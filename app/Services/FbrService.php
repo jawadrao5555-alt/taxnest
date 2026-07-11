@@ -14,6 +14,11 @@ class FbrService
     private const SANDBOX_VALIDATE_URL = 'https://gw.fbr.gov.pk/di_data/v1/di/validateinvoicedata_sb';
     private const PRODUCTION_VALIDATE_URL = 'https://gw.fbr.gov.pk/di_data/v1/di/validateinvoicedata';
 
+    // FBR IMS POS Fiscalization (SRO 1279/2021) — separate system from Digital Invoicing.
+    // FBR POS bills submit here (Bearer token, IMS invoice model), NOT to the di_data/v1 DI API.
+    private const IMS_POS_SANDBOX_URL = 'https://esp.fbr.gov.pk:8244/FBR/v1/api/Live/PostData';
+    private const IMS_POS_PRODUCTION_URL = 'https://gw.fbr.gov.pk/imsp/v1/api/Live/PostData';
+
     private function sanitizeForFbr(?string $text): string
     {
         if (empty($text)) return "";
@@ -1552,120 +1557,188 @@ class FbrService
         return 'payload_error';
     }
 
+    /**
+     * Build the FBR IMS POS Fiscalization payload (SRO 1279/2021).
+     * This is the IMS invoice model, NOT the DI di_data/v1 model.
+     */
     public function buildFbrPosPayload(\App\Models\FbrPosTransaction $transaction): array
     {
         $company = $transaction->company;
-        $env = $company->fbr_pos_environment ?? $company->fbr_environment ?? 'sandbox';
 
         $items = [];
+        $totalSaleValue = 0.0;
+        $totalTaxCharged = 0.0;
+        $totalQuantity = 0.0;
+        $index = 0;
+
         foreach ($transaction->items as $item) {
+            $index++;
             $quantity = round(floatval($item->quantity), 4);
-            $unitPrice = floatval($item->unit_price);
             $isExempt = (bool) $item->is_tax_exempt;
-            $taxRate = $isExempt ? 0 : floatval($item->tax_rate);
-            $grossLine = round($unitPrice * $quantity, 2);
-            // Prefer per-line item_discount (PKR amount). Legacy `discount` is per-unit; multiply by qty.
+            $taxRate = $isExempt ? 0.0 : floatval($item->tax_rate);
+
+            // Use the STORED fiscal snapshots — these are already correct for BOTH tax-inclusive
+            // and tax-exclusive cart modes (see FbrPosController::store). `subtotal` = net taxable
+            // value (excl tax, after this line's item discount); `tax_amount` = tax on that value.
+            // Do NOT re-derive from unit_price — that breaks tax-inclusive bills.
+            $saleValue  = round(floatval($item->subtotal), 2);
+            $taxCharged = $isExempt ? 0.00 : round(floatval($item->tax_amount), 2);
             $itemDiscount = round(floatval($item->item_discount ?? 0), 2);
-            $legacyDiscount = round(floatval($item->discount ?? 0) * $quantity, 2);
-            $discount = $itemDiscount > 0 ? $itemDiscount : $legacyDiscount;
-            if ($discount > $grossLine) { $discount = $grossLine; }
-            $valueSalesExcludingST = round($grossLine - $discount, 2);
-            $salesTaxApplicable = $isExempt ? 0.00 : round(($valueSalesExcludingST * $taxRate) / 100, 2);
-            $totalValues = round($valueSalesExcludingST + $salesTaxApplicable, 2);
-
-            $rateValue = $isExempt ? '0%' : (($taxRate == intval($taxRate)) ? intval($taxRate) . '%' : round($taxRate, 2) . '%');
-
-            $hsCode = $item->hs_code ?? '';
-            $uomCode = $item->uom ?? $this->getUomByHsCode($hsCode, 'U');
-
-            if ($isExempt) {
-                $saleType = ($env === 'production') ? 'Exempt goods' : 'Exempt';
-            } else {
-                $saleType = 'Goods at standard rate (default)';
-            }
+            $totalAmount = round($saleValue + $taxCharged, 2); // = stored `total`
 
             $items[] = [
-                'uoM' => $uomCode,
-                'rate' => $rateValue,
-                'hsCode' => $hsCode,
-                'discount' => (float) $discount,
-                'extraTax' => 0.00,
-                'quantity' => (float) round($quantity, 4),
-                'saleType' => $saleType,
-                'fedPayable' => 0.00,
-                'furtherTax' => 0.00,
-                'totalValues' => (float) $totalValues,
-                'productDescription' => $this->sanitizeForFbr($item->item_name),
-                'salesTaxApplicable' => (float) $salesTaxApplicable,
-                'valueSalesExcludingST' => (float) $valueSalesExcludingST,
-                'salesTaxWithheldAtSource' => 0.00,
-                'fixedNotifiedValueOrRetailPrice' => (float) round($unitPrice, 2),
+                'ItemCode'    => (string) ($item->product_id ?: ('IT-' . $index)),
+                'ItemName'    => $this->sanitizeForFbr($item->item_name),
+                'Quantity'    => (float) $quantity,
+                'PCTCode'     => $this->sanitizePctCode($item->hs_code ?? ''),
+                'TaxRate'     => (float) $taxRate,
+                'SaleValue'   => (float) $saleValue,
+                'TotalAmount' => (float) $totalAmount,
+                'TaxCharged'  => (float) $taxCharged,
+                'Discount'    => (float) $itemDiscount,
+                'FurtherTax'  => 0.00,
+                'InvoiceType' => 1,
+                'RefUSIN'     => null,
+            ];
+
+            $totalSaleValue  += $saleValue;
+            $totalTaxCharged += $taxCharged;
+            $totalQuantity   += $quantity;
+        }
+
+        $totalSaleValue  = round($totalSaleValue, 2);
+        $totalTaxCharged = round($totalTaxCharged, 2);
+        $totalQuantity   = round($totalQuantity, 4);
+
+        // Bill-level discount (manual + promotion) is applied POST-tax in store() and stored on the
+        // transaction. Item SaleValues are already net of their own item discounts, so the header
+        // Discount carries ONLY this bill-level amount (avoids double-subtraction). FBR IMS header rule:
+        // TotalBillAmount = TotalSaleValue + TotalTaxCharged - Discount.
+        $billDiscount = round(floatval($transaction->discount_amount ?? 0), 2);
+
+        // Fiscal goods total = net sale + tax - bill discount. This equals exactly what the customer
+        // pays for goods. The app-only Rs 1 FBR service fee and loyalty redemption are deliberately
+        // EXCLUDED — they are not part of the fiscal goods total.
+        $totalBillAmount = round($totalSaleValue + $totalTaxCharged - $billDiscount, 2);
+
+        // Buyer identifier: 13 digits => CNIC, otherwise NTN. Both optional (walk-in = blank).
+        $custDigits = preg_replace('/[^0-9]/', '', $transaction->customer_ntn ?? '');
+        $buyerNtn = '';
+        $buyerCnic = '';
+        if (strlen($custDigits) === 13) {
+            $buyerCnic = $custDigits;
+        } elseif (strlen($custDigits) >= 7) {
+            $buyerNtn = $custDigits;
+        }
+
+        return [
+            'InvoiceNumber'    => '',
+            'POSID'            => (int) preg_replace('/[^0-9]/', '', (string) ($company->fbr_pos_id ?? '')),
+            'USIN'             => (string) $transaction->invoice_number,
+            'DateTime'         => $transaction->created_at->format('Y-m-d H:i:s'),
+            'BuyerNTN'         => $buyerNtn,
+            'BuyerCNIC'        => $buyerCnic,
+            'BuyerName'        => $this->sanitizeForFbr($transaction->customer_name ?? ''),
+            'BuyerPhoneNumber' => $transaction->customer_phone ?? '',
+            'TotalSaleValue'   => (float) $totalSaleValue,
+            'TotalTaxCharged'  => (float) $totalTaxCharged,
+            'TotalQuantity'    => (float) $totalQuantity,
+            'Discount'         => (float) $billDiscount,
+            'FurtherTax'       => 0.00,
+            'TotalBillAmount'  => (float) $totalBillAmount,
+            'PaymentMode'      => $this->mapPaymentModeToImsInt($transaction->payment_method),
+            'RefUSIN'          => null,
+            'InvoiceType'      => 1,
+            'Items'            => $items,
+        ];
+    }
+
+    /** Strip non-digits from an HS code and cap at 8 for the IMS PCTCode field. */
+    private function sanitizePctCode(?string $hsCode): string
+    {
+        $digits = preg_replace('/[^0-9]/', '', $hsCode ?? '');
+        return substr($digits, 0, 8);
+    }
+
+    /** Map a stored payment_method string to the FBR IMS PaymentMode integer. */
+    private function mapPaymentModeToImsInt(?string $method): int
+    {
+        // IMS PaymentMode: 1=Cash, 2=Card, 3=Gift Voucher, 4=Loyalty Card, 5=Mixed, 6=Cheque.
+        switch (strtolower(trim($method ?? 'cash'))) {
+            case 'cash':          return 1;
+            case 'card':          return 2;
+            case 'bank_transfer': // electronic → Card (closest IMS slot)
+            case 'online':        return 2;
+            case 'cheque':
+            case 'check':         return 6;
+            case 'mixed':         return 5;
+            default:
+                Log::warning("FBR IMS POS: unmapped payment_method '{$method}', defaulting to Cash (1).");
+                return 1;
+        }
+    }
+
+    /**
+     * Parse an FBR IMS POS response. Success = Code "100" with an invoice number
+     * in InvoiceNumber or FBRInvoiceNumber; otherwise collect Response/Errors.
+     */
+    private function parseFbrPosImsResponse(array $responseData): array
+    {
+        $code = (string) ($responseData['Code'] ?? $responseData['code'] ?? '');
+        $invoiceNumber = $responseData['InvoiceNumber']
+            ?? $responseData['FBRInvoiceNumber']
+            ?? $responseData['invoiceNumber']
+            ?? null;
+
+        if ($code === '100' && !empty($invoiceNumber)) {
+            return [
+                'valid' => true,
+                'invoiceNumber' => (string) $invoiceNumber,
+                'errors' => [],
             ];
         }
 
-        $regNo = $company->fbr_registration_no ?: ($company->ntn ?? '');
-        $cleanRegNo = preg_replace('/[^0-9]/', '', $regNo);
-        $sellerNtn = strlen($cleanRegNo) === 13 ? $cleanRegNo : (strlen($cleanRegNo) >= 7 ? substr($cleanRegNo, 0, 7) : str_pad($cleanRegNo, 7, '0', STR_PAD_LEFT));
-        $invoiceRefNo = $sellerNtn . 'FPOS' . preg_replace('/[^A-Za-z0-9]/', '', $transaction->invoice_number);
-
-        $payload = [
-            'items' => $items,
-            'invoiceDate' => $transaction->created_at->toDateString(),
-            'invoiceType' => 'Sale Invoice',
-            'documentTypeId' => 1,
-            'buyerAddress' => $this->sanitizeForFbr($transaction->customer_name ? 'CUSTOMER ADDRESS' : 'WALK-IN CUSTOMER'),
-            'invoiceRefNo' => $invoiceRefNo,
-            'buyerProvince' => $this->normalizeProvince($company->province ?? 'Punjab'),
-            'sellerAddress' => $this->sanitizeForFbr($company->address ?? ''),
-            'sellerNTNCNIC' => $this->formatNtnCnic($regNo),
-            'sellerProvince' => $this->normalizeProvince($company->province ?? 'Punjab'),
-            'buyerBusinessName' => $this->sanitizeForFbr($transaction->customer_name ?: 'WALK-IN CUSTOMER'),
-            'sellerBusinessName' => $this->sanitizeForFbr($company->fbr_business_name ?: ($company->name ?? '')),
-            'buyerRegistrationType' => $this->determineBuyerRegistrationType($transaction->customer_ntn),
-            'buyerNTNCNIC' => $this->formatNtnCnic($transaction->customer_ntn ?? ''),
-        ];
-
-        if ($env === 'sandbox') {
-            $payload['scenarioId'] = $this->detectScenarioIdForFbrPos($transaction, $payload);
+        $errors = [];
+        $msg = $responseData['Response'] ?? $responseData['response'] ?? null;
+        if (!empty($msg)) {
+            $errors[] = $code !== '' ? "[{$code}] {$msg}" : (string) $msg;
+        }
+        $errObj = $responseData['Errors'] ?? $responseData['errors'] ?? null;
+        if (!empty($errObj)) {
+            if (is_array($errObj)) {
+                foreach ($errObj as $e) {
+                    $errors[] = is_array($e) ? json_encode($e) : (string) $e;
+                }
+            } else {
+                $errors[] = (string) $errObj;
+            }
+        }
+        if (empty($errors)) {
+            $errors[] = 'FBR IMS rejected the invoice (Code: ' . ($code ?: 'unknown') . '). ' . json_encode($responseData);
         }
 
-        return $payload;
+        return [
+            'valid' => false,
+            'invoiceNumber' => null,
+            'errors' => $errors,
+        ];
     }
 
     private function getFbrPosToken($company): string
     {
-        $env = $company->fbr_pos_environment ?? $company->fbr_environment ?? 'sandbox';
-
-        if (!empty($company->fbr_pos_token)) {
-            try {
-                return Crypt::decryptString($company->fbr_pos_token);
-            } catch (\Exception $e) {
-                Log::error("FBR POS token decrypt FAILED — APP_KEY mismatch. Falling back to env tokens.", [
-                    'company_id' => $company->id ?? null,
-                    'env' => $env,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-
-        $encryptedToken = '';
-        if ($env === 'production') {
-            $encryptedToken = $company->fbr_production_token ?? '';
-        } else {
-            $encryptedToken = $company->fbr_sandbox_token ?? '';
-        }
-
-        if (empty($encryptedToken)) {
-            Log::warning("FBR POS: No token found for company #{$company->id} in {$env} environment");
+        // FBR IMS POS uses its OWN dedicated token. There is NO fallback to DI tokens:
+        // a DI token is not authorized on the IMS endpoint and would reproduce the
+        // "900908 Resource forbidden" failure with a confusing, misleading error.
+        if (empty($company->fbr_pos_token)) {
+            Log::warning("FBR IMS POS: No dedicated POS token configured for company #{$company->id}");
             return '';
         }
 
         try {
-            return Crypt::decryptString($encryptedToken);
+            return Crypt::decryptString($company->fbr_pos_token);
         } catch (\Exception $e) {
-            Log::error("FBR POS env-token decrypt FAILED — APP_KEY mismatch. Refusing to send raw blob to FBR.", [
+            Log::error("FBR IMS POS token decrypt FAILED — APP_KEY mismatch. Refusing to send raw blob to FBR.", [
                 'company_id' => $company->id ?? null,
-                'env' => $env,
                 'error' => $e->getMessage(),
             ]);
             return '';
@@ -1674,11 +1747,10 @@ class FbrService
 
     private function getFbrPosUrl($company): string
     {
+        // FBR IMS POS Fiscalization endpoints (NOT the DI di_data/v1 API, and NOT the
+        // DI-only fbr_production_url/fbr_sandbox_url company overrides).
         $env = $company->fbr_pos_environment ?? $company->fbr_environment ?? 'sandbox';
-        if ($env === 'production') {
-            return $company->fbr_production_url ?: self::PRODUCTION_POST_URL;
-        }
-        return $company->fbr_sandbox_url ?: self::SANDBOX_POST_URL;
+        return $env === 'production' ? self::IMS_POS_PRODUCTION_URL : self::IMS_POS_SANDBOX_URL;
     }
 
     public function submitFbrPosTransaction(\App\Models\FbrPosTransaction $transaction): array
@@ -1710,14 +1782,53 @@ class FbrService
 
         $payload = $this->buildFbrPosPayload($transaction);
 
+        // IMS mandatory-field guards — fail with a clear message instead of an opaque FBR rejection.
+        if (empty($payload['POSID'])) {
+            $clearHashOnFailure();
+            \App\Models\FbrPosLog::create([
+                'company_id' => $company->id,
+                'transaction_id' => $transaction->id,
+                'request_payload' => $payload,
+                'status' => 'failed',
+                'error_message' => 'FBR POS Registration ID (POSID) not configured. Set it in FBR Settings.',
+            ]);
+            $transaction->update(['fbr_status' => 'failed']);
+            return [
+                'status' => 'failed',
+                'errors' => ['FBR POS Registration ID not set. Add it in FBR Settings before submitting.'],
+            ];
+        }
+
+        $missingPct = [];
+        foreach ($payload['Items'] as $imsItem) {
+            if (($imsItem['PCTCode'] ?? '') === '') {
+                $missingPct[] = $imsItem['ItemName'] ?: $imsItem['ItemCode'];
+            }
+        }
+        if (!empty($missingPct)) {
+            $clearHashOnFailure();
+            $pctMsg = 'Missing PCT/HS code for: ' . implode(', ', $missingPct) . '. Add HS codes to these items and retry.';
+            \App\Models\FbrPosLog::create([
+                'company_id' => $company->id,
+                'transaction_id' => $transaction->id,
+                'request_payload' => $payload,
+                'status' => 'failed',
+                'error_message' => $pctMsg,
+            ]);
+            $transaction->update(['fbr_status' => 'failed']);
+            return [
+                'status' => 'failed',
+                'errors' => [$pctMsg],
+            ];
+        }
+
         $posEnv = $company->fbr_pos_environment ?? $company->fbr_environment ?? 'sandbox';
         $token = $this->getFbrPosToken($company);
         $url = $this->getFbrPosUrl($company);
-        $tokenSource = !empty($company->fbr_pos_token) ? 'dedicated_pos_token' : "di_{$posEnv}_token";
+        $tokenSource = !empty($company->fbr_pos_token) ? 'dedicated_ims_pos_token' : 'none';
 
-        Log::info("FBR POS Auth: Company #{$company->id}", [
+        Log::info("FBR IMS POS Auth: Company #{$company->id}", [
             'pos_environment' => $posEnv,
-            'di_environment' => $company->fbr_environment,
             'token_source' => $tokenSource,
             'token_present' => !empty($token),
             'token_preview' => !empty($token) ? substr($token, 0, 8) . '...' . substr($token, -4) : 'NONE',
@@ -1824,23 +1935,23 @@ class FbrService
                 ];
             }
 
-            $fbrResult = $this->parseFbrResponse($responseData);
+            $fbrResult = $this->parseFbrPosImsResponse($responseData);
 
             if ($fbrResult['valid']) {
                 $fbrInvoiceNumber = $fbrResult['invoiceNumber'];
                 $transaction->update([
                     'fbr_invoice_number' => $fbrInvoiceNumber,
                     'fbr_status' => 'submitted',
-                    'fbr_response_code' => '00',
+                    'fbr_response_code' => '100',
                     'fbr_response' => $responseData,
                 ]);
                 $log->update([
                     'status' => 'success',
                     'response_payload' => $responseData,
-                    'response_code' => '00',
+                    'response_code' => '100',
                 ]);
 
-                Log::info("FBR POS Transaction #{$transaction->id} submitted successfully", [
+                Log::info("FBR IMS POS Transaction #{$transaction->id} submitted successfully", [
                     'fbr_invoice_number' => $fbrInvoiceNumber,
                     'response_time_ms' => $responseTimeMs,
                 ]);
@@ -1856,7 +1967,7 @@ class FbrService
             $log->update([
                 'status' => 'failed',
                 'response_payload' => $responseData,
-                'response_code' => $responseData['validationResponse']['statusCode'] ?? 'unknown',
+                'response_code' => (string) ($responseData['Code'] ?? 'unknown'),
                 'error_message' => implode('; ', $fbrResult['errors']),
             ]);
             $transaction->update([

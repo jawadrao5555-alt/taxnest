@@ -49,10 +49,15 @@ class SyncFbrPosOfflineInvoicesJob implements ShouldQueue
         foreach ($transactions as $transaction) {
             $company = $transaction->company;
 
-            // Skip if company missing, FBR reporting disabled, or no token
+            // Skip if company missing, FBR reporting disabled, or no dedicated IMS POS token.
+            // FBR IMS POS submits ONLY with fbr_pos_token (no DI-token fallback), so a company
+            // without it can never succeed — skip to avoid indefinite retry/log churn every tick.
             if (!$company) continue;
             if (isset($company->fbr_reporting_enabled) && !$company->fbr_reporting_enabled) continue;
-            if (empty($company->fbr_bearer_token) && empty($company->fbr_pos_token) && empty($company->fbr_token)) continue;
+            if (empty($company->fbr_pos_token)) continue;
+            // No POS Registration ID => the pre-submit POSID guard will fail every attempt.
+            // Skip here too, else each tick regenerates a guard-failure log row per bill.
+            if (empty($company->fbr_pos_id)) continue;
 
             // Re-check inside loop — concurrent retry may have completed it
             if ($transaction->fbr_invoice_number) continue;

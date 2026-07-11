@@ -23,31 +23,24 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">FBR POS Registration ID</label>
-                        <input type="text" name="fbr_pos_id" value="{{ $company->fbr_pos_id }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="FBR-assigned POS ID">
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">FBR POS Registration ID <span class="text-red-500">*</span></label>
+                        <input type="text" name="fbr_pos_id" value="{{ $company->fbr_pos_id }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="e.g. 196339">
+                        <p class="text-xs text-gray-400 mt-1">Your FBR-assigned POS Registration Number (POSID). Required for IMS submission.</p>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">FBR POS Token</label>
-                        <input type="text" name="fbr_pos_token" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="{{ $maskedPosToken ?: 'Enter FBR POS API token' }}">
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">FBR POS Token <span class="text-red-500">*</span></label>
+                        <input type="text" name="fbr_pos_token" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="{{ $maskedPosToken ?: 'Enter FBR IMS POS API token' }}">
                         @if($maskedPosToken)
                         <p class="text-xs text-gray-400 mt-1">Current: {{ $maskedPosToken }} — leave empty to keep existing token</p>
                         @else
-                        <p class="text-xs text-gray-400 mt-1">Token provided by FBR for POS integration</p>
+                        <p class="text-xs text-gray-400 mt-1">Dedicated FBR IMS POS token — this is separate from your Digital Invoicing token.</p>
                         @endif
                     </div>
-                    @if(!$maskedPosToken && ($hasSandboxFallback || $hasProductionFallback))
-                    <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                        <p class="text-xs text-amber-700 dark:text-amber-400">
-                            <strong>Note:</strong> No dedicated POS token set. FBR POS will fall back to your DI {{ $company->fbr_pos_environment ?? 'sandbox' }} token.
-                            Set a dedicated POS token above for proper isolation.
-                        </p>
-                    </div>
-                    @endif
                     <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
                         <p class="text-xs text-blue-700 dark:text-blue-400">
-                            <strong>FBR API Endpoints:</strong><br>
-                            Sandbox: https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata_sb<br>
-                            Production: https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata
+                            <strong>FBR IMS POS Endpoints (SRO 1279/2021):</strong><br>
+                            Sandbox: https://esp.fbr.gov.pk:8244/FBR/v1/api/Live/PostData<br>
+                            Production: https://gw.fbr.gov.pk/imsp/v1/api/Live/PostData
                         </p>
                     </div>
                     <div class="flex items-center gap-3">
@@ -170,13 +163,13 @@
                     </div>
                     <div class="flex justify-between">
                         <span class="text-gray-500">POS Token</span>
-                        <span class="{{ $maskedPosToken ? 'text-blue-600 font-semibold' : ($hasSandboxFallback || $hasProductionFallback ? 'text-amber-500' : 'text-red-500') }}">
-                            {{ $maskedPosToken ? 'Configured' : ($hasSandboxFallback || $hasProductionFallback ? 'Using DI Token' : 'Not Set') }}
+                        <span class="{{ $maskedPosToken ? 'text-blue-600 font-semibold' : 'text-red-500' }}">
+                            {{ $maskedPosToken ? 'Configured' : 'Not Set' }}
                         </span>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-gray-500">Connection</span>
-                        <span class="text-blue-600 font-semibold">Direct (FBR Gateway)</span>
+                        <span class="text-blue-600 font-semibold">IMS POS (Direct)</span>
                     </div>
                 </div>
             </div>

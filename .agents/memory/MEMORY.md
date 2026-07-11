@@ -46,3 +46,4 @@
 - [Shared marketing footer & panel login](shared-marketing-footer-panel-login.md) — one shared site-footer across all landings; login link must be panel-aware (POS/FBR pass own login-url) or POS/FBR visitors hit "Invalid credentials"; public contact info = admin-editable SystemSetting keys.
 - [Laravel 419 renderable gotcha](laravel-419-renderable-gotcha.md) — TokenMismatchException is converted to HttpException(419) BEFORE render callbacks; type-hint HttpException + gate status 419, not TokenMismatchException.
 - [Encrypted columns need TEXT](encrypted-columns-need-text.md) — Crypt::encryptString overflows varchar(255) even for tiny plaintext; every encrypted column must be TEXT.
+- [FBR 900908 = token/env, not a bug](fbr-900908-token-env.md) — "Resource forbidden /di_data/v1" = FBR rejected the token's authorization; env↔token mismatch or NTN not prod-enabled; FBR POS uses DI endpoint + falls back to DI token.

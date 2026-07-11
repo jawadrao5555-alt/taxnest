@@ -116,3 +116,15 @@ Separate DI system: pdi/DigitalInvoicing uses a `bposid` model, DIFFERENT from I
   DI sandbox esp.fbr.gov.pk:8244/DigitalInvoicing/v1/PostInvoiceData_v1 authenticates with FBR's DI sandbox
   token (HTTP 200 + field-validation). The v1.1 doc's prod path gw.fbr.gov.pk/pdi/v1/api/DigitalInvoicing/...
   returns 404 (stale). Never conflate IMS with DI.
+
+## UPDATE (proven LIVE, Jul 2026): activated token authenticates, then cloud IMS = Code 112 -> local fiscal device
+- Corrects the earlier "grid token = Access Code, not a cloud token" theory. The earlier 900901 was simply an
+  INACTIVE / wrong token. Once FBR issues a PROPERLY-ACTIVATED POS token, it authenticates cleanly at
+  gw.fbr.gov.pk/imsp/v1 (HTTP 200, no 900901).
+- BUT cloud bulk PostData then returns `Code 112 "Bulk data upload functionality is no more available"` --
+  IDENTICAL to PRA. FBR has RETIRED cloud bulk upload for POS. A valid token does NOT change this.
+- => FBR POS (exactly like PRA) MUST submit via the LOCAL fiscal component: install FBRIMS.zip on the shop PC
+  -> http://localhost:8524/api/IMSFiscal/GetInvoiceNumberByModel (single-object payload) -> our Desktop Sync
+  Agent (fiscal_device mode). Direct server->cloud submission is a dead end for POS (Code 112).
+- Operative blocker ladder is now: 900901 (token not activated/wrong) -> [activate token] -> Code 112 (bulk
+  cloud retired) -> [use local fiscal device]. Do not chase cloud PostData after Code 112.

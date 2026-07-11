@@ -41,6 +41,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // silently no-op.
         $middleware->web(append: [
             \App\Http\Middleware\ReadOnlyImpersonation::class,
+            \App\Http\Middleware\LogImpersonatedWrites::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

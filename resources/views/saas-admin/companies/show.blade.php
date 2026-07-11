@@ -15,9 +15,18 @@
             @if(($company->company_status ?? null) === 'active')
             <form method="POST" action="{{ route('saas.admin.companies.impersonate', $company->id) }}" onsubmit="return confirm('Open this company in VIEW-ONLY mode? You will see their panel exactly as they do, but cannot make any changes.');">
                 @csrf
+                <input type="hidden" name="mode" value="view">
                 <button type="submit" class="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/40 text-amber-400 text-xs font-medium rounded-lg transition border border-amber-700">
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                     View as Company
+                </button>
+            </form>
+            <form method="POST" action="{{ route('saas.admin.companies.impersonate', $company->id) }}" onsubmit="return confirm('FULL ACCESS: you will act AS this company and any change you make (invoices, settings, and live FBR/PRA submissions) is REAL. Continue?');">
+                @csrf
+                <input type="hidden" name="mode" value="full">
+                <button type="submit" class="flex items-center gap-1.5 px-3 py-1.5 bg-red-600/20 hover:bg-red-600/40 text-red-400 text-xs font-medium rounded-lg transition border border-red-700">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                    Manage as Company
                 </button>
             </form>
             @endif

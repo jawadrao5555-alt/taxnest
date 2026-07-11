@@ -725,9 +725,10 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/companies/{id}/delete', [AdminCompanyController::class, 'softDelete'])->name('saas.admin.companies.delete');
     Route::post('/companies/{id}/change-type', [AdminCompanyController::class, 'changeProductType'])->name('saas.admin.companies.changeType');
 
-    // ── View as Company (VIEW-ONLY impersonation) ──
+    // ── View / Manage as Company (impersonation: view-only + full-access) ──
     Route::post('/companies/{id}/impersonate', [AdminCompanyController::class, 'impersonate'])->name('saas.admin.companies.impersonate');
     Route::post('/impersonation/stop', [AdminCompanyController::class, 'stopImpersonation'])->name('saas.admin.impersonation.stop');
+    Route::post('/impersonation/lock', [AdminCompanyController::class, 'lockImpersonation'])->name('saas.admin.impersonation.lock');
 
     // Archive Viewer (Local Bills Archive Portal) — super-admin only.
     Route::post('/companies/{id}/archive-viewer', [AdminCompanyController::class, 'storeArchiveViewer'])->name('saas.admin.companies.archive-viewer.store');

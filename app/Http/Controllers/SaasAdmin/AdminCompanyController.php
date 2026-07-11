@@ -307,18 +307,31 @@ class AdminCompanyController extends Controller
         // admin login and the freshly-added panel login migrate to the new id).
         $request->session()->regenerate();
 
+        // Access mode: 'full' lets the admin make REAL changes as the company;
+        // anything else (missing / tampered) falls back to safe read-only 'view'.
+        $mode = $request->input('mode') === 'full' ? 'full' : 'view';
+        $readonly = $mode !== 'full';
+
         $request->session()->put('impersonation', [
             'admin_id' => auth('admin')->id(),
             'company_id' => $company->id,
             'company_name' => $company->name,
             'guard' => $guard,
-            'readonly' => true,
+            'mode' => $mode,
+            'readonly' => $readonly,
         ]);
 
-        AdminAuditLog::log(auth('admin')->id(), 'Started view-as (read-only)', 'Company', $company->id, [
-            'company' => $company->name,
-            'guard' => $guard,
-        ]);
+        AdminAuditLog::log(
+            auth('admin')->id(),
+            $readonly ? 'Started view-as (read-only)' : 'Started manage-as (FULL ACCESS)',
+            'Company',
+            $company->id,
+            [
+                'company' => $company->name,
+                'guard' => $guard,
+                'mode' => $mode,
+            ]
+        );
 
         $dashboard = match ($guard) {
             'pos' => '/pos/dashboard',
@@ -352,7 +365,33 @@ class AdminCompanyController extends Controller
         $companyId = $imp['company_id'] ?? null;
 
         return redirect($companyId ? route('saas.admin.companies.show', $companyId) : route('saas.admin.companies'))
-            ->with('success', 'View-only session ended.');
+            ->with('success', 'Impersonation session ended.');
+    }
+
+    /**
+     * Downgrade an active FULL-ACCESS impersonation to safe view-only WITHOUT
+     * leaving the company panel. This only ever tightens access (never upgrades),
+     * so it is always safe to expose from the in-panel banner.
+     */
+    public function lockImpersonation(Request $request)
+    {
+        $imp = $request->session()->get('impersonation');
+
+        if (is_array($imp)) {
+            $imp['mode'] = 'view';
+            $imp['readonly'] = true;
+            $request->session()->put('impersonation', $imp);
+
+            AdminAuditLog::log(
+                $imp['admin_id'] ?? auth('admin')->id(),
+                'Locked view-as to read-only',
+                'Company',
+                $imp['company_id'] ?? null,
+                ['company' => $imp['company_name'] ?? null]
+            );
+        }
+
+        return redirect()->back()->with('success', 'Switched to view-only mode.');
     }
 
     /**

@@ -34,10 +34,12 @@ DI token is not authorized on IMS. Owner wants FBR POS to be pure IMS.
   goods payable and EXCLUDES the app-only Rs 1 FBR service fee and loyalty redemption.
 - **Success = Code `"100"`** (+ InvoiceNumber/FBRInvoiceNumber in the response). Store
   `fbr_response_code='100'`. Reuse `sendDirectToFbr` (Bearer + application/json) unchanged.
-- **Pre-submit guards** in `submitFbrPosTransaction`: fail cleanly if POSID empty (no `fbr_pos_id`)
-  or any item PCTCode empty (missing `hs_code`) — clear hash + failed log + `fbr_status='failed'` +
-  return `{status:failed,errors}`. Return shape stays `{status, errors, fbr_invoice_number, fbr_response}`
-  (6 consumers rely on it).
+- **Pre-submit guard** in `submitFbrPosTransaction`: fail cleanly ONLY if POSID empty (no
+  `fbr_pos_id`) — clear hash + failed log + `fbr_status='failed'` + return `{status:failed,errors}`.
+  Return shape stays `{status, errors, fbr_invoice_number, fbr_response}` (6 consumers rely on it).
+- **HS code / PCTCode is OPTIONAL for FBR IMS POS** — unlike DI where hsCode is mandatory. Retail POS
+  items often have no HS code, so send PCTCode when present and blank otherwise; NEVER block the bill
+  on a missing HS code. (Owner confirmed Jul 2026 — an earlier PCTCode-required guard was removed.)
 - **Anti-churn:** `SyncFbrPosOfflineInvoicesJob` must skip companies missing `fbr_pos_token` OR
   `fbr_pos_id`, else guard-failed bills get re-picked every tick → a fresh `FbrPosLog` row per bill
   per 2-min tick.

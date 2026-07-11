@@ -1799,28 +1799,9 @@ class FbrService
             ];
         }
 
-        $missingPct = [];
-        foreach ($payload['Items'] as $imsItem) {
-            if (($imsItem['PCTCode'] ?? '') === '') {
-                $missingPct[] = $imsItem['ItemName'] ?: $imsItem['ItemCode'];
-            }
-        }
-        if (!empty($missingPct)) {
-            $clearHashOnFailure();
-            $pctMsg = 'Missing PCT/HS code for: ' . implode(', ', $missingPct) . '. Add HS codes to these items and retry.';
-            \App\Models\FbrPosLog::create([
-                'company_id' => $company->id,
-                'transaction_id' => $transaction->id,
-                'request_payload' => $payload,
-                'status' => 'failed',
-                'error_message' => $pctMsg,
-            ]);
-            $transaction->update(['fbr_status' => 'failed']);
-            return [
-                'status' => 'failed',
-                'errors' => [$pctMsg],
-            ];
-        }
+        // NOTE: PCTCode (HS code) is OPTIONAL for FBR IMS POS Fiscalization (SRO 1279/2021),
+        // unlike Digital Invoicing where hsCode is mandatory. Retail POS items often have no
+        // HS code, so we send PCTCode when available and blank otherwise — never block the bill.
 
         $posEnv = $company->fbr_pos_environment ?? $company->fbr_environment ?? 'sandbox';
         $token = $this->getFbrPosToken($company);

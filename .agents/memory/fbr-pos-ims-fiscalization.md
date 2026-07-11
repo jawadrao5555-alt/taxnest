@@ -47,6 +47,14 @@ DI token is not authorized on IMS. Owner wants FBR POS to be pure IMS.
 **Items table gotcha:** the relation `$transaction->items()` maps to `fbr_pos_transaction_items`
 (NOT `fbr_pos_items`, which does not exist).
 
+**Auth errors on `/imsp/v1`:** `900901 Invalid Credentials` = the token itself is invalid/empty/
+malformed to the FBR gateway (distinct from `900908 Resource forbidden` = valid token, not authorized
+for that API). Since the empty-token guard already fires before send, a 900901 means a NON-empty token
+was sent and rejected → causes: wrong/expired/mistyped token, sandbox token on the production URL (or
+vice-versa — env must match the token), copy-paste whitespace/newline in the token (now defended by
+`trim()` on both save and read), or the NTN not yet enrolled for IMS POS on the FBR portal. Token
+column is TEXT (not truncated). This is a CONFIG issue, not a code bug — the endpoint/path is correct.
+
 **Sandbox-verify (spec ambiguity, not bugs):** whether FBR expects header `Discount` = ALL discounts
 (item+bill) vs bill-only, and whether item `TotalAmount` = SaleValue+Tax vs SaleValue+Tax−Discount.
 Current code is internally consistent (SaleValue already net; item Discount informational). Settle by

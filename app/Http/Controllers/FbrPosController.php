@@ -1420,7 +1420,7 @@ class FbrPosController extends Controller
             $request->validate([
                 'fbr_pos_environment' => 'required|in:sandbox,production',
                 'fbr_pos_id' => 'nullable|string|max:100',
-                'fbr_pos_token' => 'nullable|string|max:255',
+                'fbr_pos_token' => 'nullable|string|max:2000',
             ]);
 
             $updateData = [
@@ -1432,7 +1432,7 @@ class FbrPosController extends Controller
             }
 
             if ($request->filled('fbr_pos_token')) {
-                $updateData['fbr_pos_token'] = Crypt::encryptString($request->fbr_pos_token);
+                $updateData['fbr_pos_token'] = Crypt::encryptString(trim($request->fbr_pos_token));
             }
 
             $company->update($updateData);

@@ -1735,7 +1735,9 @@ class FbrService
         }
 
         try {
-            return Crypt::decryptString($company->fbr_pos_token);
+            // trim() defends against copy-paste whitespace/newlines in the pasted token,
+            // which would make the Bearer header malformed → FBR "900901 Invalid Credentials".
+            return trim(Crypt::decryptString($company->fbr_pos_token));
         } catch (\Exception $e) {
             Log::error("FBR IMS POS token decrypt FAILED — APP_KEY mismatch. Refusing to send raw blob to FBR.", [
                 'company_id' => $company->id ?? null,

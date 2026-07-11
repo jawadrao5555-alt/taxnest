@@ -94,3 +94,25 @@ accurately instead of only checking HTTP 401.
 (item+bill) vs bill-only, and whether item `TotalAmount` = SaleValue+Tax vs SaleValue+Tax−Discount.
 Current code is internally consistent (SaleValue already net; item Discount informational). Settle by
 sending one sandbox bill that has BOTH an item discount and a bill discount.
+
+## Consolidated (proven Jul 2026): IRIS POS-registration "Token" = ACCESS CODE, not a cloud Bearer
+Evidence across X-WAY SHOES (POSID 196339):
+- Registration-grid token (UUID) -> 900901 on BOTH imsp/v1 and FBR/v1 => it is NOT a WSO2 gateway access
+  token. It is the **Access Code** for INSTALLING the local FBR Software Fiscal Component
+  (download.fbr.gov.pk/IMS_Setup/FBRIMS.zip -> localhost:8524/api/IMSFiscal/GetInvoiceNumberByModel;
+  Test/Production chosen at install). NEVER usable as `Authorization: Bearer` on the cloud.
+- A real WSO2 access token behaves differently: DI token -> 900908 (valid, not IMS-subscribed);
+  FBR's doc IMS sandbox token -> HTTP 200 `Code 104 "not authorized"` (passed gateway, reached IMS app,
+  not authorized for that POSID). HTTP 200 + Code 104/100 PROVES imsp/v1 endpoint + our IMS payload are
+  correct; only the token identity/authorization varies.
+- Cloud IMS response ladder: 900901 = not a gateway token | 900908 = gateway token not subscribed to imsp/v1
+  | Code 104 = subscribed token not authorized for this POSID | Code 100 = success.
+Two REAL integration modes for an FBR Tier-1 POS:
+  A. LOCAL fiscal component — install FBRIMS.zip on the shop PC with POS Reg No + the grid Access Code,
+     Production; Desktop Sync Agent posts to localhost:8524. (= our fiscal_device mode)
+  B. CLOUD — needs a proper WSO2 access token subscribed to imsp/v1 AND authorized for the POSID, issued
+     from FBR's API/token portal (NOT the grid token). Then the existing cloud code works.
+Separate DI system: pdi/DigitalInvoicing uses a `bposid` model, DIFFERENT from IMS (POSID/USIN/Items).
+  DI sandbox esp.fbr.gov.pk:8244/DigitalInvoicing/v1/PostInvoiceData_v1 authenticates with FBR's DI sandbox
+  token (HTTP 200 + field-validation). The v1.1 doc's prod path gw.fbr.gov.pk/pdi/v1/api/DigitalInvoicing/...
+  returns 404 (stale). Never conflate IMS with DI.

@@ -68,7 +68,22 @@ throwaway `{}` (or minimal body) with the SAME token to BOTH gateways and compar
 - `900908` on BOTH endpoints ⇒ token valid but NTN not production-enrolled for either service.
 - `900901` on both ⇒ token itself invalid/expired/sandbox-on-prod.
 A real prod submission for X-WAY SHOES (POSID 196339) with the owner-supplied production token confirmed the first
-case: 900908 on IMS, 200-with-DI-validation on DI ⇒ it is a DI token, hence every FBR POS bill fails. The settings token
+case: 900908 on IMS, 200-with-DI-validation on DI ⇒ it is a DI token, hence every FBR POS bill fails.
+
+**TWO different FBR credentials people confuse (proven, high-value):**
+1. The **POS Registration token** shown in the IRIS *"Point of Sale Registration"* grid (POS-ID row, "Token"
+   column, UUID form). This is **NOT** an OAuth Bearer/access token. Putting it in `Authorization: Bearer`
+   yields `900901 Invalid Credentials` on **BOTH** sandbox (`FBR/v1`) and production (`imsp/v1`). It only
+   identifies the POS; the POSID already carries that identity in the payload — the registration token is never
+   the auth header.
+2. The **API Access Token** — the SAME kind/source as the Digital Invoicing token (generated in FBR's API/PRAL
+   token area). THIS is the Bearer token: it actually authenticates (proven — it returns `900908`, not `900901`),
+   and its WSO2 application must be **subscribed to the `imsp/v1` POS API** to stop returning 900908.
+So the correct FBR POS setup = the **API access token** (not the registration-grid token) whose application is
+subscribed to the POS/IMS service. If someone pastes the registration-grid token → 900901 everywhere; if they
+paste a DI-only API token → 900908 on IMS. Both are FBR-portal config, not a TaxNest bug. Verify a token's
+identity by fingerprint (`printf %s "$TOK" | sha256sum | cut -c1-8`) to prove the stored secret == the value on
+screen (rules out copy typos before blaming the value). The settings token
 mask (`$maskedPosToken`) is DISPLAY-ONLY (blade placeholder + status line); the save path only writes on
 `$request->filled(...)` and always stores the full encrypted token, and getFbrPosToken sends the full decrypted
 token — masking never touches what is stored or sent, so it can NEVER cause 900901. `testConnection()` now parses

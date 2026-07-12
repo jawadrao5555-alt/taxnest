@@ -48,3 +48,4 @@
 - [Encrypted columns need TEXT](encrypted-columns-need-text.md) — Crypt::encryptString overflows varchar(255) even for tiny plaintext; every encrypted column must be TEXT.
 - [FBR POS = IMS Fiscalization not DI](fbr-pos-ims-fiscalization.md) — fbrpos→FBR IMS POS (SRO 1279/2021), own URL/token/model, amounts from stored subtotal/tax (never re-derive), success Code 100; cloud retired (Code 112)→fiscal_device local mode reusing PRA's Desktop Agent + Agent API (zero agent changes).
 - [FBR 900908 = token/env, not a bug](fbr-900908-token-env.md) — "Resource forbidden /di_data/v1" = FBR rejected the token's authorization; env↔token mismatch or NTN not prod-enabled; FBR POS uses DI endpoint + falls back to DI token.
+- [PRA POS package limits](pos-package-limits.md) — monthly FINAL-bill quota + team-account quota; four gated final paths (incl. retryPra local-only + toggleCashier reactivation); provisionals free until promoted.

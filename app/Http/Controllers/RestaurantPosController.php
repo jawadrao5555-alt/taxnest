@@ -512,6 +512,13 @@ class RestaurantPosController extends Controller
             return response()->json(['success' => false, 'message' => 'Order already paid'], 400);
         }
 
+        // Monthly bill quota (paid-plan package limits, Jul 2026) — paying a
+        // restaurant order creates a FINAL bill, same gate as storeInvoice.
+        $quota = \App\Services\PlanLimitService::canCreatePosBill($companyId);
+        if (!($quota['allowed'] ?? true)) {
+            return response()->json(['success' => false, 'message' => $quota['reason']], 403);
+        }
+
         $paymentMethod = $request->input('payment_method', 'cash');
         $taxRate = PosTaxRule::getRateForMethod($paymentMethod, $company);
 

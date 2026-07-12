@@ -137,7 +137,6 @@ class PosAuthController extends Controller
             'phone' => 'nullable|string|max:20',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'pos_type' => 'required|in:restaurant,retail,general,pharmacy,grocery,clothing,electronics,hardware,salon,autoparts,bakery',
-            'integration_mode' => 'nullable|in:pra,standalone',
         ]);
 
         // Anti free-trial-abuse: block re-use of any previously-registered credential.
@@ -151,9 +150,8 @@ class PosAuthController extends Controller
         }
 
         $posType = $request->pos_type ?? 'general';
-        // Standalone = full POS with ZERO government integration (no PRA nags,
-        // cheaper plan set). Default stays 'pra' — existing behaviour untouched.
-        $integrationMode = $request->integration_mode === 'standalone' ? 'standalone' : 'pra';
+        // Standalone edition retired (Jul 2026) — every new POS company is PRA.
+        $integrationMode = 'pra';
 
         $companyData = [
             'name' => $request->company_name,
@@ -195,7 +193,7 @@ class PosAuthController extends Controller
             'ntn' => $request->company_ntn,
         ], $company->id, 'pos');
 
-        $this->startTrial($company->id, $integrationMode === 'standalone' ? 'standalone' : 'pos');
+        $this->startTrial($company->id, 'pos');
 
         Auth::guard('pos')->login($user);
 
@@ -211,14 +209,6 @@ class PosAuthController extends Controller
         $trialPlan = \App\Models\PricingPlan::where('product_type', $productType)
             ->where('is_trial', true)
             ->first();
-
-        // Standalone trial plan missing (e.g. migration not yet run on this DB):
-        // fall back to the PRA POS trial so a fresh signup never lands planless.
-        if (!$trialPlan && $productType === 'standalone') {
-            $trialPlan = \App\Models\PricingPlan::where('product_type', 'pos')
-                ->where('is_trial', true)
-                ->first();
-        }
 
         if (!$trialPlan) {
             return;

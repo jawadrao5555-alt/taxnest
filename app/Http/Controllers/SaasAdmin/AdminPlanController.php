@@ -20,15 +20,13 @@ class AdminPlanController extends Controller
             $diPlans = PricingPlan::where('product_type', 'di')->orderBy('price')->get();
             $posPlans = PricingPlan::where('product_type', 'pos')->orderBy('price')->get();
             $fbrposPlans = PricingPlan::where('product_type', 'fbrpos')->orderBy('price')->get();
-            $standalonePlans = PricingPlan::where('product_type', 'standalone')->orderBy('price')->get();
         } else {
             $diPlans = PricingPlan::orderBy('price')->get();
             $posPlans = new Collection();
             $fbrposPlans = new Collection();
-            $standalonePlans = new Collection();
         }
 
-        return view('saas-admin.plans', compact('diPlans', 'posPlans', 'fbrposPlans', 'standalonePlans'));
+        return view('saas-admin.plans', compact('diPlans', 'posPlans', 'fbrposPlans'));
     }
 
     public function store(Request $request)
@@ -37,7 +35,7 @@ class AdminPlanController extends Controller
             'name' => 'required|string|max:100',
             'price' => 'required|numeric|min:0',
             'invoice_limit' => 'required|integer|min:-1',
-            'product_type' => 'required|in:di,pos,fbrpos,standalone',
+            'product_type' => 'required|in:di,pos,fbrpos',
             'max_terminals' => 'nullable|integer|min:-1',
             'max_users' => 'nullable|integer|min:-1',
             'max_products' => 'nullable|integer|min:-1',
@@ -76,7 +74,7 @@ class AdminPlanController extends Controller
             'name' => 'required|string|max:100',
             'price' => 'required|numeric|min:0',
             'invoice_limit' => 'required|integer|min:-1',
-            'product_type' => 'required|in:di,pos,fbrpos,standalone',
+            'product_type' => 'required|in:di,pos,fbrpos',
             'max_terminals' => 'nullable|integer|min:-1',
             'max_users' => 'nullable|integer|min:-1',
             'max_products' => 'nullable|integer|min:-1',

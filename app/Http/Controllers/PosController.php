@@ -683,6 +683,19 @@ class PosController extends Controller
         // PRA submission is skipped. Bill remains editable/deletable until promoted to final
         // via retryPra (the "Submit to PRA — Make Final" button on transaction-show).
         $saveAsProvisional = (bool) $request->input('save_as_provisional', false);
+
+        // Monthly bill quota (paid-plan package limits, Jul 2026) — FINAL bills only.
+        // Provisionals stay allowed; they consume quota when promoted to final.
+        if (!$saveAsProvisional) {
+            $quota = \App\Services\PlanLimitService::canCreatePosBill($companyId);
+            if (!($quota['allowed'] ?? true)) {
+                if ($request->expectsJson()) {
+                    return response()->json(['success' => false, 'error' => $quota['reason'], 'message' => $quota['reason']], 403);
+                }
+                return back()->withInput()->with('error', $quota['reason']);
+            }
+        }
+
         $praEnabled = (bool) $company->pra_reporting_enabled && !$saveAsProvisional;
         if ($saveAsProvisional) {
             // Deliberate provisional — editable/deletable via F10 Local modal until promoted.
@@ -1163,6 +1176,17 @@ class PosController extends Controller
             return back()->with('error', 'This invoice cannot be submitted. Current status: ' . $transaction->pra_status);
         }
 
+        // Monthly bill quota (paid-plan package limits, Jul 2026): promoting a
+        // provisional here creates a NEW final — same gate as storeInvoice /
+        // apiPromoteProvisional. Plain retries of already-final failed/offline/
+        // pending bills are NOT re-charged (they consumed quota at creation).
+        if ($transaction->pra_status === 'local') {
+            $quota = \App\Services\PlanLimitService::canCreatePosBill($companyId);
+            if (!($quota['allowed'] ?? true)) {
+                return back()->with('error', $quota['reason']);
+            }
+        }
+
         if (!$company->pra_reporting_enabled) {
             // PRA-reporting-OFF company promoting a provisional → finalize WITHOUT any
             // PRA submission: 'pra' mode + NULL pra_status = normal final bill.
@@ -1426,6 +1450,13 @@ class PosController extends Controller
         }
         if (!in_array($method, ['cash', 'debit_card', 'credit_card', 'qr_payment'], true)) {
             $method = null; // resolve from the stored value inside the transaction
+        }
+
+        // Promoting a provisional to a FINAL bill consumes monthly quota — same
+        // gate as storeInvoice finals (paid-plan package limits, Jul 2026).
+        $quota = \App\Services\PlanLimitService::canCreatePosBill($companyId);
+        if (!($quota['allowed'] ?? true)) {
+            return response()->json(['success' => false, 'message' => $quota['reason']], 403);
         }
 
         $reportingOn = (bool) $company->pra_reporting_enabled;
@@ -2905,6 +2936,13 @@ class PosController extends Controller
             'password' => 'required|string|min:6',
         ]);
 
+        // Team-account quota (paid-plan package limits, Jul 2026):
+        // Starter 1 (admin only), Business 5, Pro unlimited.
+        $quota = \App\Services\PlanLimitService::canAddPosUser($companyId);
+        if (!($quota['allowed'] ?? true)) {
+            return back()->with('error', $quota['reason']);
+        }
+
         User::create([
             'name' => $request->name,
             'email' => $request->email,
@@ -2959,6 +2997,16 @@ class PosController extends Controller
         }
 
         $cashier = User::where('company_id', $companyId)->where('pos_role', 'pos_cashier')->findOrFail($id);
+
+        // Reactivating a cashier re-consumes a team-account slot — same gate as
+        // storeCashier, otherwise deactivate→create→reactivate bypasses the limit.
+        if (!$cashier->is_active) {
+            $quota = \App\Services\PlanLimitService::canAddPosUser($companyId);
+            if (!($quota['allowed'] ?? true)) {
+                return back()->with('error', $quota['reason']);
+            }
+        }
+
         $cashier->update(['is_active' => !$cashier->is_active]);
 
         return back()->with('success', $cashier->is_active ? 'Cashier activated.' : 'Cashier deactivated.');
@@ -4421,14 +4469,8 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        // Standalone (no-integration) companies see the cheaper Standalone plan
-        // set; everyone else keeps the PRA POS plans — zero change for them.
-        $planType = ($company->pos_integration_mode ?? 'pra') === 'standalone' ? 'standalone' : 'pos';
-        $plans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', $planType)->orderBy('price')->get();
-        if ($planType === 'standalone' && $plans->isEmpty()) {
-            // Migration not yet run on this DB — fall back to PRA POS plans.
-            $plans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', 'pos')->orderBy('price')->get();
-        }
+        // Standalone edition retired (Jul 2026) — everyone sees the PRA POS plans.
+        $plans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', 'pos')->orderBy('price')->get();
         $currentSubscription = \App\Models\Subscription::where('company_id', $companyId)
             ->where('active', true)
             ->with('pricingPlan')

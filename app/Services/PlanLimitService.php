@@ -63,6 +63,120 @@ class PlanLimitService
         return ['allowed' => true, 'remaining' => $limit - $count];
     }
 
+    /**
+     * PRA POS monthly bill quota (package restructure, Jul 2026).
+     *
+     * Plans store invoice_limit as bills-per-CALENDAR-MONTH for POS:
+     *   Starter 500 / Business 2000 / Pro -1 (unlimited).
+     *
+     * Counted: FINAL bills only — status='completed' and invoice_mode != 'local'
+     * (deliberate provisionals don't consume quota until promoted to PRA).
+     * Archived rows still count (they were real sales this month).
+     * Trial plans are excluded — the 20-bill total trial cap lives in
+     * SubscriptionAccessService::hasAccess and stays untouched.
+     */
+    public static function canCreatePosBill(int $companyId): array
+    {
+        $company = \App\Models\Company::find($companyId);
+        if ($company && $company->is_internal_account) {
+            return ['allowed' => true, 'internal' => true];
+        }
+
+        $monthlyCount = function () use ($companyId): int {
+            return \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->where('status', 'completed')
+                ->where(function ($q) {
+                    $q->whereNull('invoice_mode')->orWhere('invoice_mode', '!=', 'local');
+                })
+                ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])
+                ->count();
+        };
+
+        // Admin override wins (interpreted as bills/month for POS companies).
+        if ($company && $company->invoice_limit_override !== null) {
+            if ((int) $company->invoice_limit_override === -1) {
+                return ['allowed' => true, 'unlimited' => true];
+            }
+            $limit = (int) $company->invoice_limit_override;
+            $count = $monthlyCount();
+            if ($count >= $limit) {
+                return ['allowed' => false, 'reason' => "Monthly bill limit reached ({$count}/{$limit} this month). Please contact admin."];
+            }
+            return ['allowed' => true, 'remaining' => $limit - $count];
+        }
+
+        $sub = self::getActiveSubscription($companyId);
+        if (!$sub || !$sub->pricingPlan) {
+            // Access/subscription gating is owned by SubscriptionAccessService —
+            // don't double-block here.
+            return ['allowed' => true];
+        }
+
+        $plan = $sub->pricingPlan;
+        if ($plan->is_trial) {
+            return ['allowed' => true]; // trial cap handled by SubscriptionAccessService
+        }
+
+        $limit = (int) ($plan->invoice_limit ?? -1);
+        if ($limit === -1 || $limit <= 0) {
+            return ['allowed' => true];
+        }
+
+        $count = $monthlyCount();
+        if ($count >= $limit) {
+            return ['allowed' => false, 'reason' => "Monthly bill limit reached ({$count}/{$limit} bills this month on the {$plan->name} plan). Please upgrade your plan to keep billing."];
+        }
+
+        return ['allowed' => true, 'remaining' => $limit - $count];
+    }
+
+    /**
+     * PRA POS team-account quota: plan user_limit counts the POS panel accounts
+     * (pos_admin + pos_cashier) — Starter 1 (admin only), Business 5, Pro -1.
+     * Read-only portal accounts (local_viewer / archive_viewer) are super-admin
+     * provisioned and never consume the quota.
+     */
+    public static function canAddPosUser(int $companyId): array
+    {
+        $company = \App\Models\Company::find($companyId);
+        if ($company && $company->is_internal_account) {
+            return ['allowed' => true, 'internal' => true];
+        }
+
+        $count = User::where('company_id', $companyId)
+            ->where('is_active', true)
+            ->whereIn('pos_role', ['pos_admin', 'pos_cashier'])
+            ->count();
+
+        if ($company && $company->user_limit_override !== null) {
+            if ((int) $company->user_limit_override === -1) {
+                return ['allowed' => true, 'unlimited' => true];
+            }
+            $limit = (int) $company->user_limit_override;
+            if ($count >= $limit) {
+                return ['allowed' => false, 'reason' => "Team account limit reached ({$count}/{$limit}). Please contact admin."];
+            }
+            return ['allowed' => true, 'remaining' => $limit - $count];
+        }
+
+        $sub = self::getActiveSubscription($companyId);
+        if (!$sub || !$sub->pricingPlan) {
+            return ['allowed' => true];
+        }
+
+        $limit = $sub->pricingPlan->user_limit;
+        if ($limit === null || (int) $limit === -1) {
+            return ['allowed' => true];
+        }
+
+        if ($count >= (int) $limit) {
+            return ['allowed' => false, 'reason' => "Team account limit reached ({$count}/{$limit} on the {$sub->pricingPlan->name} plan). Please upgrade your plan to add more accounts."];
+        }
+
+        return ['allowed' => true, 'remaining' => (int) $limit - $count];
+    }
+
     public static function canAddUser(int $companyId): array
     {
         $company = \App\Models\Company::find($companyId);

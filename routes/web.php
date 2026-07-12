@@ -138,8 +138,7 @@ Route::get('/di', function () {
 
 Route::get('/pos', function () {
     $plans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', 'pos')->orderBy('price')->get();
-    $standalonePlans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', 'standalone')->orderBy('price')->get();
-    return view('pos.landing', ['plans' => $plans, 'standalonePlans' => $standalonePlans]);
+    return view('pos.landing', ['plans' => $plans]);
 })->name('pos.landing');
 Route::get('/pos/login', [PosAuthController::class, 'showLogin'])->name('pos.login');
 Route::post('/pos/login', [PosAuthController::class, 'login']);

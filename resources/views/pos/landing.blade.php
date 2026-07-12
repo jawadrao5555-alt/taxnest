@@ -279,61 +279,17 @@
         <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center max-w-2xl mx-auto mb-16">
                 <h2 class="text-4xl font-serif text-[#052730] mb-6">Simple pricing.</h2>
-                <p class="text-gray-600 font-light text-lg">Choose the edition that fits your regulatory requirement.</p>
+                <p class="text-gray-600 font-light text-lg">One edition, full PRA compliance — pick the plan that fits your shop.</p>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-                <!-- Standalone Edition -->
-                <div class="bg-white border-t-4 border-gray-300 shadow-sm p-8 flex flex-col">
-                    <div class="inline-block px-3 py-1 bg-gray-100 text-gray-600 font-bold text-xs uppercase tracking-widest mb-6 self-start">
-                        Standalone
-                    </div>
-                    <h4 class="text-2xl font-serif text-[#052730] mb-3">POS Only</h4>
-                    <p class="text-sm text-gray-600 mb-8">Fast retail and restaurant billing without government integration.</p>
-                    
-                    <div class="flex-grow space-y-4">
-                        @if(isset($standalonePlans) && $standalonePlans->count())
-                            @foreach($standalonePlans as $plan)
-                                @php
-                                    $perMonth = round($plan->sale_price / 12);
-                                    $hasOffer = $plan->sale_percent > 0;
-                                    $features = is_array($plan->features) ? $plan->features : (is_string($plan->features) ? json_decode($plan->features, true) : []);
-                                @endphp
-                                <div class="p-5 border border-gray-200">
-                                    <div class="flex justify-between items-start mb-2">
-                                        <h5 class="font-bold text-gray-900">{{ $plan->name }}</h5>
-                                        <div class="text-right">
-                                            <div class="font-semibold text-xl text-[#052730]">PKR {{ number_format($plan->sale_price) }}<span class="text-sm text-gray-500 font-normal">/yr</span></div>
-                                        </div>
-                                    </div>
-                                    <p class="text-xs text-gray-500 mb-4">Effective: PKR {{ number_format($perMonth) }}/mo</p>
-                                    @if(!empty($features))
-                                        <ul class="space-y-2 mt-4 border-t border-gray-100 pt-4">
-                                            @foreach(array_slice($features, 0, 3) as $feature)
-                                            <li class="flex items-start text-sm text-gray-700">
-                                                <span class="text-gray-400 mr-2 mt-0.5 text-xs">■</span>
-                                                {{ $feature }}
-                                            </li>
-                                            @endforeach
-                                        </ul>
-                                    @endif
-                                </div>
-                            @endforeach
-                        @else
-                            <div class="p-6 border border-gray-200 text-center text-gray-500 text-sm">
-                                Plans loading...
-                            </div>
-                        @endif
-                    </div>
-                </div>
-
+            <div class="grid grid-cols-1 gap-8 max-w-2xl mx-auto">
                 <!-- PRA Integrated Edition -->
                 <div class="bg-white border-t-4 border-purple-700 shadow-xl p-8 flex flex-col relative">
                     <div class="inline-block px-3 py-1 bg-purple-50 text-purple-700 font-bold text-xs uppercase tracking-widest mb-6 self-start">
                         PRA Integrated
                     </div>
                     <h4 class="text-2xl font-serif text-[#052730] mb-3">Full PRA Compliance</h4>
-                    <p class="text-sm text-gray-600 mb-8">Includes everything in Standalone, plus automatic Punjab Revenue Authority fiscal reporting.</p>
+                    <p class="text-sm text-gray-600 mb-8">The complete NestPOS with automatic Punjab Revenue Authority fiscal reporting built in.</p>
                     
                     <div class="flex-grow space-y-4">
                         @if(isset($plans) && $plans->count())
@@ -420,10 +376,10 @@
                 </div>
                 <div class="border-b border-gray-200">
                     <button @click="open = (open === 4 ? null : 4)" class="w-full flex items-center justify-between py-6 text-left">
-                        <span class="font-serif text-lg text-gray-900">Is there a version without PRA integration?</span>
+                        <span class="font-serif text-lg text-gray-900">What do the plans include?</span>
                         <span class="text-gray-400 font-mono text-xl" x-text="open === 4 ? '-' : '+'">+</span>
                     </button>
-                    <div x-show="open === 4" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Yes — the Standalone edition. Same POS, same speed, zero government integration, at a lower annual price. You can upgrade a standalone shop to full PRA mode later; the switch is one-way.</div>
+                    <div x-show="open === 4" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Starter covers a single account with up to 500 PRA bills per month. Business adds up to 5 team accounts and 2,000 bills per month. Pro is fully unlimited — unlimited team accounts, unlimited monthly billing, and every feature unlocked.</div>
                 </div>
             </div>
         </div>

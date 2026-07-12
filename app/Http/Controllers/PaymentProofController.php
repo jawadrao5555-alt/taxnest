@@ -106,14 +106,14 @@ class PaymentProofController extends Controller
     /**
      * Map the acting panel/company to its pricing product line so a company can
      * only request (and be shown) plans from its own panel.
-     *  - pos guard    → 'standalone' when the company runs standalone POS, else 'pos'
+     *  - pos guard    → 'pos'
      *  - fbrpos guard → 'fbrpos'
      *  - web guard    → 'di'
      */
     private function resolveProductType(?\App\Models\Company $company): string
     {
         if (auth('pos')->check()) {
-            return (($company->pos_integration_mode ?? 'pra') === 'standalone') ? 'standalone' : 'pos';
+            return 'pos';
         }
         if (auth('fbrpos')->check()) {
             return 'fbrpos';

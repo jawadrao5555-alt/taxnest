@@ -8,6 +8,7 @@ use App\Models\AdminAuditLog;
 use App\Models\CompanyUsageStat;
 use App\Models\Invoice;
 use App\Models\PosTransaction;
+use App\Models\FbrPosTransaction;
 use App\Models\User;
 use App\Models\Subscription;
 use App\Models\Franchise;
@@ -221,10 +222,24 @@ class AdminCompanyController extends Controller
             $extraStats['locked_invoices'] = Invoice::where('company_id', $id)->where('status', 'locked')->count();
             $extraStats['total_revenue'] = Invoice::where('company_id', $id)->where('status', 'locked')->sum('total_amount');
             $extraStats['draft_invoices'] = Invoice::where('company_id', $id)->where('status', 'draft')->count();
+        } elseif ($company->product_type === 'fbrpos') {
+            // FBR POS sales live in fbr_pos_transactions — NOT pos_transactions.
+            // Querying the PRA table here always returned zero for FBR companies.
+            $base = FbrPosTransaction::where('company_id', $id)->where('status', 'completed');
+            $extraStats['total_transactions'] = (clone $base)->count();
+            $extraStats['total_revenue'] = (clone $base)->sum('total_amount');
+            $extraStats['today_transactions'] = (clone $base)->whereDate('created_at', today())->count();
+            $extraStats['today_revenue'] = (clone $base)->whereDate('created_at', today())->sum('total_amount');
+            $extraStats['month_revenue'] = (clone $base)->whereBetween('created_at', [now()->startOfMonth(), now()])->sum('total_amount');
+            $extraStats['last_sale_at'] = (clone $base)->max('created_at');
         } else {
-            $extraStats['total_transactions'] = PosTransaction::where('company_id', $id)->where('status', 'completed')->count();
-            $extraStats['total_revenue'] = PosTransaction::where('company_id', $id)->where('status', 'completed')->sum('total_amount');
-            $extraStats['today_transactions'] = PosTransaction::where('company_id', $id)->where('status', 'completed')->whereDate('created_at', today())->count();
+            $base = PosTransaction::where('company_id', $id)->where('status', 'completed');
+            $extraStats['total_transactions'] = (clone $base)->count();
+            $extraStats['total_revenue'] = (clone $base)->sum('total_amount');
+            $extraStats['today_transactions'] = (clone $base)->whereDate('created_at', today())->count();
+            $extraStats['today_revenue'] = (clone $base)->whereDate('created_at', today())->sum('total_amount');
+            $extraStats['month_revenue'] = (clone $base)->whereBetween('created_at', [now()->startOfMonth(), now()])->sum('total_amount');
+            $extraStats['last_sale_at'] = (clone $base)->max('created_at');
         }
 
         $extraStats['total_users'] = User::where('company_id', $id)->count();

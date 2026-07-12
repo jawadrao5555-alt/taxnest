@@ -204,7 +204,10 @@
                 @else
                 <div class="flex justify-between"><span class="text-gray-400">Transactions</span><span class="text-white font-medium">{{ number_format($extraStats['total_transactions']) }}</span></div>
                 <div class="flex justify-between"><span class="text-gray-400">Today's Txns</span><span class="text-white font-medium">{{ number_format($extraStats['today_transactions']) }}</span></div>
+                <div class="flex justify-between"><span class="text-gray-400">Today's Revenue</span><span class="text-white font-medium">PKR {{ number_format($extraStats['today_revenue'] ?? 0, 0) }}</span></div>
+                <div class="flex justify-between"><span class="text-gray-400">This Month</span><span class="text-white font-medium">PKR {{ number_format($extraStats['month_revenue'] ?? 0, 0) }}</span></div>
                 <div class="flex justify-between"><span class="text-gray-400">Total Revenue</span><span class="text-purple-400 font-bold">PKR {{ number_format($extraStats['total_revenue'], 0) }}</span></div>
+                <div class="flex justify-between"><span class="text-gray-400">Last Sale</span><span class="text-white">{{ !empty($extraStats['last_sale_at']) ? \Carbon\Carbon::parse($extraStats['last_sale_at'])->format('d M Y, h:i A') : '—' }}</span></div>
                 @endif
                 @if($extraStats['active_subscription'])
                 <div class="pt-2 border-t border-gray-800">

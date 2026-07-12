@@ -98,6 +98,99 @@
         </div>
     </div>
 
+    @if($company->product_type === 'fbrpos')
+    {{-- ============================================================
+         VPS / FISCAL DEVICE SETUP (super-admin) — everything needed to
+         install FBRIMS + the Desktop Sync Agent on the cloud VPS for
+         this client without logging into their panel. Access Code
+         reveal is audit-logged.
+         ============================================================ --}}
+    <script>
+        function vpsSetupCard() {
+            return {
+                showKey: false, code: null, loading: false,
+                async reveal() {
+                    this.loading = true;
+                    try {
+                        const r = await fetch('{{ route('saas.admin.companies.revealAccessCode', $company->id) }}', {
+                            method: 'POST',
+                            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' }
+                        });
+                        const d = await r.json();
+                        if (r.ok && d.code) { this.code = d.code; } else { alert(d.error || 'Failed to reveal access code'); }
+                    } catch (e) { alert('Failed to reveal access code'); }
+                    this.loading = false;
+                },
+                copy(input, btn) {
+                    navigator.clipboard.writeText(input.value).then(() => {
+                        const t = btn.textContent; btn.textContent = 'Copied!';
+                        setTimeout(() => btn.textContent = t, 1200);
+                    });
+                }
+            };
+        }
+    </script>
+    @php $vpsAgentOnline = $company->agent_last_seen && \Carbon\Carbon::parse($company->agent_last_seen)->gt(now()->subMinutes(2)); @endphp
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6" x-data="vpsSetupCard()">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-white">VPS / Fiscal Device Setup</h3>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs {{ $vpsAgentOnline ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">
+                Agent {{ $vpsAgentOnline ? 'Online' : ($company->agent_enabled ? 'Offline' : 'Disabled') }}
+            </span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-sm mb-4">
+            <div class="flex justify-between"><span class="text-gray-400">Connection Mode</span><span class="text-white">{{ ($company->fbr_connection_mode ?? 'cloud') === 'fiscal_device' ? 'Fiscal Device (Agent)' : 'Cloud' }}</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">FBR POS ID</span><span class="text-white font-mono">{{ $company->fbr_pos_id ?? '—' }}</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Environment</span><span class="text-white">{{ ucfirst($company->fbr_pos_environment ?? 'sandbox') }}</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Agent Last Seen</span><span class="text-white">{{ $company->agent_last_seen ? \Carbon\Carbon::parse($company->agent_last_seen)->format('d M Y h:i A') : 'Never' }}</span></div>
+        </div>
+        <div class="space-y-3 text-sm">
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">Agent Server URL</label>
+                <div class="flex gap-2">
+                    <input type="text" readonly value="{{ url('/api/agent') }}" x-ref="srv" class="w-full rounded-lg bg-gray-800 border-gray-700 text-gray-200 text-xs font-mono">
+                    <button type="button" @click="copy($refs.srv, $el)" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs rounded-lg">Copy</button>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Company ID</label>
+                    <div class="flex gap-2">
+                        <input type="text" readonly value="{{ $company->id }}" x-ref="cid" class="w-full rounded-lg bg-gray-800 border-gray-700 text-gray-200 text-xs font-mono">
+                        <button type="button" @click="copy($refs.cid, $el)" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs rounded-lg">Copy</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Agent API Key</label>
+                    <div class="flex gap-2">
+                        <input :type="showKey ? 'text' : 'password'" readonly value="{{ $company->agent_api_key ?? '' }}" placeholder="Not generated yet" x-ref="agkey" class="w-full rounded-lg bg-gray-800 border-gray-700 text-gray-200 text-xs font-mono">
+                        <button type="button" @click="showKey = !showKey" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs rounded-lg" x-text="showKey ? 'Hide' : 'Show'"></button>
+                        <button type="button" @click="copy($refs.agkey, $el)" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg">Copy</button>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">FBR Access Code (IRIS)</label>
+                <template x-if="!code">
+                    <div class="flex items-center gap-2">
+                        <span class="text-gray-500 text-xs">{{ $company->fbr_access_code ? 'Saved (encrypted) — reveal to view' : 'Not saved yet — client adds it in FBR POS settings' }}</span>
+                        @if($company->fbr_access_code)
+                        <button type="button" @click="reveal()" :disabled="loading" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs rounded-lg" x-text="loading ? '...' : 'Reveal'"></button>
+                        @endif
+                    </div>
+                </template>
+                <template x-if="code">
+                    <div class="flex gap-2">
+                        <input type="text" readonly :value="code" x-ref="ac" class="w-full rounded-lg bg-gray-800 border-amber-700 text-amber-300 text-xs font-mono">
+                        <button type="button" @click="copy($refs.ac, $el)" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg">Copy</button>
+                    </div>
+                </template>
+                <p class="text-xs text-gray-500 mt-1">Reveal is audit-logged. Needed once while installing the FBR fiscal component (FBRIMS) on the VPS.</p>
+            </div>
+        </div>
+    </div>
+    @endif
+
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-white mb-3">Usage & Revenue</h3>

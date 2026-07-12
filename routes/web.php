@@ -724,6 +724,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/companies/{id}/limits', [AdminCompanyController::class, 'updateLimits'])->name('saas.admin.companies.limits');
     Route::post('/companies/{id}/delete', [AdminCompanyController::class, 'softDelete'])->name('saas.admin.companies.delete');
     Route::post('/companies/{id}/change-type', [AdminCompanyController::class, 'changeProductType'])->name('saas.admin.companies.changeType');
+    Route::post('/companies/{id}/reveal-access-code', [AdminCompanyController::class, 'revealFbrAccessCode'])->name('saas.admin.companies.revealAccessCode');
 
     // ── View / Manage as Company (impersonation: view-only + full-access) ──
     Route::post('/companies/{id}/impersonate', [AdminCompanyController::class, 'impersonate'])->name('saas.admin.companies.impersonate');

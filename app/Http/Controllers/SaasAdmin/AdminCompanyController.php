@@ -246,6 +246,31 @@ class AdminCompanyController extends Controller
     }
 
     /**
+     * Reveal the (encrypted) FBR IRIS Access Code for VPS/FBRIMS setup.
+     * Super-admin only; every reveal is audit-logged.
+     */
+    public function revealFbrAccessCode($id)
+    {
+        $company = Company::withTrashed()->findOrFail($id);
+
+        if (empty($company->fbr_access_code)) {
+            return response()->json(['error' => 'No access code saved for this company.'], 404);
+        }
+
+        try {
+            $code = \Illuminate\Support\Facades\Crypt::decryptString($company->fbr_access_code);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Decryption failed — stored value is unreadable (check APP_KEY).'], 500);
+        }
+
+        AdminAuditLog::log(auth('admin')->id(), 'FBR Access Code revealed', 'Company', $company->id, [
+            'company' => $company->name,
+        ]);
+
+        return response()->json(['code' => $code]);
+    }
+
+    /**
      * View as Company — start a VIEW-ONLY impersonation session.
      *
      * The admin guard uses a separate provider (admin_users), so logging the

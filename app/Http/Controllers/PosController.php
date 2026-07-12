@@ -1388,6 +1388,35 @@ class PosController extends Controller
             return response()->json(['success' => false, 'message' => 'Company not found'], 404);
         }
 
+        // ── LOCAL FINAL (owner request Jul 2026): finalize WITHOUT sending to PRA ──
+        // The bill keeps its local invoice number, amounts and payment method exactly
+        // as saved, and is archived immediately — it leaves the F10 provisional list
+        // but stays visible in the Local Bills Portal (which reads archived bills).
+        // pra_status stays 'local' + invoice_mode stays 'local' (deliberate local bill,
+        // consistent with the Reporting-OFF Finals Invariant).
+        if (!$request->boolean('send_to_pra', true)) {
+            $tx = PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->where('id', $id)
+                ->where('status', 'completed')
+                ->where('invoice_mode', 'local')
+                ->where('pra_status', 'local')
+                ->first();
+            if (!$tx) {
+                return response()->json(['success' => false, 'message' => 'Bill not found'], 404);
+            }
+            $tx->update(['is_archived' => true, 'archived_at' => now()]);
+            return response()->json([
+                'success'        => true,
+                'submitted'      => false,
+                'local_final'    => true,
+                'invoice_number' => $tx->invoice_number,
+                'total_amount'   => (float) $tx->total_amount,
+                'message'        => '✓ Bill ' . $tx->invoice_number . ' finalized as LOCAL (Rs. ' . number_format((float) $tx->total_amount) . ') — NOT sent to PRA.',
+                'id'             => $tx->id,
+            ]);
+        }
+
         // Cashier picks the settlement method AT promote time — cash vs card carry
         // different PRA tax rates (e.g. 16% vs 8%), so the bill is RE-TAXED for the
         // chosen method. Falls back to the stored method when none is supplied.
@@ -1771,7 +1800,19 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        $transaction = PosTransaction::where('company_id', $companyId)
+        // withoutGlobalScope: a bill finalized as LOCAL (no PRA) is archived on the
+        // spot — its receipt must still render for the post-finalize popup/print.
+        // Bypass is limited to LOCAL-mode bills so archived PRA bills stay hidden
+        // (preserves the "nothing sees archived bills" invariant for PRA data).
+        $transaction = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->where(function ($q) {
+                if (\Schema::hasColumn('pos_transactions', 'is_archived')) {
+                    $q->where('is_archived', false)
+                      ->orWhereNull('is_archived')
+                      ->orWhere('invoice_mode', 'local');
+                }
+            })
             ->with(['items', 'payments', 'creator', 'terminal'])
             ->findOrFail($id);
 

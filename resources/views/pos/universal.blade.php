@@ -1163,7 +1163,7 @@ window.addEventListener('popstate', function() {
                     <span class="font-bold text-gray-700 dark:text-gray-300" x-text="promoteTarget ? (promoteTarget.invoice_number || ('#' + promoteTarget.id)) : ''"></span>
                     <span x-show="promoteTarget"> • current Rs. <span x-text="promoteTarget ? Number(promoteTarget.total_amount).toLocaleString() : ''"></span></span>
                 </p>
-                <p class="text-[10px] text-amber-600 dark:text-amber-400 mt-1" x-text="praEnabled ? 'Tax is re-applied for the chosen method, then submitted to PRA with a new POS number.' : 'Tax is re-applied for the chosen method, then finalized (PRA OFF — no submission).'"></p>
+                <p class="text-[10px] text-amber-600 dark:text-amber-400 mt-1" x-text="praEnabled ? 'Cash/Card: tax re-applied + submitted to PRA with a new POS number. Or finalize LOCAL below — no PRA.' : 'Cash/Card: tax re-applied, then finalized (PRA OFF — no submission). Or finalize LOCAL below.'"></p>
             </div>
             <div class="p-5 grid grid-cols-2 gap-3">
                 <button @click="promoteMethodIndex = 0; promoteProvisional(promoteTarget, 'cash')" :disabled="promoteSubmitting" :class="promoteMethodIndex === 0 ? 'ring-2 ring-green-500 ring-offset-2 dark:ring-offset-gray-900 scale-105 border-green-400' : ''" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:bg-green-100 hover:border-green-400">
@@ -1173,6 +1173,17 @@ window.addEventListener('popstate', function() {
                 <button @click="promoteMethodIndex = 1; promoteProvisional(promoteTarget, 'card')" :disabled="promoteSubmitting" :class="promoteMethodIndex === 1 ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900 scale-105 border-blue-400' : ''" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 hover:border-blue-400">
                     <span class="block text-sm font-black text-blue-700 dark:text-blue-400">Card</span>
                     <span class="block text-[10px] font-semibold mt-0.5 text-blue-600/60" x-text="'Tax: ' + (taxRules['debit_card'] || taxRules['card'] || 8) + '%'"></span>
+                </button>
+            </div>
+            <div class="px-5 pb-3">
+                <div class="flex items-center gap-2 mb-3">
+                    <div class="flex-1 h-px bg-gray-200 dark:bg-gray-700"></div>
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">or</span>
+                    <div class="flex-1 h-px bg-gray-200 dark:bg-gray-700"></div>
+                </div>
+                <button @click="promoteProvisional(promoteTarget, null, false)" :disabled="promoteSubmitting" class="w-full py-3 rounded-xl text-center border-2 transition disabled:opacity-50 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 hover:bg-amber-100 hover:border-amber-400">
+                    <span class="block text-sm font-black text-amber-700 dark:text-amber-400">Finalize LOCAL — don't send to PRA (L)</span>
+                    <span class="block text-[10px] font-semibold mt-0.5 text-amber-600/70">Amounts stay unchanged • bill stays in local records only</span>
                 </button>
             </div>
             <div class="px-5 pb-5">
@@ -3403,6 +3414,7 @@ function restaurantPos() {
                 if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); e.stopPropagation(); this.promoteMethodIndex = 1; return; }
                 if (e.key === '1') { e.preventDefault(); e.stopPropagation(); this.promoteMethodIndex = 0; this.promoteProvisional(this.promoteTarget, 'cash'); return; }
                 if (e.key === '2') { e.preventDefault(); e.stopPropagation(); this.promoteMethodIndex = 1; this.promoteProvisional(this.promoteTarget, 'card'); return; }
+                if (e.key === '3' || e.key === 'l' || e.key === 'L') { e.preventDefault(); e.stopPropagation(); this.promoteProvisional(this.promoteTarget, null, false); return; }
                 if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); e.stopPropagation(); this.promoteProvisional(this.promoteTarget, this.promoteMethodIndex === 1 ? 'card' : 'cash'); return; }
                 if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (!this.promoteSubmitting) { this.showPromoteMethod = false; this.promoteTarget = null; } return; }
                 return;
@@ -4209,7 +4221,7 @@ function restaurantPos() {
             this.promoteMethodIndex = (bill.payment_method && bill.payment_method !== 'cash') ? 1 : 0;
             this.showPromoteMethod = true;
         },
-        async promoteProvisional(bill, method) {
+        async promoteProvisional(bill, method, sendToPra = true) {
             if (!bill) return;
             if (this.promoteSubmitting) return;
             this.promoteSubmitting = true;
@@ -4217,7 +4229,7 @@ function restaurantPos() {
                 const res = await fetch('{{ url('/pos/api/provisional-bills') }}/' + bill.id + '/promote', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: JSON.stringify({ payment_method: method || 'cash' }),
+                    body: JSON.stringify({ payment_method: method || bill.payment_method || 'cash', send_to_pra: !!sendToPra }),
                 });
                 const data = await res.json();
                 if (data && data.success) {

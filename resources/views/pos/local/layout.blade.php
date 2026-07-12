@@ -28,6 +28,9 @@
             <div class="flex items-center gap-3">
                 <a href="{{ route('pos.local.index') }}" class="text-sm text-slate-300 hover:text-white px-3 py-1.5 rounded-md hover:bg-slate-800/50 transition">Local Bills</a>
                 <a href="{{ route('pos.local.export') }}" class="text-sm text-slate-300 hover:text-white px-3 py-1.5 rounded-md hover:bg-slate-800/50 transition">Export CSV</a>
+                @if(auth('pos')->user()?->isPosAdmin())
+                <a href="{{ route('pos.dashboard') }}" class="text-sm text-slate-300 hover:text-white px-3 py-1.5 rounded-md hover:bg-slate-800/50 transition">← Back to POS</a>
+                @endif
                 <div class="text-xs text-slate-400 hidden sm:block px-3 border-l border-slate-800">{{ auth('pos')->user()->name ?? 'Viewer' }}</div>
                 <form method="POST" action="{{ route('pos.logout') }}" class="inline">
                     @csrf

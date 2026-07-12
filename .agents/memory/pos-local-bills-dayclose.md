@@ -13,6 +13,11 @@ description: Retention rules, cashier-gate trap, and midnight auto-close semanti
 ## Purge query invariant
 - Day-close "purge local bills" must target ONLY `invoice_mode='local' AND pra_status='local'` (provisionals). Reporting-OFF finals are `mode + NULL` and must NEVER be swept. A looser query silently deletes/archives real finals.
 
+## Local Final (promote without PRA) — Jul 2026
+- Promote modal offers "Finalize LOCAL" (send_to_pra=false): bill keeps its local triple + local number/amounts, is `is_archived=true` on the spot → leaves F10, stays in Local Bills Portal. `archived_by_report_id` stays NULL — nothing depends on it; Archive Portal filters mode to pra/NULL so local finals never leak there.
+- `receipt()` bypasses hide_archived ONLY for `invoice_mode='local'` bills (post-finalize popup needs it); archived PRA bills stay hidden.
+- Company admins (isPosAdmin) may VIEW /pos/local-bills alongside local_viewer accounts (owner request Jul 2026); cashiers still 404.
+
 ## Toggle B / Toggle C
 - Toggle B = `companies.pos_auto_purge_local_on_dayclose` (archive locals on every day-close). Effective purge = `requestedPurge || company.toggleB`. A cashier-requested manual purge is rejected, but the company policy still applies regardless of who closes.
 - Toggle C = `companies.pos_auto_dayclose_24h` (column name kept for stability; behavior is NO LONGER 24h-inactivity). The `pos:auto-dayclose` command (hourly, withoutOverlapping) is MIDNIGHT-BASED with a 1-full-day grace: it sweeps un-closed days whose calendar date is `< today()->subDay()` (i.e. older than yesterday) — so Monday's day auto-closes at Wednesday 00:00, NOT last-bill+24h. App tz = Asia/Karachi so "midnight" = Pakistan midnight. Yesterday is deliberately left open (grace). It calls performDayClose and its purge follows Toggle B (NOT forced on).

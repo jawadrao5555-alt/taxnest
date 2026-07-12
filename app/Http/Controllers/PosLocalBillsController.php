@@ -10,10 +10,11 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class PosLocalBillsController extends Controller
 {
     /**
-     * Local Bills Portal — only accessible by users with pos_role = 'local_viewer'.
-     * The ONLY surface where local (non-PRA) bills are visible: live local bills
-     * plus those already archived at day-close. Completely isolated from normal
-     * POS UI; cashiers/admins cannot see this data (PosAuth confines both ways).
+     * Local Bills Portal — accessible by pos_role='local_viewer' accounts AND by
+     * POS admins of the company (owner request Jul 2026). The ONLY surface where
+     * local (non-PRA) bills are visible: live local bills plus those already
+     * archived at day-close / Local Final. Cashiers cannot see this data
+     * (PosAuth confines access).
      */
     private function baseQuery(int $companyId)
     {

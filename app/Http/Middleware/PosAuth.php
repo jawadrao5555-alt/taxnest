@@ -64,8 +64,10 @@ class PosAuth
 
         // ═══ Local Bills Viewer isolation ═══
         // Users with pos_role='local_viewer' are confined to /pos/local-bills/* and
-        // /pos/logout — the ONLY surface where local (non-PRA) bills are visible.
-        // Every other pos_role gets a 404 on these routes.
+        // /pos/logout — the surface where local (non-PRA) bills are visible.
+        // POS ADMINS may also VIEW the portal (owner request Jul 2026) — the company
+        // admin of a local-billing company must always see its local bills.
+        // Cashiers and every other pos_role still get a 404 on these routes.
         if (($user->pos_role ?? null) === 'local_viewer') {
             $path = ltrim($request->path(), '/');
             $allowed = str_starts_with($path, 'pos/local-bills')
@@ -75,7 +77,7 @@ class PosAuth
                 return redirect('/pos/local-bills');
             }
         } else {
-            if (str_starts_with(ltrim($request->path(), '/'), 'pos/local-bills')) {
+            if (str_starts_with(ltrim($request->path(), '/'), 'pos/local-bills') && !$user->isPosAdmin()) {
                 abort(404);
             }
         }

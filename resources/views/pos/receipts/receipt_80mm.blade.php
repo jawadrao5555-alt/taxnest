@@ -217,12 +217,12 @@
         // Owner decision (Jul 2026): the "Show Tax on Receipt" toggle applies to ALL
         // receipts, including PRA fiscal ones. When OFF the customer copy shows only
         // the grand total (subtotal + tax lines hidden — showing subtotal alone would
-        // reveal the tax gap), and item Rate/Amt are shown TAX-INCLUSIVE so line items
-        // add up to the grand total (item subtotal + item tax_amount, which already
-        // carries its bill-discount share). Tax is ALWAYS submitted to PRA in full
-        // regardless; full details remain visible via PRA Sahulat app QR scan.
+        // reveal the tax gap). Item Rate/Amt show the ORIGINAL as-entered (ex-tax)
+        // prices — owner update Jul 2026: shelf prices must read exactly as typed,
+        // even though lines then intentionally do NOT sum to the grand total.
+        // Tax is ALWAYS submitted to PRA in full regardless; full details remain
+        // visible via PRA Sahulat app QR scan.
         $showTaxLines = (bool) (optional($transaction->company)->pos_receipt_show_tax ?? true);
-        $inclAmts = $showTaxLines ? [] : $transaction->inclusiveLineAmounts();
     @endphp
     <table class="items-table">
         <thead>
@@ -236,8 +236,8 @@
         <tbody>
             @foreach($transaction->items as $item)
             @php
-                $lineAmt = $showTaxLines ? (float) $item->subtotal : (float) ($inclAmts[$item->id] ?? ((float) $item->subtotal + (float) ($item->tax_amount ?? 0)));
-                $lineRate = $showTaxLines ? (float) $item->unit_price : ((float) $item->quantity > 0 ? $lineAmt / (float) $item->quantity : (float) $item->unit_price);
+                $lineAmt = (float) $item->subtotal;
+                $lineRate = (float) $item->unit_price;
             @endphp
             <tr>
                 <td class="col-item">

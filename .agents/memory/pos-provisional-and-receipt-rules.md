@@ -90,11 +90,12 @@ Do NOT re-add `|| invoice_mode==='pra' || pra_invoice_number` overrides. transac
 view) keeps full details. restaurant/receipt.blade.php is DEAD (RestaurantPosController::receipt renders
 the shared receipt_80mm/58mm templates).
 
-**Tax-hidden mode must self-reconcile (owner: "larai ho sakti hai"):** when the toggle is OFF, item
-Rate/Amt print TAX-INCLUSIVE via `PosTransaction::inclusiveLineAmounts()` (largest-remainder allocation),
-and TOTAL + discount rows print whole-rupee rounded — so itemsSum − printedDiscount == printedTotal
-ALWAYS holds. Never print raw pre-tax item lines next to an inclusive total. NT/EXEMPT tags and the
-invoice-pdf Tax% column are also hidden in this mode.
+**Tax-hidden mode shows ASAL (as-entered, ex-tax) line prices — owner REVERSED the gross-up (Jul 2026):**
+when the toggle is OFF, item Rate/Amt print the stored `unit_price`/`subtotal` exactly as typed on the
+sale screen; lines intentionally do NOT sum to the grand TOTAL (owner: shelf prices must read exactly
+as typed). TOTAL + discount rows still print whole-rupee rounded. `inclusiveLineAmounts()` is now dead
+code — do NOT re-wire the tax-inclusive gross-up into the templates. NT/EXEMPT tags and the invoice-pdf
+Tax% column remain hidden in this mode.
 
 **Toggle location (owner-mandated):** the checkbox lives on the Receipt Settings page
 (`/pos/receipt-settings`, field `rp_show_tax`, saved in `receiptSettings()`), NOT on the Features page.

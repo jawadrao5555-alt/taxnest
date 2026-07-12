@@ -150,3 +150,16 @@ The Code-112 resolution is BUILT. Key non-obvious facts:
   once (agentServesFbr routes ALL agent endpoints to the FBR branch).
 - Shop-PC install guide: `pra-agent/FBR-FISCAL-DEVICE-SETUP.md`. X-WAY SHOES (NTN 2595908-5, POSID 196354) is
   prod-only (not in dev DB) — enable via the prod UI toggle after deploy; e2e proven in dev on company 16.
+
+## Web-based POS answer (official, Jul 2026): SDC "locally OR on Cloud" — central Windows VPS is compliant
+Owner's requirement: shopkeeper gives only POS ID + Access Code (+token), zero shop-PC installs (TaxNest is web POS).
+- FBR's own FiscSolution doc (attached_assets/2019121116123534681FiscSolution_03-12-2019*.pdf) states the Software
+  Data Controller "will be installed locally **or on Cloud** on the same POS System/Within local Network" — so
+  hosting FBRIMS on a TaxNest-managed Windows cloud VPS (with the Desktop Sync Agent beside it) is officially
+  sanctioned. Shopkeeper installs NOTHING; agent polls taxnest.com.pk over HTTPS from anywhere. Zero code changes.
+- **Why:** pure token-only cloud submission is permanently dead (Code 112 — bulk retired; no token unlocks it), so
+  the VPS-hosted fiscal component is the ONLY fully-web path.
+- **How to apply:** per client: FBRIMS install needs that client's POS Reg No + IRIS-grid Access Code (Production);
+  the cloud token is NOT needed in fiscal_device mode. FBRIMS binds localhost:8524 → assume ONE instance per
+  Windows machine/VM (multi-instance unverified); agent config is per-company too → simplest = one small Windows
+  VPS (~$10–25/mo) per client, sellable as a "cloud fiscal bridge" service.

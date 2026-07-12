@@ -164,6 +164,14 @@ Owner's requirement: shopkeeper gives only POS ID + Access Code (+token), zero s
   Windows machine/VM (multi-instance unverified); agent config is per-company too → simplest = one small Windows
   VPS (~$10–25/mo) per client, sellable as a "cloud fiscal bridge" service.
 
+## Replit-IP cloud probe (Jul 12 2026): reconfirms ladder; stored secrets are NOT POS gateway tokens
+Live PostData probe from dev egress IP with real company-16 payload (fake POSID → zero fiscal risk):
+- env secret `FBR_POS_PRODUCTION_TOKEN` → 900901 on BOTH FBR/v1 + imsp/v1 ⇒ it is the IRIS grid
+  token/Access Code, NOT a WSO2 gateway token. Never wire it as a cloud Bearer.
+- env secret `FBR_PRODUCTION_TOKEN_C18` → 900908 on both ⇒ valid gateway token, DI-only subscription.
+- Neither reaches Code 112, consistent with the proven ladder. "IP whitelist for Cloud POS" advice in
+  Tier3-era docs is pre-Code-112 (~2020) — IP is NOT the blocker; cloud bulk is retired regardless of IP.
+
 ## Universal-cheap verdict (web-researched Jul 2026): shop's OWN counter PC = Rs 0, industry standard
 Owner rejected per-client VPS cost → exhaustive web search confirmed NO universal cloud path exists:
 - Tier3's "Cloud Based POS - Using WEBAPI" doc = the SAME retired `imsp/v1 PostData` endpoint (pre-Code-112, ~2020);

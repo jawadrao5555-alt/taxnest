@@ -163,3 +163,14 @@ Owner's requirement: shopkeeper gives only POS ID + Access Code (+token), zero s
   the cloud token is NOT needed in fiscal_device mode. FBRIMS binds localhost:8524 → assume ONE instance per
   Windows machine/VM (multi-instance unverified); agent config is per-company too → simplest = one small Windows
   VPS (~$10–25/mo) per client, sellable as a "cloud fiscal bridge" service.
+
+## Universal-cheap verdict (web-researched Jul 2026): shop's OWN counter PC = Rs 0, industry standard
+Owner rejected per-client VPS cost → exhaustive web search confirmed NO universal cloud path exists:
+- Tier3's "Cloud Based POS - Using WEBAPI" doc = the SAME retired `imsp/v1 PostData` endpoint (pre-Code-112, ~2020);
+  web-POS vendors claiming "just enter store ID" (XStak etc.) are marketing — under the hood it's SDC or dead cloud.
+- 2025-26 "licensed integrator" regime (SRO 709, Circular 1/2025) is for DI/e-invoicing, NOT the POS IMS chain;
+  PRAL 150XF gives free integration HELP but same architecture. One SDC = one store POS ID (FBR hard rule); SDC
+  multi-user covers multiple counters of the SAME store only. Multi-FBRIMS-per-machine: unverified hearsay only.
+- **Cheapest universal answer:** every browser-billing shop already has a counter PC → 15-min remote (AnyDesk)
+  install of FBRIMS + Desktop Agent there = Rs 0/month, cashier stays 100% web, offline-safe (bills queue while PC
+  off). VPS remains the fallback for shops with no Windows PC. Pitch client ask as: POS ID + Access Code + AnyDesk.

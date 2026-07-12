@@ -165,6 +165,15 @@ class AgentController extends Controller
         $invoices = [];
         foreach ($pending as $txn) {
             try {
+                // All-exempt bills are never reported to PRA (mirrors sendInvoice) —
+                // without this, the agent would receive an empty-Items payload.
+                if ($txn->items->isNotEmpty() && $txn->items->every(fn ($item) => (bool) $item->is_tax_exempt)) {
+                    $txn->pra_status = 'exempt_internal';
+                    $txn->save();
+                    Log::info("Agent: PRA submission skipped for transaction #{$txn->id} — all items tax-exempt. Internal only.");
+                    continue;
+                }
+
                 $payload = $praService->generatePayload($txn);
                 $invoices[] = [
                     'transaction_id' => $txn->id,

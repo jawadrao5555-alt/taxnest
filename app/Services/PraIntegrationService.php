@@ -114,6 +114,52 @@ class PraIntegrationService
         $totalTaxCharged = array_sum(array_column($items, 'TaxCharged'));
         $totalBillAmount = array_sum(array_column($items, 'TotalAmount'));
 
+        // ── Whole-rupee bill at PRA (matches receipt/stored total convention) ──
+        // Per-line 2dp values can sum to a fractional bill (e.g. 580.07 @16% → 672.88)
+        // even though the STORED total is whole-rupee (673). Absorb the paisa difference
+        // into the largest line so Items still sum EXACTLY to TotalBillAmount.
+        if (count($items) > 0) {
+            $hasExempt = $transaction->items->contains(fn ($item) => (bool) $item->is_tax_exempt);
+            // Exempt lines are not reported, so the PRA bill is the taxable-only subset —
+            // round that subset. A full (no-exempt) bill mirrors the stored whole-rupee total.
+            $target = round($totalBillAmount);
+            if (!$hasExempt) {
+                $storedTotal = round((float) $transaction->total_amount);
+                if (abs($storedTotal - $totalBillAmount) <= 1.00) {
+                    $target = $storedTotal;
+                }
+            }
+            $diff = round($target - $totalBillAmount, 2);
+            if (abs($diff) >= 0.01) {
+                $idx = 0;
+                $max = -INF;
+                foreach ($items as $i => $ln) {
+                    if ($ln['TotalAmount'] > $max) {
+                        $max = $ln['TotalAmount'];
+                        $idx = $i;
+                    }
+                }
+                if ($items[$idx]['TaxCharged'] > 0 && $items[$idx]['TaxCharged'] + $diff >= 0) {
+                    $items[$idx]['TaxCharged'] = round($items[$idx]['TaxCharged'] + $diff, 2);
+                } elseif ($items[$idx]['SaleValue'] + $diff > 0) {
+                    $items[$idx]['SaleValue'] = round($items[$idx]['SaleValue'] + $diff, 2);
+                } else {
+                    $diff = 0.0; // cannot absorb safely — keep the raw sums
+                }
+                if ($diff !== 0.0) {
+                    $items[$idx]['TotalAmount'] = round($items[$idx]['TotalAmount'] + $diff, 2);
+                    $totalSaleValue = array_sum(array_column($items, 'SaleValue'));
+                    $totalTaxCharged = array_sum(array_column($items, 'TaxCharged'));
+                    $totalBillAmount = array_sum(array_column($items, 'TotalAmount'));
+                }
+            }
+        }
+
+        // Guard against float-sum drift (e.g. 0.30000000000000004) in the JSON payload.
+        $totalSaleValue = round($totalSaleValue, 2);
+        $totalTaxCharged = round($totalTaxCharged, 2);
+        $totalBillAmount = round($totalBillAmount, 2);
+
         return [
             'InvoiceNumber' => '',
             'POSID' => (int) ($this->company->pra_pos_id ?? 0),

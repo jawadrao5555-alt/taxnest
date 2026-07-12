@@ -99,6 +99,7 @@ class Company extends Model
         'fbr_pos_enabled',
         'fbr_reporting_enabled',
         'fbr_pos_id',
+        'fbr_access_code',
         'fbr_pos_token',
         'fbr_pos_environment',
         'fbr_connection_mode',

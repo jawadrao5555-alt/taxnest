@@ -106,6 +106,15 @@
                         <p class="text-xs text-gray-400 mt-1">Your FBR-assigned POS Registration Number (POSID). Required for IMS submission.</p>
                     </div>
                     <div>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">FBR Access Code</label>
+                        <input type="text" name="fbr_access_code" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="{{ $maskedAccessCode ?: 'IRIS POS Registration grid ka Access Code' }}">
+                        @if($maskedAccessCode)
+                        <p class="text-xs text-gray-400 mt-1">Current: {{ $maskedAccessCode }} — leave empty to keep existing code</p>
+                        @else
+                        <p class="text-xs text-gray-400 mt-1">IRIS portal ke <strong>Point of Sale Registration</strong> grid mein POS ID ke saath jo Access Code likha hai — Fiscal Device setup ke liye zaroori. Encrypted mehfooz hota hai.</p>
+                        @endif
+                    </div>
+                    <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">FBR POS Token <span class="text-red-500">*</span></label>
                         <input type="text" name="fbr_pos_token" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="{{ $maskedPosToken ?: 'Enter FBR IMS POS API token' }}">
                         @if($maskedPosToken)

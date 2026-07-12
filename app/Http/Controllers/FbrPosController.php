@@ -1456,6 +1456,7 @@ class FbrPosController extends Controller
                 'fbr_connection_mode' => 'nullable|in:cloud,fiscal_device',
                 'fbr_pos_id' => 'nullable|string|max:100',
                 'fbr_pos_token' => 'nullable|string|max:2000',
+                'fbr_access_code' => 'nullable|string|max:500',
             ]);
 
             $updateData = [
@@ -1483,6 +1484,13 @@ class FbrPosController extends Controller
                 $updateData['fbr_pos_token'] = Crypt::encryptString(trim($request->fbr_pos_token));
             }
 
+            // IRIS "Point of Sale Registration" grid Access Code — needed once at FBRIMS
+            // (fiscal component) install time. Stored encrypted so the cloud-VPS setup can be
+            // done without asking the client again.
+            if ($request->filled('fbr_access_code')) {
+                $updateData['fbr_access_code'] = Crypt::encryptString(trim($request->fbr_access_code));
+            }
+
             $company->update($updateData);
 
             return back()->with('success', 'FBR POS settings updated successfully.');
@@ -1496,10 +1504,16 @@ class FbrPosController extends Controller
         }
         $maskedPosToken = $posToken ? substr($posToken, 0, 8) . '****' . substr($posToken, -4) : '';
 
+        $accessCode = '';
+        if ($company->fbr_access_code) {
+            try { $accessCode = Crypt::decryptString($company->fbr_access_code); } catch (\Exception $e) { $accessCode = $company->fbr_access_code; }
+        }
+        $maskedAccessCode = $accessCode ? substr($accessCode, 0, 3) . '****' . substr($accessCode, -2) : '';
+
         $hasSandboxFallback = !empty($company->fbr_sandbox_token);
         $hasProductionFallback = !empty($company->fbr_production_token);
 
-        return view('fbr-pos.settings', compact('company', 'fbrLogs', 'maskedPosToken', 'hasSandboxFallback', 'hasProductionFallback'));
+        return view('fbr-pos.settings', compact('company', 'fbrLogs', 'maskedPosToken', 'maskedAccessCode', 'hasSandboxFallback', 'hasProductionFallback'));
     }
 
     public function testConnection()

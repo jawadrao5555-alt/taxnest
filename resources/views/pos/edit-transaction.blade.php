@@ -4,7 +4,7 @@
 
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
                 <div class="flex items-center space-x-3">
-                    <a href="{{ route('pos.transaction.show', $transaction->id) }}" class="inline-flex items-center text-gray-500 hover:text-emerald-600 transition text-sm">
+                    <a href="{{ request('from') === 'sale' ? route('pos.invoice.create') : route('pos.transaction.show', $transaction->id) }}" class="inline-flex items-center text-gray-500 hover:text-emerald-600 transition text-sm">
                         <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                         Back
                     </a>
@@ -34,6 +34,9 @@
             <form method="POST" action="{{ route('pos.transaction.update', $transaction->id) }}" @submit.prevent="submitForm($event)" class="space-y-6">
                 @csrf
                 @method('PUT')
+                @if(request('from') === 'sale')
+                <input type="hidden" name="from" value="sale">
+                @endif
 
                 @if($errors->any())
                 <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-xl p-4">

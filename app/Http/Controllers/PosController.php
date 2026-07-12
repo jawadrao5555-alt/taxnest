@@ -1081,6 +1081,13 @@ class PosController extends Controller
             }
         }
 
+        // Edited from the sale screen (F10/F11 modals pass from=sale) → return the cashier
+        // straight back to the sale screen instead of the transaction detail page.
+        if ($request->input('from') === 'sale') {
+            return redirect()->route('pos.invoice.create')
+                ->with('success', 'Invoice updated successfully!' . $praMessage);
+        }
+
         return redirect()->route('pos.transaction.show', $transaction->id)
             ->with('success', 'Invoice updated successfully!' . $praMessage);
     }

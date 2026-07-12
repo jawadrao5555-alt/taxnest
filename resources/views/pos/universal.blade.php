@@ -1124,7 +1124,7 @@ window.addEventListener('popstate', function() {
                         </div>
                         <p class="text-[11px] text-gray-500 ml-7 mb-2" x-text="bill.items_count + ' item(s) • ' + bill.created_human"></p>
                         <div class="flex gap-2 ml-7">
-                            <a :href="'{{ url('/pos/transaction') }}/' + bill.id + '/edit'" class="flex-1 py-2 text-xs font-bold text-blue-700 border border-blue-300 rounded-xl hover:bg-blue-50 transition text-center flex items-center justify-center gap-1">
+                            <a :href="'{{ url('/pos/transaction') }}/' + bill.id + '/edit?from=sale'" class="flex-1 py-2 text-xs font-bold text-blue-700 border border-blue-300 rounded-xl hover:bg-blue-50 transition text-center flex items-center justify-center gap-1">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                 Edit
                             </a>
@@ -1238,7 +1238,7 @@ window.addEventListener('popstate', function() {
                             <p class="text-[10px] text-red-500 ml-7 mb-2 font-mono truncate" x-text="'⚠ ' + bill.error_code"></p>
                         </template>
                         <div class="flex gap-2 ml-7 mt-2">
-                            <a :href="'{{ url('/pos/transaction') }}/' + bill.id + '/edit'" class="flex-1 py-2 text-xs font-bold text-blue-700 border border-blue-300 rounded-xl hover:bg-blue-50 transition text-center flex items-center justify-center gap-1">
+                            <a :href="'{{ url('/pos/transaction') }}/' + bill.id + '/edit?from=sale'" class="flex-1 py-2 text-xs font-bold text-blue-700 border border-blue-300 rounded-xl hover:bg-blue-50 transition text-center flex items-center justify-center gap-1">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                 Edit
                             </a>
@@ -3412,7 +3412,7 @@ function restaurantPos() {
                 if (e.key === 'ArrowDown') { e.preventDefault(); this.activeLocalIndex = Math.min(this.activeLocalIndex + 1, this.localBills.length - 1); }
                 else if (e.key === 'ArrowUp') { e.preventDefault(); this.activeLocalIndex = Math.max(this.activeLocalIndex - 1, 0); }
                 else if (e.key === 'Enter') { e.preventDefault(); this.askPromoteMethod(this.localBills[this.activeLocalIndex]); }
-                else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); window.location.href = '{{ url('/pos/transaction') }}/' + this.localBills[this.activeLocalIndex].id + '/edit'; }
+                else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); window.location.href = '{{ url('/pos/transaction') }}/' + this.localBills[this.activeLocalIndex].id + '/edit?from=sale'; }
                 else if ((e.key === 'd' || e.key === 'D') && this.posRole !== 'pos_cashier') { e.preventDefault(); this.deleteProvisional(this.localBills[this.activeLocalIndex]); }
                 else if (e.key === 'Escape') { e.preventDefault(); this.showLocalBills = false; }
                 return;
@@ -3426,7 +3426,7 @@ function restaurantPos() {
                 if (e.key === 'ArrowDown') { e.preventDefault(); this.activeFailedIndex = Math.min(this.activeFailedIndex + 1, this.failedBills.length - 1); }
                 else if (e.key === 'ArrowUp') { e.preventDefault(); this.activeFailedIndex = Math.max(this.activeFailedIndex - 1, 0); }
                 else if (e.key === 'Enter') { e.preventDefault(); this.retryFailed(this.failedBills[this.activeFailedIndex]); }
-                else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); window.location.href = '{{ url('/pos/transaction') }}/' + this.failedBills[this.activeFailedIndex].id + '/edit'; }
+                else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); window.location.href = '{{ url('/pos/transaction') }}/' + this.failedBills[this.activeFailedIndex].id + '/edit?from=sale'; }
                 else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); this.deleteFailed(this.failedBills[this.activeFailedIndex]); }
                 else if (e.key === 'Escape') { e.preventDefault(); this.showFailedBills = false; }
                 return;
@@ -4224,16 +4224,35 @@ function restaurantPos() {
                     // Remove from list (no longer provisional) regardless of submitted vs queued.
                     this.localBills = this.localBills.filter(b => b.id !== bill.id);
                     if (this.activeLocalIndex >= this.localBills.length) this.activeLocalIndex = Math.max(0, this.localBills.length - 1);
-                    if (this.localBills.length === 0) { this.showLocalBills = false; this.activeLocalIndex = 0; }
+                    if (this.localBills.length === 0) { this.activeLocalIndex = 0; }
                     this.showPromoteMethod = false;
                     this.promoteTarget = null;
                     this.showToast(data.message || ('Finalized' + (data.invoice_number ? ' — ' + data.invoice_number : '')), 'success');
+                    // Finalized provisional = a completed sale → show the SAME persistent receipt
+                    // popup as a normal sale finish. Auto-print honors the header toggle via
+                    // runAutoPrintChain (no-op when Auto-Print is OFF).
+                    this.showLocalBills = false;
+                    this.lastInvoiceNumber = data.invoice_number || bill.invoice_number || '';
+                    this.lastTransactionId = data.id || bill.id;
+                    this.lastOrderId = null; // provisional bills have no restaurant order
+                    this.lastTotal = Math.round(parseFloat(data.total_amount ?? bill.total_amount) || 0);
+                    this.lastPaymentMethod = method || bill.payment_method || 'cash';
+                    this.lastPraNumber = data.pra_number || '';
+                    this.lastPraStatus = data.submitted ? 'completed' : (data.queued ? 'pending' : '');
+                    this.lastItemsCount = parseFloat(bill.items_count) || 0;
+                    this.lastSaleAt = Date.now();
+                    this.showReceipt = true;
+                    this.scheduleReceiptAutoClose();
+                    this.runAutoPrintChain(null);
                 } else {
                     // Failed — refresh list so cashier sees current state.
                     this.showToast((data && data.message) || 'Submit failed', 'error');
                     this.showPromoteMethod = false;
                     this.promoteTarget = null;
                     this.loadLocalBills();
+                    // Promote failure usually means the bill is now final-but-offline/failed —
+                    // refresh the F11 badge so the cashier sees it immediately.
+                    this.loadFailedBills();
                 }
             } catch (e) {
                 console.error('promoteProvisional', e);
@@ -4241,6 +4260,7 @@ function restaurantPos() {
                 this.showPromoteMethod = false;
                 this.promoteTarget = null;
                 this.loadLocalBills();
+                this.loadFailedBills();
             } finally {
                 this.promoteSubmitting = false;
             }

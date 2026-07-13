@@ -78,14 +78,20 @@
                         <td class="py-2.5 text-right font-medium text-gray-900 dark:text-white">PKR {{ number_format($bill->total_amount) }}</td>
                         <td class="py-2.5 text-gray-700 dark:text-gray-300">{{ $bill->creator?->name ?? '-' }}</td>
                         <td class="py-2.5 text-right whitespace-nowrap">
-                            @if($bill->created_at->gte($monthStart))
-                            <button type="button"
-                                onclick="promoteLocalBill(this, {{ $bill->id }}, '{{ $bill->invoice_number }}')"
-                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 text-white hover:bg-purple-700 transition">
-                                Submit to PRA
-                            </button>
+                            @if($bill->invoice_mode === 'local')
+                                @if($bill->created_at->gte($monthStart))
+                                <button type="button"
+                                    onclick="promoteLocalBill(this, {{ $bill->id }}, '{{ $bill->invoice_number }}')"
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 text-white hover:bg-purple-700 transition">
+                                    Submit to PRA
+                                </button>
+                                @else
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">Month closed</span>
+                                @endif
                             @else
-                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">Month closed</span>
+                            {{-- Reporting-OFF final: already FINAL with a POS serial, PRA was
+                                 never involved (no fiscal) — nothing to submit. --}}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 border border-teal-200 dark:border-teal-800">Final — reporting OFF</span>
                             @endif
                         </td>
                     </tr>

@@ -2043,17 +2043,27 @@ class PosController extends Controller
 
     private function applyReportFilters($query, $tab, $cashierFilter = null)
     {
-        // Two FULLY ISOLATED report sets (owner request Jul 2026):
-        //   tab='pra'   → PRA invoices only (invoice_mode 'pra' or NULL) — default.
-        //   tab='local' → local invoices only (invoice_mode='local'), INCLUDING
-        //                 archived ones (local finals + day-close archived), so the
-        //                 hide_archived scope must be bypassed. Admin-only (callers
-        //                 force 'pra' for cashiers).
+        // Two FULLY ISOLATED report sets (owner rule Jul 2026) — split by whether the
+        // bill was actually REPORTED to PRA (fiscal), not just by invoice_mode:
+        //   tab='pra'   → bills in the PRA pipeline: pra_status NOT NULL (pending /
+        //                 completed / failed / offline) OR a PRA fiscal number exists.
+        //   tab='local' → bills PRA never saw: L-series (invoice_mode='local') PLUS
+        //                 reporting-OFF finals (mode pra/NULL + pra_status NULL + no
+        //                 fiscal number — "jis pe PRA fiscal nahi aya wo local hai").
+        //                 INCLUDING archived ones, so hide_archived is bypassed.
+        //                 Admin-only (callers force 'pra' for cashiers).
         if ($tab === 'local') {
-            $query->withoutGlobalScope('hide_archived')->where('invoice_mode', 'local');
+            $query->withoutGlobalScope('hide_archived')->where(function ($sub) {
+                $sub->where('invoice_mode', 'local')
+                    ->orWhere(function ($s) {
+                        $s->whereNull('pra_status')->whereNull('pra_invoice_number');
+                    });
+            });
         } else {
             $query->where(function ($sub) {
                 $sub->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+            })->where(function ($sub) {
+                $sub->whereNotNull('pra_status')->orWhereNotNull('pra_invoice_number');
             });
         }
 
@@ -2169,7 +2179,14 @@ class PosController extends Controller
             $localBills = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->where('status', 'completed')
-                ->where('invoice_mode', 'local')
+                // Same non-reported set as applyReportFilters: L-series bills PLUS
+                // reporting-OFF finals (no PRA fiscal ever).
+                ->where(function ($sub) {
+                    $sub->where('invoice_mode', 'local')
+                        ->orWhere(function ($s) {
+                            $s->whereNull('pra_status')->whereNull('pra_invoice_number');
+                        });
+                })
                 ->when($cashierFilter && $cashierFilter !== 'all', fn ($q) => $q->where('created_by', $cashierFilter))
                 ->with('creator')
                 ->orderByDesc('created_at')
@@ -4562,9 +4579,12 @@ class PosController extends Controller
     {
         $year = now()->format('Y');
 
+        // Order by the NUMERIC serial, NOT by id: a promoted local bill (old row,
+        // low id) is RENUMBERED to the newest serial — id-ordering would then read
+        // a stale max from the latest row and hand out a DUPLICATE serial.
         $lastTransaction = PosTransaction::where('company_id', $companyId)
             ->where('invoice_number', 'like', "POS-{$year}-%")
-            ->orderBy('id', 'desc')
+            ->orderByRaw(\App\Helpers\DbCompat::cast('SUBSTR(invoice_number, 10)', 'int') . ' DESC')
             ->lockForUpdate()
             ->first();
 

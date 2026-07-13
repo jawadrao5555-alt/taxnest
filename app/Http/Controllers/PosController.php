@@ -123,6 +123,7 @@ class PosController extends Controller
                 'show_ntn' => $request->has('rp_show_ntn'),
                 'show_email' => $request->has('rp_show_email'),
                 'show_mobile' => $request->has('rp_show_mobile'),
+                'show_cashier' => $request->has('rp_show_cashier'),
                 'show_footer' => $request->has('rp_show_footer'),
                 'footer_text' => trim((string) $request->input('rp_footer_text', '')) ?: null,
             ];

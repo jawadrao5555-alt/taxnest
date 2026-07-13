@@ -48,6 +48,10 @@
                     <input type="checkbox" name="rp_show_mobile" value="1" {{ $rp['show_mobile'] ? 'checked' : '' }} class="rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4">
                     <span class="text-sm text-gray-800 dark:text-gray-200">Show Phone / Mobile</span>
                 </label>
+                <label class="flex items-center gap-2.5 cursor-pointer p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700 transition">
+                    <input type="checkbox" name="rp_show_cashier" value="1" {{ $rp['show_cashier'] ? 'checked' : '' }} class="rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4">
+                    <span class="text-sm text-gray-800 dark:text-gray-200">Show Cashier Details</span>
+                </label>
             </div>
             <div class="mt-4 p-3 rounded-lg border-2 {{ ($company->pos_receipt_show_tax ?? true) ? 'border-amber-400 bg-amber-50/40 dark:bg-amber-900/10' : 'border-gray-200 dark:border-gray-700' }}">
                 <label class="flex items-start gap-2.5 cursor-pointer">

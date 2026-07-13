@@ -146,7 +146,9 @@
     </div>
     @endif
 
+    @if($rp['show_cashier'])
     <p class="cashier-line">Cashier: {{ $transaction->creator->name ?? 'Staff' }}</p>
+    @endif
 
     <hr class="sep-bold">
 

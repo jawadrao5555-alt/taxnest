@@ -157,6 +157,7 @@ class Company extends Model
             'show_ntn' => true,
             'show_email' => true,
             'show_mobile' => true,
+            'show_cashier' => true,
             'show_footer' => true,
             'footer_text' => null,
         ];
@@ -171,7 +172,7 @@ class Company extends Model
 
         $merged = array_merge($defaults, is_array($prefs) ? $prefs : []);
 
-        foreach (['show_address', 'show_ntn', 'show_email', 'show_mobile', 'show_footer'] as $k) {
+        foreach (['show_address', 'show_ntn', 'show_email', 'show_mobile', 'show_cashier', 'show_footer'] as $k) {
             $merged[$k] = filter_var($merged[$k], FILTER_VALIDATE_BOOLEAN);
         }
 

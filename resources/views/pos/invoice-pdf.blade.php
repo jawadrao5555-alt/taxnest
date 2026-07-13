@@ -135,7 +135,8 @@
                 <div class="lbl">Payment</div>
                 <div class="val">{{ ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</div>
             </div>
-            @if($transaction->creator)
+            @php $rpPdf = optional($transaction->company)->displayPrefs('pos') ?? \App\Models\Company::defaultDisplayPrefs(); @endphp
+            @if($transaction->creator && $rpPdf['show_cashier'])
             <div class="info-row">
                 <div class="lbl">Cashier</div>
                 <div class="val">{{ $transaction->creator->name }}</div>

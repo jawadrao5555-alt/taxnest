@@ -45,6 +45,87 @@
         </form>
     </div>
 
+    @if(($tab ?? 'pra') === 'local' && isset($localBills))
+    {{-- ── Local Invoices list (admin-only tab) ──
+         Current-month bills can be promoted to PRA (gets a real POS serial +
+         counts toward the monthly bill quota). Previous months are CLOSED —
+         view/report only, the promote option disappears. --}}
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Local Invoices</h3>
+            <span class="text-xs text-gray-500">Sirf current month ke bills PRA par submit ho sakte hain</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm table-cards">
+                <thead>
+                    <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-700">
+                        <th class="pb-2">Date</th>
+                        <th class="pb-2">Invoice #</th>
+                        <th class="pb-2">Customer</th>
+                        <th class="pb-2">Method</th>
+                        <th class="pb-2 text-right">Total</th>
+                        <th class="pb-2">Cashier</th>
+                        <th class="pb-2 text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($localBills as $bill)
+                    <tr class="border-b border-gray-50 dark:border-gray-800">
+                        <td class="py-2.5 text-gray-700 dark:text-gray-300 whitespace-nowrap">{{ $bill->created_at->format('d M Y H:i') }}</td>
+                        <td class="py-2.5 font-medium text-gray-900 dark:text-white">{{ $bill->invoice_number }}</td>
+                        <td class="py-2.5 text-gray-700 dark:text-gray-300">{{ $bill->customer_name ?: 'Walk-in' }}</td>
+                        <td class="py-2.5 text-gray-700 dark:text-gray-300">{{ ucwords(str_replace('_', ' ', $bill->payment_method)) }}</td>
+                        <td class="py-2.5 text-right font-medium text-gray-900 dark:text-white">PKR {{ number_format($bill->total_amount) }}</td>
+                        <td class="py-2.5 text-gray-700 dark:text-gray-300">{{ $bill->creator?->name ?? '-' }}</td>
+                        <td class="py-2.5 text-right whitespace-nowrap">
+                            @if($bill->created_at->gte($monthStart))
+                            <button type="button"
+                                onclick="promoteLocalBill(this, {{ $bill->id }}, '{{ $bill->invoice_number }}')"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 text-white hover:bg-purple-700 transition">
+                                Submit to PRA
+                            </button>
+                            @else
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">Month closed</span>
+                            @endif
+                        </td>
+                    </tr>
+                    @empty
+                    <tr><td colspan="7" class="py-6 text-center text-gray-400">No local invoices</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        @if($localBills->hasPages())
+        <div class="mt-4">{{ $localBills->links() }}</div>
+        @endif
+    </div>
+    <script>
+        function promoteLocalBill(btn, id, number) {
+            if (!confirm('Bill ' + number + ' ko PRA par submit karein?\n\n• Ye bill FINAL ho jayega aur naya POS serial number milega\n• Monthly bill quota mein count hoga\n• Ye action wapis nahi ho sakta')) return;
+            btn.disabled = true; btn.textContent = 'Submitting…';
+            fetch('{{ url('/pos/api/provisional-bills') }}/' + id + '/promote', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ send_to_pra: true })
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                alert(data.message || (data.success ? 'Done' : 'Failed'));
+                if (data.success) { window.location.reload(); }
+                else { btn.disabled = false; btn.textContent = 'Submit to PRA'; }
+            })
+            .catch(function () {
+                alert('Network error — dobara koshish karein.');
+                btn.disabled = false; btn.textContent = 'Submit to PRA';
+            });
+        }
+    </script>
+    @endif
+
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Payment Method Summary (This Month)</h3>

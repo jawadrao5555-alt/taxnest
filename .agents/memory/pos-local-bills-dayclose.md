@@ -13,6 +13,13 @@ description: Retention rules, cashier-gate trap, and midnight auto-close semanti
 ## Purge query invariant
 - Day-close "purge local bills" must target ONLY `invoice_mode='local' AND pra_status='local'` (provisionals). Reporting-OFF finals are `mode + NULL` and must NEVER be swept. A looser query silently deletes/archives real finals.
 
+## Local Invoices report tab & promote month-gate — Jul 2026
+- Sales Reports + Tax Reports have an ADMIN-ONLY "Local Invoices" tab (`?tab=local`), fully isolated from the PRA tab via `applyReportFilters()` — local tab bypasses `hide_archived` + filters `invoice_mode='local'`; PRA tab stays pra/NULL. ALL five entry points (reports, reports CSV, taxReports, tax CSV, tax PDF) force `tab='pra'` for non-admins server-side; the tab is also hidden in mode-tabs for cashiers.
+- **Promote month gate (owner rule):** only CURRENT-calendar-month local bills may be promoted to PRA — previous months are CLOSED (view/report only). Enforced in BOTH promote paths (apiPromoteProvisional 422 MONTH_CLOSED + retryPra back-error), not just hidden in UI.
+- **Promote always renumbers + un-archives:** every local→final promotion allots a fresh POS-YYYY-NNNNN serial (leaves the L-series) and sets `is_archived=false`. retryPra's local branch goes through the race-safe `promoteLocalToPosSerial()` helper (lock + re-verify triple inside the txn) — do NOT revert it to a bare `update()` (double-POST would burn/clobber serials).
+- **Archived local bills promotable by ADMINS only** (apiPromoteProvisional 403 ARCHIVED_ADMIN_ONLY for cashiers) — a cashier must not resurrect a bill the owner deliberately finalized as LOCAL.
+- Promote consumes monthly bill quota (pre-existing gate) — owner confirmed this is intended.
+
 ## Local Final (promote without PRA) — Jul 2026
 - Promote modal offers "Finalize LOCAL" (send_to_pra=false): bill keeps its local triple + local number/amounts, is `is_archived=true` on the spot → leaves F10, stays in Local Bills Portal. `archived_by_report_id` stays NULL — nothing depends on it; Archive Portal filters mode to pra/NULL so local finals never leak there.
 - `receipt()` bypasses hide_archived ONLY for `invoice_mode='local'` bills (post-finalize popup needs it); archived PRA bills stay hidden.

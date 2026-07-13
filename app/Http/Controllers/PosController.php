@@ -1154,6 +1154,49 @@ class PosController extends Controller
             ->with('success', 'Invoice ' . $transaction->invoice_number . ' deleted successfully.');
     }
 
+    /**
+     * Race-safe local→final promotion for retryPra: locks + re-verifies the bill is
+     * still a genuine provisional (triple completed/local/local) INSIDE the transaction
+     * before allotting the POS serial — a double-POST (or a race with
+     * apiPromoteProvisional) must never renumber twice or clobber a bill already
+     * queued/submitted to PRA. Returns false when the bill is no longer promotable.
+     * $newPraStatus: 'pending' (reporting ON, will submit) or null (reporting OFF final).
+     */
+    private function promoteLocalToPosSerial(PosTransaction $transaction, int $companyId, ?string $newPraStatus): bool
+    {
+        try {
+            DB::transaction(function () use ($transaction, $companyId, $newPraStatus) {
+                $locked = PosTransaction::withoutGlobalScope('hide_archived')
+                    ->where('company_id', $companyId)
+                    ->where('id', $transaction->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$locked || $locked->pra_status !== 'local' || $locked->status !== 'completed' || $locked->invoice_mode !== 'local') {
+                    throw new \RuntimeException('NOT_PROVISIONAL');
+                }
+
+                $locked->update([
+                    // Local serial leaves the L-series: promoted finals always get
+                    // a real POS serial (owner rule Jul 2026).
+                    'invoice_number' => $this->generateInvoiceNumber($companyId),
+                    'pra_status' => $newPraStatus,
+                    'invoice_mode' => 'pra',
+                    'pra_response_code' => null,
+                    // Un-archive: a promoted bill is a live PRA bill and must appear
+                    // on the normal POS surfaces.
+                    'is_archived' => false,
+                    'archived_at' => null,
+                ]);
+            });
+        } catch (\RuntimeException $e) {
+            return false;
+        }
+
+        $transaction->refresh();
+        return true;
+    }
+
     public function retryPra($id)
     {
         $companyId = app('currentCompanyId');
@@ -1185,17 +1228,20 @@ class PosController extends Controller
             if (!($quota['allowed'] ?? true)) {
                 return back()->with('error', $quota['reason']);
             }
+            // MONTH GATE (owner rule Jul 2026): only CURRENT-MONTH local bills may be
+            // promoted to PRA — previous months are closed (report/view only).
+            if ($transaction->created_at && $transaction->created_at->lt(now()->startOfMonth())) {
+                return back()->with('error', 'Sirf CURRENT month ke local bills PRA par submit ho sakte hain — pichhle month ke bills close ho chuke hain.');
+            }
         }
 
         if (!$company->pra_reporting_enabled) {
             // PRA-reporting-OFF company promoting a provisional → finalize WITHOUT any
             // PRA submission: 'pra' mode + NULL pra_status = normal final bill.
             if ($transaction->pra_status === 'local') {
-                $transaction->update([
-                    'pra_status' => null,
-                    'invoice_mode' => 'pra',
-                    'pra_response_code' => null,
-                ]);
+                if (!$this->promoteLocalToPosSerial($transaction, $companyId, null)) {
+                    return back()->with('error', 'Bill is no longer a provisional/local bill — refresh the page and try again.');
+                }
                 return back()->with('success', 'Bill ' . $transaction->invoice_number . ' is now FINAL. PRA reporting is OFF — no PRA submission needed.');
             }
             return back()->with('error', 'PRA reporting is currently disabled. Enable it from PRA Settings first.');
@@ -1204,11 +1250,9 @@ class PosController extends Controller
         // Promoting a provisional bill to final — flip mode + status before submission so
         // generators / templates treat it as a real PRA invoice from this point onward.
         if ($transaction->pra_status === 'local') {
-            $transaction->update([
-                'pra_status' => 'pending',
-                'invoice_mode' => 'pra',
-                'pra_response_code' => null,
-            ]);
+            if (!$this->promoteLocalToPosSerial($transaction, $companyId, 'pending')) {
+                return back()->with('error', 'Bill is no longer a provisional/local bill — refresh the page and try again.');
+            }
         }
 
         // ENTERPRISE SAFE MODE — Phase 1: agent-enabled companies just re-queue; the agent polls every 10s.
@@ -1468,7 +1512,10 @@ class PosController extends Controller
                 // Race-safe: lock the row and re-verify it is still a genuine provisional.
                 // The F10 modal fires promote on Enter, so double-Enter is a real
                 // double-promote path — the lock + re-check closes it.
-                $tx = PosTransaction::where('company_id', $companyId)
+                // hide_archived bypassed: archived local bills (local finals / day-close
+                // archived) are promotable from the Local Invoices report too.
+                $tx = PosTransaction::withoutGlobalScope('hide_archived')
+                    ->where('company_id', $companyId)
                     ->where('id', $id)
                     ->lockForUpdate()
                     ->first();
@@ -1478,6 +1525,20 @@ class PosController extends Controller
                 }
                 if ($tx->pra_status !== 'local' || $tx->status !== 'completed' || $tx->invoice_mode !== 'local') {
                     throw new \RuntimeException('NOT_PROVISIONAL:' . $tx->status . '/' . $tx->pra_status);
+                }
+
+                // ARCHIVED local bills (deliberate LOCAL FINALS / day-close archived)
+                // are promotable ONLY by admins — cashiers use F10 for LIVE provisionals
+                // and must not resurrect a bill the owner finalized as local.
+                if ($tx->is_archived && !(auth('pos')->user()?->isPosAdmin())) {
+                    throw new \RuntimeException('ARCHIVED_ADMIN_ONLY');
+                }
+
+                // MONTH GATE (owner rule Jul 2026): only CURRENT-MONTH local bills may
+                // be promoted to PRA. Once the month changes, previous-month locals are
+                // closed — view/report only, never submitted late to PRA.
+                if ($tx->created_at && $tx->created_at->lt(now()->startOfMonth())) {
+                    throw new \RuntimeException('MONTH_CLOSED');
                 }
 
                 $payMethod = $method ?? $tx->payment_method;
@@ -1517,6 +1578,10 @@ class PosController extends Controller
                     'invoice_mode'      => 'pra',
                     'pra_status'        => $reportingOn ? 'pending' : null,
                     'pra_response_code' => null,
+                    // Un-archive: a promoted bill is a live PRA bill and must appear
+                    // on the normal POS surfaces (archived local finals included).
+                    'is_archived'       => false,
+                    'archived_at'       => null,
                 ]);
 
                 // Re-tax each line for the new rate — the PRA payload reads per-item tax_rate.
@@ -1545,6 +1610,18 @@ class PosController extends Controller
             $msg = $e->getMessage();
             if ($msg === 'NOT_FOUND') {
                 return response()->json(['success' => false, 'message' => 'Bill not found'], 404);
+            }
+            if ($msg === 'MONTH_CLOSED') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Sirf CURRENT month ke local bills PRA par submit ho sakte hain — pichhle month ke bills close ho chuke hain (sirf report mein dekhe ja sakte hain).',
+                ], 422);
+            }
+            if ($msg === 'ARCHIVED_ADMIN_ONLY') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ye bill LOCAL FINAL ho chuka hai — sirf company admin ise PRA par submit kar sakta hai.',
+                ], 403);
             }
             if (str_starts_with($msg, 'NOT_PROVISIONAL:')) {
                 return response()->json([
@@ -1966,11 +2043,19 @@ class PosController extends Controller
 
     private function applyReportFilters($query, $tab, $cashierFilter = null)
     {
-        // Local bills are NEVER shown in the normal POS panel — they live only in
-        // the isolated Local Bills Portal (pos_role='local_viewer').
-        $query->where(function ($sub) {
-            $sub->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
-        });
+        // Two FULLY ISOLATED report sets (owner request Jul 2026):
+        //   tab='pra'   → PRA invoices only (invoice_mode 'pra' or NULL) — default.
+        //   tab='local' → local invoices only (invoice_mode='local'), INCLUDING
+        //                 archived ones (local finals + day-close archived), so the
+        //                 hide_archived scope must be bypassed. Admin-only (callers
+        //                 force 'pra' for cashiers).
+        if ($tab === 'local') {
+            $query->withoutGlobalScope('hide_archived')->where('invoice_mode', 'local');
+        } else {
+            $query->where(function ($sub) {
+                $sub->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+            });
+        }
 
         if ($cashierFilter && $cashierFilter !== 'all') {
             $query->where('created_by', $cashierFilter);
@@ -1983,11 +2068,11 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        // Local bills excluded from all normal reporting (Local Bills Portal only).
-        $tab = 'pra';
 
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
+        // Local Invoices tab is ADMIN-ONLY — cashiers are always forced to PRA.
+        $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin()) ? 'local' : 'pra';
         $cashierFilter = $request->get('cashier', 'all');
 
         if ($isCashier && $cashierFilter !== 'all' && $cashierFilter != $user->id) {
@@ -2044,18 +2129,35 @@ class PosController extends Controller
         $localCount = 0;
         $selectedCashier = $cashierFilter;
 
-        return view('pos.reports', compact('dailySales', 'paymentSummary', 'topItems', 'monthlyTrend', 'tab', 'hasPinSet', 'localCount', 'user', 'teamMembers', 'isCashier', 'selectedCashier'));
+        // Local tab: list the individual local invoices so the admin can promote
+        // any CURRENT-MONTH bill to PRA (previous months are closed — view only).
+        $localBills = null;
+        $monthStart = now()->startOfMonth();
+        if ($tab === 'local') {
+            $localBills = PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->where('status', 'completed')
+                ->where('invoice_mode', 'local')
+                ->when($cashierFilter && $cashierFilter !== 'all', fn ($q) => $q->where('created_by', $cashierFilter))
+                ->with('creator')
+                ->orderByDesc('created_at')
+                ->orderByDesc('id')
+                ->paginate(50)
+                ->withQueryString();
+        }
+
+        return view('pos.reports', compact('dailySales', 'paymentSummary', 'topItems', 'monthlyTrend', 'tab', 'hasPinSet', 'localCount', 'user', 'teamMembers', 'isCashier', 'selectedCashier', 'localBills', 'monthStart'));
     }
 
     public function exportReportCsv(Request $request)
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        // Local bills excluded from exports (Local Bills Portal only).
-        $tab = 'pra';
 
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
+        // Local export is ADMIN-ONLY — cashiers always export PRA data.
+        $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin()) ? 'local' : 'pra';
         $cashierFilter = $request->get('cashier', 'all');
 
         if ($isCashier && $cashierFilter !== 'all' && $cashierFilter != $user->id) {
@@ -2065,7 +2167,7 @@ class PosController extends Controller
         $transactions = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
             ->where('created_at', '>=', now()->subDays(30))
-            ->where(function ($s) { $s->where('invoice_mode', 'pra')->orWhereNull('invoice_mode'); })
+            ->tap(fn ($q) => $this->applyReportFilters($q, $tab))
             ->when($cashierFilter && $cashierFilter !== 'all', fn($q) => $q->where('created_by', $cashierFilter))
             ->with('creator')
             ->orderBy('created_at', 'desc')
@@ -2117,8 +2219,8 @@ class PosController extends Controller
             ->where('status', 'completed')
             ->with('terminal');
 
-        // Local bills excluded everywhere in the normal POS panel (Local Bills Portal only).
-        $query->where(function ($q) { $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode'); });
+        // Isolated tab sets: PRA (default) vs Local (admin-only, callers gate).
+        $this->applyReportFilters($query, $tab);
 
         if (!$skipTaxRateFilter && $request->filled('tax_rate')) {
             if ($request->tax_rate === 'exempt') {
@@ -2267,8 +2369,8 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        // Local bills excluded from tax reports (Local Bills Portal only).
-        $tab = 'pra';
+        // Local Invoices tab is ADMIN-ONLY — cashiers are always forced to PRA.
+        $tab = ($request->get('tab') === 'local' && auth('pos')->user()?->isPosAdmin()) ? 'local' : 'pra';
 
         $taxRateFilter = $request->filled('tax_rate') ? $request->tax_rate : null;
 
@@ -2314,8 +2416,8 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        // Local bills excluded from tax report exports (Local Bills Portal only).
-        $tab = 'pra';
+        // Local export is ADMIN-ONLY — cashiers always export PRA data.
+        $tab = ($request->get('tab') === 'local' && auth('pos')->user()?->isPosAdmin()) ? 'local' : 'pra';
 
         $taxRateFilter = $request->filled('tax_rate') ? $request->tax_rate : null;
 
@@ -2451,8 +2553,8 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        // Local bills excluded from tax report exports (Local Bills Portal only).
-        $tab = 'pra';
+        // Local export is ADMIN-ONLY — cashiers always export PRA data.
+        $tab = ($request->get('tab') === 'local' && auth('pos')->user()?->isPosAdmin()) ? 'local' : 'pra';
 
         $taxRateFilter = $request->filled('tax_rate') ? $request->tax_rate : null;
 

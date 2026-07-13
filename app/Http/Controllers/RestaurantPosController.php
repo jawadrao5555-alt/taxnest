@@ -540,7 +540,8 @@ class RestaurantPosController extends Controller
         // promoted to final via PosController::retryPra (the "Submit to PRA — Make Final"
         // button on the transaction-show provisional card).
         $saveAsProvisional = (bool) $request->input('save_as_provisional', false);
-        $praEnabled = (bool) $company->pra_reporting_enabled && !$saveAsProvisional;
+        // Per-cashier toggle (owner rule Jul 2026): the ACTING user's own reporting switch.
+        $praEnabled = (bool) auth('pos')->user()?->praReportingEnabled($company) && !$saveAsProvisional;
         // Reporting-OFF Finals Invariant — three-branch (mirrors PosController::storeInvoice):
         // provisional → local/'local'; reporting-ON final → pra/'pending';
         // reporting-OFF FINAL → pra/NULL (NEVER 'local' — local mode hides the bill from
@@ -833,10 +834,13 @@ class RestaurantPosController extends Controller
         // PosController::generateLocalInvoiceNumber so retail + restaurant share one sequence
         // per company. Exclude legacy "LOCAL-YYYY-NNNNN" rows from the new "L-%" pattern so
         // the counter is not corrupted on companies that have legacy provisional bills.
+        // Order by NUMERIC serial, not id — mirrors PosController::generateLocalInvoiceNumber
+        // (draft-resume POS→L downgrade can put the max L number on an old row; id-ordering
+        // would re-issue it and trip UNIQUE(company_id, invoice_number)).
         $lastTransaction = PosTransaction::where('company_id', $companyId)
             ->where('invoice_number', 'like', 'L-%')
             ->where('invoice_number', 'not like', 'LOCAL-%')
-            ->orderBy('id', 'desc')
+            ->orderByRaw(\App\Helpers\DbCompat::cast("SUBSTR(invoice_number, 3)", 'int') . ' DESC')
             ->lockForUpdate()
             ->first();
 
@@ -1273,7 +1277,7 @@ class RestaurantPosController extends Controller
         $dashboardStyle = in_array($company->pos_dashboard_style, $allowedStyles) ? $company->pos_dashboard_style : 'default';
         $isRestaurant = true;
         $isAdmin = in_array($user->pos_role ?? $user->role ?? '', ['pos_admin', 'company_admin']);
-        $praStatus = $company->pra_reporting_enabled;
+        $praStatus = (bool) $user?->praReportingEnabled($company);
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
 
         return view('pos.restaurant.dashboard', compact(

@@ -2092,11 +2092,12 @@ function restaurantPos() {
         promoteSubmitting: false,
         showHeldOrders: false,
         // ── PRA REPORTING TOGGLE (root scope so modals/buttons can read it) ───
-        // Mirrors $company->pra_reporting_enabled. Used by Provisional/Failed bill
+        // Mirrors the logged-in user's OWN reporting switch (per-cashier toggle,
+        // owner rule Jul 2026). Used by Provisional/Failed bill
         // action buttons (:disabled="!praEnabled"). Was previously defined only in
         // a nested x-data on the toggle strip → caused "praEnabled is not defined"
         // Alpine crashes inside the modals which broke the whole page (incl. Pay).
-        praEnabled: {{ ($company->pra_reporting_enabled ?? false) ? 'true' : 'false' }},
+        praEnabled: {{ (auth('pos')->user()?->praReportingEnabled($company) ?? false) ? 'true' : 'false' }},
         praLoading: false,
         // ── GUIDED KEYBOARD BILLING FLOW (opt-in, default OFF) ───────────────
         // Mirrors $company->pos_guided_flow_enabled. When false EVERY keyboard

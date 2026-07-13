@@ -231,7 +231,7 @@
                 @php
                     $company = \App\Models\Company::find(app('currentCompanyId'));
                 @endphp
-                @if($company && $company->pra_reporting_enabled)
+                @if($company && auth('pos')->user()?->praReportingEnabled($company))
                 <form method="POST" action="{{ route('pos.transaction.retry-pra', $transaction->id) }}" onsubmit="return confirm('Submit this bill to PRA as a FINAL invoice?\n\nOnce reported, the bill will be locked — no more edit or delete. Continue?');">
                     @csrf
                     <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-lg transition shadow-md shadow-purple-600/20">

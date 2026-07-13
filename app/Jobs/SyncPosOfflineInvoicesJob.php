@@ -29,7 +29,10 @@ class SyncPosOfflineInvoicesJob implements ShouldQueue
         foreach ($transactions as $transaction) {
             $company = $transaction->company;
 
-            if (!$company || !$company->pra_reporting_enabled) {
+            // Per-cashier toggle (owner rule Jul 2026): offline bills were queued by a
+            // user whose own switch was ON — sync them if reporting is active for ANY
+            // account of the company (company flag OR any user's personal toggle).
+            if (!$company || !$company->praReportingActive()) {
                 continue;
             }
 

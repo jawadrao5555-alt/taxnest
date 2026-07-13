@@ -729,7 +729,7 @@
                 services: @json($services),
                 taxRules: @json($taxRules),
                 posCustomers: @json($posCustomers ?? []),
-                praEnabled: {{ $company->pra_reporting_enabled ? 'true' : 'false' }},
+                praEnabled: {{ (auth('pos')->user()?->praReportingEnabled($company) ?? false) ? 'true' : 'false' }},
 
                 showProducts: true,
                 toggleShowProducts() {

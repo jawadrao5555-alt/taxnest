@@ -11,7 +11,8 @@
     // POS UNIFICATION: every company (restaurant or retail) now bills on the single
     // universal sale screen (pos.universal). The legacy restaurant sale screen and its
     // per-company opt-out were retired — restaurant behavior is driven by feature flags.
-    $praEnabledLayout = $companyLayout && $companyLayout->pra_reporting_enabled;
+    // Per-cashier toggle (owner rule Jul 2026): layout badge shows THIS user's effective state.
+    $praEnabledLayout = $companyLayout && $posUserLayout && $posUserLayout->praReportingEnabled($companyLayout);
     $inventoryEnabledLayout = $companyLayout && $companyLayout->inventory_enabled;
     $companyName = $companyLayout->name ?? 'My Business';
     $userName = $posUserLayout->name ?? 'User';

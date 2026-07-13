@@ -311,7 +311,9 @@ class PosController extends Controller
             ->groupBy('payment_method')
             ->get();
 
-        $praStatus = $company->pra_reporting_enabled;
+        // Per-cashier toggle (owner rule Jul 2026): dashboard pill shows THIS user's
+        // effective reporting state, not the company-wide flag.
+        $praStatus = (bool) auth('pos')->user()?->praReportingEnabled($company);
 
         $drafts = PosTransaction::where('company_id', $companyId)
             ->where('status', 'draft')
@@ -696,7 +698,10 @@ class PosController extends Controller
             }
         }
 
-        $praEnabled = (bool) $company->pra_reporting_enabled && !$saveAsProvisional;
+        // Per-cashier toggle (owner rule Jul 2026): the ACTING user's own reporting
+        // switch decides this bill's fate — never another cashier's or (once the user
+        // has personally toggled) the company-wide flag.
+        $praEnabled = $posUser->praReportingEnabled($company) && !$saveAsProvisional;
         if ($saveAsProvisional) {
             // Deliberate provisional — editable/deletable via F10 Local modal until promoted.
             $invoiceMode = 'local';
@@ -1003,9 +1008,22 @@ class PosController extends Controller
         $taxAmount = (float) round($taxableAfterDiscount * $taxRate / 100);
         $totalAmount = (float) round($afterDiscount + $taxAmount);
 
+        // Per-cashier toggle (owner rule Jul 2026): the EDITING user's own switch
+        // decides whether this edit re-queues the bill for PRA.
+        $praEnabledEdit = (bool) auth('pos')->user()?->praReportingEnabled($company);
+        $isProvisionalEdit = ($transaction->invoice_mode === 'local' && $transaction->pra_status === 'local');
+        // Serial split: an L-series final re-queued for PRA must first get a real
+        // fiscal serial (PRA must never receive an L-NNN USIN). A POS-serial bill
+        // edited by a reporting-OFF user keeps its number (never renumber downward).
+        $invoiceNumberEdit = $transaction->invoice_number;
+        if (!$isProvisionalEdit && $praEnabledEdit && !str_starts_with($invoiceNumberEdit, 'POS-')) {
+            $invoiceNumberEdit = $this->generateInvoiceNumber($companyId);
+        }
+
         DB::beginTransaction();
         try {
             $transaction->update([
+                'invoice_number' => $invoiceNumberEdit,
                 'terminal_id' => $request->terminal_id,
                 'customer_name' => $request->customer_name,
                 'customer_phone' => $request->customer_phone,
@@ -1022,9 +1040,9 @@ class PosController extends Controller
                 // provisional stays provisional; PRA-on final re-queues as 'pending';
                 // PRA-off final keeps NULL (never regress to 'local' — that would hide
                 // it from transactions/KPIs and expose it in the F10 modal).
-                'pra_status' => ($transaction->invoice_mode === 'local' && $transaction->pra_status === 'local')
+                'pra_status' => $isProvisionalEdit
                     ? 'local'
-                    : ($company->pra_reporting_enabled ? 'pending' : null),
+                    : ($praEnabledEdit ? 'pending' : null),
                 'notes' => $request->input('kitchen_notes'),
             ]);
 
@@ -1084,7 +1102,7 @@ class PosController extends Controller
         }
 
         $praMessage = '';
-        if ($company->pra_reporting_enabled) {
+        if ($praEnabledEdit && !$isProvisionalEdit) {
             // ENTERPRISE SAFE MODE — Phase 1: agent-enabled companies bypass server-side submission.
             if ($company->agent_enabled) {
                 $transaction->update(['pra_status' => 'pending', 'pra_response_code' => null]);
@@ -1254,8 +1272,8 @@ class PosController extends Controller
             }
         }
 
-        if (!$company->pra_reporting_enabled) {
-            // PRA-reporting-OFF company promoting a provisional → finalize WITHOUT any
+        if (!auth('pos')->user()?->praReportingEnabled($company)) {
+            // PRA-reporting-OFF user promoting a provisional → finalize WITHOUT any
             // PRA submission: 'pra' mode + NULL pra_status = normal final bill.
             if ($transaction->pra_status === 'local') {
                 if (!$this->promoteLocalToPosSerial($transaction, $companyId, null)) {
@@ -1301,7 +1319,7 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
-        if (!$company->pra_reporting_enabled) {
+        if (!auth('pos')->user()?->praReportingEnabled($company)) {
             return back()->with('error', 'PRA reporting is currently disabled. Enable it from PRA Settings first.');
         }
 
@@ -1522,7 +1540,8 @@ class PosController extends Controller
             return response()->json(['success' => false, 'message' => $quota['reason']], 403);
         }
 
-        $reportingOn = (bool) $company->pra_reporting_enabled;
+        // Per-cashier toggle (owner rule Jul 2026): the promoting user's own switch decides.
+        $reportingOn = (bool) auth('pos')->user()?->praReportingEnabled($company);
         $newNumber = null;
         $newTotal  = null;
 
@@ -1762,7 +1781,7 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
-        if (!$company || !$company->pra_reporting_enabled) {
+        if (!$company || !auth('pos')->user()?->praReportingEnabled($company)) {
             return response()->json([
                 'success' => false,
                 'message' => 'PRA reporting is currently disabled. Enable it from PRA Settings first.',
@@ -2777,9 +2796,15 @@ class PosController extends Controller
             ], 422);
         }
 
+        // Per-cashier toggle (owner rule Jul 2026): flip ONLY the acting user's own
+        // switch — the company-wide flag stays untouched, so one cashier turning
+        // reporting on/off NEVER affects another cashier or the admin.
+        $togglingUser = auth('pos')->user();
+        $effectiveNow = $togglingUser->praReportingEnabled($company);
+
         // Turning PRA Reporting ON requires an NTN on file (submitted with every fiscal
         // invoice). Turning it OFF is always allowed. NTN is optional at registration.
-        if (!$company->pra_reporting_enabled && empty($company->ntn)) {
+        if (!$effectiveNow && empty($company->ntn)) {
             return response()->json([
                 'success' => false,
                 'enabled' => false,
@@ -2787,13 +2812,15 @@ class PosController extends Controller
             ], 422);
         }
 
-        $company->pra_reporting_enabled = !$company->pra_reporting_enabled;
-        $company->save();
+        $togglingUser->pra_reporting_enabled = !$effectiveNow;
+        $togglingUser->save();
 
         return response()->json([
             'success' => true,
-            'enabled' => $company->pra_reporting_enabled,
-            'message' => $company->pra_reporting_enabled ? 'PRA Reporting enabled' : 'PRA Reporting disabled',
+            'enabled' => (bool) $togglingUser->pra_reporting_enabled,
+            'message' => $togglingUser->pra_reporting_enabled
+                ? 'PRA Reporting enabled (sirf aap ke apne bills ke liye)'
+                : 'PRA Reporting disabled (sirf aap ke apne bills ke liye)',
         ]);
     }
 
@@ -4412,7 +4439,8 @@ class PosController extends Controller
         DB::beginTransaction();
         try {
             $company = Company::find($companyId);
-            $praEnabled = (bool) $company->pra_reporting_enabled;
+            // Per-cashier toggle (owner rule Jul 2026): the drafting user's own switch.
+            $praEnabled = (bool) auth('pos')->user()?->praReportingEnabled($company);
             $invoiceMode = $praEnabled ? 'pra' : 'local';
             $invoiceNumber = $invoiceMode === 'local'
                 ? $this->generateLocalInvoiceNumber($companyId)
@@ -4628,10 +4656,14 @@ class PosController extends Controller
         // can spot provisional bills at a glance in lists/receipts/PDFs.
         // Exclude legacy "LOCAL-YYYY-NNNNN" rows from the new "L-NNN" sequence — the LIKE 'L-%'
         // pattern would otherwise match both formats and corrupt the counter.
+        // Order by NUMERIC serial, not id — the draft-resume POS→L downgrade path can
+        // assign a fresh (max) L number to an OLD row, so id-ordering would re-issue it
+        // and trip the UNIQUE(company_id, invoice_number) index (same lesson as
+        // generateInvoiceNumber's numeric-ordering fix).
         $lastTransaction = PosTransaction::where('company_id', $companyId)
             ->where('invoice_number', 'like', 'L-%')
             ->where('invoice_number', 'not like', 'LOCAL-%')
-            ->orderBy('id', 'desc')
+            ->orderByRaw(\App\Helpers\DbCompat::cast("SUBSTR(invoice_number, 3)", 'int') . ' DESC')
             ->lockForUpdate()
             ->first();
 
@@ -4684,7 +4716,7 @@ class PosController extends Controller
             // NTN is submitted with EVERY PRA fiscal invoice — do not allow clearing it
             // while PRA reporting is live, or subsequent submissions would carry a null NTN.
             // (NTN is optional at registration; it only becomes mandatory once PRA is ON.)
-            if ($company->pra_reporting_enabled && $request->has('ntn') && trim((string) $request->input('ntn')) === '') {
+            if ($company->praReportingActive() && $request->has('ntn') && trim((string) $request->input('ntn')) === '') {
                 return back()->withInput()->with('error', 'PRA Reporting on hai — NTN khali nahi kiya ja sakta. Pehle PRA Reporting band karein ya sahi NTN daalein.');
             }
 

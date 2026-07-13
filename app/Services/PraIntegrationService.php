@@ -31,7 +31,10 @@ class PraIntegrationService
 
     public function isEnabled(): bool
     {
-        return (bool) $this->company->pra_reporting_enabled;
+        // Per-cashier toggle (owner rule Jul 2026): this service submits bills that
+        // were ALREADY queued (pending/offline/failed) by a user whose own switch was
+        // ON — so it's enabled when reporting is active for ANY account of the company.
+        return $this->company->praReportingActive();
     }
 
     public function getApiUrl(): string

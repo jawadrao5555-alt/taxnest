@@ -124,8 +124,9 @@
                 <div class="space-y-3 text-sm">
                     <div class="flex justify-between">
                         <span class="text-gray-500">PRA Reporting</span>
-                        <span class="{{ $company->pra_reporting_enabled ? 'text-emerald-600 font-semibold' : 'text-red-500' }}">
-                            {{ $company->pra_reporting_enabled ? 'Enabled' : 'Disabled' }}
+                        @php $praOnPraSettings = (bool) (auth('pos')->user()?->praReportingEnabled($company) ?? false); @endphp
+                        <span class="{{ $praOnPraSettings ? 'text-emerald-600 font-semibold' : 'text-red-500' }}">
+                            {{ $praOnPraSettings ? 'Enabled' : 'Disabled' }}
                         </span>
                     </div>
                     <div class="flex justify-between">

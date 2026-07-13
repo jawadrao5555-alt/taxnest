@@ -228,6 +228,24 @@ class Company extends Model
         return $this->hasMany(User::class);
     }
 
+    /**
+     * True when PRA reporting is in play for ANY account of this company —
+     * the company-level flag OR any user's personal per-cashier toggle.
+     * Used by user-less contexts (offline sync job, PraIntegrationService)
+     * and the NTN-clearing guard. Missing-column safe (pre-migration prod).
+     */
+    public function praReportingActive(): bool
+    {
+        if ($this->pra_reporting_enabled) {
+            return true;
+        }
+        try {
+            return $this->users()->where('pra_reporting_enabled', 1)->exists();
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     public function invoices()
     {
         return $this->hasMany(Invoice::class);

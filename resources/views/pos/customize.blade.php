@@ -1,7 +1,7 @@
 <x-pos-layout>
     @php
         $density = $company->pos_ui_density ? ucfirst($company->pos_ui_density) : 'Standard';
-        $praOn   = (bool) ($company->pra_reporting_enabled ?? false);
+        $praOn   = (bool) (auth('pos')->user()?->praReportingEnabled($company) ?? false);
         $agentOn = (bool) ($company->agent_enabled ?? false);
         $invOn   = (bool) ($company->inventory_enabled ?? false);
 

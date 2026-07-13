@@ -288,7 +288,7 @@
                 products: @json($products),
                 services: @json($services),
                 taxRules: @json($taxRules),
-                praEnabled: {{ $company->pra_reporting_enabled ? 'true' : 'false' }},
+                praEnabled: {{ (auth('pos')->user()?->praReportingEnabled($company) ?? false) ? 'true' : 'false' }},
 
                 customerName: @json($transaction->customer_name ?? ''),
                 customerPhone: @json($transaction->customer_phone ?? ''),

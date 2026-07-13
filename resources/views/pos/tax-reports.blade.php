@@ -29,8 +29,10 @@
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tax Rate</label>
                     <select name="tax_rate" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
                         <option value="">All Taxes</option>
-                        <option value="5" {{ request('tax_rate') == '5' ? 'selected' : '' }}>5% Tax Only</option>
-                        <option value="16" {{ request('tax_rate') == '16' ? 'selected' : '' }}>16% Tax Only</option>
+                        @foreach($availableRates ?? [] as $rate)
+                            @php $rateLabel = rtrim(rtrim(number_format($rate, 2, '.', ''), '0'), '.'); @endphp
+                            <option value="{{ $rateLabel }}" {{ request('tax_rate') !== null && request('tax_rate') !== '' && request('tax_rate') !== 'exempt' && (float) request('tax_rate') === (float) $rate ? 'selected' : '' }}>{{ $rateLabel }}% Tax Only</option>
+                        @endforeach
                         <option value="exempt" {{ request('tax_rate') == 'exempt' ? 'selected' : '' }}>Exempt Items Only</option>
                     </select>
                 </div>

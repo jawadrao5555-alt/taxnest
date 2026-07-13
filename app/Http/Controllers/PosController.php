@@ -2064,6 +2064,38 @@ class PosController extends Controller
         return $query;
     }
 
+    /**
+     * Tax-rate options for the report filter dropdown — DYNAMIC, never hardcoded:
+     *   1. every distinct item-level rate that actually exists in THIS tab's data
+     *      (historical bills keep old rates filterable), and
+     *   2. the currently CONFIGURED effective rates (global pos_tax_rules + the
+     *      company's overrides), so an updated rate appears immediately.
+     * Computed PER TAB so PRA and Local rate sets stay fully isolated.
+     */
+    private function availableTaxRates(int $companyId, string $tab, ?Company $company): array
+    {
+        $txQuery = PosTransaction::where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->select('id');
+        $this->applyReportFilters($txQuery, $tab);
+
+        $dataRates = \App\Models\PosTransactionItem::whereIn('transaction_id', $txQuery)
+            ->where('is_tax_exempt', false)
+            ->where('tax_rate', '>', 0)
+            ->distinct()
+            ->pluck('tax_rate');
+
+        $configuredRates = PosTaxRule::effectiveRules($company)->pluck('tax_rate');
+
+        return $dataRates->concat($configuredRates)
+            ->map(fn ($r) => round((float) $r, 2))
+            ->filter(fn ($r) => $r > 0)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+    }
+
     public function reports(Request $request)
     {
         $companyId = app('currentCompanyId');
@@ -2408,8 +2440,9 @@ class PosController extends Controller
         $hasPinSet = !empty($company->confidential_pin);
         $localCount = 0;
         $user = auth('pos')->user();
+        $availableRates = $this->availableTaxRates($companyId, $tab, $company);
 
-        return view('pos.tax-reports', compact('company', 'transactions', 'summary', 'dateLabel', 'taxRateLabel', 'tab', 'hasPinSet', 'localCount', 'user', 'itemValues', 'taxRateFilter'));
+        return view('pos.tax-reports', compact('company', 'transactions', 'summary', 'dateLabel', 'taxRateLabel', 'tab', 'hasPinSet', 'localCount', 'user', 'itemValues', 'taxRateFilter', 'availableRates'));
     }
 
     public function exportTaxReportCsv(Request $request)

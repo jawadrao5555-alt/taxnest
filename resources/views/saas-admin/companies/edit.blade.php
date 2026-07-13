@@ -10,14 +10,6 @@
         <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ $tc[$company->product_type] ?? '' }}">{{ $typeLabels[$company->product_type] ?? $company->product_type }}</span>
     </div>
 
-    @if($errors->any())
-    <div class="bg-red-900/30 border border-red-700 rounded-xl p-4 mb-6">
-        <ul class="text-sm text-red-400 space-y-1">
-            @foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach
-        </ul>
-    </div>
-    @endif
-
     <form method="POST" action="{{ route('saas.admin.companies.update', $company->id) }}" class="space-y-6">
         @csrf
         @method('PUT')

@@ -5,14 +5,6 @@
         <h1 class="text-2xl font-bold text-white">Create New Company</h1>
     </div>
 
-    @if($errors->any())
-    <div class="bg-red-900/30 border border-red-700 rounded-xl p-4 mb-6">
-        <ul class="text-sm text-red-400 space-y-1">
-            @foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach
-        </ul>
-    </div>
-    @endif
-
     <form method="POST" action="{{ route('saas.admin.companies.store') }}" class="space-y-6" x-data="{ productType: '{{ old('product_type', 'di') }}' }">
         @csrf
 

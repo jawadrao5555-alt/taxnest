@@ -5,16 +5,6 @@
         <p class="text-sm text-gray-400 mt-1">Run a limited-time discount across your plans. Sales auto-expire on their end date — no manual switch-off needed. Prices update instantly on every landing &amp; billing page.</p>
     </div>
 
-    @if(session('success'))
-    <div class="bg-emerald-900/30 border border-emerald-700 rounded-lg p-3 mb-6 text-sm text-emerald-300">{{ session('success') }}</div>
-    @endif
-    @if(session('error'))
-    <div class="bg-red-900/30 border border-red-700 rounded-lg p-3 mb-6 text-sm text-red-300">{{ session('error') }}</div>
-    @endif
-    @if($errors->any())
-    <div class="bg-red-900/30 border border-red-700 rounded-lg p-3 mb-6 text-sm text-red-300">{{ $errors->first() }}</div>
-    @endif
-
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6">
         <h3 class="text-sm font-semibold text-white mb-4">Create a Sale</h3>
         <form method="POST" action="{{ route('saas.admin.sales.store') }}" class="space-y-4">

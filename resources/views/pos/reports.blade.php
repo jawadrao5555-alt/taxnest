@@ -89,8 +89,9 @@
                                 <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">Month closed</span>
                                 @endif
                             @else
-                            {{-- Reporting-OFF final: already FINAL with a POS serial, PRA was
-                                 never involved (no fiscal) — nothing to submit. --}}
+                            {{-- Reporting-OFF final: already FINAL (L-series serial — fiscal
+                                 serials are reserved for PRA-reported bills), PRA was never
+                                 involved (no fiscal) — nothing to submit. --}}
                             <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 border border-teal-200 dark:border-teal-800">Final — reporting OFF</span>
                             @endif
                         </td>

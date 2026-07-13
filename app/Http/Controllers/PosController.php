@@ -729,9 +729,20 @@ class PosController extends Controller
 
             if ($transaction) {
                 $invoiceNumber = $transaction->invoice_number;
+                // Serial split (owner rule Jul 2026): re-resolve the serial if the
+                // reporting toggle changed between draft save and finalize. A PRA-bound
+                // final must carry a POS fiscal serial (PRA must never receive an
+                // L-NNN USIN), and a non-PRA bill must not hold a fiscal serial.
+                $isPosSerial = str_starts_with($invoiceNumber, 'POS-');
+                if ($praEnabled && !$isPosSerial) {
+                    $invoiceNumber = $this->generateInvoiceNumber($companyId);
+                } elseif (!$praEnabled && $isPosSerial) {
+                    $invoiceNumber = $this->generateLocalInvoiceNumber($companyId);
+                }
                 $submissionHash = hash('sha256', $companyId . '|' . $invoiceNumber . '|' . $totalAmount . '|' . now()->timestamp);
 
                 $transaction->update([
+                    'invoice_number' => $invoiceNumber,
                     'terminal_id' => $request->terminal_id,
                     'customer_name' => $request->customer_name,
                     'customer_phone' => $request->customer_phone,
@@ -757,9 +768,13 @@ class PosController extends Controller
 
                 $transaction->items()->delete();
             } else {
-                $invoiceNumber = $invoiceMode === 'local'
-                    ? $this->generateLocalInvoiceNumber($companyId)
-                    : $this->generateInvoiceNumber($companyId);
+                // Serial split (owner rule Jul 2026): POS-YYYY-NNNNN fiscal serials are
+                // ONLY for bills actually reported to PRA. Provisionals AND
+                // reporting-OFF finals both draw from the L-series — the fiscal
+                // sequence must never be consumed by a bill PRA will never see.
+                $invoiceNumber = $praEnabled
+                    ? $this->generateInvoiceNumber($companyId)
+                    : $this->generateLocalInvoiceNumber($companyId);
                 $submissionHash = hash('sha256', $companyId . '|' . $invoiceNumber . '|' . $totalAmount . '|' . now()->timestamp);
 
                 $transaction = PosTransaction::create([
@@ -1177,9 +1192,13 @@ class PosController extends Controller
                 }
 
                 $locked->update([
-                    // Local serial leaves the L-series: promoted finals always get
-                    // a real POS serial (owner rule Jul 2026).
-                    'invoice_number' => $this->generateInvoiceNumber($companyId),
+                    // Serial split (owner rule Jul 2026): the L-series number changes
+                    // to a real POS fiscal serial ONLY when the bill actually goes to
+                    // PRA ('pending'). A reporting-OFF finalize keeps its L number —
+                    // fiscal serials are reserved for PRA-reported bills.
+                    'invoice_number' => $newPraStatus !== null
+                        ? $this->generateInvoiceNumber($companyId)
+                        : $locked->invoice_number,
                     'pra_status' => $newPraStatus,
                     'invoice_mode' => 'pra',
                     'pra_response_code' => null,
@@ -1558,9 +1577,14 @@ class PosController extends Controller
                 $taxAmount = (float) round($taxableAfterDiscount * $taxRate / 100);
                 $totalAmount = (float) round($afterDiscount + $taxAmount);
 
-                // Allot a real POS serial (replaces the provisional L-NNN). generateInvoiceNumber's
-                // lockForUpdate is now effective inside this transaction.
-                $newInvoiceNumber = $this->generateInvoiceNumber($companyId);
+                // Serial split (owner rule Jul 2026): a real POS fiscal serial replaces
+                // the provisional L-NNN ONLY when the bill actually goes to PRA
+                // (reporting ON). Reporting-OFF finalize keeps the L number — fiscal
+                // serials are reserved for PRA-reported bills. generateInvoiceNumber's
+                // lockForUpdate is effective inside this transaction.
+                $newInvoiceNumber = $reportingOn
+                    ? $this->generateInvoiceNumber($companyId)
+                    : $tx->invoice_number;
                 $newHash = hash('sha256', $companyId . '|' . $newInvoiceNumber . '|' . $totalAmount . '|' . now()->timestamp);
 
                 $tx->update([

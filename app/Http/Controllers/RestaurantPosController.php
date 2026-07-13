@@ -568,9 +568,12 @@ class RestaurantPosController extends Controller
                     'message' => 'Insufficient stock: ' . implode(', ', $stockErrors),
                 ], 400);
             }
-            $invoiceNumber = $invoiceMode === 'local'
-                ? $this->generateLocalInvoiceNumber($companyId)
-                : $this->generateInvoiceNumber($companyId);
+            // Serial split (owner rule Jul 2026): POS fiscal serials only for bills
+            // actually reported to PRA; provisionals AND reporting-OFF finals use
+            // the L-series (mirrors PosController::storeInvoice).
+            $invoiceNumber = $praEnabled
+                ? $this->generateInvoiceNumber($companyId)
+                : $this->generateLocalInvoiceNumber($companyId);
 
             $submissionHash = hash('sha256', $companyId . '|' . $invoiceNumber . '|' . $totalAmount . '|' . now()->timestamp);
 

@@ -40,15 +40,16 @@ class SubscriptionAccessService
             return ['allowed' => true, 'reason' => 'Lifetime free access.', 'override' => 'lifetime'];
         }
 
-        // 2. Usage-free (cap by invoice count)
+        // 2. Usage-free (cap by invoice count; NULL limit = unlimited free invoices)
         if ($type === 'usage_free') {
-            $limit = (int) ($subscription->free_invoice_limit ?? 0);
+            if ($subscription->free_invoice_limit === null) {
+                return ['allowed' => true, 'reason' => 'Unlimited free invoices.', 'override' => 'usage_free'];
+            }
+            $limit = (int) $subscription->free_invoice_limit;
             if ($limit <= 0) {
                 return ['allowed' => false, 'reason' => 'Free invoice limit not configured.', 'override' => 'usage_free'];
             }
-            $count = Invoice::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
-                ->where('company_id', $company->id)
-                ->count();
+            $count = self::billableCount($company);
             if ($count >= $limit) {
                 return [
                     'allowed' => false,

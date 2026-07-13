@@ -49,7 +49,7 @@ class Subscription extends Model
     {
         return match ($this->override_type) {
             'lifetime' => 'Lifetime Free',
-            'usage_free' => 'Free Invoice Limit (' . ($this->free_invoice_limit ?? 0) . ')',
+            'usage_free' => 'Free Invoices (' . ($this->free_invoice_limit ?? 'Unlimited') . ')',
             'temporary' => 'Temporary Access until ' . optional($this->override_until)->format('Y-m-d'),
             'grace' => 'Grace Period until ' . optional($this->override_until)->format('Y-m-d'),
             default => 'No Override',

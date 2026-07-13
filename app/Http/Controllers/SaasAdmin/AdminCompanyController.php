@@ -875,23 +875,25 @@ class AdminCompanyController extends Controller
     public function grantUsageFree(Request $request, $id)
     {
         $request->validate([
-            'free_invoice_limit' => 'required|integer|min:1|max:1000000',
+            'free_invoice_limit' => 'nullable|integer|min:1|max:1000000',
             'reason' => 'nullable|string|max:255',
         ]);
         $company = Company::findOrFail($id);
+        $limit = $request->filled('free_invoice_limit') ? (int) $request->input('free_invoice_limit') : null;
+        $limitLabel = $limit === null ? 'unlimited' : (string) $limit;
         $sub = $this->getOrCreateActiveSubscription($company->id);
         $sub->update([
             'override_type' => 'usage_free',
             'override_until' => null,
-            'free_invoice_limit' => (int) $request->input('free_invoice_limit'),
-            'override_reason' => $request->input('reason', "Free invoice limit: " . $request->input('free_invoice_limit')),
+            'free_invoice_limit' => $limit,
+            'override_reason' => $request->input('reason') ?: "Free invoice limit: {$limitLabel}",
             'override_by' => auth('admin')->id(),
         ]);
         $this->activateForGrant($company);
         AdminAuditLog::log(auth('admin')->id(), 'Override granted: USAGE_FREE', 'Subscription', $sub->id, [
-            'company' => $company->name, 'limit' => $sub->free_invoice_limit,
+            'company' => $company->name, 'limit' => $limitLabel,
         ]);
-        return back()->with('success', "Free invoice limit of {$sub->free_invoice_limit} granted to '{$company->name}'.");
+        return back()->with('success', "Free invoices ({$limitLabel}) granted to '{$company->name}'.");
     }
 
     public function removeOverride($id)

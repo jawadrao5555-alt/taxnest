@@ -380,8 +380,8 @@
         <div x-show="open === 'usage'" x-cloak class="mt-4 p-4 bg-gray-800/40 rounded-lg border border-gray-700">
             <form method="POST" action="{{ route('saas.admin.companies.override.usageFree', $company->id) }}" class="space-y-3">
                 @csrf
-                <label class="text-xs text-gray-400 block">Free Invoice Limit (e.g. 10000)</label>
-                <input type="number" name="free_invoice_limit" required min="1" max="1000000" placeholder="10000" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
+                <label class="text-xs text-gray-400 block">Free Invoice Limit (optional — leave empty for unlimited)</label>
+                <input type="number" name="free_invoice_limit" min="1" max="1000000" placeholder="Empty = unlimited" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
                 <label class="text-xs text-gray-400 block">Reason (optional)</label>
                 <input type="text" name="reason" maxlength="255" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
                 <button type="submit" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg font-medium transition">Grant Free Limit</button>

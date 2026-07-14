@@ -51,3 +51,4 @@
 - [Unicode heredoc writes truncate files](unicode-heredoc-write.md) — \ud-escape emoji in heredoc/python writes can truncate the target file mid-write; use \U0001F5A8 + atomic write; restore via git show HEAD:path.
 - [SaaS admin flash banners](admin-panel-flash-banners.md) — admin layout renders success/error/$errors centrally; pages add none; "form does nothing" = suspect silent validation fail.
 - [PRA POS package limits](pos-package-limits.md) — monthly FINAL-bill quota + team-account quota; four gated final paths (incl. retryPra local-only + toggleCashier reactivation); provisionals free until promoted.
+- [mobile.css global overrides](mobile-css-global-overrides.md) — mobile.css beats Tailwind on phones: forced table-cell vs .hidden, touch-target blobs on toggle pills, grid collapse needs grid-cols-keep; bump ?v= on edit.

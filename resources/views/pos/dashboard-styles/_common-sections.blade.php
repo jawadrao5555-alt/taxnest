@@ -66,7 +66,7 @@
             <table class="w-full">
                 <thead>
                     <tr class="text-left text-[9px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-800">
-                        <th class="pb-2.5 pr-4">Invoice</th><th class="pb-2.5 pr-4">Customer</th><th class="pb-2.5 pr-4">Method</th><th class="pb-2.5 pr-4 text-right">Amount</th><th class="pb-2.5">Time</th>
+                        <th class="pb-2.5 pr-4">Invoice</th><th class="pb-2.5 pr-4">Customer</th><th class="pb-2.5 pr-4 hidden sm:table-cell">Method</th><th class="pb-2.5 pr-4 text-right">Amount</th><th class="pb-2.5">Time</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -74,7 +74,7 @@
                     <tr class="table-row-hover border-b border-gray-50 dark:border-gray-800/50 last:border-0 transition-colors">
                         <td class="py-2.5 pr-4"><a href="{{ route('pos.transaction.show', $txn->id) }}" class="text-[11px] text-purple-600 font-bold">{{ $txn->invoice_number }}</a></td>
                         <td class="py-2.5 pr-4 text-[11px] text-gray-600 dark:text-gray-400">{{ $txn->customer_name ?? 'Walk-in' }}</td>
-                        <td class="py-2.5 pr-4"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold uppercase {{ $txn->payment_method === 'cash' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' }}">{{ $txn->payment_method }}</span></td>
+                        <td class="py-2.5 pr-4 hidden sm:table-cell"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold uppercase {{ $txn->payment_method === 'cash' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' }}">{{ $txn->payment_method }}</span></td>
                         <td class="py-2.5 pr-4 text-right text-[11px] font-bold text-gray-900 dark:text-white">Rs.{{ number_format($txn->total_amount) }}</td>
                         <td class="py-2.5 text-[10px] text-gray-400">{{ $txn->created_at->diffForHumans() }}</td>
                     </tr>

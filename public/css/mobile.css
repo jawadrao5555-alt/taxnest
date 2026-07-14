@@ -172,6 +172,22 @@ body {
     /* Reduce padding inside dense tables on mobile */
     .premium-table:not(.table-cards) th, .premium-table:not(.table-cards) td { padding: 0.5rem 0.6rem; font-size: 0.78rem; }
 }
+/* The forced display:table-cell above out-specifies Tailwind's .hidden (columns
+   marked "hidden sm:table-cell" were re-shown on phones). Restore Tailwind
+   semantics: below the sm breakpoint every .hidden cell stays hidden; between
+   sm and 768px only cells WITHOUT a sm:table-cell variant stay hidden. */
+@media (max-width: 639.98px) {
+    main table:not(.table-static):not(.table-cards) > * > tr > th.hidden,
+    main table:not(.table-static):not(.table-cards) > * > tr > td.hidden {
+        display: none;
+    }
+}
+@media (min-width: 640px) and (max-width: 768px) {
+    main table:not(.table-static):not(.table-cards) > * > tr > th.hidden:not(.sm\:table-cell),
+    main table:not(.table-static):not(.table-cards) > * > tr > td.hidden:not(.sm\:table-cell) {
+        display: none;
+    }
+}
 
 /* ----- 6. Mobile-friendly modals / dialogs ----- */
 @media (max-width: 768px) {
@@ -716,5 +732,48 @@ pre, code { max-width: 100%; overflow-x: auto; word-break: break-word; }
     [x-data*="restaurantPos"] .grid.grid-cols-3 > button {
         min-height: 52px !important;
         font-size: 1.1rem !important;
+    }
+}
+
+/* ----- 38. TOGGLE SWITCH EXCEPTION to touch-target inflation -----
+   Pill toggle switches (PRA Reporting / Auto-Print / Auto-KOT etc.) are
+   h-5 w-10 rounded-full buttons. Sections 4 & 37 inflate them to 40-44px
+   blobs on phones, destroying the pill shape. Restore their designed
+   geometry everywhere (higher specificity + later source than 37). */
+@media (max-width: 768px) {
+    button.inline-flex.h-5.w-10.rounded-full,
+    button.relative.inline-flex.h-5.w-10 {
+        min-width: 0 !important;
+        min-height: 0 !important;
+        width: 2.5rem !important;
+        height: 1.25rem !important;
+        padding: 0 !important;
+    }
+    /* Larger pill variant (h-6 w-11) used on the POS dashboard header */
+    button.inline-flex.h-6.w-11.rounded-full,
+    button.relative.inline-flex.h-6.w-11 {
+        min-width: 0 !important;
+        min-height: 0 !important;
+        width: 2.75rem !important;
+        height: 1.5rem !important;
+        padding: 0 !important;
+    }
+    /* Narrow pill variant (h-5 w-9) */
+    button.inline-flex.h-5.w-9.rounded-full,
+    button.relative.inline-flex.h-5.w-9 {
+        min-width: 0 !important;
+        min-height: 0 !important;
+        width: 2.25rem !important;
+        height: 1.25rem !important;
+        padding: 0 !important;
+    }
+    /* Mini pill variant (h-4 w-7) */
+    button.inline-flex.h-4.w-7.rounded-full,
+    button.relative.inline-flex.h-4.w-7 {
+        min-width: 0 !important;
+        min-height: 0 !important;
+        width: 1.75rem !important;
+        height: 1rem !important;
+        padding: 0 !important;
     }
 }

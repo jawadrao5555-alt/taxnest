@@ -24,6 +24,18 @@
 .dark .r-glass { background: rgba(17,24,39,0.8); border: 1px solid rgba(255,255,255,0.06); }
 .r-row:hover { background: rgba(124,58,237,0.02); }
 .dark .r-row:hover { background: rgba(124,58,237,0.06); }
+/* ── Mobile polish (Jul 2026): compact tiles, 3-up grid, calmer spacing ── */
+@media (max-width: 639px) {
+    /* !important + 3-class specificity: ties mobile.css section 13's collapse rule,
+       wins by source order (this block renders after the head stylesheets).
+       Section 13b is skipped via .grid-cols-keep on the tile grids. */
+    .pos-layout-root .grid.tile-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 8px !important; }
+    .tile-card { padding: 10px 6px; }
+    .tile-icon { width: 38px; height: 38px; margin-bottom: 6px; border-radius: 12px; }
+    .tile-icon svg { width: 18px; height: 18px; }
+    .tile-card p:last-child { display: none; }
+    .stat-card { padding: 12px; }
+}
 </style>
 
 <div class="space-y-5 w-full">
@@ -36,7 +48,7 @@
     </div>
 
     @if($isRestaurant)
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 slide-up slide-up-2">
+    <div class="tile-grid grid-cols-keep grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 slide-up slide-up-2">
         <a href="{{ route('pos.invoice.create') }}" class="tile-card glass-card p-4 text-center group cursor-pointer">
             <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center mb-2.5 shadow-lg">
                 <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
@@ -81,7 +93,7 @@
         </a>
     </div>
     @else
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 slide-up slide-up-2">
+    <div class="tile-grid grid-cols-keep grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 slide-up slide-up-2">
         <a href="{{ route('pos.invoice.create') }}" class="tile-card glass-card p-4 text-center group cursor-pointer">
             <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center mb-2.5 shadow-lg">
                 <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>

@@ -74,6 +74,34 @@
     .prod-card:active { transform: scale(0.96); }
     .cart-item { padding: 10px 12px !important; }
     .cart-item .qty-btn-mobile { min-width: 44px; min-height: 44px; }
+
+    /* ── Mobile polish (Jul 2026): keyboard hints are meaningless on touch ── */
+    .tn-sale-root kbd { display: none !important; }
+
+    /* Toggles strip: wrap neatly instead of clipping PRA Reporting off-screen */
+    .tn-toggles-strip { flex-wrap: wrap; justify-content: center; row-gap: 4px; column-gap: 14px; padding: 5px 8px; }
+    .tn-toggles-strip .w-px { display: none; }
+    .tn-toggles-strip span:first-child { white-space: nowrap; }
+
+    /* Guided-flow coach strip: single tidy line — no chevrons, tighter pills */
+    .tn-flow-strip { gap: 3px; padding: 4px 6px; flex-wrap: nowrap; overflow-x: auto; }
+    .tn-flow-strip svg { display: none; }
+    .tn-flow-strip span[x-text] { padding: 2px 7px; font-size: 10px; white-space: nowrap; }
+
+    /* Action bar: inputs on row 1, buttons wrap below (nothing clipped anymore) */
+    .tn-action-bar { flex-wrap: wrap; row-gap: 6px; }
+    .tn-action-bar > div:first-child { min-width: 0 !important; max-width: none !important; flex: 1 1 44%; }
+    .tn-action-bar > .flex-1.relative { flex: 1 1 48%; }
+    /* F-key chips are meaningless on touch — hide them, show the text labels instead */
+    .tn-key-chip { display: none !important; }
+    .tn-action-bar > button > span.hidden:not(.font-mono) { display: inline; }
+
+    /* Product grid: tighter cards, always-visible + button (no hover on touch) */
+    [x-ref="gridContainer"] { padding: 8px; }
+    [x-ref="gridContainer"] .grid { gap: 8px; }
+    .prod-card .quick-add { opacity: 1; transform: none; }
+    .prod-card .price-badge { font-size: 12px; padding: 1px 6px; }
+    .cat-pill { padding-left: 12px; padding-right: 12px; }
 }
 .priority-badge { position: relative; }
 .priority-badge::after { content: ''; position: absolute; top: -1px; right: -1px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; }
@@ -188,11 +216,11 @@ window.addEventListener('popstate', function() {
 });
 </script>
 
-<div x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
+<div x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="tn-sale-root flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
     {{-- PRA Reporting + Auto-Print toggles strip (visible to admin + cashier).
          autoPrintEnabled lives on the parent restaurantPos() scope (mirrors kitchenSettings.print_on_pay)
          so toggling immediately updates the receipt-iframe URL on the very next sale, no refresh needed. --}}
-    <div class="flex items-center justify-end gap-4 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/10 border-b border-purple-100 dark:border-purple-900/30 flex-shrink-0"
+    <div class="tn-toggles-strip flex items-center justify-end gap-4 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/10 border-b border-purple-100 dark:border-purple-900/30 flex-shrink-0"
          x-data="{
             autoPrintLoading: false,
             autoKotLoading: false
@@ -265,7 +293,7 @@ window.addEventListener('popstate', function() {
         if ($features->delivery) $guidedTypes[] = 'delivery';
         $hasTypeStep = count($guidedTypes) > 1;
     @endphp
-    <div x-show="guidedFlow" x-cloak class="flex items-center justify-center flex-wrap gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-900/20 dark:to-blue-900/20 border-b border-emerald-200 dark:border-emerald-800 flex-shrink-0 text-[11px] font-bold select-none pointer-events-none">
+    <div x-show="guidedFlow" x-cloak class="tn-flow-strip flex items-center justify-center flex-wrap gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-900/20 dark:to-blue-900/20 border-b border-emerald-200 dark:border-emerald-800 flex-shrink-0 text-[11px] font-bold select-none pointer-events-none">
 @if($hasTypeStep)
         <template x-for="(s, i) in [{k:'customer',l:'1 · Customer'},{k:'items',l:'2 · Items'},{k:'type',l:'3 · Type'},{k:'cart',l:'4 · Cart'},{k:'finish',l:'5 · Bill'}]" :key="s.k">
 @else
@@ -305,7 +333,7 @@ window.addEventListener('popstate', function() {
     </div>
     @endif
 
-    <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0 shadow-sm">
+    <div class="tn-action-bar flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0 shadow-sm">
 
         <div class="relative flex-shrink-0" style="min-width:180px;max-width:220px;">
             <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
@@ -467,7 +495,7 @@ window.addEventListener('popstate', function() {
             @if($features->delivery)
             <button @click="setOrderType('delivery')" class="px-2 py-1.5 text-[10px] font-bold transition-all" :class="orderType === 'delivery' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">Delivery</button>
             @endif
-            <span class="px-1.5 py-1.5 text-[8px] font-mono text-gray-400 bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">F2</span>
+            <span class="tn-key-chip px-1.5 py-1.5 text-[8px] font-mono text-gray-400 bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">F2</span>
         </div>
         @endif
 
@@ -478,7 +506,7 @@ window.addEventListener('popstate', function() {
             <span>Rush</span>
         </button>
 
-        <button @click="showShortcuts = true" class="flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-purple-50 hover:text-purple-600 hover:border-purple-300 transition flex-shrink-0" title="Keyboard Shortcuts (F1)">
+        <button @click="showShortcuts = true" class="hidden sm:flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-purple-50 hover:text-purple-600 hover:border-purple-300 transition flex-shrink-0" title="Keyboard Shortcuts (F1)">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3C6.5 3 2 6.58 2 11c0 2.24 1.12 4.27 2.94 5.72L4 21l4.28-2.55c1.15.35 2.4.55 3.72.55 5.5 0 10-3.58 10-8s-4.5-8-10-8z"/></svg>
             <span class="hidden lg:inline">Keys</span>
             <span class="text-[8px] font-mono bg-gray-200 dark:bg-gray-700 px-1 rounded hidden sm:inline">F1</span>
@@ -520,7 +548,7 @@ window.addEventListener('popstate', function() {
         {{-- Click → modal with Edit / Delete / Make Final actions inline. F10 shortcut. --}}
         <button @click="openLocalBills()" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition" title="Provisional bills (local — not submitted to PRA). Press F10.">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-            <span class="text-[10px] bg-purple-400/30 px-1 rounded">F10</span>
+            <span class="tn-key-chip text-[10px] bg-purple-400/30 px-1 rounded">F10</span>
             <span class="hidden sm:inline">Local</span>
             <span x-show="localBills.length > 0" class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-purple-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="localBills.length"></span>
         </button>
@@ -536,14 +564,14 @@ window.addEventListener('popstate', function() {
         {{-- Click → modal with Retry / Edit / Delete actions inline. --}}
         <button @click="openFailedBills()" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 transition" title="Failed PRA submissions — needs retry. Press F11.">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-            <span class="text-[10px] bg-red-400/30 px-1 rounded">F11</span>
+            <span class="tn-key-chip text-[10px] bg-red-400/30 px-1 rounded">F11</span>
             <span class="hidden sm:inline">Failed</span>
             <span x-show="failedBills.length > 0" class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-red-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold animate-pulse" x-text="failedBills.length"></span>
         </button>
 
         <button @click="activeHeldIndex = 0; showHeldOrders = !showHeldOrders" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            <span class="text-[10px] bg-amber-400/30 px-1 rounded">F3</span>
+            <span class="tn-key-chip text-[10px] bg-amber-400/30 px-1 rounded">F3</span>
             <span class="hidden sm:inline">Held</span>
             <span x-show="heldOrders.length > 0" class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="heldOrders.length"></span>
         </button>

@@ -13,13 +13,13 @@
             </button>
             <div class="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pr-6">
                 <div class="flex items-start gap-3">
-                    <div class="text-3xl">🎯</div>
+                    <div class="text-2xl sm:text-3xl hidden sm:block">🎯</div>
                     <div>
                         <div class="flex items-center gap-1.5 mb-0.5">
                             <span class="inline-flex items-center px-1.5 py-0.5 rounded-full bg-white/20 backdrop-blur text-[9px] font-bold uppercase tracking-wider">New</span>
                             <span class="text-sm font-extrabold">PRA POS Universal v2 — One Screen, All Features</span>
                         </div>
-                        <p class="text-xs text-white/85">Customize from 9 industry presets (Restaurant, Cafe, Quick Service, Retail, Pharmacy, Salon, Grocery, Wholesale, Hybrid). Toggle KOT, KDS, recipes, inventory, loyalty &amp; more.</p>
+                        <p class="hidden sm:block text-xs text-white/85">Customize from 9 industry presets (Restaurant, Cafe, Quick Service, Retail, Pharmacy, Salon, Grocery, Wholesale, Hybrid). Toggle KOT, KDS, recipes, inventory, loyalty &amp; more.</p>
                     </div>
                 </div>
                 <div class="flex gap-2 flex-shrink-0 w-full sm:w-auto">

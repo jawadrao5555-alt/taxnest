@@ -54,7 +54,7 @@
         ];
     @endphp
 
-    <div x-data="{ currentTheme: '{{ $company->pos_theme ?? 'purple' }}', guidedOn: {{ ($company->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }}, savingGuided: false, invOn: {{ $invOn ? 'true' : 'false' }}, savingInv: false, restockOn: {{ ($company->pos_restock_on_void ?? true) ? 'true' : 'false' }}, savingRestock: false, autoPurgeOn: {{ ($company->pos_auto_purge_local_on_dayclose ?? false) ? 'true' : 'false' }}, savingPurge: false, autoDaycloseOn: {{ ($company->pos_auto_dayclose_24h ?? false) ? 'true' : 'false' }}, savingDayclose: false }"
+    <div x-data="{ currentTheme: '{{ $company->pos_theme ?? 'purple' }}', guidedOn: {{ ($company->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }}, savingGuided: false, invOn: {{ $invOn ? 'true' : 'false' }}, savingInv: false, restockOn: {{ ($company->pos_restock_on_void ?? true) ? 'true' : 'false' }}, savingRestock: false, autoDaycloseOn: {{ ($company->pos_auto_dayclose_24h ?? false) ? 'true' : 'false' }}, savingDayclose: false, kdsAutoOn: {{ ($company->pos_kds_auto_print ?? false) ? 'true' : 'false' }}, savingKdsAuto: false, lbFinal: '{{ in_array($company->pos_dayclose_final_local_action ?? 'save', ['save','delete'], true) ? ($company->pos_dayclose_final_local_action ?? 'save') : 'save' }}', lbProv: '{{ in_array($company->pos_dayclose_provisional_action ?? 'save', ['save','delete'], true) ? ($company->pos_dayclose_provisional_action ?? 'save') : 'save' }}', lbPersist: {{ ($company->pos_customer_spend_persist ?? true) ? 'true' : 'false' }}, savingLB: false, saveLB() { this.savingLB = true; fetch('/pos/settings/local-billing', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({final_action:this.lbFinal, provisional_action:this.lbProv, spend_persist:this.lbPersist})}).then(r=>r.json()).catch(()=>{}).finally(()=>{ this.savingLB=false; }) } }"
          class="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
 
         {{-- ═══════════ HERO ═══════════ --}}
@@ -149,6 +149,24 @@
                         <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="restockOn && 'translate-x-6'"></span>
                     </button>
                 </div>
+
+                @if($company->restaurant_mode ?? false)
+                {{-- KDS auto-print KOT (P6, F5) — kitchen display device prints new orders itself --}}
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400 flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">Kitchen Display auto-print KOT</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">Naya order aate hi KDS screen wali device khud KOT ticket print kare (kitchen printer KDS device se attached ho)</p>
+                    </div>
+                    <button type="button"
+                        @click="kdsAutoOn=!kdsAutoOn; savingKdsAuto=true; fetch('/pos/settings/kds-auto-print', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({enabled:kdsAutoOn})}).then(r=>r.json()).catch(()=>{}).finally(()=>{ savingKdsAuto=false; })"
+                        class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200" :class="kdsAutoOn ? 'bg-teal-500' : 'bg-gray-300 dark:bg-gray-600'">
+                        <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="kdsAutoOn && 'translate-x-6'"></span>
+                    </button>
+                </div>
+                @endif
             </div>
         </section>
 
@@ -160,20 +178,50 @@
             </div>
             <div class="grid sm:grid-cols-2 gap-4">
 
-                {{-- Auto-archive local bills on day-close --}}
-                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400 flex items-center justify-center shrink-0">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+                {{-- Local Billing day-close policy (F1) — save/delete per bill kind + spend persist --}}
+                <div class="sm:col-span-2 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400 flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-bold text-gray-900 dark:text-white">Local Billing — day-close policy</p>
+                            <p class="text-[11px] text-gray-500 dark:text-gray-400">Day-close par local bills ka kya ho — save (archive, wapas mil sakte hain) ya delete (hamesha ke liye khatam). PRA ko bheje gaye bills par kabhi asar nahi hota.</p>
+                        </div>
+                        <span class="shrink-0 text-[10px] font-semibold text-gray-400" x-show="savingLB" x-cloak>Saving…</span>
                     </div>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-sm font-bold text-gray-900 dark:text-white">Day-close par local bills archive</p>
-                        <p class="text-[11px] text-gray-500 dark:text-gray-400">Har day-close par local/provisional bills khud archive ho jayein — data safe rehta hai, delete nahi hota</p>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between gap-3 flex-wrap">
+                            <div class="min-w-0">
+                                <p class="text-[13px] font-semibold text-gray-800 dark:text-gray-200">Final local bills (reporting OFF)</p>
+                                <p class="text-[11px] text-gray-500 dark:text-gray-400">Woh mukammal bills jo PRA ko report nahi hue</p>
+                            </div>
+                            <div class="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shrink-0">
+                                <button type="button" @click="lbFinal='save'; saveLB()" class="px-4 py-1.5 text-[12px] font-bold transition" :class="lbFinal==='save' ? 'bg-teal-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300'">Save</button>
+                                <button type="button" @click="lbFinal='delete'; saveLB()" class="px-4 py-1.5 text-[12px] font-bold transition border-l border-gray-200 dark:border-gray-700" :class="lbFinal==='delete' ? 'bg-red-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300'">Delete</button>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between gap-3 flex-wrap">
+                            <div class="min-w-0">
+                                <p class="text-[13px] font-semibold text-gray-800 dark:text-gray-200">Provisional bills</p>
+                                <p class="text-[11px] text-gray-500 dark:text-gray-400">Cashier ke save kiye hue kachche (local) bills</p>
+                            </div>
+                            <div class="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shrink-0">
+                                <button type="button" @click="lbProv='save'; saveLB()" class="px-4 py-1.5 text-[12px] font-bold transition" :class="lbProv==='save' ? 'bg-teal-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300'">Save</button>
+                                <button type="button" @click="lbProv='delete'; saveLB()" class="px-4 py-1.5 text-[12px] font-bold transition border-l border-gray-200 dark:border-gray-700" :class="lbProv==='delete' ? 'bg-red-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300'">Delete</button>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between gap-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                            <div class="min-w-0">
+                                <p class="text-[13px] font-semibold text-gray-800 dark:text-gray-200">Customer spent record</p>
+                                <p class="text-[11px] text-gray-500 dark:text-gray-400">Bill delete hone par bhi customer ki purchase history mehfooz rahe</p>
+                            </div>
+                            <button type="button" @click="lbPersist=!lbPersist; saveLB()"
+                                class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200" :class="lbPersist ? 'bg-teal-600' : 'bg-gray-300 dark:bg-gray-600'">
+                                <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="lbPersist && 'translate-x-6'"></span>
+                            </button>
+                        </div>
                     </div>
-                    <button type="button"
-                        @click="autoPurgeOn=!autoPurgeOn; savingPurge=true; fetch('/pos/settings/auto-purge-local-toggle', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({enabled:autoPurgeOn})}).then(r=>r.json()).catch(()=>{}).finally(()=>{ savingPurge=false; })"
-                        class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200" :class="autoPurgeOn ? 'bg-teal-600' : 'bg-gray-300 dark:bg-gray-600'">
-                        <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="autoPurgeOn && 'translate-x-6'"></span>
-                    </button>
                 </div>
 
                 {{-- Auto day-close at next midnight (1 full day grace) --}}

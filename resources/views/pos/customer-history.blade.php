@@ -54,11 +54,11 @@
                         <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ $t->created_at->format('d M Y, H:i') }}</td>
                         <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ $t->invoice_number }}</td>
                         <td class="px-4 py-3 text-center hidden sm:table-cell">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $t->invoice_mode === 'local' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' }}">
-                                {{ $t->invoice_mode === 'local' ? 'Local' : 'PRA' }}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $t->isLocalBill() ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' }}">
+                                {{ $t->isLocalBill() ? (($t->is_spend_snapshot ?? false) ? 'Local · record' : 'Local') : 'PRA' }}
                             </span>
                         </td>
-                        <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ ucwords(str_replace('_', ' ', $t->payment_method)) }}</td>
+                        <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ ucwords(str_replace('_', ' ', (string) $t->payment_method)) }}</td>
                         <td class="px-4 py-3 text-right text-gray-500 hidden sm:table-cell">{{ number_format($t->tax_amount, 0) }}</td>
                         <td class="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">PKR {{ number_format($t->total_amount, 0) }}</td>
                     </tr>

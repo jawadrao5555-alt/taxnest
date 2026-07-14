@@ -5,36 +5,37 @@
     {{-- Hidden scanner input: stays focused; barcode scanners auto-type then send Enter --}}
     <input type="text" x-ref="scanInput" x-model="scanBuffer"
            @keydown.enter.prevent="processScan()"
-           @blur="setTimeout(() => $refs.scanInput && $refs.scanInput.focus(), 100)"
+           @blur="setTimeout(() => { if (!cameraOpen) { $refs.scanInput && $refs.scanInput.focus(); } }, 100)"
            autocomplete="off"
            style="position:fixed; top:-9999px; left:-9999px; opacity:0; width:1px; height:1px;">
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Kitchen Display System</h1>
             <p class="text-sm text-gray-500 dark:text-gray-400">Active orders for kitchen staff</p>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 flex-wrap">
             <div class="flex gap-2 text-xs">
-                <span class="px-2 py-1 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">Held: <span x-text="orders.filter(o => o.status === 'held').length"></span></span>
-                <span class="px-2 py-1 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium">Preparing: <span x-text="orders.filter(o => o.status === 'preparing').length"></span></span>
-                <span class="px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium">Ready: <span x-text="orders.filter(o => o.status === 'ready').length"></span></span>
+                <span class="px-2 py-1 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">New: <span x-text="orders.filter(o => kstate(o) === 'new').length"></span></span>
+                <span class="px-2 py-1 rounded bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 font-medium">Preparing: <span x-text="orders.filter(o => kstate(o) === 'preparing').length"></span></span>
+                <span class="px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium">Ready: <span x-text="orders.filter(o => kstate(o) === 'ready').length"></span></span>
             </div>
             <div class="inline-flex rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600 text-xs font-semibold">
                 <button @click="viewMode = 'list'" :class="viewMode === 'list' ? 'bg-purple-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'" class="px-3 py-1.5">📋 List</button>
                 <button @click="viewMode = 'aggregate'" :class="viewMode === 'aggregate' ? 'bg-purple-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'" class="px-3 py-1.5">📊 Aggregate</button>
             </div>
+            <button @click="openCamera()" class="px-3 py-1.5 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-medium">📷 Camera Scan</button>
             <button @click="refreshOrders()" class="px-3 py-1.5 text-sm rounded-lg bg-purple-600 text-white hover:bg-purple-700 font-medium">Refresh</button>
         </div>
     </div>
 
-    {{-- Scan-to-Ready banner: shows scanner status, click to refocus --}}
+    {{-- Scan-to-Clear banner: shows scanner status, click to refocus --}}
     <div @click="$refs.scanInput && $refs.scanInput.focus()"
          class="mb-4 px-4 py-3 rounded-xl border-2 border-dashed border-emerald-400 bg-emerald-50 dark:bg-emerald-900/10 dark:border-emerald-600 flex items-center justify-between cursor-pointer select-none">
         <div class="flex items-center gap-3">
             <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7V5a2 2 0 012-2h2M4 17v2a2 2 0 002 2h2m8-18h2a2 2 0 012 2v2m-4 14h2a2 2 0 002-2v-2M8 12h.01M12 12h.01M16 12h.01"/></svg>
             <div>
-                <div class="text-sm font-bold text-emerald-800 dark:text-emerald-300">📡 Scanner Active — Scan KOT barcode to mark order READY</div>
-                <div class="text-xs text-emerald-700 dark:text-emerald-400">Buffer: <span x-text="scanBuffer || '(waiting…)'" class="font-mono"></span> &nbsp;|&nbsp; Click anywhere to refocus</div>
+                <div class="text-sm font-bold text-emerald-800 dark:text-emerald-300">📡 Scanner Active — Scan KOT barcode/QR to CLEAR order from board</div>
+                <div class="text-xs text-emerald-700 dark:text-emerald-400">Buffer: <span x-text="scanBuffer || '(waiting…)'" class="font-mono"></span> &nbsp;|&nbsp; Click anywhere to refocus &nbsp;|&nbsp; 📷 button for camera scan</div>
             </div>
         </div>
     </div>
@@ -42,9 +43,9 @@
     <style>
         @keyframes urgentPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); } 50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); } }
         .kds-urgent { animation: urgentPulse 1.5s ease-in-out infinite; }
-        .kds-timer-green { background: linear-gradient(135deg, #dcfce7, #bbf7d0); color: #166534; }
-        .kds-timer-yellow { background: linear-gradient(135deg, #fef9c3, #fde68a); color: #92400e; }
-        .kds-timer-red { background: linear-gradient(135deg, #fee2e2, #fecaca); color: #991b1b; font-weight: 800; }
+        .kds-timer-green { background: #dcfce7; color: #166534; }
+        .kds-timer-yellow { background: #fef9c3; color: #92400e; }
+        .kds-timer-red { background: #fee2e2; color: #991b1b; font-weight: 800; }
     </style>
     {{-- AGGREGATE VIEW: product-wise totals (vendor request — less confusion than full orders) --}}
     <div x-show="viewMode === 'aggregate'" class="mb-4">
@@ -63,21 +64,22 @@
         </div>
     </div>
 
-    {{-- LIST VIEW: order cards (default) --}}
+    {{-- LIST VIEW: order cards (default). Card state = KITCHEN lifecycle (new → preparing → ready → cleared),
+         never the billing status — clearing removes from the board, the cashier's held bill survives. --}}
     <div x-show="viewMode === 'list'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         <template x-for="order in orders" :key="order.id">
             <div :class="{
-                'border-amber-400 bg-amber-50 dark:bg-amber-900/10': order.status === 'held',
-                'border-blue-400 bg-blue-50 dark:bg-blue-900/10': order.status === 'preparing',
-                'border-green-400 bg-green-50 dark:bg-green-900/10': order.status === 'ready',
+                'border-amber-400 bg-amber-50 dark:bg-amber-900/10': kstate(order) === 'new',
+                'border-teal-400 bg-teal-50 dark:bg-teal-900/10': kstate(order) === 'preparing',
+                'border-green-400 bg-green-50 dark:bg-green-900/10': kstate(order) === 'ready',
                 'ring-4 ring-emerald-500 scale-105': lastScanFlash === order.id,
                 'ring-2 ring-red-500 kds-urgent': order.elapsed_minutes > 15 && lastScanFlash !== order.id,
                 'ring-1 ring-amber-400': order.elapsed_minutes > 5 && order.elapsed_minutes <= 15 && lastScanFlash !== order.id
             }" class="border-2 rounded-xl overflow-hidden dark:border-opacity-50 transition-all duration-300">
                 <div class="px-4 py-3 flex items-center justify-between" :class="{
-                    'bg-amber-100 dark:bg-amber-900/30': order.status === 'held',
-                    'bg-blue-100 dark:bg-blue-900/30': order.status === 'preparing',
-                    'bg-green-100 dark:bg-green-900/30': order.status === 'ready',
+                    'bg-amber-100 dark:bg-amber-900/30': kstate(order) === 'new',
+                    'bg-teal-100 dark:bg-teal-900/30': kstate(order) === 'preparing',
+                    'bg-green-100 dark:bg-green-900/30': kstate(order) === 'ready',
                 }">
                     <div>
                         <span class="font-bold text-gray-900 dark:text-white text-sm" x-text="order.order_number"></span>
@@ -106,16 +108,16 @@
                 </div>
 
                 <div class="px-4 py-3 bg-gray-50 dark:bg-gray-800 flex gap-2">
-                    <template x-if="order.status === 'held'">
-                        <button @click="updateStatus(order.id, 'preparing')" class="flex-1 py-2 text-xs rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-semibold">Start Preparing</button>
+                    <template x-if="kstate(order) === 'new'">
+                        <button @click="kitchenUpdate(order.id, 'preparing')" class="flex-1 py-2 text-xs rounded-lg bg-teal-600 text-white hover:bg-teal-700 font-semibold">Start Preparing</button>
                     </template>
-                    <template x-if="order.status === 'preparing'">
-                        <button @click="updateStatus(order.id, 'ready')" class="flex-1 py-2 text-xs rounded-lg bg-green-600 text-white hover:bg-green-700 font-semibold">Mark Ready</button>
+                    <template x-if="kstate(order) === 'preparing'">
+                        <button @click="kitchenUpdate(order.id, 'ready')" class="flex-1 py-2 text-xs rounded-lg bg-green-600 text-white hover:bg-green-700 font-semibold">Mark Ready</button>
                     </template>
-                    <template x-if="order.status === 'ready'">
+                    <template x-if="kstate(order) === 'ready'">
                         <span class="flex-1 py-2 text-xs rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-semibold text-center">Ready for Pickup</span>
                     </template>
-                    <button @click="updateStatus(order.id, 'cancelled')" class="py-2 px-3 text-xs rounded-lg border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400">Cancel</button>
+                    <button @click="kitchenUpdate(order.id, 'cleared')" class="py-2 px-3 text-xs rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 font-semibold" title="Remove from kitchen board (bill stays with cashier)">Clear</button>
                 </div>
             </div>
         </template>
@@ -127,9 +129,26 @@
         <p class="text-gray-500 dark:text-gray-400 text-sm">No active kitchen orders</p>
     </div>
 
+    {{-- Camera scan modal (P5) — html5-qrcode reads the KOT QR/barcode with the device camera --}}
+    <div x-show="cameraOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" @click.self="closeCamera()">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div class="px-4 py-3 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
+                <h3 class="font-bold text-gray-900 dark:text-white text-sm">📷 Scan KOT — Camera</h3>
+                <button @click="closeCamera()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none">&times;</button>
+            </div>
+            <div class="p-4">
+                <div id="kdsCameraReader" class="w-full rounded-lg overflow-hidden bg-black" style="min-height: 260px;"></div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">Point the camera at the KOT QR code or barcode — the order clears automatically.</p>
+            </div>
+        </div>
+    </div>
+
     <div x-show="toast.show" x-transition class="fixed bottom-4 right-4 z-50 max-w-sm">
         <div :class="toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'" class="text-white px-4 py-3 rounded-lg shadow-lg text-sm" x-text="toast.message"></div>
     </div>
+
+    {{-- P6 (F5): hidden iframe host for KDS auto-print — tickets load here with auto_print=1 --}}
+    <div id="kdsPrintHost" style="position:fixed; width:0; height:0; overflow:hidden; border:0;"></div>
 </div>
 
 @php
@@ -142,6 +161,7 @@ $kdsOrdersJson = $orders->map(function($o) {
         'id' => $o->id,
         'order_number' => $o->order_number,
         'status' => $o->status,
+        'kitchen_status' => $o->kitchen_status ?: 'new',
         'priority' => (bool)$o->priority,
         'table' => $o->table ? $o->table->table_number : null,
         'items' => $items,
@@ -152,6 +172,7 @@ $kdsOrdersJson = $orders->map(function($o) {
     ];
 })->values();
 @endphp
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
 function kdsScreen() {
     return {
@@ -162,11 +183,28 @@ function kdsScreen() {
         lastScanFlash: null,
         lastScanFlashItem: null,
         viewMode: (typeof localStorage !== 'undefined' && localStorage.getItem('kds_view_mode')) || 'list',
+        cameraOpen: false,
+        cameraScanner: null,
+        // P6 (F5): KDS auto-print — this device prints the KOT for every NEW order
+        // it sees. Printed ids persist in localStorage so a page refresh never
+        // re-prints. First-ever load seeds the set with the current backlog
+        // (no print storm) — only orders arriving AFTER that print automatically.
+        autoPrintEnabled: {{ ($kdsAutoPrint ?? false) ? 'true' : 'false' }},
+        printedIds: [],
+        printQueue: [],
+        printingNow: false,
+
+        // Kitchen lifecycle state (never the billing status): new → preparing → ready.
+        kstate(order) {
+            const k = order.kitchen_status || 'new';
+            return (k === 'new' || k === 'preparing' || k === 'ready') ? k : 'new';
+        },
 
         get aggregateItems() {
             const map = new Map();
             this.orders.forEach(o => {
-                if (o.status !== 'held' && o.status !== 'preparing') return;
+                const k = this.kstate(o);
+                if (k !== 'new' && k !== 'preparing') return;
                 (o.items || []).forEach(it => {
                     const key = (it.name || '').trim();
                     if (!key) return;
@@ -181,10 +219,11 @@ function kdsScreen() {
 
         startPolling() {
             this.$watch('viewMode', v => { try { localStorage.setItem('kds_view_mode', v); } catch(e){} });
+            this.initAutoPrint();
             this.polling = setInterval(() => this.refreshOrders(), 15000);
             this.timerInterval = setInterval(() => {
                 this.orders.forEach(o => { o.elapsed_minutes++; });
-                const hasUrgent = this.orders.some(o => o.elapsed_minutes > 15 && (o.status === 'held' || o.status === 'preparing'));
+                const hasUrgent = this.orders.some(o => o.elapsed_minutes > 15 && (this.kstate(o) === 'new' || this.kstate(o) === 'preparing'));
                 if (hasUrgent) this.playUrgentBeep();
             }, 60000);
         },
@@ -204,10 +243,111 @@ function kdsScreen() {
         async refreshOrders() {
             try {
                 const res = await fetch('{{ route("pos.restaurant.live-orders") }}');
-                if (res.ok) this.orders = await res.json();
+                if (res.ok) {
+                    this.orders = await res.json();
+                    this.checkAutoPrint();
+                }
             } catch (e) {}
         },
 
+        initAutoPrint() {
+            if (!this.autoPrintEnabled) return;
+            let stored = null;
+            try { stored = localStorage.getItem('kds_printed_ids'); } catch(e) {}
+            if (stored === null) {
+                // First-ever load on this device: seed with the current backlog so
+                // we don't blast N tickets at once — only NEW orders print.
+                this.printedIds = this.orders.map(o => o.id);
+                this.savePrintedIds();
+            } else {
+                try { this.printedIds = JSON.parse(stored) || []; } catch(e) { this.printedIds = []; }
+                this.checkAutoPrint();
+            }
+            // Ticket iframe signals back when its print dialog closes — strict
+            // one-at-a-time ordering so two tickets never race the printer.
+            window.addEventListener('message', (ev) => {
+                if (ev.data && ev.data.type === 'pos_print_done' && String(ev.data.signal || '').startsWith('kds-')) {
+                    this.finishCurrentPrint();
+                }
+            });
+        },
+
+        savePrintedIds() {
+            try {
+                if (this.printedIds.length > 300) this.printedIds = this.printedIds.slice(-300);
+                localStorage.setItem('kds_printed_ids', JSON.stringify(this.printedIds));
+            } catch(e) {}
+        },
+
+        checkAutoPrint() {
+            if (!this.autoPrintEnabled) return;
+            this.orders.forEach(o => {
+                if (!this.printedIds.includes(o.id) && !this.printQueue.includes(o.id)) {
+                    this.printQueue.push(o.id);
+                }
+            });
+            this.processPrintQueue();
+        },
+
+        processPrintQueue() {
+            if (this.printingNow || this.printQueue.length === 0) return;
+            const orderId = this.printQueue.shift();
+            // Mark BEFORE printing — a refresh mid-print must never duplicate.
+            this.printedIds.push(orderId);
+            this.savePrintedIds();
+            this.printingNow = true;
+            const host = document.getElementById('kdsPrintHost');
+            const frame = document.createElement('iframe');
+            frame.id = 'kdsPrintFrame';
+            frame.src = `/pos/restaurant/orders/${orderId}/kitchen-ticket?auto_print=1&_signal=kds-${orderId}`;
+            host.appendChild(frame);
+            // Fallback: if the iframe never signals (blocked dialog etc.), move on.
+            this.printFallbackTimer = setTimeout(() => this.finishCurrentPrint(), 25000);
+        },
+
+        finishCurrentPrint() {
+            if (!this.printingNow) return;
+            this.printingNow = false;
+            clearTimeout(this.printFallbackTimer);
+            const host = document.getElementById('kdsPrintHost');
+            if (host) host.innerHTML = '';
+            setTimeout(() => this.processPrintQueue(), 400);
+        },
+
+        async openCamera() {
+            this.cameraOpen = true;
+            await this.$nextTick();
+            try {
+                if (typeof Html5Qrcode === 'undefined') {
+                    throw new Error('Camera library not loaded');
+                }
+                if (!this.cameraScanner) this.cameraScanner = new Html5Qrcode('kdsCameraReader');
+                await this.cameraScanner.start(
+                    { facingMode: 'environment' },
+                    { fps: 10, qrbox: { width: 220, height: 220 } },
+                    (decodedText) => { this.onCameraScan(decodedText); },
+                    () => {}
+                );
+            } catch (e) {
+                this.showToast('Camera not available on this device', 'error');
+                this.cameraOpen = false;
+            }
+        },
+
+        async closeCamera() {
+            this.cameraOpen = false;
+            try { if (this.cameraScanner) { await this.cameraScanner.stop(); } } catch(e) {}
+            setTimeout(() => { this.$refs.scanInput && this.$refs.scanInput.focus(); }, 150);
+        },
+
+        onCameraScan(text) {
+            this.closeCamera();
+            this.scanBuffer = (text || '').trim();
+            this.processScan();
+        },
+
+        // Scan = CLEAR from any state (owner rule Jul 2026). Order leaves the board;
+        // the cashier's held bill is untouched.
         async processScan() {
             const raw = (this.scanBuffer || '').trim();
             this.scanBuffer = '';
@@ -223,14 +363,13 @@ function kdsScreen() {
                     this.playScanBeep(true);
                     this.showToast(data.message, 'success');
                     if (data.order_id) {
-                        // Flash the card green briefly
+                        // Flash briefly, then remove from the board (cleared)
                         this.lastScanFlash = data.order_id;
-                        setTimeout(() => { this.lastScanFlash = null; }, 1200);
-                        // Update local state — set status to ready
-                        const o = this.orders.find(x => x.id === data.order_id);
-                        if (o) o.status = 'ready';
-                        // Then refresh from server (auto-removes ready→completed transitions)
-                        setTimeout(() => this.refreshOrders(), 800);
+                        setTimeout(() => {
+                            this.lastScanFlash = null;
+                            this.orders = this.orders.filter(o => o.id !== data.order_id);
+                        }, 700);
+                        setTimeout(() => this.refreshOrders(), 1200);
                     }
                 } else {
                     this.playScanBeep(false);
@@ -253,24 +392,28 @@ function kdsScreen() {
             } catch(e) {}
         },
 
-        async updateStatus(orderId, status) {
+        // Kitchen-side status change — hits the kitchen-status endpoint which NEVER
+        // touches the billing status (tables + cashier bills stay intact).
+        async kitchenUpdate(orderId, kstatus) {
             try {
-                const res = await fetch(`/pos/restaurant/kds/${orderId}/status`, {
+                const res = await fetch(`/pos/restaurant/kds/${orderId}/kitchen-status`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: JSON.stringify({ status }),
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
+                    body: JSON.stringify({ kitchen_status: kstatus }),
                 });
                 const data = await res.json();
                 if (data.success) {
                     this.showToast(data.message, 'success');
-                    if (status === 'completed' || status === 'cancelled') {
+                    if (kstatus === 'cleared') {
                         this.orders = this.orders.filter(o => o.id !== orderId);
                     } else {
                         const order = this.orders.find(o => o.id === orderId);
-                        if (order) order.status = status;
+                        if (order) order.kitchen_status = kstatus;
                     }
                 } else {
-                    this.showToast(data.message, 'error');
+                    this.showToast(data.message || 'Update failed', 'error');
+                    // State may be stale (e.g. cleared elsewhere) — resync.
+                    this.refreshOrders();
                 }
             } catch (e) { this.showToast('Error updating order', 'error'); }
         },

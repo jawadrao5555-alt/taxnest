@@ -351,7 +351,7 @@
                                class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition border
                                       {{ $agentOn
                                             ? ($agentOnline ? 'bg-purple-500/20 text-purple-100 border-purple-300/40 hover:bg-purple-500/30' : 'bg-amber-500/20 text-amber-100 border-amber-300/40 hover:bg-amber-500/30 animate-pulse')
-                                            : 'bg-blue-500/20 text-blue-100 border-blue-300/40 hover:bg-blue-500/30' }}">
+                                            : 'bg-teal-500/20 text-teal-100 border-teal-300/40 hover:bg-teal-500/30' }}">
                                 @if($agentOn)
                                     <span class="w-1.5 h-1.5 rounded-full {{ $agentOnline ? 'bg-emerald-400' : 'bg-red-400 animate-pulse' }}"></span>
                                     🤖 Agent

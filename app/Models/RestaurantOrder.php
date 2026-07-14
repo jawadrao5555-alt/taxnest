@@ -13,6 +13,8 @@ class RestaurantOrder extends Model
         'payment_method', 'kitchen_notes', 'priority', 'pos_transaction_id', 'created_by',
         'estimated_cost',
         'kot_sent_at', 'kot_print_count',
+        'kitchen_status', 'kitchen_started_at', 'kitchen_ready_at', 'kitchen_cleared_at',
+        'assigned_cashier_id', 'source',
     ];
 
     protected $casts = [
@@ -23,11 +25,20 @@ class RestaurantOrder extends Model
         'priority' => 'boolean',
         'kot_sent_at' => 'datetime',
         'kot_print_count' => 'integer',
+        'kitchen_started_at' => 'datetime',
+        'kitchen_ready_at' => 'datetime',
+        'kitchen_cleared_at' => 'datetime',
     ];
 
     public function company()
     {
         return $this->belongsTo(Company::class);
+    }
+
+    // P7 (F6): cashier a waiter-tablet order was sent to for payment.
+    public function assignedCashier()
+    {
+        return $this->belongsTo(User::class, 'assigned_cashier_id');
     }
 
     public function table()

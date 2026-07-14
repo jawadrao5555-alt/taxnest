@@ -67,6 +67,19 @@ class PosTransaction extends Model
     }
 
     /**
+     * "Local" bill for display/tag purposes = no PRA fiscal trail at all:
+     * deliberate provisionals (invoice_mode='local') OR reporting-OFF finals
+     * (pra_status NULL + no fiscal number). Anything with a non-NULL pra_status
+     * (pending/submitted/completed/failed/offline) or a fiscal number is in the
+     * PRA pipeline and is NOT local. Mirrors the Local Invoices report-tab split.
+     */
+    public function isLocalBill(): bool
+    {
+        return $this->invoice_mode === 'local'
+            || ($this->pra_status === null && empty($this->pra_invoice_number));
+    }
+
+    /**
      * Tax-inclusive per-item display amounts (whole rupees) for receipts when the
      * "Show Tax on Receipt" toggle is OFF. Uses largest-remainder allocation so the
      * item amounts ALWAYS sum exactly to round(total + discount) — i.e. line items

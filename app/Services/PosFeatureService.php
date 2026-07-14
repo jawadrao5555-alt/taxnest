@@ -13,6 +13,18 @@ class PosFeatureService
         'multi_branch', 'customer_loyalty',
     ];
 
+    /**
+     * Plan-gated Restaurant & Kitchen flags (Jul 2026): available only on
+     * Pro / Unlimited POS plans (pricing_plans.restaurant_enabled), active
+     * admin overrides, or internal accounts. Masked OFF at runtime for
+     * everyone else — stored feature_flags stay untouched so a later plan
+     * upgrade restores the shop's previous kitchen configuration.
+     */
+    public const RESTAURANT_FLAGS = ['kot', 'tables', 'kitchen', 'kitchen_notes', 'recipes'];
+
+    /** Per-request cache: company_id => bool */
+    protected static array $restaurantAllowedCache = [];
+
     public const FLAG_META = [
         'kot' => [
             'label' => 'KOT (Kitchen Order Tickets)',
@@ -259,9 +271,50 @@ class PosFeatureService
         // feature_flags holds their full resolved set (see
         // 2026_07_03_180000_snapshot_pos_feature_flags migration).
         $overrides = is_array($company->feature_flags) ? $company->feature_flags : [];
-        $resolved = self::resolve(array_merge(self::baseDefaults(), $overrides));
+        $flags = array_merge(self::baseDefaults(), $overrides);
 
-        return self::flagsToObject($resolved);
+        // Plan gating: mask restaurant flags OFF when the company's plan
+        // doesn't include the Restaurant module. Masking happens BEFORE
+        // dependency resolution so children of masked parents drop too.
+        if (!self::restaurantAllowed($company)) {
+            foreach (self::RESTAURANT_FLAGS as $flag) {
+                $flags[$flag] = false;
+            }
+        }
+
+        return self::flagsToObject(self::resolve($flags));
+    }
+
+    /**
+     * Does this company's plan include the Restaurant & Kitchen module?
+     *  - Internal accounts: always yes.
+     *  - Active admin override (lifetime / temporary): yes.
+     *  - Otherwise: the active plan's restaurant_enabled column decides.
+     */
+    public static function restaurantAllowed(?Company $company): bool
+    {
+        if (!$company) {
+            return false;
+        }
+        if (array_key_exists($company->id, self::$restaurantAllowedCache)) {
+            return self::$restaurantAllowedCache[$company->id];
+        }
+
+        $allowed = false;
+        if ($company->is_internal_account) {
+            $allowed = true;
+        } else {
+            $sub = \App\Services\PlanLimitService::getActiveSubscription($company->id);
+            if ($sub) {
+                if ($sub->hasActiveOverride()) {
+                    $allowed = true;
+                } elseif ($sub->pricingPlan && $sub->pricingPlan->restaurant_enabled) {
+                    $allowed = true;
+                }
+            }
+        }
+
+        return self::$restaurantAllowedCache[$company->id] = $allowed;
     }
 
     public static function defaultsForCategory(string $category): array

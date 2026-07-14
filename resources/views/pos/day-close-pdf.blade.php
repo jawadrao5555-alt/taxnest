@@ -103,6 +103,20 @@
                 <td class="r">-</td>
             </tr>
             @endif
+            @if(($report->deleted_final_count ?? 0) > 0)
+            <tr>
+                <td>Local final bills deleted per company policy (included in totals above)</td>
+                <td class="c">{{ $report->deleted_final_count }}</td>
+                <td class="r">-</td>
+            </tr>
+            @endif
+            @if(($report->deleted_provisional_count ?? 0) > 0)
+            <tr>
+                <td>Provisional bills deleted per company policy</td>
+                <td class="c">{{ $report->deleted_provisional_count }}</td>
+                <td class="r">-</td>
+            </tr>
+            @endif
         </tbody>
         <tfoot>
             <tr>

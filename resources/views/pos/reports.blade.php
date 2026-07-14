@@ -24,7 +24,7 @@
                     @else
                     @foreach($teamMembers as $member)
                     <option value="{{ $member->id }}" {{ $selectedCashier == $member->id ? 'selected' : '' }}>
-                        {{ $member->name }} ({{ $member->pos_role === 'pos_admin' ? 'Admin' : 'Cashier' }})
+                        {{ $member->name }} ({{ $member->pos_role === 'pos_admin' ? 'Admin' : ($member->pos_role === 'pos_manager' ? 'Manager' : 'Cashier') }})
                     </option>
                     @endforeach
                     @endif

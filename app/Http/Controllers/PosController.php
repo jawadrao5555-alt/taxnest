@@ -41,7 +41,7 @@ class PosController extends Controller
     public function updateDashboardStyle(Request $request)
     {
         $user = auth('pos')->user();
-        $isAdmin = in_array($user->pos_role ?? $user->role ?? '', ['pos_admin', 'company_admin']);
+        $isAdmin = in_array($user->pos_role ?? $user->role ?? '', ['pos_admin', 'pos_manager', 'company_admin']);
         if (!$isAdmin) {
             return response()->json(['success' => false, 'message' => 'Only admin can change dashboard style.'], 403);
         }
@@ -533,7 +533,9 @@ class PosController extends Controller
             'cash' => PosTaxRule::getRateForMethod('cash'),
             'card' => PosTaxRule::getRateForMethod('debit_card'),
         ];
-        return view('pos.feature-settings', compact('company', 'features', 'categories', 'allFlags', 'isFirstTime', 'globalTaxRates'));
+        // Restaurant module plan gating (Pro / Unlimited only).
+        $restaurantAllowed = PosFeatureService::restaurantAllowed($company);
+        return view('pos.feature-settings', compact('company', 'features', 'categories', 'allFlags', 'isFirstTime', 'globalTaxRates', 'restaurantAllowed'));
     }
 
     public function updateFeatureSettings(Request $request)
@@ -559,6 +561,16 @@ class PosController extends Controller
         $flags = [];
         foreach (PosFeatureService::ALL_FLAGS as $flag) {
             $flags[$flag] = (bool) $request->input("feature_flags.$flag", false);
+        }
+        // Restaurant module plan gating (Jul 2026): when the plan doesn't
+        // include it, IGNORE the request for restaurant flags and PRESERVE the
+        // stored values — runtime masking keeps them inert, and a later plan
+        // upgrade restores the shop's previous kitchen configuration.
+        if (!PosFeatureService::restaurantAllowed($company)) {
+            $stored = is_array($company->feature_flags) ? $company->feature_flags : [];
+            foreach (PosFeatureService::RESTAURANT_FLAGS as $flag) {
+                $flags[$flag] = (bool) ($stored[$flag] ?? false);
+            }
         }
         // Canonicalize server-side: a child feature can't persist ON while its
         // required parent is OFF (mirrors the wizard's client-side resolveDeps).
@@ -855,6 +867,21 @@ class PosController extends Controller
             $invoiceNumber,
             auth('pos')->id()
         );
+
+        // F3 Dine-In (Jul 2026): a table reserved from the universal sale screen is
+        // auto-freed the moment its bill is stored (final OR provisional). Only
+        // touches status='reserved' — 'occupied' belongs to the held-order lifecycle
+        // (payOrder/deleteOrder free those). Freeing must never fail a sale.
+        if ($request->filled('table_id')) {
+            try {
+                RestaurantTable::where('company_id', $companyId)
+                    ->where('id', (int) $request->input('table_id'))
+                    ->where('status', 'reserved')
+                    ->update(['status' => 'available', 'locked_by_user_id' => null, 'locked_at' => null]);
+            } catch (\Throwable $e) {
+                \Log::warning('Table auto-free failed: ' . $e->getMessage());
+            }
+        }
 
         $praMessage = '';
         if ($praEnabled) {
@@ -2962,6 +2989,65 @@ class PosController extends Controller
     }
 
     /**
+     * Customize POS → Local Billing — persist the day-close wash policy (F1, Jul 2026):
+     * what happens to reporting-OFF FINAL local bills and to PROVISIONAL bills at
+     * day-close ('save' = archive | 'delete'), and whether customer spend snapshots
+     * survive a delete. Admin/manager only — a standing company decision.
+     */
+    /**
+     * Customize POS → Kitchen Display — KDS device auto-prints the KOT for every
+     * NEW incoming order it sees (P6, F5). Distinct from auto_print_kot which is
+     * the cashier-side print at sale time.
+     */
+    public function toggleKdsAutoPrint(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->isPosCashier()) {
+            return response()->json(['success' => false, 'message' => 'Only POS administrators can change this setting.'], 403);
+        }
+
+        $validated = $request->validate(['enabled' => 'required|boolean']);
+
+        $company = Company::find(app('currentCompanyId'));
+        $company->pos_kds_auto_print = (bool) $validated['enabled'];
+        $company->save();
+
+        return response()->json([
+            'success' => true,
+            'enabled' => (bool) $company->pos_kds_auto_print,
+            'message' => $company->pos_kds_auto_print ? 'KDS auto-print enabled' : 'KDS auto-print disabled',
+        ]);
+    }
+
+    public function updateLocalBillingSettings(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->isPosCashier()) {
+            return response()->json(['success' => false, 'message' => 'Only POS administrators can change this setting.'], 403);
+        }
+
+        $validated = $request->validate([
+            'final_action' => 'required|in:save,delete',
+            'provisional_action' => 'required|in:save,delete',
+            'spend_persist' => 'required|boolean',
+        ]);
+
+        $company = Company::find(app('currentCompanyId'));
+        $company->pos_dayclose_final_local_action = $validated['final_action'];
+        $company->pos_dayclose_provisional_action = $validated['provisional_action'];
+        $company->pos_customer_spend_persist = (bool) $validated['spend_persist'];
+        $company->save();
+
+        return response()->json([
+            'success' => true,
+            'final_action' => $company->pos_dayclose_final_local_action,
+            'provisional_action' => $company->pos_dayclose_provisional_action,
+            'spend_persist' => (bool) $company->pos_customer_spend_persist,
+            'message' => 'Local billing day-close policy saved.',
+        ]);
+    }
+
+    /**
      * Customize POS → Local Bills — persist "auto day-close at midnight".
      * When ON, the scheduled pos:auto-dayclose command closes any un-closed prior day
      * at the second midnight after it (1 full day grace — yesterday stays open;
@@ -3230,8 +3316,8 @@ class PosController extends Controller
         }
 
         $team = User::where('company_id', $companyId)
-            ->whereIn('pos_role', ['pos_admin', 'pos_cashier'])
-            ->orderByRaw("CASE WHEN pos_role = 'pos_admin' THEN 0 ELSE 1 END")
+            ->whereIn('pos_role', ['pos_admin', 'pos_manager', 'pos_cashier', 'pos_kitchen', 'pos_waiter'])
+            ->orderByRaw("CASE WHEN pos_role = 'pos_admin' THEN 0 WHEN pos_role = 'pos_manager' THEN 1 WHEN pos_role = 'pos_cashier' THEN 2 ELSE 3 END")
             ->orderBy('name')
             ->get();
 
@@ -3252,13 +3338,20 @@ class PosController extends Controller
             'email' => 'required|email|unique:users,email',
             'phone' => 'nullable|string|max:20',
             'password' => 'required|string|min:6',
+            'pos_role' => 'nullable|in:pos_cashier,pos_manager,pos_kitchen,pos_waiter',
         ]);
 
+        $newRole = $request->input('pos_role') ?: 'pos_cashier';
+
         // Team-account quota (paid-plan package limits, Jul 2026):
-        // Starter 1 (admin only), Business 5, Pro unlimited.
-        $quota = \App\Services\PlanLimitService::canAddPosUser($companyId);
-        if (!($quota['allowed'] ?? true)) {
-            return back()->with('error', $quota['reason']);
+        // Starter 1 (admin only), Business 5, Pro 10, Unlimited unlimited.
+        // Managers count toward the limit exactly like cashiers.
+        // Kitchen (P5, F4) + Waiter (P7, F6) accounts are limit-EXEMPT — confined roles.
+        if (!in_array($newRole, ['pos_kitchen', 'pos_waiter'], true)) {
+            $quota = \App\Services\PlanLimitService::canAddPosUser($companyId);
+            if (!($quota['allowed'] ?? true)) {
+                return back()->with('error', $quota['reason']);
+            }
         }
 
         User::create([
@@ -3268,11 +3361,12 @@ class PosController extends Controller
             'password' => bcrypt($request->password),
             'company_id' => $companyId,
             'role' => 'employee',
-            'pos_role' => 'pos_cashier',
+            'pos_role' => $newRole,
             'is_active' => true,
         ]);
 
-        return back()->with('success', 'Cashier account created successfully.');
+        $roleLabel = ['pos_manager' => 'Manager', 'pos_kitchen' => 'Kitchen', 'pos_waiter' => 'Waiter'][$newRole] ?? 'Cashier';
+        return back()->with('success', "{$roleLabel} account created successfully.");
     }
 
     public function updateCashier(Request $request, $id)
@@ -3284,7 +3378,7 @@ class PosController extends Controller
             return back()->with('error', 'Access denied.');
         }
 
-        $cashier = User::where('company_id', $companyId)->where('pos_role', 'pos_cashier')->findOrFail($id);
+        $cashier = User::where('company_id', $companyId)->whereIn('pos_role', ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter'])->findOrFail($id);
 
         $request->validate([
             'name' => 'required|string|max:100',
@@ -3314,11 +3408,12 @@ class PosController extends Controller
             return back()->with('error', 'Access denied.');
         }
 
-        $cashier = User::where('company_id', $companyId)->where('pos_role', 'pos_cashier')->findOrFail($id);
+        $cashier = User::where('company_id', $companyId)->whereIn('pos_role', ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter'])->findOrFail($id);
 
         // Reactivating a cashier re-consumes a team-account slot — same gate as
         // storeCashier, otherwise deactivate→create→reactivate bypasses the limit.
-        if (!$cashier->is_active) {
+        // Kitchen + Waiter accounts are limit-EXEMPT (never consume a slot).
+        if (!$cashier->is_active && !in_array($cashier->pos_role, ['pos_kitchen', 'pos_waiter'], true)) {
             $quota = \App\Services\PlanLimitService::canAddPosUser($companyId);
             if (!($quota['allowed'] ?? true)) {
                 return back()->with('error', $quota['reason']);
@@ -4378,6 +4473,64 @@ class PosController extends Controller
     }
 
     /**
+     * Full customer purchase history for the history page / CSV / PDF.
+     *
+     * When the company's "customer spend persist" setting is ON (default), the
+     * history additionally includes:
+     *   - ARCHIVED local bills (day-close 'save' policy) — via withoutGlobalScope
+     *   - spend SNAPSHOTS of deleted local bills (day-close 'delete' policy) —
+     *     merged as non-persisted PosTransaction stand-ins carrying the original
+     *     figures, flagged is_spend_snapshot so views can annotate them.
+     * When OFF, behaviour is the classic live-bills-only view.
+     *
+     * @return \Illuminate\Support\Collection ordered newest-first
+     */
+    private function customerHistoryTransactions($companyId, PosCustomer $customer)
+    {
+        $company = Company::find($companyId);
+        $persist = (bool) ($company->pos_customer_spend_persist ?? true);
+
+        $query = $this->customerTransactions($companyId, $customer);
+        if ($persist) {
+            $query->withoutGlobalScope('hide_archived');
+        }
+        $transactions = $query->get();
+
+        if ($persist && \Illuminate\Support\Facades\Schema::hasTable('pos_customer_spend_snapshots')) {
+            $snapshots = \App\Models\PosCustomerSpendSnapshot::where('company_id', $companyId)
+                ->where(function ($q) use ($customer) {
+                    $q->where('customer_id', $customer->id);
+                    if (!empty($customer->phone)) {
+                        $q->orWhere('customer_phone', $customer->phone);
+                    }
+                })
+                ->get()
+                ->map(function ($s) {
+                    $t = (new PosTransaction)->forceFill([
+                        'invoice_number' => $s->invoice_number,
+                        'invoice_mode' => 'local',
+                        'pra_status' => null,
+                        'pra_invoice_number' => null,
+                        'payment_method' => $s->payment_method,
+                        'subtotal' => $s->subtotal,
+                        'discount_amount' => $s->discount_amount,
+                        'tax_amount' => $s->tax_amount,
+                        'total_amount' => $s->total_amount,
+                        'created_at' => $s->sold_at ?? $s->created_at,
+                    ]);
+                    $t->is_spend_snapshot = true;
+                    return $t;
+                });
+
+            $transactions = $transactions->concat($snapshots)
+                ->sortByDesc(fn ($t) => $t->created_at)
+                ->values();
+        }
+
+        return $transactions;
+    }
+
+    /**
      * Per-customer purchase history page.
      */
     public function customerHistory($id)
@@ -4386,7 +4539,7 @@ class PosController extends Controller
         $company = Company::find($companyId);
         $customer = PosCustomer::where('company_id', $companyId)->findOrFail($id);
 
-        $transactions = $this->customerTransactions($companyId, $customer)->get();
+        $transactions = $this->customerHistoryTransactions($companyId, $customer);
         $totalSpent = $transactions->sum('total_amount');
         $totalOrders = $transactions->count();
         $avgOrder = $totalOrders > 0 ? $totalSpent / $totalOrders : 0;
@@ -4403,7 +4556,7 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $customer = PosCustomer::where('company_id', $companyId)->findOrFail($id);
-        $transactions = $this->customerTransactions($companyId, $customer)->get();
+        $transactions = $this->customerHistoryTransactions($companyId, $customer);
 
         $filename = 'Customer_History_' . preg_replace('/[^A-Za-z0-9]+/', '_', $customer->name) . '_' . now()->format('Ymd') . '.csv';
         $headers = [
@@ -4423,7 +4576,7 @@ class PosController extends Controller
                 fputcsv($file, [
                     $t->created_at->format('d M Y H:i'),
                     $this->csvSafe($t->invoice_number),
-                    $t->invoice_mode === 'local' ? 'Local' : 'PRA',
+                    $t->isLocalBill() ? (($t->is_spend_snapshot ?? false) ? 'Local (record)' : 'Local') : 'PRA',
                     ucwords(str_replace('_', ' ', (string) $t->payment_method)),
                     number_format($t->subtotal, 2, '.', ''),
                     number_format($t->discount_amount, 2, '.', ''),
@@ -4447,7 +4600,7 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $customer = PosCustomer::where('company_id', $companyId)->findOrFail($id);
-        $transactions = $this->customerTransactions($companyId, $customer)->get();
+        $transactions = $this->customerHistoryTransactions($companyId, $customer);
         $totalSpent = $transactions->sum('total_amount');
         $totalOrders = $transactions->count();
 
@@ -4973,21 +5126,11 @@ class PosController extends Controller
         $user = \Illuminate\Support\Facades\Auth::guard('pos')->user();
         $date = $request->input('date', today()->format('Y-m-d'));
 
-        // Destructive purge guard — only POS admin / company admin may REQUEST a local-bill
-        // purge from the checkbox. Cashiers can still close the day, but a manual purge flag
-        // under cashier authority is rejected.
-        $requestedPurge = $request->boolean('purge_local_bills');
-        $canPurge = $user && in_array(($user->pos_role ?? null), ['pos_admin', 'company_admin'], true);
-        if ($requestedPurge && !$canPurge) {
-            return back()->with('error', 'Only POS admin can purge local/provisional bills at day-close.');
-        }
-
-        // Company policy (Customize POS → Local Bills) auto-purges on EVERY day-close,
-        // regardless of who closes the day — a standing admin decision, not cashier authority.
-        // By this point a manual purge request is already admin-validated above.
-        $purge = $requestedPurge || (bool) ($company->pos_auto_purge_local_on_dayclose ?? false);
-
-        $result = $this->performDayClose($companyId, $date, $user?->id, $purge, $request->input('notes'));
+        // Local-bill wash at day-close now follows the STANDING company policy set by
+        // an admin in Customize POS → Local Billing (save=archive | delete, per bill
+        // kind). Cashiers closing the day merely trigger that admin decision — no
+        // per-close purge checkbox / cashier authority question anymore.
+        $result = $this->performDayClose($companyId, $date, $user?->id, $request->input('notes'));
 
         if ($result['status'] === 'exists') {
             return back()->with('error', 'Day Close Report for this date already exists.');
@@ -4998,28 +5141,43 @@ class PosController extends Controller
 
         $msg = 'Day Close Report ' . $result['report_number'] . ' generated for ' . \Carbon\Carbon::parse($date)->format('d M Y');
         if ($result['archived'] > 0) {
-            $msg .= " — {$result['archived']} local/provisional bill(s) moved to Archive.";
+            $msg .= " — {$result['archived']} local bill(s) moved to Archive.";
+        }
+        if (($result['deleted'] ?? 0) > 0) {
+            $msg .= " — {$result['deleted']} local bill(s) deleted per company policy.";
         }
         return back()->with('success', $msg);
     }
 
     /**
      * Core day-close logic shared by the HTTP endpoint (closeDayReport) and the
-     * midnight auto-close command (pos:auto-dayclose). The caller decides whether to
-     * $purge (archive local bills) and who $closedBy is — this method does NOT
-     * enforce role authority, so authorize before calling.
+     * midnight auto-close command (pos:auto-dayclose).
      *
-     * @return array{status:string,report:?\App\Models\PosDayCloseReport,archived:int,report_number:?string}
+     * LOCAL-BILL WASH (owner rule Jul 2026 — REVERSES the old "never sweep
+     * reporting-OFF finals" invariant): every day-close washes that day's local
+     * bills per the STANDING company policy from Customize POS → Local Billing:
+     *   - deliberate provisionals (invoice_mode='local' + pra_status='local')
+     *     → pos_dayclose_provisional_action: 'save' (archive) | 'delete'
+     *   - reporting-OFF finals (completed + invoice_mode pra/NULL + pra_status NULL
+     *     + no fiscal number) → pos_dayclose_final_local_action: 'save' | 'delete'
+     * On 'delete' with pos_customer_spend_persist ON, a pos_customer_spend_snapshots
+     * ledger row is written FIRST so customer purchase history survives.
+     * GUARD: bills with a non-NULL pra_status (pending/submitted/completed/failed/
+     * offline) or a PRA fiscal number are NEVER touched — fiscal pipeline is sacred.
+     *
+     * This method does NOT enforce role authority, so authorize before calling.
+     *
+     * @return array{status:string,report:?\App\Models\PosDayCloseReport,archived:int,deleted:int,report_number:?string}
      *         status is one of 'created' | 'exists' | 'empty'.
      */
-    public function performDayClose(int $companyId, string $date, ?int $closedBy, bool $purge, ?string $notes = null): array
+    public function performDayClose(int $companyId, string $date, ?int $closedBy, ?string $notes = null): array
     {
         $existing = PosDayCloseReport::where('company_id', $companyId)
             ->where('report_date', $date)
             ->first();
 
         if ($existing) {
-            return ['status' => 'exists', 'report' => $existing, 'archived' => 0, 'report_number' => $existing->report_number];
+            return ['status' => 'exists', 'report' => $existing, 'archived' => 0, 'deleted' => 0, 'report_number' => $existing->report_number];
         }
 
         // Local (non-PRA) bills stay OUT of the stored day-close figures — they are
@@ -5040,7 +5198,7 @@ class PosController extends Controller
             ->exists();
 
         if ($transactions->isEmpty() && !$hasLocalBills) {
-            return ['status' => 'empty', 'report' => null, 'archived' => 0, 'report_number' => null];
+            return ['status' => 'empty', 'report' => null, 'archived' => 0, 'deleted' => 0, 'report_number' => null];
         }
 
         $reportCount = PosDayCloseReport::where('company_id', $companyId)->count();
@@ -5073,33 +5231,116 @@ class PosController extends Controller
         $hashString = json_encode($data);
         $data['hash'] = hash('sha256', $hashString);
 
-        // Optional archive of local/provisional bills at day-close. Uses the CANONICAL
-        // local-bill definition — invoice_mode='local' AND pra_status='local' — so
-        // reporting-OFF finals (invoice_mode='pra' + NULL pra_status) are NEVER swept in.
-        // Archive (NOT delete): is_archived=true hides rows via the global 'hide_archived'
-        // scope while keeping them fully recoverable/audit-safe. Wrapped in one DB
-        // transaction so report creation + archive succeed/fail atomically.
+        // ── LOCAL-BILL WASH (per-company policy, Customize POS → Local Billing) ──
+        // Runs on EVERY day-close. Two disjoint bill sets, each with its own action:
+        //   provisionals      = invoice_mode='local' + pra_status='local' (deliberate)
+        //   reporting-OFF finals = completed + invoice_mode pra/NULL + pra_status NULL
+        // Both selectors also require pra_invoice_number NULL — a fiscal number OR any
+        // non-NULL pra_status (pending/submitted/completed/failed/offline) means the
+        // bill is in the PRA pipeline and is NEVER touched.
+        // 'save'  → archive (is_archived=true; recoverable, still in Local reports tab)
+        // 'delete'→ permanent delete; with spend-persist ON a pos_customer_spend_snapshots
+        //           ledger row is written FIRST for bills linked to a customer.
+        // Wrapped in one DB transaction so report + wash succeed/fail atomically.
+        $company = Company::find($companyId);
+        $provAction = in_array($company->pos_dayclose_provisional_action ?? 'save', ['save', 'delete'], true)
+            ? ($company->pos_dayclose_provisional_action ?? 'save') : 'save';
+        $finalAction = in_array($company->pos_dayclose_final_local_action ?? 'save', ['save', 'delete'], true)
+            ? ($company->pos_dayclose_final_local_action ?? 'save') : 'save';
+        $spendPersist = (bool) ($company->pos_customer_spend_persist ?? true);
+
         $archivedCount = 0;
+        $deletedCount = 0;
         $report = null;
-        \DB::transaction(function () use ($data, $companyId, $date, $purge, &$archivedCount, &$report) {
+        \DB::transaction(function () use ($data, $companyId, $date, $provAction, $finalAction, $spendPersist, &$archivedCount, &$deletedCount, &$report) {
             $report = PosDayCloseReport::create($data);
-            if ($purge) {
-                $archivedCount = PosTransaction::withoutGlobalScope('hide_archived')
+
+            $baseQuery = function () use ($companyId, $date) {
+                return PosTransaction::withoutGlobalScope('hide_archived')
                     ->where('company_id', $companyId)
                     ->whereDate('created_at', $date)
-                    ->where('invoice_mode', 'local')
-                    ->where('pra_status', 'local')
                     ->whereNull('pra_invoice_number')
-                    ->where('is_archived', false)
-                    ->update([
+                    ->where('is_archived', false);
+            };
+
+            $sets = [
+                'provisional' => [
+                    'action' => $provAction,
+                    'query' => $baseQuery()
+                        ->where('invoice_mode', 'local')
+                        ->where('pra_status', 'local'),
+                ],
+                'final_local' => [
+                    'action' => $finalAction,
+                    'query' => $baseQuery()
+                        ->where('status', 'completed')
+                        ->where(function ($q) {
+                            $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+                        })
+                        ->whereNull('pra_status'),
+                ],
+            ];
+
+            $deletedByKind = ['provisional' => 0, 'final_local' => 0];
+            foreach ($sets as $billKind => $set) {
+                if ($set['action'] === 'delete') {
+                    $rows = $set['query']->get();
+                    if ($rows->isEmpty()) {
+                        continue;
+                    }
+                    if ($spendPersist) {
+                        $now = now();
+                        $snapshots = $rows
+                            ->filter(fn ($t) => $t->customer_id || !empty($t->customer_phone))
+                            ->map(fn ($t) => [
+                                'company_id' => $companyId,
+                                'customer_id' => $t->customer_id,
+                                'customer_phone' => $t->customer_phone,
+                                'customer_name' => $t->customer_name,
+                                'invoice_number' => $t->invoice_number,
+                                'bill_kind' => $billKind,
+                                'payment_method' => $t->payment_method,
+                                'subtotal' => $t->subtotal,
+                                'discount_amount' => $t->discount_amount,
+                                'tax_amount' => $t->tax_amount,
+                                'total_amount' => $t->total_amount,
+                                'sold_at' => $t->created_at,
+                                'dayclose_report_id' => $report->id,
+                                'created_at' => $now,
+                                'updated_at' => $now,
+                            ])->values()->all();
+                        if (!empty($snapshots)) {
+                            \App\Models\PosCustomerSpendSnapshot::insert($snapshots);
+                        }
+                    }
+                    $ids = $rows->pluck('id')->all();
+                    \App\Models\PosTransactionItem::whereIn('transaction_id', $ids)->delete();
+                    \App\Models\PosPayment::whereIn('transaction_id', $ids)->delete();
+                    $kindDeleted = PosTransaction::withoutGlobalScope('hide_archived')
+                        ->whereIn('id', $ids)->delete();
+                    $deletedCount += $kindDeleted;
+                    $deletedByKind[$billKind] += $kindDeleted;
+                } else {
+                    $archivedCount += $set['query']->update([
                         'is_archived' => true,
                         'archived_at' => now(),
                         'archived_by_report_id' => $report->id,
                     ]);
+                }
+            }
+
+            // Persist deleted counts on the report: deleted reporting-OFF finals must
+            // still consume monthly quota (PlanLimitService adds these back in), and
+            // the Z-report PDF states how many bills were removed per policy.
+            if ($deletedByKind['provisional'] > 0 || $deletedByKind['final_local'] > 0) {
+                $report->forceFill([
+                    'deleted_final_count' => $deletedByKind['final_local'],
+                    'deleted_provisional_count' => $deletedByKind['provisional'],
+                ])->save();
             }
         });
 
-        return ['status' => 'created', 'report' => $report, 'archived' => $archivedCount, 'report_number' => $reportNumber];
+        return ['status' => 'created', 'report' => $report, 'archived' => $archivedCount, 'deleted' => $deletedCount, 'report_number' => $reportNumber];
     }
 
     public function dayCloseReportPdf($id)

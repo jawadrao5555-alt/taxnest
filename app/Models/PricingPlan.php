@@ -22,6 +22,7 @@ class PricingPlan extends Model
         'max_products',
         'inventory_enabled',
         'reports_enabled',
+        'restaurant_enabled',
     ];
 
     protected $casts = [
@@ -31,6 +32,7 @@ class PricingPlan extends Model
         'compare_at_price' => 'decimal:2',
         'inventory_enabled' => 'boolean',
         'reports_enabled' => 'boolean',
+        'restaurant_enabled' => 'boolean',
     ];
 
     public function subscriptions()

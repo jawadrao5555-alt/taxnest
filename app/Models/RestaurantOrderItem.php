@@ -10,6 +10,7 @@ class RestaurantOrderItem extends Model
         'order_id', 'item_type', 'item_id', 'item_name',
         'quantity', 'unit_price', 'subtotal', 'special_notes', 'is_tax_exempt',
         'item_discount_type', 'item_discount_value', 'item_discount_amount',
+        'kot_printed_at',
     ];
 
     protected $casts = [
@@ -19,6 +20,7 @@ class RestaurantOrderItem extends Model
         'is_tax_exempt' => 'boolean',
         'item_discount_value' => 'decimal:2',
         'item_discount_amount' => 'decimal:2',
+        'kot_printed_at' => 'datetime',
     ];
 
     public function order()

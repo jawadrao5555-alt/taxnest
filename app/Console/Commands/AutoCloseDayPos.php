@@ -27,7 +27,7 @@ class AutoCloseDayPos extends Command
 
         $companies = Company::where('pos_auto_dayclose_24h', true)
             ->where('product_type', 'pos')
-            ->get(['id', 'pos_auto_purge_local_on_dayclose']);
+            ->get(['id']);
 
         if ($companies->isEmpty()) {
             $this->info('No companies with midnight auto day-close enabled.');
@@ -63,10 +63,8 @@ class AutoCloseDayPos extends Command
                     ->whereIn('pos_role', ['pos_admin', 'company_admin'])
                     ->value('id');
 
-                // Purge/archive follows the SAME company policy as a manual day-close
-                // (Customize POS → "Day-close par local bills archive").
-                $purge = (bool) ($company->pos_auto_purge_local_on_dayclose ?? false);
-
+                // The local-bill wash inside performDayClose follows the STANDING
+                // company policy (Customize POS → Local Billing) — same as manual close.
                 foreach ($dates as $date) {
                     if (PosDayCloseReport::where('company_id', $company->id)->where('report_date', $date)->exists()) {
                         continue;
@@ -76,13 +74,12 @@ class AutoCloseDayPos extends Command
                         $company->id,
                         $date,
                         $adminId,
-                        $purge,
                         'Auto-closed by system (midnight, 1-day grace)'
                     );
 
                     if ($result['status'] === 'created') {
                         $closedTotal++;
-                        $this->info("Company {$company->id}: closed {$date} → {$result['report_number']} (archived {$result['archived']}).");
+                        $this->info("Company {$company->id}: closed {$date} → {$result['report_number']} (archived {$result['archived']}, deleted {$result['deleted']}).");
                     }
                 }
             } catch (\Throwable $e) {

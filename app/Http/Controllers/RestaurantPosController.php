@@ -457,8 +457,21 @@ class RestaurantPosController extends Controller
         DB::beginTransaction();
         try {
             $orderData = ['order_number' => $order->order_number, 'total_amount' => $order->total_amount, 'status' => $order->status];
+            $tableId = $order->table_id;
             $order->items()->delete();
             $order->delete();
+            // F3 (Jul 2026): deleting a held order frees its table — unless another
+            // active order is still parked on the same table.
+            if ($tableId) {
+                $stillActive = RestaurantOrder::where('company_id', $companyId)
+                    ->where('table_id', $tableId)
+                    ->whereIn('status', ['held', 'preparing', 'ready'])
+                    ->exists();
+                if (!$stillActive) {
+                    RestaurantTable::where('company_id', $companyId)->where('id', $tableId)
+                        ->update(['status' => 'available', 'locked_by_user_id' => null, 'locked_at' => null]);
+                }
+            }
             try {
                 if (class_exists(\App\Services\AuditLogService::class)) {
                     \App\Services\AuditLogService::log('order_deleted', 'restaurant_order', $orderId, $orderData, null, $companyId, Auth::guard('pos')->id());
@@ -969,7 +982,7 @@ class RestaurantPosController extends Controller
         return back()->with('success', 'Kitchen settings updated successfully.');
     }
 
-    public function kitchenTicket($orderId)
+    public function kitchenTicket(Request $request, $orderId)
     {
         $companyId = app('currentCompanyId');
         $order = RestaurantOrder::where('company_id', $companyId)
@@ -978,7 +991,21 @@ class RestaurantPosController extends Controller
 
         $company = Company::find($companyId);
 
-        return view('pos.restaurant.kitchen-ticket', compact('order', 'company'));
+        // P7 (F6) delta-KOT: ?delta=1 renders ONLY not-yet-printed items (appended
+        // rows) so the kitchen never re-fires dishes already on the pass.
+        $delta = $request->query('delta') == '1';
+        $ticketItems = $delta ? $order->items->whereNull('kot_printed_at')->values() : $order->items;
+
+        // Stamp on ACTUAL print renders only (auto_print=1) — plain views never
+        // consume the delta. Full prints stamp everything they render too, so a
+        // later delta covers only genuinely new rows.
+        if ($request->query('auto_print') == '1' && $ticketItems->isNotEmpty()) {
+            \App\Models\RestaurantOrderItem::whereIn('id', $ticketItems->pluck('id'))
+                ->whereNull('kot_printed_at')
+                ->update(['kot_printed_at' => now()]);
+        }
+
+        return view('pos.restaurant.kitchen-ticket', compact('order', 'company', 'ticketItems', 'delta'));
     }
 
     /**
@@ -1155,7 +1182,7 @@ class RestaurantPosController extends Controller
         $company = Company::find($companyId);
 
         $user = auth('pos')->user();
-        if ($user && $user->pos_role !== 'pos_admin' && $user->role !== 'company_admin') {
+        if ($user && !in_array($user->pos_role, ['pos_admin', 'pos_manager'], true) && $user->role !== 'company_admin') {
             return redirect('/pos/invoice/create');
         }
 
@@ -1276,7 +1303,7 @@ class RestaurantPosController extends Controller
         $allowedStyles = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify'];
         $dashboardStyle = in_array($company->pos_dashboard_style, $allowedStyles) ? $company->pos_dashboard_style : 'default';
         $isRestaurant = true;
-        $isAdmin = in_array($user->pos_role ?? $user->role ?? '', ['pos_admin', 'company_admin']);
+        $isAdmin = in_array($user->pos_role ?? $user->role ?? '', ['pos_admin', 'pos_manager', 'company_admin']);
         $praStatus = (bool) $user?->praReportingEnabled($company);
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
 
@@ -1399,7 +1426,7 @@ class RestaurantPosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $user = Auth::guard('pos')->user();
-        if ($user->pos_role !== 'pos_admin' && $user->role !== 'company_admin') {
+        if (!in_array($user->pos_role, ['pos_admin', 'pos_manager'], true) && $user->role !== 'company_admin') {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
         $request->validate([

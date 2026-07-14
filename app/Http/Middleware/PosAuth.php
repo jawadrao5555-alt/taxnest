@@ -82,6 +82,36 @@ class PosAuth
             }
         }
 
+        // ═══ Kitchen account isolation (P5, F4) ═══
+        // Users with pos_role='pos_kitchen' are confined to the Kitchen Display —
+        // /pos/restaurant/kds* (board, kitchen-status, scan) + live-orders polling
+        // + logout. Any other /pos/* URL redirects back to the KDS. They are
+        // limit-EXEMPT team accounts created from the Team page.
+        if (($user->pos_role ?? null) === 'pos_kitchen') {
+            $path = ltrim($request->path(), '/');
+            $allowed = str_starts_with($path, 'pos/restaurant/kds')
+                || $path === 'pos/restaurant/api/live-orders'
+                // KOT ticket view (GET) — needed by the KDS auto-print iframe (P6).
+                || preg_match('#^pos/restaurant/orders/\d+/kitchen-ticket$#', $path)
+                || $path === 'pos/logout'
+                || $path === 'pos/login';
+            if (!$allowed) {
+                return redirect('/pos/restaurant/kds');
+            }
+        }
+
+        // Waiter accounts (P7, F6) are confined to the Waiter Tablet — order
+        // composing + send-to-cashier only. Limit-EXEMPT team accounts.
+        if (($user->pos_role ?? null) === 'pos_waiter') {
+            $path = ltrim($request->path(), '/');
+            $allowed = str_starts_with($path, 'pos/waiter')
+                || $path === 'pos/logout'
+                || $path === 'pos/login';
+            if (!$allowed) {
+                return redirect('/pos/waiter');
+            }
+        }
+
         // Resolve & bind active branch (returns null if no branches exist yet).
         // NOTE: use bind() not instance() — instance(name, null) is treated as "not bound" by Laravel.
         $branchId = app(\App\Services\BranchContextService::class)->getActiveBranchId();

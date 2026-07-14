@@ -25,9 +25,9 @@
 
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6" x-data="{ showForm: false }">
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Add New Cashier</h3>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Add Team Member</h3>
             <button @click="showForm = !showForm" class="text-sm text-purple-600 hover:text-purple-700 font-medium">
-                <span x-text="showForm ? 'Cancel' : '+ Add Cashier'"></span>
+                <span x-text="showForm ? 'Cancel' : '+ Add Member'"></span>
             </button>
         </div>
         <form x-show="showForm" x-transition method="POST" action="{{ route('pos.team.store-cashier') }}" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -48,8 +48,17 @@
                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Password</label>
                 <input type="password" name="password" required minlength="6" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500" placeholder="Min 6 characters">
             </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Role</label>
+                <select name="pos_role" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                    <option value="pos_cashier">Cashier — sale screen &amp; billing only</option>
+                    <option value="pos_manager">Manager — full admin access</option>
+                    <option value="pos_kitchen">Kitchen — Kitchen Display only (free, no team-slot)</option>
+                    <option value="pos_waiter">Waiter — tablet ordering only (free, no team-slot)</option>
+                </select>
+            </div>
             <div class="sm:col-span-2">
-                <button type="submit" class="px-6 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition font-semibold">Create Cashier Account</button>
+                <button type="submit" class="px-6 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition font-semibold">Create Account</button>
             </div>
         </form>
     </div>
@@ -91,8 +100,14 @@
                         <td class="px-4 py-3">
                             @if($member->pos_role === 'pos_admin' || $member->role === 'company_admin')
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">Admin</span>
+                            @elseif($member->pos_role === 'pos_manager')
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400">Manager</span>
+                            @elseif($member->pos_role === 'pos_kitchen')
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">Kitchen</span>
+                            @elseif($member->pos_role === 'pos_waiter')
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">Waiter</span>
                             @else
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">Cashier</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">Cashier</span>
                             @endif
                         </td>
                         <td class="px-4 py-3">
@@ -103,7 +118,7 @@
                             @endif
                         </td>
                         <td class="px-4 py-3">
-                            @if($member->pos_role === 'pos_cashier')
+                            @if(in_array($member->pos_role, ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter'], true))
                             <div class="flex items-center gap-2">
                                 <button x-show="!editing" @click="editing = true" class="text-amber-600 hover:text-amber-700 text-xs font-medium" title="Edit">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>

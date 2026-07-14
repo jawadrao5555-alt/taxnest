@@ -80,6 +80,7 @@
         .kot-barcode-hint { font-size: 9px; color: #000; font-weight: bold; letter-spacing: 1px; margin-top: 2px; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 </head>
 <body>
     <div class="text-center">
@@ -117,8 +118,15 @@
 
     <div class="separator"></div>
 
+    @if(!empty($delta))
+    <div class="mt-1" style="border: 2px solid #000; padding: 4px; text-align: center;">
+        <span class="bold text-lg">++ ADDED ITEMS ++</span>
+    </div>
+    @endif
+
     @php
-        $grouped = $order->items->groupBy(function($item) {
+        // P7 delta-KOT: $ticketItems = NULL-kot_printed_at rows only when ?delta=1.
+        $grouped = ($ticketItems ?? $order->items)->groupBy(function($item) {
             if ($item->item_type === 'service') return 'Services';
             $product = \App\Models\PosProduct::find($item->item_id);
             return $product && $product->category ? $product->category : 'General';
@@ -168,7 +176,8 @@
     <div class="separator"></div>
     <div class="kot-barcode-box">
         <svg id="kotBarcode"></svg>
-        <div class="kot-barcode-hint">SCAN TO MARK READY</div>
+        <div id="kotQr" style="display:inline-block; margin-top:6px;"></div>
+        <div class="kot-barcode-hint">SCAN (BARCODE OR QR) TO CLEAR</div>
     </div>
     <p class="text-center bold text-sm">{{ $company->name ?? 'Restaurant' }}</p>
 
@@ -221,6 +230,20 @@
                     });
                 }
             } catch (e) { console.warn('Barcode render failed', e); }
+            // P5: QR alongside CODE128 — same "KOT-{id}" payload, scannable by the
+            // KDS camera scanner (phones/tablets read QR far better than 1D codes).
+            try {
+                if (typeof QRCode === 'function') {
+                    new QRCode(document.getElementById('kotQr'), {
+                        text: 'KOT-{{ $order->id }}',
+                        width: 90,
+                        height: 90,
+                        colorDark: '#000000',
+                        colorLight: '#ffffff',
+                        correctLevel: QRCode.CorrectLevel.M
+                    });
+                }
+            } catch (e) { console.warn('QR render failed', e); }
         }
 
         window.onload = function() {

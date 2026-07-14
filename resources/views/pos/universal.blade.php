@@ -447,7 +447,7 @@ window.addEventListener('popstate', function() {
         </div>
 
         @if($features->tables)
-        <button @click="showTablePicker = true" class="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold border transition flex-shrink-0" :class="selectedTable ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'">
+        <button @click="openTablePicker()" class="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold border transition flex-shrink-0" :class="selectedTable ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'">
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
             <span x-text="selectedTable ? 'T-' + selectedTable.table_number : 'Table'"></span>
         </button>
@@ -461,11 +461,11 @@ window.addEventListener('popstate', function() {
         @if(($features->tables ?? false) || ($features->kot ?? false) || ($features->kitchen ?? false) || ($features->delivery ?? false))
         <div class="flex items-center rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex-shrink-0" title="Press F2 to cycle">
             @if($features->tables)
-            <button @click="orderType = 'dine_in'" class="px-2 py-1.5 text-[10px] font-bold transition-all" :class="orderType === 'dine_in' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">Dine In</button>
+            <button @click="setOrderType('dine_in')" class="px-2 py-1.5 text-[10px] font-bold transition-all" :class="orderType === 'dine_in' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">Dine In</button>
             @endif
-            <button @click="orderType = 'takeaway'" class="px-2 py-1.5 text-[10px] font-bold transition-all border-x border-gray-200 dark:border-gray-700" :class="orderType === 'takeaway' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">Takeaway</button>
+            <button @click="setOrderType('takeaway')" class="px-2 py-1.5 text-[10px] font-bold transition-all border-x border-gray-200 dark:border-gray-700" :class="orderType === 'takeaway' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">Takeaway</button>
             @if($features->delivery)
-            <button @click="orderType = 'delivery'" class="px-2 py-1.5 text-[10px] font-bold transition-all" :class="orderType === 'delivery' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">Delivery</button>
+            <button @click="setOrderType('delivery')" class="px-2 py-1.5 text-[10px] font-bold transition-all" :class="orderType === 'delivery' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">Delivery</button>
             @endif
             <span class="px-1.5 py-1.5 text-[8px] font-mono text-gray-400 bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">F2</span>
         </div>
@@ -1007,23 +1007,41 @@ window.addEventListener('popstate', function() {
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">Select Table</h3>
                 <button @click="showTablePicker = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
             </div>
-            <div class="p-4 max-h-[50vh] overflow-y-auto grid grid-cols-3 gap-2">
-                @foreach($tables as $t)
-                <button @click="selectTable({ id: {{ $t->id }}, table_number: '{{ $t->table_number }}', seats: {{ $t->seats }} })" class="py-3 px-2 rounded-xl text-center border-2 transition hover:scale-105 {{ $t->status === 'occupied' ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-purple-400' }}">
-                    {{-- Top-view table + chairs diagram (color = status) --}}
-                    <svg viewBox="0 0 48 48" class="w-8 h-8 mx-auto mb-1 {{ $t->status === 'occupied' ? 'text-red-500' : 'text-green-500 dark:text-green-400' }}" fill="currentColor" aria-hidden="true">
-                        <rect x="17" y="1.5" width="14" height="7" rx="3"/>
-                        <rect x="17" y="39.5" width="14" height="7" rx="3"/>
-                        <rect x="1.5" y="17" width="7" height="14" rx="3"/>
-                        <rect x="39.5" y="17" width="7" height="14" rx="3"/>
-                        <circle cx="24" cy="24" r="13"/>
-                        <circle cx="24" cy="24" r="8.5" fill="#fff" fill-opacity="0.35"/>
-                    </svg>
-                    <p class="text-sm font-bold {{ $t->status === 'occupied' ? 'text-red-600' : 'text-gray-900 dark:text-white' }}">T-{{ $t->table_number }}</p>
-                    <p class="text-[10px] text-gray-400">{{ $t->seats }} seats</p>
-                    @if($t->status === 'occupied')<span class="text-[9px] text-red-500 font-medium">Occupied</span>@endif
-                </button>
-                @endforeach
+            {{-- F3 Dine-In (Jul 2026): LIVE floors + tables, refreshed on every open via
+                 /pos/restaurant/api/table-status. Green=free, amber=reserved, red=occupied.
+                 Selecting a table RESERVES it server-side (race-safe) before it sticks. --}}
+            <div class="p-4 max-h-[50vh] overflow-y-auto">
+                <template x-if="tablesLoading && tableFloors.length === 0">
+                    <p class="text-center text-sm text-gray-400 py-6">Loading tables…</p>
+                </template>
+                <template x-if="!tablesLoading && tableFloors.length === 0">
+                    <p class="text-center text-sm text-gray-400 py-6">No tables configured</p>
+                </template>
+                <template x-for="floor in tableFloors" :key="floor.name">
+                    <div class="mb-3">
+                        <p class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1.5" x-text="floor.name"></p>
+                        <div class="grid grid-cols-3 gap-2">
+                            <template x-for="t in floor.tables" :key="t.id">
+                                <button @click="selectTable(t)" :disabled="t.status === 'occupied'" class="py-3 px-2 rounded-xl text-center border-2 transition"
+                                    :class="t.status === 'occupied' ? 'border-red-300 bg-red-50 dark:bg-red-900/20 cursor-not-allowed' : (t.status === 'reserved' ? 'border-amber-300 bg-amber-50 dark:bg-amber-900/20 hover:border-amber-400 hover:scale-105' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-purple-400 hover:scale-105')">
+                                    {{-- Top-view table + chairs diagram (color = status) --}}
+                                    <svg viewBox="0 0 48 48" class="w-8 h-8 mx-auto mb-1" :class="t.status === 'occupied' ? 'text-red-500' : (t.status === 'reserved' ? 'text-amber-500' : 'text-green-500 dark:text-green-400')" fill="currentColor" aria-hidden="true">
+                                        <rect x="17" y="1.5" width="14" height="7" rx="3"/>
+                                        <rect x="17" y="39.5" width="14" height="7" rx="3"/>
+                                        <rect x="1.5" y="17" width="7" height="14" rx="3"/>
+                                        <rect x="39.5" y="17" width="7" height="14" rx="3"/>
+                                        <circle cx="24" cy="24" r="13"/>
+                                        <circle cx="24" cy="24" r="8.5" fill="#fff" fill-opacity="0.35"/>
+                                    </svg>
+                                    <p class="text-sm font-bold" :class="t.status === 'occupied' ? 'text-red-600' : 'text-gray-900 dark:text-white'" x-text="'T-' + t.table_number"></p>
+                                    <p class="text-[10px] text-gray-400" x-text="t.seats + ' seats'"></p>
+                                    <span x-show="t.status === 'occupied'" class="text-[9px] text-red-500 font-medium">Occupied</span>
+                                    <span x-show="t.status === 'reserved'" class="text-[9px] text-amber-600 font-medium">Reserved</span>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                </template>
             </div>
         </div>
     </div>
@@ -2072,6 +2090,9 @@ function restaurantPos() {
         selectedTable: {!! $jsEnc($selectedTableJson, 'null') !!},
         heldOrders: {!! $jsEnc($heldOrders) !!},
         showTablePicker: false,
+        // F3 Dine-In — live floors/tables for the picker modal (fetched on open).
+        tableFloors: [],
+        tablesLoading: false,
         showPayModal: false,
         // payMethodIndex — which method is highlighted in the Pay modal (0 = Cash,
         // 1 = Card). Arrow keys move it, Enter confirms the highlighted one, and
@@ -3216,7 +3237,7 @@ function restaurantPos() {
             //   the old empty-search shortcut ate the first letter of "Tapal"/"tea".
             // Always operates on activeCartIndex if valid, else on the LAST cart row.
             // ═══════════════════════════════════════════════════════════════
-            if ((e.key === 't' || e.key === 'T' || e.code === 'KeyT') && !e.ctrlKey && !e.metaKey) {
+            if ((e.key === 't' || e.key === 'T' || e.code === 'KeyT') && !e.ctrlKey && !e.metaKey && !this.showTablePicker) {
                 const tgt = e.target;
                 const isSearchInput = tgt && tgt === this.$refs.searchInput;
                 const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
@@ -3250,7 +3271,7 @@ function restaurantPos() {
             // F10 keystroke would steal focus from Pay/Held/Receipt/etc.
             if (e.key === 'F10') {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker) return;
                 this.openLocalBills();
                 return;
             }
@@ -3258,7 +3279,7 @@ function restaurantPos() {
             // Same gating as F10. Browser's native F11 = fullscreen toggle is overridden.
             if (e.key === 'F11') {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker) return;
                 this.openFailedBills();
                 return;
             }
@@ -3274,7 +3295,7 @@ function restaurantPos() {
                 && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills
                 && !this.showPayModal && !this.showReceipt && !this.showQuickType
                 && !this.showManualItem && !this.showCustomerPicker && !this.showShortcuts
-                && !this.showManagerPinModal) {
+                && !this.showManagerPinModal && !this.showTablePicker) {
                 const tgt = e.target;
                 const isSearchInput = tgt && tgt === this.$refs.searchInput;
                 const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
@@ -3311,7 +3332,7 @@ function restaurantPos() {
                 && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills
                 && !this.showPayModal && !this.showReceipt && !this.showQuickType
                 && !this.showManualItem && !this.showCustomerPicker && !this.showShortcuts
-                && !this.showManagerPinModal) {
+                && !this.showManagerPinModal && !this.showTablePicker) {
                 const tgt = e.target;
                 const isSearchInput = tgt && tgt === this.$refs.searchInput;
                 const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
@@ -3537,7 +3558,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.fixCartIndex(); this.clearCartStorage(); },
+        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm('Current order has ' + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast('New sale started', 'success');
@@ -3547,7 +3568,67 @@ function restaurantPos() {
             if (!confirm('Void current order? All items will be removed.')) return;
             this.clearCart(); this.showToast('Order voided', 'success');
         },
-        selectTable(table) { this.selectedTable = table; this.orderType = 'dine_in'; this.showTablePicker = false; },
+        // ── F3 Dine-In table picker (Jul 2026) ────────────────────────────────
+        // Dine In pill → picker opens (if no table yet). Selecting a table
+        // RESERVES it server-side (race-safe; 409 if another cashier got it).
+        // Reservation auto-frees on: bill stored (backend, final+provisional),
+        // void/new-sale/clear-cart, or switching to Takeaway/Delivery.
+        setOrderType(type) {
+            if (type === 'dine_in') {
+                this.orderType = 'dine_in';
+                if (!this.selectedTable) this.openTablePicker();
+                return;
+            }
+            if (this.selectedTable) { this.releaseTable(this.selectedTable.id); this.selectedTable = null; }
+            this.orderType = type;
+        },
+        openTablePicker() { this.showTablePicker = true; this.loadTableStatus(); },
+        async loadTableStatus() {
+            this.tablesLoading = true;
+            try {
+                const res = await fetch('/pos/restaurant/api/table-status', { headers: { 'Accept': 'application/json' } });
+                const list = await res.json();
+                const groups = {};
+                (Array.isArray(list) ? list : []).forEach(t => {
+                    const f = t.floor || 'Main';
+                    (groups[f] = groups[f] || []).push(t);
+                });
+                this.tableFloors = Object.keys(groups).map(name => ({ name, tables: groups[name] }));
+            } catch (e) { console.error('[tables] status load failed', e); }
+            this.tablesLoading = false;
+        },
+        async selectTable(table) {
+            if (table.status === 'occupied') { this.showToast('Table T-' + table.table_number + ' is occupied', 'warning'); return; }
+            try {
+                const res = await fetch('/pos/restaurant/tables/' + table.id + '/reserve', {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                let data = null; try { data = await res.json(); } catch(_) {}
+                if (!res.ok || !data || !data.success) {
+                    this.showToast((data && data.message) || 'Table unavailable', 'error');
+                    this.loadTableStatus(); // refresh — someone else may have taken it
+                    return;
+                }
+            } catch (e) { this.showToast('Could not reserve table — check connection', 'error'); return; }
+            if (this.selectedTable && this.selectedTable.id !== table.id) this.releaseTable(this.selectedTable.id);
+            this.selectedTable = { id: table.id, table_number: table.table_number, seats: table.seats };
+            this.orderType = 'dine_in';
+            this.showTablePicker = false;
+            this.showToast('Table T-' + table.table_number + ' reserved', 'success');
+        },
+        // Fire-and-forget: backend only flips status='reserved' → available, so this
+        // is harmless after payment (already freed) or on occupied tables (held-order
+        // lifecycle owns those).
+        releaseTable(id) {
+            if (!id) return;
+            try {
+                fetch('/pos/restaurant/tables/' + id + '/release', {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+            } catch (e) {}
+        },
 
         // ── Global mouse-wheel forwarding ──────────────────────────────────────
         // The sale screen is a fixed-height app shell (body never scrolls), so a
@@ -3967,6 +4048,9 @@ function restaurantPos() {
                     customer_name: this.selectedCustomer?.name || null,
                     customer_phone: this.selectedCustomer?.phone || null,
                     kitchen_notes: this.kitchenNotes,
+                    // F3 Dine-In — backend auto-frees this reserved table once the
+                    // bill is stored (reserved → available; occupied untouched).
+                    table_id: this.selectedTable?.id || null,
                     // PROVISIONAL BILL FLOW — when true, storeInvoice forces
                     // pra_status='local' regardless of company.pra_reporting_enabled
                     // and skips PRA submission. Bill stays editable / deletable.

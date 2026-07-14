@@ -162,17 +162,20 @@
                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Notes (Optional)</label>
                 <textarea name="notes" rows="2" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500" placeholder="Any additional notes for this day's report..."></textarea>
             </div>
-            @if(($stats->local_invoices ?? 0) > 0)
-            <div class="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                <label class="flex items-start gap-2 cursor-pointer">
-                    <input type="checkbox" name="purge_local_bills" value="1" class="mt-0.5 rounded border-amber-400 text-amber-600 focus:ring-amber-500">
-                    <div class="text-sm">
-                        <span class="font-bold text-amber-800 dark:text-amber-300">Move all local/provisional bills to Archive ({{ $stats->local_invoices }})</span>
-                        <p class="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Yeh bills aapki normal POS screen se hat jayenge (safe rahenge — delete nahi hote). Sirf authorized Archive Viewer hi access kar payega. PRA-submitted bills bilkul untouched rahenge.</p>
-                    </div>
-                </label>
+            @php
+                $lbFinal = in_array($company->pos_dayclose_final_local_action ?? 'save', ['save','delete'], true) ? ($company->pos_dayclose_final_local_action ?? 'save') : 'save';
+                $lbProv  = in_array($company->pos_dayclose_provisional_action ?? 'save', ['save','delete'], true) ? ($company->pos_dayclose_provisional_action ?? 'save') : 'save';
+            @endphp
+            <div class="mb-4 p-3 rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800">
+                <div class="text-sm">
+                    <span class="font-bold text-teal-800 dark:text-teal-300">Local bills policy (company setting)</span>
+                    <p class="text-xs text-teal-700 dark:text-teal-400 mt-0.5">
+                        Day-close par final local bills <b>{{ $lbFinal === 'delete' ? 'DELETE' : 'ARCHIVE (save)' }}</b> aur provisional bills <b>{{ $lbProv === 'delete' ? 'DELETE' : 'ARCHIVE (save)' }}</b> honge.
+                        PRA ko bheje gaye bills bilkul untouched rahenge. Policy badalni ho to
+                        <a href="{{ route('pos.customize') }}" class="underline font-semibold">Customize POS → Local Billing</a>.
+                    </p>
+                </div>
             </div>
-            @endif
             <button type="submit" onclick="return confirm('Are you sure you want to close this day? This action cannot be undone.')"
                 class="px-6 py-2.5 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition text-sm flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>

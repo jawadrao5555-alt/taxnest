@@ -104,7 +104,16 @@
                     <span class="text-2xl" x-text="selectedPresetMeta.icon"></span>
                     <div>
                         <p class="font-extrabold text-gray-900 dark:text-white">Features for <span class="text-purple-700 dark:text-purple-300" x-text="selectedPresetMeta.label"></span></p>
-                        <p class="text-[11px] text-gray-500 dark:text-gray-400">Recommended features are already on. Add or remove anything — nothing is locked.</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">Recommended features are already on. Add or remove anything you need.</p>
+                    </div>
+                </div>
+
+                {{-- Restaurant module plan-lock notice (Pro / Unlimited only) --}}
+                <div x-show="restaurantLocked" x-cloak class="mb-4 p-3.5 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 flex items-start gap-2.5">
+                    <span class="text-lg leading-none">🔒</span>
+                    <div>
+                        <p class="text-sm font-bold text-amber-900 dark:text-amber-200">Restaurant &amp; Kitchen features need the Pro or Unlimited plan</p>
+                        <p class="text-[11px] text-amber-800 dark:text-amber-300/90 leading-snug">KOT, Kitchen Display Screen, Table Management, Kitchen Notes and Recipes are included in the Pro and Unlimited packages. Upgrade your plan to unlock them.</p>
                     </div>
                 </div>
 
@@ -116,16 +125,19 @@
                     </div>
                     <div class="grid sm:grid-cols-2 gap-2.5">
                         <template x-for="f in recommendedFlags" :key="'rec-'+f">
-                            <label class="flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition"
-                                :class="flags[f] ? 'border-purple-500 bg-purple-50/50 dark:bg-purple-900/10' : 'border-gray-200 dark:border-gray-700 hover:border-purple-300'">
-                                <input type="checkbox" :name="'feature_flags['+f+']'" value="1" x-model="flags[f]" @change="onFlagChange()" class="mt-0.5 w-4 h-4 text-purple-600 rounded">
+                            <label class="flex items-start gap-3 p-3 rounded-xl border-2 transition"
+                                :class="isLocked(f) ? 'border-gray-200 dark:border-gray-700 opacity-60 cursor-not-allowed' : (flags[f] ? 'border-purple-500 bg-purple-50/50 dark:bg-purple-900/10 cursor-pointer' : 'border-gray-200 dark:border-gray-700 hover:border-purple-300 cursor-pointer')">
+                                <input type="checkbox" :name="'feature_flags['+f+']'" value="1" x-model="flags[f]" @change="onFlagChange()" :disabled="isLocked(f)" class="mt-0.5 w-4 h-4 text-purple-600 rounded disabled:opacity-50">
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center gap-1.5 mb-0.5">
                                         <span class="text-base leading-none" x-text="flagIcon(f)"></span>
                                         <span class="text-sm font-bold text-gray-900 dark:text-white" x-text="flagLabel(f)"></span>
                                     </div>
                                     <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug" x-text="flagDesc(f)"></p>
-                                    <template x-if="flagDeps(f).length">
+                                    <template x-if="isLocked(f)">
+                                        <span class="mt-1.5 inline-flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-wider text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded">🔒 Pro / Unlimited plan</span>
+                                    </template>
+                                    <template x-if="!isLocked(f) && flagDeps(f).length">
                                         <span class="mt-1.5 inline-flex items-center gap-1 text-[9px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded" x-text="'Auto-includes: ' + flagDeps(f).map(flagLabel).join(', ')"></span>
                                     </template>
                                 </div>
@@ -142,16 +154,19 @@
                     </div>
                     <div class="grid sm:grid-cols-2 gap-2.5">
                         <template x-for="f in extraFlags" :key="'extra-'+f">
-                            <label class="flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition"
-                                :class="flags[f] ? 'border-purple-500 bg-purple-50/50 dark:bg-purple-900/10' : 'border-gray-200 dark:border-gray-700 hover:border-purple-300'">
-                                <input type="checkbox" :name="'feature_flags['+f+']'" value="1" x-model="flags[f]" @change="onFlagChange()" class="mt-0.5 w-4 h-4 text-purple-600 rounded">
+                            <label class="flex items-start gap-3 p-3 rounded-xl border-2 transition"
+                                :class="isLocked(f) ? 'border-gray-200 dark:border-gray-700 opacity-60 cursor-not-allowed' : (flags[f] ? 'border-purple-500 bg-purple-50/50 dark:bg-purple-900/10 cursor-pointer' : 'border-gray-200 dark:border-gray-700 hover:border-purple-300 cursor-pointer')">
+                                <input type="checkbox" :name="'feature_flags['+f+']'" value="1" x-model="flags[f]" @change="onFlagChange()" :disabled="isLocked(f)" class="mt-0.5 w-4 h-4 text-purple-600 rounded disabled:opacity-50">
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center gap-1.5 mb-0.5">
                                         <span class="text-base leading-none" x-text="flagIcon(f)"></span>
                                         <span class="text-sm font-bold text-gray-900 dark:text-white" x-text="flagLabel(f)"></span>
                                     </div>
                                     <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug" x-text="flagDesc(f)"></p>
-                                    <template x-if="flagDeps(f).length">
+                                    <template x-if="isLocked(f)">
+                                        <span class="mt-1.5 inline-flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-wider text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded">🔒 Pro / Unlimited plan</span>
+                                    </template>
+                                    <template x-if="!isLocked(f) && flagDeps(f).length">
                                         <span class="mt-1.5 inline-flex items-center gap-1 text-[9px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded" x-text="'Auto-includes: ' + flagDeps(f).map(flagLabel).join(', ')"></span>
                                     </template>
                                 </div>
@@ -322,6 +337,8 @@
                 categoryDefaults: @json(\App\Services\PosFeatureService::CATEGORY_DEFAULTS),
                 dependencies: @json(\App\Services\PosFeatureService::DEPENDENCIES),
                 allFlags: @json(\App\Services\PosFeatureService::ALL_FLAGS),
+                restaurantLocked: @json(!($restaurantAllowed ?? true)),
+                restaurantFlags: @json(\App\Services\PosFeatureService::RESTAURANT_FLAGS),
 
                 get selectedPresetMeta() {
                     return this.presetMeta[this.selectedPreset] || { label: 'Custom', icon: '⚙️', description: '' };
@@ -342,6 +359,7 @@
                 flagDesc(f) { return (this.flagMeta[f] || {}).description || ''; },
                 flagIcon(f) { return (this.flagMeta[f] || {}).icon || '•'; },
                 flagDeps(f) { return this.dependencies[f] || []; },
+                isLocked(f) { return this.restaurantLocked && this.restaurantFlags.includes(f); },
 
                 selectPreset(preset) {
                     this.selectedPreset = preset;
@@ -351,6 +369,11 @@
                 },
                 onFlagChange() { this.resolveDeps(); },
                 resolveDeps() {
+                    // Plan-locked restaurant flags can never switch ON client-side
+                    // (server enforces the same rule on save).
+                    if (this.restaurantLocked) {
+                        this.restaurantFlags.forEach(f => { this.flags[f] = false; });
+                    }
                     // Enable required parents of any enabled child.
                     for (const child in this.dependencies) {
                         if (this.flags[child]) {

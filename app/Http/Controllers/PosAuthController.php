@@ -106,6 +106,18 @@ class PosAuthController extends Controller
                     return redirect('/pos/local-bills');
                 }
 
+                // Kitchen account (P5, F4) → straight to the Kitchen Display.
+                // PosAuth middleware confines this role to /pos/restaurant/kds*.
+                if (($user->pos_role ?? null) === 'pos_kitchen') {
+                    return redirect('/pos/restaurant/kds');
+                }
+
+                // Waiter account (P7, F6) → straight to the Waiter Tablet.
+                // PosAuth middleware confines this role to /pos/waiter*.
+                if (($user->pos_role ?? null) === 'pos_waiter') {
+                    return redirect('/pos/waiter');
+                }
+
                 return redirect('/pos/invoice/create');
             }
             // Wrong panel → fall through to generic failure (no info leak)

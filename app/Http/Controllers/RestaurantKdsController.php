@@ -12,13 +12,78 @@ class RestaurantKdsController extends Controller
     {
         $companyId = app('currentCompanyId');
 
+        // P5 (F4): the KDS board is driven by the KITCHEN lifecycle, not the billing
+        // one. Cleared orders (scan or manual Clear) disappear from the board even
+        // though the cashier still has them held for payment.
         $orders = RestaurantOrder::where('company_id', $companyId)
             ->whereIn('status', ['held', 'preparing', 'ready'])
+            ->whereNull('kitchen_cleared_at')
             ->with(['table', 'items', 'creator'])
             ->orderBy('created_at', 'asc')
             ->get();
 
-        return view('pos.restaurant.kds', compact('orders'));
+        // P6 (F5): KDS auto-print flag — the KDS device prints new-order KOTs itself.
+        $kdsAutoPrint = (bool) (\App\Models\Company::find($companyId)->pos_kds_auto_print ?? false);
+
+        return view('pos.restaurant.kds', compact('orders', 'kdsAutoPrint'));
+    }
+
+    /**
+     * P5 (F4) — kitchen-side status change. NEVER touches restaurant_orders.status
+     * (that drives tables + cashier billing). kitchen_status lifecycle:
+     * NULL (new) → preparing → ready → cleared. Clear allowed from ANY state
+     * (manual "Clear" button mirrors the scan-to-clear contract).
+     */
+    public function kitchenStatus(Request $request, $orderId)
+    {
+        $companyId = app('currentCompanyId');
+
+        $request->validate([
+            'kitchen_status' => 'required|in:preparing,ready,cleared',
+        ]);
+        $new = $request->kitchen_status;
+
+        $order = RestaurantOrder::where('company_id', $companyId)->findOrFail($orderId);
+
+        if ($order->kitchen_cleared_at) {
+            return response()->json([
+                'success' => false,
+                'message' => "Order {$order->order_number} already cleared",
+            ], 400);
+        }
+
+        $updates = ['kitchen_status' => $new];
+        if ($new === 'preparing' && !$order->kitchen_started_at) {
+            $updates['kitchen_started_at'] = now();
+        }
+        if ($new === 'ready') {
+            $updates['kitchen_ready_at'] = $order->kitchen_ready_at ?: now();
+            $updates['kitchen_started_at'] = $order->kitchen_started_at ?: now();
+        }
+        if ($new === 'cleared') {
+            $updates['kitchen_cleared_at'] = now();
+        }
+
+        // Race-safe: a concurrent scan may clear the order between our read and
+        // write — the WHERE excludes it so we never overwrite cleared_at.
+        $affected = RestaurantOrder::where('company_id', $companyId)
+            ->where('id', $order->id)
+            ->whereNull('kitchen_cleared_at')
+            ->update($updates);
+
+        if ($affected === 0) {
+            return response()->json([
+                'success' => false,
+                'message' => "Order {$order->order_number} already cleared",
+            ], 400);
+        }
+
+        $label = $new === 'cleared' ? 'CLEARED' : ucfirst($new);
+        return response()->json([
+            'success' => true,
+            'kitchen_status' => $new,
+            'message' => "Order {$order->order_number} → {$label}",
+        ]);
     }
 
     public function updateStatus(Request $request, $orderId)
@@ -56,10 +121,10 @@ class RestaurantKdsController extends Controller
     }
 
     /**
-     * Scan-to-Ready endpoint — kitchen scanner reads "KOT-{id}" barcode from
-     * the printed ticket. Bypasses normal transition validation (held→preparing→ready)
-     * and jumps directly to "ready" regardless of current state. This is the kitchen
-     * staff's "I'm done with this dish" signal.
+     * Scan-to-Clear endpoint (P5, F4 — owner rule Jul 2026) — kitchen scanner or
+     * camera reads "KOT-{id}" from the printed ticket. Scan = CLEAR from ANY
+     * kitchen state: the dish is done and handed off, remove it from the board.
+     * NEVER touches restaurant_orders.status — the cashier's held bill survives.
      */
     public function scanComplete(Request $request)
     {
@@ -68,20 +133,22 @@ class RestaurantKdsController extends Controller
 
         // Strict barcode contract — kitchen tickets always print "KOT-{id}". Reject anything
         // else (incl. bare digits) so a stray scan of an unrelated barcode on the floor
-        // cannot accidentally mark a kitchen order ready.
+        // cannot accidentally clear a kitchen order.
         if (!preg_match('/^KOT-(\d+)$/', $code, $m)) {
             return response()->json(['success' => false, 'message' => 'Invalid KOT barcode'], 400);
         }
         $orderId = (int) $m[1];
 
-        // Atomic conditional update — race-safe. If another process (payment flow,
-        // cancel) flipped the order to completed/cancelled between our read and write,
-        // the WHERE clause excludes it and affected-rows = 0 → we return the correct
-        // "already X" response without overwriting a terminal state.
+        // Atomic conditional update — race-safe. If another scan/manual clear
+        // landed between our read and write, affected-rows = 0 → correct
+        // "already cleared" response without double-stamping cleared_at.
         $affected = RestaurantOrder::where('company_id', $companyId)
             ->where('id', $orderId)
-            ->whereIn('status', ['held', 'preparing'])
-            ->update(['status' => 'ready']);
+            ->whereNull('kitchen_cleared_at')
+            ->update([
+                'kitchen_status' => 'cleared',
+                'kitchen_cleared_at' => now(),
+            ]);
 
         $order = RestaurantOrder::where('company_id', $companyId)->find($orderId);
         if (!$order) {
@@ -89,25 +156,19 @@ class RestaurantKdsController extends Controller
         }
 
         if ($affected === 0) {
-            if ($order->status === 'ready') {
-                return response()->json([
-                    'success' => true,
-                    'already_ready' => true,
-                    'order_id' => $order->id,
-                    'message' => "Order {$order->order_number} already READY",
-                ]);
-            }
             return response()->json([
-                'success' => false,
-                'message' => "Order {$order->order_number} is already {$order->status}",
-            ], 400);
+                'success' => true,
+                'already_cleared' => true,
+                'order_id' => $order->id,
+                'message' => "Order {$order->order_number} already CLEARED",
+            ]);
         }
 
         return response()->json([
             'success' => true,
             'order_id' => $order->id,
             'order_number' => $order->order_number,
-            'message' => "✓ {$order->order_number} → READY",
+            'message' => "✓ {$order->order_number} CLEARED",
         ]);
     }
 
@@ -117,6 +178,7 @@ class RestaurantKdsController extends Controller
 
         $orders = RestaurantOrder::where('company_id', $companyId)
             ->whereIn('status', ['held', 'preparing', 'ready'])
+            ->whereNull('kitchen_cleared_at')
             ->with(['table', 'items', 'creator'])
             ->orderBy('created_at', 'asc')
             ->get()
@@ -126,6 +188,7 @@ class RestaurantKdsController extends Controller
                     'id' => $o->id,
                     'order_number' => $o->order_number,
                     'status' => $o->status,
+                    'kitchen_status' => $o->kitchen_status ?: 'new',
                     'order_type' => $o->order_type,
                     'priority' => (bool)$o->priority,
                     'table' => $o->table ? $o->table->table_number : null,
@@ -135,6 +198,10 @@ class RestaurantKdsController extends Controller
                         'notes' => $i->special_notes,
                     ]),
                     'kitchen_notes' => $o->kitchen_notes,
+                    // P7 delta-KOT: appended (not-yet-printed) rows — KDS auto-print
+                    // fires a delta ticket when this is > 0 on an already-printed order.
+                    'unprinted_count' => $o->items->whereNull('kot_printed_at')->count(),
+                    'source' => $o->source ?? 'pos',
                     'created_by' => $o->creator?->name ?? 'Unknown',
                     'elapsed_minutes' => $elapsed,
                     'is_urgent' => $elapsed > 15,

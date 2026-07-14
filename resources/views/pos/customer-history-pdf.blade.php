@@ -62,8 +62,8 @@
             <tr>
                 <td>{{ $t->created_at->format('d M Y H:i') }}</td>
                 <td>{{ $t->invoice_number }}</td>
-                <td>{{ $t->invoice_mode === 'local' ? 'Local' : 'PRA' }}</td>
-                <td>{{ ucwords(str_replace('_', ' ', $t->payment_method)) }}</td>
+                <td>{{ $t->isLocalBill() ? (($t->is_spend_snapshot ?? false) ? 'Local (record)' : 'Local') : 'PRA' }}</td>
+                <td>{{ ucwords(str_replace('_', ' ', (string) $t->payment_method)) }}</td>
                 <td class="r">{{ number_format($t->subtotal, 0) }}</td>
                 <td class="r">{{ number_format($t->discount_amount, 0) }}</td>
                 <td class="r">{{ number_format($t->tax_amount, 0) }}</td>

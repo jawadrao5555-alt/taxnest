@@ -446,7 +446,9 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/settings/inventory-toggle', [PosController::class, 'updateInventoryToggle'])->name('pos.settings.inventory-toggle');
     Route::post('/settings/restock-toggle', [PosController::class, 'updateRestockToggle'])->name('pos.settings.restock-toggle');
     Route::post('/settings/auto-purge-local-toggle', [PosController::class, 'toggleAutoPurgeLocal'])->name('pos.settings.auto-purge-local-toggle');
+    Route::post('/settings/local-billing', [PosController::class, 'updateLocalBillingSettings'])->name('pos.settings.local-billing');
     Route::post('/settings/auto-dayclose-toggle', [PosController::class, 'toggleAutoDayclose'])->name('pos.settings.auto-dayclose-toggle');
+    Route::post('/settings/kds-auto-print', [PosController::class, 'toggleKdsAutoPrint'])->name('pos.settings.kds-auto-print');
     Route::get('/invoice/create', [PosController::class, 'createInvoice'])->name('pos.invoice.create');
     Route::get('/v2/invoice/create', [PosController::class, 'universalCreateInvoice'])->name('pos.v2.invoice.create');
     Route::get('/features', [PosController::class, 'featureSettings'])->name('pos.features');
@@ -584,12 +586,27 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/restaurant/tables', [RestaurantTableController::class, 'index'])->name('pos.restaurant.tables');
     Route::post('/restaurant/tables/{id}/lock', [RestaurantTableController::class, 'lockTable'])->name('pos.restaurant.tables.lock');
     Route::post('/restaurant/tables/{id}/unlock', [RestaurantTableController::class, 'unlockTable'])->name('pos.restaurant.tables.unlock');
+    Route::post('/restaurant/tables/{id}/reserve', [RestaurantTableController::class, 'reserveTable'])->name('pos.restaurant.tables.reserve');
+    Route::post('/restaurant/tables/{id}/release', [RestaurantTableController::class, 'releaseTable'])->name('pos.restaurant.tables.release');
     Route::get('/restaurant/api/table-status', [RestaurantTableController::class, 'tableStatus'])->name('pos.restaurant.table-status');
     Route::get('/restaurant/kds', [RestaurantKdsController::class, 'index'])->name('pos.restaurant.kds');
     Route::post('/restaurant/kds/{id}/status', [RestaurantKdsController::class, 'updateStatus'])->name('pos.restaurant.kds.status');
+    Route::post('/restaurant/kds/{id}/kitchen-status', [RestaurantKdsController::class, 'kitchenStatus'])->name('pos.restaurant.kds.kitchen-status');
     Route::post('/restaurant/kds/scan', [RestaurantKdsController::class, 'scanComplete'])->name('pos.restaurant.kds.scan');
     Route::get('/restaurant/api/live-orders', [RestaurantKdsController::class, 'liveOrders'])->name('pos.restaurant.live-orders');
     Route::get('/restaurant/orders/{id}/kitchen-ticket', [RestaurantPosController::class, 'kitchenTicket'])->name('pos.restaurant.kitchen-ticket');
+
+    // ── P7 (F6): Waiter Tablets ──────────────────────────────────────────────
+    // Waiter composes an order (customer/table/items) and SENDs it to a cashier.
+    // pos_waiter role is confined to these routes by PosAuth.
+    Route::get('/waiter', [\App\Http\Controllers\RestaurantWaiterController::class, 'index'])->name('pos.waiter');
+    Route::get('/waiter/api/tables', [\App\Http\Controllers\RestaurantWaiterController::class, 'tables'])->name('pos.waiter.tables');
+    Route::get('/waiter/api/orders', [\App\Http\Controllers\RestaurantWaiterController::class, 'myOrders'])->name('pos.waiter.orders');
+    Route::post('/waiter/orders', [\App\Http\Controllers\RestaurantWaiterController::class, 'storeOrder'])->name('pos.waiter.orders.store');
+    Route::post('/waiter/orders/{id}/items', [\App\Http\Controllers\RestaurantWaiterController::class, 'appendItems'])->name('pos.waiter.orders.append');
+    // Cashier side — incoming waiter orders on the sale screen.
+    Route::get('/api/incoming-orders', [\App\Http\Controllers\RestaurantWaiterController::class, 'incomingOrders'])->name('pos.api.incoming-orders');
+    Route::post('/api/incoming-orders/{id}/complete', [\App\Http\Controllers\RestaurantWaiterController::class, 'completeIncoming'])->name('pos.api.incoming-orders.complete');
     Route::post('/restaurant/orders/{id}/resend-kitchen', [RestaurantPosController::class, 'resendKitchen'])->name('pos.restaurant.orders.resend-kitchen');
     Route::post('/api/toggle-auto-kot', [PosController::class, 'toggleAutoKot'])->name('pos.api.toggle-auto-kot');
     Route::get('/restaurant/dashboard', [RestaurantPosController::class, 'dashboard'])->name('pos.restaurant.dashboard');

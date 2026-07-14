@@ -62,7 +62,13 @@ class User extends Authenticatable
 
     public function isPosAdmin()
     {
-        return $this->pos_role === 'pos_admin' || $this->role === 'company_admin';
+        // pos_manager = full admin-equivalent inside the POS panel (owner rule Jul 2026).
+        return in_array($this->pos_role, ['pos_admin', 'pos_manager'], true) || $this->role === 'company_admin';
+    }
+
+    public function isPosManager()
+    {
+        return $this->pos_role === 'pos_manager';
     }
 
     public function isPosCashier()
@@ -73,6 +79,16 @@ class User extends Authenticatable
     public function isLocalViewer()
     {
         return $this->pos_role === 'local_viewer';
+    }
+
+    public function isPosKitchen()
+    {
+        return $this->pos_role === 'pos_kitchen';
+    }
+
+    public function isPosWaiter()
+    {
+        return $this->pos_role === 'pos_waiter';
     }
 
     public function company()

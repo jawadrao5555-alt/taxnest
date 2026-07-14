@@ -188,6 +188,65 @@ class RestaurantTableController extends Controller
         return response()->json(['success' => true]);
     }
 
+    /**
+     * F3 Dine-In (Jul 2026) — reserve a table from the universal sale screen.
+     * Race-safe conditional claim: available tables, your own reservation, or a
+     * stale (30min+) reservation may be claimed; occupied tables never.
+     */
+    public function reserveTable($tableId)
+    {
+        $companyId = app('currentCompanyId');
+        $user = Auth::guard('pos')->user();
+
+        $table = RestaurantTable::where('company_id', $companyId)
+            ->where('is_active', true)
+            ->find($tableId);
+        if (!$table) {
+            return response()->json(['success' => false, 'message' => 'Table not found'], 404);
+        }
+        if ($table->status === 'occupied') {
+            return response()->json(['success' => false, 'message' => "Table T-{$table->table_number} is occupied"], 409);
+        }
+
+        $claimed = RestaurantTable::where('company_id', $companyId)
+            ->where('id', $table->id)
+            ->where('status', '!=', 'occupied')
+            ->where(function ($q) use ($user) {
+                $q->where('status', 'available')
+                    ->orWhereNull('locked_by_user_id')
+                    ->orWhere('locked_by_user_id', $user->id)
+                    ->orWhere('locked_at', '<', now()->subMinutes(30));
+            })
+            ->update([
+                'status' => 'reserved',
+                'locked_by_user_id' => $user->id,
+                'locked_at' => now(),
+            ]);
+
+        if (!$claimed) {
+            return response()->json(['success' => false, 'message' => "Table T-{$table->table_number} is reserved by another cashier"], 409);
+        }
+
+        return response()->json(['success' => true, 'table' => ['id' => $table->id, 'table_number' => $table->table_number, 'seats' => $table->seats]]);
+    }
+
+    /**
+     * Release a RESERVED table back to available. Deliberately never touches
+     * 'occupied' — that status belongs to the held-order lifecycle
+     * (holdOrder sets it, payOrder/deleteOrder free it). Idempotent.
+     */
+    public function releaseTable($tableId)
+    {
+        $companyId = app('currentCompanyId');
+
+        RestaurantTable::where('company_id', $companyId)
+            ->where('id', $tableId)
+            ->where('status', 'reserved')
+            ->update(['status' => 'available', 'locked_by_user_id' => null, 'locked_at' => null]);
+
+        return response()->json(['success' => true]);
+    }
+
     public function tableStatus()
     {
         $companyId = app('currentCompanyId');

@@ -83,7 +83,7 @@ class PlanLimitService
         }
 
         $monthlyCount = function () use ($companyId): int {
-            return \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
+            $live = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->where('status', 'completed')
                 ->where(function ($q) {
@@ -91,6 +91,21 @@ class PlanLimitService
                 })
                 ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])
                 ->count();
+
+            // Reporting-OFF finals hard-deleted by the day-close DELETE policy would
+            // otherwise vanish from this count (quota bypass) — add back the counts
+            // persisted on that month's day-close reports. try/catch: column may not
+            // exist yet on a prod box mid-deploy (schema-drift self-heal pattern).
+            $deletedFinals = 0;
+            try {
+                $deletedFinals = (int) \App\Models\PosDayCloseReport::where('company_id', $companyId)
+                    ->whereBetween('report_date', [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()])
+                    ->sum('deleted_final_count');
+            } catch (\Throwable $e) {
+                // column missing pre-migration — quota falls back to live count only
+            }
+
+            return $live + $deletedFinals;
         };
 
         // Admin override wins (interpreted as bills/month for POS companies).
@@ -146,7 +161,7 @@ class PlanLimitService
 
         $count = User::where('company_id', $companyId)
             ->where('is_active', true)
-            ->whereIn('pos_role', ['pos_admin', 'pos_cashier'])
+            ->whereIn('pos_role', ['pos_admin', 'pos_manager', 'pos_cashier'])
             ->count();
 
         if ($company && $company->user_limit_override !== null) {

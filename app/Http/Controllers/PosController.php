@@ -1899,15 +1899,16 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        // Local bills are ONLY visible in the isolated Local Bills Portal
-        // (pos_role='local_viewer'). Normal surfaces always show PRA-mode bills.
-        $tab = 'pra';
+        $user = auth('pos')->user();
+        // Same isolated tab split as Sales/Tax Reports (owner rule Jul 2026):
+        //   PRA tab   → bills actually in the PRA pipeline (pra_status NOT NULL or fiscal number)
+        //   Local tab → ADMIN-ONLY: L-series bills + reporting-OFF finals (no PRA fiscal).
+        // Cashiers are always forced to PRA server-side.
+        $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin()) ? 'local' : 'pra';
 
         $query = PosTransaction::where('company_id', $companyId)->where('status', 'completed')->with('creator');
 
-        $query->where(function ($q) {
-            $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
-        });
+        $this->applyReportFilters($query, $tab);
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -1933,7 +1934,6 @@ class PosController extends Controller
 
         $hasPinSet = !empty($company->confidential_pin);
         $localCount = 0;
-        $user = auth('pos')->user();
 
         return view('pos.transactions', compact('transactions', 'tab', 'hasPinSet', 'localCount', 'user'));
     }
@@ -1941,7 +1941,19 @@ class PosController extends Controller
     public function transactionShow($id)
     {
         $companyId = app('currentCompanyId');
-        $transaction = PosTransaction::where('company_id', $companyId)
+        // withoutGlobalScope: archived LOCAL bills are listed in the admin-only
+        // Local tab (Transactions + Reports) — their detail page must open.
+        // Bypass is limited to LOCAL-mode bills so archived PRA bills stay hidden
+        // (same pattern as receipt()).
+        $transaction = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->where(function ($q) {
+                if (\Schema::hasColumn('pos_transactions', 'is_archived')) {
+                    $q->where('is_archived', false)
+                      ->orWhereNull('is_archived')
+                      ->orWhere('invoice_mode', 'local');
+                }
+            })
             ->with(['items', 'payments', 'praLogs', 'creator', 'terminal'])
             ->findOrFail($id);
 

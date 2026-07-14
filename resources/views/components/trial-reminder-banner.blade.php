@@ -14,7 +14,24 @@
     if ($rCompanyId) {
         $rCompany = \App\Models\Company::find($rCompanyId);
         if ($rCompany && !$rCompany->is_internal_account) {
-            $status = \App\Services\SubscriptionAccessService::trialStatus($rCompany);
+            // Active TEMPORARY override → show how long the granted access lasts
+            // (lifetime overrides show nothing; trialStatus() is null under any override).
+            $ov = \App\Services\SubscriptionAccessService::overrideReminder($rCompany);
+            if ($ov) {
+                $parts = [];
+                $parts[] = $ov['days_left'] <= 0
+                    ? 'ends today'
+                    : ('ends ' . $ov['until'] . ' — ' . $ov['days_left'] . ' day' . ($ov['days_left'] == 1 ? '' : 's') . ' left');
+                if ($ov['invoices_left'] !== null) {
+                    $parts[] = $ov['invoices_left'] <= 0 ? 'no invoices left' : ($ov['invoices_left'] . ' invoice' . ($ov['invoices_left'] == 1 ? '' : 's') . ' left');
+                }
+                $reminder = [
+                    'text' => 'Free access granted by admin — ' . implode(' · ', $parts) . '.',
+                    'key' => 'override_reminder_' . now()->toDateString() . '_' . $ov['days_left'] . '_' . ($ov['invoices_left'] ?? 'x'),
+                ];
+            }
+
+            $status = $reminder ? null : \App\Services\SubscriptionAccessService::trialStatus($rCompany);
             if ($status && $status['on_trial']) {
                 $daysLeft = $status['days_left'];
                 $invLeft = $status['invoices_left'];

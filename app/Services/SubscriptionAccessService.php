@@ -185,6 +185,47 @@ class SubscriptionAccessService
     }
 
     /**
+     * Reminder data for an active TEMPORARY (or legacy grace) override:
+     * how long the granted free access lasts and how many invoices remain.
+     * Lifetime overrides return null (no banner — permanent access).
+     * Returns null once hasAccess() denies (the lock modal owns messaging then).
+     */
+    public static function overrideReminder(Company $company): ?array
+    {
+        $subscription = Subscription::where('company_id', $company->id)
+            ->where('active', true)
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$subscription || !in_array($subscription->override_type, ['temporary', 'grace'], true)) {
+            return null;
+        }
+
+        $until = $subscription->override_until;
+        if (!$until || !$until->isFuture()) {
+            return null;
+        }
+
+        $access = self::hasAccess($company);
+        if (!($access['allowed'] ?? false)) {
+            return null;
+        }
+
+        $daysLeft = (int) ceil(abs(now()->diffInDays($until)));
+
+        $invoicesLeft = null;
+        if ($subscription->free_invoice_limit !== null) {
+            $invoicesLeft = max(0, (int) $subscription->free_invoice_limit - self::billableCount($company, $subscription->override_granted_at));
+        }
+
+        return [
+            'until' => $until->format('Y-m-d'),
+            'days_left' => $daysLeft,
+            'invoices_left' => $invoicesLeft,
+        ];
+    }
+
+    /**
      * Count a company's billable documents by product type.
      * DI uses the invoices table; PRA POS uses pos_transactions;
      * FBR POS uses its own fbr_pos_transactions table.

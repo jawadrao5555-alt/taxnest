@@ -799,6 +799,12 @@ class AdminCompanyController extends Controller
      */
     private function activateForGrant(Company $company): void
     {
+        // Old trial-nag notifications are stale the moment an override is granted —
+        // clear them so the dashboard doesn't keep showing "trial ending" messages.
+        \App\Models\Notification::where('company_id', $company->id)
+            ->whereIn('type', ['trial_reminder_day_1', 'trial_reminder_inv_5'])
+            ->delete();
+
         if (in_array($company->status, ['suspended', 'rejected'], true)
             || in_array($company->company_status, ['suspended', 'rejected'], true)) {
             return;

@@ -152,6 +152,12 @@ class SubscriptionAccessService
             return null;
         }
 
+        // An active admin override (lifetime / temporary / legacy grant) supersedes
+        // the trial — no trial-ending banners or reminder emails while it's in force.
+        if ($subscription->hasActiveOverride()) {
+            return null;
+        }
+
         // Already blocked? The lock modal owns the messaging — skip the reminder.
         $access = self::hasAccess($company);
         if (!($access['allowed'] ?? false)) {

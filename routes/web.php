@@ -514,6 +514,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::post('/api/enable-pra-integration', [PosController::class, 'enablePraIntegration'])->name('pos.api.enable-pra-integration');
         Route::get('/billing', [PosController::class, 'billing'])->name('pos.billing');
         Route::match(['get', 'post'], '/business-profile', [PosController::class, 'businessProfile'])->name('pos.business-profile');
+        // F8 — public profile + menu builder (admin-only POSTs, gated in controller)
+        Route::post('/public-profile', [\App\Http\Controllers\PublicProfileController::class, 'saveSettings'])->name('pos.public-profile.save');
+        Route::post('/public-profile/regenerate', [\App\Http\Controllers\PublicProfileController::class, 'regenerateSlug'])->name('pos.public-profile.regenerate');
+        Route::post('/public-profile/menu', [\App\Http\Controllers\PublicProfileController::class, 'saveMenu'])->name('pos.public-profile.menu');
         Route::match(['get', 'post'], '/receipt-settings', [PosController::class, 'receiptSettings'])->name('pos.receipt-settings');
         Route::post('/products', [PosController::class, 'storeProduct'])->name('pos.products.store')->middleware('plan.limit:products');
         Route::get('/products/template', [PosController::class, 'downloadProductTemplate'])->name('pos.products.template');
@@ -944,6 +948,11 @@ Route::prefix('api/agent')->middleware(['agent.auth'])->group(function () {
     Route::get('/pending-invoices', [\App\Http\Controllers\AgentController::class, 'pendingInvoices']);
     Route::post('/submit-result', [\App\Http\Controllers\AgentController::class, 'submitResult']);
 });
+
+// === Public business profile + menu (F8) — slug-only, throttled, 404 on unknown ===
+Route::get('/menu/{slug}', [\App\Http\Controllers\PublicProfileController::class, 'show'])
+    ->middleware('throttle:60,1')
+    ->name('public.company-profile');
 
 // === PWA Diagnostics page (public — no sensitive data, only client-side checks) ===
 Route::get('/pwa-status', function () {

@@ -5023,7 +5023,18 @@ class PosController extends Controller
             return redirect()->route('pos.customize')->with('success', 'Business profile updated successfully.');
         }
 
-        return view('pos.business-profile', compact('company'));
+        // F8 — public profile + menu builder data (admin-only section in the view)
+        $ppSettings = \App\Http\Controllers\PublicProfileController::settingsFor($company);
+        $ppUrl = \App\Http\Controllers\PublicProfileController::publicUrlFor($company);
+        $ppQr = $ppUrl ? \App\Support\QrImage::dataUri($ppUrl) : null;
+        $ppSelectedIds = \App\Models\PosMenuItem::where('company_id', $company->id)
+            ->orderBy('sort_order')->pluck('pos_product_id')->map(fn ($v) => (int) $v)->all();
+        $ppProducts = \App\Models\PosProduct::where('company_id', $company->id)
+            ->where('is_active', true)
+            ->orderBy('category')->orderBy('name')
+            ->get(['id', 'name', 'category', 'price']);
+
+        return view('pos.business-profile', compact('company', 'ppSettings', 'ppUrl', 'ppQr', 'ppSelectedIds', 'ppProducts'));
     }
 
     public function userProfile(Request $request)

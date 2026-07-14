@@ -314,14 +314,23 @@
     </div>
     @else
     @php
-        $qrData = json_encode([
-            'type' => 'Provisional Bill',
-            'inv' => $transaction->invoice_number,
-            'date' => $transaction->created_at->format('d/m/Y H:i'),
-            'total' => number_format($transaction->total_amount, 2),
-            'business' => $transaction->company->name ?? 'NestPOS',
-        ]);
-        $qrUrl = \App\Support\QrImage::dataUri($qrData);
+        // F8: local/provisional receipts carry the PUBLIC profile QR when the
+        // company enabled its public page (PRA fiscal branch above is untouched).
+        $publicUrl = \App\Http\Controllers\PublicProfileController::publicUrlFor($transaction->company);
+        if ($publicUrl) {
+            $qrUrl = \App\Support\QrImage::dataUri($publicUrl);
+            $qrCaption = 'Scan to view our menu & info';
+        } else {
+            $qrData = json_encode([
+                'type' => 'Provisional Bill',
+                'inv' => $transaction->invoice_number,
+                'date' => $transaction->created_at->format('d/m/Y H:i'),
+                'total' => number_format($transaction->total_amount, 2),
+                'business' => $transaction->company->name ?? 'NestPOS',
+            ]);
+            $qrUrl = \App\Support\QrImage::dataUri($qrData);
+            $qrCaption = 'Scan for invoice details';
+        }
     @endphp
     <div class="local-badge" style="border: 2px dashed #000; color: #000; padding: 8px; font-weight: 700;">
         <strong style="font-size: 12px; color: #000;">PROVISIONAL BILL</strong><br>
@@ -331,7 +340,7 @@
     @if($qrUrl)
     <div class="qr-code">
         <img src="{{ $qrUrl }}" alt="Invoice QR" style="width: 100px; height: 100px; margin: 4px auto;">
-        <p style="font-size: 10px; color: #000; font-weight: 600;">Scan for invoice details</p>
+        <p style="font-size: 10px; color: #000; font-weight: 600;">{{ $qrCaption }}</p>
     </div>
     @endif
     @endif

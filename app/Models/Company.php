@@ -108,6 +108,8 @@ class Company extends Model
         'manager_override_pin',
         'cashier_discount_limit',
         'manager_discount_limit',
+        'public_profile_slug',
+        'public_profile_settings',
     ];
 
     protected $casts = [
@@ -130,6 +132,7 @@ class Company extends Model
         'agent_last_seen' => 'datetime',
         'feature_flags' => 'array',
         'invoice_display_prefs' => 'array',
+        'public_profile_settings' => 'array',
         'use_universal_pos' => 'boolean',
         'auto_print_kot' => 'boolean',
         'pos_kds_auto_print' => 'boolean',

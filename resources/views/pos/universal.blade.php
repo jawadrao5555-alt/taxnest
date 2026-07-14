@@ -525,6 +525,13 @@ window.addEventListener('popstate', function() {
             <span x-show="localBills.length > 0" class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-purple-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="localBills.length"></span>
         </button>
 
+        {{-- ── P7 (F6): INCOMING WAITER ORDERS — teal. Badge = orders waiting for payment. ── --}}
+        <button x-show="isRestaurantMode" x-cloak @click="openIncoming()" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 transition" title="Orders sent by waiters — load to cart and take payment.">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+            <span class="hidden sm:inline">Waiter</span>
+            <span x-show="incomingOrders.length > 0" class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-teal-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold animate-pulse" x-text="incomingOrders.length"></span>
+        </button>
+
         {{-- ── FAILED BILLS — header shortcut. F11. Red theme = needs attention. ── --}}
         {{-- Click → modal with Retry / Edit / Delete actions inline. --}}
         <button @click="openFailedBills()" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 transition" title="Failed PRA submissions — needs retry. Press F11.">
@@ -1160,6 +1167,61 @@ window.addEventListener('popstate', function() {
             </div>
             <div x-show="localBills.length > 0" class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-[11px] text-gray-500">
                 <span>💡 Provisional bills NOT reported to PRA — edit/delete anytime, or "Make Final" to lock & submit.</span>
+            </div>
+        </div>
+    </div>
+
+    {{-- ─────────────────────────────────────────────────────────────────────── --}}
+    {{-- P7 (F6): INCOMING WAITER ORDERS MODAL — header "Waiter" button.        --}}
+    {{-- Load to Cart → manual billing path → settle on payment. KOT = full     --}}
+    {{-- reprint any time; "+ Added" prints ONLY not-yet-printed (delta) rows.   --}}
+    {{-- ─────────────────────────────────────────────────────────────────────── --}}
+    <div x-show="showIncoming" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showIncoming = false"></div>
+        <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+            <div class="px-5 py-4 bg-teal-600 flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                    <h3 class="text-white font-bold text-base">Waiter Orders — awaiting payment</h3>
+                    <span x-show="incomingOrders.length" class="px-2 py-0.5 bg-white/20 text-white text-xs rounded-full font-bold" x-text="incomingOrders.length"></span>
+                </div>
+                <button @click="showIncoming = false" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/25 text-white flex items-center justify-center transition" title="Close">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 space-y-3">
+                <div x-show="incomingLoading" class="text-center py-8 text-sm text-gray-400">Loading…</div>
+                <div x-show="!incomingLoading && incomingOrders.length === 0" class="text-center py-10">
+                    <svg class="w-12 h-12 mx-auto text-gray-300 dark:text-gray-700 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 font-medium">No waiter orders waiting.</p>
+                </div>
+                <template x-for="o in incomingOrders" :key="o.id">
+                    <div class="rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-50/50 dark:bg-teal-900/10 p-3">
+                        <div class="flex items-center justify-between gap-2 flex-wrap">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-mono text-sm font-bold text-gray-800 dark:text-gray-100" x-text="o.order_number"></span>
+                                <span class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-teal-600 text-white" x-text="'by ' + o.waiter"></span>
+                                <span x-show="o.table" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" x-text="'T-' + o.table"></span>
+                                <span x-show="o.unprinted_count > 0 && o.items.some(i => i.printed)" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" x-text="'+' + o.unprinted_count + ' new'"></span>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-sm font-black text-gray-900 dark:text-white" x-text="'Rs ' + Math.round(o.total_amount).toLocaleString()"></span>
+                                <span class="block text-[10px] text-gray-400" x-text="o.created_at"></span>
+                            </div>
+                        </div>
+                        <div class="mt-1.5 text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+                            <template x-for="(it, ix) in o.items" :key="ix"><span><span x-text="it.quantity + '× ' + it.name"></span><span x-show="ix < o.items.length - 1"> · </span></span></template>
+                        </div>
+                        <div x-show="o.customer_name || o.customer_phone" class="mt-1 text-[11px] text-gray-500" x-text="(o.customer_name || '') + (o.customer_phone ? ' · ' + o.customer_phone : '')"></div>
+                        <div class="mt-2.5 flex items-center gap-2 flex-wrap">
+                            <button @click="loadIncomingToCart(o)" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition">Load to Cart</button>
+                            @if(($company->kot_reprint_enabled ?? true))
+                            <button @click="printIncomingKot(o)" class="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs font-bold transition" title="Print the FULL kitchen ticket (reprint any time)">KOT</button>
+                            @endif
+                            <button x-show="o.unprinted_count > 0 && o.items.some(i => i.printed)" @click="printIncomingKot(o, true)" class="px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition" title="Print ONLY the newly-added items">+ Added</button>
+                        </div>
+                    </div>
+                </template>
             </div>
         </div>
     </div>
@@ -2152,6 +2214,15 @@ function restaurantPos() {
         showFailedBills: false,
         activeFailedIndex: 0,
         failedBillsLoading: false,
+        // ── INCOMING WAITER ORDERS (P7, F6) ───────────────────────────────
+        // Orders composed on waiter tablets (source='waiter', status 'held').
+        // Cashier loads one into the cart, takes payment via the MANUAL path
+        // (the restaurant order already exists — hold endpoint must NOT run),
+        // then the linked order is settled server-side (atomic claim).
+        incomingOrders: [],
+        showIncoming: false,
+        incomingLoading: false,
+        incomingOrderId: null,
         // ── AUTO-SYNC ENGINE ──────────────────────────────────────────────
         // syncStatus: 'online' | 'syncing' | 'offline'
         // _syncTimer fires every 30 sec; pings count endpoint then silently
@@ -2277,6 +2348,11 @@ function restaurantPos() {
             // Failures are silent — badge just won't show until next refresh.
             setTimeout(() => this.loadLocalBills(), 1200);
             setTimeout(() => this.loadFailedBills(), 1500);
+            // P7: incoming waiter orders — badge poll every 20s (restaurant mode only).
+            if (this.isRestaurantMode) {
+                setTimeout(() => this.loadIncoming(), 1800);
+                setInterval(() => { if (!document.hidden && !this.showPayModal) this.loadIncoming(); }, 20000);
+            }
             // 🔄 Auto-Sync — kicks in after 4 sec, then every 30 sec.
             // Live-updates online/offline pill + silently retries pending bills.
             setTimeout(() => this._startAutoSync(), 4000);
@@ -3558,7 +3634,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.fixCartIndex(); this.clearCartStorage(); },
+        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.incomingOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm('Current order has ' + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast('New sale started', 'success');
@@ -3981,7 +4057,9 @@ function restaurantPos() {
             // Retail POS (non-restaurant) companies: restaurant hold endpoint
             // returns 403. Route ALL payments through processPaymentManual
             // which posts directly to pos.invoice.store (universal endpoint).
-            if (!this.isRestaurantMode || this.hasManualItems()) {
+            // P7: incoming waiter carts ALWAYS bill via the manual path — their
+            // restaurant order already exists; the hold endpoint would duplicate it.
+            if (!this.isRestaurantMode || this.hasManualItems() || this.incomingOrderId) {
                 return await this.processPaymentManual(method, provisional);
             }
 
@@ -4081,7 +4159,9 @@ function restaurantPos() {
                 console.log('[storeInvoice] isRestaurantMode=', this.isRestaurantMode, 'transaction_id=', data.transaction_id);
                 this.lastInvoiceNumber = data.invoice_number || '';
                 this.lastTransactionId = data.transaction_id || null;
-                this.lastOrderId = null; // no restaurant order for manual carts
+                // P7: waiter-origin sales DO have a restaurant order — keep its id so
+                // the receipt popup's KOT button can reprint the full kitchen ticket.
+                this.lastOrderId = this.incomingOrderId || null;
                 this.lastTotal = Math.round(savedTotal || data.total_amount || 0);
                 this.lastPaymentMethod = method;
                 this.lastPraNumber = data.pra_invoice_number || '';
@@ -4094,6 +4174,14 @@ function restaurantPos() {
                 // Auto-print receipt for manual-cart bills too (parity with held-order pay).
                 // Manual carts don't have a restaurant order so KOT is a no-op — receipt only.
                 this.runAutoPrintChain(null);
+                // P7: settle the linked waiter order (atomic server-side claim) —
+                // frees the table and clears it from every cashier's Incoming list.
+                // FINAL bills only: a provisional is editable/deletable, so it must
+                // NOT consume the waiter order — the order stays in Incoming until
+                // a final settles it (conscious decision per review).
+                if (this.incomingOrderId && data.transaction_id && !provisional) {
+                    this.completeIncomingOrder(this.incomingOrderId, data.transaction_id);
+                }
                 this.clearCart();
                 this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
                 // Refresh provisional badge count if this save was provisional.
@@ -4217,6 +4305,64 @@ function restaurantPos() {
             if (!id) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
             const url = '/pos/restaurant/orders/' + id + '/kitchen-ticket?auto_print=1';
             this._printViaIframe('print-kot-frame', url, 'width=350,height=600', onAfterPrint);
+        },
+
+        // ── P7 (F6): INCOMING WAITER ORDERS ───────────────────────────
+        async loadIncoming() {
+            if (!this.isRestaurantMode) return;
+            try {
+                const res = await fetch('/pos/api/incoming-orders', { headers: { 'Accept': 'application/json' } });
+                if (!res.ok) return;
+                this.incomingOrders = await res.json();
+            } catch (e) { /* silent — badge just goes stale until next poll */ }
+        },
+        openIncoming() {
+            this.showIncoming = true;
+            this.incomingLoading = true;
+            this.loadIncoming().finally(() => { this.incomingLoading = false; });
+        },
+        loadIncomingToCart(o) {
+            if (this.cart.length && !confirm('Replace current cart with waiter order ' + o.order_number + '?')) return;
+            this.cart = (o.items || []).map(it => ({
+                cart_uid: 'inc' + Date.now() + '_' + Math.random().toString(36).slice(2, 9),
+                item_id: it.item_id || null,
+                item_type: it.item_id ? (it.item_type || 'product') : 'manual',
+                item_name: it.name,
+                quantity: parseFloat(it.quantity) || 1,
+                unit_price: parseFloat(it.unit_price) || 0,
+                special_notes: it.special_notes || '',
+                is_tax_exempt: !!it.is_tax_exempt,
+                item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false,
+            }));
+            this.incomingOrderId = o.id;
+            // Table stays attached to the RESTAURANT order — settlement frees it.
+            this.selectedCustomer = (o.customer_name || o.customer_phone)
+                ? { id: null, name: o.customer_name || 'Walk-in', phone: o.customer_phone || '' }
+                : null;
+            this.kitchenNotes = o.kitchen_notes || '';
+            this.showIncoming = false;
+            this.activeCartIndex = this.cart.length ? 0 : -1;
+            this.flowStep = 'cart';
+            this.showToast('Waiter order ' + o.order_number + ' loaded — take payment to settle it', 'success');
+        },
+        // Full KOT reprint (all items) or delta print (only newly-added items).
+        printIncomingKot(o, delta = false) {
+            const url = '/pos/restaurant/orders/' + o.id + '/kitchen-ticket?auto_print=1' + (delta ? '&delta=1' : '');
+            this._printViaIframe('print-kot-frame', url, 'width=350,height=600', () => this.loadIncoming());
+        },
+        async completeIncomingOrder(orderId, txnId) {
+            try {
+                const res = await fetch('/pos/api/incoming-orders/' + orderId + '/complete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ transaction_id: txnId }),
+                });
+                const data = await res.json().catch(() => null);
+                if (!data || !data.success) {
+                    console.warn('[completeIncomingOrder]', res.status, data);
+                }
+            } catch (e) { console.warn('[completeIncomingOrder] FAIL', e); }
+            this.loadIncoming();
         },
 
         // Print invoice → KOT in strict order. Used by auto-print on successful pay.

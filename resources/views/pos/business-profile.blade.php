@@ -150,5 +150,132 @@
             </button>
         </div>
     </form>
+
+    {{-- ============ F8: PUBLIC QR PROFILE + MENU (admin only) ============ --}}
+    @if(isset($ppSettings) && auth('pos')->user() && !auth('pos')->user()->isPosCashier())
+    <div class="mt-10 space-y-6">
+        <div>
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white">Public QR Profile &amp; Menu</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Customers scan a QR code on local receipts to see your business page and live menu. You control exactly what is shown.</p>
+        </div>
+
+        {{-- Settings + link --}}
+        <form method="POST" action="{{ route('pos.public-profile.save') }}" class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-6 space-y-5">
+            @csrf
+            <div class="flex items-center justify-between gap-4">
+                <div>
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Public Page</h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Turn on to get a private QR link for your business page.</p>
+                </div>
+                <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" name="pp_enabled" value="1" {{ ($ppSettings['enabled'] ?? false) ? 'checked' : '' }} class="rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-5 h-5">
+                    <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">Enabled</span>
+                </label>
+            </div>
+
+            @if($ppUrl)
+            <div class="flex flex-col sm:flex-row items-center gap-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4">
+                @if($ppQr)
+                <img src="{{ $ppQr }}" alt="Public profile QR" class="w-28 h-28 rounded-lg bg-white p-1.5 border border-gray-200">
+                @endif
+                <div class="min-w-0 flex-1 text-center sm:text-left" x-data="{ copied: false }">
+                    <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Your public link</p>
+                    <p class="text-sm font-mono text-teal-800 dark:text-teal-300 break-all">{{ $ppUrl }}</p>
+                    <div class="mt-2 flex items-center justify-center sm:justify-start gap-2">
+                        <button type="button" @click="navigator.clipboard.writeText('{{ $ppUrl }}').then(() => { copied = true; setTimeout(() => copied = false, 1500); })"
+                            class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                            <span x-show="!copied">Copy Link</span><span x-show="copied" x-cloak class="text-emerald-600">Copied!</span>
+                        </button>
+                        <a href="{{ $ppUrl }}" target="_blank" rel="noopener" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition">Open Page</a>
+                    </div>
+                </div>
+            </div>
+            @elseif($ppSettings['enabled'] ?? false)
+            <p class="text-xs text-amber-600 dark:text-amber-400">Save once to generate your link and QR code.</p>
+            @endif
+
+            <div>
+                <h4 class="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-3">What to show on the public page</h4>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    @foreach([
+                        'show_phone' => 'Phone',
+                        'show_mobile' => 'Mobile',
+                        'show_email' => 'Email',
+                        'show_address' => 'Address',
+                        'show_ntn' => 'NTN',
+                        'show_website' => 'Website',
+                        'show_hours' => 'Opening Hours',
+                        'show_menu' => 'Menu',
+                    ] as $key => $label)
+                    <label class="inline-flex items-center gap-2 cursor-pointer select-none text-sm text-gray-700 dark:text-gray-300">
+                        <input type="checkbox" name="pp_{{ $key }}" value="1" {{ ($ppSettings[$key] ?? false) ? 'checked' : '' }} class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                        {{ $label }}
+                    </label>
+                    @endforeach
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Opening Hours (text)</label>
+                    <input type="text" name="hours_text" value="{{ old('hours_text', $ppSettings['hours_text'] ?? '') }}" maxlength="200"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500" placeholder="e.g. Daily 12pm – 12am">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">About / Tagline</label>
+                    <input type="text" name="about_text" value="{{ old('about_text', $ppSettings['about_text'] ?? '') }}" maxlength="600"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500" placeholder="Short intro shown under your business name">
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-3">
+                <button type="submit" class="px-6 py-2.5 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition shadow-sm">Save Public Profile</button>
+            </div>
+        </form>
+
+        @if($company->public_profile_slug)
+        <form method="POST" action="{{ route('pos.public-profile.regenerate') }}" onsubmit="return confirm('Naya link banane se purane chhape hue QR codes kaam karna band kar denge. Continue?');" class="flex justify-end">
+            @csrf
+            <button type="submit" class="text-xs font-semibold text-red-600 hover:text-red-700 underline underline-offset-2">Generate a new link (old QR codes stop working)</button>
+        </form>
+        @endif
+
+        {{-- Menu builder --}}
+        <form method="POST" action="{{ route('pos.public-profile.menu') }}" class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-6"
+            x-data="{ selected: {{ json_encode(array_map('intval', array_values($ppSelectedIds ?? []))) ?: '[]' }} }">
+            @csrf
+            <div class="flex items-center justify-between gap-4 mb-1">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Public Menu Items</h3>
+                <span class="text-xs font-semibold text-gray-500 dark:text-gray-400" x-text="selected.length + ' selected'"></span>
+            </div>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Tick the products to show on your public menu. Prices always show LIVE from your product list — update the product, the menu updates itself.</p>
+
+            @if(($ppProducts ?? collect())->isEmpty())
+            <p class="text-sm text-gray-500 dark:text-gray-400">No active products yet — add products first, then build your menu.</p>
+            @else
+            <div class="max-h-96 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-800">
+                @foreach(($ppProducts ?? collect())->groupBy(fn ($p) => trim((string) $p->category) !== '' ? $p->category : 'Uncategorized') as $cat => $prods)
+                <div>
+                    <div class="px-4 py-2 bg-gray-50 dark:bg-gray-800 text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 sticky top-0">{{ $cat }}</div>
+                    @foreach($prods as $p)
+                    <label class="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/60 transition">
+                        <input type="checkbox" name="menu_product_ids[]" value="{{ $p->id }}"
+                            {{ in_array((int) $p->id, $ppSelectedIds ?? [], true) ? 'checked' : '' }}
+                            @change="$event.target.checked ? selected.push({{ (int) $p->id }}) : selected = selected.filter(i => i !== {{ (int) $p->id }})"
+                            class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                        <span class="flex-1 text-sm text-gray-800 dark:text-gray-200 min-w-0 truncate">{{ $p->name }}</span>
+                        <span class="text-xs font-bold text-teal-800 dark:text-teal-300 shrink-0">Rs {{ number_format((float) $p->price, 2) }}</span>
+                    </label>
+                    @endforeach
+                </div>
+                @endforeach
+            </div>
+            <div class="flex items-center justify-end mt-4">
+                <button type="submit" class="px-6 py-2.5 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition shadow-sm">Save Menu</button>
+            </div>
+            @endif
+        </form>
+    </div>
+    @endif
 </div>
 </x-pos-layout>

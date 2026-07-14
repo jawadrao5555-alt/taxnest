@@ -117,6 +117,7 @@
                     <template x-if="kstate(order) === 'ready'">
                         <span class="flex-1 py-2 text-xs rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-semibold text-center">Ready for Pickup</span>
                     </template>
+                    <button @click="reprintTicket(order.id)" class="py-2 px-3 text-xs rounded-lg border border-teal-300 text-teal-700 hover:bg-teal-50 dark:border-teal-700 dark:text-teal-300 dark:hover:bg-teal-900/20 font-semibold" title="Print this KOT again (duplicate ticket)">🖨 KOT</button>
                     <button @click="kitchenUpdate(order.id, 'cleared')" class="py-2 px-3 text-xs rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 font-semibold" title="Remove from kitchen board (bill stays with cashier)">Clear</button>
                 </div>
             </div>
@@ -193,6 +194,9 @@ function kdsScreen() {
         printedIds: [],
         printQueue: [],
         printingNow: false,
+        // P7: throttle delta re-queues — stamping happens when the ticket renders,
+        // but a poll can land mid-print; don't re-fire the same delta within 30s.
+        _deltaFiredAt: {},
 
         // Kitchen lifecycle state (never the billing status): new → preparing → ready.
         kstate(order) {
@@ -282,24 +286,49 @@ function kdsScreen() {
         checkAutoPrint() {
             if (!this.autoPrintEnabled) return;
             this.orders.forEach(o => {
-                if (!this.printedIds.includes(o.id) && !this.printQueue.includes(o.id)) {
-                    this.printQueue.push(o.id);
+                // Brand-new order → FULL ticket.
+                if (!this.printedIds.includes(o.id)) {
+                    if (!this.printQueue.some(q => q.id === o.id && !q.delta)) {
+                        this.printQueue.push({ id: o.id, delta: false });
+                    }
+                    return;
+                }
+                // P7: already-printed order grew NEW items (waiter append) → DELTA
+                // ticket: prints ONLY rows with kot_printed_at NULL, then stamps them.
+                if ((o.unprinted_count || 0) > 0) {
+                    const last = this._deltaFiredAt[o.id] || 0;
+                    if (!this.printQueue.some(q => q.id === o.id && q.delta) && (Date.now() - last) > 30000) {
+                        this._deltaFiredAt[o.id] = Date.now();
+                        this.printQueue.push({ id: o.id, delta: true });
+                    }
                 }
             });
             this.processPrintQueue();
         },
 
+        // P7: manual duplicate KOT — owner ask: kitchen can reprint the FULL ticket
+        // any time (ignores printedIds; works even when auto-print is OFF).
+        reprintTicket(orderId) {
+            if (!this.printedIds.includes(orderId)) { this.printedIds.push(orderId); this.savePrintedIds(); }
+            this.printQueue.push({ id: orderId, delta: false });
+            this.processPrintQueue();
+            this.showToast('KOT sent to printer', 'success');
+        },
+
         processPrintQueue() {
             if (this.printingNow || this.printQueue.length === 0) return;
-            const orderId = this.printQueue.shift();
+            const job = this.printQueue.shift();
             // Mark BEFORE printing — a refresh mid-print must never duplicate.
-            this.printedIds.push(orderId);
-            this.savePrintedIds();
+            // (Delta jobs skip this — the id is already in printedIds.)
+            if (!job.delta && !this.printedIds.includes(job.id)) {
+                this.printedIds.push(job.id);
+                this.savePrintedIds();
+            }
             this.printingNow = true;
             const host = document.getElementById('kdsPrintHost');
             const frame = document.createElement('iframe');
             frame.id = 'kdsPrintFrame';
-            frame.src = `/pos/restaurant/orders/${orderId}/kitchen-ticket?auto_print=1&_signal=kds-${orderId}`;
+            frame.src = `/pos/restaurant/orders/${job.id}/kitchen-ticket?auto_print=1${job.delta ? '&delta=1' : ''}&_signal=kds-${job.id}`;
             host.appendChild(frame);
             // Fallback: if the iframe never signals (blocked dialog etc.), move on.
             this.printFallbackTimer = setTimeout(() => this.finishCurrentPrint(), 25000);

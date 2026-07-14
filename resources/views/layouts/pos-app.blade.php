@@ -497,6 +497,12 @@
                                         My Profile
                                     </a>
                                     @endif
+
+                                    {{-- PWA install — always visible for every POS user --}}
+                                    <div class="px-3 pt-3 pb-1">
+                                        <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">App</p>
+                                    </div>
+                                    <x-pwa-install-menu-item color="purple" app-name="Nest POS" label="Install App on this Device" item-class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300" />
                                 </div>
 
                                 <div class="border-t border-gray-100 dark:border-gray-800 p-2">

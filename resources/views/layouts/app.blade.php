@@ -251,6 +251,8 @@
                                 </x-slot>
                                 <x-slot name="content">
                                     <x-dropdown-link :href="route('profile.edit')">Profile</x-dropdown-link>
+                                    {{-- PWA install — always visible --}}
+                                    <x-pwa-install-menu-item color="emerald" app-name="Tax DI" label="Install App on this Device" item-class="w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none transition duration-150 ease-in-out flex items-center gap-2" />
                                     <form method="POST" action="{{ route('toggle.dark-mode') }}">
                                         @csrf
                                         <x-dropdown-link href="#" onclick="event.preventDefault(); this.closest('form').submit();">

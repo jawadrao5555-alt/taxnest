@@ -741,8 +741,6 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::delete('/companies/{id}/local-viewer/{userId}', [AdminCompanyController::class, 'deleteLocalViewer'])->name('saas.admin.companies.local-viewer.delete');
     Route::post('/companies/{id}/override/lifetime', [AdminCompanyController::class, 'grantLifetime'])->name('saas.admin.companies.override.lifetime');
     Route::post('/companies/{id}/override/temporary', [AdminCompanyController::class, 'grantTemporary'])->name('saas.admin.companies.override.temporary');
-    Route::post('/companies/{id}/override/grace', [AdminCompanyController::class, 'grantGrace'])->name('saas.admin.companies.override.grace');
-    Route::post('/companies/{id}/override/usage-free', [AdminCompanyController::class, 'grantUsageFree'])->name('saas.admin.companies.override.usageFree');
     Route::delete('/companies/{id}/override', [AdminCompanyController::class, 'removeOverride'])->name('saas.admin.companies.override.remove');
     Route::get('/bin', [AdminCompanyController::class, 'bin'])->name('saas.admin.companies.bin');
     Route::post('/bin/{id}/restore', [AdminCompanyController::class, 'restore'])->name('saas.admin.companies.restore');

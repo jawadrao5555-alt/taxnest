@@ -304,7 +304,7 @@
         <div class="flex items-center justify-between mb-4">
             <div>
                 <h3 class="text-lg font-bold text-white">Subscription Override &amp; Usage Limit</h3>
-                <p class="text-xs text-gray-500 mt-1">Lifetime / Temporary / Grace / Free-invoice access. Always overrides expiry.</p>
+                <p class="text-xs text-gray-500 mt-1">Lifetime (no limits) or Temporary (until a date, optional invoice limit). Always overrides expiry.</p>
             </div>
             @if($overrideActive)
                 <span class="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-600/20 text-emerald-400 border border-emerald-700">
@@ -324,11 +324,9 @@
             </div>
         @endif
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
             <button type="button" @click="open = open === 'lifetime' ? null : 'lifetime'" class="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 text-xs font-semibold rounded-lg border border-emerald-800 transition">Grant Lifetime</button>
             <button type="button" @click="open = open === 'temporary' ? null : 'temporary'" class="px-3 py-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 text-xs font-semibold rounded-lg border border-blue-800 transition">Grant Temporary</button>
-            <button type="button" @click="open = open === 'grace' ? null : 'grace'" class="px-3 py-2 bg-yellow-600/20 hover:bg-yellow-600/40 text-yellow-400 text-xs font-semibold rounded-lg border border-yellow-800 transition">Grant Grace Period</button>
-            <button type="button" @click="open = open === 'usage' ? null : 'usage'" class="px-3 py-2 bg-purple-600/20 hover:bg-purple-600/40 text-purple-400 text-xs font-semibold rounded-lg border border-purple-800 transition">Free Invoice Limit</button>
             @if($overrideActive)
             <form method="POST" action="{{ route('saas.admin.companies.override.remove', $company->id) }}" onsubmit="return confirm('Remove the active override?');">
                 @csrf @method('DELETE')
@@ -353,38 +351,11 @@
                 @csrf
                 <label class="text-xs text-gray-400 block">Access until (date)</label>
                 <input type="date" name="until" required min="{{ now()->addDay()->toDateString() }}" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
-                <label class="text-xs text-gray-400 block">Reason (optional)</label>
-                <input type="text" name="reason" maxlength="255" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
-                <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition">Grant Temporary</button>
-            </form>
-        </div>
-
-        {{-- Grace form --}}
-        <div x-show="open === 'grace'" x-cloak class="mt-4 p-4 bg-gray-800/40 rounded-lg border border-gray-700">
-            <form method="POST" action="{{ route('saas.admin.companies.override.grace', $company->id) }}" class="space-y-3">
-                @csrf
-                <div class="flex gap-2">
-                    <button type="button" onclick="this.form.days.value=7" class="px-3 py-1 bg-yellow-600/20 text-yellow-300 text-xs rounded border border-yellow-800">7 days</button>
-                    <button type="button" onclick="this.form.days.value=15" class="px-3 py-1 bg-yellow-600/20 text-yellow-300 text-xs rounded border border-yellow-800">15 days</button>
-                    <button type="button" onclick="this.form.days.value=30" class="px-3 py-1 bg-yellow-600/20 text-yellow-300 text-xs rounded border border-yellow-800">30 days</button>
-                </div>
-                <label class="text-xs text-gray-400 block">Days (1–90)</label>
-                <input type="number" name="days" required min="1" max="90" value="7" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
-                <label class="text-xs text-gray-400 block">Reason (optional)</label>
-                <input type="text" name="reason" maxlength="255" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
-                <button type="submit" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded-lg font-medium transition">Grant Grace</button>
-            </form>
-        </div>
-
-        {{-- Usage-free form --}}
-        <div x-show="open === 'usage'" x-cloak class="mt-4 p-4 bg-gray-800/40 rounded-lg border border-gray-700">
-            <form method="POST" action="{{ route('saas.admin.companies.override.usageFree', $company->id) }}" class="space-y-3">
-                @csrf
-                <label class="text-xs text-gray-400 block">Free Invoice Limit (optional — leave empty for unlimited)</label>
+                <label class="text-xs text-gray-400 block">Invoice Limit (optional — leave empty for unlimited)</label>
                 <input type="number" name="free_invoice_limit" min="1" max="1000000" placeholder="Empty = unlimited" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
                 <label class="text-xs text-gray-400 block">Reason (optional)</label>
                 <input type="text" name="reason" maxlength="255" class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-sm px-3 py-2">
-                <button type="submit" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg font-medium transition">Grant Free Limit</button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition">Grant Temporary</button>
             </form>
         </div>
     </div>

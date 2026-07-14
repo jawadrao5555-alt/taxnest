@@ -18,6 +18,7 @@ class Subscription extends Model
         'active',
         'override_type',
         'override_until',
+        'override_granted_at',
         'free_invoice_limit',
         'override_reason',
         'override_by',
@@ -30,6 +31,7 @@ class Subscription extends Model
         'discount_percent' => 'decimal:2',
         'final_price' => 'decimal:2',
         'override_until' => 'datetime',
+        'override_granted_at' => 'datetime',
         'free_invoice_limit' => 'integer',
     ];
 
@@ -50,7 +52,7 @@ class Subscription extends Model
         return match ($this->override_type) {
             'lifetime' => 'Lifetime Free',
             'usage_free' => 'Free Invoices (' . ($this->free_invoice_limit ?? 'Unlimited') . ')',
-            'temporary' => 'Temporary Access until ' . optional($this->override_until)->format('Y-m-d'),
+            'temporary' => 'Temporary Access until ' . optional($this->override_until)->format('Y-m-d') . ($this->free_invoice_limit ? " · {$this->free_invoice_limit} invoices" : ''),
             'grace' => 'Grace Period until ' . optional($this->override_until)->format('Y-m-d'),
             default => 'No Override',
         };

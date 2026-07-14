@@ -816,6 +816,7 @@ class AdminCompanyController extends Controller
         $sub->update([
             'override_type' => 'lifetime',
             'override_until' => null,
+            'override_granted_at' => now(),
             'free_invoice_limit' => null,
             'override_reason' => $request->input('reason', 'Lifetime free access granted by admin'),
             'override_by' => auth('admin')->id(),
@@ -831,50 +832,6 @@ class AdminCompanyController extends Controller
     {
         $request->validate([
             'until' => 'required|date|after:today',
-            'reason' => 'nullable|string|max:255',
-        ]);
-        $company = Company::findOrFail($id);
-        $sub = $this->getOrCreateActiveSubscription($company->id);
-        $sub->update([
-            'override_type' => 'temporary',
-            'override_until' => $request->input('until'),
-            'free_invoice_limit' => null,
-            'override_reason' => $request->input('reason', 'Temporary access granted by admin'),
-            'override_by' => auth('admin')->id(),
-        ]);
-        $this->activateForGrant($company);
-        AdminAuditLog::log(auth('admin')->id(), 'Override granted: TEMPORARY', 'Subscription', $sub->id, [
-            'company' => $company->name, 'until' => $sub->override_until?->toDateString(), 'reason' => $sub->override_reason,
-        ]);
-        return back()->with('success', "Temporary access granted to '{$company->name}' until " . $sub->override_until->format('Y-m-d') . '.');
-    }
-
-    public function grantGrace(Request $request, $id)
-    {
-        $request->validate([
-            'days' => 'required|integer|min:1|max:90',
-            'reason' => 'nullable|string|max:255',
-        ]);
-        $company = Company::findOrFail($id);
-        $sub = $this->getOrCreateActiveSubscription($company->id);
-        $until = now()->addDays((int) $request->input('days'));
-        $sub->update([
-            'override_type' => 'grace',
-            'override_until' => $until,
-            'free_invoice_limit' => null,
-            'override_reason' => $request->input('reason', $request->input('days') . '-day grace period'),
-            'override_by' => auth('admin')->id(),
-        ]);
-        $this->activateForGrant($company);
-        AdminAuditLog::log(auth('admin')->id(), 'Override granted: GRACE', 'Subscription', $sub->id, [
-            'company' => $company->name, 'days' => $request->input('days'), 'until' => $until->toDateString(),
-        ]);
-        return back()->with('success', "Grace period of {$request->input('days')} days granted to '{$company->name}'.");
-    }
-
-    public function grantUsageFree(Request $request, $id)
-    {
-        $request->validate([
             'free_invoice_limit' => 'nullable|integer|min:1|max:1000000',
             'reason' => 'nullable|string|max:255',
         ]);
@@ -883,17 +840,18 @@ class AdminCompanyController extends Controller
         $limitLabel = $limit === null ? 'unlimited' : (string) $limit;
         $sub = $this->getOrCreateActiveSubscription($company->id);
         $sub->update([
-            'override_type' => 'usage_free',
-            'override_until' => null,
+            'override_type' => 'temporary',
+            'override_until' => $request->input('until'),
+            'override_granted_at' => now(),
             'free_invoice_limit' => $limit,
-            'override_reason' => $request->input('reason') ?: "Free invoice limit: {$limitLabel}",
+            'override_reason' => $request->input('reason') ?: 'Temporary access granted by admin',
             'override_by' => auth('admin')->id(),
         ]);
         $this->activateForGrant($company);
-        AdminAuditLog::log(auth('admin')->id(), 'Override granted: USAGE_FREE', 'Subscription', $sub->id, [
-            'company' => $company->name, 'limit' => $limitLabel,
+        AdminAuditLog::log(auth('admin')->id(), 'Override granted: TEMPORARY', 'Subscription', $sub->id, [
+            'company' => $company->name, 'until' => $sub->override_until?->toDateString(), 'invoices' => $limitLabel, 'reason' => $sub->override_reason,
         ]);
-        return back()->with('success', "Free invoices ({$limitLabel}) granted to '{$company->name}'.");
+        return back()->with('success', "Temporary access granted to '{$company->name}' until " . $sub->override_until->format('Y-m-d') . " ({$limitLabel} invoices).");
     }
 
     public function removeOverride($id)
@@ -907,6 +865,7 @@ class AdminCompanyController extends Controller
         $sub->update([
             'override_type' => 'none',
             'override_until' => null,
+            'override_granted_at' => null,
             'free_invoice_limit' => null,
             'override_reason' => null,
             'override_by' => null,

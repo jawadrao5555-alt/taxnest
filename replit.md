@@ -22,7 +22,7 @@ Multi-company SaaS for tax + invoice management in Pakistan (FBR/PRA compliant):
 
 ### Core Platform
 - Multi-tenancy via `company_id` + `CompanyIsolation` middleware; RBAC via `RoleMiddleware`; company approval workflow; multi-branch support; customer ledger (auto debits + manual adjustments); immutable audit logs (SHA256); database queue for background jobs; `ForceHttps` + subscription-based access control.
-- SaaS management layer: separate admin + franchise panels (own auth/layouts), subscription plan builders, approval workflows, usage monitoring. `pricing_plans.product_type` separates `di` / `pos` / `fbrpos` / `standalone` plan sets; admin-only subscription overrides + usage limits on `subscriptions`.
+- SaaS management layer: separate admin + franchise panels (own auth/layouts), subscription plan builders, approval workflows, usage monitoring. `pricing_plans.product_type` separates `di` / `pos` / `fbrpos` / `standalone` plan sets; admin-only subscription overrides + usage limits on `subscriptions`. Override grants (Jul 2026) = TWO types only: Lifetime (no limits) and Temporary (until date + OPTIONAL invoice allowance counted from `override_granted_at`, product-type-aware). Grace + standalone usage_free grants RETIRED (UI/routes/methods removed) — legacy `grace`/`usage_free` rows still honored in access logic; do NOT re-add the buttons.
 - Admin announcement system (targeted, dismissible). Dual invoice numbering (internal + regulatory).
 
 ### Digital Invoice (DI)

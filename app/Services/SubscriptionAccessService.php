@@ -68,6 +68,24 @@ class SubscriptionAccessService
         if (in_array($type, ['temporary', 'grace'], true)) {
             $until = $subscription->override_until ? Carbon::parse($subscription->override_until) : null;
             if ($until && $until->isFuture()) {
+                // Optional invoice allowance on temporary grants: only bills created
+                // AFTER the grant count, so old history never eats the allowance.
+                if ($subscription->free_invoice_limit !== null) {
+                    $limit = (int) $subscription->free_invoice_limit;
+                    $used = self::billableCount($company, $subscription->override_granted_at);
+                    if ($limit > 0 && $used >= $limit) {
+                        return [
+                            'allowed' => false,
+                            'reason' => "Temporary invoice allowance reached ({$used}/{$limit}). Please subscribe to a plan.",
+                            'override' => $type,
+                        ];
+                    }
+                    return [
+                        'allowed' => true,
+                        'reason' => ucfirst($type) . " access until {$until->format('Y-m-d')} ({$used}/{$limit} invoices used).",
+                        'override' => $type,
+                    ];
+                }
                 return [
                     'allowed' => true,
                     'reason' => ucfirst($type) . " access until {$until->format('Y-m-d')}.",
@@ -165,23 +183,27 @@ class SubscriptionAccessService
      * DI uses the invoices table; PRA POS uses pos_transactions;
      * FBR POS uses its own fbr_pos_transactions table.
      */
-    protected static function billableCount(Company $company): int
+    protected static function billableCount(Company $company, $since = null): int
     {
         // FBR POS bills live in their own table (fbr_pos_transactions).
         if ($company->product_type === 'fbrpos') {
-            return \App\Models\FbrPosTransaction::where('company_id', $company->id)->count();
+            return \App\Models\FbrPosTransaction::where('company_id', $company->id)
+                ->when($since, fn ($q) => $q->where('created_at', '>=', $since))
+                ->count();
         }
 
         // PRA POS bills live in pos_transactions (archived rows hidden by a global scope).
         if ($company->product_type === 'pos') {
             return \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $company->id)
+                ->when($since, fn ($q) => $q->where('created_at', '>=', $since))
                 ->count();
         }
 
         // Digital Invoice uses the invoices table.
         return Invoice::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
             ->where('company_id', $company->id)
+            ->when($since, fn ($q) => $q->where('created_at', '>=', $since))
             ->count();
     }
 
@@ -236,7 +258,7 @@ class SubscriptionAccessService
         // demote a company whose paid plan lapses later. hasAccess() already
         // treats an expired temporary/grace grant identically to 'none', so this
         // clears no access that still mattered.
-        $expired()->update(['override_type' => 'none', 'override_until' => null]);
+        $expired()->update(['override_type' => 'none', 'override_until' => null, 'override_granted_at' => null, 'free_invoice_limit' => null]);
 
         return $flipped;
     }

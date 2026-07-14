@@ -1009,15 +1009,34 @@ class PosController extends Controller
         $taxAmount = (float) round($taxableAfterDiscount * $taxRate / 100);
         $totalAmount = (float) round($afterDiscount + $taxAmount);
 
-        // Per-cashier toggle (owner rule Jul 2026): the EDITING user's own switch
-        // decides whether this edit re-queues the bill for PRA.
-        $praEnabledEdit = (bool) auth('pos')->user()?->praReportingEnabled($company);
+        // Owner rule (Jul 2026 update): an EDIT must NEVER silently change a bill's
+        // reporting fate. The bill keeps whatever it was:
+        //   provisional stays provisional; a LOCAL final (NULL pra_status, no fiscal)
+        //   stays local UNLESS the editor explicitly ticked "Report to PRA";
+        //   a PRA-pipeline bill (pending/failed/offline) stays in the pipeline.
+        $posEditUser = auth('pos')->user();
         $isProvisionalEdit = ($transaction->invoice_mode === 'local' && $transaction->pra_status === 'local');
-        // Serial split: an L-series final re-queued for PRA must first get a real
-        // fiscal serial (PRA must never receive an L-NNN USIN). A POS-serial bill
-        // edited by a reporting-OFF user keeps its number (never renumber downward).
+        $isLocalFinalEdit = !$isProvisionalEdit && $transaction->pra_status === null;
+        $isPipelineEdit = !$isProvisionalEdit && !$isLocalFinalEdit;
+        $reportRequested = $isLocalFinalEdit && $request->boolean('report_to_pra');
+
+        if ($reportRequested) {
+            // Explicit promote-on-save: admin-only + current month only — the exact
+            // same gates as the per-bill "Submit to PRA" promote paths.
+            if (!$posEditUser?->isPosAdmin()) {
+                return back()->withInput()->with('error', 'Sirf POS admin local bill ko PRA par report kar sakta hai.');
+            }
+            if ($transaction->created_at && $transaction->created_at->lt(now()->startOfMonth())) {
+                return back()->withInput()->with('error', 'Sirf CURRENT month ke local bills PRA par submit ho sakte hain — pichhle month ke bills close ho chuke hain.');
+            }
+        }
+
+        $goingToPra = $isPipelineEdit || $reportRequested;
+        // Serial split: a bill headed to PRA must carry a real POS fiscal serial
+        // (PRA must never receive an L-NNN USIN). A local bill KEEPS its L number;
+        // a POS-serial bill never renumbers downward.
         $invoiceNumberEdit = $transaction->invoice_number;
-        if (!$isProvisionalEdit && $praEnabledEdit && !str_starts_with($invoiceNumberEdit, 'POS-')) {
+        if ($goingToPra && !str_starts_with($invoiceNumberEdit, 'POS-')) {
             $invoiceNumberEdit = $this->generateInvoiceNumber($companyId);
         }
 
@@ -1037,13 +1056,14 @@ class PosController extends Controller
                 'exempt_amount' => $exemptAfterDiscount,
                 'total_amount' => $totalAmount,
                 'payment_method' => $request->payment_method,
-                // Mirror storeInvoice's three-branch invariant:
-                // provisional stays provisional; PRA-on final re-queues as 'pending';
-                // PRA-off final keeps NULL (never regress to 'local' — that would hide
-                // it from transactions/KPIs and expose it in the F10 modal).
+                // Three-branch invariant, fate preserved (owner rule Jul 2026):
+                // provisional stays provisional; a bill going to PRA (pipeline bill
+                // or explicit "Report to PRA" tick) re-queues as 'pending'; a local
+                // final keeps NULL (never regress to 'local' — that would hide it
+                // from transactions/KPIs and expose it in the F10 modal).
                 'pra_status' => $isProvisionalEdit
                     ? 'local'
-                    : ($praEnabledEdit ? 'pending' : null),
+                    : ($goingToPra ? 'pending' : null),
                 'notes' => $request->input('kitchen_notes'),
             ]);
 
@@ -1103,7 +1123,7 @@ class PosController extends Controller
         }
 
         $praMessage = '';
-        if ($praEnabledEdit && !$isProvisionalEdit) {
+        if ($goingToPra) {
             // ENTERPRISE SAFE MODE — Phase 1: agent-enabled companies bypass server-side submission.
             if ($company->agent_enabled) {
                 $transaction->update(['pra_status' => 'pending', 'pra_response_code' => null]);
@@ -1235,12 +1255,67 @@ class PosController extends Controller
         return true;
     }
 
+    /**
+     * Race-safe promote for a reporting-OFF FINAL (completed, NULL pra_status, no
+     * fiscal) heading to PRA via the per-bill "Submit to PRA" button (owner rule
+     * Jul 2026 update). Locks + re-verifies inside the transaction, allots a POS
+     * fiscal serial only when the bill still carries an L-series number (a POS-
+     * serial bill never renumbers), queues as 'pending' and un-archives.
+     * Returns false when the bill is no longer a promotable local final.
+     */
+    private function promoteNullFinalToPra(PosTransaction $transaction, int $companyId): bool
+    {
+        try {
+            DB::transaction(function () use ($transaction, $companyId) {
+                $locked = PosTransaction::withoutGlobalScope('hide_archived')
+                    ->where('company_id', $companyId)
+                    ->where('id', $transaction->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$locked || $locked->pra_status !== null || $locked->status !== 'completed' || $locked->pra_invoice_number) {
+                    throw new \RuntimeException('NOT_LOCAL_FINAL');
+                }
+
+                $locked->update([
+                    'invoice_number' => str_starts_with($locked->invoice_number, 'POS-')
+                        ? $locked->invoice_number
+                        : $this->generateInvoiceNumber($companyId),
+                    'pra_status' => 'pending',
+                    'invoice_mode' => 'pra',
+                    'pra_response_code' => null,
+                    'is_archived' => false,
+                    'archived_at' => null,
+                ]);
+            });
+        } catch (\RuntimeException $e) {
+            return false;
+        }
+
+        $transaction->refresh();
+        return true;
+    }
+
     public function retryPra($id)
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
-        $transaction = PosTransaction::where('company_id', $companyId)->findOrFail($id);
+        // Archived LOCAL-category bills (day-close archive) must stay reachable for
+        // the per-bill "Submit to PRA" promote — mirror the receipt()/transactionShow()
+        // limited bypass: archived rows only pass when they are local-category.
+        $retryQuery = PosTransaction::where('company_id', $companyId);
+        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'is_archived')) {
+            $retryQuery = PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->where(function ($q) {
+                    $q->where('is_archived', false)
+                        ->orWhereNull('is_archived')
+                        ->orWhere('invoice_mode', 'local')
+                        ->orWhereNull('pra_status');
+                });
+        }
+        $transaction = $retryQuery->findOrFail($id);
 
         if ($transaction->pra_invoice_number) {
             return back()->with('error', 'This invoice has already been submitted to PRA. PRA Fiscal Invoice #: ' . $transaction->pra_invoice_number);
@@ -1250,11 +1325,27 @@ class PosController extends Controller
             return back()->with('error', 'This invoice has already been successfully submitted to PRA.');
         }
 
+        // Reporting-OFF final = LOCAL-category bill: completed, NULL pra_status,
+        // no fiscal. Owner rule (Jul 2026 update): these get a per-bill
+        // "Submit to PRA" too — current month only.
+        $isNullFinal = $transaction->pra_status === null && $transaction->status === 'completed';
+
         // Provisional ('local') bills CAN be promoted to final — this is the
         // "Submit to PRA — Make Final" path. They will be re-queued as 'pending'
         // and submitted just like any pending/failed/offline retry.
-        if (!in_array($transaction->pra_status, ['pending', 'failed', 'offline', 'local'])) {
+        if (!in_array($transaction->pra_status, ['pending', 'failed', 'offline', 'local']) && !$isNullFinal) {
             return back()->with('error', 'This invoice cannot be submitted. Current status: ' . $transaction->pra_status);
+        }
+
+        if ($isNullFinal) {
+            // Admin-only (matches Local tab visibility) + MONTH GATE. NO quota
+            // re-charge — reporting-OFF finals already consumed quota at creation.
+            if (!auth('pos')->user()?->isPosAdmin()) {
+                return back()->with('error', 'Sirf POS admin local bill ko PRA par report kar sakta hai.');
+            }
+            if ($transaction->created_at && $transaction->created_at->lt(now()->startOfMonth())) {
+                return back()->with('error', 'Sirf CURRENT month ke local bills PRA par submit ho sakte hain — pichhle month ke bills close ho chuke hain.');
+            }
         }
 
         // Monthly bill quota (paid-plan package limits, Jul 2026): promoting a
@@ -1282,7 +1373,11 @@ class PosController extends Controller
                 }
                 return back()->with('success', 'Bill ' . $transaction->invoice_number . ' is now FINAL. PRA reporting is OFF — no PRA submission needed.');
             }
-            return back()->with('error', 'PRA reporting is currently disabled. Enable it from PRA Settings first.');
+            if (!$isNullFinal) {
+                return back()->with('error', 'PRA reporting is currently disabled. Enable it from PRA Settings first.');
+            }
+            // NULL final + explicit per-bill "Submit to PRA": the admin's personal
+            // reporting toggle does NOT block a deliberate submit — fall through.
         }
 
         // Promoting a provisional bill to final — flip mode + status before submission so
@@ -1290,6 +1385,13 @@ class PosController extends Controller
         if ($transaction->pra_status === 'local') {
             if (!$this->promoteLocalToPosSerial($transaction, $companyId, 'pending')) {
                 return back()->with('error', 'Bill is no longer a provisional/local bill — refresh the page and try again.');
+            }
+        } elseif ($isNullFinal) {
+            // Reporting-OFF final going to PRA: allot a real POS fiscal serial
+            // (keeps a POS- serial if it already has one — never renumber downward)
+            // and queue as 'pending'. Race-safe: locked + re-verified inside.
+            if (!$this->promoteNullFinalToPra($transaction, $companyId)) {
+                return back()->with('error', 'Bill is no longer a local final — refresh the page and try again.');
             }
         }
 

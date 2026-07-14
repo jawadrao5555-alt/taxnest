@@ -48,6 +48,32 @@
                 </div>
                 @endif
 
+                @php
+                    // LOCAL final = completed bill with NULL pra_status + no fiscal —
+                    // editing it must NEVER auto-report to PRA (owner rule Jul 2026
+                    // update): the admin decides per-save via this explicit checkbox.
+                    $isProvisionalEditView = $transaction->invoice_mode === 'local' && $transaction->pra_status === 'local';
+                    $isLocalFinalView = !$isProvisionalEditView && is_null($transaction->pra_status) && !$transaction->pra_invoice_number;
+                    $editMonthOpen = $transaction->created_at && $transaction->created_at->gte(now()->startOfMonth());
+                @endphp
+                @if($isLocalFinalView)
+                    @if($editMonthOpen && auth('pos')->user()?->isPosAdmin())
+                    <div class="bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-xl p-4">
+                        <label class="flex items-start gap-3 cursor-pointer">
+                            <input type="checkbox" name="report_to_pra" value="1" class="mt-0.5 w-5 h-5 rounded border-gray-300 text-teal-600 focus:ring-teal-500">
+                            <span class="text-sm text-teal-800 dark:text-teal-300">
+                                <span class="font-semibold block">Report this bill to PRA after saving?</span>
+                                Ye LOCAL bill hai. Checkbox tick karne par save ke baad ye PRA par submit hoga aur isay naya POS fiscal serial milega. Khali chhorne par bill LOCAL hi rahega (number {{ $transaction->invoice_number }} same rahega).
+                            </span>
+                        </label>
+                    </div>
+                    @elseif(!$editMonthOpen)
+                    <div class="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 text-sm text-gray-500 dark:text-gray-400">
+                        <span class="font-semibold text-gray-600 dark:text-gray-300">Month closed</span> — pichhle month ka local bill ab PRA par report nahi ho sakta. Save karne par bill LOCAL hi rahega.
+                    </div>
+                    @endif
+                @endif
+
                 <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                     <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Customer & Terminal</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">

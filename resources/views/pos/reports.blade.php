@@ -89,10 +89,19 @@
                                 <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">Month closed</span>
                                 @endif
                             @else
-                            {{-- Reporting-OFF final: already FINAL (L-series serial — fiscal
-                                 serials are reserved for PRA-reported bills), PRA was never
-                                 involved (no fiscal) — nothing to submit. --}}
-                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 border border-teal-200 dark:border-teal-800">Final — reporting OFF</span>
+                            {{-- Reporting-OFF final ("local" — no PRA fiscal). Owner rule
+                                 (Jul 2026 update): these CAN also be submitted per-bill —
+                                 current month only; older months are closed. --}}
+                                @if($bill->created_at->gte($monthStart))
+                                <form method="POST" action="{{ route('pos.transaction.retry-pra', $bill->id) }}" class="inline" onsubmit="return confirm('Submit {{ $bill->invoice_number }} to PRA? Bill ko POS fiscal serial mil jayega.')">
+                                    @csrf
+                                    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 text-white hover:bg-purple-700 transition">
+                                        Submit to PRA
+                                    </button>
+                                </form>
+                                @else
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">Month closed</span>
+                                @endif
                             @endif
                         </td>
                     </tr>

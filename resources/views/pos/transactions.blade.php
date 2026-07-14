@@ -171,6 +171,21 @@
                                     </button>
                                 </form>
                                 @endif
+                                {{-- LOCAL tab (owner rule Jul 2026 update): every local bill
+                                     (provisional L-series OR reporting-OFF final) gets a per-bill
+                                     "Submit to PRA" — CURRENT month only; older months are closed. --}}
+                                @if(($tab ?? 'pra') === 'local' && !$txn->pra_invoice_number && ($txn->pra_status === 'local' || is_null($txn->pra_status)))
+                                    @if($txn->created_at->gte(now()->startOfMonth()))
+                                    <form method="POST" action="{{ route('pos.transaction.retry-pra', $txn->id) }}" class="inline" onsubmit="return confirm('Submit {{ $txn->invoice_number }} to PRA? Bill ko POS fiscal serial mil jayega.')">
+                                        @csrf
+                                        <button type="submit" class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-purple-600 text-white hover:bg-purple-700 transition whitespace-nowrap">
+                                            Submit to PRA
+                                        </button>
+                                    </form>
+                                    @else
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400 whitespace-nowrap">Month closed</span>
+                                    @endif
+                                @endif
                             </div>
                         </td>
                     </tr>

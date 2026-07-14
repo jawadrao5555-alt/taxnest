@@ -98,6 +98,49 @@
         </div>
     </div>
 
+    {{-- ============================================================
+         LOGIN CREDENTIALS — main company admin account. Passwords are
+         one-way hashed (bcrypt) and can NEVER be displayed; the super
+         admin can only set a NEW password here. Audit-logged.
+         ============================================================ --}}
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6" x-data="{ showPw: false }">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                <span class="text-emerald-400">🔑</span> Login Credentials
+            </h3>
+        </div>
+        @if($companyAdmin)
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between"><span class="text-gray-400">Login Email</span><span class="text-white font-medium">{{ $companyAdmin->email }}</span></div>
+                <div class="flex justify-between"><span class="text-gray-400">Account Name</span><span class="text-white">{{ $companyAdmin->name ?? '—' }}</span></div>
+                @if($companyAdmin->username)
+                <div class="flex justify-between"><span class="text-gray-400">Username</span><span class="text-white">{{ $companyAdmin->username }}</span></div>
+                @endif
+                <div class="flex justify-between"><span class="text-gray-400">Current Password</span><span class="text-gray-500 italic">Hidden — one-way encrypted, cannot be shown</span></div>
+                <p class="text-xs text-gray-500 pt-1">Passwords are stored one-way encrypted for security — nobody (including admins) can view them. To help a locked-out company, set a new password on the right and share it with the owner.</p>
+            </div>
+            <form method="POST" action="{{ route('saas.admin.companies.resetPassword', $company->id) }}"
+                  onsubmit="return confirm('Change this company\'s login password? Their old password will stop working immediately.');"
+                  class="space-y-3">
+                @csrf
+                <label class="block text-xs font-medium text-gray-400">Set New Password</label>
+                <div class="relative">
+                    <input :type="showPw ? 'text' : 'password'" name="new_password" required minlength="6" maxlength="100"
+                           autocomplete="new-password" placeholder="Type new password (min 6 characters)"
+                           class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 pr-16 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 placeholder-gray-500">
+                    <button type="button" @click="showPw = !showPw"
+                            class="absolute inset-y-0 right-0 px-3 text-xs text-gray-400 hover:text-white"
+                            x-text="showPw ? 'Hide' : 'Show'"></button>
+                </div>
+                <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg">Change Password</button>
+            </form>
+        </div>
+        @else
+        <div class="text-center py-4 text-xs text-gray-500 border border-dashed border-gray-700 rounded-lg">No admin login account found for this company.</div>
+        @endif
+    </div>
+
     @if($company->product_type === 'fbrpos')
     {{-- ============================================================
          VPS / FISCAL DEVICE SETUP (super-admin) — everything needed to

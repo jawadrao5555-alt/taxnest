@@ -14,6 +14,7 @@ use App\Models\Subscription;
 use App\Models\Franchise;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Services\CredentialLedgerService;
 
@@ -149,6 +150,8 @@ class AdminCompanyController extends Controller
             if ($companyAdmin) {
                 if ($request->filled('admin_password')) {
                     $companyAdmin->password = Hash::make($request->admin_password);
+                    // Rotate remember token so old "remember me" cookies die too.
+                    $companyAdmin->setRememberToken(Str::random(60));
                 }
                 if ($request->filled('admin_email')) {
                     $emailTaken = User::where('email', $request->admin_email)
@@ -257,7 +260,55 @@ class AdminCompanyController extends Controller
             ->orderBy('id', 'desc')
             ->get();
 
-        return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers', 'localViewers'));
+        // Main login account for the "Login Credentials" card (password reset).
+        $companyAdmin = $this->findCompanyAdmin($id);
+
+        return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers', 'localViewers', 'companyAdmin'));
+    }
+
+    /**
+     * Locate the company's main login account: the company_admin user,
+     * falling back to a pos_admin (some legacy POS registrations).
+     */
+    private function findCompanyAdmin($companyId): ?User
+    {
+        return User::where('company_id', $companyId)->where('role', 'company_admin')->orderBy('id')->first()
+            ?? User::where('company_id', $companyId)->where('pos_role', 'pos_admin')->orderBy('id')->first();
+    }
+
+    /**
+     * Reset the company's main login password from the company details page.
+     * Passwords are one-way hashed and can never be displayed — only replaced.
+     * Super-admin action; audit-logged.
+     */
+    public function resetAdminPassword(Request $request, $id)
+    {
+        $this->assertSuperAdmin();
+
+        $company = Company::withTrashed()->findOrFail($id);
+
+        $request->validate([
+            'new_password' => 'required|string|min:6|max:100',
+        ]);
+
+        $companyAdmin = $this->findCompanyAdmin($id);
+        if (!$companyAdmin) {
+            return back()->with('error', 'No admin login account found for this company.');
+        }
+
+        $companyAdmin->password = Hash::make($request->new_password);
+        // Rotate the remember token so any "remember me" cookies issued with
+        // the OLD password stop working — otherwise the previous holder stays
+        // logged in indefinitely after a reset.
+        $companyAdmin->setRememberToken(Str::random(60));
+        $companyAdmin->save();
+
+        AdminAuditLog::log(auth('admin')->id(), 'Company admin password reset', 'User', $companyAdmin->id, [
+            'company' => $company->name,
+            'email' => $companyAdmin->email,
+        ]);
+
+        return back()->with('success', "Password updated for {$companyAdmin->email}. All new logins now require the new password.");
     }
 
     /**

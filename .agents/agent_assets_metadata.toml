@@ -150,3 +150,9 @@ id = "gYF0dThNiyb7WQnHt2Ri3"
 uri = "file://storage/app/zia_march_2026_FINAL_submitted.csv"
 type = "table"
 title = "ZIA CORPORATION — March 2026 — All 75 Invoices FULLY SUBMITTED to FBR Production"
+
+[[outputs]]
+id = "IXPdXaNUA0nKTajnki41O"
+uri = "file://exports/nestpos_video_series_scripts.txt"
+type = "text"
+title = "NestPOS Tutorial Video Series — 5 Scripts"

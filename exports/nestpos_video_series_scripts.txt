@@ -1,0 +1,91 @@
+==============================================
+NESTPOS TUTORIAL VIDEO SERIES - 5 SCRIPTS
+==============================================
+
+TAREEQA (kaise banayein):
+1. replit.com par EK nayi App banayein (Create App) - isi ek app mein saari videos banengi
+2. Pehle VIDEO 1 ka script paste karein, video banne dein, MP4 download karein
+3. Phir usi chat mein likhein: "Now replace the video with this new one:" aur VIDEO 2 ka script paste karein
+4. Isi tarah 3, 4, 5 - har video ka MP4 download karte jayein
+5. Client ko WhatsApp par order se bhejein (1 se 5 tak)
+
+----------------------------------------------
+VIDEO 1 - SHURUAAT: Company Register Kaise Karein (~90 seconds)
+----------------------------------------------
+
+Make a 90-second animated TUTORIAL video (not a promo) for NestPOS, a Pakistani PRA-verified POS billing software. This is Video 1 of a 5-part "How to use NestPOS" series for new clients. Style: clean step-by-step walkthrough with animated UI mockups, numbered steps, and short Roman Urdu + English text. Brand: teal #0A4D5C primary, gold #E7BF3B accent, white/light backgrounds, geometric sans font. Every video in this series opens with the same 3-second series intro: "NestPOS Tutorials - Part 1: Shuruaat" on teal background with logo, and ends with the same 4-second outro: NestPOS logo + "Agli video: Pehla Bill Banayein" + taxnest.com.pk.
+
+Steps to show (each as an animated mockup screen with a step number badge):
+1. STEP 1 - "Website kholein" - a browser mockup opening the NestPOS registration page.
+2. STEP 2 - "Apni dukan ki maloomat bharein" - an animated signup form filling itself: Business Name, Owner Name, Phone, Email, NTN (optional), Password. Text: "2 minute ka form".
+3. STEP 3 - "Package chunein" - three package cards: Starter Rs 9,999/year (1 account, 500 bills/month), Business Rs 14,999/year (5 accounts, 2,000 bills/month), Pro Rs 24,999/year (unlimited + restaurant). A hand cursor selects one.
+4. STEP 4 - "Admin approval ka intezar" - a friendly pending screen mockup with a clock icon. Text: "Approval se pehle bhi aap sab dekh sakte hain - sirf bill nahi ban sakta". Then a green checkmark: "Approved!"
+5. STEP 5 - "Login karein" - login screen mockup. Text: "Email, phone, ya NTN se login karein".
+Close: "Ab aap tayyar hain! Agli video mein: pehla bill."
+
+Tutorial tone, slow enough to follow, big readable text, 16:9, must work on mute.
+
+----------------------------------------------
+VIDEO 2 - PEHLA BILL: Sale Screen Ka Istemal (~2 minutes)
+----------------------------------------------
+
+Make a 2-minute animated TUTORIAL video (not a promo) for NestPOS, Video 2 of 5: "Pehla Bill Banayein". Same series style as before: teal #0A4D5C + gold #E7BF3B, white backgrounds, step badges, Roman Urdu + English text, series intro "NestPOS Tutorials - Part 2: Pehla Bill" and outro "Agli video: PRA Receipt aur QR".
+
+Show an animated POS sale screen mockup (product grid on left, cart on right) and walk through:
+1. STEP 1 - "Customer chunein (ya chhor dein)" - typing a phone number filters customers; text: "Walk-in ke liye skip karein".
+2. STEP 2 - "Cheezein add karein - 3 tareeqay": (a) product tile par click, (b) barcode scan animation - item instantly cart mein, (c) "Quick Type" - naam aur qeemat khud likhein. Show all three quickly.
+3. STEP 3 - "Cart check karein" - quantity badhana/ghatana, kisi item par discount, kisi item par tax ON/OFF toggle.
+4. STEP 4 - "Payment lein" - Pay button, choose Cash / Card, total whole rupees mein round hota hua dikhayein. Text: "Cash 16% tax, Card 8% tax - khud lag jata hai".
+5. STEP 5 - "Receipt print" - a thermal receipt slides out with shop name, items, total and QR code. Text: "Bill 10 second mein - practice ke baad!"
+Bonus tip card: "Keyboard se aur bhi tez - Enter dabate jayein, screen khud aage barhti hai (Guided Flow)".
+
+Tutorial pacing, readable text, 16:9, works on mute.
+
+----------------------------------------------
+VIDEO 3 - PRA RECEIPT AUR QR: Tax Verified Billing (~90 seconds)
+----------------------------------------------
+
+Make a 90-second animated TUTORIAL video for NestPOS, Video 3 of 5: "PRA Receipt aur QR". Same series style: teal #0A4D5C + gold #E7BF3B, step badges, Roman Urdu + English, intro "NestPOS Tutorials - Part 3: PRA Verified Billing" and outro "Agli video: Restaurant Mode".
+
+Content:
+1. "PRA kya hai?" - simple explainer: Punjab Revenue Authority - "Har bill sarkar ke system mein register hota hai - aapka business 100% legal".
+2. STEP 1 - "Bill banate hi khud submit" - animation: receipt se ek data packet PRA cloud tak jata hai, green check "PRA Verified" wapas aata hai. Text: "Aapko kuch nahi karna - sab automatic".
+3. STEP 2 - "Receipt par QR" - zoom into thermal receipt QR. Text: "Customer scan kar ke apna bill verify kar sakta hai".
+4. STEP 3 - "Internet chala jaye?" - wifi icon cuts, bills queue up locally, internet returns, bills auto-sync with checkmarks. Text: "Offline bhi billing chalti rahegi - khud sync ho jayegi".
+5. STEP 4 - "Serial numbers" - show fiscal serial POS-2026-00123 on receipt. Text: "Har PRA bill ka apna number - koi gadbad nahi".
+Close: "Aapka business, sarkar ke sath, tension-free."
+
+Tutorial pacing, readable, 16:9, works on mute.
+
+----------------------------------------------
+VIDEO 4 - RESTAURANT MODE: Kitchen, Waiter, Tables (~2 minutes)
+----------------------------------------------
+
+Make a 2-minute animated TUTORIAL video for NestPOS, Video 4 of 5: "Restaurant Mode (Pro Package)". Same series style: teal #0A4D5C + gold #E7BF3B, step badges, Roman Urdu + English, intro "NestPOS Tutorials - Part 4: Restaurant Mode" with a small gold "Pro Package" pill, outro "Aakhri video: Reports aur Hisaab".
+
+Content (three mini-sections):
+1. SECTION A - "Dine-In Tables": floor plan grid of tables animates in; cashier taps Dine In, picks Table 5, table turns occupied color; after payment it frees up automatically. Text: "Table chunein - baaki khud ho jata hai".
+2. SECTION B - "Kitchen Display (KDS)": a kitchen screen mockup - new order card pops in with items, KOT ticket auto-prints animation, chef scans/taps done, card clears. Text: "Order seedha kitchen mein - awaz lagane ki zaroorat nahi" + "Naye order ki parchi khud print hoti hai".
+3. SECTION C - "Waiter Tablets": waiter with tablet takes order at table, taps send, order flies to cashier screen "Incoming" popup; cashier loads it to cart and takes payment. Text: "Waiter order bheje, cashier bill banaye - koi confusion nahi". Small note: "Order add karein to sirf nayi cheezon ki parchi kitchen mein chapti hai".
+Close card: "Yeh sab Pro package mein shamil hai - Rs 24,999/saal".
+
+Tutorial pacing, readable, 16:9, works on mute.
+
+----------------------------------------------
+VIDEO 5 - REPORTS AUR HISAAB: Din Ka Day-Close (~90 seconds)
+----------------------------------------------
+
+Make a 90-second animated TUTORIAL video for NestPOS, Video 5 of 5: "Reports aur Hisaab". Same series style: teal #0A4D5C + gold #E7BF3B, step badges, Roman Urdu + English, intro "NestPOS Tutorials - Part 5: Reports aur Hisaab", and a FINAL series outro: NestPOS logo, "Shukriya! Aaj hi shuru karein", packages line "Starter Rs 9,999/saal se", taxnest.com.pk.
+
+Content:
+1. STEP 1 - "Sales Reports" - dashboard mockup with animated bar chart rising, date filter, top products list. Text: "Kis din kitni sale - sab saamne".
+2. STEP 2 - "Tax Reports" - a clean table mockup with tax totals. Text: "PRA tax ka poora hisaab - CSV/PDF download".
+3. STEP 3 - "Day Close (Z-Report)" - end-of-day animation: cashier clicks Day Close, a summary card prints: total bills, total sale, cash vs card. Text: "Raat ko ek click - din ka poora khulasa". Note: "Raat 12 baje khud bhi ho jata hai".
+4. STEP 4 - "Team ka control" - admin vs cashier icons. Text: "Cashier sirf billing dekhe, admin sab kuch - aap ka control".
+Close: full series recap strip showing all 5 video titles as small cards, then final outro.
+
+Tutorial pacing, readable, 16:9, works on mute.
+
+==============================================
+KHATAM - Yeh file sambhal kar rakhein
+==============================================

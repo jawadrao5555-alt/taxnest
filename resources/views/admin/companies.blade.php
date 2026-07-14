@@ -29,7 +29,13 @@
                     <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                         @forelse($companies as $company)
                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 cursor-pointer" onclick="window.location='/admin/company/{{ $company->id }}'">
-                            <td class="px-6 py-4 text-sm font-medium text-emerald-700 hover:text-emerald-900"><a href="/admin/company/{{ $company->id }}">{{ $company->name }}</a></td>
+                            <td class="px-6 py-4 text-sm font-medium text-emerald-700 hover:text-emerald-900">
+                                <a href="/admin/company/{{ $company->id }}">{{ $company->name }}</a>
+                                {{-- Package picked at registration — what approval will activate for 1 year --}}
+                                @if($company->company_status === 'pending' && $company->requestedPlan)
+                                <span class="block mt-1"><span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">{{ $company->requestedPlan->name }} — Rs {{ number_format((float) $company->requestedPlan->sale_price) }}/yr</span></span>
+                                @endif
+                            </td>
                             <td class="px-6 py-4 text-sm font-mono text-gray-600 dark:text-gray-400">{{ $company->ntn }}</td>
                             <td class="px-6 py-4">
                                 @if($company->company_status === 'pending')

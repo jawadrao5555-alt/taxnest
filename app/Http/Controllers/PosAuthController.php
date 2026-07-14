@@ -124,7 +124,13 @@ class PosAuthController extends Controller
         if (Auth::guard('pos')->check()) {
             return redirect('/pos/invoice/create');
         }
-        return view('pos.auth.register');
+        // Package picker (owner rule Jul 2026): the shop chooses its plan at
+        // sign-up; the admin sees it at approval and approves exactly that plan.
+        $plans = \App\Models\PricingPlan::where('product_type', 'pos')
+            ->where('is_trial', false)
+            ->orderBy('price')
+            ->get();
+        return view('pos.auth.register', ['plans' => $plans]);
     }
 
     public function register(Request $request)
@@ -137,7 +143,20 @@ class PosAuthController extends Controller
             'phone' => 'nullable|string|max:20',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'pos_type' => 'required|in:restaurant,retail,general,pharmacy,grocery,clothing,electronics,hardware,salon,autoparts,bakery',
+            'pricing_plan_id' => 'required|integer|exists:pricing_plans,id',
         ]);
+
+        // The selected package must be a real, non-trial POS plan — the admin
+        // approves exactly this plan for 1 year (owner rule Jul 2026).
+        $selectedPlan = \App\Models\PricingPlan::where('id', $request->pricing_plan_id)
+            ->where('product_type', 'pos')
+            ->where('is_trial', false)
+            ->first();
+        if (!$selectedPlan) {
+            throw ValidationException::withMessages([
+                'pricing_plan_id' => 'Please select a valid NestPOS package.',
+            ]);
+        }
 
         // Anti free-trial-abuse: block re-use of any previously-registered credential.
         if ($usedType = CredentialLedgerService::firstUsed([
@@ -172,6 +191,9 @@ class PosAuthController extends Controller
         // must still work (defaults to PRA behaviour) instead of 500ing.
         if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_integration_mode')) {
             $companyData['pos_integration_mode'] = $integrationMode;
+        }
+        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'requested_plan_id')) {
+            $companyData['requested_plan_id'] = $selectedPlan->id;
         }
 
         $company = Company::create($companyData);

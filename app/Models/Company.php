@@ -43,6 +43,7 @@ class Company extends Model
         'invoice_limit_override',
         'user_limit_override',
         'branch_limit_override',
+        'requested_plan_id',
         'registration_no',
         'mobile',
         'city',
@@ -255,6 +256,15 @@ class Company extends Model
     public function subscriptions()
     {
         return $this->hasMany(Subscription::class);
+    }
+
+    /**
+     * The package the shop picked at POS registration — shown to the admin
+     * at approval time; approval assigns a 1-year subscription of this plan.
+     */
+    public function requestedPlan()
+    {
+        return $this->belongsTo(PricingPlan::class, 'requested_plan_id');
     }
 
     public function activeSubscription()

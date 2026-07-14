@@ -99,4 +99,43 @@ class SubscriptionAssignmentService
             'final_price' => $priced['final_price'],
         ]);
     }
+
+    /**
+     * Owner rule (Jul 2026): a POS shop picks its package at registration
+     * (companies.requested_plan_id); admin approval activates EXACTLY that
+     * plan for 1 year. Called from BOTH admin approve paths
+     * (SaasAdmin\AdminCompanyController::approve + AdminController::approveCompany)
+     * so they can never drift apart.
+     *
+     * No-ops when: no requested plan (legacy registrations), the plan was
+     * deleted/trial, or a paid (non-trial) subscription is already active
+     * (admin assigned one manually first — never stomp it).
+     */
+    public static function assignRequestedPlanOnApproval(\App\Models\Company $company): ?Subscription
+    {
+        $planId = $company->requested_plan_id ?? null;
+        if (!$planId) {
+            return null;
+        }
+
+        $plan = PricingPlan::find($planId);
+        if (!$plan || $plan->is_trial) {
+            return null;
+        }
+
+        $hasPaidActive = Subscription::where('company_id', $company->id)
+            ->where('active', true)
+            ->whereHas('pricingPlan', function ($q) {
+                $q->where('is_trial', false);
+            })
+            ->exists();
+        if ($hasPaidActive) {
+            return null;
+        }
+
+        // assign() deactivates the 3-day trial row and forces the cycle to
+        // annual for POS plans → end_date = +12 months. After that the shop
+        // must renew (expiry is enforced by PlanLimitService).
+        return self::assign($company->id, $plan->id, 'annual');
+    }
 }

@@ -55,10 +55,36 @@
                         <p class="text-sm text-purple-200/50 mt-1">Register your business for NestPOS</p>
                     </div>
 
-                    <form method="POST" action="/pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'retail') }}' }">
+                    <form method="POST" action="/pos/register" class="px-6 pb-6 pt-4 space-y-4" x-data="{ posType: '{{ old('pos_type', 'retail') }}', planId: '{{ old('pricing_plan_id', '') }}' }">
                         @csrf
 
-                        <div class="pt-1 pb-2">
+                        {{-- Package picker (owner rule Jul 2026): shop selects its plan at
+                             sign-up; admin sees it at approval and approves exactly this plan
+                             for a 1-year subscription. --}}
+                        <div class="pb-1">
+                            <p class="text-xs font-semibold text-purple-300/50 uppercase tracking-wider">Select Your Package <span class="normal-case font-normal">— annual billing</span></p>
+                        </div>
+
+                        <input type="hidden" name="pricing_plan_id" :value="planId">
+
+                        <div class="grid grid-cols-2 gap-2">
+                            @foreach(($plans ?? collect()) as $plan)
+                            <label class="relative cursor-pointer" @click="planId = '{{ $plan->id }}'">
+                                <div class="flex flex-col gap-0.5 py-2.5 px-3 rounded-xl transition-all cat-card" :class="planId === '{{ $plan->id }}' ? 'cat-active' : ''">
+                                    <span class="text-sm font-bold text-white">{{ $plan->name }}</span>
+                                    <span class="text-xs font-semibold text-purple-200/80">Rs {{ number_format((float) $plan->sale_price) }}<span class="text-purple-300/40 font-normal"> / year</span></span>
+                                    <span class="text-[10px] text-purple-200/50 leading-tight">
+                                        {{ ($plan->user_limit ?? 0) === -1 ? 'Unlimited' : $plan->user_limit }} team account{{ ($plan->user_limit ?? 0) === 1 ? '' : 's' }}
+                                        · {{ ($plan->branch_limit ?? 0) === -1 ? 'Unlimited' : ($plan->branch_limit ?? 1) }} branch{{ ($plan->branch_limit ?? 0) === 1 ? '' : 'es' }}
+                                    </span>
+                                    <span class="text-[10px] text-purple-200/50 leading-tight">{{ ($plan->invoice_limit ?? 0) === -1 ? 'Unlimited bills' : number_format($plan->invoice_limit) . ' bills / month' }}</span>
+                                </div>
+                            </label>
+                            @endforeach
+                        </div>
+                        <p class="text-[10px] text-purple-300/40 leading-snug">Your account starts with a 3-day free trial. On approval, your selected package activates for 1 full year.</p>
+
+                        <div class="pt-1 pb-2" style="border-top: 1px solid rgba(255,255,255,0.08); margin-top: 8px; padding-top: 12px;">
                             <p class="text-xs font-semibold text-purple-300/50 uppercase tracking-wider">Select Your Business Type</p>
                         </div>
 

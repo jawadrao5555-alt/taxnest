@@ -176,7 +176,7 @@ class AdminController extends Controller
 
     public function companies()
     {
-        $companies = Company::withCount('invoices', 'users')->paginate(15);
+        $companies = Company::withCount('invoices', 'users')->with('requestedPlan')->paginate(15);
         return view('admin.companies', compact('companies'));
     }
 
@@ -278,16 +278,27 @@ class AdminController extends Controller
 
     public function pendingCompanies()
     {
-        $companies = Company::where('company_status', 'pending')->withCount('invoices', 'users')->paginate(15);
+        $companies = Company::where('company_status', 'pending')->withCount('invoices', 'users')->with('requestedPlan')->paginate(15);
         return view('admin.companies', compact('companies'));
     }
 
     public function approveCompany(Company $company)
     {
         $company->update(['company_status' => 'active', 'status' => 'approved']);
+
+        // Owner rule (Jul 2026): approval activates the package the shop picked
+        // at registration — a 1-year subscription of exactly that plan (mirrors
+        // SaasAdmin\AdminCompanyController::approve).
+        $assigned = \App\Services\SubscriptionAssignmentService::assignRequestedPlanOnApproval($company);
+
         SecurityLogService::log('company_approved', auth()->id(), ['company_id' => $company->id, 'name' => $company->name]);
-        AuditLogService::log('company_approved', 'Company', $company->id, null, ['name' => $company->name]);
-        return redirect('/admin/company/' . $company->id)->with('success', 'Company approved successfully.');
+        AuditLogService::log('company_approved', 'Company', $company->id, null, ['name' => $company->name, 'assigned_plan' => $assigned?->pricingPlan?->name]);
+
+        $msg = 'Company approved successfully.';
+        if ($assigned) {
+            $msg .= " {$assigned->pricingPlan->name} package activated for 1 year (until {$assigned->end_date->format('d M Y')}).";
+        }
+        return redirect('/admin/company/' . $company->id)->with('success', $msg);
     }
 
     public function rejectCompany(Company $company)

@@ -186,7 +186,7 @@ class AdminCompanyController extends Controller
         // Lazily lock any company whose date-based grant has expired (cron-safe).
         \App\Services\SubscriptionAccessService::reconcileExpiredGrants();
 
-        $query = Company::query()->with(['franchise', 'activeSubscription']);
+        $query = Company::query()->with(['franchise', 'activeSubscription', 'requestedPlan']);
 
         if ($request->filled('product_type')) {
             $query->where('product_type', $request->product_type);
@@ -210,7 +210,7 @@ class AdminCompanyController extends Controller
 
     public function show($id)
     {
-        $company = Company::withTrashed()->with(['franchise', 'activeSubscription'])->findOrFail($id);
+        $company = Company::withTrashed()->with(['franchise', 'activeSubscription', 'requestedPlan'])->findOrFail($id);
         $usageStats = CompanyUsageStat::refreshForCompany($id);
 
         $extraStats = [];
@@ -649,8 +649,21 @@ class AdminCompanyController extends Controller
         // view-only gate + admin UI badges; `company_status` drives login-time
         // checks (CompanyIsolation) — leaving it 'pending' would strand the company.
         $company->update(['status' => 'approved', 'company_status' => 'active']);
-        AdminAuditLog::log(auth('admin')->id(), 'Company approved', 'Company', $id, ['name' => $company->name]);
-        return back()->with('success', "Company '{$company->name}' has been approved.");
+
+        // Owner rule (Jul 2026): approval activates the package the shop picked
+        // at registration — a 1-year subscription of exactly that plan.
+        $assigned = \App\Services\SubscriptionAssignmentService::assignRequestedPlanOnApproval($company);
+
+        AdminAuditLog::log(auth('admin')->id(), 'Company approved', 'Company', $id, [
+            'name' => $company->name,
+            'assigned_plan' => $assigned?->pricingPlan?->name,
+        ]);
+
+        $msg = "Company '{$company->name}' has been approved.";
+        if ($assigned) {
+            $msg .= " {$assigned->pricingPlan->name} package activated for 1 year (until {$assigned->end_date->format('d M Y')}).";
+        }
+        return back()->with('success', $msg);
     }
 
     public function reject($id)

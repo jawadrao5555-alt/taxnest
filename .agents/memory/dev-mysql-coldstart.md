@@ -20,6 +20,12 @@ DB. It self-heals within seconds once mysqld is up — verify with a fresh
 **Do not** treat this as a code regression, a dropped fix, or a deploy gap. The
 LIVE cPanel site is unaffected (its MySQL is always-on).
 
+**Workflow FAILED with NO output = stale lock files:** if the `MySQL Staging`
+workflow status is FAILED with zero log output and restarts keep failing, delete
+stale `.local/mysql_run/mysql.sock.lock`, `mysql.pid`, and `mysql.sock`, then
+restart the workflow — mysqld refuses to boot silently over a leftover sock.lock
+from an unclean workspace sleep.
+
 **`ss -ltn` lies here:** in this sandbox `ss` shows NO listening sockets even
 when the port is open. Confirm the DB with `/dev/tcp/127.0.0.1/9000` or a real
 `mysql -h 127.0.0.1 -P 9000 -uroot -e 'SELECT 1'`, not with `ss | grep 9000`.

@@ -2517,9 +2517,15 @@ function restaurantPos() {
         },
         confirmGuidedType() {
             const types = this.guidedOrderTypes();
-            this.orderType = types[this.flowTypeIndex] || types[0] || 'takeaway';
+            const picked = types[this.flowTypeIndex] || types[0] || 'takeaway';
+            // Route through setOrderType so Dine In opens the table picker (and
+            // switching away from Dine In releases any reserved table) — assigning
+            // orderType directly here silently skipped the picker (owner bug Jul 2026).
+            this.setOrderType(picked);
             this.flowStep = 'cart';
-            this.enterCartMode('last');
+            // Dine In with no table yet → picker modal is now open; hold off cart
+            // mode until a table is chosen (selectTable resumes the guided chain).
+            if (!(picked === 'dine_in' && this.showTablePicker)) this.enterCartMode('last');
         },
         enterGridMode() {
             if (this.displayItems.length === 0) return;
@@ -3736,6 +3742,9 @@ function restaurantPos() {
             this.orderType = 'dine_in';
             this.showTablePicker = false;
             this.showToast('Table T-' + table.table_number + ' reserved', 'success');
+            // Guided keyboard flow paused at the type step waiting for a table —
+            // resume the chain into cart mode now that the table is locked in.
+            if (this.guidedFlow && this.flowStep === 'cart' && !this.cartMode) this.enterCartMode('last');
         },
         // Fire-and-forget: backend only flips status='reserved' → available, so this
         // is harmless after payment (already freed) or on occupied tables (held-order

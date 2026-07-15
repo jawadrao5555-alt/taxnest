@@ -8,13 +8,14 @@ class PosTransactionItem extends Model
 {
     protected $fillable = [
         'transaction_id', 'item_type', 'item_id', 'item_name',
-        'special_notes',
+        'special_notes', 'deal_snapshot',
         'quantity', 'unit_price', 'subtotal',
         'is_tax_exempt', 'tax_rate', 'tax_amount',
         'item_discount_type', 'item_discount_value', 'item_discount_amount',
     ];
 
     protected $casts = [
+        'deal_snapshot' => 'array',
         'quantity' => 'decimal:3',
         'unit_price' => 'decimal:2',
         'subtotal' => 'decimal:2',

@@ -8,6 +8,8 @@ use App\Models\PosDayCloseReport;
 use App\Models\PosProduct;
 use App\Models\PosCustomer;
 use App\Models\PosService;
+use App\Models\PosDeal;
+use App\Models\PosDealItem;
 use App\Models\PosTerminal;
 use App\Models\PosTransaction;
 use App\Models\PosTransactionItem;
@@ -471,6 +473,35 @@ class PosController extends Controller
         $customers = PosCustomer::where('company_id', $companyId)->orderBy('name')->get();
         $taxRate = PosTaxRule::getRateForMethod('cash', $company);
         $taxRules = PosTaxRule::effectiveRules($company);
+
+        // Deals (Jul 2026): only deals live TODAY reach the sale screen — the
+        // weekday/date-range filter is server-side so the client never sees
+        // (or bills) an off-day deal. Component names resolved company-scoped.
+        $dealsForJs = [];
+        $activeDeals = PosDeal::where('company_id', $companyId)->where('is_active', true)->with('items')->get()
+            ->filter(fn ($d) => $d->isActiveOn());
+        if ($activeDeals->isNotEmpty()) {
+            $dealProductIds = $activeDeals->flatMap(fn ($d) => $d->items->pluck('pos_product_id'))->unique();
+            $dealProductNames = PosProduct::where('company_id', $companyId)
+                ->whereIn('id', $dealProductIds)->pluck('name', 'id');
+            foreach ($activeDeals as $deal) {
+                $componentsText = $deal->items
+                    ->map(fn ($di) => $di->quantity . 'x ' . ($dealProductNames[$di->pos_product_id] ?? 'Item'))
+                    ->implode(' + ');
+                $dealsForJs[] = [
+                    'id' => $deal->id,
+                    'type' => 'deal',
+                    'name' => $deal->name,
+                    'price' => (float) $deal->price,
+                    'category' => 'Deals',
+                    'components' => $componentsText,
+                    'is_tax_exempt' => false,
+                    'hasRecipe' => false,
+                    'image' => null,
+                    'stockStatus' => null,
+                ];
+            }
+        }
         // Inventory master switch governs ALL stock behavior. When OFF:
         //   - block_out_of_stock is FORCED false (cannot block adds based on stock)
         //   - lowStockAlerts is empty (popup cannot open)
@@ -490,7 +521,7 @@ class PosController extends Controller
             'recipeLookup', 'tables', 'selectedTable', 'heldOrders',
             'customers', 'taxRate', 'taxRules', 'stockStatus', 'blockOutOfStock',
             'posRole', 'discountLimit', 'hasManagerPin', 'ingredientCosts',
-            'lowStockAlerts', 'inventoryEnabled'
+            'lowStockAlerts', 'inventoryEnabled', 'dealsForJs'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         ->header('Pragma', 'no-cache')
@@ -834,6 +865,7 @@ class PosController extends Controller
                     'item_id' => $ri['item_id'],
                     'item_name' => $ri['name'],
                     'special_notes' => $ri['notes'] ?? null,
+                    'deal_snapshot' => $ri['deal_snapshot'] ?? null,
                     'quantity' => $ri['quantity'],
                     'unit_price' => $ri['price'],
                     'subtotal' => $ri['lineTotal'],
@@ -860,9 +892,19 @@ class PosController extends Controller
             return back()->withInput()->with('error', $errMsg);
         }
 
+        // Deduct from the RESOLVED items (not raw request): resolved rows carry the
+        // frozen deal_snapshot so deal components move stock too (deal lines
+        // themselves are type 'deal' → skipped by the deduction loop).
+        $stockItems = $this->expandDealComponentsForStock(array_map(fn ($ri) => [
+            'type' => $ri['type'],
+            'item_id' => $ri['item_id'],
+            'quantity' => (float) $ri['quantity'],
+            'unit_price' => (float) $ri['price'],
+            'deal_snapshot' => $ri['deal_snapshot'] ?? null,
+        ], $companyItems));
         $inventoryResult = PosInventoryController::deductStockForInvoice(
             $companyId,
-            $request->items,
+            $stockItems,
             $transaction->id,
             $invoiceNumber,
             auth('pos')->id()
@@ -979,12 +1021,13 @@ class PosController extends Controller
         // opted into restock-on-void. Captured now — items are deleted below.
         $restockOnEdit = $company && $company->inventory_enabled && $company->pos_restock_on_void;
         $oldStockItems = $restockOnEdit
-            ? $transaction->items->map(fn ($i) => [
+            ? $this->expandDealComponentsForStock($transaction->items->map(fn ($i) => [
                 'type' => $i->item_type ?? 'product',
                 'item_id' => $i->item_id,
                 'quantity' => (float) $i->quantity,
                 'unit_price' => (float) $i->unit_price,
-            ])->all()
+                'deal_snapshot' => $i->deal_snapshot,
+            ])->all())
             : [];
 
         $request->validate([
@@ -1108,6 +1151,7 @@ class PosController extends Controller
                     'item_id' => $ri['item_id'],
                     'item_name' => $ri['name'],
                     'special_notes' => $ri['notes'] ?? null,
+                    'deal_snapshot' => $ri['deal_snapshot'] ?? null,
                     'quantity' => $ri['quantity'],
                     'unit_price' => $ri['price'],
                     'subtotal' => $ri['lineTotal'],
@@ -1132,12 +1176,13 @@ class PosController extends Controller
                 PosInventoryController::restoreStockForInvoice(
                     $companyId, $oldStockItems, $transaction->id, $transaction->invoice_number, auth('pos')->id(), 'pos_edit'
                 );
-                $newStockItems = array_map(fn ($ri) => [
+                $newStockItems = $this->expandDealComponentsForStock(array_map(fn ($ri) => [
                     'type' => $ri['type'],
                     'item_id' => $ri['item_id'],
                     'quantity' => (float) $ri['quantity'],
                     'unit_price' => (float) $ri['price'],
-                ], $companyItems);
+                    'deal_snapshot' => $ri['deal_snapshot'] ?? null,
+                ], $companyItems));
                 PosInventoryController::deductStockForInvoice(
                     $companyId, $newStockItems, $transaction->id, $transaction->invoice_number, auth('pos')->id()
                 );
@@ -1210,12 +1255,13 @@ class PosController extends Controller
             // Return the sold stock to inventory before the items disappear —
             // only when tracking is on AND the owner opted into restock-on-void.
             if ($company && $company->inventory_enabled && $company->pos_restock_on_void) {
-                $restoreItems = $transaction->items->map(fn ($i) => [
+                $restoreItems = $this->expandDealComponentsForStock($transaction->items->map(fn ($i) => [
                     'type' => $i->item_type ?? 'product',
                     'item_id' => $i->item_id,
                     'quantity' => (float) $i->quantity,
                     'unit_price' => (float) $i->unit_price,
-                ])->all();
+                    'deal_snapshot' => $i->deal_snapshot,
+                ])->all());
                 PosInventoryController::restoreStockForInvoice(
                     $companyId, $restoreItems, $transaction->id, $transaction->invoice_number, auth('pos')->id(), 'pos_void'
                 );
@@ -1587,12 +1633,13 @@ class PosController extends Controller
         // F10 "Local" modal delete must restore it too — same rule as
         // deleteTransaction (only when tracking + restock-on-void are on).
         $restoreItems = ($company && $company->inventory_enabled && $company->pos_restock_on_void)
-            ? $tx->items->map(fn ($i) => [
+            ? $this->expandDealComponentsForStock($tx->items->map(fn ($i) => [
                 'type' => $i->item_type ?? 'product',
                 'item_id' => $i->item_id,
                 'quantity' => (float) $i->quantity,
                 'unit_price' => (float) $i->unit_price,
-            ])->all()
+                'deal_snapshot' => $i->deal_snapshot,
+            ])->all())
             : [];
 
         DB::transaction(function () use ($tx, $companyId, $restoreItems) {
@@ -2887,6 +2934,122 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         PosService::where('company_id', $companyId)->findOrFail($id)->delete();
         return back()->with('success', 'Service deleted.');
+    }
+
+    // ── Deals (Jul 2026) — fast-food combo promos at one promo price ──────────
+
+    public function deals()
+    {
+        $companyId = app('currentCompanyId');
+        $deals = PosDeal::where('company_id', $companyId)
+            ->with('items')
+            ->orderBy('name')
+            ->get();
+        $products = PosProduct::where('company_id', $companyId)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'price']);
+        // Company-scoped product-name lookup for the list table (deal items store
+        // only pos_product_id; PosProduct has no global scope).
+        $productNames = $products->pluck('name', 'id');
+        return view('pos.deals', compact('deals', 'products', 'productNames'));
+    }
+
+    /**
+     * Shared validation + normalization for storeDeal/updateDeal. Returns
+     * [attrs, components] where components = validated company-scoped
+     * [{pos_product_id, quantity}] rows.
+     */
+    private function validateDealRequest(Request $request, int $companyId): array
+    {
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string|max:255',
+            'price' => 'required|numeric|min:0|max:10000000',
+            'active_days' => 'nullable|array',
+            'active_days.*' => 'integer|min:1|max:7',
+            'starts_on' => 'nullable|date',
+            'ends_on' => 'nullable|date|after_or_equal:starts_on',
+            'items' => 'required|array|min:1|max:30',
+            'items.*.product_id' => 'required|integer',
+            'items.*.quantity' => 'required|integer|min:1|max:999',
+        ]);
+
+        // Tamper-safe: every component product must belong to THIS company.
+        $productIds = collect($data['items'])->pluck('product_id')->map(fn ($v) => (int) $v)->unique();
+        $ownedIds = PosProduct::where('company_id', $companyId)
+            ->whereIn('id', $productIds)
+            ->pluck('id');
+        if ($ownedIds->count() !== $productIds->count()) {
+            abort(422, 'Invalid product selected for this deal.');
+        }
+
+        // Merge duplicate product rows (same product picked twice → sum qty).
+        $components = [];
+        foreach ($data['items'] as $row) {
+            $pid = (int) $row['product_id'];
+            $components[$pid] = ($components[$pid] ?? 0) + (int) $row['quantity'];
+        }
+
+        $attrs = [
+            'name' => $data['name'],
+            'description' => $data['description'] ?? null,
+            'price' => round((float) $data['price'], 2),
+            'active_days' => array_values(array_unique(array_map('intval', $data['active_days'] ?? []))),
+            'starts_on' => $data['starts_on'] ?? null,
+            'ends_on' => $data['ends_on'] ?? null,
+        ];
+
+        return [$attrs, $components];
+    }
+
+    public function storeDeal(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        [$attrs, $components] = $this->validateDealRequest($request, $companyId);
+
+        DB::transaction(function () use ($companyId, $attrs, $components) {
+            $deal = PosDeal::create(array_merge($attrs, [
+                'company_id' => $companyId,
+                'is_active' => true,
+            ]));
+            foreach ($components as $pid => $qty) {
+                PosDealItem::create(['deal_id' => $deal->id, 'pos_product_id' => $pid, 'quantity' => $qty]);
+            }
+        });
+
+        return back()->with('success', 'Deal added successfully.');
+    }
+
+    public function updateDeal(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $deal = PosDeal::where('company_id', $companyId)->findOrFail($id);
+        [$attrs, $components] = $this->validateDealRequest($request, $companyId);
+        $attrs['is_active'] = $request->has('is_active');
+
+        DB::transaction(function () use ($deal, $attrs, $components) {
+            $deal->update($attrs);
+            $deal->items()->delete();
+            foreach ($components as $pid => $qty) {
+                PosDealItem::create(['deal_id' => $deal->id, 'pos_product_id' => $pid, 'quantity' => $qty]);
+            }
+        });
+
+        return back()->with('success', 'Deal updated successfully.');
+    }
+
+    public function deleteDeal($id)
+    {
+        $companyId = app('currentCompanyId');
+        $deal = PosDeal::where('company_id', $companyId)->findOrFail($id);
+        DB::transaction(function () use ($deal) {
+            $deal->items()->delete();
+            $deal->delete();
+        });
+        // Sold bills keep their own deal_snapshot — deleting a deal never
+        // touches historical transactions.
+        return back()->with('success', 'Deal deleted.');
     }
 
     public function getTaxRate(Request $request)
@@ -4837,6 +5000,7 @@ class PosController extends Controller
             // user may flip it via T-key. We MUST honor that override here.
             $isExempt = !empty($item['is_tax_exempt']);
 
+            $dealSnapshot = null;
             if ($itemId) {
                 if ($itemType === 'product') {
                     $obj = PosProduct::where('company_id', $companyId)->where('id', $itemId)->first();
@@ -4845,6 +5009,28 @@ class PosController extends Controller
                     }
                     // NOTE: Do NOT overwrite $isExempt from $obj->is_tax_exempt here.
                     // Cart payload already reflects user's intent (master default OR T-toggle override).
+                } elseif ($itemType === 'deal') {
+                    // Deals (Jul 2026): MANDATORY explicit branch — without it a deal's
+                    // item_id would be probed against pos_services below. Server price is
+                    // ENFORCED (promo price is server-defined; closes the tamper hole),
+                    // and a frozen component snapshot [{product_id,name,qty}] is captured
+                    // now so receipts + inventory restore stay correct even if the deal
+                    // is later edited or deleted. Unresolved → item_id null, client price
+                    // (consistent with services).
+                    $deal = PosDeal::where('company_id', $companyId)->where('id', $itemId)->with('items')->first();
+                    if ($deal) {
+                        $itemPrice = (float) $deal->price;
+                        $componentIds = $deal->items->pluck('pos_product_id');
+                        $componentNames = PosProduct::where('company_id', $companyId)
+                            ->whereIn('id', $componentIds)->pluck('name', 'id');
+                        $dealSnapshot = $deal->items->map(fn ($di) => [
+                            'product_id' => (int) $di->pos_product_id,
+                            'name' => $componentNames[$di->pos_product_id] ?? 'Item',
+                            'qty' => (int) $di->quantity,
+                        ])->values()->all();
+                    } else {
+                        $itemId = null;
+                    }
                 } else {
                     $obj = PosService::where('company_id', $companyId)->where('id', $itemId)->first();
                     if (!$obj) {
@@ -4890,9 +5076,43 @@ class PosController extends Controller
                 'lineTotal' => round($qty * $itemPrice, 2),
                 'isExempt' => $isExempt,
                 'notes' => isset($item['special_notes']) ? (string) $item['special_notes'] : null,
+                'deal_snapshot' => $dealSnapshot,
             ];
         }
         return $resolved;
+    }
+
+    /**
+     * Deals (Jul 2026) — expand deal lines into synthetic product-component
+     * entries for the inventory engine. Deduct/restore loops only process
+     * type==='product', so the deal line itself is skipped and each component
+     * moves stock at qty = dealQty × componentQty. ALWAYS snapshot-driven
+     * (never live pos_deal_items) so voids/edits restore exactly what was sold,
+     * immune to later deal edits/deletes. unit_price 0 on components: the deal
+     * price belongs to the deal line; movement sale-values show Rs 0 (accepted).
+     */
+    private function expandDealComponentsForStock(array $items): array
+    {
+        $expanded = [];
+        foreach ($items as $item) {
+            $expanded[] = $item;
+            if (($item['type'] ?? 'product') !== 'deal') continue;
+            $dealQty = (float) ($item['quantity'] ?? 0);
+            $snapshot = $item['deal_snapshot'] ?? null;
+            if ($dealQty <= 0 || !is_array($snapshot)) continue;
+            foreach ($snapshot as $comp) {
+                $pid = (int) ($comp['product_id'] ?? 0);
+                $compQty = (float) ($comp['qty'] ?? 0);
+                if ($pid <= 0 || $compQty <= 0) continue;
+                $expanded[] = [
+                    'type' => 'product',
+                    'item_id' => $pid,
+                    'quantity' => $dealQty * $compQty,
+                    'unit_price' => 0,
+                ];
+            }
+        }
+        return $expanded;
     }
 
     private function generateInvoiceNumber(int $companyId): string

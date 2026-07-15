@@ -577,14 +577,14 @@ window.addEventListener('popstate', function() {
         </button>
 
         <div class="hidden md:flex items-center gap-1.5">
-            <button @click="holdOrder()" :disabled="cart.length === 0 || submitting || hasManualItems()" :title="hasManualItems() ? 'Manual items billing-only — pay first or remove from cart to hold' : 'Hold this order'" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
+            <button @click="holdOrder()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems()" :title="(hasManualItems() || hasDealItems()) ? 'Manual items & deals billing-only — pay first or remove from cart to hold' : 'Hold this order'" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
                 <svg x-show="submitting" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                 <span x-show="!submitting" class="text-[10px] bg-amber-400/30 px-1 rounded">F5</span> <span x-text="submitting ? 'Holding...' : 'Hold'"></span>
             </button>
 
             {{-- Phase 5 — Send to Kitchen (visible only when feature.kot is on) --}}
             @if($features->kot ?? false)
-            <button @click="sendToKitchen()" :disabled="cart.length === 0 || submitting || hasManualItems()" :title="hasManualItems() ? 'Manual items billing-only — pay first or remove from cart' : 'Saves the order and prints the kitchen ticket without taking payment.'" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
+            <button @click="sendToKitchen()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems()" :title="(hasManualItems() || hasDealItems()) ? 'Manual items & deals billing-only — pay first or remove from cart' : 'Saves the order and prints the kitchen ticket without taking payment.'" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
                 <span class="text-base leading-none">🍳</span>
                 <span x-text="submitting ? 'Sending...' : 'Send to Kitchen'"></span>
             </button>
@@ -603,12 +603,15 @@ window.addEventListener('popstate', function() {
             <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
                 <div class="flex items-center gap-2 overflow-x-auto hide-scrollbar flex-1 min-w-0">
                     <button @click="activeCategory = 'all'; filterProducts()" x-show="showProducts" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === 'all' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">
-                        All <span class="ml-1 text-[10px] opacity-70" x-text="'(' + (allProducts.filter(p => p.show_on_sale !== false).length + allServices.length) + ')'"></span>
+                        All <span class="ml-1 text-[10px] opacity-70" x-text="'(' + (allProducts.filter(p => p.show_on_sale !== false).length + allServices.length + allDeals.length) + ')'"></span>
                     </button>
                     @foreach($categories as $cat)
                     <button @click="activeCategory = '{{ $cat }}'; filterProducts()" x-show="showProducts" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === '{{ $cat }}' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">{{ $cat }}</button>
                     @endforeach
                     <button @click="activeCategory = 'services'; filterProducts()" x-show="showProducts" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === 'services' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">Services</button>
+                    @if(!empty($dealsForJs))
+                    <button @click="activeCategory = 'deals'; filterProducts()" x-show="showProducts" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === 'deals' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">🔥 Deals <span class="ml-1 text-[10px] opacity-70" x-text="'(' + allDeals.length + ')'"></span></button>
+                    @endif
                     <span x-show="!showProducts" class="text-[11px] text-gray-400 dark:text-gray-500 italic px-1 whitespace-nowrap">Grid hidden — search to add, or type to create</span>
                 </div>
                 {{-- MASTER products toggle — inventory-OFF (Simple) mode ONLY. In inventory mode the
@@ -673,6 +676,9 @@ window.addEventListener('popstate', function() {
                                 </template>
                                 <div class="px-3 py-2.5">
                                     <p class="font-bold text-gray-900 dark:text-white truncate leading-tight" :class="item.image ? 'text-xs' : 'text-sm'" x-text="item.name"></p>
+                                    <template x-if="item.type === 'deal' && item.components">
+                                        <p class="text-[10px] text-gray-500 dark:text-gray-400 truncate mt-0.5" x-text="item.components" :title="item.components"></p>
+                                    </template>
                                     <div class="flex items-center justify-between mt-1.5 gap-2">
                                         <span class="price-badge text-sm font-extrabold text-purple-600 dark:text-purple-400" x-text="'Rs. ' + Number(item.price).toLocaleString()"></span>
                                         <div class="flex items-center gap-2">
@@ -966,7 +972,7 @@ window.addEventListener('popstate', function() {
                 <div class="px-3 pb-3 space-y-2 mobile-sticky-pay">
                     <div class="grid grid-cols-3 gap-2">
                         <button @click="if(cart.length && confirm('Clear entire cart?')) { clearCart(); }" :disabled="cart.length === 0" class="py-2 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-30 transition flex items-center justify-center gap-0.5">Clear <kbd class="text-[8px] bg-red-200/50 dark:bg-red-800/30 px-1 rounded font-mono">F4</kbd></button>
-                        <button @click="holdOrder()" :disabled="cart.length === 0 || submitting || hasManualItems()" :title="hasManualItems() ? 'Manual items billing-only — pay first or remove' : ''" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center gap-1">
+                        <button @click="holdOrder()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems()" :title="(hasManualItems() || hasDealItems()) ? 'Manual items & deals billing-only — pay first or remove' : ''" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center gap-1">
                             <svg x-show="submitting" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                             <span x-text="submitting ? 'Holding...' : 'Hold'"></span>
                             <kbd x-show="!submitting" class="text-[8px] bg-amber-200/50 dark:bg-amber-800/30 px-1 rounded ml-0.5 font-mono">F5</kbd>
@@ -2106,6 +2112,10 @@ function restaurantPos() {
     return {
         allProducts: {!! $jsEnc($productsJson) !!},
         allServices: {!! $jsEnc($servicesJson) !!},
+        // Deals (Jul 2026): server-filtered to TODAY's live deals only (weekday +
+        // date-range checked in universalCreateInvoice) — never cached client-side,
+        // so an off-day deal can never linger past midnight via localStorage.
+        allDeals: {!! $jsEnc(collect($dealsForJs ?? [])->values()) !!},
         allCustomers: {!! $jsEnc($customersJson) !!},
         kitchenSettings: @json($kitchenSettings),
         // Inventory master switch — single source of truth.
@@ -2119,6 +2129,10 @@ function restaurantPos() {
         // but the restaurant Hold/Send-to-Kitchen endpoints require a real
         // item_id, so we gate those actions while a manual line is in cart.
         hasManualItems() { return (this.cart || []).some(i => i && i.item_type === 'manual'); },
+        // Deals are billing-only like manual items: the restaurant hold endpoint
+        // validates item_type in:product,service,manual → a deal line would 422.
+        // Gate Hold/Send-to-Kitchen AND route Pay through processPaymentManual.
+        hasDealItems() { return (this.cart || []).some(i => i && i.item_type === 'deal'); },
         blockOutOfStock: {{ $blockOutOfStock ? 'true' : 'false' }},
         taxRate: {{ (float) ($taxRate ?? 0) }},
         taxRules: {!! $jsEnc($taxRules->mapWithKeys(fn($r) => [$r->payment_method => (float) $r->tax_rate]), '{}') !!},
@@ -2565,7 +2579,7 @@ function restaurantPos() {
                 // cashier can search a saved product and add it to the cart. No catalog
                 // match falls through to the inline "Create" prompt (inventory-OFF only).
                 if (q.length > 0) {
-                    const all = [...this.allProducts, ...this.allServices];
+                    const all = [...this.allDeals, ...this.allProducts, ...this.allServices];
                     const out = [];
                     for (let i = 0; i < all.length && out.length < 12; i++) {
                         const it = all[i];
@@ -2655,7 +2669,7 @@ function restaurantPos() {
             if (!this.showProducts && !hasSearch) {
                 this.filteredItems = []; this.displayCount = 60; this.updateDisplayItems(); return;
             }
-            let items = [...this.allProducts, ...this.allServices];
+            let items = [...this.allDeals, ...this.allProducts, ...this.allServices];
             items = items.filter(i => parseFloat(i.price) > 0 && i.name && i.name.trim().length > 0);
             // A SEARCH query always spans the WHOLE catalog: it ignores the active category
             // (the pills may be hidden, or a stale category chosen earlier would hide a match in
@@ -2664,8 +2678,9 @@ function restaurantPos() {
             // never stop a cashier from finding a saved product by name and adding it to the cart.
             const ignoreCategory = hasSearch;
             if (!ignoreCategory) {
-                if (this.activeCategory !== 'all' && this.activeCategory !== 'services') { items = this.allProducts.filter(p => p.category === this.activeCategory && parseFloat(p.price) > 0 && p.name && p.name.trim().length > 0); }
-                else if (this.activeCategory === 'services') { items = this.allServices.filter(s => parseFloat(s.price) > 0 && s.name && s.name.trim().length > 0); }
+                if (this.activeCategory === 'services') { items = this.allServices.filter(s => parseFloat(s.price) > 0 && s.name && s.name.trim().length > 0); }
+                else if (this.activeCategory === 'deals') { items = this.allDeals.filter(d => parseFloat(d.price) > 0 && d.name && d.name.trim().length > 0); }
+                else if (this.activeCategory !== 'all') { items = this.allProducts.filter(p => p.category === this.activeCategory && parseFloat(p.price) > 0 && p.name && p.name.trim().length > 0); }
             }
             // Hidden products stay OUT of the browsable grid (when NOT searching) but remain fully
             // searchable above — so only drop show_on_sale=false items when there is no search.
@@ -2830,7 +2845,8 @@ function restaurantPos() {
         quickTypePool() {
             const products = (this.allProducts || []).filter(p => p && p.name).map(p => ({ ...p, _type: 'product' }));
             const services = (this.allServices || []).filter(s => s && s.name).map(s => ({ ...s, _type: 'service' }));
-            return [...products, ...services];
+            const deals = (this.allDeals || []).filter(d => d && d.name).map(d => ({ ...d, _type: 'deal' }));
+            return [...deals, ...products, ...services];
         },
         parseQuickTypeText() {
             // Preserve any manual prices the cashier already typed for unmatched
@@ -3986,8 +4002,8 @@ function restaurantPos() {
             // and item_type in product,service. Synthetic manual lines (item_id=null,
             // item_type='manual') would 422. Block the action client-side too so the
             // cashier doesn't lose the cart on a server reject.
-            if (this.hasManualItems()) {
-                this.showToast('Manual items billing-only — pay first or remove them to hold.', 'error');
+            if (this.hasManualItems() || this.hasDealItems()) {
+                this.showToast('Manual items & deals billing-only — pay first or remove them to hold.', 'error');
                 return null;
             }
             const now = Date.now();
@@ -4087,7 +4103,7 @@ function restaurantPos() {
             // which posts directly to pos.invoice.store (universal endpoint).
             // P7: incoming waiter carts ALWAYS bill via the manual path — their
             // restaurant order already exists; the hold endpoint would duplicate it.
-            if (!this.isRestaurantMode || this.hasManualItems() || this.incomingOrderId) {
+            if (!this.isRestaurantMode || this.hasManualItems() || this.hasDealItems() || this.incomingOrderId) {
                 return await this.processPaymentManual(method, provisional);
             }
 
@@ -4140,7 +4156,7 @@ function restaurantPos() {
                         name: c.item_name,
                         quantity: c.quantity,
                         unit_price: c.unit_price,
-                        type: c.item_type === 'service' ? 'service' : 'product',
+                        type: c.item_type === 'service' ? 'service' : (c.item_type === 'deal' ? 'deal' : 'product'),
                         item_id: c.item_id || null,
                         is_tax_exempt: !!c.is_tax_exempt,
                         special_notes: c.special_notes || null,

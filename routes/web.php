@@ -505,6 +505,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::post('/services', [PosController::class, 'storeService'])->name('pos.services.store');
         Route::put('/services/{id}', [PosController::class, 'updateService'])->name('pos.services.update');
         Route::delete('/services/{id}', [PosController::class, 'deleteService'])->name('pos.services.delete');
+        Route::get('/deals', [PosController::class, 'deals'])->name('pos.deals');
+        Route::post('/deals', [PosController::class, 'storeDeal'])->name('pos.deals.store');
+        Route::put('/deals/{id}', [PosController::class, 'updateDeal'])->name('pos.deals.update');
+        Route::delete('/deals/{id}', [PosController::class, 'deleteDeal'])->name('pos.deals.delete');
         Route::get('/terminals', [PosController::class, 'terminals'])->name('pos.terminals');
         Route::post('/terminals', [PosController::class, 'storeTerminal'])->name('pos.terminals.store')->middleware('plan.limit:terminals');
         Route::put('/terminals/{id}', [PosController::class, 'updateTerminal'])->name('pos.terminals.update');

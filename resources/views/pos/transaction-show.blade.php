@@ -124,9 +124,17 @@
                                 @if($item->is_tax_exempt)
                                 <span class="inline-block ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-600 align-middle">NT</span>
                                 @endif
+                                {{-- Deal components (frozen snapshot) — indented, informational only --}}
+                                @if($item->item_type === 'deal' && is_array($item->deal_snapshot))
+                                <div class="mt-1 space-y-0.5">
+                                    @foreach($item->deal_snapshot as $comp)
+                                    <div class="text-xs text-gray-500 dark:text-gray-400 font-normal pl-3">• {{ (int)($comp['qty'] ?? 1) }}x {{ $comp['name'] ?? 'Item' }}</div>
+                                    @endforeach
+                                </div>
+                                @endif
                             </td>
                             <td class="py-2.5">
-                                <span class="text-xs px-2 py-0.5 rounded {{ $item->item_type === 'service' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' }}">{{ ucfirst($item->item_type) }}</span>
+                                <span class="text-xs px-2 py-0.5 rounded {{ $item->item_type === 'deal' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : ($item->item_type === 'service' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400') }}">{{ ucfirst($item->item_type) }}</span>
                             </td>
                             <td class="py-2.5 text-right text-gray-700 dark:text-gray-300">{{ $item->quantity }}</td>
                             <td class="py-2.5 text-right text-gray-700 dark:text-gray-300">{{ number_format($item->unit_price, 2) }}</td>

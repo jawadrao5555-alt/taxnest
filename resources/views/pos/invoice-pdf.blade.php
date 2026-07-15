@@ -186,6 +186,20 @@
                     <td class="r">{{ number_format($lineRate, 2) }}</td>
                     <td class="r">{{ number_format($lineAmt, 2) }}</td>
                 </tr>
+                {{-- Deal components (frozen snapshot) — indented, NO price columns. --}}
+                @if($item->item_type === 'deal' && is_array($item->deal_snapshot))
+                @foreach($item->deal_snapshot as $comp)
+                <tr>
+                    <td style="padding-left:14px; font-size:9px; color:#000;">• {{ (int)($comp['qty'] ?? 1) }}x {{ $comp['name'] ?? 'Item' }}</td>
+                    <td class="c"></td>
+                    @if($showTaxLines)
+                    <td class="r"></td>
+                    @endif
+                    <td class="r"></td>
+                    <td class="r"></td>
+                </tr>
+                @endforeach
+                @endif
                 @endforeach
             </tbody>
         </table>

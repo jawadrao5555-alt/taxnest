@@ -112,10 +112,26 @@
                 <div x-show="restaurantLocked" x-cloak class="mb-4 p-3.5 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 flex items-start gap-2.5">
                     <span class="text-lg leading-none">🔒</span>
                     <div>
-                        <p class="text-sm font-bold text-amber-900 dark:text-amber-200">Restaurant &amp; Kitchen features need the Pro or Unlimited plan</p>
-                        <p class="text-[11px] text-amber-800 dark:text-amber-300/90 leading-snug">KOT, Kitchen Display Screen, Table Management, Kitchen Notes and Recipes are included in the Pro and Unlimited packages. Upgrade your plan to unlock them.</p>
+                        @if(!empty($restaurantTrialEnded))
+                            <p class="text-sm font-bold text-amber-900 dark:text-amber-200">Your free trial ended — Restaurant &amp; Kitchen features are switched off</p>
+                            <p class="text-[11px] text-amber-800 dark:text-amber-300/90 leading-snug">KOT, Kitchen Display Screen, Table Management, Kitchen Notes and Recipes were part of your trial. Your saved kitchen setup is kept — subscribe to the Pro or Unlimited plan and it comes right back. <a href="{{ route('pos.billing') }}" class="font-bold underline hover:no-underline">View plans →</a></p>
+                        @else
+                            <p class="text-sm font-bold text-amber-900 dark:text-amber-200">Restaurant &amp; Kitchen features need the Pro or Unlimited plan</p>
+                            <p class="text-[11px] text-amber-800 dark:text-amber-300/90 leading-snug">KOT, Kitchen Display Screen, Table Management, Kitchen Notes and Recipes are included in the Pro and Unlimited packages. <a href="{{ route('pos.billing') }}" class="font-bold underline hover:no-underline">Upgrade your plan</a> to unlock them.</p>
+                        @endif
                     </div>
                 </div>
+
+                {{-- Trial-restaurant heads-up: features work now, lock on expiry --}}
+                @if(($restaurantAccessSource ?? null) === 'trial')
+                <div class="mb-4 p-3.5 rounded-xl border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20 flex items-start gap-2.5">
+                    <span class="text-lg leading-none">🍽️</span>
+                    <div>
+                        <p class="text-sm font-bold text-orange-900 dark:text-orange-200">Restaurant &amp; Kitchen features are part of your free trial</p>
+                        <p class="text-[11px] text-orange-800 dark:text-orange-300/90 leading-snug">KOT, Kitchen Display Screen, Table Management, Kitchen Notes and Recipes switch off automatically when the trial ends. Your setup is saved — upgrade to the Pro or Unlimited plan to keep them. <a href="{{ route('pos.billing') }}" class="font-bold underline hover:no-underline">View plans →</a></p>
+                    </div>
+                </div>
+                @endif
 
                 {{-- RECOMMENDED --}}
                 <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm mb-4" x-show="recommendedFlags.length">

@@ -681,7 +681,11 @@ class PosController extends Controller
         ];
         // Restaurant module plan gating (Pro / Unlimited only).
         $restaurantAllowed = PosFeatureService::restaurantAllowed($company);
-        return view('pos.feature-settings', compact('company', 'features', 'categories', 'allFlags', 'isFirstTime', 'globalTaxRates', 'restaurantAllowed'));
+        // Trial context for the lock notice: 'trial' = access via active trial
+        // (will lapse); trial-ended = flags were on but the trial expired.
+        $restaurantAccessSource = PosFeatureService::restaurantAccessSource($company);
+        $restaurantTrialEnded = PosFeatureService::restaurantLostToTrialExpiry($company);
+        return view('pos.feature-settings', compact('company', 'features', 'categories', 'allFlags', 'isFirstTime', 'globalTaxRates', 'restaurantAllowed', 'restaurantAccessSource', 'restaurantTrialEnded'));
     }
 
     public function updateFeatureSettings(Request $request)

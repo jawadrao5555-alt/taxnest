@@ -300,27 +300,71 @@ class PosFeatureService
             return self::$restaurantAllowedCache[$company->id];
         }
 
-        $allowed = false;
+        return self::$restaurantAllowedCache[$company->id]
+            = self::restaurantAccessSource($company) !== null;
+    }
+
+    /**
+     * WHY the company has (or doesn't have) the Restaurant module.
+     * Returns 'internal' | 'override' | 'plan' | 'trial' | null (no access).
+     * 'trial' means access exists ONLY because of an active trial — it will
+     * disappear the moment the trial expires (mask returns automatically).
+     */
+    public static function restaurantAccessSource(?Company $company): ?string
+    {
+        if (!$company) {
+            return null;
+        }
         if ($company->is_internal_account) {
-            $allowed = true;
-        } else {
-            $sub = \App\Services\PlanLimitService::getActiveSubscription($company->id);
-            if ($sub) {
-                if ($sub->hasActiveOverride()) {
-                    $allowed = true;
-                } elseif ($sub->pricingPlan && $sub->pricingPlan->restaurant_enabled) {
-                    $allowed = true;
-                } elseif ($sub->isTrialActive()) {
-                    // Owner decision (Jul 2026): active-trial companies get the
-                    // Restaurant module so they can evaluate it before buying.
-                    // When the trial expires the mask returns automatically —
-                    // stored feature_flags are never touched.
-                    $allowed = true;
-                }
+            return 'internal';
+        }
+        $sub = \App\Services\PlanLimitService::getActiveSubscription($company->id);
+        if ($sub) {
+            if ($sub->hasActiveOverride()) {
+                return 'override';
+            }
+            if ($sub->pricingPlan && $sub->pricingPlan->restaurant_enabled) {
+                return 'plan';
+            }
+            if ($sub->isTrialActive()) {
+                // Owner decision (Jul 2026): active-trial companies get the
+                // Restaurant module so they can evaluate it before buying.
+                // When the trial expires the mask returns automatically —
+                // stored feature_flags are never touched.
+                return 'trial';
             }
         }
+        return null;
+    }
 
-        return self::$restaurantAllowedCache[$company->id] = $allowed;
+    /**
+     * Did this company's Restaurant access lapse because its trial ended?
+     * True only when: no current access AND the subscription's trial has
+     * expired AND the company had restaurant flags stored (i.e. they actually
+     * used/enabled kitchen features during the trial).
+     */
+    public static function restaurantLostToTrialExpiry(?Company $company): bool
+    {
+        if (!$company || self::restaurantAllowed($company)) {
+            return false;
+        }
+        // CheckTrialExpiryJob deactivates expired-trial subscriptions, so the
+        // active-only lookup misses them — fall back to the company's most
+        // recent subscription when no active one exists.
+        $sub = \App\Services\PlanLimitService::getActiveSubscription($company->id)
+            ?? \App\Models\Subscription::where('company_id', $company->id)
+                ->orderByDesc('id')
+                ->first();
+        if (!$sub || !$sub->isTrialExpired()) {
+            return false;
+        }
+        $stored = is_array($company->feature_flags) ? $company->feature_flags : [];
+        foreach (self::RESTAURANT_FLAGS as $flag) {
+            if (!empty($stored[$flag])) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static function defaultsForCategory(string $category): array

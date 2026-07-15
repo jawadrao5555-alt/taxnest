@@ -1,5 +1,5 @@
 <x-pos-layout>
-<div x-data="{ showAddModal: false, showAdjustModal: false, adjustId: null, adjustName: '' }" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div x-data="{ showAddModal: false, showAdjustModal: false, adjustId: null, adjustName: '', showEditModal: false, edit: { id: null, name: '', unit: '', cost: 0, min: 0, active: true }, openEdit(d) { this.edit = d; this.showEditModal = true } }" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Ingredients</h1>
@@ -57,7 +57,8 @@
                 </div>
             </div>
             <div class="px-4 py-3 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-700 flex gap-2">
-                <button @click="adjustId = {{ $ingredient->id }}; adjustName = '{{ $ingredient->name }}'; showAdjustModal = true" class="flex-1 py-1.5 text-xs rounded-lg bg-purple-600 text-white hover:bg-purple-700 font-medium">Adjust Stock</button>
+                <button @click='openEdit({{ json_encode(['id' => $ingredient->id, 'name' => $ingredient->name, 'unit' => $ingredient->unit, 'cost' => (float) $ingredient->cost_per_unit, 'min' => (float) $ingredient->min_stock_level, 'active' => (bool) $ingredient->is_active], JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE) }})' class="flex-1 py-1.5 text-xs rounded-lg border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 font-medium">Edit</button>
+                <button @click="adjustId = {{ $ingredient->id }}; adjustName = {{ json_encode($ingredient->name, JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE) }}; showAdjustModal = true" class="flex-1 py-1.5 text-xs rounded-lg bg-purple-600 text-white hover:bg-purple-700 font-medium">Adjust Stock</button>
                 <form method="POST" action="{{ route('pos.restaurant.ingredients.delete', $ingredient->id) }}" onsubmit="return confirm('Delete?')" class="inline">
                     @csrf @method('DELETE')
                     <button class="py-1.5 px-3 text-xs rounded-lg border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400">Delete</button>
@@ -116,6 +117,55 @@
                 <div class="flex gap-2 pt-2">
                     <button type="submit" class="flex-1 py-2.5 rounded-lg bg-purple-600 text-white hover:bg-purple-700 text-sm font-semibold">Add Ingredient</button>
                     <button type="button" @click="showAddModal = false" class="px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div x-show="showEditModal" x-transition.opacity x-cloak class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" @click.self="showEditModal = false">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md">
+            <div class="p-5 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Edit Ingredient</h3>
+                <p class="text-sm text-gray-500" x-text="edit.name"></p>
+            </div>
+            <form method="POST" :action="'/pos/restaurant/ingredients/' + edit.id" class="p-5 space-y-4">
+                @csrf @method('PUT')
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+                    <input type="text" name="name" x-model="edit.name" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Unit</label>
+                        <input type="text" name="unit" x-model="edit.unit" required maxlength="20" list="unit-options" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
+                        <datalist id="unit-options">
+                            <option value="kg"></option>
+                            <option value="g"></option>
+                            <option value="ltr"></option>
+                            <option value="ml"></option>
+                            <option value="pcs"></option>
+                            <option value="dozen"></option>
+                            <option value="pack"></option>
+                        </datalist>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cost/Unit (Rs.)</label>
+                        <input type="number" name="cost_per_unit" x-model="edit.cost" step="0.01" min="0" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Min Stock Level</label>
+                    <input type="number" name="min_stock_level" x-model="edit.min" step="0.01" min="0" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
+                </div>
+                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <input type="hidden" name="is_active" value="0">
+                    <input type="checkbox" name="is_active" value="1" x-model="edit.active" class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                    Active (recipes mein istemal ho sakta hai)
+                </label>
+                <p class="text-xs text-gray-400 dark:text-gray-500">Stock badalne ke liye "Adjust Stock" button use karen.</p>
+                <div class="flex gap-2 pt-1">
+                    <button type="submit" class="flex-1 py-2.5 rounded-lg bg-purple-600 text-white hover:bg-purple-700 text-sm font-semibold">Save Changes</button>
+                    <button type="button" @click="showEditModal = false" class="px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm">Cancel</button>
                 </div>
             </form>
         </div>

@@ -128,9 +128,16 @@ class IngredientController extends Controller
     {
         $companyId = app('currentCompanyId');
 
+        // MULTI-INGREDIENT FLOW (owner request Jul 2026): one form submits MANY ingredient
+        // rows for a product. Each row picks an existing ingredient OR creates one inline.
         $request->validate([
             'product_id' => 'required|integer',
-            'quantity_needed' => 'required|numeric|min:0.0001',
+            'ingredients' => 'required|array|min:1',
+            'ingredients.*.quantity_needed' => 'required|numeric|min:0.0001',
+            'ingredients.*.ingredient_id' => 'nullable|integer',
+            'ingredients.*.new_name' => 'nullable|string|max:120',
+            'ingredients.*.new_unit' => 'nullable|string|max:20',
+            'ingredients.*.new_cost' => 'nullable|numeric|min:0',
         ]);
 
         $product = PosProduct::where('company_id', $companyId)->where('id', $request->product_id)->first();
@@ -138,56 +145,70 @@ class IngredientController extends Controller
             return back()->with('error', 'Invalid product.');
         }
 
-        // UNIFIED FLOW (vendor request — "ek hi box"): user can either pick existing ingredient
-        // OR create a new one inline by providing name + unit + cost in the same form.
-        $ingredient = null;
-        if ($request->filled('ingredient_id')) {
-            $ingredient = Ingredient::where('company_id', $companyId)->where('id', $request->ingredient_id)->first();
-        } elseif ($request->filled('new_ingredient_name')) {
-            $request->validate([
-                'new_ingredient_name' => 'required|string|max:120',
-                'new_ingredient_unit' => 'required|string|max:20',
-                'new_ingredient_cost' => 'nullable|numeric|min:0',
-            ]);
-            $name = trim($request->new_ingredient_name);
-            // Reuse existing ingredient if name+unit matches (avoid duplicates)
-            $ingredient = Ingredient::where('company_id', $companyId)
-                ->whereRaw('LOWER(name) = ?', [strtolower($name)])
-                ->where('unit', $request->new_ingredient_unit)
-                ->first();
-            if (!$ingredient) {
-                $ingredient = Ingredient::create([
-                    'company_id' => $companyId,
-                    'name' => $name,
-                    'unit' => $request->new_ingredient_unit,
-                    'cost_per_unit' => (float) ($request->new_ingredient_cost ?: 0),
-                    'current_stock' => 0,
-                    'min_stock_level' => 0,
-                    'is_active' => true,
-                ]);
+        $added = [];
+        $skipped = [];
+
+        foreach ($request->input('ingredients', []) as $row) {
+            $ingredient = null;
+
+            if (!empty($row['ingredient_id'])) {
+                $ingredient = Ingredient::where('company_id', $companyId)->where('id', $row['ingredient_id'])->first();
+            } elseif (!empty($row['new_name'])) {
+                $name = trim($row['new_name']);
+                $unit = trim($row['new_unit'] ?? '') ?: 'pcs';
+                // Reuse existing ingredient if name+unit matches (avoid duplicates)
+                $ingredient = Ingredient::where('company_id', $companyId)
+                    ->whereRaw('LOWER(name) = ?', [strtolower($name)])
+                    ->where('unit', $unit)
+                    ->first();
+                if (!$ingredient) {
+                    $ingredient = Ingredient::create([
+                        'company_id' => $companyId,
+                        'name' => $name,
+                        'unit' => $unit,
+                        'cost_per_unit' => (float) ($row['new_cost'] ?? 0),
+                        'current_stock' => 0,
+                        'min_stock_level' => 0,
+                        'is_active' => true,
+                    ]);
+                }
             }
+
+            if (!$ingredient) {
+                $skipped[] = 'ek row (ingredient select/likha nahi gaya)';
+                continue;
+            }
+
+            $exists = ProductRecipe::where('company_id', $companyId)
+                ->where('product_id', $request->product_id)
+                ->where('ingredient_id', $ingredient->id)
+                ->exists();
+
+            if ($exists || in_array($ingredient->id, array_column($added, 'id'))) {
+                $skipped[] = "'{$ingredient->name}' (pehle se recipe mein hai)";
+                continue;
+            }
+
+            ProductRecipe::create([
+                'company_id' => $companyId,
+                'product_id' => $request->product_id,
+                'ingredient_id' => $ingredient->id,
+                'quantity_needed' => $row['quantity_needed'],
+            ]);
+
+            $added[] = ['id' => $ingredient->id, 'name' => $ingredient->name];
         }
-        if (!$ingredient) {
-            return back()->with('error', 'Please select an existing ingredient OR fill in new ingredient details.');
+
+        if (empty($added)) {
+            return back()->with('error', 'Koi ingredient add nahi hua' . (!empty($skipped) ? ' — ' . implode(', ', $skipped) : '.'));
         }
 
-        $exists = ProductRecipe::where('company_id', $companyId)
-            ->where('product_id', $request->product_id)
-            ->where('ingredient_id', $ingredient->id)
-            ->exists();
-
-        if ($exists) {
-            return back()->with('error', 'This ingredient is already in this recipe.');
+        $msg = count($added) . ' ingredient(s) added: ' . implode(', ', array_column($added, 'name')) . '.';
+        if (!empty($skipped)) {
+            $msg .= ' Skipped: ' . implode(', ', $skipped) . '.';
         }
 
-        ProductRecipe::create([
-            'company_id' => $companyId,
-            'product_id' => $request->product_id,
-            'ingredient_id' => $ingredient->id,
-            'quantity_needed' => $request->quantity_needed,
-        ]);
-
-        return back()->with('success', "Recipe ingredient '{$ingredient->name}' added.");
+        return back()->with('success', $msg);
     }
 
     public function updateRecipe(Request $request, $id)

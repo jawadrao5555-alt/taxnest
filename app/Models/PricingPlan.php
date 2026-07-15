@@ -33,6 +33,13 @@ class PricingPlan extends Model
         'inventory_enabled' => 'boolean',
         'reports_enabled' => 'boolean',
         'restaurant_enabled' => 'boolean',
+        // Integer casts guard the strict `=== -1` unlimited checks (and the
+        // `=== 1` singular/plural checks in views) against DB drivers or
+        // legacy prod columns that hand these back as strings — a string "-1"
+        // silently fails `=== -1` and renders a literal "-1 bills / month".
+        'invoice_limit' => 'integer',
+        'user_limit' => 'integer',
+        'branch_limit' => 'integer',
     ];
 
     public function subscriptions()

@@ -52,6 +52,7 @@ class RestaurantTable extends Model
     public function isLockedByOther($userId)
     {
         if (!$this->isLocked()) return false;
-        return $this->locked_by_user_id !== $userId;
+        // Loose int compare — PDO may return the column as a string on some hosts.
+        return (int) $this->locked_by_user_id !== (int) $userId;
     }
 }

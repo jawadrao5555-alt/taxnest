@@ -398,11 +398,18 @@ class RestaurantPosController extends Controller
 
             if ($request->table_id) {
                 $table = RestaurantTable::where('company_id', $companyId)->where('id', $request->table_id)->first();
-                if ($table && $table->locked_by_user_id && $table->locked_by_user_id !== $user->id) {
-                    $lockAge = $table->locked_at ? now()->diffInMinutes($table->locked_at) : 0;
-                    if ($lockAge < 30) {
+                // Int-cast both sides: some MySQL/PDO setups (emulated prepares on
+                // shared hosting) return integer columns as STRINGS, so a strict !==
+                // against the int user id false-positives "another user" for the SAME
+                // cashier who just reserved the table.
+                if ($table && $table->locked_by_user_id && (int) $table->locked_by_user_id !== (int) $user->id) {
+                    // Carbon 3: now()->diffInMinutes($past) is SIGNED (negative) — the old
+                    // `< 30` check made every other-user lock permanent. Compare timestamps
+                    // directly instead: block only locks fresher than 30 minutes.
+                    $lockIsFresh = $table->locked_at && $table->locked_at->gt(now()->subMinutes(30));
+                    if ($lockIsFresh) {
                         DB::rollBack();
-                        return response()->json(['success' => false, 'message' => 'Table is locked by another user'], 423);
+                        return response()->json(['success' => false, 'message' => "Table T-{$table->table_number} is reserved by another cashier — pick a different table or ask them to release it"], 423);
                     }
                 }
                 RestaurantTable::where('company_id', $companyId)

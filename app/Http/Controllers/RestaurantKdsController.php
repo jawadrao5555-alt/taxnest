@@ -183,7 +183,8 @@ class RestaurantKdsController extends Controller
             ->orderBy('created_at', 'asc')
             ->get()
             ->map(function ($o) {
-                $elapsed = now()->diffInMinutes($o->created_at);
+                // Carbon 3 signed diff — measure FROM created_at TO now so elapsed is positive.
+                $elapsed = (int) $o->created_at->diffInMinutes(now());
                 return [
                     'id' => $o->id,
                     'order_number' => $o->order_number,

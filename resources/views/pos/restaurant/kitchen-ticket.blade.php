@@ -265,6 +265,13 @@
                     };
                     window.addEventListener('afterprint', signalParent, { once: true });
                     setTimeout(signalParent, 20000);
+                } else {
+                    // Opened as a POPUP (Send to Kitchen button) — auto-close once the
+                    // print dialog is dismissed so the cashier lands straight back on a
+                    // fresh sale screen. Iframe case above must NOT close (parent owns it).
+                    window.addEventListener('afterprint', function() {
+                        setTimeout(function() { window.close(); }, 300);
+                    }, { once: true });
                 }
                 setTimeout(function() { window.print(); }, 200);
             }

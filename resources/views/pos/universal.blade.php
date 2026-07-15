@@ -4055,6 +4055,12 @@ function restaurantPos() {
                 this.showToast('Manual items & deals billing-only — pay first or remove them to hold.', 'error');
                 return null;
             }
+            // P7 guard — an incoming WAITER order already exists as a held restaurant
+            // order (KDS sees it). Re-holding would duplicate it; settle via payment.
+            if (this.incomingOrderId) {
+                this.showToast('Waiter order loaded — take payment to settle it (kitchen already has the KOT).', 'error');
+                return null;
+            }
             const now = Date.now();
             if (now - this.lastHoldTime < 2000) return null;
             this.lastHoldTime = now;

@@ -23,9 +23,15 @@ class RestaurantKdsController extends Controller
             ->get();
 
         // P6 (F5): KDS auto-print flag — the KDS device prints new-order KOTs itself.
-        $kdsAutoPrint = (bool) (\App\Models\Company::find($companyId)->pos_kds_auto_print ?? false);
+        $company = \App\Models\Company::find($companyId);
+        $kdsAutoPrint = (bool) ($company->pos_kds_auto_print ?? false);
 
-        return view('pos.restaurant.kds', compact('orders', 'kdsAutoPrint'));
+        // Silent printer routing: when the Desktop Agent has a KOT printer set,
+        // KDS prints route through the print-jobs queue instead of the iframe.
+        $ps = $company ? $company->printerSettings() : ['silent_print_enabled' => false, 'kot_printer' => null];
+        $kdsSilentKot = (bool) ($ps['silent_print_enabled'] && $ps['kot_printer']);
+
+        return view('pos.restaurant.kds', compact('orders', 'kdsAutoPrint', 'kdsSilentKot'));
     }
 
     /**

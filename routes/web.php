@@ -491,6 +491,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/api/check-pin-session', [PosController::class, 'checkPinSession'])->name('pos.api.check-pin-session');
     Route::post('/api/toggle-pra', [PosController::class, 'togglePra'])->name('pos.api.toggle-pra');
     Route::post('/api/toggle-auto-print', [PosController::class, 'toggleAutoPrint'])->name('pos.api.toggle-auto-print');
+    Route::post('/api/print-jobs', [PosController::class, 'apiCreatePrintJob'])->name('pos.api.print-jobs');
     // Smart Product Creation — Simple POS quick-create (refused server-side when inventory ON)
     Route::post('/api/products/quick-create', [PosController::class, 'apiQuickCreate'])->name('pos.api.products.quick-create');
     Route::post('/api/products/{id}/quick-price', [PosController::class, 'apiQuickUpdatePrice'])->name('pos.api.products.quick-price');
@@ -523,6 +524,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::post('/public-profile/regenerate', [\App\Http\Controllers\PublicProfileController::class, 'regenerateSlug'])->name('pos.public-profile.regenerate');
         Route::post('/public-profile/menu', [\App\Http\Controllers\PublicProfileController::class, 'saveMenu'])->name('pos.public-profile.menu');
         Route::match(['get', 'post'], '/receipt-settings', [PosController::class, 'receiptSettings'])->name('pos.receipt-settings');
+        Route::match(['get', 'post'], '/printer-settings', [PosController::class, 'printerSettings'])->name('pos.printer-settings');
         Route::post('/products', [PosController::class, 'storeProduct'])->name('pos.products.store')->middleware('plan.limit:products');
         Route::get('/products/template', [PosController::class, 'downloadProductTemplate'])->name('pos.products.template');
         Route::post('/products/import', [PosController::class, 'importProducts'])->name('pos.products.import');
@@ -952,6 +954,11 @@ Route::prefix('api/agent')->middleware(['agent.auth'])->group(function () {
     Route::post('/heartbeat', [\App\Http\Controllers\AgentController::class, 'heartbeat']);
     Route::get('/pending-invoices', [\App\Http\Controllers\AgentController::class, 'pendingInvoices']);
     Route::post('/submit-result', [\App\Http\Controllers\AgentController::class, 'submitResult']);
+    // Silent printer routing — agent reports printers + polls/prints queued jobs.
+    Route::post('/printers', [\App\Http\Controllers\AgentController::class, 'reportPrinters']);
+    Route::get('/print-jobs', [\App\Http\Controllers\AgentController::class, 'claimPrintJobs']);
+    Route::get('/print-jobs/{id}/content', [\App\Http\Controllers\AgentController::class, 'printJobContent']);
+    Route::post('/print-jobs/{id}/result', [\App\Http\Controllers\AgentController::class, 'printJobResult']);
 });
 
 // === Public business profile + menu (F8) — slug-only, throttled, 404 on unknown ===

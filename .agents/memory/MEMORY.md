@@ -54,3 +54,4 @@
 - [PRA POS Deals rules](pos-deals-feature.md) — server-enforced price, snapshot-driven stock, billing-only (no hold/KOT); cart→payload builder flattens item_type — new cart types MUST be added to the type mapping + UI-payload tested.
 - [mobile.css global overrides](mobile-css-global-overrides.md) — mobile.css beats Tailwind on phones: forced table-cell vs .hidden, touch-target blobs on toggle pills, grid collapse needs grid-cols-keep; bump ?v= on edit.
 - [pricing_plans.features = display-only](pos-plan-features-display-only.md) — no code reads the JSON; restaurant gate = restaurant_enabled column; plan cards render limits from columns + cumulative lists.
+- [Silent printer routing](silent-printer-routing.md) — KOT stamping at result-time not render; Electron listener leak = double print; no pageSize for thermal; MySQL NOW() looks offline to Laravel.

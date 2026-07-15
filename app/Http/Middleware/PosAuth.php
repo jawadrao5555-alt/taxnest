@@ -93,6 +93,8 @@ class PosAuth
                 || $path === 'pos/restaurant/api/live-orders'
                 // KOT ticket view (GET) — needed by the KDS auto-print iframe (P6).
                 || preg_match('#^pos/restaurant/orders/\d+/kitchen-ticket$#', $path)
+                // Silent printing — KDS enqueues KOT jobs for the Desktop Agent.
+                || $path === 'pos/api/print-jobs'
                 || $path === 'pos/logout'
                 || $path === 'pos/login';
             if (!$allowed) {

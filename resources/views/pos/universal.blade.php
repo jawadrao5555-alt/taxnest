@@ -2294,6 +2294,12 @@ function restaurantPos() {
         autoPrintEnabled: {{ ($company->print_on_pay ?? true) ? 'true' : 'false' }},
         // Phase 5+ — Auto-print kitchen ticket on successful sale (mirrors companies.auto_print_kot)
         autoKotEnabled: {{ ($company->auto_print_kot ?? false) ? 'true' : 'false' }},
+        // Silent printer routing via Desktop Sync Agent (companies.pos_printer_settings).
+        // Per-type flags: enabled AND the matching printer is chosen. Agent-online is
+        // checked SERVER-SIDE at enqueue — any non-2xx falls back to popup/iframe print.
+        @php $__ps = $company->printerSettings(); @endphp
+        silentBillPrint: {{ ($__ps['silent_print_enabled'] && $__ps['receipt_printer']) ? 'true' : 'false' }},
+        silentKotPrint: {{ ($__ps['silent_print_enabled'] && $__ps['kot_printer']) ? 'true' : 'false' }},
         // Phase 5+ — auto-dismiss timer for the success modal so cashiers can chain sales hands-free
         receiptAutoCloseTimer: null,
         // Print-chain session tracker — bumping the epoch invalidates in-flight iframe.onload /
@@ -4079,7 +4085,7 @@ function restaurantPos() {
                     // Auto-print KOT when print_on_hold is enabled, OR when the caller explicitly asked
                     // (e.g. "Send to Kitchen" button always prints a ticket).
                     if (this.kitchenSettings.print_on_hold || opts.forcePrintKot) {
-                        window.open('/pos/restaurant/orders/' + data.order.id + '/kitchen-ticket?auto_print=1', '_blank', 'width=380,height=620');
+                        this.kotPrintOrPopup(data.order.id);
                     }
                     result = data;
                 } else { this.showToast(data.message || 'Failed', 'error'); }
@@ -4107,7 +4113,7 @@ function restaurantPos() {
                 const data = await res.json();
                 if (data.success) {
                     this.showToast('Re-sent to kitchen (#' + data.kot_print_count + ')', 'success');
-                    window.open('/pos/restaurant/orders/' + order.id + '/kitchen-ticket?auto_print=1', '_blank', 'width=380,height=620');
+                    this.kotPrintOrPopup(order.id);
                 } else {
                     this.showToast(data.message || 'Re-send failed', 'error');
                 }
@@ -4391,11 +4397,50 @@ function restaurantPos() {
             frame.src = cacheBustedUrl;
         },
 
+        // ── SILENT PRINTING via Desktop Sync Agent ──────────────────────
+        // Enqueue a print job on the server; the agent picks it up and prints
+        // directly on the configured printer (no dialog, no popup). Resolves
+        // true ONLY on a 2xx {success:true} — anything else (agent offline,
+        // feature off server-side, network error) returns false and the caller
+        // falls back to the classic popup/iframe print path.
+        async trySilentPrint(payload) {
+            try {
+                const res = await fetch('/pos/api/print-jobs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify(payload),
+                });
+                if (!res.ok) return false;
+                const d = await res.json().catch(() => null);
+                return !!(d && d.success);
+            } catch (e) { return false; }
+        },
+
+        // KOT gateway for the popup-window call sites (hold / resend-kitchen):
+        // silent first, identical popup fallback.
+        kotPrintOrPopup(orderId) {
+            const popup = () => window.open('/pos/restaurant/orders/' + orderId + '/kitchen-ticket?auto_print=1', '_blank', 'width=380,height=620');
+            if (!this.silentKotPrint) { popup(); return; }
+            this.trySilentPrint({ type: 'kot', restaurant_order_id: orderId }).then(ok => {
+                if (ok) this.showToast('KOT sent to printer', 'success'); else popup();
+            });
+        },
+
         printReceipt(onAfterPrint) {
             if (!this.lastTransactionId) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
             const url = (this.isRestaurantMode ? '/pos/restaurant/receipt/' : '/pos/transaction/') + this.lastTransactionId + (this.isRestaurantMode ? '?auto_print=1' : '/receipt?auto_print=1');
             console.log('[printReceipt] URL=', url, 'isRestaurantMode=', this.isRestaurantMode);
-            this._printViaIframe('print-receipt-frame', url, 'width=400,height=700', onAfterPrint);
+            const fallback = () => this._printViaIframe('print-receipt-frame', url, 'width=400,height=700', onAfterPrint);
+            if (this.silentBillPrint) {
+                this.trySilentPrint({ type: 'bill', transaction_id: this.lastTransactionId }).then(ok => {
+                    if (ok) {
+                        this.showToast('Receipt sent to printer', 'success');
+                        if (typeof onAfterPrint === 'function') onAfterPrint();
+                    } else { fallback(); }
+                });
+                return;
+            }
+            fallback();
         },
 
         // Silent KOT print via hidden iframe — no popup window blocks the cashier screen.
@@ -4403,7 +4448,17 @@ function restaurantPos() {
             const id = orderId || this.lastOrderId;
             if (!id) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
             const url = '/pos/restaurant/orders/' + id + '/kitchen-ticket?auto_print=1';
-            this._printViaIframe('print-kot-frame', url, 'width=350,height=600', onAfterPrint);
+            const fallback = () => this._printViaIframe('print-kot-frame', url, 'width=350,height=600', onAfterPrint);
+            if (this.silentKotPrint) {
+                this.trySilentPrint({ type: 'kot', restaurant_order_id: id }).then(ok => {
+                    if (ok) {
+                        this.showToast('KOT sent to printer', 'success');
+                        if (typeof onAfterPrint === 'function') onAfterPrint();
+                    } else { fallback(); }
+                });
+                return;
+            }
+            fallback();
         },
 
         // ── P7 (F6): INCOMING WAITER ORDERS ───────────────────────────
@@ -4447,7 +4502,15 @@ function restaurantPos() {
         // Full KOT reprint (all items) or delta print (only newly-added items).
         printIncomingKot(o, delta = false) {
             const url = '/pos/restaurant/orders/' + o.id + '/kitchen-ticket?auto_print=1' + (delta ? '&delta=1' : '');
-            this._printViaIframe('print-kot-frame', url, 'width=350,height=600', () => this.loadIncoming());
+            const done = () => this.loadIncoming();
+            const fallback = () => this._printViaIframe('print-kot-frame', url, 'width=350,height=600', done);
+            if (this.silentKotPrint) {
+                this.trySilentPrint({ type: 'kot', restaurant_order_id: o.id, delta: delta }).then(ok => {
+                    if (ok) { this.showToast('KOT sent to printer', 'success'); done(); } else { fallback(); }
+                });
+                return;
+            }
+            fallback();
         },
         async completeIncomingOrder(orderId, txnId) {
             try {

@@ -6,7 +6,7 @@ const { autoUpdater } = require('electron-updater');
 const { startAgent, stopAgent, getStatus } = require('./src/agent');
 
 const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/taxnest/releases/latest';
-const BUILD_TIMESTAMP = '20260418-6';
+const BUILD_TIMESTAMP = '20260715-1';
 let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
 
 autoUpdater.autoDownload = true;

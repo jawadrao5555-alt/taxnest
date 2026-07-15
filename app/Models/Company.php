@@ -87,6 +87,7 @@ class Company extends Model
         'agent_version',
         'agent_enabled',
         'receipt_printer_size',
+        'pos_printer_settings',
         'confidential_pin',
         'next_local_invoice_number',
         'logo_path',
@@ -130,6 +131,7 @@ class Company extends Model
         'fbr_reporting_enabled' => 'boolean',
         'agent_enabled' => 'boolean',
         'agent_last_seen' => 'datetime',
+        'pos_printer_settings' => 'array',
         'feature_flags' => 'array',
         'invoice_display_prefs' => 'array',
         'public_profile_settings' => 'array',
@@ -210,6 +212,34 @@ class Company extends Model
     {
         return (bool) $this->fbr_pos_enabled
             && ($this->fbr_connection_mode ?? 'cloud') === 'fiscal_device';
+    }
+
+    /**
+     * Normalized silent-print settings (Desktop Sync Agent printer routing).
+     * Always returns the full shape with defaults so views/controllers never
+     * null-check individual keys.
+     */
+    public function printerSettings(): array
+    {
+        $s = $this->pos_printer_settings ?? [];
+        return [
+            'silent_print_enabled' => (bool) ($s['silent_print_enabled'] ?? false),
+            'receipt_printer' => $s['receipt_printer'] ?? null,
+            'kot_printer' => $s['kot_printer'] ?? null,
+            'available_printers' => is_array($s['available_printers'] ?? null) ? $s['available_printers'] : [],
+            'printers_reported_at' => $s['printers_reported_at'] ?? null,
+        ];
+    }
+
+    /**
+     * True when the Desktop Sync Agent has heartbeat within the last 2 minutes.
+     * Used to decide silent-print vs popup fallback at enqueue time.
+     */
+    public function agentOnline(): bool
+    {
+        return (bool) $this->agent_enabled
+            && $this->agent_last_seen
+            && $this->agent_last_seen->gt(now()->subMinutes(2));
     }
 
     public function getActiveFbrTokenAttribute()

@@ -143,6 +143,121 @@ class PosController extends Controller
     }
 
     /**
+     * Printer Settings — silent printing via the Desktop Sync Agent (admin-only).
+     * Admin picks which installed printer receives customer bills and which
+     * receives kitchen tickets (KOT). Default OFF; popup printing stays the
+     * fallback whenever the agent is offline or silent print is disabled.
+     */
+    public function printerSettings(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->isPosCashier()) {
+            abort(403, 'Only POS administrators can change printer settings.');
+        }
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        if (!$company) { abort(404); }
+
+        if ($request->isMethod('post')) {
+            $validated = $request->validate([
+                'silent_print_enabled' => 'nullable|boolean',
+                'receipt_printer' => 'nullable|string|max:255',
+                'kot_printer' => 'nullable|string|max:255',
+            ]);
+
+            $settings = $company->printerSettings();
+            $known = collect($settings['available_printers'])->pluck('name')->all();
+
+            // Only accept printers the agent actually reported (or blank = unset).
+            $receipt = trim((string) ($validated['receipt_printer'] ?? ''));
+            $kot = trim((string) ($validated['kot_printer'] ?? ''));
+            $settings['receipt_printer'] = ($receipt !== '' && in_array($receipt, $known, true)) ? $receipt : null;
+            $settings['kot_printer'] = ($kot !== '' && in_array($kot, $known, true)) ? $kot : null;
+            $settings['silent_print_enabled'] = $request->boolean('silent_print_enabled')
+                && ($settings['receipt_printer'] || $settings['kot_printer']);
+
+            $company->update(['pos_printer_settings' => $settings]);
+
+            return redirect()->route('pos.printer-settings')->with('success', 'Printer settings saved.');
+        }
+
+        $settings = $company->printerSettings();
+        $agentOnline = $company->agentOnline();
+        $recentFailed = \App\Models\PosPrintJob::where('company_id', $companyId)
+            ->where('status', 'failed')
+            ->orderByDesc('id')
+            ->limit(10)
+            ->get();
+
+        return view('pos.printer-settings', compact('company', 'settings', 'agentOnline', 'recentFailed'));
+    }
+
+    /**
+     * Session-authed enqueue of a silent print job (bill receipt or KOT).
+     * Returns 409 when silent printing cannot happen right now (disabled,
+     * printer not chosen, or agent offline) — the sale screen falls back to
+     * the normal popup/iframe print path on ANY non-2xx.
+     */
+    public function apiCreatePrintJob(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user) { abort(403); }
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        if (!$company) { abort(404); }
+
+        $validated = $request->validate([
+            'type' => 'required|in:bill,kot',
+            'transaction_id' => 'required_if:type,bill|nullable|integer',
+            'restaurant_order_id' => 'required_if:type,kot|nullable|integer',
+            'delta' => 'nullable|boolean',
+        ]);
+
+        $settings = $company->printerSettings();
+        if (!$settings['silent_print_enabled']) {
+            return response()->json(['success' => false, 'reason' => 'disabled'], 409);
+        }
+        $targetPrinter = $validated['type'] === 'bill' ? $settings['receipt_printer'] : $settings['kot_printer'];
+        if (!$targetPrinter) {
+            return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
+        }
+        if (!$company->agentOnline()) {
+            return response()->json(['success' => false, 'reason' => 'agent_offline'], 409);
+        }
+
+        // Ownership checks — never enqueue another company's documents.
+        if ($validated['type'] === 'bill') {
+            $exists = PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->where('id', (int) $validated['transaction_id'])
+                ->exists();
+            if (!$exists) {
+                return response()->json(['success' => false, 'reason' => 'not_found'], 404);
+            }
+        } else {
+            $exists = \App\Models\RestaurantOrder::where('company_id', $companyId)
+                ->where('id', (int) $validated['restaurant_order_id'])
+                ->exists();
+            if (!$exists) {
+                return response()->json(['success' => false, 'reason' => 'not_found'], 404);
+            }
+        }
+
+        $job = \App\Models\PosPrintJob::create([
+            'company_id' => $companyId,
+            'type' => $validated['type'],
+            'target_printer' => $targetPrinter,
+            'transaction_id' => $validated['type'] === 'bill' ? (int) $validated['transaction_id'] : null,
+            'restaurant_order_id' => $validated['type'] === 'kot' ? (int) $validated['restaurant_order_id'] : null,
+            'render_query' => ($validated['type'] === 'kot' && $request->boolean('delta')) ? 'delta=1' : null,
+            'status' => 'pending',
+            'created_by' => $user->id,
+        ]);
+
+        return response()->json(['success' => true, 'job_id' => $job->id]);
+    }
+
+    /**
      * Customize POS — single consolidated settings hub (admin-only).
      * Surfaces every POS customization feature from one place; complex
      * sub-features link out to their existing pages.

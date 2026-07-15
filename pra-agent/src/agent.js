@@ -2,6 +2,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { startPrinting, stopPrinting, getPrintStatus } = require('./printer');
 
 let pollInterval = null;
 let heartbeatInterval = null;
@@ -90,7 +91,7 @@ async function flushCallbackQueue() {
 }
 
 function getStatus() {
-  return { ...status };
+  return { ...status, printer: getPrintStatus() };
 }
 
 function notify() {
@@ -268,9 +269,15 @@ function startAgent(config, onStatusChange) {
 
   heartbeatInterval = setInterval(heartbeat, 30000);
   pollInterval = setInterval(syncOnce, 5000);
+
+  // Silent printer routing — report printers + poll/print queued jobs.
+  // Runs alongside PRA sync; harmless when the shop hasn't enabled it
+  // (server just returns zero jobs).
+  startPrinting(config);
 }
 
 function stopAgent() {
+  stopPrinting();
   if (pollInterval) {
     clearInterval(pollInterval);
     pollInterval = null;

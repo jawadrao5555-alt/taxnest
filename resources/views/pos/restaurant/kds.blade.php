@@ -191,6 +191,9 @@ function kdsScreen() {
         // re-prints. First-ever load seeds the set with the current backlog
         // (no print storm) — only orders arriving AFTER that print automatically.
         autoPrintEnabled: {{ ($kdsAutoPrint ?? false) ? 'true' : 'false' }},
+        // Silent printer routing — KOT jobs go to the Desktop Agent's queue when
+        // enabled; any enqueue failure falls back to the classic iframe print.
+        silentKotPrint: {{ ($kdsSilentKot ?? false) ? 'true' : 'false' }},
         printedIds: [],
         printQueue: [],
         printingNow: false,
@@ -325,6 +328,27 @@ function kdsScreen() {
                 this.savePrintedIds();
             }
             this.printingNow = true;
+
+            // Silent printer routing: enqueue for the Desktop Agent first; the agent
+            // prints on the configured KOT printer with no dialog. Any failure
+            // (agent offline, feature disabled server-side, network) falls back to
+            // the classic hidden-iframe print for THIS job only.
+            if (this.silentKotPrint) {
+                fetch('/pos/api/print-jobs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
+                    body: JSON.stringify({ type: 'kot', restaurant_order_id: job.id, delta: !!job.delta }),
+                }).then(r => r.ok ? r.json().catch(() => null) : null).then(d => {
+                    if (d && d.success) { this.finishCurrentPrint(); }
+                    else { this._iframePrint(job); }
+                }).catch(() => { this._iframePrint(job); });
+                return;
+            }
+            this._iframePrint(job);
+        },
+
+        // Classic hidden-iframe KOT print (also the silent-print fallback).
+        _iframePrint(job) {
             const host = document.getElementById('kdsPrintHost');
             const frame = document.createElement('iframe');
             frame.id = 'kdsPrintFrame';

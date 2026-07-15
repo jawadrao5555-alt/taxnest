@@ -389,4 +389,193 @@ class AgentController extends Controller
 
         return response()->json(['ok' => true]);
     }
+
+    // =====================================================
+    // SILENT PRINTER ROUTING (Desktop Sync Agent print jobs)
+    // =====================================================
+
+    /**
+     * Agent reports the shop PC's installed printers (on start + every 5 min).
+     * Stored inside companies.pos_printer_settings so the Printer Settings page
+     * can offer real dropdowns.
+     */
+    public function reportPrinters(Request $request)
+    {
+        $company = $request->attributes->get('agent_company');
+
+        $validated = $request->validate([
+            'printers' => 'required|array|max:50',
+            'printers.*.name' => 'required|string|max:255',
+            'printers.*.displayName' => 'nullable|string|max:255',
+            'printers.*.isDefault' => 'nullable|boolean',
+        ]);
+
+        $settings = $company->printerSettings();
+        $settings['available_printers'] = collect($validated['printers'])->map(fn ($p) => [
+            'name' => $p['name'],
+            'displayName' => $p['displayName'] ?? $p['name'],
+            'isDefault' => (bool) ($p['isDefault'] ?? false),
+        ])->values()->all();
+        $settings['printers_reported_at'] = now()->toIso8601String();
+
+        $company->update([
+            'pos_printer_settings' => $settings,
+            'agent_last_seen' => now(),
+        ]);
+
+        return response()->json(['ok' => true, 'count' => count($settings['available_printers'])]);
+    }
+
+    /**
+     * Atomically claim up to 10 pending print jobs for this company.
+     * Two-step token claim (UPDATE ... LIMIT, then SELECT by token) — race-safe
+     * without lockForUpdate, matching the fail-safe patterns used elsewhere.
+     */
+    public function claimPrintJobs(Request $request)
+    {
+        $company = $request->attributes->get('agent_company');
+
+        // Stale-claim requeue: a job stuck 'printing' >2 min means the agent
+        // died mid-print. Retry up to 3 attempts, then park as failed.
+        DB::table('pos_print_jobs')
+            ->where('company_id', $company->id)
+            ->where('status', 'printing')
+            ->where('updated_at', '<', now()->subMinutes(2))
+            ->where('attempts', '<', 3)
+            ->update(['status' => 'pending', 'claim_token' => null, 'updated_at' => now()]);
+        DB::table('pos_print_jobs')
+            ->where('company_id', $company->id)
+            ->where('status', 'printing')
+            ->where('updated_at', '<', now()->subMinutes(2))
+            ->where('attempts', '>=', 3)
+            ->update(['status' => 'failed', 'error' => 'Print attempt timed out repeatedly (agent lost the job mid-print).', 'updated_at' => now()]);
+
+        // Housekeeping: finished jobs older than 7 days are useless — prune so
+        // the table never grows unbounded (failed jobs stay visible on the
+        // Printer Settings page until they age out too).
+        DB::table('pos_print_jobs')
+            ->where('company_id', $company->id)
+            ->whereIn('status', ['done', 'failed'])
+            ->where('updated_at', '<', now()->subDays(7))
+            ->delete();
+
+        $token = (string) \Illuminate\Support\Str::uuid();
+        DB::table('pos_print_jobs')
+            ->where('company_id', $company->id)
+            ->where('status', 'pending')
+            ->orderBy('id')
+            ->limit(10)
+            ->update([
+                'status' => 'printing',
+                'claim_token' => $token,
+                'attempts' => DB::raw('attempts + 1'),
+                'updated_at' => now(),
+            ]);
+
+        $jobs = DB::table('pos_print_jobs')
+            ->where('company_id', $company->id)
+            ->where('claim_token', $token)
+            ->orderBy('id')
+            ->get(['id', 'type', 'target_printer', 'transaction_id', 'restaurant_order_id', 'render_query']);
+
+        return response()->json(['ok' => true, 'jobs' => $jobs, 'count' => $jobs->count()]);
+    }
+
+    /**
+     * Render a claimed job's printable HTML for the agent's hidden window.
+     * Reuses the exact same blade templates as the popup flow. Never accepts
+     * arbitrary URLs — only job-id lookups scoped to the agent key's company.
+     */
+    public function printJobContent(Request $request, $id)
+    {
+        $company = $request->attributes->get('agent_company');
+
+        $job = \App\Models\PosPrintJob::where('company_id', $company->id)->find($id);
+        if (!$job) {
+            return response()->json(['error' => 'Job not found'], 404);
+        }
+
+        // Views + nested render logic may read the container binding.
+        app()->instance('currentCompanyId', $company->id);
+
+        if ($job->type === 'bill') {
+            $transaction = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $company->id)
+                ->with(['items', 'payments', 'creator', 'terminal'])
+                ->find($job->transaction_id);
+            if (!$transaction) {
+                return response()->json(['error' => 'Transaction not found'], 404);
+            }
+            $printerSize = $company->receipt_printer_size ?? '80mm';
+            $receiptView = $printerSize === '58mm' ? 'pos.receipts.receipt_58mm' : 'pos.receipts.receipt_80mm';
+            return response(view($receiptView, compact('transaction', 'company'))->render())
+                ->header('Content-Type', 'text/html; charset=UTF-8');
+        }
+
+        if ($job->type === 'kot') {
+            $order = \App\Models\RestaurantOrder::where('company_id', $company->id)
+                ->with(['items', 'table', 'creator'])
+                ->find($job->restaurant_order_id);
+            if (!$order) {
+                return response()->json(['error' => 'Order not found'], 404);
+            }
+            parse_str($job->render_query ?? '', $q);
+            $delta = ($q['delta'] ?? null) == '1';
+            $ticketItems = $delta ? $order->items->whereNull('kot_printed_at')->values() : $order->items;
+
+            // Nothing left to print (another job already covered these items) —
+            // 204 tells the agent to mark the job done WITHOUT printing a blank.
+            if ($delta && $ticketItems->isEmpty()) {
+                return response('', 204);
+            }
+
+            // DON'T stamp kot_printed_at here — the physical print can still
+            // fail after render (printer off, driver error). We record which
+            // items this ticket carries and stamp them only when the agent
+            // reports success in printJobResult. A failed job re-renders the
+            // SAME items (still NULL), so retries print identical content.
+            $job->update(['printed_item_ids' => $ticketItems->pluck('id')->values()->all()]);
+
+            return response(view('pos.restaurant.kitchen-ticket', compact('order', 'company', 'ticketItems', 'delta'))->render())
+                ->header('Content-Type', 'text/html; charset=UTF-8');
+        }
+
+        return response()->json(['error' => 'Unknown job type'], 422);
+    }
+
+    /**
+     * Agent reports the outcome of a claimed print job.
+     */
+    public function printJobResult(Request $request, $id)
+    {
+        $company = $request->attributes->get('agent_company');
+
+        $validated = $request->validate([
+            'success' => 'required|boolean',
+            'error' => 'nullable|string|max:2000',
+        ]);
+
+        $job = \App\Models\PosPrintJob::where('company_id', $company->id)->find($id);
+        if (!$job) {
+            return response()->json(['error' => 'Job not found'], 404);
+        }
+
+        $job->update([
+            'status' => $validated['success'] ? 'done' : 'failed',
+            'error' => $validated['success'] ? null : ($validated['error'] ?? 'Print failed'),
+            'claim_token' => null,
+        ]);
+
+        // KOT actually reached paper — NOW stamp the rendered items so delta
+        // tickets stay correct. Failed prints leave items NULL, so the KDS
+        // delta cycle (or a retry) naturally re-prints them.
+        if ($validated['success'] && $job->type === 'kot' && !empty($job->printed_item_ids)) {
+            \App\Models\RestaurantOrderItem::whereIn('id', $job->printed_item_ids)
+                ->where('order_id', $job->restaurant_order_id)
+                ->whereNull('kot_printed_at')
+                ->update(['kot_printed_at' => now()]);
+        }
+
+        return response()->json(['ok' => true]);
+    }
 }

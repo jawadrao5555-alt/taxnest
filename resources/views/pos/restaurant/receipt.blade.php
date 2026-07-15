@@ -218,7 +218,7 @@
 
     <div class="footer">
         @if($rp['show_footer'])<p class="thanks">{{ $rp['footer_text'] ?? 'Thank you for dining with us!' }}</p>@endif
-        <p class="powered">Powered by TaxNest</p>
+        <p class="powered">Developed by: taxnest.com.pk</p>
     </div>
 
     <div class="no-print print-btn-row">

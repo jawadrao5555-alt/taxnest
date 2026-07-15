@@ -328,7 +328,7 @@
 
     <div class="footer text-center">
         @if($rp['show_footer'])<p>{{ $rp['footer_text'] ?? 'Thank you!' }}</p>@endif
-        <p>NestPOS</p>
+        <p>Developed by: taxnest.com.pk</p>
         <p>{{ now()->format('d/m/Y h:i A') }}</p>
     </div>
 </body>

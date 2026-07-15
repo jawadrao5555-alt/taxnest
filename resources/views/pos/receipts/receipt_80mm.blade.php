@@ -359,7 +359,7 @@
 
     <div class="footer text-center">
         @if($rp['show_footer'])<p>{{ $rp['footer_text'] ?? 'Thank you for your purchase!' }}</p>@endif
-        <p>Powered by NestPOS</p>
+        <p>Developed by: taxnest.com.pk</p>
         <p>{{ now()->format('d/m/Y h:i:s A') }}</p>
     </div>
 </body>

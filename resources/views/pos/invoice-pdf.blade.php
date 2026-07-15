@@ -278,7 +278,7 @@
 
         <div class="footer">
             <p>Thank you for your purchase!</p>
-            <div class="brand">Powered by NestPOS</div>
+            <div class="brand">Developed by: taxnest.com.pk</div>
             <p>{{ now()->format('d/m/Y h:i:s A') }}</p>
         </div>
     </div>

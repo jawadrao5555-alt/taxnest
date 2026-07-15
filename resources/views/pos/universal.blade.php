@@ -216,7 +216,11 @@ window.addEventListener('popstate', function() {
 });
 </script>
 
-<div x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="tn-sale-root flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950">
+{{-- Screen Fit (Jul 2026): fitStyleStr applies CSS zoom + a /zoom-compensated px height
+     so the sale screen renders correctly on ANY display (small shop laptops, low-res
+     terminals, big TVs). Auto mode picks the zoom from viewport size; manual % is
+     per-device via localStorage 'tn_screen_fit'. Empty string = normal 100% layout. --}}
+<div x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="tn-sale-root flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950" :style="fitStyleStr">
     {{-- PRA Reporting + Auto-Print toggles strip (visible to admin + cashier).
          autoPrintEnabled lives on the parent restaurantPos() scope (mirrors kitchenSettings.print_on_pay)
          so toggling immediately updates the receipt-iframe URL on the very next sale, no refresh needed. --}}
@@ -333,7 +337,9 @@ window.addEventListener('popstate', function() {
     </div>
     @endif
 
-    <div class="tn-action-bar flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0 shadow-sm">
+    {{-- flex-wrap: on narrow displays the action buttons wrap to a second row instead of
+         being clipped off-screen (overflow-hidden root swallows anything past the edge). --}}
+    <div class="tn-action-bar flex flex-wrap items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0 shadow-sm">
 
         <div class="relative flex-shrink-0" style="min-width:180px;max-width:220px;">
             <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
@@ -402,7 +408,7 @@ window.addEventListener('popstate', function() {
 
         <div class="w-px h-6 bg-gray-200 dark:bg-gray-700 hidden sm:block flex-shrink-0"></div>
 
-        <div class="flex-1 relative">
+        <div class="flex-1 relative" style="min-width:170px;">
             <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
             <input type="search" x-ref="searchInput" x-model="searchQuery" @input="onSearchInput()" @keydown.arrow-down.prevent="moveHighlight(1)" @keydown.arrow-up.prevent="moveHighlight(-1)" @keydown.enter.prevent.stop="addHighlightedItem($event)" @keydown.tab="if(flowStep === 'type'){ $event.preventDefault(); } else if(!searchQuery && cart.length > 0){ $event.preventDefault(); enterCartMode('last'); }" @focus="if(searchQuery) showSearchDropdown = true" @click.away="showSearchDropdown = false" placeholder="Search products... (type to filter, Enter to add, Tab → cart)" class="search-glow w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-400 transition shadow-sm" autocomplete="one-time-code" name="pos_product_search_nofill" data-lpignore="true" data-form-type="other" role="combobox">
             <kbd x-show="!searchQuery" class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 font-mono">Ctrl+S</kbd>
@@ -505,6 +511,23 @@ window.addEventListener('popstate', function() {
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
             <span>Rush</span>
         </button>
+
+        {{-- Screen Fit control (Jul 2026): cashier picks Auto or a fixed % for THIS display; saved per device. --}}
+        <div class="relative hidden sm:block flex-shrink-0" @click.away="showFitMenu = false">
+            <button @click="showFitMenu = !showFitMenu" class="flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-purple-50 hover:text-purple-600 hover:border-purple-300 transition" title="Screen Fit — adjust the sale screen to this display">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V5a1 1 0 011-1h3m8 0h3a1 1 0 011 1v3m0 8v3a1 1 0 01-1 1h-3m-8 0H5a1 1 0 01-1-1v-3"/></svg>
+                <span class="hidden lg:inline" x-text="fitLabel()"></span>
+            </button>
+            <div x-show="showFitMenu" x-cloak x-transition class="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                <p class="px-3 pt-2 pb-1 text-[9px] font-bold uppercase tracking-wider text-gray-400">Screen Fit</p>
+                <button @click="setFit('auto')" class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold hover:bg-purple-50 dark:hover:bg-purple-900/20 transition" :class="screenFit === 'auto' ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' : 'text-gray-700 dark:text-gray-200'"><span>Auto (recommended)</span><span x-show="screenFit === 'auto'" class="text-purple-600 dark:text-purple-400">✓</span></button>
+                <button @click="setFit(0.8)" class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold hover:bg-purple-50 dark:hover:bg-purple-900/20 transition" :class="screenFit === 0.8 ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' : 'text-gray-700 dark:text-gray-200'"><span>80% — compact</span><span x-show="screenFit === 0.8" class="text-purple-600 dark:text-purple-400">✓</span></button>
+                <button @click="setFit(0.9)" class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold hover:bg-purple-50 dark:hover:bg-purple-900/20 transition" :class="screenFit === 0.9 ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' : 'text-gray-700 dark:text-gray-200'"><span>90%</span><span x-show="screenFit === 0.9" class="text-purple-600 dark:text-purple-400">✓</span></button>
+                <button @click="setFit(1)" class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold hover:bg-purple-50 dark:hover:bg-purple-900/20 transition" :class="screenFit === 1 ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' : 'text-gray-700 dark:text-gray-200'"><span>100% — standard</span><span x-show="screenFit === 1" class="text-purple-600 dark:text-purple-400">✓</span></button>
+                <button @click="setFit(1.1)" class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold hover:bg-purple-50 dark:hover:bg-purple-900/20 transition" :class="screenFit === 1.1 ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' : 'text-gray-700 dark:text-gray-200'"><span>110%</span><span x-show="screenFit === 1.1" class="text-purple-600 dark:text-purple-400">✓</span></button>
+                <button @click="setFit(1.25)" class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold hover:bg-purple-50 dark:hover:bg-purple-900/20 transition" :class="screenFit === 1.25 ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' : 'text-gray-700 dark:text-gray-200'"><span>125% — large screens</span><span x-show="screenFit === 1.25" class="text-purple-600 dark:text-purple-400">✓</span></button>
+            </div>
+        </div>
 
         <button @click="showShortcuts = true" class="hidden sm:flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-purple-50 hover:text-purple-600 hover:border-purple-300 transition flex-shrink-0" title="Keyboard Shortcuts (F1)">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3C6.5 3 2 6.58 2 11c0 2.24 1.12 4.27 2.94 5.72L4 21l4.28-2.55c1.15.35 2.4.55 3.72.55 5.5 0 10-3.58 10-8s-4.5-8-10-8z"/></svg>
@@ -743,7 +766,7 @@ window.addEventListener('popstate', function() {
             </button>
         </div>
 
-        <div class="w-full md:w-[340px] lg:w-[380px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl" :class="mobileView === 'cart' ? 'flex' : 'hidden md:flex'">
+        <div class="w-full md:w-[300px] lg:w-[340px] xl:w-[380px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl" :class="mobileView === 'cart' ? 'flex' : 'hidden md:flex'">
             <div class="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
                 <button @click="mobileView = 'menu'" class="md:hidden p-1.5 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
@@ -2377,9 +2400,61 @@ function restaurantPos() {
             }
         },
 
+        // ── Screen Fit (Jul 2026): sale screen adapts to ANY display size ──
+        // 'auto' derives a zoom factor from viewport width/height (small shop
+        // laptops / low-res terminals scale DOWN, very large TVs scale UP a bit);
+        // a manual % choice is saved per device in localStorage 'tn_screen_fit'.
+        // The root div gets CSS zoom + a px height divided by the zoom so the
+        // layout still fills exactly the space under the 48px top nav (viewport
+        // units are NOT reliable inside a zoomed subtree — px are).
+        screenFit: 'auto',
+        fitZoom: 1,
+        fitStyleStr: '',
+        showFitMenu: false,
+        initFit() {
+            try {
+                const s = localStorage.getItem('tn_screen_fit');
+                if (s) this.screenFit = (s === 'auto') ? 'auto' : (parseFloat(s) || 'auto');
+            } catch (e) {}
+            this.applyFit();
+            window.addEventListener('resize', () => this.applyFit());
+        },
+        computeAutoFit() {
+            const w = window.innerWidth, h = window.innerHeight;
+            if (w < 768) return 1; // <md uses the dedicated mobile menu/cart layout
+            let f = 1;
+            if (w < 1360) f = 0.9;
+            if (w < 1150) f = 0.85;
+            if (w < 1000) f = 0.8;
+            if (h < 700) f = Math.min(f, 0.9);
+            if (h < 600) f = Math.min(f, 0.85);
+            if (h < 520) f = Math.min(f, 0.8);
+            if (w >= 2300 && h >= 1100) f = 1.15; // very large displays: don't look microscopic
+            return f;
+        },
+        applyFit() {
+            const f = this.screenFit === 'auto'
+                ? this.computeAutoFit()
+                : Math.min(1.5, Math.max(0.6, parseFloat(this.screenFit) || 1));
+            this.fitZoom = f;
+            // Guard: if the browser lacks CSS zoom, applying only the px height would
+            // make the root taller than the viewport and clip the Pay button — worse
+            // than no scaling at all. In that case keep the plain 100% layout.
+            const zoomOk = (typeof CSS !== 'undefined' && CSS.supports && CSS.supports('zoom', '0.9'));
+            this.fitStyleStr = (f === 1 || !zoomOk) ? '' : ('zoom:' + f + ';height:' + Math.round((window.innerHeight - 48) / f) + 'px');
+        },
+        setFit(v) {
+            this.screenFit = v;
+            try { localStorage.setItem('tn_screen_fit', String(v)); } catch (e) {}
+            this.applyFit();
+            this.showFitMenu = false;
+        },
+        fitLabel() { return this.screenFit === 'auto' ? 'Fit' : Math.round(this.screenFit * 100) + '%'; },
+
         init() {
             if (this._inited) return;
             this._inited = true;
+            this.initFit();
             // Honor the saved "hide products" preference ONLY in inventory-OFF mode.
             // Inventory mode must always show the catalog (no manual on-the-fly create).
             try { if (!this.isInventoryEnabled() && localStorage.getItem('pos_show_products') === '0') this.showProducts = false; } catch (e) {}

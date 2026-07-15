@@ -20,7 +20,7 @@ return new class extends Migration
         $limits = [
             'Starter'   => ['invoice_limit' => 500,  'user_limit' => 1,  'branch_limit' => 1,  'restaurant_enabled' => 0],
             'Business'  => ['invoice_limit' => 2000, 'user_limit' => 5,  'branch_limit' => 1,  'restaurant_enabled' => 0],
-            'Pro'       => ['invoice_limit' => -1,   'user_limit' => 10, 'branch_limit' => 2,  'restaurant_enabled' => 1],
+            'Pro'       => ['invoice_limit' => 3000, 'user_limit' => 10, 'branch_limit' => 2,  'restaurant_enabled' => 1],
             'Unlimited' => ['invoice_limit' => -1,   'user_limit' => -1, 'branch_limit' => -1, 'restaurant_enabled' => 1],
         ];
 
@@ -36,6 +36,7 @@ return new class extends Migration
             ->where('name', 'Unlimited')
             ->update([
                 'features' => json_encode([
+                    'UNLIMITED bills every month — no cap, ever (Pro: 3,000/month)',
                     'UNLIMITED team accounts — every cashier, manager, waiter & kitchen login you need (Pro stops at 10)',
                     'UNLIMITED branches — run all your locations on one account (Pro: 2)',
                     'Every current AND future feature unlocked forever — nothing is ever locked again',

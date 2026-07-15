@@ -6,7 +6,7 @@ description: What actually gates plan features vs what the features JSON does; h
 # pricing_plans.features JSON is DISPLAY-ONLY
 
 **Rule:** No PHP code consumes `pricing_plans.features` programmatically — it is pure marketing copy rendered on plan cards. Actual enforcement lives elsewhere:
-- Restaurant gate = `pricing_plans.restaurant_enabled` COLUMN (PosFeatureService, ~line 311).
+- Restaurant gate = `pricing_plans.restaurant_enabled` COLUMN OR an active (non-expired) trial subscription (owner decision Jul 2026: trials get restaurant/kitchen to evaluate; mask returns automatically on expiry) — see `PosFeatureService::restaurantAllowed()`.
 - Numeric limits = `invoice_limit` / `user_limit` / `branch_limit` columns via PlanLimitService.
 - Everything else (deals, offline sync, guided billing, etc.) is NOT plan-gated — listing them under higher tiers is deliberate upsell positioning, not enforcement.
 

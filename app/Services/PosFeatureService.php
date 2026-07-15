@@ -310,6 +310,12 @@ class PosFeatureService
                     $allowed = true;
                 } elseif ($sub->pricingPlan && $sub->pricingPlan->restaurant_enabled) {
                     $allowed = true;
+                } elseif ($sub->isTrialActive()) {
+                    // Owner decision (Jul 2026): active-trial companies get the
+                    // Restaurant module so they can evaluate it before buying.
+                    // When the trial expires the mask returns automatically —
+                    // stored feature_flags are never touched.
+                    $allowed = true;
                 }
             }
         }

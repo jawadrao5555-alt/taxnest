@@ -8,6 +8,10 @@
     // Single source of truth = companies.restaurant_mode (toggle in Business Profile).
     // Disable that toggle → restaurant nav items disappear immediately, regardless of business_category or pos_type.
     $isRestaurantLayout = $companyLayout && (bool) $companyLayout->restaurant_mode;
+    // Nav visibility for Tables/KDS follows the EFFECTIVE feature flags (Task Jul 2026):
+    // matches what the restaurant.only middleware actually allows, regardless of
+    // the restaurant_mode toggle. Dashboard routing above stays on restaurant_mode.
+    $posFeaturesLayout = \App\Services\PosFeatureService::forCompany($companyLayout);
     // POS UNIFICATION: every company (restaurant or retail) now bills on the single
     // universal sale screen (pos.universal). The legacy restaurant sale screen and its
     // per-company opt-out were retired — restaurant behavior is driven by feature flags.
@@ -413,11 +417,13 @@
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                         Customers
                                     </a>
-                                    @if($isRestaurantLayout && !$isCashierLayout)
+                                    @if($posFeaturesLayout->tables && !$isCashierLayout)
                                     <a href="{{ route('pos.restaurant.tables') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"/></svg>
                                         Tables
                                     </a>
+                                    @endif
+                                    @if($posFeaturesLayout->kitchen && !$isCashierLayout)
                                     <a href="{{ route('pos.restaurant.kds') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                                         Kitchen Display

@@ -1045,7 +1045,10 @@ window.addEventListener('popstate', function() {
     <div x-show="showTablePicker" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showTablePicker = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md max-h-[70vh] overflow-hidden" x-transition.scale.90>
             <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Select Table</h3>
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">Select Table</h3>
+                    <p class="text-[10px] text-gray-400 mt-0.5">&uarr; &darr; &larr; &rarr; select &middot; Enter reserve &middot; Esc close</p>
+                </div>
                 <button @click="showTablePicker = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
             </div>
             {{-- F3 Dine-In (Jul 2026): LIVE floors + tables, refreshed on every open via
@@ -1064,7 +1067,7 @@ window.addEventListener('popstate', function() {
                         <div class="grid grid-cols-3 gap-2">
                             <template x-for="t in floor.tables" :key="t.id">
                                 <button @click="selectTable(t)" :disabled="t.status === 'occupied'" class="py-3 px-2 rounded-xl text-center border-2 transition"
-                                    :class="t.status === 'occupied' ? 'border-red-300 bg-red-50 dark:bg-red-900/20 cursor-not-allowed' : (t.status === 'reserved' ? 'border-amber-300 bg-amber-50 dark:bg-amber-900/20 hover:border-amber-400 hover:scale-105' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-purple-400 hover:scale-105')">
+                                    :class="(t.status === 'occupied' ? 'border-red-300 bg-red-50 dark:bg-red-900/20 cursor-not-allowed' : (t.status === 'reserved' ? 'border-amber-300 bg-amber-50 dark:bg-amber-900/20 hover:border-amber-400 hover:scale-105' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-purple-400 hover:scale-105')) + (tablePickerFlat()[tablePickerIndex]?.id === t.id ? ' ring-2 ring-emerald-500 ring-offset-1 dark:ring-offset-gray-900' : '')">
                                     {{-- Top-view table + chairs diagram (color = status) --}}
                                     <svg viewBox="0 0 48 48" class="w-8 h-8 mx-auto mb-1" :class="t.status === 'occupied' ? 'text-red-500' : (t.status === 'reserved' ? 'text-amber-500' : 'text-green-500 dark:text-green-400')" fill="currentColor" aria-hidden="true">
                                         <rect x="17" y="1.5" width="14" height="7" rx="3"/>
@@ -2194,6 +2197,7 @@ function restaurantPos() {
         selectedTable: {!! $jsEnc($selectedTableJson, 'null') !!},
         heldOrders: {!! $jsEnc($heldOrders) !!},
         showTablePicker: false,
+        tablePickerIndex: 0,
         // F3 Dine-In — live floors/tables for the picker modal (fetched on open).
         tableFloors: [],
         tablesLoading: false,
@@ -2625,6 +2629,11 @@ function restaurantPos() {
             // re-seeds the highlight back to the current orderType and never confirms.
             // !e?.repeat mirrors the document-path held-Enter guard in handleKey.
             if (this.guidedFlow && this.flowStep === 'type') { if (!e?.repeat) this.confirmGuidedType(); return; }
+            // TABLE PICKER open + focus raced back into the search box: the input's
+            // .stop keeps Enter from reaching handleKey's picker branch, so forward
+            // it here (same pattern as the type-step forwarding above) — Enter must
+            // reserve the highlighted table, never re-run search/guided logic.
+            if (this.showTablePicker) { if (!e?.repeat) { const t = this.tablePickerFlat()[this.tablePickerIndex]; if (t) this.selectTable(t); } return; }
             // BARCODE SCAN fast path: scanner's Enter can arrive BEFORE the 60ms search
             // debounce fills the dropdown — an exact barcode/SKU match must add instantly
             // here, or (inventory-OFF) the scan would fall through to quick-CREATE a bogus
@@ -2647,7 +2656,7 @@ function restaurantPos() {
             // When the company has 2+ order types, it first opens the Order-Type step
             // (dine in / takeaway / delivery) — the owner-specified step between Items and
             // Cart. Single-type companies skip straight to the cart (byte-identical to before).
-            if (this.guidedFlow && this.searchQuery.trim().length === 0 && this.cart.length > 0) {
+            if (this.guidedFlow && this.searchQuery.trim().length === 0 && this.cart.length > 0 && !this.showTablePicker) {
                 if (this.guidedOrderTypes().length > 1) { this.enterTypeStep(); return; }
                 this.flowStep = 'cart';
                 this.enterCartMode('last');
@@ -3332,6 +3341,25 @@ function restaurantPos() {
                 return;
             }
             // ═══════════════════════════════════════════════════════════════
+            // DINE-IN TABLE PICKER — owns the keyboard while open (same pattern
+            // as the order-type step above). Arrows move the highlight across
+            // the flattened floor/table grid, Enter reserves the highlighted
+            // table (selectTable resumes the guided chain into cart mode),
+            // Esc closes. Everything else is swallowed so keystrokes can't
+            // re-open the order-type overlay or type into the search box
+            // behind the modal (that stacking is what broke the flow).
+            // ═══════════════════════════════════════════════════════════════
+            if (this.showTablePicker) {
+                const flat = this.tablePickerFlat();
+                const n = flat.length;
+                if ((e.key === 'ArrowRight' || e.key === 'ArrowDown') && n) { e.preventDefault(); this.tablePickerIndex = (this.tablePickerIndex + 1) % n; return; }
+                if ((e.key === 'ArrowLeft' || e.key === 'ArrowUp') && n)  { e.preventDefault(); this.tablePickerIndex = (this.tablePickerIndex - 1 + n) % n; return; }
+                if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); const t = flat[this.tablePickerIndex]; if (t) this.selectTable(t); return; }
+                if (e.key === 'Escape') { e.preventDefault(); this.showTablePicker = false; return; }
+                if (/^F\d+$/.test(e.key) || ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'e'))) { e.preventDefault(); }
+                return;
+            }
+            // ═══════════════════════════════════════════════════════════════
             // GLOBAL FUNCTION-KEY SHORTCUTS — fire FIRST, regardless of focus.
             // Without this, search/qty inputs swallow F1-F8 (and F5 would even
             // reload the browser). preventDefault on document-level handler
@@ -3684,7 +3712,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.incomingOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.fixCartIndex(); this.clearCartStorage(); },
+        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.incomingOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm('Current order has ' + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast('New sale started', 'success');
@@ -3708,7 +3736,19 @@ function restaurantPos() {
             if (this.selectedTable) { this.releaseTable(this.selectedTable.id); this.selectedTable = null; }
             this.orderType = type;
         },
-        openTablePicker() { this.showTablePicker = true; this.loadTableStatus(); },
+        openTablePicker() {
+            this.showTablePicker = true;
+            this.tablePickerIndex = 0;
+            // Blur any focused input so the picker's keyboard branch in handleKey
+            // (arrows/Enter/Esc) owns every keystroke — otherwise the search box
+            // keeps eating keys behind the modal and the guided chain dead-ends.
+            document.activeElement?.blur();
+            this.loadTableStatus();
+        },
+        // Flattened table list in visual order (floor by floor) — drives the
+        // keyboard highlight in the picker. Recomputed live so a status refresh
+        // can't desync highlight from the rendered grid.
+        tablePickerFlat() { return this.tableFloors.flatMap(f => f.tables); },
         async loadTableStatus() {
             this.tablesLoading = true;
             try {

@@ -105,11 +105,32 @@ is unaffected while delivery/restaurant-style companies get the picker.
 handler lives in `handleKey` placed right AFTER the `showManagerPinModal` capture block (so
 it owns Arrow/Enter/Esc and swallows F1–F8 / Ctrl+S+E while active) and `return`s for every
 key. `enterTypeStep()` seeds the highlight from the current `orderType` and blurs the search
-box; `confirmGuidedType()` commits `orderType` then calls `enterCartMode()`. Gate the
-empty-search→type transition on `cart.length > 0` (can't bill empty). Do NOT auto-open the
-table picker when "dine in" is chosen — owner's spec is type → cart directly; table stays an
-independent optional action. The overlay + all of this is gated on `guidedFlow`, so plain
-mode is byte-identical.
+box; `confirmGuidedType()` commits the type **through `setOrderType()`** then enters cart mode.
+Gate the empty-search→type transition on `cart.length > 0` (can't bill empty). The overlay +
+all of this is gated on `guidedFlow`, so plain mode is byte-identical.
+
+## Dine In in the type step MUST open the table picker (owner REVERSAL, mid-Jul 2026)
+The original spec said "type → cart directly, table stays optional" — the owner REVERSED this:
+choosing Dine In (guided type step OR the Dine In pill) must open the Select Table picker when
+no table is selected. Do NOT flip it back. The working shape:
+- `confirmGuidedType()` routes through `setOrderType(picked)` (never assigns `orderType`
+  directly — direct assignment silently skips the picker AND skips table release on switch-away).
+  It skips `enterCartMode` when the picker opened; `selectTable()` resumes the chain
+  (`guidedFlow && flowStep==='cart' && !cartMode → enterCartMode('last')`).
+- The picker is a full capturing keyboard state (same pattern as the type step): a
+  `showTablePicker` branch in `handleKey` right after the type branch — arrows move a highlight
+  across `tablePickerFlat()` (flattened floors), Enter (!e.repeat) reserves, Esc closes,
+  everything else swallowed. `openTablePicker()` seeds index 0 + blurs the active element.
+  The search input's Enter (`.prevent.stop`) must FORWARD to the picker (like the type-step
+  forwarding) and `addHighlightedItem`'s guided empty-Enter branch is gated `!showTablePicker`
+  — without both, Enter re-opens the type overlay UNDER the picker (z-stack mess = the owner's
+  "flow toot raha").
+- `clearCart()` resets `orderType='takeaway'` — a finished dine-in sale otherwise leaves
+  `orderType='dine_in'`, so the next sale's type step seeds on Dine In and a natural fast
+  Enter-Enter pops the picker "out of nowhere" (the owner's "table pehle show ho raha").
+**Why:** three separate root causes produced one vague symptom ("Dine In par table nahi aa
+raha / flow toot raha"); every new modal on this screen must own the keyboard like the type
+step or the document-level handleKey + `.stop`ped input handlers will fight it.
 
 **Universal placement specifics:** the type block sits at the VERY TOP of `handleKey` (before the
 global F-key hotkeys) so it fully owns the keyboard while active. Its Enter-confirm MUST carry

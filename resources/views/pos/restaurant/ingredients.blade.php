@@ -1,5 +1,5 @@
 <x-pos-layout>
-<div x-data="{ showAddModal: false, showAdjustModal: false, adjustId: null, adjustName: '', showEditModal: false, edit: { id: null, name: '', unit: '', cost: 0, min: 0, active: true }, openEdit(d) { this.edit = d; this.showEditModal = true } }" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div x-data="{ showAddModal: false, showAdjustModal: false, adjustId: null, adjustName: '', showEditModal: false, edit: { id: null, name: '', unit: '', cost: 0, min: 0, active: true }, openEdit(d) { this.edit = d; this.showEditModal = true }, q: '', ingredientNames: {{ json_encode($ingredients->map(fn($i) => mb_strtolower($i->name ?? ''))->values(), JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }} }" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Ingredients</h1>
@@ -16,9 +16,22 @@
     @endif
 
     @if($ingredients->count() > 0)
+    <div class="mb-4 relative w-full sm:max-w-md">
+        <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <input type="text" x-model="q" placeholder="Search ingredients…" autocomplete="off" name="ingredient_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+               class="w-full pl-10 pr-9 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+        <button type="button" x-show="q" x-cloak @click="q = ''" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" aria-label="Clear search">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+    </div>
+    <div x-show="q.trim() && !ingredientNames.some(n => n.includes(q.trim().toLowerCase()))" x-cloak class="mb-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400 text-center">
+        No ingredients match "<span class="font-semibold" x-text="q"></span>"
+    </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         @foreach($ingredients as $ingredient)
-        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+             data-search="{{ mb_strtolower($ingredient->name ?? '') }}"
+             x-show="!q.trim() || $el.dataset.search.includes(q.trim().toLowerCase())">
             <div class="p-4">
                 <div class="flex items-start justify-between mb-3">
                     <div>

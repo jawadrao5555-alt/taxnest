@@ -1,6 +1,8 @@
 <x-pos-layout>
 <div x-data="{
         showAddModal: false,
+        q: '',
+        recipeNames: {{ json_encode($recipes->map(fn($g) => mb_strtolower($g->first()->product->name ?? ''))->values(), JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }},
         selectedProduct: '',
         rows: [],
         newRow() { return { mode: 'existing', ingredient_id: '', name: '', unit: 'kg', cost: '', qty: '' } },
@@ -24,10 +26,23 @@
     @endif
 
     @if($recipes->count() > 0)
+    <div class="mb-4 relative w-full sm:max-w-md">
+        <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <input type="text" x-model="q" placeholder="Search product recipes…" autocomplete="off" name="recipe_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+               class="w-full pl-10 pr-9 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+        <button type="button" x-show="q" x-cloak @click="q = ''" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" aria-label="Clear search">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+    </div>
+    <div x-show="q.trim() && !recipeNames.some(n => n.includes(q.trim().toLowerCase()))" x-cloak class="mb-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400 text-center">
+        No recipes match "<span class="font-semibold" x-text="q"></span>"
+    </div>
     <div class="space-y-4">
         @foreach($recipes as $productId => $productRecipes)
         @php $product = $productRecipes->first()->product; @endphp
-        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+             data-search="{{ mb_strtolower($product->name ?? '') }}"
+             x-show="!q.trim() || $el.dataset.search.includes(q.trim().toLowerCase())">
             <div class="px-5 py-4 bg-gray-50 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <span class="text-lg">🍳</span>

@@ -37,7 +37,7 @@
                     $isCurrent = $currentSubscription && $currentSubscription->pricing_plan_id === $plan->id;
                     $isPopular = $plan->name === 'Business';
                 @endphp
-                <div class="relative rounded-2xl overflow-hidden transition duration-300 hover:-translate-y-1 {{ $isPopular ? 'ring-2 ring-purple-500 shadow-lg shadow-purple-500/10' : 'shadow-sm' }}">
+                <div class="relative rounded-2xl overflow-hidden transition duration-300 hover:-translate-y-1 {{ $isPopular ? 'ring-2 ring-purple-500 shadow-lg' : 'shadow-sm' }}">
                     @if($isPopular)
                     <div class="bg-purple-600 text-center py-1.5">
                         <span class="text-white text-xs font-bold tracking-wide">MOST POPULAR</span>
@@ -60,38 +60,40 @@
                         <p class="text-xs text-gray-400">PKR {{ number_format($perMonth) }}/mo effective</p>
                         @if($hasOffer)<p class="text-xs text-purple-600 font-medium mt-0.5">Save PKR {{ number_format($compareYearly - $yearlyTotal) }}</p>@endif
 
-                        <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                {{ $plan->getInvoiceLimitDisplay() }} transactions/mo
+                        @php
+                            $planFeatures = is_array($plan->features) ? $plan->features : (is_string($plan->features) ? json_decode($plan->features, true) : []);
+                            $prevPlan = $loop->index > 0 ? ($plans[$loop->index - 1] ?? null) : null;
+                        @endphp
+                        <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-2 text-sm">
+                            <div class="flex items-center gap-2 font-semibold text-gray-800 dark:text-gray-200">
+                                <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                                {{ $plan->getInvoiceLimitDisplay() }} bills / month
                             </div>
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <div class="flex items-center gap-2 font-semibold text-gray-800 dark:text-gray-200">
+                                <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4z"/></svg>
                                 {{ $plan->getUserLimitDisplay() }} team account{{ $plan->user_limit === 1 ? '' : 's' }}
                             </div>
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                PRA fiscal receipts
+                            <div class="flex items-center gap-2 font-semibold text-gray-800 dark:text-gray-200">
+                                <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                                {{ $plan->getBranchLimitDisplay() }} branch{{ $plan->branch_limit === 1 ? '' : 'es' }}
                             </div>
-                            @if($plan->name !== 'Retail')
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Inventory management
-                            </div>
-                            @endif
-                            @if(in_array($plan->name, ['Industrial', 'Enterprise']))
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Offline mode + auto-sync
-                            </div>
-                            @endif
-                            @if($plan->name === 'Enterprise')
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Priority support
-                            </div>
-                            @endif
                         </div>
+
+                        @if(!empty($planFeatures))
+                        <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                            @if($prevPlan)
+                            <p class="text-[11px] font-bold uppercase tracking-wide text-purple-600 dark:text-purple-400 mb-2">Everything in {{ $prevPlan->name }}, plus:</p>
+                            @endif
+                            <div class="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                                @foreach($planFeatures as $feature)
+                                <div class="flex items-start gap-2">
+                                    <svg class="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    <span>{{ $feature }}</span>
+                                </div>
+                                @endforeach
+                            </div>
+                        </div>
+                        @endif
 
                         <div class="mt-5">
                             @if($isCurrent)

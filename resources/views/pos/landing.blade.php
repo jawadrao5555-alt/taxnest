@@ -298,15 +298,22 @@
                                     $perMonth = round($plan->sale_price / 12);
                                     $hasOffer = $plan->sale_percent > 0;
                                     $features = is_array($plan->features) ? $plan->features : (is_string($plan->features) ? json_decode($plan->features, true) : []);
+                                    $prevPlan = $loop->index > 0 ? ($plans[$loop->index - 1] ?? null) : null;
+                                    $isPopular = $plan->name === 'Business';
                                 @endphp
-                                <div class="p-5 border border-purple-700/20 bg-purple-50/30 relative overflow-hidden">
+                                <div class="p-5 border {{ $isPopular ? 'border-[#0A4D5C] ring-1 ring-[#0A4D5C]' : 'border-purple-700/20' }} bg-purple-50/30 relative overflow-hidden">
                                     @if($hasOffer)
                                         <div class="absolute top-0 right-0 bg-[#0A4D5C] text-white text-[10px] font-bold px-2 py-0.5">
                                             {{ $plan->sale_badge }}
                                         </div>
                                     @endif
                                     <div class="flex justify-between items-start mb-2">
-                                        <h5 class="font-bold text-gray-900">{{ $plan->name }}</h5>
+                                        <div>
+                                            <h5 class="font-bold text-gray-900">{{ $plan->name }}</h5>
+                                            @if($isPopular)
+                                                <span class="inline-block mt-1 px-2 py-0.5 bg-[#0A4D5C] text-white text-[9px] font-bold uppercase tracking-widest">Most Popular</span>
+                                            @endif
+                                        </div>
                                         <div class="text-right">
                                             @if($hasOffer)
                                                 <div class="text-[10px] text-gray-400 line-through mb-0.5">PKR {{ number_format($plan->price) }}</div>
@@ -314,16 +321,26 @@
                                             <div class="font-semibold text-xl text-[#0A4D5C]">PKR {{ number_format($plan->sale_price) }}<span class="text-sm text-gray-500 font-normal">/yr</span></div>
                                         </div>
                                     </div>
-                                    <p class="text-xs text-gray-500 mb-4">Effective: PKR {{ number_format($perMonth) }}/mo</p>
+                                    <p class="text-xs text-gray-500 mb-3">Effective: PKR {{ number_format($perMonth) }}/mo</p>
+                                    <p class="text-xs font-semibold text-gray-800 mb-1">
+                                        {{ $plan->getInvoiceLimitDisplay() }} bills/month
+                                        · {{ $plan->getUserLimitDisplay() }} team account{{ $plan->user_limit === 1 ? '' : 's' }}
+                                        · {{ $plan->getBranchLimitDisplay() }} branch{{ $plan->branch_limit === 1 ? '' : 'es' }}
+                                    </p>
                                     @if(!empty($features))
-                                        <ul class="space-y-2 mt-4 border-t border-purple-700/10 pt-4">
-                                            @foreach(array_slice($features, 0, 4) as $feature)
-                                            <li class="flex items-start text-sm text-gray-700">
-                                                <span class="text-[#0A4D5C] mr-2 mt-0.5 text-xs">■</span>
-                                                {{ $feature }}
-                                            </li>
-                                            @endforeach
-                                        </ul>
+                                        <div class="mt-4 border-t border-purple-700/10 pt-4">
+                                            @if($prevPlan)
+                                                <p class="text-[10px] font-bold uppercase tracking-widest text-[#0A4D5C] mb-2">Everything in {{ $prevPlan->name }}, plus:</p>
+                                            @endif
+                                            <ul class="space-y-2">
+                                                @foreach($features as $feature)
+                                                <li class="flex items-start text-sm text-gray-700">
+                                                    <span class="text-[#0A4D5C] mr-2 mt-0.5 text-xs">■</span>
+                                                    {{ $feature }}
+                                                </li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
                                     @endif
                                 </div>
                             @endforeach

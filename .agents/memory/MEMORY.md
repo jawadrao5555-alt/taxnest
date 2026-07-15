@@ -53,3 +53,4 @@
 - [PRA POS package limits](pos-package-limits.md) — monthly FINAL-bill quota + team-account quota; four gated final paths (incl. retryPra local-only + toggleCashier reactivation); provisionals free until promoted.
 - [PRA POS Deals rules](pos-deals-feature.md) — server-enforced price, snapshot-driven stock, billing-only (no hold/KOT); cart→payload builder flattens item_type — new cart types MUST be added to the type mapping + UI-payload tested.
 - [mobile.css global overrides](mobile-css-global-overrides.md) — mobile.css beats Tailwind on phones: forced table-cell vs .hidden, touch-target blobs on toggle pills, grid collapse needs grid-cols-keep; bump ?v= on edit.
+- [pricing_plans.features = display-only](pos-plan-features-display-only.md) — no code reads the JSON; restaurant gate = restaurant_enabled column; plan cards render limits from columns + cumulative lists.

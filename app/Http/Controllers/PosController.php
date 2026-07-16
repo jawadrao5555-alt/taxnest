@@ -217,22 +217,24 @@ class PosController extends Controller
             'transaction_id' => 'required_if:type,bill|nullable|integer',
             'restaurant_order_id' => 'required_if:type,kot|nullable|integer',
             'delta' => 'nullable|boolean',
+            // Counter/Station routing: a station-pinned KDS device enqueues ONLY
+            // its own counter's ticket (0 = main Kitchen bucket).
+            'station_id' => 'nullable|integer',
         ]);
 
         $settings = $company->printerSettings();
         if (!$settings['silent_print_enabled']) {
             return response()->json(['success' => false, 'reason' => 'disabled'], 409);
         }
-        $targetPrinter = $validated['type'] === 'bill' ? $settings['receipt_printer'] : $settings['kot_printer'];
-        if (!$targetPrinter) {
-            return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
-        }
         if (!$company->agentOnline()) {
             return response()->json(['success' => false, 'reason' => 'agent_offline'], 409);
         }
 
-        // Ownership checks — never enqueue another company's documents.
+        // ── BILL: single job, receipt printer (unchanged behavior) ─────────
         if ($validated['type'] === 'bill') {
+            if (!$settings['receipt_printer']) {
+                return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
+            }
             $exists = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->where('id', (int) $validated['transaction_id'])
@@ -240,27 +242,93 @@ class PosController extends Controller
             if (!$exists) {
                 return response()->json(['success' => false, 'reason' => 'not_found'], 404);
             }
-        } else {
-            $exists = \App\Models\RestaurantOrder::where('company_id', $companyId)
-                ->where('id', (int) $validated['restaurant_order_id'])
-                ->exists();
-            if (!$exists) {
-                return response()->json(['success' => false, 'reason' => 'not_found'], 404);
-            }
+            $job = \App\Models\PosPrintJob::create([
+                'company_id' => $companyId,
+                'type' => 'bill',
+                'target_printer' => $settings['receipt_printer'],
+                'transaction_id' => (int) $validated['transaction_id'],
+                'status' => 'pending',
+                'created_by' => $user->id,
+            ]);
+            return response()->json(['success' => true, 'job_id' => $job->id]);
         }
 
-        $job = \App\Models\PosPrintJob::create([
-            'company_id' => $companyId,
-            'type' => $validated['type'],
-            'target_printer' => $targetPrinter,
-            'transaction_id' => $validated['type'] === 'bill' ? (int) $validated['transaction_id'] : null,
-            'restaurant_order_id' => $validated['type'] === 'kot' ? (int) $validated['restaurant_order_id'] : null,
-            'render_query' => ($validated['type'] === 'kot' && $request->boolean('delta')) ? 'delta=1' : null,
-            'status' => 'pending',
-            'created_by' => $user->id,
-        ]);
+        // ── KOT ─────────────────────────────────────────────────────────────
+        $order = \App\Models\RestaurantOrder::where('company_id', $companyId)
+            ->with('items')
+            ->find((int) $validated['restaurant_order_id']);
+        if (!$order) {
+            return response()->json(['success' => false, 'reason' => 'not_found'], 404);
+        }
 
-        return response()->json(['success' => true, 'job_id' => $job->id]);
+        $delta = $request->boolean('delta');
+        $deltaQ = $delta ? '&delta=1' : '';
+        $stations = \App\Models\PosStation::activeFor($companyId);
+        $makeJob = function (?string $printer, ?string $renderQuery) use ($companyId, $order, $user) {
+            return \App\Models\PosPrintJob::create([
+                'company_id' => $companyId,
+                'type' => 'kot',
+                'target_printer' => $printer,
+                'restaurant_order_id' => $order->id,
+                'render_query' => $renderQuery,
+                'status' => 'pending',
+                'created_by' => $user->id,
+            ]);
+        };
+
+        // Zero stations => single full/delta KOT on the company KOT printer
+        // (byte-identical to pre-station behavior).
+        if ($stations->isEmpty()) {
+            if (!$settings['kot_printer']) {
+                return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
+            }
+            $job = $makeJob($settings['kot_printer'], $delta ? 'delta=1' : null);
+            return response()->json(['success' => true, 'job_id' => $job->id]);
+        }
+
+        // Station-pinned device (KDS counter screen): ONE job for that bucket.
+        if ($request->filled('station_id')) {
+            $sid = (int) $validated['station_id'];
+            $station = $sid === \App\Models\PosStation::DEFAULT_ID ? null : $stations->firstWhere('id', $sid);
+            if ($sid !== \App\Models\PosStation::DEFAULT_ID && !$station) {
+                return response()->json(['success' => false, 'reason' => 'not_found'], 404);
+            }
+            $printer = ($station->printer_name ?? null) ?: $settings['kot_printer'];
+            if (!$printer) {
+                return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
+            }
+            $job = $makeJob($printer, 'station=' . $sid . $deltaQ);
+            return response()->json(['success' => true, 'job_id' => $job->id]);
+        }
+
+        // Cashier path with stations configured: SPLIT — one job per station
+        // that actually has items, each to its own printer (fallback: company
+        // KOT printer). Agent renders each with render_query station=ID; empty
+        // buckets never become jobs. If ANY bucket lacks a printer, 409 so the
+        // caller falls back to the classic full-ticket popup (nothing lost).
+        $baseItems = $delta ? $order->items->whereNull('kot_printed_at')->values() : $order->items;
+        $itemMap = \App\Models\PosStation::mapItems($companyId, $stations, $baseItems);
+        $sids = collect($itemMap)->values()->unique()->sort()->values();
+
+        if ($sids->isEmpty()) {
+            // Nothing to print (e.g. delta with no unprinted rows) — succeed with no jobs.
+            return response()->json(['success' => true, 'job_ids' => []]);
+        }
+
+        $plan = [];
+        foreach ($sids as $sid) {
+            $station = $sid === \App\Models\PosStation::DEFAULT_ID ? null : $stations->firstWhere('id', $sid);
+            $printer = ($station->printer_name ?? null) ?: $settings['kot_printer'];
+            if (!$printer) {
+                return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
+            }
+            $plan[] = [$printer, 'station=' . $sid . $deltaQ];
+        }
+        $jobIds = [];
+        foreach ($plan as [$printer, $rq]) {
+            $jobIds[] = $makeJob($printer, $rq)->id;
+        }
+        return response()->json(['success' => true, 'job_ids' => $jobIds]);
     }
 
     /**

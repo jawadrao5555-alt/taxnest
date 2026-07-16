@@ -94,7 +94,7 @@
         @if($order->priority ?? false)
             <p class="priority-badge mt-1">!!! RUSH !!!</p>
         @endif
-        <p class="text-xl bold mt-1">*** KITCHEN ***</p>
+        <p class="text-xl bold mt-1">*** {{ strtoupper($stationLabel ?? 'KITCHEN') }} ***</p>
         <p class="text-lg bold mt-1">{{ $order->order_number }}</p>
         {{-- Item #6: stable per-print-batch number — delta tickets get their own KOT #
              so the kitchen can reference "KOT #2 of table 5" (stamped, not counted). --}}
@@ -132,14 +132,20 @@
     @endif
 
     @php
-        // P7 delta-KOT: $ticketItems = NULL-kot_printed_at rows only when ?delta=1.
-        $grouped = ($ticketItems ?? $order->items)->groupBy(function($item) {
-            if ($item->item_type === 'service') return 'Services';
-            $product = \App\Models\PosProduct::find($item->item_id);
-            return $product && $product->category ? $product->category : 'General';
-        });
+        // Counter/Station routing (Jul 2026): grouping is resolved in the
+        // CONTROLLER (PosStation::prepareTicket — bulk lookup, no per-item
+        // queries). Stations configured => sections are STATION names;
+        // zero stations => legacy raw-category sections. $stationLabel set
+        // means this ticket is already server-filtered to ONE station.
+        $grouped = $grouped ?? collect();
         $stationNames = $grouped->keys()->toArray();
     @endphp
+
+    @if(($ticketItems ?? collect())->isEmpty())
+    <div class="mt-1" style="border: 2px dashed #000; padding: 6px; text-align: center;">
+        <span class="bold text-sm">NO ITEMS FOR THIS COUNTER</span>
+    </div>
+    @endif
 
     @foreach($grouped as $station => $items)
         <div class="station-section" data-station="{{ $station }}">
@@ -253,6 +259,12 @@
             } catch (e) { console.warn('QR render failed', e); }
         }
 
+        // Counter/Station routing: when the server already filtered this ticket to one
+        // station ($stationLabel set), the legacy client-side ?station= name filter must
+        // NOT run (its param is an id, not a section label — it would hide everything).
+        const serverStationFiltered = {{ isset($stationLabel) && $stationLabel !== null ? 'true' : 'false' }};
+        const ticketHasItems = {{ ($ticketItems ?? collect())->count() > 0 ? 'true' : 'false' }};
+
         window.onload = function() {
             renderBarcode();
             const urlParams = new URLSearchParams(window.location.search);
@@ -260,6 +272,17 @@
             const frameSignal = urlParams.get('_signal'); // sent by parent for postMessage routing
             if (urlParams.get('auto_print') === '1' && !hasPrinted) {
                 hasPrinted = true;
+                // Race guard: a station-filtered ticket can come up empty (another
+                // device printed these rows first). Never fire a blank print —
+                // signal the parent (or close the popup) and stop.
+                if (!ticketHasItems) {
+                    if (isInIframe && frameSignal) {
+                        try { window.parent.postMessage({ type: 'pos_print_done', signal: frameSignal }, '*'); } catch (e) {}
+                    } else {
+                        setTimeout(function() { window.close(); }, 300);
+                    }
+                    return;
+                }
                 // When inside the parent's hidden print iframe, attach afterprint INSIDE the iframe
                 // (where it's spec-reliable) and signal the parent via postMessage when the print
                 // dialog actually closes. Parent uses this signal to enforce strict print ordering.
@@ -283,7 +306,7 @@
                 setTimeout(function() { window.print(); }, 200);
             }
             const station = urlParams.get('station');
-            if (station && !isInIframe) {
+            if (station && !isInIframe && !serverStationFiltered) {
                 setTimeout(() => printStation(station), 600);
             }
         };

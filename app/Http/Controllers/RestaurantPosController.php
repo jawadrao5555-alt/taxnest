@@ -979,7 +979,130 @@ class RestaurantPosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        return view('pos.restaurant.kitchen-settings', compact('company'));
+
+        // Counter/Station routing (owner, Jul 2026): stations claim product
+        // categories; unmatched items fall to the main Kitchen.
+        $stations = \App\Models\PosStation::where('company_id', $companyId)
+            ->orderBy('sort')->orderBy('id')->get();
+        $categories = \App\Models\PosProduct::where('company_id', $companyId)
+            ->whereNotNull('category')->where('category', '!=', '')
+            ->distinct()->orderBy('category')->pluck('category');
+        $printers = collect($company->printerSettings()['available_printers'])->pluck('name')->filter()->values();
+
+        return view('pos.restaurant.kitchen-settings', compact('company', 'stations', 'categories', 'printers'));
+    }
+
+    /**
+     * Counter/Station CRUD (admin-only). Validation rule: a category may be
+     * claimed by at most ONE active station per company — overlapping claims
+     * would make item routing ambiguous.
+     */
+    private function validateStationRequest(Request $request, int $companyId, ?int $ignoreStationId = null): array
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:60',
+            'categories' => 'nullable|array',
+            'categories.*' => 'string|max:100',
+            'printer_name' => 'nullable|string|max:255',
+            'is_active' => 'nullable|boolean',
+        ]);
+
+        $isActive = $request->boolean('is_active');
+        $categories = collect($validated['categories'] ?? [])
+            ->map(fn ($c) => trim((string) $c))->filter()->unique()->values();
+
+        // Duplicate counter names would merge sections on an unfiltered full
+        // ticket (routing by id stays correct, but the header reads wrong).
+        $name = trim($validated['name']);
+        $dupe = \App\Models\PosStation::where('company_id', $companyId)
+            ->when($ignoreStationId, fn ($q) => $q->where('id', '!=', $ignoreStationId))
+            ->get()
+            ->first(fn ($s) => mb_strtolower(trim($s->name)) === mb_strtolower($name));
+        if ($dupe) {
+            abort(redirect()->back()->withErrors([
+                'name' => "A counter named \"{$name}\" already exists.",
+            ])->withInput());
+        }
+
+        // Overlap check only matters when THIS station is active.
+        if ($isActive && $categories->isNotEmpty()) {
+            $others = \App\Models\PosStation::where('company_id', $companyId)
+                ->where('is_active', true)
+                ->when($ignoreStationId, fn ($q) => $q->where('id', '!=', $ignoreStationId))
+                ->get();
+            $claimed = \App\Models\PosStation::categoryMap($others); // catKey => station_id
+            foreach ($categories as $cat) {
+                $key = \App\Models\PosStation::catKey($cat);
+                if (isset($claimed[$key])) {
+                    $ownerName = optional($others->firstWhere('id', $claimed[$key]))->name ?? 'another counter';
+                    abort(redirect()->back()->withErrors([
+                        'categories' => "Category \"{$cat}\" is already assigned to counter \"{$ownerName}\". A category can belong to only one active counter.",
+                    ])->withInput());
+                }
+            }
+        }
+
+        // Printer must be one the agent actually reported (or blank = use company
+        // KOT printer). Unknown name = loud error, NOT a silent null — otherwise
+        // the admin believes a dedicated printer is set when it isn't.
+        $company = Company::find($companyId);
+        $known = collect($company->printerSettings()['available_printers'])->pluck('name')->all();
+        $printer = trim((string) ($validated['printer_name'] ?? ''));
+        if ($printer !== '' && !in_array($printer, $known, true)) {
+            abort(redirect()->back()->withErrors([
+                'printer_name' => "Printer \"{$printer}\" is not known to the Desktop Agent. Refresh the agent's printer list or leave blank to use the company KOT printer.",
+            ])->withInput());
+        }
+        $printer = $printer !== '' ? $printer : null;
+
+        return [
+            'name' => $name,
+            'categories' => $categories->all(),
+            'printer_name' => $printer,
+            'is_active' => $isActive,
+        ];
+    }
+
+    public function storeStation(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->isPosCashier()) {
+            abort(403, 'Only POS administrators can manage counters.');
+        }
+        $companyId = app('currentCompanyId');
+
+        $data = $this->validateStationRequest($request, $companyId);
+        $data['company_id'] = $companyId;
+        $data['sort'] = ((int) \App\Models\PosStation::where('company_id', $companyId)->max('sort')) + 1;
+        \App\Models\PosStation::create($data);
+
+        return back()->with('success', 'Counter added.');
+    }
+
+    public function updateStation(Request $request, $id)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->isPosCashier()) {
+            abort(403, 'Only POS administrators can manage counters.');
+        }
+        $companyId = app('currentCompanyId');
+        $station = \App\Models\PosStation::where('company_id', $companyId)->findOrFail($id);
+
+        $station->update($this->validateStationRequest($request, $companyId, (int) $station->id));
+
+        return back()->with('success', 'Counter updated.');
+    }
+
+    public function deleteStation(Request $request, $id)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->isPosCashier()) {
+            abort(403, 'Only POS administrators can manage counters.');
+        }
+        $companyId = app('currentCompanyId');
+        \App\Models\PosStation::where('company_id', $companyId)->findOrFail($id)->delete();
+
+        return back()->with('success', 'Counter removed. Its categories now print with the main Kitchen.');
     }
 
     public function updateKitchenSettings(Request $request)
@@ -1011,6 +1134,15 @@ class RestaurantPosController extends Controller
         $delta = $request->query('delta') == '1';
         $ticketItems = $delta ? $order->items->whereNull('kot_printed_at')->values() : $order->items;
 
+        // Counter/Station routing (owner, Jul 2026): optional ?station= filter
+        // (numeric id, 0 = main Kitchen). Zero configured stations => legacy
+        // raw-category grouping, no filter. Grouping resolved HERE (bulk lookup)
+        // — the blade never queries per item.
+        $prep = \App\Models\PosStation::prepareTicket($companyId, $ticketItems, $request->query('station'));
+        $ticketItems = $prep['items'];
+        $grouped = $prep['grouped'];
+        $stationLabel = $prep['stationLabel'];
+
         // Item #6 (owner, Jul 2026): every print BATCH carries a stable "KOT #N".
         // Reprints/plain views show the batch already stamped on the rendered rows.
         $kotBatchNo = $ticketItems->max('kot_batch_no');
@@ -1028,7 +1160,7 @@ class RestaurantPosController extends Controller
             $kotBatchNo = $nextBatch;
         }
 
-        return view('pos.restaurant.kitchen-ticket', compact('order', 'company', 'ticketItems', 'delta', 'kotBatchNo'));
+        return view('pos.restaurant.kitchen-ticket', compact('order', 'company', 'ticketItems', 'delta', 'kotBatchNo', 'grouped', 'stationLabel'));
     }
 
     /**

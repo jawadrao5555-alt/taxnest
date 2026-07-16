@@ -1,0 +1,183 @@
+Excellent investigation.
+
+However, before we permanently conclude that direct cloud submission to FBR POS Production is impossible, I need documentary evidence.
+
+Please answer the following questions with evidence.
+
+------------------------------------------------
+
+1.
+
+You concluded that FBR cloud submission has been retired because production returns Code 112.
+
+Provide the exact raw HTTP response.
+
+Include:
+
+HTTP Status
+
+Headers
+
+Body
+
+Timestamp
+
+Do not summarize.
+
+------------------------------------------------
+
+2.
+
+What is the exact JSON response containing Code 112?
+
+Paste it exactly as received.
+
+------------------------------------------------
+
+3.
+
+Is Code 112 documented anywhere by FBR?
+
+If yes,
+
+provide the document,
+
+page,
+
+section,
+
+or official source.
+
+------------------------------------------------
+
+4.
+
+Search official FBR POS documentation.
+
+Does FBR officially state that
+
+"Bulk data upload functionality is no more available"
+
+or
+
+"Cloud POS submission has been retired"
+
+Provide documentary proof.
+
+------------------------------------------------
+
+5.
+
+If cloud submission has been retired,
+
+how are currently approved cloud POS vendors submitting invoices?
+
+Investigate companies such as:
+
+X-WAY
+
+Techfas
+
+EasyPOS
+
+Retailium
+
+others integrated with FBR POS.
+
+Determine whether they use:
+
+A)
+
+direct cloud
+
+B)
+
+middleware
+
+C)
+
+desktop connector
+
+D)
+
+FBRIMS
+
+Support your answer with evidence.
+
+------------------------------------------------
+
+6.
+
+Is Code 112 returned for
+
+ALL production POSIDs,
+
+or only this POSID?
+
+Could it be
+
+merchant-specific,
+
+subscription-specific,
+
+or rollout-specific?
+
+------------------------------------------------
+
+7.
+
+Have we tested
+
+more than one
+
+production POS registration?
+
+If not,
+
+state that clearly.
+
+------------------------------------------------
+
+8.
+
+Search recent discussions,
+
+vendor documentation,
+
+release notes,
+
+or FBR circulars
+
+after 2024.
+
+Has anyone reported Code 112?
+
+Provide evidence.
+
+------------------------------------------------
+
+9.
+
+If cloud submission is retired,
+
+why does FBR still expose
+
+https://gw.fbr.gov.pk/imsp/v1/api/Live/PostData
+
+Explain technically.
+
+------------------------------------------------
+
+10.
+
+Final conclusion.
+
+Classify your confidence.
+
+High
+
+Medium
+
+Low
+
+Explain why.

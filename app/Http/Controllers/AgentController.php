@@ -523,11 +523,22 @@ class AgentController extends Controller
             $delta = ($q['delta'] ?? null) == '1';
             $ticketItems = $delta ? $order->items->whereNull('kot_printed_at')->values() : $order->items;
 
-            // Nothing left to print (another job already covered these items) —
-            // 204 tells the agent to mark the job done WITHOUT printing a blank.
-            if ($delta && $ticketItems->isEmpty()) {
+            // Counter/Station routing (Jul 2026): render_query may pin this job to
+            // one station (station=ID, 0 = main Kitchen). Same shared resolver as
+            // the kitchenTicket route — grouping/filtering never diverges.
+            $prep = \App\Models\PosStation::prepareTicket($company->id, $ticketItems, $q['station'] ?? null);
+            $ticketItems = $prep['items'];
+            $grouped = $prep['grouped'];
+            $stationLabel = $prep['stationLabel'];
+
+            // Nothing left to print (another job already covered these items, or
+            // this station has no rows) — 204 tells the agent to mark the job
+            // done WITHOUT printing a blank.
+            if ($ticketItems->isEmpty()) {
                 return response('', 204);
             }
+
+            $kotBatchNo = $ticketItems->max('kot_batch_no');
 
             // DON'T stamp kot_printed_at here — the physical print can still
             // fail after render (printer off, driver error). We record which
@@ -536,7 +547,7 @@ class AgentController extends Controller
             // SAME items (still NULL), so retries print identical content.
             $job->update(['printed_item_ids' => $ticketItems->pluck('id')->values()->all()]);
 
-            return response(view('pos.restaurant.kitchen-ticket', compact('order', 'company', 'ticketItems', 'delta'))->render())
+            return response(view('pos.restaurant.kitchen-ticket', compact('order', 'company', 'ticketItems', 'delta', 'kotBatchNo', 'grouped', 'stationLabel'))->render())
                 ->header('Content-Type', 'text/html; charset=UTF-8');
         }
 

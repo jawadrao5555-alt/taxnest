@@ -15,10 +15,22 @@
         </div>
         <div class="flex items-center gap-3 flex-wrap">
             <div class="flex gap-2 text-xs">
-                <span class="px-2 py-1 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">New: <span x-text="orders.filter(o => kstate(o) === 'new').length"></span></span>
-                <span class="px-2 py-1 rounded bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 font-medium">Preparing: <span x-text="orders.filter(o => kstate(o) === 'preparing').length"></span></span>
-                <span class="px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium">Ready: <span x-text="orders.filter(o => kstate(o) === 'ready').length"></span></span>
+                <span class="px-2 py-1 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">New: <span x-text="filteredOrders.filter(o => kstate(o) === 'new').length"></span></span>
+                <span class="px-2 py-1 rounded bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 font-medium">Preparing: <span x-text="filteredOrders.filter(o => kstate(o) === 'preparing').length"></span></span>
+                <span class="px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium">Ready: <span x-text="filteredOrders.filter(o => kstate(o) === 'ready').length"></span></span>
             </div>
+            @if(($kdsStations ?? collect())->isNotEmpty())
+            {{-- Counter/Station picker: pin THIS display to one counter — cards, items
+                 and auto-prints then cover only that counter's dishes. Persists per device. --}}
+            <select x-model="stationFilter"
+                    class="text-xs font-semibold rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 py-1.5 pl-2 pr-7 focus:ring-purple-500 focus:border-purple-500">
+                <option value="all">🍽 All Counters</option>
+                <option value="0">Main Kitchen</option>
+                @foreach($kdsStations as $st)
+                <option value="{{ $st->id }}">{{ $st->name }}</option>
+                @endforeach
+            </select>
+            @endif
             <div class="inline-flex rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600 text-xs font-semibold">
                 <button @click="viewMode = 'list'" :class="viewMode === 'list' ? 'bg-purple-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'" class="px-3 py-1.5">📋 List</button>
                 <button @click="viewMode = 'aggregate'" :class="viewMode === 'aggregate' ? 'bg-purple-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'" class="px-3 py-1.5">📊 Aggregate</button>
@@ -67,7 +79,7 @@
     {{-- LIST VIEW: order cards (default). Card state = KITCHEN lifecycle (new → preparing → ready → cleared),
          never the billing status — clearing removes from the board, the cashier's held bill survives. --}}
     <div x-show="viewMode === 'list'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        <template x-for="order in orders" :key="order.id">
+        <template x-for="order in filteredOrders" :key="order.id">
             <div :class="{
                 'border-amber-400 bg-amber-50 dark:bg-amber-900/10': kstate(order) === 'new',
                 'border-teal-400 bg-teal-50 dark:bg-teal-900/10': kstate(order) === 'preparing',
@@ -93,7 +105,7 @@
                 </div>
 
                 <div class="p-4 bg-white dark:bg-gray-800/50">
-                    <template x-for="(item, idx) in order.items" :key="idx">
+                    <template x-for="(item, idx) in myItems(order)" :key="idx">
                         <div class="flex items-start gap-2 py-1.5 border-b border-gray-100 dark:border-gray-700 last:border-0">
                             <span class="w-6 h-6 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 flex items-center justify-center text-xs font-bold flex-shrink-0" x-text="item.qty"></span>
                             <div class="flex-1 min-w-0">
@@ -124,7 +136,7 @@
         </template>
     </div>
 
-    <div x-show="orders.length === 0" class="text-center py-16">
+    <div x-show="filteredOrders.length === 0" class="text-center py-16">
         <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">All Clear!</h3>
         <p class="text-gray-500 dark:text-gray-400 text-sm">No active kitchen orders</p>
@@ -153,10 +165,11 @@
 </div>
 
 @php
-$kdsOrdersJson = $orders->map(function($o) {
+$stationItemMap = $stationItemMap ?? [];
+$kdsOrdersJson = $orders->map(function($o) use ($stationItemMap) {
     $elapsed = now()->diffInMinutes($o->created_at);
-    $items = $o->items->map(function($i) {
-        return ['name' => $i->item_name, 'qty' => $i->quantity, 'notes' => $i->special_notes];
+    $items = $o->items->map(function($i) use ($stationItemMap) {
+        return ['name' => $i->item_name, 'qty' => $i->quantity, 'notes' => $i->special_notes, 'station_id' => $stationItemMap[$i->id] ?? 0];
     })->values();
     return [
         'id' => $o->id,
@@ -167,6 +180,10 @@ $kdsOrdersJson = $orders->map(function($o) {
         'table' => $o->table ? $o->table->table_number : null,
         'items' => $items,
         'kitchen_notes' => $o->kitchen_notes,
+        'unprinted_count' => $o->items->whereNull('kot_printed_at')->count(),
+        'unprinted_by_station' => (object) $o->items->whereNull('kot_printed_at')
+            ->groupBy(fn($i) => (string)($stationItemMap[$i->id] ?? 0))
+            ->map->count()->toArray(),
         'elapsed_minutes' => $elapsed,
         'is_urgent' => $elapsed > 15,
         'created_at' => $o->created_at->format('H:i'),
@@ -186,6 +203,11 @@ function kdsScreen() {
         viewMode: (typeof localStorage !== 'undefined' && localStorage.getItem('kds_view_mode')) || 'list',
         cameraOpen: false,
         cameraScanner: null,
+        // Counter/Station routing: pin THIS display to one counter. 'all' = classic
+        // full-kitchen board. Persists per device; ?station= URL param overrides.
+        hasStations: {{ ($kdsStations ?? collect())->isNotEmpty() ? 'true' : 'false' }},
+        validStations: @json(collect($kdsStations ?? [])->pluck('id')->map(fn($i) => (string)$i)->prepend('0')->prepend('all')->values()),
+        stationFilter: 'all',
         // P6 (F5): KDS auto-print — this device prints the KOT for every NEW order
         // it sees. Printed ids persist in localStorage so a page refresh never
         // re-prints. First-ever load seeds the set with the current backlog
@@ -207,12 +229,23 @@ function kdsScreen() {
             return (k === 'new' || k === 'preparing' || k === 'ready') ? k : 'new';
         },
 
+        // Items belonging to this display's pinned counter ('all' = everything).
+        myItems(order) {
+            if (!this.hasStations || this.stationFilter === 'all') return order.items || [];
+            return (order.items || []).filter(i => String(i.station_id || 0) === String(this.stationFilter));
+        },
+
+        get filteredOrders() {
+            if (!this.hasStations || this.stationFilter === 'all') return this.orders;
+            return this.orders.filter(o => this.myItems(o).length > 0);
+        },
+
         get aggregateItems() {
             const map = new Map();
-            this.orders.forEach(o => {
+            this.filteredOrders.forEach(o => {
                 const k = this.kstate(o);
                 if (k !== 'new' && k !== 'preparing') return;
-                (o.items || []).forEach(it => {
+                this.myItems(o).forEach(it => {
                     const key = (it.name || '').trim();
                     if (!key) return;
                     if (!map.has(key)) map.set(key, { name: key, qty: 0, orders: 0 });
@@ -226,6 +259,7 @@ function kdsScreen() {
 
         startPolling() {
             this.$watch('viewMode', v => { try { localStorage.setItem('kds_view_mode', v); } catch(e){} });
+            this.initStation();
             this.initAutoPrint();
             this.polling = setInterval(() => this.refreshOrders(), 15000);
             this.timerInterval = setInterval(() => {
@@ -233,6 +267,16 @@ function kdsScreen() {
                 const hasUrgent = this.orders.some(o => o.elapsed_minutes > 15 && (this.kstate(o) === 'new' || this.kstate(o) === 'preparing'));
                 if (hasUrgent) this.playUrgentBeep();
             }, 60000);
+        },
+
+        initStation() {
+            if (!this.hasStations) return;
+            // Register the persist-watch FIRST so a ?station= URL override is
+            // also saved to localStorage (device stays pinned on next plain load).
+            this.$watch('stationFilter', s => { try { localStorage.setItem('kds_station', s); } catch(e) {} });
+            let v = new URLSearchParams(window.location.search).get('station');
+            if (v === null || v === '') { try { v = localStorage.getItem('kds_station'); } catch(e) {} }
+            if (v !== null && this.validStations.includes(String(v))) this.stationFilter = String(v);
         },
 
         playUrgentBeep() {
@@ -286,10 +330,18 @@ function kdsScreen() {
             } catch(e) {}
         },
 
+        // Pinned to one counter? Prints must cover ONLY that counter's items.
+        get stationPinned() {
+            return this.hasStations && this.stationFilter !== 'all';
+        },
+
         checkAutoPrint() {
             if (!this.autoPrintEnabled) return;
             this.orders.forEach(o => {
-                // Brand-new order → FULL ticket.
+                // Pinned counter: orders with no items for this counter are not
+                // ours — never queue OR mark them printed (items may arrive later).
+                if (this.stationPinned && this.myItems(o).length === 0) return;
+                // Brand-new order → FULL ticket (station-scoped when pinned).
                 if (!this.printedIds.includes(o.id)) {
                     if (!this.printQueue.some(q => q.id === o.id && !q.delta)) {
                         this.printQueue.push({ id: o.id, delta: false });
@@ -298,7 +350,12 @@ function kdsScreen() {
                 }
                 // P7: already-printed order grew NEW items (waiter append) → DELTA
                 // ticket: prints ONLY rows with kot_printed_at NULL, then stamps them.
-                if ((o.unprinted_count || 0) > 0) {
+                // Pinned counter: fire only when THIS counter's bucket grew — the
+                // order-wide count would fire blank tickets for other counters.
+                const unprinted = this.stationPinned
+                    ? Number((o.unprinted_by_station || {})[String(this.stationFilter)] || 0)
+                    : (o.unprinted_count || 0);
+                if (unprinted > 0) {
                     const last = this._deltaFiredAt[o.id] || 0;
                     if (!this.printQueue.some(q => q.id === o.id && q.delta) && (Date.now() - last) > 30000) {
                         this._deltaFiredAt[o.id] = Date.now();
@@ -334,10 +391,14 @@ function kdsScreen() {
             // (agent offline, feature disabled server-side, network) falls back to
             // the classic hidden-iframe print for THIS job only.
             if (this.silentKotPrint) {
+                const payload = { type: 'kot', restaurant_order_id: job.id, delta: !!job.delta };
+                // Pinned counter device: enqueue ONLY this counter's ticket (its
+                // printer). Un-pinned: server splits across counters by itself.
+                if (this.stationPinned) payload.station_id = Number(this.stationFilter);
                 fetch('/pos/api/print-jobs', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
-                    body: JSON.stringify({ type: 'kot', restaurant_order_id: job.id, delta: !!job.delta }),
+                    body: JSON.stringify(payload),
                 }).then(r => r.ok ? r.json().catch(() => null) : null).then(d => {
                     if (d && d.success) { this.finishCurrentPrint(); }
                     else { this._iframePrint(job); }
@@ -352,7 +413,8 @@ function kdsScreen() {
             const host = document.getElementById('kdsPrintHost');
             const frame = document.createElement('iframe');
             frame.id = 'kdsPrintFrame';
-            frame.src = `/pos/restaurant/orders/${job.id}/kitchen-ticket?auto_print=1${job.delta ? '&delta=1' : ''}&_signal=kds-${job.id}`;
+            const stationQ = this.stationPinned ? `&station=${encodeURIComponent(this.stationFilter)}` : '';
+            frame.src = `/pos/restaurant/orders/${job.id}/kitchen-ticket?auto_print=1${job.delta ? '&delta=1' : ''}${stationQ}&_signal=kds-${job.id}`;
             host.appendChild(frame);
             // Fallback: if the iframe never signals (blocked dialog etc.), move on.
             this.printFallbackTimer = setTimeout(() => this.finishCurrentPrint(), 25000);

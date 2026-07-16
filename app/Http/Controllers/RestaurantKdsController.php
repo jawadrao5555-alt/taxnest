@@ -31,7 +31,14 @@ class RestaurantKdsController extends Controller
         $ps = $company ? $company->printerSettings() : ['silent_print_enabled' => false, 'kot_printer' => null];
         $kdsSilentKot = (bool) ($ps['silent_print_enabled'] && $ps['kot_printer']);
 
-        return view('pos.restaurant.kds', compact('orders', 'kdsAutoPrint', 'kdsSilentKot'));
+        // Counter/Station routing (Jul 2026): this KDS device can pin itself to
+        // one counter — cards/items/prints then cover ONLY that counter's dishes.
+        $kdsStations = \App\Models\PosStation::activeFor($companyId);
+        $stationItemMap = $kdsStations->isEmpty()
+            ? []
+            : \App\Models\PosStation::mapItems($companyId, $kdsStations, $orders->pluck('items')->flatten(1));
+
+        return view('pos.restaurant.kds', compact('orders', 'kdsAutoPrint', 'kdsSilentKot', 'kdsStations', 'stationItemMap'));
     }
 
     /**
@@ -187,8 +194,16 @@ class RestaurantKdsController extends Controller
             ->whereNull('kitchen_cleared_at')
             ->with(['table', 'items', 'creator'])
             ->orderBy('created_at', 'asc')
-            ->get()
-            ->map(function ($o) {
+            ->get();
+
+        // Counter/Station routing: resolve station per item ONCE for the whole
+        // payload (2 bulk queries total — stations + product categories).
+        $stations = \App\Models\PosStation::activeFor($companyId);
+        $stationItemMap = $stations->isEmpty()
+            ? []
+            : \App\Models\PosStation::mapItems($companyId, $stations, $orders->pluck('items')->flatten(1));
+
+        $orders = $orders->map(function ($o) use ($stationItemMap) {
                 // Carbon 3 signed diff — measure FROM created_at TO now so elapsed is positive.
                 $elapsed = (int) $o->created_at->diffInMinutes(now());
                 return [
@@ -203,11 +218,18 @@ class RestaurantKdsController extends Controller
                         'name' => $i->item_name,
                         'qty' => $i->quantity,
                         'notes' => $i->special_notes,
+                        'station_id' => $stationItemMap[$i->id] ?? 0,
                     ]),
                     'kitchen_notes' => $o->kitchen_notes,
                     // P7 delta-KOT: appended (not-yet-printed) rows — KDS auto-print
                     // fires a delta ticket when this is > 0 on an already-printed order.
                     'unprinted_count' => $o->items->whereNull('kot_printed_at')->count(),
+                    // Per-station unprinted counts — a pinned counter's KDS fires its
+                    // delta ONLY when ITS bucket grew (order-wide count would fire
+                    // blank tickets on other counters). Keys are station-id strings.
+                    'unprinted_by_station' => (object) $o->items->whereNull('kot_printed_at')
+                        ->groupBy(fn ($i) => (string) ($stationItemMap[$i->id] ?? 0))
+                        ->map->count()->toArray(),
                     'source' => $o->source ?? 'pos',
                     'created_by' => $o->creator?->name ?? 'Unknown',
                     'elapsed_minutes' => $elapsed,

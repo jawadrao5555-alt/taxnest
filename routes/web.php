@@ -560,6 +560,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::prefix('restaurant')->middleware('feature:kitchen')->group(function () {
             Route::get('/kitchen-settings', [RestaurantPosController::class, 'kitchenSettings'])->name('pos.restaurant.kitchen-settings');
             Route::post('/kitchen-settings', [RestaurantPosController::class, 'updateKitchenSettings'])->name('pos.restaurant.kitchen-settings.update');
+            // Counter/Station KOT routing (owner, Jul 2026) — admin-only CRUD (guarded in controller).
+            Route::post('/stations', [RestaurantPosController::class, 'storeStation'])->name('pos.restaurant.stations.store');
+            Route::post('/stations/{id}', [RestaurantPosController::class, 'updateStation'])->name('pos.restaurant.stations.update');
+            Route::post('/stations/{id}/delete', [RestaurantPosController::class, 'deleteStation'])->name('pos.restaurant.stations.delete');
         });
         Route::prefix('restaurant')->middleware('feature:tables')->group(function () {
             Route::get('/table-management', [RestaurantTableController::class, 'manage'])->name('pos.restaurant.table-management');

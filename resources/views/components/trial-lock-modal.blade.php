@@ -44,9 +44,19 @@
         } elseif (auth('web')->check()) {
             $submitAction = route('payment-proof.store');
         }
+        $rejectedProof = null;
         if ($companyId && \Illuminate\Support\Facades\Schema::hasTable('payment_proofs')) {
             $pendingProof = \App\Models\PaymentProof::where('company_id', $companyId)
                 ->where('status', 'pending')->exists();
+            // No pending proof + the LATEST proof was rejected → show the
+            // reason right where the company resubmits.
+            if (!$pendingProof) {
+                $latestProof = \App\Models\PaymentProof::where('company_id', $companyId)
+                    ->orderByDesc('id')->first();
+                if ($latestProof && $latestProof->status === 'rejected') {
+                    $rejectedProof = $latestProof;
+                }
+            }
         }
         $forceOpen = session('payment_proof') || $errors->has('proof') || $errors->has('amount')
             || $errors->has('pricing_plan_id') || $errors->has('billing_cycle');
@@ -164,11 +174,17 @@
                     <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <span>Your payment proof is <strong>under review</strong>. We'll unlock your account as soon as our team verifies it.</span>
                 </div>
-                @elseif($submitAction && empty($lockPlans))
+                @elseif($submitAction && !empty($rejectedProof))
+                <div class="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-4 text-sm text-red-700 dark:text-red-300 flex items-start gap-2">
+                    <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>Your last payment proof was <strong>rejected</strong>{{ trim((string) $rejectedProof->reject_reason) !== '' ? ' — ' . $rejectedProof->reject_reason : '' }}. Please submit a new payment proof below.</span>
+                </div>
+                @endif
+                @if(!$pendingProof && $submitAction && empty($lockPlans))
                 <div class="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 text-sm text-amber-700 dark:text-amber-300">
                     No subscription packages are available for your account yet. Please contact support to subscribe.
                 </div>
-                @elseif($submitAction)
+                @elseif(!$pendingProof && $submitAction)
                 <form method="POST" action="{{ $submitAction }}" enctype="multipart/form-data"
                       x-data="{
                         plans: {{ \Illuminate\Support\Js::from($lockPlans) }},

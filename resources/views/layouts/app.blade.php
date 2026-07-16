@@ -287,6 +287,7 @@
                 @endif
 
                 <x-trial-reminder-banner />
+                <x-payment-status-banner />
 
                 <main class="flex-1 overflow-y-auto p-4 sm:p-6 main-scroll bg-gray-50 dark:bg-gray-950 page-fade">
                     @if(session('success'))

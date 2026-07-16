@@ -4,11 +4,15 @@ namespace App\Http\Controllers\SaasAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdminAuditLog;
+use App\Models\Company;
+use App\Models\Notification;
 use App\Models\PaymentProof;
 use App\Models\PricingPlan;
 use App\Services\SubscriptionAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
@@ -87,6 +91,8 @@ class AdminPaymentProofController extends Controller
             'subscription_id' => $subscription->id,
         ]);
 
+        $this->notifyCompany($proof->fresh(['company', 'pricingPlan']), 'approved');
+
         return back()->with('success', 'Payment approved & subscription activated — company is now unlocked.');
     }
 
@@ -116,6 +122,8 @@ class AdminPaymentProofController extends Controller
             'reason' => $request->reject_reason,
         ]);
 
+        $this->notifyCompany($proof->fresh(['company', 'pricingPlan']), 'rejected');
+
         return back()->with('success', 'Payment proof rejected. The company can submit a new one.');
     }
 
@@ -133,5 +141,122 @@ class AdminPaymentProofController extends Controller
         }
 
         return Storage::disk('local')->download($proof->proof_path);
+    }
+
+    /**
+     * Close the loop with the company after an admin decision: write an in-app
+     * notification row (shown on the DI dashboard + the cross-panel payment
+     * banner) and email the company admin. Mirrors the SendTrialReminders
+     * pattern — the notification row is written even if mail fails, and any
+     * failure here can NEVER break the admin's approve/reject action.
+     */
+    private function notifyCompany(?PaymentProof $proof, string $decision): void
+    {
+        try {
+            if (!$proof || !$proof->company) {
+                return;
+            }
+
+            $company = $proof->company;
+            $plan = $proof->pricingPlan;
+
+            $productLabel = match ($plan?->product_type ?? 'di') {
+                'pos' => 'NestPOS',
+                'fbrpos' => 'FBR POS',
+                default => 'TaxNest Digital Invoice',
+            };
+            $cycleLabels = [
+                'monthly' => 'Monthly',
+                'quarterly' => 'Quarterly',
+                'semi_annual' => 'Semi-Annual',
+                'annual' => 'Annual',
+                'yearly' => 'Annual',
+            ];
+            $cycleLabel = $cycleLabels[$proof->billing_cycle] ?? ucfirst((string) $proof->billing_cycle);
+            $planLine = $plan
+                ? ($plan->name . ($cycleLabel ? ' (' . $cycleLabel . ')' : ''))
+                : null;
+
+            if ($decision === 'approved') {
+                $title = 'Payment verified — account unlocked';
+                $message = 'Your payment has been verified'
+                    . ($planLine ? ' for the ' . $planLine . ' package' : '')
+                    . '. Your ' . $productLabel . ' account is now unlocked.';
+                $subject = 'Payment verified — your TaxNest account is unlocked';
+                $body = "Assalam-o-Alaikum,\n\n"
+                    . "Good news! Your payment for {$company->name} has been verified.\n\n"
+                    . ($planLine ? "Package: {$planLine}\n\n" : '')
+                    . "Your {$productLabel} account is now UNLOCKED — you can continue working right away.\n\n"
+                    . "Thank you for choosing TaxNest.\n\n"
+                    . "Team TaxNest";
+            } else {
+                $reason = trim((string) $proof->reject_reason);
+                $reasonLine = $reason !== '' ? $reason : 'No reason specified — please contact support.';
+                if (!str_ends_with($reasonLine, '.')) {
+                    $reasonLine .= '.';
+                }
+                $title = 'Payment proof rejected';
+                $message = 'Payment rejected: ' . $reasonLine . ' Please submit a new payment proof.';
+                $subject = 'Payment proof rejected — action required';
+                $body = "Assalam-o-Alaikum,\n\n"
+                    . "Unfortunately the payment proof you submitted for {$company->name} could not be verified.\n\n"
+                    . "Reason: {$reasonLine}\n\n"
+                    . "Please log in to your {$productLabel} account and submit a new payment proof. "
+                    . "If you believe this is a mistake, contact our support team on WhatsApp.\n\n"
+                    . "Team TaxNest";
+            }
+
+            Notification::create([
+                'company_id' => $company->id,
+                'type' => $decision === 'approved' ? 'payment_verified' : 'payment_rejected',
+                'title' => $title,
+                'message' => $message,
+                'read' => false,
+                'metadata' => [
+                    'payment_proof_id' => $proof->id,
+                    'product_type' => $plan?->product_type ?? 'di',
+                ],
+            ]);
+
+            $email = $this->companyRecipientEmail($company);
+            if ($email) {
+                try {
+                    Mail::raw($body, function ($m) use ($email, $subject) {
+                        $m->to($email)->subject($subject);
+                    });
+                } catch (\Throwable $e) {
+                    Log::warning('Payment decision email failed', [
+                        'payment_proof_id' => $proof->id,
+                        'company_id' => $company->id,
+                        'decision' => $decision,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Payment decision notification failed', [
+                'payment_proof_id' => $proof->id ?? null,
+                'decision' => $decision,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Company admin first (all three panels register their owner with
+     * role=company_admin), then the company email, then any user with one.
+     */
+    private function companyRecipientEmail(Company $company): ?string
+    {
+        $admin = $company->users()->where('role', 'company_admin')->orderBy('id')->first();
+        if ($admin && $admin->email) {
+            return $admin->email;
+        }
+        if ($company->email) {
+            return $company->email;
+        }
+        $any = $company->users()->whereNotNull('email')->orderBy('id')->first();
+
+        return $any->email ?? null;
     }
 }

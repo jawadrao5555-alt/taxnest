@@ -539,6 +539,7 @@
 
             <main class="flex-1 overflow-y-auto overflow-x-hidden main-scroll bg-slate-50 dark:bg-gray-950 page-fade" style="min-width: 0;">
                 <x-trial-reminder-banner />
+                <x-payment-status-banner />
                 <x-trial-restaurant-notice />
                 @if(session('success'))
                     <div class="max-w-7xl mx-auto px-4 sm:px-6 pt-4">

@@ -20,12 +20,14 @@ class PaymentProof extends Model
         'verified_by',
         'verified_at',
         'reject_reason',
+        'file_pruned_at',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
         'payment_date' => 'date',
         'verified_at' => 'datetime',
+        'file_pruned_at' => 'datetime',
     ];
 
     public function company()

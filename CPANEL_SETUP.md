@@ -80,6 +80,9 @@ cPanel > **Cron Jobs** mein add karein:
 * * * * * cd ~/public_html/taxnest && php artisan schedule:run >> /dev/null 2>&1
 ```
 
+Yehi `schedule:run` cron sab scheduled jobs chalata hai, jin mein shamil hai:
+- `payment-proofs:prune` (roz 04:30) — 12 mahine se purane verified/rejected payment receipts ki FILES delete (record audit ke liye rehta hai). Retention change karne ke liye: `php artisan payment-proofs:prune --months=24`; pehle check karne ke liye `--dry-run`.
+
 Queue ke liye Supervisor ya cron:
 ```
 * * * * * cd ~/public_html/taxnest && php artisan queue:work --stop-when-empty >> /dev/null 2>&1

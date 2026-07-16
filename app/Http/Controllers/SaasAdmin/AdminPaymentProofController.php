@@ -123,6 +123,11 @@ class AdminPaymentProofController extends Controller
     {
         $proof = PaymentProof::findOrFail($id);
 
+        // Retention cleanup removed the file — the row is audit-only now.
+        if ($proof->file_pruned_at) {
+            abort(410, 'This receipt file was removed by the retention cleanup. The record is kept for audit.');
+        }
+
         if (!$proof->proof_path || !Storage::disk('local')->exists($proof->proof_path)) {
             abort(404, 'Proof file not found.');
         }

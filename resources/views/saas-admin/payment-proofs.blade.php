@@ -65,11 +65,15 @@
                             <td class="px-4 py-3 text-gray-400 text-xs hidden lg:table-cell">{{ optional($proof->payment_date)->format('d M Y') ?? '—' }}</td>
                             <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ $proof->created_at->format('d M Y, H:i') }}</td>
                             <td class="px-4 py-3 text-center">
-                                <a href="{{ route('saas.admin.payment-proofs.download', $proof->id) }}"
-                                   class="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300">
-                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                                    View
-                                </a>
+                                @if($proof->file_pruned_at)
+                                    <span class="text-[11px] text-gray-500 dark:text-gray-400" title="File deleted by retention cleanup on {{ $proof->file_pruned_at->format('d M Y') }} — record kept for audit">File removed</span>
+                                @else
+                                    <a href="{{ route('saas.admin.payment-proofs.download', $proof->id) }}"
+                                       class="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                        View
+                                    </a>
+                                @endif
                             </td>
                             <td class="px-4 py-3 text-center">
                                 @php

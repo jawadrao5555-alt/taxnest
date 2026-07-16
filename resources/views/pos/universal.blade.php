@@ -343,7 +343,7 @@ window.addEventListener('popstate', function() {
 
         <div class="relative flex-shrink-0" style="min-width:180px;max-width:220px;">
             <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-            <input type="search" x-ref="customerPhoneInput" x-model="customerPhoneQuery" @input="onCustomerPhoneInput()" @keydown.enter.prevent="if(!$event.repeat) onCustomerPhoneEnter()" @keydown.escape.prevent="customerPhoneDropdown = false" @keydown.tab.prevent="$refs.searchInput?.focus()" @click.away="customerPhoneDropdown = false" placeholder="Customer name or mobile..." class="w-full pl-9 pr-7 py-2.5 rounded-xl text-sm border-2 transition shadow-sm" :class="selectedCustomer ? 'font-bold border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200' : 'font-medium border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400'" autocomplete="one-time-code" name="pos_customer_phone_nofill" data-lpignore="true" data-form-type="other">
+            <input type="search" x-ref="customerPhoneInput" x-model="customerPhoneQuery" @input="onCustomerPhoneInput()" @keydown.enter.prevent="if(!$event.repeat) onCustomerPhoneEnter()" @keydown.down.prevent="custNav(1)" @keydown.up.prevent="custNav(-1)" @keydown.escape.prevent="customerPhoneDropdown = false" @keydown.tab.prevent="$refs.searchInput?.focus()" @click.away="customerPhoneDropdown = false" placeholder="Customer name or mobile..." class="w-full pl-9 pr-7 py-2.5 rounded-xl text-sm border-2 transition shadow-sm" :class="selectedCustomer ? 'font-bold border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200' : 'font-medium border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400'" autocomplete="one-time-code" name="pos_customer_phone_nofill" data-lpignore="true" data-form-type="other">
             <kbd x-show="!customerPhoneQuery && !selectedCustomer && !customerSearching" class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded font-mono">Alt+P</kbd>
             {{-- Inline search spinner --}}
             <svg x-show="customerSearching && !selectedCustomer" x-cloak class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -354,8 +354,10 @@ window.addEventListener('popstate', function() {
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
             <div x-show="customerPhoneDropdown && customerPhoneResults.length > 0 && !showNewCustomerInline" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 max-h-52 overflow-y-auto" style="min-width:280px;">
+                {{-- Item #2 (owner, Jul 2026): ↑↓ arrow-key navigation — custHiIndex is the
+                     keyboard-highlighted row; Enter picks IT (not always the first result). --}}
                 <template x-for="(cr, ci) in customerPhoneResults" :key="cr.id">
-                    <button @click="selectCustomerFromPhone(cr)" class="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 transition border-b border-gray-50 dark:border-gray-800" :class="ci === 0 ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''">
+                    <button @click="selectCustomerFromPhone(cr)" @mouseenter="custHiIndex = ci" :data-cust-row="ci" class="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 transition border-b border-gray-50 dark:border-gray-800" :class="ci === custHiIndex ? 'bg-blue-100 dark:bg-blue-900/30' : ''">
                         <div class="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-blue-600" x-text="cr.name.charAt(0)"></span></div>
                         <div class="flex-1 min-w-0">
                             <p class="text-xs font-semibold text-gray-900 dark:text-white truncate" x-text="cr.name"></p>
@@ -519,6 +521,17 @@ window.addEventListener('popstate', function() {
             <button @click="setOrderType('delivery')" class="px-2 py-1.5 text-[10px] font-bold transition-all" :class="orderType === 'delivery' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">Delivery</button>
             @endif
             <span class="tn-key-chip px-1.5 py-1.5 text-[8px] font-mono text-gray-400 bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">F2</span>
+        </div>
+
+        {{-- Item #3 (owner, Jul 2026): delivery charges — visible only when order type is
+             Delivery. Applies as a TAX-EXEMPT manual cart line ("Delivery Charges") so it
+             rides every existing bill path (processPaymentManual) with NO schema change;
+             switching away from Delivery removes the line automatically. --}}
+        <div x-show="orderType === 'delivery'" x-cloak class="flex items-center gap-1 flex-shrink-0 rounded-lg border border-gray-200 dark:border-gray-700 px-2 py-1">
+            <span class="text-[10px] font-bold text-gray-500 dark:text-gray-400 whitespace-nowrap">Delivery Rs</span>
+            <input type="number" min="0" step="1" x-model="deliveryChargeInput" @change="setDeliveryCharge()" @keydown.enter.prevent="setDeliveryCharge()" placeholder="0"
+                   autocomplete="off" name="pos_delivery_charge_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                   class="w-16 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-1.5 py-1 focus:ring-purple-500 focus:border-purple-500">
         </div>
         @endif
 
@@ -1047,12 +1060,20 @@ window.addEventListener('popstate', function() {
          Provisional save is now a SEPARATE button + F9 shortcut
          in the right sidebar (no modal, no checkbox, no key conflict).
          ═══════════════════════════════════════════════════════════════ -->
-    <div x-show="showPayModal" x-cloak x-transition.opacity x-effect="if (showPayModal) { submitting = false; saveAsProvisional = false; payMethodIndex = 0; }" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false">
+    {{-- x-effect close branch: clear payingHeldOrderId whenever the modal is dismissed
+         (ESC / click-away / Cancel). Without this a cancelled held-order payment left the
+         stale id behind and the NEXT normal cart sale silently routed to payHeldOrderDirect
+         for that old held order (processPayment checks payingHeldOrderId first). --}}
+    <div x-show="showPayModal" x-cloak x-transition.opacity x-effect="if (showPayModal) { submitting = false; saveAsProvisional = false; payMethodIndex = 0; } else if (!submitting) { payingHeldOrderId = null; }" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
             <div class="p-5 text-center border-b border-gray-100 dark:border-gray-800">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">Payment</h3>
-                <p class="text-3xl font-extrabold mt-2 text-purple-600 dark:text-purple-400" x-text="'Rs. ' + Number(roundedTotal).toLocaleString()"></p>
-                <p x-show="Math.abs(roundOff) > 0.001" class="text-[10px] text-gray-400 mt-0.5" x-text="(roundOff >= 0 ? 'rounded up by ' : 'rounded down by ') + 'Rs. ' + Math.abs(roundOff).toFixed(2)"></p>
+                {{-- Item #8 (owner, Jul 2026): held/dine-in orders pay with an EMPTY cart, so
+                     the cart-based roundedTotal showed Rs. 0 here. payModalTotal switches to a
+                     method-aware estimate computed from the held order itself (server total
+                     from payOrder stays authoritative on the receipt). --}}
+                <p class="text-3xl font-extrabold mt-2 text-purple-600 dark:text-purple-400" x-text="'Rs. ' + Number(payModalTotal).toLocaleString()"></p>
+                <p x-show="!payingHeldOrderId && Math.abs(roundOff) > 0.001" class="text-[10px] text-gray-400 mt-0.5" x-text="(roundOff >= 0 ? 'rounded up by ' : 'rounded down by ') + 'Rs. ' + Math.abs(roundOff).toFixed(2)"></p>
                 <p x-show="stockError" class="text-xs text-red-500 mt-2 bg-red-50 dark:bg-red-900/20 p-2 rounded-lg" x-text="stockError"></p>
                 <p x-show="submitting" class="text-xs text-purple-500 mt-2">Processing payment...</p>
             </div>
@@ -2215,6 +2236,7 @@ function restaurantPos() {
         customerPhoneQuery: '',
         customerPhoneResults: [],
         customerPhoneDropdown: false,
+        custHiIndex: 0,
         customerPhoneTimer: null,
         showNewCustomerModal: false, // legacy, kept for backward compat — not used
         showNewCustomerInline: false,
@@ -2232,6 +2254,11 @@ function restaurantPos() {
         gridFocusIndex: 0,
         gridCols: 4,
         orderType: '{{ $selectedTable ? "dine_in" : "takeaway" }}',
+        deliveryChargeInput: '',
+        customerAddresses: [],
+        selectedDeliveryAddress: '',
+        showAddrNew: false,
+        newAddrText: '',
         cart: [],
         kitchenNotes: '',
         selectedTable: {!! $jsEnc($selectedTableJson, 'null') !!},
@@ -3856,6 +3883,9 @@ function restaurantPos() {
         // Reservation auto-frees on: bill stored (backend, final+provisional),
         // void/new-sale/clear-cart, or switching to Takeaway/Delivery.
         setOrderType(type) {
+            // Item #3: the delivery-charge line only belongs to Delivery orders —
+            // leaving the type removes it so it can never bill on dine-in/takeaway.
+            if (type !== 'delivery') this.removeDeliveryCharge();
             if (type === 'dine_in') {
                 this.orderType = 'dine_in';
                 if (!this.selectedTable) this.openTablePicker();
@@ -3863,6 +3893,77 @@ function restaurantPos() {
             }
             if (this.selectedTable) { this.releaseTable(this.selectedTable.id); this.selectedTable = null; }
             this.orderType = type;
+            // Item #1: entering Delivery with a customer already picked → pull their
+            // saved addresses so the picker is ready without an extra click.
+            if (type === 'delivery' && this.selectedCustomer && !this.customerAddresses.length) this.loadCustomerAddresses();
+        },
+
+        // ── Item #3: Delivery charges (owner, Jul 2026) ────────────────────────
+        // One synthetic MANUAL cart line (item_id=null → _manual:true server-side,
+        // no master-product auto-create), TAX-EXEMPT, qty pinned to 1. Manual lines
+        // already route Pay through processPaymentManual and are blocked from
+        // restaurant hold/KOT — exactly the behaviour we want for a delivery fee.
+        setDeliveryCharge() {
+            const amt = Math.max(0, Math.round(parseFloat(this.deliveryChargeInput) || 0));
+            const idx = this.cart.findIndex(c => c && c._delivery);
+            if (amt <= 0) { this.removeDeliveryCharge(); return; }
+            this.deliveryChargeInput = amt;
+            if (idx >= 0) {
+                this.cart[idx].unit_price = amt;
+                this.cart[idx].quantity = 1;
+            } else {
+                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: null, item_type: 'manual', _delivery: true, item_name: 'Delivery Charges', quantity: 1, unit_price: amt, special_notes: '', is_tax_exempt: true, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false });
+            }
+        },
+        removeDeliveryCharge() {
+            const idx = this.cart.findIndex(c => c && c._delivery);
+            if (idx >= 0) { this.cart.splice(idx, 1); this.fixCartIndex(); }
+            this.deliveryChargeInput = '';
+        },
+
+        // ── Item #1: Customer multi-address (owner, Jul 2026) ─────────────────
+        // pos_customers.address = "address #1"; extras live in pos_customer_addresses.
+        // The chosen text is a SNAPSHOT on the bill (pos_transactions.delivery_address)
+        // so later address edits never rewrite old receipts. Walk-in customers (no id)
+        // can still type a one-off address — it snapshots without being saved.
+        async loadCustomerAddresses() {
+            this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = '';
+            const c = this.selectedCustomer;
+            if (!c || !c.id) return;
+            try {
+                const res = await fetch('/pos/api/customer-addresses?customer_id=' + c.id, { headers: { 'Accept': 'application/json' } });
+                const data = await res.json();
+                this.customerAddresses = Array.isArray(data.addresses) ? data.addresses : [];
+                if (this.customerAddresses.length) this.selectedDeliveryAddress = this.customerAddresses[0].address;
+            } catch (e) { console.error('[addresses] load failed', e); }
+        },
+        async saveNewAddress() {
+            const text = (this.newAddrText || '').trim();
+            if (!text) return;
+            const c = this.selectedCustomer;
+            if (!c || !c.id) {
+                // Walk-in: one-off snapshot only, nothing to persist against.
+                this.customerAddresses.push({ id: null, label: null, address: text });
+                this.selectedDeliveryAddress = text;
+                this.showAddrNew = false; this.newAddrText = '';
+                return;
+            }
+            try {
+                const res = await fetch('/pos/api/customer-addresses', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ customer_id: c.id, address: text }),
+                });
+                const data = await res.json().catch(() => null);
+                if (data && data.success && data.address) {
+                    this.customerAddresses.push(data.address);
+                    this.selectedDeliveryAddress = data.address.address;
+                    this.showAddrNew = false; this.newAddrText = '';
+                    this.showToast('Address saved', 'success');
+                } else {
+                    this.showToast((data && data.message) || 'Could not save address', 'error');
+                }
+            } catch (e) { this.showToast('Could not save address — check connection', 'error'); }
         },
         openTablePicker() {
             this.showTablePicker = true;
@@ -4020,6 +4121,7 @@ function restaurantPos() {
             const local = (this.allCustomers || [])
                 .filter(c => (c.name && c.name.toLowerCase().includes(lq)) || (c.phone && String(c.phone).includes(q)))
                 .slice(0, 8);
+            this.custHiIndex = 0;
             if (local.length > 0) {
                 this.customerPhoneResults = local;
                 this.customerPhoneDropdown = true;
@@ -4030,6 +4132,16 @@ function restaurantPos() {
             if (q.length >= 2) {
                 this.customerPhoneTimer = setTimeout(() => this.searchCustomerByPhone(q), 150);
             }
+        },
+
+        // Item #2 — ↑↓ keyboard navigation over the customer dropdown (wraps around).
+        custNav(dir) {
+            if (!this.customerPhoneDropdown || this.customerPhoneResults.length === 0) return;
+            const n = this.customerPhoneResults.length;
+            this.custHiIndex = ((this.custHiIndex + dir) % n + n) % n;
+            this.$nextTick(() => {
+                document.querySelector('[data-cust-row="' + this.custHiIndex + '"]')?.scrollIntoView({ block: 'nearest' });
+            });
         },
 
         searchCustomerByPhone(q) {
@@ -4045,6 +4157,7 @@ function restaurantPos() {
                     // land AFTER a newer one — never let it clobber fresher results.
                     if (q !== this.customerPhoneQuery.trim()) return;
                     this.customerPhoneResults = data.customers || [];
+                    this.custHiIndex = 0;
                     // Always show dropdown so the inline "add new" hint can appear when results === 0
                     this.customerPhoneDropdown = true;
                 } catch(e) { this.customerPhoneResults = []; this.customerPhoneDropdown = false; }
@@ -4077,7 +4190,7 @@ function restaurantPos() {
                     }
                 }
                 if (this.customerPhoneResults.length > 0) {
-                    this.selectCustomerFromPhone(this.customerPhoneResults[0]);
+                    this.selectCustomerFromPhone(this.customerPhoneResults[this.custHiIndex] || this.customerPhoneResults[0]);
                     this.customerPhoneDropdown = false;
                     this.flowStep = 'items';
                     this.$nextTick(() => { this.$refs.searchInput?.focus(); });
@@ -4091,7 +4204,7 @@ function restaurantPos() {
             }
             if (!q) return;
             if (this.customerPhoneResults.length > 0) {
-                this.selectCustomerFromPhone(this.customerPhoneResults[0]);
+                this.selectCustomerFromPhone(this.customerPhoneResults[this.custHiIndex] || this.customerPhoneResults[0]);
             } else if (q.length >= 4 && /^\d+$/.test(q)) {
                 this.openInlineNewCustomer();
             } else {
@@ -4127,6 +4240,9 @@ function restaurantPos() {
             this.customerPhoneQuery = cr.name + (cr.phone ? ' · ' + cr.phone : '');
             this.customerPhoneDropdown = false;
             this.customerPhoneResults = [];
+            // Item #1: on a Delivery order the address picker should be ready instantly.
+            if (this.orderType === 'delivery') this.loadCustomerAddresses();
+            else { this.customerAddresses = []; this.selectedDeliveryAddress = ''; }
             this.showToast('Customer: ' + cr.name + (cr.stats && cr.stats.is_frequent ? ' (VIP)' : ''), 'success');
             this.$nextTick(() => { this.$refs.searchInput?.focus(); });
         },
@@ -4169,6 +4285,8 @@ function restaurantPos() {
             this.newCustomerPhone = '';
             this.selectedCustomer = null;
             this.customerStats = null;
+            // Item #1: addresses belong to the cleared customer — drop them.
+            this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = '';
             this.$refs.customerPhoneInput?.focus();
         },
 
@@ -4352,6 +4470,8 @@ function restaurantPos() {
                     discount_value: this.discountAmount > 0 ? this.discountValue : 0,
                     customer_name: this.selectedCustomer?.name || null,
                     customer_phone: this.selectedCustomer?.phone || null,
+                    // Item #1: delivery-address snapshot — only rides on Delivery orders.
+                    delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || null) : null,
                     kitchen_notes: this.kitchenNotes,
                     // F3 Dine-In — backend auto-frees this reserved table once the
                     // bill is stored (reserved → available; occupied untouched).
@@ -4432,6 +4552,29 @@ function restaurantPos() {
             this.showHeldOrders = false;
             this.stockError = '';
             this.showPayModal = true;
+        },
+
+        // Item #8 — method-aware total estimate for a HELD order shown in the Pay modal.
+        // Mirrors RestaurantPosController::payOrder math: subtotal − order discount;
+        // tax on non-exempt subtotal scaled by the discount ratio; whole-rupee round.
+        // Server total from payOrder JSON remains authoritative for the receipt popup.
+        heldOrderEstimate(method) {
+            const o = this.heldOrders.find(x => x.id === this.payingHeldOrderId);
+            if (!o) return 0;
+            const items = o.items || [];
+            const sub = items.reduce((s, i) => s + (parseFloat(i.subtotal) || 0), 0);
+            const disc = parseFloat(o.discount_amount) || 0;
+            const ratio = sub > 0 ? Math.max(0, (sub - disc) / sub) : 1;
+            const taxable = items.filter(i => !i.is_tax_exempt).reduce((s, i) => s + (parseFloat(i.subtotal) || 0), 0);
+            const rate = method === 'card'
+                ? (this.taxRules['debit_card'] || this.taxRules['card'] || 8)
+                : (this.taxRules['cash'] || 16);
+            const tax = Math.round(taxable * ratio * rate / 100);
+            return Math.round(sub - disc + tax);
+        },
+        get payModalTotal() {
+            if (this.payingHeldOrderId) return this.heldOrderEstimate(this.payMethodIndex === 1 ? 'card' : 'cash');
+            return this.roundedTotal;
         },
 
         startNewAfterPayment() {
@@ -4892,7 +5035,7 @@ function restaurantPos() {
                 // PROVISIONAL BILL FLOW — when true, RestaurantPosController::payOrder
                 // forces pra_status='local' and skips PRA submission. Bill remains
                 // editable / deletable until promoted via "Submit to PRA — Make Final".
-                const res = await fetch(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method, save_as_provisional: !!provisional }) });
+                const res = await fetch(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method, save_as_provisional: !!provisional, delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || null) : null }) });
                 if (!res.ok) {
                     const bodyText = await res.text().catch(() => '');
                     console.error('[payOrder] HTTP', res.status, res.statusText, bodyText.slice(0, 500));

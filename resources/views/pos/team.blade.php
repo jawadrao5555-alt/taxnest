@@ -129,6 +129,9 @@
                                             @csrf
                                             @method('PUT')
                                         </form>
+                                        {{-- Item #7: optional password reset — blank keeps the current one
+                                             (hashes are irreversible, so there is no "show password"). --}}
+                                        <input form="edit-{{ $member->id }}" type="password" name="password" placeholder="New password (optional)" autocomplete="new-password" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-36 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1.5 focus:ring-purple-500 focus:border-purple-500">
                                         <button form="edit-{{ $member->id }}" type="submit" class="text-emerald-600 hover:text-emerald-700 text-xs font-medium">Save</button>
                                         <button @click="editing = false" class="text-gray-400 hover:text-gray-600 text-xs font-medium">Cancel</button>
                                     </div>

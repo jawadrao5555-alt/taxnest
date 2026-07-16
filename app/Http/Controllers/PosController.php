@@ -798,6 +798,9 @@ class PosController extends Controller
             'discount_type' => 'required|in:percentage,amount',
             'discount_value' => 'nullable|numeric|min:0',
             'cash_received' => 'nullable|numeric|min:0',
+            // Item #1 (Jul 2026): delivery-address SNAPSHOT — frozen on the bill so
+            // later edits to the customer's saved addresses never rewrite receipts.
+            'delivery_address' => 'nullable|string|max:500',
         ]);
 
         // Normalize 'card' alias → 'debit_card' (front-end Universal POS sends 'card';
@@ -920,6 +923,7 @@ class PosController extends Controller
                     'terminal_id' => $request->terminal_id,
                     'customer_name' => $request->customer_name,
                     'customer_phone' => $request->customer_phone,
+                    'delivery_address' => $request->input('delivery_address') ?: null,
                     'subtotal' => $subtotal,
                     'discount_type' => $discountType,
                     'discount_value' => $discountValue,
@@ -959,6 +963,7 @@ class PosController extends Controller
                     'invoice_mode' => $invoiceMode,
                     'customer_name' => $request->customer_name,
                     'customer_phone' => $request->customer_phone,
+                    'delivery_address' => $request->input('delivery_address') ?: null,
                     'subtotal' => $subtotal,
                     'discount_type' => $discountType,
                     'discount_value' => $discountValue,
@@ -1164,6 +1169,9 @@ class PosController extends Controller
             'discount_type' => 'required|in:percentage,amount',
             'discount_value' => 'nullable|numeric|min:0',
             'cash_received' => 'nullable|numeric|min:0',
+            // Item #1 (Jul 2026): delivery-address SNAPSHOT — frozen on the bill so
+            // later edits to the customer's saved addresses never rewrite receipts.
+            'delivery_address' => 'nullable|string|max:500',
         ]);
 
         // Normalize 'card' alias → 'debit_card' (see storeInvoice() for rationale).
@@ -1242,6 +1250,7 @@ class PosController extends Controller
                 'terminal_id' => $request->terminal_id,
                 'customer_name' => $request->customer_name,
                 'customer_phone' => $request->customer_phone,
+                'delivery_address' => $request->input('delivery_address') ?: null,
                 'subtotal' => $subtotal,
                 'discount_type' => $discountType,
                 'discount_value' => $discountValue,
@@ -3672,6 +3681,10 @@ class PosController extends Controller
             'name' => 'required|string|max:100',
             'email' => 'required|email|unique:users,email,' . $cashier->id,
             'phone' => 'nullable|string|max:20',
+            // Item #7 (owner, Jul 2026): optional password RESET from the team edit
+            // row — stored hashes are irreversible, so "view password" is impossible;
+            // the admin sets a NEW one instead. Blank = keep the current password.
+            'password' => 'nullable|string|min:6|max:100',
         ]);
 
         $cashier->update([

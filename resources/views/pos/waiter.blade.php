@@ -82,9 +82,17 @@
             </div>
             <div x-show="!cart.length" class="text-center py-6 text-sm text-gray-400">Tap items to add them.</div>
 
-            <div class="border-t border-gray-100 dark:border-gray-700 pt-3 flex items-center justify-between" x-show="cart.length">
-                <span class="text-sm font-bold text-gray-500 dark:text-gray-400">Total (before tax)</span>
-                <span class="text-xl font-black text-gray-900 dark:text-white" x-text="'Rs ' + total().toLocaleString()"></span>
+            <div class="border-t border-gray-100 dark:border-gray-700 pt-3" x-show="cart.length">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm font-bold text-gray-500 dark:text-gray-400">Total (before tax)</span>
+                    <span class="text-xl font-black text-gray-900 dark:text-white" x-text="'Rs ' + total().toLocaleString()"></span>
+                </div>
+                {{-- Item #5: indicative tax-inclusive estimate (cash rate) — the REAL bill
+                     (rate by payment method, discounts) is settled on the cashier screen. --}}
+                <div class="flex items-center justify-between mt-0.5" x-show="taxEstimate() > 0">
+                    <span class="text-[11px] font-semibold text-gray-400 dark:text-gray-500" x-text="'≈ incl. tax (cash ' + cashTaxRate + '%)'"></span>
+                    <span class="text-sm font-bold text-gray-600 dark:text-gray-300" x-text="'Rs ' + (total() + taxEstimate()).toLocaleString()"></span>
+                </div>
             </div>
 
             {{-- Order details (hidden in append mode — the order already has them) --}}
@@ -192,6 +200,7 @@
 function waiterApp() {
     return {
         products: {!! $jsEnc($products) !!},
+        cashTaxRate: {{ (float) ($cashTaxRate ?? 16) }},
         filtered: [],
         categories: [],
         search: '',
@@ -238,11 +247,19 @@ function waiterApp() {
                 uid: 'w' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
                 item_id: p.id, name: p.name, quantity: 1,
                 unit_price: p.price, special_notes: '',
+                is_tax_exempt: !!p.is_tax_exempt,
             });
         },
 
         total() {
             return Math.round(this.cart.reduce((s, l) => s + l.quantity * l.unit_price, 0));
+        },
+
+        // Item #5 — indicative tax at the CASH rate on non-exempt lines only.
+        // Whole-rupee like every other POS total; real tax is settled by the cashier.
+        taxEstimate() {
+            const taxable = this.cart.reduce((s, l) => s + (l.is_tax_exempt ? 0 : l.quantity * l.unit_price), 0);
+            return Math.round(taxable * this.cashTaxRate / 100);
         },
 
         async openTables() {

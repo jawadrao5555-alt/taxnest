@@ -57,6 +57,7 @@ class RestaurantWaiterController extends Controller
                 'category' => $p->category ?: 'General',
                 'barcode' => $p->barcode ?: null,
                 'show_on_sale' => (bool) ($p->show_on_sale ?? true),
+                'is_tax_exempt' => (bool) ($p->is_tax_exempt ?? false),
             ])
             ->filter(fn($p) => $p['show_on_sale'])
             ->values();
@@ -70,7 +71,12 @@ class RestaurantWaiterController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'pos_role']);
 
-        return view('pos.waiter', compact('company', 'products', 'cashiers'));
+        // Item #5 (owner, Jul 2026): running total shows an "≈ incl. tax" ESTIMATE.
+        // Cash rate only — the waiter never knows the final payment method; the REAL
+        // tax is computed by the cashier's settle path (storeInvoice), never here.
+        $cashTaxRate = \App\Models\PosTaxRule::getRateForMethod('cash', $company);
+
+        return view('pos.waiter', compact('company', 'products', 'cashiers', 'cashTaxRate'));
     }
 
     /** Live floors + tables — waiter-scoped twin of the sale screen's table-status API. */

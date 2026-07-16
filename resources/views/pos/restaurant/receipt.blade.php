@@ -6,9 +6,10 @@
     <title>Receipt - {{ $transaction->invoice_number }}</title>
     <style>
         @page { size: 80mm auto; margin: 0; }
-        /* PRINTABLE-WIDTH FIX (Jul 2026): 80mm paper prints only ~72mm — forcing full 80mm
-           clips the right edge on real thermal printers. width:auto fits printable width. */
-        @media print { body { width: auto; max-width: 80mm; } .no-print { display: none !important; } }
+        /* PRINTABLE-WIDTH FIX v2 (Jul 2026): cap at the SAFE ~72mm printable width of
+           80mm thermal paper and center — drivers reporting the full 80mm page no
+           longer push the right edge into the unprintable strip. */
+        @media print { body { width: auto; max-width: 72mm; margin: 0 auto; } .no-print { display: none !important; } }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;

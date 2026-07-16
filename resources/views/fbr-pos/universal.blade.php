@@ -347,7 +347,7 @@ window.addEventListener('popstate', function() {
 
         <div class="relative flex-shrink-0" style="min-width:180px;max-width:220px;">
             <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-            <input type="search" x-ref="customerPhoneInput" x-model="customerPhoneQuery" @input="onCustomerPhoneInput()" @keydown.enter.prevent="if(!$event.repeat) onCustomerPhoneEnter()" @keydown.escape.prevent="customerPhoneDropdown = false" @keydown.tab.prevent="$refs.searchInput?.focus()" @click.away="customerPhoneDropdown = false" placeholder="Customer name or mobile..." class="w-full pl-9 pr-7 py-2.5 rounded-xl text-sm border-2 transition shadow-sm" :class="selectedCustomer ? 'font-bold border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200' : 'font-medium border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400'" autocomplete="one-time-code" name="pos_customer_phone_nofill" data-lpignore="true" data-form-type="other">
+            <input type="search" x-ref="customerPhoneInput" x-model="customerPhoneQuery" @input="onCustomerPhoneInput()" @keydown.enter.prevent="if(!$event.repeat) onCustomerPhoneEnter()" @keydown.down.prevent="custNav(1)" @keydown.up.prevent="custNav(-1)" @keydown.escape.prevent="customerPhoneDropdown = false" @keydown.tab.prevent="$refs.searchInput?.focus()" @click.away="customerPhoneDropdown = false" placeholder="Customer name or mobile..." class="w-full pl-9 pr-7 py-2.5 rounded-xl text-sm border-2 transition shadow-sm" :class="selectedCustomer ? 'font-bold border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200' : 'font-medium border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400'" autocomplete="one-time-code" name="pos_customer_phone_nofill" data-lpignore="true" data-form-type="other">
             <kbd x-show="!customerPhoneQuery && !selectedCustomer && !customerSearching" class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded font-mono">Alt+P</kbd>
             {{-- Inline search spinner --}}
             <svg x-show="customerSearching && !selectedCustomer" x-cloak class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -359,7 +359,9 @@ window.addEventListener('popstate', function() {
             </button>
             <div x-show="customerPhoneDropdown && customerPhoneResults.length > 0 && !showNewCustomerInline" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 max-h-52 overflow-y-auto" style="min-width:280px;">
                 <template x-for="(cr, ci) in customerPhoneResults" :key="cr.id">
-                    <button @click="selectCustomerFromPhone(cr)" class="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 transition border-b border-gray-50 dark:border-gray-800" :class="ci === 0 ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''">
+                    {{-- Item #2 mirror (owner, Jul 2026): ↑↓ arrow-key navigation, Enter picks
+                         the highlighted row (custHiIndex), same as the PRA universal screen. --}}
+                    <button @click="selectCustomerFromPhone(cr)" @mouseenter="custHiIndex = ci" :data-cust-row="ci" class="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 transition border-b border-gray-50 dark:border-gray-800" :class="ci === custHiIndex ? 'bg-blue-100 dark:bg-blue-900/30' : ''">
                         <div class="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-blue-600" x-text="cr.name.charAt(0)"></span></div>
                         <div class="flex-1 min-w-0">
                             <p class="text-xs font-semibold text-gray-900 dark:text-white truncate" x-text="cr.name"></p>
@@ -2108,6 +2110,7 @@ function restaurantPos() {
         selectedCustomer: null,
         customerPhoneQuery: '',
         customerPhoneResults: [],
+        custHiIndex: 0,
         customerPhoneDropdown: false,
         customerPhoneTimer: null,
         showNewCustomerModal: false, // legacy, kept for backward compat — not used
@@ -3717,12 +3720,23 @@ function restaurantPos() {
                 this.selectedCustomer = null;
                 this.customerStats = null;
             }
+            this.custHiIndex = 0;
             if (q.length >= 3) {
                 this.customerPhoneTimer = setTimeout(() => this.searchCustomerByPhone(q), 300);
             } else {
                 this.customerPhoneResults = [];
                 this.customerPhoneDropdown = false;
             }
+        },
+
+        // Item #2 mirror — ↑↓ keyboard navigation over the customer dropdown (wraps around).
+        custNav(dir) {
+            if (!this.customerPhoneDropdown || this.customerPhoneResults.length === 0) return;
+            const n = this.customerPhoneResults.length;
+            this.custHiIndex = ((this.custHiIndex + dir) % n + n) % n;
+            this.$nextTick(() => {
+                document.querySelector('[data-cust-row="' + this.custHiIndex + '"]')?.scrollIntoView({ block: 'nearest' });
+            });
         },
 
         searchCustomerByPhone(q) {
@@ -3735,6 +3749,7 @@ function restaurantPos() {
                     const res = await fetch('/fbr-pos/api/customer-search?q=' + encodeURIComponent(q));
                     const data = await res.json();
                     this.customerPhoneResults = data.customers || [];
+                    this.custHiIndex = 0;
                     // Always show dropdown so the inline "add new" hint can appear when results === 0
                     this.customerPhoneDropdown = true;
                 } catch(e) { this.customerPhoneResults = []; this.customerPhoneDropdown = false; }
@@ -3767,7 +3782,7 @@ function restaurantPos() {
                     }
                 }
                 if (this.customerPhoneResults.length > 0) {
-                    this.selectCustomerFromPhone(this.customerPhoneResults[0]);
+                    this.selectCustomerFromPhone(this.customerPhoneResults[this.custHiIndex] || this.customerPhoneResults[0]);
                     this.customerPhoneDropdown = false;
                     this.flowStep = 'items';
                     this.$nextTick(() => { this.$refs.searchInput?.focus(); });
@@ -3781,7 +3796,7 @@ function restaurantPos() {
             }
             if (!q) return;
             if (this.customerPhoneResults.length > 0) {
-                this.selectCustomerFromPhone(this.customerPhoneResults[0]);
+                this.selectCustomerFromPhone(this.customerPhoneResults[this.custHiIndex] || this.customerPhoneResults[0]);
             } else if (q.length >= 4 && /^\d+$/.test(q)) {
                 this.openInlineNewCustomer();
             } else {

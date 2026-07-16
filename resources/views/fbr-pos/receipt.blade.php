@@ -75,11 +75,11 @@
         .footer { margin-top: 8px; font-size: 10px; line-height: 1.5; color: #000; font-weight: 600; }
 
         @media print {
-            /* PRINTABLE-WIDTH FIX (Jul 2026): 80mm paper prints only ~72mm — forcing full
-               80mm clips the right edge on real thermal printers. width:auto fits the
-               driver's printable width; max-width caps it. A4 branch below re-fixes 80mm
+            /* PRINTABLE-WIDTH FIX v2 (Jul 2026): 80mm paper prints only ~72mm — cap at
+               the SAFE printable width and center; drivers reporting the full 80mm page
+               no longer clip the right edge. A4 branch below re-fixes width for A4
                (centered on the big page, so no clipping there). */
-            body { width: auto; max-width: 80mm; padding: 1mm; margin: 0 auto; }
+            body { width: auto; max-width: 72mm; padding: 1mm; margin: 0 auto; }
             .no-print { display: none !important; }
             @if($paperSize === 'a4')
                 /* A4: centered on page, no page break inside the receipt so it stays intact */

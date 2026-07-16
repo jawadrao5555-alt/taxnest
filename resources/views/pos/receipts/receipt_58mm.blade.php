@@ -74,10 +74,11 @@
         .footer { margin-top: 6px; font-size: 9px; line-height: 1.4; color: #000; font-weight: 600; }
 
         @media print {
-            /* PRINTABLE-WIDTH FIX (Jul 2026): 58mm paper prints only ~48mm — forcing the
-               full 58mm clips the right edge. width:auto fits the driver's printable
-               width; max-width caps A4 test-prints. Never force physical paper width. */
-            body { width: auto; max-width: 58mm; padding: 1mm; margin: 0; }
+            /* PRINTABLE-WIDTH FIX v2 (Jul 2026): 58mm paper prints only ~48mm. Drivers
+               that report the FULL 58mm page clip the right edge with width:auto — cap
+               content at the SAFE 48mm printable width and center it (also fits 52mm
+               rolls, ~48mm printable). Never force physical paper width. */
+            body { width: auto; max-width: 48mm; padding: 1mm; margin: 0 auto; }
             .no-print { display: none !important; }
         }
         @media screen {

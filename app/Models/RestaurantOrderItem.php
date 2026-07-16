@@ -10,7 +10,7 @@ class RestaurantOrderItem extends Model
         'order_id', 'item_type', 'item_id', 'item_name',
         'quantity', 'unit_price', 'subtotal', 'special_notes', 'is_tax_exempt',
         'item_discount_type', 'item_discount_value', 'item_discount_amount',
-        'kot_printed_at',
+        'kot_printed_at', 'kot_batch_no',
     ];
 
     protected $casts = [

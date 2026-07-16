@@ -439,7 +439,10 @@ class RestaurantPosController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => "Order {$orderNumber} held successfully",
-                'order' => $order->load('items'),
+                // Item #4 (owner, Jul 2026): load table too — the Held Orders modal
+                // renders "Table: T-N" via x-if="order.table"; items-only left fresh
+                // holds table-less in the list until a full page reload.
+                'order' => $order->load(['items', 'table']),
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -605,6 +608,11 @@ class RestaurantPosController extends Controller
                 'customer_id' => $order->customer_id ? (int) $order->customer_id : null,
                 'customer_name' => $order->customer_name,
                 'customer_phone' => $order->customer_phone,
+                // Item #1 (Jul 2026): delivery-address SNAPSHOT — sent with the PAY
+                // request (not stored on restaurant_orders); frozen on the bill.
+                'delivery_address' => $request->filled('delivery_address')
+                    ? substr((string) $request->input('delivery_address'), 0, 500)
+                    : null,
                 'subtotal' => (float) $subtotal,
                 'discount_type' => $order->discount_type ?? 'amount',
                 'discount_value' => (float)($order->discount_value ?? 0),
@@ -1003,16 +1011,24 @@ class RestaurantPosController extends Controller
         $delta = $request->query('delta') == '1';
         $ticketItems = $delta ? $order->items->whereNull('kot_printed_at')->values() : $order->items;
 
+        // Item #6 (owner, Jul 2026): every print BATCH carries a stable "KOT #N".
+        // Reprints/plain views show the batch already stamped on the rendered rows.
+        $kotBatchNo = $ticketItems->max('kot_batch_no');
+
         // Stamp on ACTUAL print renders only (auto_print=1) — plain views never
         // consume the delta. Full prints stamp everything they render too, so a
-        // later delta covers only genuinely new rows.
-        if ($request->query('auto_print') == '1' && $ticketItems->isNotEmpty()) {
+        // later delta covers only genuinely new rows. kot_batch_no is stamped in
+        // the SAME update as kot_printed_at (deterministic, reprint-stable —
+        // render-time kot_print_count+1 would renumber on races/reprints).
+        if ($request->query('auto_print') == '1' && $ticketItems->whereNull('kot_printed_at')->isNotEmpty()) {
+            $nextBatch = ((int) \App\Models\RestaurantOrderItem::where('order_id', $order->id)->max('kot_batch_no')) + 1;
             \App\Models\RestaurantOrderItem::whereIn('id', $ticketItems->pluck('id'))
                 ->whereNull('kot_printed_at')
-                ->update(['kot_printed_at' => now()]);
+                ->update(['kot_printed_at' => now(), 'kot_batch_no' => $nextBatch]);
+            $kotBatchNo = $nextBatch;
         }
 
-        return view('pos.restaurant.kitchen-ticket', compact('order', 'company', 'ticketItems', 'delta'));
+        return view('pos.restaurant.kitchen-ticket', compact('order', 'company', 'ticketItems', 'delta', 'kotBatchNo'));
     }
 
     /**

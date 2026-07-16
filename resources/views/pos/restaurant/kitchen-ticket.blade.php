@@ -7,8 +7,9 @@
     <style>
         @page { size: 80mm auto; margin: 0; }
         @media print {
-            /* PRINTABLE-WIDTH FIX (Jul 2026): 80mm paper prints only ~72mm. */
-            body { width: auto; max-width: 80mm; }
+            /* PRINTABLE-WIDTH FIX v2 (Jul 2026): 80mm paper prints only ~72mm — cap at
+               the safe printable width and center so full-80mm drivers don't clip. */
+            body { width: auto; max-width: 72mm; margin: 0 auto; }
             .no-print { display: none !important; }
             .station-section { page-break-after: auto; }
         }
@@ -95,6 +96,11 @@
         @endif
         <p class="text-xl bold mt-1">*** KITCHEN ***</p>
         <p class="text-lg bold mt-1">{{ $order->order_number }}</p>
+        {{-- Item #6: stable per-print-batch number — delta tickets get their own KOT #
+             so the kitchen can reference "KOT #2 of table 5" (stamped, not counted). --}}
+        @if(!empty($kotBatchNo))
+            <p class="text-sm bold">KOT #{{ $kotBatchNo }}</p>
+        @endif
     </div>
 
     <div class="separator"></div>
@@ -121,7 +127,7 @@
 
     @if(!empty($delta))
     <div class="mt-1" style="border: 2px solid #000; padding: 4px; text-align: center;">
-        <span class="bold text-lg">++ ADDED ITEMS ++</span>
+        <span class="bold text-lg">++ ADDED ITEMS{{ !empty($kotBatchNo) ? ' — KOT #'.$kotBatchNo : '' }} ++</span>
     </div>
     @endif
 

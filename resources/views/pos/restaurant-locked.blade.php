@@ -43,6 +43,42 @@
                 </button>
             </form>
         </div>
+
+        <p class="mt-6 text-xs text-teal-100/50" id="auto-check-note">
+            This screen re-checks automatically every minute &mdash; it will come back on its own once the plan is upgraded.
+        </p>
     </div>
+
+    <script>
+        (function () {
+            var INTERVAL_MS = 60000 + Math.floor(Math.random() * 10000); // ~60s + jitter so tablets don't sync up
+            var checking = false;
+
+            function checkAccess() {
+                if (checking || document.hidden) return;
+                checking = true;
+                fetch(window.location.href, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                    cache: 'no-store'
+                }).then(function (res) {
+                    // Middleware returns 403 JSON while features are off.
+                    // Anything OK (or a redirect that resolved OK) means we're back.
+                    if (res.ok) {
+                        window.location.reload();
+                    }
+                }).catch(function () {
+                    /* offline / transient error — try again next tick */
+                }).finally(function () {
+                    checking = false;
+                });
+            }
+
+            setInterval(checkAccess, INTERVAL_MS);
+            document.addEventListener('visibilitychange', function () {
+                if (!document.hidden) checkAccess();
+            });
+        })();
+    </script>
 </body>
 </html>

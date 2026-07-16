@@ -63,6 +63,19 @@
                 </label>
             </div>
 
+            {{-- Paper size lives here too (owner request Jul 2026) — same companies.receipt_printer_size
+                 column the PRA Settings page writes; whichever page saves last wins. Only the paper
+                 TYPE matters (fonts/layout): print width auto-fits the printer's real printable area,
+                 so no 55/72mm options are needed. --}}
+            <div class="mt-4">
+                <label class="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">🖨️ Receipt Paper Size</label>
+                <select name="rp_printer_size" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-purple-500 focus:ring-purple-500">
+                    <option value="80mm" {{ ($company->receipt_printer_size ?? '80mm') === '80mm' ? 'selected' : '' }}>80mm (Standard)</option>
+                    <option value="58mm" {{ ($company->receipt_printer_size ?? '80mm') === '58mm' ? 'selected' : '' }}>58mm (Compact)</option>
+                </select>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Match your thermal printer's paper roll. The print automatically fits your printer's actual printable width — no fine-tuning needed.</p>
+            </div>
+
             <div class="mt-4">
                 <label class="flex items-center gap-2.5 cursor-pointer mb-2">
                     <input type="checkbox" name="rp_show_footer" value="1" {{ $rp['show_footer'] ? 'checked' : '' }} class="rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4">

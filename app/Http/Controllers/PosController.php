@@ -118,7 +118,10 @@ class PosController extends Controller
         if (!$company) { abort(404); }
 
         if ($request->isMethod('post')) {
-            $request->validate(['rp_footer_text' => 'nullable|string|max:150']);
+            $request->validate([
+                'rp_footer_text' => 'nullable|string|max:150',
+                'rp_printer_size' => 'nullable|in:80mm,58mm',
+            ]);
             $prefs = $company->invoice_display_prefs ?? [];
             $prefs['pos'] = [
                 'show_address' => $request->has('rp_show_address'),
@@ -135,6 +138,9 @@ class PosController extends Controller
                 // customization), not on the Features page. OFF = customer copy
                 // shows grand TOTAL only; tax is always submitted to PRA in full.
                 'pos_receipt_show_tax' => $request->has('rp_show_tax'),
+                // Paper size (owner request Jul 2026): same column PRA Settings writes —
+                // last save from either page wins. Missing/invalid input keeps 80mm default.
+                'receipt_printer_size' => $request->input('rp_printer_size', $company->receipt_printer_size ?? '80mm'),
             ]);
             return redirect()->route('pos.receipt-settings')->with('success', 'Receipt display settings saved.');
         }

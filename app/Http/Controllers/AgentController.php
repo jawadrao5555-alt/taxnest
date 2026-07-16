@@ -270,6 +270,9 @@ class AgentController extends Controller
             'pra_invoice_number' => 'nullable|string',
             'response' => 'nullable|array',
             'error' => 'nullable|string',
+            // Agent >= Jul 2026: true when the failure was transport-level (IMS service
+            // down / no internet / timeout) — the bill stays QUEUED, never 'failed'.
+            'offline' => 'nullable|boolean',
         ]);
 
         // ===== FBR POS Fiscal Device company =====
@@ -312,13 +315,22 @@ class AgentController extends Controller
         } else {
             $errMsg = (string) $request->input('error', 'PRA submission failed');
 
+            // IMS-contact-optional (owner rule Jul 2026): transport-level failures
+            // (IMS Fiscal Device service down, no internet, timeout) are NOT PRA
+            // rejections — keep the bill QUEUED as 'offline' so it auto-syncs the
+            // moment the service/net is back. Pattern rescue covers OLD installed
+            // agents that don't send the `offline` flag yet.
+            $transportError = $request->boolean('offline')
+                || $this->isTransportError($errMsg);
+            $newStatus = $transportError ? 'offline' : 'failed';
+
             DB::table('pos_transactions')->where('id', $txnId)->update([
-                'pra_status' => 'failed',
+                'pra_status' => $newStatus,
                 'pra_response_code' => substr($errMsg, 0, 250),
                 'updated_at' => now(),
             ]);
 
-            Log::warning('Agent: PRA submission failed', [
+            Log::log($transportError ? 'info' : 'warning', 'Agent: PRA submission ' . ($transportError ? 'deferred (offline/IMS unreachable — queued)' : 'failed'), [
                 'company_id' => $company->id,
                 'transaction_id' => $txnId,
                 'error' => $errMsg,
@@ -329,6 +341,20 @@ class AgentController extends Controller
         $company->update(['agent_last_seen' => now()]);
 
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * True when an agent-reported error is a TRANSPORT failure (IMS Fiscal Device
+     * service not running, no internet, DNS/timeout) rather than a regulator
+     * rejection. Covers old installed agents that predate the `offline` flag —
+     * their messages contain the raw axios/network error codes.
+     */
+    private function isTransportError(string $errMsg): bool
+    {
+        return (bool) preg_match(
+            '/ECONNREFUSED|ENOTFOUND|ETIMEDOUT|ECONNABORTED|EHOSTUNREACH|ENETUNREACH|ECONNRESET|socket hang up|Network Error|timeout of \d+ms|localhost:8524 unreachable|NOT running on this PC/i',
+            $errMsg
+        );
     }
 
     /**
@@ -371,13 +397,19 @@ class AgentController extends Controller
         } else {
             $errMsg = (string) $request->input('error', 'FBR submission failed');
 
+            // Same IMS-contact-optional rule as PRA: transport failures stay QUEUED
+            // ('offline') and auto-retry; only real FBR rejections become 'failed'.
+            $transportError = $request->boolean('offline')
+                || $this->isTransportError($errMsg);
+            $newStatus = $transportError ? 'offline' : 'failed';
+
             $txn->update([
-                'fbr_status' => 'failed',
+                'fbr_status' => $newStatus,
                 'fbr_response_code' => substr($errMsg, 0, 250),
                 'fbr_submission_hash' => null,
             ]);
 
-            Log::warning('Agent: FBR submission failed', [
+            Log::log($transportError ? 'info' : 'warning', 'Agent: FBR submission ' . ($transportError ? 'deferred (offline/IMS unreachable — queued)' : 'failed'), [
                 'company_id' => $company->id,
                 'transaction_id' => $txnId,
                 'error' => $errMsg,

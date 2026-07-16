@@ -36,6 +36,16 @@ class SyncPosOfflineInvoicesJob implements ShouldQueue
                 continue;
             }
 
+            // Agent-first: when the shop's desktop agent is alive, leave submission
+            // to it — avoids a concurrent double-submit window between this job's
+            // direct cloud POST and the agent (both read pra_invoice_number
+            // non-atomically). Stale/absent agent → job still rescues the bills.
+            if (($company->agent_enabled ?? false)
+                && $company->agent_last_seen
+                && $company->agent_last_seen->gt(now()->subMinutes(10))) {
+                continue;
+            }
+
             if ($transaction->pra_invoice_number) {
                 continue;
             }

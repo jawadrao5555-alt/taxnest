@@ -72,6 +72,7 @@ async function flushCallbackQueue() {
           pra_invoice_number: item.pra_invoice_number,
           response: item.response,
           error: item.error,
+          offline: item.offline || false,
         },
         { headers: { Authorization: `Bearer ${currentConfig.apiKey}` }, timeout: 10000 }
       );
@@ -216,23 +217,39 @@ async function submitToPra(invoice, praEndpoint, praToken, praMode) {
     }
   } catch (e) {
     let errMsg = e.response?.data ? JSON.stringify(e.response.data) : e.message;
+    // Transport-level failure = IMS service down / no internet / timeout — NOT a PRA rejection.
+    // These bills stay QUEUED (server marks them 'offline') and auto-sync when the service is back.
+    const transportError = !e.response
+      || /ECONNREFUSED|ENOTFOUND|ETIMEDOUT|ECONNABORTED|EHOSTUNREACH|ENETUNREACH|ECONNRESET|socket hang up|Network Error|timeout of/i
+        .test(String(e.code || '') + ' ' + (e.message || ''));
     if (isFiscalDevice && /ECONNREFUSED|ENOTFOUND|ETIMEDOUT/i.test(e.message || '')) {
       errMsg = `IMS Fiscal Device service is NOT running on this PC (localhost:8524 unreachable). Install/start PRAL's IMS Fiscal Device software, then bills will sync automatically. (${e.message})`;
     }
-    log(`❌ PRA error txn ${invoice.transaction_id}: ${errMsg}`);
-    await reportResult(invoice.transaction_id, false, null, e.response?.data, errMsg);
-    failedTxnIds.add(invoice.transaction_id);
-    status.failedCount = failedTxnIds.size;
+    if (transportError) {
+      log(`📡 Offline/unreachable for txn ${invoice.transaction_id} — queued, will retry automatically: ${errMsg}`);
+      await reportResult(invoice.transaction_id, false, null, e.response?.data, errMsg, true);
+      // Not counted as "failed" — this is a connectivity wait, not a rejection.
+      if (failedTxnIds.has(invoice.transaction_id)) {
+        failedTxnIds.delete(invoice.transaction_id);
+        status.failedCount = failedTxnIds.size;
+      }
+    } else {
+      log(`❌ PRA error txn ${invoice.transaction_id}: ${errMsg}`);
+      await reportResult(invoice.transaction_id, false, null, e.response?.data, errMsg);
+      failedTxnIds.add(invoice.transaction_id);
+      status.failedCount = failedTxnIds.size;
+    }
   }
 }
 
-async function reportResult(txnId, success, praInvoiceNumber, response, error) {
+async function reportResult(txnId, success, praInvoiceNumber, response, error, offline = false) {
   const payload = {
     transaction_id: txnId,
     success,
     pra_invoice_number: praInvoiceNumber,
     response,
     error,
+    offline,
   };
   try {
     await axios.post(

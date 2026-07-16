@@ -74,7 +74,19 @@ class PrunePaymentProofFiles extends Command
 
                 try {
                     if ($exists) {
-                        $disk->delete($proof->proof_path);
+                        // The 'local' disk has 'throw' => false, so a failed
+                        // delete returns false instead of throwing. Only mark
+                        // pruned on a CONFIRMED delete — otherwise leave the
+                        // row unflagged so tomorrow's run retries it.
+                        if (!$disk->delete($proof->proof_path)) {
+                            $failed++;
+                            Log::warning('Payment proof file prune failed', [
+                                'proof_id' => $proof->id,
+                                'path' => $proof->proof_path,
+                                'error' => 'delete returned false (permissions/IO?)',
+                            ]);
+                            continue;
+                        }
                         $deleted++;
                     } else {
                         // File already gone (manual cleanup / host migration) —
@@ -88,6 +100,7 @@ class PrunePaymentProofFiles extends Command
                     $failed++;
                     Log::warning('Payment proof file prune failed', [
                         'proof_id' => $proof->id,
+                        'path' => $proof->proof_path,
                         'error' => $e->getMessage(),
                     ]);
                 }

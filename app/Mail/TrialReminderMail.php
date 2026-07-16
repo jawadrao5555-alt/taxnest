@@ -26,6 +26,7 @@ class TrialReminderMail extends Mailable
     public function build()
     {
         return $this->subject($this->subjectLine)
-            ->view('emails.trial-reminder');
+            ->view('emails.trial-reminder')
+            ->text('emails.trial-reminder-text');
     }
 }

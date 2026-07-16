@@ -522,11 +522,46 @@ class PosController extends Controller
         $isRestaurant = false;
         $isAdmin = !$isCashier;
 
+        // Same pattern as DI dashboard: unread company notifications, 30-day auto-expiry.
+        $notifications = \App\Models\Notification::where('company_id', $companyId)
+            ->where('read', false)
+            ->where('created_at', '>=', now()->subDays(30))
+            ->orderBy('created_at', 'desc')
+            ->take(5)
+            ->get();
+
         return view('pos.dashboard', compact(
             'company', 'todayStats', 'monthStats', 'recentTransactions', 'paymentBreakdown', 'praStatus', 'drafts', 'isCashier',
-            'dashboardStyle', 'isRestaurant', 'isAdmin',
+            'dashboardStyle', 'isRestaurant', 'isAdmin', 'notifications',
             'profitStats', 'topSold', 'topProfit', 'lowMargin', 'costCoverage'
         ));
+    }
+
+    /**
+     * Dismiss (mark read) a single in-app notification — mirrors
+     * DashboardController::dismissNotification. NEVER deletes rows:
+     * SendTrialReminders dedupes on row existence.
+     */
+    public function dismissNotification($id)
+    {
+        $companyId = app('currentCompanyId');
+
+        \App\Models\Notification::where('company_id', $companyId)
+            ->where('id', $id)
+            ->update(['read' => true]);
+
+        return back();
+    }
+
+    public function dismissAllNotifications()
+    {
+        $companyId = app('currentCompanyId');
+
+        \App\Models\Notification::where('company_id', $companyId)
+            ->where('read', false)
+            ->update(['read' => true]);
+
+        return back();
     }
 
     public function createInvoice(Request $request)

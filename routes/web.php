@@ -440,6 +440,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/agent/download', [\App\Http\Controllers\AgentManagementController::class, 'downloadAgent'])->name('pos.agent.download');
 
     Route::get('/dashboard', [PosController::class, 'dashboard'])->name('pos.dashboard');
+    Route::post('/notifications/{id}/dismiss', [PosController::class, 'dismissNotification'])->name('pos.notifications.dismiss');
+    Route::post('/notifications/dismiss-all', [PosController::class, 'dismissAllNotifications'])->name('pos.notifications.dismiss-all');
     Route::post('/payment-proof', [\App\Http\Controllers\PaymentProofController::class, 'store'])
         ->name('pos.payment-proof.store')->middleware('throttle:6,1');
     Route::post('/settings/theme', [PosController::class, 'updateTheme'])->name('pos.settings.theme');
@@ -834,6 +836,8 @@ Route::post('/fbr-pos/logout', [FbrPosAuthController::class, 'logout'])->name('f
 
 Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group(function () {
     Route::get('/dashboard', [FbrPosController::class, 'dashboard'])->name('fbrpos.dashboard');
+    Route::post('/notifications/{id}/dismiss', [FbrPosController::class, 'dismissNotification'])->name('fbrpos.notifications.dismiss');
+    Route::post('/notifications/dismiss-all', [FbrPosController::class, 'dismissAllNotifications'])->name('fbrpos.notifications.dismiss-all');
     Route::post('/payment-proof', [\App\Http\Controllers\PaymentProofController::class, 'store'])
         ->name('fbrpos.payment-proof.store')->middleware('throttle:6,1');
     Route::get('/create', [FbrPosController::class, 'create'])->name('fbrpos.create');

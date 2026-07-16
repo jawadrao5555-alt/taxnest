@@ -190,11 +190,46 @@ class FbrPosController extends Controller
         $allowedStyles = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify'];
         $dashboardStyle = in_array($company->pos_dashboard_style, $allowedStyles) ? $company->pos_dashboard_style : 'default';
 
+        // Same pattern as DI dashboard: unread company notifications, 30-day auto-expiry.
+        $notifications = \App\Models\Notification::where('company_id', $companyId)
+            ->where('read', false)
+            ->where('created_at', '>=', now()->subDays(30))
+            ->orderBy('created_at', 'desc')
+            ->take(5)
+            ->get();
+
         return view('fbr-pos.dashboard', compact(
             'company', 'todayStats', 'monthStats',
             'fbrSubmitted', 'fbrPending', 'recentTransactions', 'fbrReportingStatus',
-            'dashboardStyle'
+            'dashboardStyle', 'notifications'
         ));
+    }
+
+    /**
+     * Dismiss (mark read) a single in-app notification — mirrors
+     * DashboardController::dismissNotification. NEVER deletes rows:
+     * SendTrialReminders dedupes on row existence.
+     */
+    public function dismissNotification($id)
+    {
+        $companyId = app('currentCompanyId');
+
+        \App\Models\Notification::where('company_id', $companyId)
+            ->where('id', $id)
+            ->update(['read' => true]);
+
+        return back();
+    }
+
+    public function dismissAllNotifications()
+    {
+        $companyId = app('currentCompanyId');
+
+        \App\Models\Notification::where('company_id', $companyId)
+            ->where('read', false)
+            ->update(['read' => true]);
+
+        return back();
     }
 
     /**

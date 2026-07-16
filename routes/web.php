@@ -180,6 +180,8 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
     Route::post('/onboarding/skip', [OnboardingController::class, 'skip']);
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::post('/notifications/{id}/dismiss', [DashboardController::class, 'dismissNotification'])->name('notifications.dismiss');
+    Route::post('/notifications/dismiss-all', [DashboardController::class, 'dismissAllNotifications'])->name('notifications.dismiss-all');
 
     Route::get('/billing/plans', [BillingController::class, 'plans'])->name('billing.plans');
     Route::post('/billing/subscribe', [BillingController::class, 'subscribe']);

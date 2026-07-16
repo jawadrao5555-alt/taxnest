@@ -164,6 +164,7 @@ class DashboardController extends Controller
 
         $notifications = Notification::where('company_id', $companyId)
             ->where('read', false)
+            ->where('created_at', '>=', now()->subDays(30))
             ->orderBy('created_at', 'desc')
             ->take(5)
             ->get();
@@ -382,5 +383,27 @@ class DashboardController extends Controller
             'hs_categories' => $hsCategories,
             'branches' => $branchHeatmap,
         ];
+    }
+
+    public function dismissNotification($id)
+    {
+        $companyId = app('currentCompanyId');
+
+        Notification::where('company_id', $companyId)
+            ->where('id', $id)
+            ->update(['read' => true]);
+
+        return back();
+    }
+
+    public function dismissAllNotifications()
+    {
+        $companyId = app('currentCompanyId');
+
+        Notification::where('company_id', $companyId)
+            ->where('read', false)
+            ->update(['read' => true]);
+
+        return back();
     }
 }

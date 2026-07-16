@@ -61,7 +61,7 @@
         .totals-table td { font-size: 9px; padding: 2px 0; vertical-align: top; color: #000; font-weight: 600; }
         .totals-table .tot-label { text-align: left; color: #000; }
         .totals-table .tot-value { text-align: right; white-space: nowrap; color: #000; font-weight: bold; }
-        .totals-table .grand-total td { font-size: 13px; font-weight: bold; padding: 5px 3px; background: #000; color: #fff; }
+        .totals-table .grand-total td { font-size: 14px; font-weight: 900; padding: 6px 3px; color: #000; border-top: 2px solid #000; border-bottom: 2px solid #000; letter-spacing: 0.3px; }
 
         .pra-badge { border: 1.5px solid #000; padding: 4px; margin: 5px 0; text-align: center; font-size: 9px; overflow: hidden; color: #000; font-weight: 600; }
         .pra-badge .pra-title { font-size: 10px; font-weight: bold; margin-bottom: 2px; color: #000; }

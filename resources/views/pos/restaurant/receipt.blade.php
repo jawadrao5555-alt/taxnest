@@ -76,9 +76,9 @@
         .total-line.discount .t-label, .total-line.discount .t-value { color: #000; font-weight: 700; }
         .total-line.exempt .t-label, .total-line.exempt .t-value { color: #000; font-size: 10px; font-weight: 700; }
 
-        .grand-total-box { background: #000; border-top: 2px solid #000; border-bottom: 2px solid #000; padding: 8px 8px; margin: 6px 0; display: flex; justify-content: space-between; align-items: center; }
-        .grand-total-box .gt-label { font-size: 14px; font-weight: 900; color: #fff; letter-spacing: 0.8px; }
-        .grand-total-box .gt-value { font-size: 14px; font-weight: 900; color: #fff; font-variant-numeric: tabular-nums; }
+        .grand-total-box { background: #fff; border-top: 2.5px solid #000; border-bottom: 2.5px solid #000; padding: 8px 8px; margin: 6px 0; display: flex; justify-content: space-between; align-items: center; }
+        .grand-total-box .gt-label { font-size: 14px; font-weight: 900; color: #000; letter-spacing: 0.8px; }
+        .grand-total-box .gt-value { font-size: 14px; font-weight: 900; color: #000; font-variant-numeric: tabular-nums; }
 
         .pra-box { text-align: center; font-size: 11px; font-weight: 800; color: #000; background: #fff; padding: 6px 8px; border-radius: 0; margin: 6px 0; border: 2px solid #000; letter-spacing: 0.3px; }
 

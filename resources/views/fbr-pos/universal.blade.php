@@ -2394,6 +2394,11 @@ function restaurantPos() {
             window.addEventListener('offline', () => { this.syncStatus = 'offline'; });
             this._autoSyncTick();
             this._syncTimer = setInterval(() => this._autoSyncTick(), 30000);
+
+            // PWA auto-update guard: hold the auto-reload while a sale is mid-flight
+            // (items in cart, pay modal open, submitting, or the persistent receipt
+            // popup still on screen) — pwa-update toast retries afterwards.
+            window.tnPwaUpdateHold = () => (this.cart && this.cart.length > 0) || this.showPayModal || this.showReceipt || this.submitting;
         },
         async _autoSyncTick(force = false) {
             if (this._autoSyncBusy) return;

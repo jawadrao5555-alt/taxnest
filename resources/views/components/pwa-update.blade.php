@@ -79,6 +79,15 @@ Usage: <x-pwa-update color="emerald" />
         countdownTimer = setInterval(() => {
             countdownSeconds--;
             if (countdownSeconds <= 0) {
+                // Mid-task hold: pages can register window.tnPwaUpdateHold (e.g. POS sale
+                // screen with items in the cart / pay modal open). While it returns true,
+                // keep the toast visible but DON'T auto-reload — retry every 30s. The
+                // manual Refresh button still works immediately.
+                if (typeof window.tnPwaUpdateHold === 'function') {
+                    let busy = false;
+                    try { busy = !!window.tnPwaUpdateHold(); } catch (e) {}
+                    if (busy) { countdownSeconds = 30; countdownEl.textContent = ''; return; }
+                }
                 stopCountdown();
                 applyUpdate();
                 return;
@@ -112,8 +121,8 @@ Usage: <x-pwa-update color="emerald" />
         if (reg.waiting) showBar();
         reg.addEventListener('updatefound', () => watchWorker(reg.installing));
 
-        // Faster auto-check: every 5 minutes
-        setInterval(() => { reg.update().catch(()=>{}); }, 5 * 60 * 1000);
+        // Auto-check every minute (owner rule Jul 2026): updates reach devices fast
+        setInterval(() => { reg.update().catch(()=>{}); }, 60 * 1000);
 
         // Check on tab focus / visibility / online — instant detection
         const checkNow = () => { reg.update().catch(()=>{}); };

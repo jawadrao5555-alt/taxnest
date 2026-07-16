@@ -408,6 +408,23 @@ window.addEventListener('popstate', function() {
 
         <div class="w-px h-6 bg-gray-200 dark:bg-gray-700 hidden sm:block flex-shrink-0"></div>
 
+        {{-- CATEGORY DROPDOWN (optional filter) — same activeCategory as the grid pills, so the two
+             stay in sync. Default "All Categories" = old behavior, byte-identical. Unlike the pills
+             it is ALWAYS visible (even when the grid is hidden), so a chosen category is never an
+             invisible/stale filter — search deliberately narrows to it. Hidden automatically when
+             the company has no categories/services/deals to pick. --}}
+        <div class="relative flex-shrink-0 hidden sm:block" x-show="catOptions().length > 0 || allServices.length > 0 || allDeals.length > 0" x-cloak>
+            <select x-model="activeCategory" title="Category chunein — grid aur search sirf usi category ke products dikhayenge"
+                    class="appearance-none pl-3 pr-8 py-2.5 rounded-xl text-xs font-bold border-2 cursor-pointer max-w-[150px] shadow-sm transition focus:ring-2 focus:ring-purple-500 focus:border-purple-400"
+                    :class="activeCategory !== 'all' ? 'border-purple-400 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300'">
+                <option value="all">All Categories</option>
+                <template x-for="c in catOptions()" :key="c"><option :value="c" x-text="c"></option></template>
+                <template x-if="allServices.length > 0"><option value="services">Services</option></template>
+                <template x-if="allDeals.length > 0"><option value="deals">🔥 Deals</option></template>
+            </select>
+            <svg class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+        </div>
+
         <div class="flex-1 relative" style="min-width:170px;">
             <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
             <input type="search" x-ref="searchInput" x-model="searchQuery" @input="onSearchInput()" @keydown.arrow-down.prevent="moveHighlight(1)" @keydown.arrow-up.prevent="moveHighlight(-1)" @keydown.enter.prevent.stop="addHighlightedItem($event)" @keydown.tab="if(flowStep === 'type'){ $event.preventDefault(); } else if(!searchQuery && cart.length > 0){ $event.preventDefault(); enterCartMode('last'); }" @focus="if(searchQuery) showSearchDropdown = true" @click.away="showSearchDropdown = false" placeholder="Search products... (type to filter, Enter to add, Tab → cart)" class="search-glow w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-400 transition shadow-sm" autocomplete="one-time-code" name="pos_product_search_nofill" data-lpignore="true" data-form-type="other" role="combobox">
@@ -2460,7 +2477,7 @@ function restaurantPos() {
             try { if (!this.isInventoryEnabled() && localStorage.getItem('pos_show_products') === '0') this.showProducts = false; } catch (e) {}
             this.filterProducts();
             setTimeout(() => { this.loading = false; }, 300);
-            this.$watch('activeCategory', () => { this.filterProducts(); this.gridFocusIndex = 0; });
+            this.$watch('activeCategory', () => { this.filterProducts(); this.gridFocusIndex = 0; if (this.searchQuery.trim().length > 0) this.onSearchInput(); });
             this.calcGridCols();
             window.addEventListener('resize', () => this.calcGridCols());
             // Cart auto-restore is intentionally disabled — every page load starts with an EMPTY cart.
@@ -2670,7 +2687,13 @@ function restaurantPos() {
                 // cashier can search a saved product and add it to the cart. No catalog
                 // match falls through to the inline "Create" prompt (inventory-OFF only).
                 if (q.length > 0) {
-                    const all = [...this.allDeals, ...this.allProducts, ...this.allServices];
+                    // CATEGORY DROPDOWN: a chosen category narrows the suggestion pool to it.
+                    // "all" = whole catalog (old behavior, byte-identical).
+                    let all;
+                    if (this.activeCategory === 'services') all = [...this.allServices];
+                    else if (this.activeCategory === 'deals') all = [...this.allDeals];
+                    else if (this.activeCategory !== 'all') all = this.allProducts.filter(p => p.category === this.activeCategory);
+                    else all = [...this.allDeals, ...this.allProducts, ...this.allServices];
                     const out = [];
                     for (let i = 0; i < all.length && out.length < 12; i++) {
                         const it = all[i];
@@ -2680,6 +2703,13 @@ function restaurantPos() {
                         if (it.name.toLowerCase().includes(q)
                             || (it.barcode && String(it.barcode).toLowerCase().includes(q))
                             || (it.sku && String(it.sku).toLowerCase().includes(q))) out.push(it);
+                    }
+                    // SCANNER SAFETY: an exact barcode/SKU match from ANY category still
+                    // surfaces while a category filter is active — a scan must never "fail"
+                    // just because the dropdown was left on some other category.
+                    if (this.activeCategory !== 'all') {
+                        const exact = this.findExactCodeItem(q);
+                        if (exact && !out.includes(exact)) out.unshift(exact);
                     }
                     // Exact barcode/SKU match jumps to the top so the scanner's trailing
                     // Enter always adds the right product (not an accidental name match).
@@ -2732,7 +2762,15 @@ function restaurantPos() {
             }
             if (this.showSearchDropdown && this.searchSuggestions.length > 0) { this.quickAddItem(this.searchSuggestions[this.highlightIndex]); return; }
             // No catalog match: in SIMPLE (inventory-OFF) mode, Enter creates the typed item on the fly.
-            if (!this.isInventoryEnabled() && this.searchQuery.trim().length > 0 && !this.quickCreating) { this.quickCreateProduct(); return; }
+            if (!this.isInventoryEnabled() && this.searchQuery.trim().length > 0 && !this.quickCreating) {
+                // DUPLICATE GUARD: before quick-creating, check the WHOLE catalog (any category,
+                // hidden included) for an exact NAME match — an active category filter must never
+                // cause a second 'Quick' copy of a product that already exists elsewhere.
+                const nameQ = this.searchQuery.trim().toLowerCase();
+                const existing = [...this.allProducts, ...this.allServices].find(it => it.name && parseFloat(it.price) > 0 && it.name.trim().toLowerCase() === nameQ);
+                if (existing) { this.quickAddItem(existing); return; }
+                this.quickCreateProduct(); return;
+            }
             // GUIDED FLOW (opt-in): Enter on an EMPTY search box advances the chain.
             // When the company has 2+ order types, it first opens the Order-Type step
             // (dine in / takeaway / delivery) — the owner-specified step between Items and
@@ -2767,17 +2805,16 @@ function restaurantPos() {
             }
             let items = [...this.allDeals, ...this.allProducts, ...this.allServices];
             items = items.filter(i => parseFloat(i.price) > 0 && i.name && i.name.trim().length > 0);
-            // A SEARCH query always spans the WHOLE catalog: it ignores the active category
-            // (the pills may be hidden, or a stale category chosen earlier would hide a match in
-            // another category) AND it includes products marked "Hidden from sale screen"
-            // (show_on_sale=false). The hidden flag ONLY declutters the browsable grid — it must
-            // never stop a cashier from finding a saved product by name and adding it to the cart.
-            const ignoreCategory = hasSearch;
-            if (!ignoreCategory) {
-                if (this.activeCategory === 'services') { items = this.allServices.filter(s => parseFloat(s.price) > 0 && s.name && s.name.trim().length > 0); }
-                else if (this.activeCategory === 'deals') { items = this.allDeals.filter(d => parseFloat(d.price) > 0 && d.name && d.name.trim().length > 0); }
-                else if (this.activeCategory !== 'all') { items = this.allProducts.filter(p => p.category === this.activeCategory && parseFloat(p.price) > 0 && p.name && p.name.trim().length > 0); }
-            }
+            // CATEGORY: the dropdown next to the search box is ALWAYS visible (unlike the pills),
+            // so a chosen category is never an invisible/stale filter — search now deliberately
+            // narrows to it ("All Categories" = whole catalog, old behavior). Search still includes
+            // products marked "Hidden from sale screen" (show_on_sale=false) within that scope —
+            // the hidden flag ONLY declutters the browsable grid, it must never stop a cashier
+            // from finding a saved product by name. Barcode scans stay GLOBAL via the exact-match
+            // fast path in addHighlightedItem/onSearchInput (never category-filtered).
+            if (this.activeCategory === 'services') { items = this.allServices.filter(s => parseFloat(s.price) > 0 && s.name && s.name.trim().length > 0); }
+            else if (this.activeCategory === 'deals') { items = this.allDeals.filter(d => parseFloat(d.price) > 0 && d.name && d.name.trim().length > 0); }
+            else if (this.activeCategory !== 'all') { items = this.allProducts.filter(p => p.category === this.activeCategory && parseFloat(p.price) > 0 && p.name && p.name.trim().length > 0); }
             // Hidden products stay OUT of the browsable grid (when NOT searching) but remain fully
             // searchable above — so only drop show_on_sale=false items when there is no search.
             if (!hasSearch) { items = items.filter(i => i.show_on_sale !== false); }
@@ -2797,6 +2834,12 @@ function restaurantPos() {
             this.displayItems = this.filteredItems.slice(0, this.displayCount);
         },
 
+        // Distinct product categories for the header dropdown — client-side so quick-created
+        // products ("Quick" category) appear without a reload. Mirrors the server pills list.
+        catOptions() {
+            return [...new Set(this.allProducts.map(p => p.category).filter(Boolean))].sort();
+        },
+
         // MASTER toggle — show/hide the saved products catalog on the sale screen.
         // Persisted per-browser (localStorage). When OFF, cashiers bill via manual entry only.
         toggleShowProducts() {
@@ -2804,6 +2847,10 @@ function restaurantPos() {
             if (this.isInventoryEnabled()) { this.showProducts = true; return; }
             this.showProducts = !this.showProducts;
             try { localStorage.setItem('pos_show_products', this.showProducts ? '1' : '0'); } catch (e) {}
+            // Grid OFF hides the pills — and on <sm screens the category dropdown is hidden too,
+            // so a previously-picked category would become an INVISIBLE search filter. Reset to
+            // 'all' (desktop can simply re-pick from the always-visible dropdown).
+            if (!this.showProducts && this.activeCategory !== 'all') this.activeCategory = 'all';
             this.filterProducts();
             // Search still works when the grid is hidden — keep suggestions live if a query is active.
             if (this.searchQuery && this.searchQuery.trim().length > 0) { this.onSearchInput(); }

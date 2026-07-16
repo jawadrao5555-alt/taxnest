@@ -529,7 +529,7 @@ window.addEventListener('popstate', function() {
         </button>
 
         {{-- Screen Fit control (Jul 2026): cashier picks Auto or a fixed % for THIS display; saved per device. --}}
-        <div class="relative hidden sm:block flex-shrink-0" @click.away="showFitMenu = false">
+        <div class="relative block flex-shrink-0" @click.away="showFitMenu = false">
             <button @click="showFitMenu = !showFitMenu" class="flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 transition" title="Screen Fit — adjust the sale screen to this display">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V5a1 1 0 011-1h3m8 0h3a1 1 0 011 1v3m0 8v3a1 1 0 01-1 1h-3m-8 0H5a1 1 0 01-1-1v-3"/></svg>
                 <span class="hidden lg:inline" x-text="fitLabel()"></span>

@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\PaymentProof;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -66,7 +68,7 @@ class PaymentProofController extends Controller
         // Private (non-public) disk: receipts are downloadable by admins only.
         $path = $request->file('proof')->store('payment-proofs/' . $companyId, 'local');
 
-        PaymentProof::create([
+        $proof = PaymentProof::create([
             'company_id' => $companyId,
             'pricing_plan_id' => $plan->id,
             'billing_cycle' => \App\Services\SubscriptionAssignmentService::normalizeCycle($validated['billing_cycle']),
@@ -78,8 +80,56 @@ class PaymentProofController extends Controller
             'status' => 'pending',
         ]);
 
+        // Alert admins right away — the company is blocked from billing until an
+        // admin verifies, so review speed matters. Best-effort: a mail failure
+        // must NEVER break the company's submission (mirrors trial-reminder pattern).
+        $this->alertAdmins($company, $plan, $proof);
+
         return back()->with('success', 'Payment proof submitted! Your account will be unlocked once our team verifies it.')
             ->with('payment_proof', 'submitted');
+    }
+
+    /**
+     * Email every admin account about the newly submitted receipt. Sent
+     * synchronously (no queue-worker dependency on cPanel), swallowing failures
+     * with a log line — the sidebar badge + dashboard tile still cover it.
+     */
+    private function alertAdmins(?\App\Models\Company $company, \App\Models\PricingPlan $plan, PaymentProof $proof): void
+    {
+        try {
+            $emails = \App\Models\AdminUser::whereNotNull('email')
+                ->where('email', '!=', '')
+                ->pluck('email')->unique()->values();
+            if ($emails->isEmpty()) {
+                return;
+            }
+
+            $companyName = $company->name ?? ('Company #' . $proof->company_id);
+            $panel = strtoupper($plan->product_type ?? 'di');
+            $cycle = ucwords(str_replace('_', ' ', (string) $proof->billing_cycle));
+            $amount = $proof->amount !== null ? 'PKR ' . number_format((float) $proof->amount) : 'Not specified';
+
+            $body = "A new payment receipt is waiting for review.\n\n"
+                . "Company: {$companyName}\n"
+                . "Panel: {$panel}\n"
+                . "Package: {$plan->name}\n"
+                . "Billing cycle: {$cycle}\n"
+                . "Amount: {$amount}\n"
+                . ($proof->reference ? "Reference: {$proof->reference}\n" : '')
+                . ($proof->payment_date ? 'Payment date: ' . $proof->payment_date->format('Y-m-d') . "\n" : '')
+                . "\nThe company stays locked until this is verified.\n"
+                . 'Review: ' . route('saas.admin.payment-proofs') . "\n\n"
+                . 'TaxNest';
+
+            Mail::raw($body, function ($m) use ($emails, $companyName) {
+                $m->to($emails->all())->subject("New payment receipt — {$companyName}");
+            });
+        } catch (\Throwable $e) {
+            Log::warning('Payment proof admin alert email failed', [
+                'proof_id' => $proof->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

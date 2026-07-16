@@ -2,7 +2,7 @@
 <div class="p-4 sm:p-6 max-w-7xl mx-auto" x-data="{ activeTab: 'di' }">
     <h1 class="text-2xl font-bold text-white mb-6">Admin Dashboard</h1>
 
-    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-8">
+    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mb-8">
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
             <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Total Companies</p>
             <p class="text-xl font-bold text-white">{{ $stats['total_companies'] }}</p>
@@ -22,6 +22,13 @@
         <div class="bg-gray-900 border border-amber-900/50 rounded-xl p-4">
             <p class="text-[10px] text-amber-500 uppercase tracking-wide mb-1">Pending</p>
             <p class="text-xl font-bold {{ $stats['pending_companies'] > 0 ? 'text-amber-400' : 'text-gray-500 dark:text-gray-400' }}">{{ $stats['pending_companies'] }}</p>
+        </div>
+        <div class="bg-gray-900 border border-amber-900/50 rounded-xl p-4">
+            <p class="text-[10px] text-amber-500 uppercase tracking-wide mb-1">Pending Payments</p>
+            <p class="text-xl font-bold {{ ($stats['pending_payment_proofs'] ?? 0) > 0 ? 'text-amber-400' : 'text-gray-500 dark:text-gray-400' }}">{{ $stats['pending_payment_proofs'] ?? 0 }}</p>
+            @if(($stats['pending_payment_proofs'] ?? 0) > 0)
+            <a href="{{ route('saas.admin.payment-proofs') }}" class="text-[10px] text-indigo-400 hover:underline">Review now</a>
+            @endif
         </div>
         <div class="bg-gray-900 border border-red-900/50 rounded-xl p-4">
             <p class="text-[10px] text-red-500 uppercase tracking-wide mb-1">Suspended</p>

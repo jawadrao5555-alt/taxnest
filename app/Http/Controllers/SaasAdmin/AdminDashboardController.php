@@ -29,6 +29,8 @@ class AdminDashboardController extends Controller
             'pos_companies' => (int) ($productCounts['pos'] ?? 0),
             'fbrpos_companies' => (int) ($productCounts['fbrpos'] ?? 0),
             'pending_companies' => Company::where('status', 'pending')->count(),
+            'pending_payment_proofs' => Schema::hasTable('payment_proofs')
+                ? \App\Models\PaymentProof::where('status', 'pending')->count() : 0,
             'suspended_companies' => Company::where('status', 'suspended')->count(),
             'binned_companies' => Company::onlyTrashed()->count(),
             'active_subscriptions' => Subscription::where('active', true)->count(),

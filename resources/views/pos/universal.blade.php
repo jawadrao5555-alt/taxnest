@@ -831,6 +831,26 @@ window.addEventListener('popstate', function() {
                         <template x-if="selectedCustomer.address">
                             <p class="text-[10px] text-blue-500 dark:text-blue-400 truncate" x-text="'📍 ' + selectedCustomer.address"></p>
                         </template>
+                        {{-- Item #1 (Jul 2026): delivery-address picker — Delivery orders only.
+                             Saved addresses (address #1 + extras) in a dropdown; "+ New" saves an
+                             extra address to the customer AND selects it for this bill. --}}
+                        <template x-if="orderType === 'delivery'">
+                            <div class="mt-1 space-y-1">
+                                <div class="flex items-center gap-1">
+                                    <select x-model="selectedDeliveryAddress" class="flex-1 min-w-0 text-[10px] rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1 px-1.5 focus:ring-blue-500 focus:border-blue-400">
+                                        <option value="">— Delivery address —</option>
+                                        <template x-for="(a, ai) in customerAddresses" :key="a.id ?? ('t' + ai)">
+                                            <option :value="a.address" x-text="(a.label ? a.label + ': ' : '') + a.address"></option>
+                                        </template>
+                                    </select>
+                                    <button @click="showAddrNew = !showAddrNew; if (showAddrNew) $nextTick(() => document.getElementById('tnNewAddrInput')?.focus())" class="text-[10px] font-bold text-blue-600 dark:text-blue-300 px-1.5 py-1 rounded-md border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 whitespace-nowrap">+ New</button>
+                                </div>
+                                <div x-show="showAddrNew" x-cloak class="flex items-center gap-1">
+                                    <input id="tnNewAddrInput" type="text" x-model="newAddrText" @keydown.enter.prevent="saveNewAddress()" @keydown.escape.prevent="showAddrNew = false" placeholder="Full delivery address..." autocomplete="off" name="pos_new_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="flex-1 min-w-0 text-[10px] rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1 px-1.5 focus:ring-blue-500 focus:border-blue-400">
+                                    <button @click="saveNewAddress()" class="text-[10px] font-bold text-white bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded-md">Save</button>
+                                </div>
+                            </div>
+                        </template>
                         <template x-if="customerStats">
                             <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
                                 <span class="text-[10px] font-semibold text-blue-700 dark:text-blue-300" x-text="(customerStats.total_orders || 0) + ' orders'"></span>
@@ -3867,7 +3887,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.incomingOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.fixCartIndex(); this.clearCartStorage(); },
+        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.incomingOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm('Current order has ' + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast('New sale started', 'success');

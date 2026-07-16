@@ -98,5 +98,27 @@
             </button>
         </div>
     </form>
+
+    {{-- Direct Print guide (owner request Jul 2026): browsers ALWAYS show a print
+         dialog from JavaScript — the ONLY reliable no-dialog path is the browser's
+         own kiosk-printing mode. This card teaches the one-time shortcut setup;
+         paired with the sale screen's Auto-Print toggle the receipt then prints
+         instantly with zero clicks. Informational only — no server state. --}}
+    <div class="mt-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+        <h2 class="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">⚡ Direct Print — skip the print dialog</h2>
+        <p class="text-sm text-gray-600 dark:text-gray-300 mt-2">
+            By default every browser opens a print dialog before printing. To make receipts print <span class="font-semibold">instantly on your thermal printer with no popup</span>, set up your billing computer once:
+        </p>
+        <ol class="list-decimal list-inside text-sm text-gray-700 dark:text-gray-200 mt-3 space-y-2">
+            <li><span class="font-semibold">Set the thermal printer as the Default Printer</span> in Windows — Settings → Bluetooth &amp; devices → Printers → your thermal printer → "Set as default".</li>
+            <li><span class="font-semibold">Make a Direct-Print shortcut for Chrome:</span> right-click the Desktop → New → Shortcut, and paste:
+                <code class="block mt-1.5 mb-1 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-[12px] text-gray-800 dark:text-gray-100 select-all overflow-x-auto">"C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk-printing</code>
+                Name it <span class="font-semibold">"POS Direct Print"</span>. (Microsoft Edge: replace the path with <code class="text-[11px]">msedge.exe</code> — same <code class="text-[11px]">--kiosk-printing</code> flag.)
+            </li>
+            <li><span class="font-semibold">Always open the POS from that shortcut.</span> Close all other Chrome windows first — the flag only works when Chrome starts fresh.</li>
+            <li>On the sale screen, keep <span class="font-semibold">Auto-Print Receipt = ON</span>. Now every finished bill goes straight to the printer — no dialog, no clicks.</li>
+        </ol>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-3">Note: this is a one-time setup per billing computer. Without it, the browser's print dialog cannot be skipped — that's a browser security rule, not a TaxNest setting.</p>
+    </div>
 </div>
 </x-pos-layout>

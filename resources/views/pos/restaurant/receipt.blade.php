@@ -146,6 +146,7 @@
     <div class="customer-box">
         <p class="c-name">{{ $transaction->customer_name }}</p>
         @if($transaction->customer_phone)<p class="c-phone">{{ $transaction->customer_phone }}</p>@endif
+        @if($transaction->delivery_address)<p class="c-phone">Deliver: {{ $transaction->delivery_address }}</p>@endif
     </div>
     @endif
 

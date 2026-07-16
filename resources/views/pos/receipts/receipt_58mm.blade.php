@@ -189,6 +189,9 @@
         @if($transaction->customer_name)
         <tr><td class="info-label">Cust:</td><td class="info-value">{{ $transaction->customer_name }}</td></tr>
         @endif
+        @if($transaction->delivery_address)
+        <tr><td class="info-label">Deliver:</td><td class="info-value">{{ $transaction->delivery_address }}</td></tr>
+        @endif
         <tr><td class="info-label">Pay:</td><td class="info-value">{{ ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</td></tr>
         @if($transaction->creator && $rp['show_cashier'])
         <tr><td class="info-label">Cashier:</td><td class="info-value">{{ $transaction->creator->name }}</td></tr>

@@ -3700,6 +3700,73 @@ class PosController extends Controller
         return back()->with('success', 'Cashier updated.');
     }
 
+    // ── Item #1 (Jul 2026): customer saved delivery addresses ──────────────
+    // pos_customers.address = "address #1" (default); extras live in
+    // pos_customer_addresses (NO FK — shared-table rule; always company-scoped).
+    // Cashiers allowed: this is part of the sale flow, not admin config.
+    public function apiCustomerAddresses(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $customer = \App\Models\PosCustomer::where('company_id', $companyId)
+            ->find((int) $request->query('customer_id'));
+        if (!$customer) {
+            return response()->json(['addresses' => []]);
+        }
+
+        $addresses = [];
+        if (trim((string) $customer->address) !== '') {
+            $addresses[] = ['id' => 0, 'label' => 'Default', 'address' => $customer->address];
+        }
+        \App\Models\PosCustomerAddress::where('company_id', $companyId)
+            ->where('customer_id', $customer->id)
+            ->orderBy('id')
+            ->get()
+            ->each(function ($a) use (&$addresses) {
+                $addresses[] = ['id' => $a->id, 'label' => $a->label, 'address' => $a->address];
+            });
+
+        return response()->json(['addresses' => $addresses]);
+    }
+
+    public function apiStoreCustomerAddress(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $request->validate([
+            'customer_id' => 'required|integer',
+            'address' => 'required|string|max:500',
+            'label' => 'nullable|string|max:50',
+        ]);
+
+        $customer = \App\Models\PosCustomer::where('company_id', $companyId)
+            ->find((int) $request->customer_id);
+        if (!$customer) {
+            return response()->json(['success' => false, 'message' => 'Customer not found'], 404);
+        }
+
+        // First-ever address becomes the customer's default (address #1) so the
+        // legacy pos_customers.address surfaces (chip, exports) stay populated.
+        if (trim((string) $customer->address) === '') {
+            $customer->update(['address' => trim($request->address)]);
+            return response()->json(['success' => true, 'address' => ['id' => 0, 'label' => 'Default', 'address' => $customer->address]]);
+        }
+
+        // Sanity cap — a walk-in POS customer never needs 15+ saved addresses.
+        $count = \App\Models\PosCustomerAddress::where('company_id', $companyId)
+            ->where('customer_id', $customer->id)->count();
+        if ($count >= 15) {
+            return response()->json(['success' => false, 'message' => 'Address limit reached (15) — delete an old one first.'], 422);
+        }
+
+        $addr = \App\Models\PosCustomerAddress::create([
+            'company_id' => $companyId,
+            'customer_id' => $customer->id,
+            'label' => $request->input('label') ?: null,
+            'address' => trim($request->address),
+        ]);
+
+        return response()->json(['success' => true, 'address' => ['id' => $addr->id, 'label' => $addr->label, 'address' => $addr->address]]);
+    }
+
     public function toggleCashier($id)
     {
         $companyId = app('currentCompanyId');

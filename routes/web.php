@@ -466,6 +466,9 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/api/provisional-bills', [PosController::class, 'apiProvisionalBills'])->name('pos.api.provisional-bills');
     Route::post('/api/provisional-bills/{id}/delete', [PosController::class, 'apiDeleteProvisional'])->name('pos.api.provisional.delete');
     Route::post('/api/provisional-bills/{id}/promote', [PosController::class, 'apiPromoteProvisional'])->name('pos.api.provisional.promote');
+    // Item #1 (Jul 2026): customer saved delivery addresses (sale-flow, cashiers allowed)
+    Route::get('/api/customer-addresses', [PosController::class, 'apiCustomerAddresses'])->name('pos.api.customer-addresses');
+    Route::post('/api/customer-addresses', [PosController::class, 'apiStoreCustomerAddress'])->name('pos.api.customer-addresses.store');
     Route::get('/api/failed-bills', [PosController::class, 'apiFailedBills'])->name('pos.api.failed-bills');
     Route::post('/api/failed-bills/{id}/retry', [PosController::class, 'apiRetryFailed'])->name('pos.api.failed.retry');
     Route::get('/transaction/{id}/receipt', [PosController::class, 'receipt'])->name('pos.receipt');

@@ -3,19 +3,19 @@ name: PRA POS sale screen — live view, product loaders & visibility
 description: Which Blade renders the POS sale screen, the 3 product loaders that must stay in sync, and the two-layer product visibility (incl. inventory-mode gating)
 ---
 
-## Live sale screen — DEPENDS ON company type (this trips people up)
-- **Non-restaurant companies** → `resources/views/pos/universal.blade.php` (`pos.invoice.create` / `pos.v2.invoice.create`; `PosController::createInvoice()` unconditionally returns `universalCreateInvoice()`).
-- **restaurant_mode companies → `resources/views/pos/restaurant/pos.blade.php`, NOT universal.** After login, `PosAuthController` (3 redirect spots) sends restaurant companies to `/pos/restaurant/pos` → `RestaurantPosController::pos()`. They NEVER reach universal. So "universal is the only sale screen" is FALSE for restaurants.
-  **Why this matters:** a fix applied only to `universal.blade.php` has ZERO effect for a restaurant company (they render `restaurant/pos.blade.php`). Multiple deploys looked "stale/cached" but were really edits to the wrong file. CHECK `companies.restaurant_mode` FIRST. Tell-tale: empty-state text differs — universal = "No products match"; restaurant = "No products found" / "Try a different category or search term".
-- `resources/views/pos/create-invoice.blade.php` is DEAD (never reached). Edit the live file for the company type, never the dead file.
+## Live sale screen — universal ONLY (updated after POS unification, Jul 2026)
+- `resources/views/pos/universal.blade.php` is the ONLY live sale screen for ALL companies (`pos.invoice.create`; `PosController::createInvoice()` unconditionally returns `universalCreateInvoice()`). Universal adapts to restaurant mode via company feature settings.
+- **`RestaurantPosController::pos()` early-RETURNS a redirect to `pos.invoice.create` (carries table_id)** — the dedicated restaurant screen is retired. Code below the redirect is DEAD but still present.
+- `resources/views/pos/create-invoice.blade.php` AND `resources/views/pos/restaurant/pos.blade.php` are both DEAD (never rendered). Edit universal, never the dead files.
+- **History why:** pre-unification, restaurant companies rendered `restaurant/pos.blade.php` — fixes applied only to universal looked "stale/cached" on restaurant shops. That trap is gone, but verify with the redirect if ever in doubt.
 
 ## Product loaders (keep in sync)
-The cashier sale/billing product list is loaded by THREE controller methods. Any "which products appear when billing" filter must be applied to ALL three, or products leak into one register but not another:
-- `PosController::universalCreateInvoice()` — the active universal POS register (default sale screen).
+The cashier sale/billing product list is loaded by these controller methods. Any "which products appear when billing" filter must be applied to ALL of them, or products leak into one register but not another:
+- `PosController::universalCreateInvoice()` — the live universal POS register.
 - `PosController::editTransaction()` — product picker when editing a non-PRA-submitted transaction.
-- `RestaurantPosController::pos()` — restaurant-mode register.
+- (`RestaurantPosController::pos()` — DEAD code after its early redirect, but keep its loader in sync if it's ever touched.)
 The catalog management page (`PosController::products()`) and stats/count queries must NOT be filtered — they list every product.
-**How to apply:** grep `PosProduct::where('company_id', ...)->where('is_active', true)` and update the three loaders only.
+**How to apply:** grep `PosProduct::where('company_id', ...)->where('is_active', true)` and update the loaders only.
 
 ## Two-layer product visibility (don't confuse them)
 1. **Per-product "Hidden from sale screen"** — `show_on_sale` column on `pos_products` (default true), toggled from the products page. As of Jun 2026 this means HIDDEN-FROM-GRID, **not** excluded, on the universal register: `universalCreateInvoice()` loads ALL active products (incl. `show_on_sale=false`) and `productsJson` carries the flag. `universal.blade.php` `filterProducts()` drops `show_on_sale===false` from the browsable grid **only when there is no search**; a search ALWAYS includes hidden items (and `ignoreCategory = hasSearch`, so search spans the whole catalog). `addRandomProduct()` excludes hidden; the "All (N)" count counts visible-only. **Why:** owner wanted hidden = decluttered grid yet still findable by name to add to cart. **Divergence:** As of Jun 2026 `RestaurantPosController::pos()` ALSO loads all active products and `restaurant/pos.blade.php` `filterProducts()` mirrors universal (hidden dropped from grid only when not searching; search spans whole catalog incl. hidden) + `productsJson` carries `show_on_sale`. `editTransaction()` STILL hard-filters `show_on_sale = true` (hidden not searchable there) — leave unless asked.

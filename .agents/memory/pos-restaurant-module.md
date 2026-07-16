@@ -1,0 +1,27 @@
+---
+name: POS Restaurant module invariants
+description: Full rules for restaurant gating, dine-in tables, station KOT routing, KDS, waiter tablets, deals, and public QR menu (moved out of replit.md Jul 2026)
+---
+
+# Restaurant module (NestPOS) — full invariants
+
+## Gating
+Restaurant = Pro/Unlimited + active TRIAL. `PosFeatureService::forCompany()` masks restaurant-category flags OFF unless the active plan's `restaurant_enabled` COLUMN is 1 (never plan IDs) OR the subscription is an active non-expired trial (mask returns on expiry). Nav "Tables"/"Kitchen Display" links gate on effective flags (forCompany), not `restaurant_mode`. `pricing_plans.features` JSON is DISPLAY-ONLY marketing copy; plan cards render limits from the limit columns + cumulative "Everything in <prev>, plus:" lists. Stored flags preserved — locked saves don't wipe config; upgrade restores. Features page greys out with "Pro/Unlimited only" label.
+
+## Dine-In table picker (F3)
+Universal screen order-type 'Dine In' + tables ON → Alpine floor/table modal; select reserves (occupied), auto-frees on final payment AND cancel/delete. T/D/N gated OFF while open. Opens from BOTH the Dine In pill AND the guided keyboard type step (confirmGuidedType routes through setOrderType); full keyboard state (arrows/Enter/Esc), selectTable resumes the guided chain; clearCart resets orderType to takeaway.
+
+## Counter/Station KOT routing
+`pos_stations` — counters claim product categories (case-insensitive; one ACTIVE counter per category + unique names, validated). `PosStation::prepareTicket` is the SINGLE resolver for BOTH KOT render paths (kitchen-ticket route + Agent print job) — never let them diverge. Unassigned categories/manual items/services → default KITCHEN (id 0). Zero stations = legacy single KOT, byte-identical. Silent print with stations & no station_id: server splits one job per counter-with-items (counter printer ?? kot_printer; ANY bucket missing printer → 409 whole request → client falls back to full popup). Empty station ticket never prints (blade guard signals/closes; agent 204). KDS counter picker (localStorage `kds_station`, `?station=` override, whitelist) filters cards/aggregate/counts/auto-print; pinned KDS delta fires per-station via `unprinted_by_station` (order-wide count would print blanks on other counters). Station CRUD on Kitchen Settings, admin-only; printer must be agent-known (loud error, not silent null).
+
+## Kitchen account + KDS (F4/F5)
+`pos_kitchen` login → confined to /pos/restaurant/kds. KDS uses separate `kitchen_status`+timestamps (NEVER touches restaurant_orders.status — that drives tables); scan (scanner/camera) or manual button clears; KOT has QR + CODE128. `pos_kds_auto_print` (admin-only POST) → KDS auto-prints NEW orders once (localStorage seed, no dupes) AND delta tickets for appended items ({id,delta} queue, 30s throttle); per-card manual reprint works with auto-print OFF (`kot_reprint_enabled`).
+
+## Waiter tablets (F6)
+`pos_waiter` login → confined to /pos/waiter (customer, table reserve, product grid, send to chosen cashier, append to own held orders). Orders = RestaurantOrder rows (status 'held', source='waiter', assigned_cashier_id) — KDS/tables/day-close see them with zero new lifecycle. Cashier universal screen: teal "Waiter" button + Incoming modal (20s poll) → load to cart → settle via manual storeInvoice path (quota charged THERE only; waiter sends free) → `/pos/api/incoming-orders/{id}/complete` links txn + frees table (race-safe claim). FINAL bills only settle the waiter order — provisional save leaves it in Incoming. Delta-KOT: `restaurant_order_items.kot_printed_at` — only NULL rows print, so appends print alone.
+
+## Deals — day-based combos
+`pos_deals` (price, active_days JSON ISO 1–7 empty=daily, optional starts_on/ends_on) + `pos_deal_items` (component pos_products, no FK per shared-table rule); admin CRUD at /pos/deals. Universal sale screen only: server-side `isActiveOn()` filter → `$dealsForJs`, Deals pill, never in localStorage cache. Server ENFORCES deal price (client price ignored) + freezes `pos_transaction_items.deal_snapshot` [{product_id,name,qty}]; ALL stock paths expand from SNAPSHOT (never live deal items) via `expandDealComponentsForStock()`. Billing-only: `hasDealItems()` blocks Hold/KOT + routes pay to processPaymentManual (restaurant hold 422s on 'deal'). No re-check of isActiveOn at storeInvoice (midnight-crossing cart honored). Receipts/PDF/show render snapshot components as indented no-price sub-lines.
+
+## Public QR profile + menu (F8)
+`companies.public_profile_slug` (random 24 lowercase, unique, regenerable — old QRs die) + `public_profile_settings` JSON (enabled + per-detail show/hide + hours/about) + `pos_menu_items` (company_id+pos_product_id unique, sort; NO price copy — public page reads LIVE from pos_products, company-scoped + is_active only; no FK per shared-table rule). Public GET /menu/{slug}: throttle:60,1, slug regex, disabled/unknown = same as unknown route (no enumeration), noindex; website renders as link ONLY when ^https?:// (else plain text). Admin section on POS Business Profile page (cashiers: middleware-blocked + controller 403). Receipts 80mm/58mm: ONLY local/provisional @else branch — QR switches from JSON blob to public URL when enabled; PRA fiscal + offline branches untouched.

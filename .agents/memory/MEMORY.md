@@ -52,6 +52,8 @@
 - [Unicode heredoc writes truncate files](unicode-heredoc-write.md) — \ud-escape emoji in heredoc/python writes can truncate the target file mid-write; use \U0001F5A8 + atomic write; restore via git show HEAD:path.
 - [SaaS admin flash banners](admin-panel-flash-banners.md) — admin layout renders success/error/$errors centrally; pages add none; "form does nothing" = suspect silent validation fail.
 - [PRA POS package limits](pos-package-limits.md) — monthly FINAL-bill quota + team-account quota; four gated final paths (incl. retryPra local-only + toggleCashier reactivation); provisionals free until promoted.
+- [POS restaurant module invariants](pos-restaurant-module.md) — gating column rule, station-KOT single resolver, KDS kitchen_status isolation, waiter settle path, deal snapshot stock, QR menu.
+- [POS universal screen features](pos-universal-screen-features.md) — Screen Fit, manual-cart type mapping, receipt popup, F10/F11 modals, PWA update hold; detail moved out of replit.md.
 - [Offline-first POS billing dedupe](offline-first-pos-billing.md) — offline_uuid rides on EVERY submit attempt incl. online (lost-response dupes); replay guard before quota; timestamp/poison-queue gaps open.
 - [POS Screen Fit zoom](pos-screen-fit-zoom.md) — sale screens scale via CSS zoom + px-height compensation (vh unreliable in zoomed subtree); CSS.supports guard mandatory; auto shrinks 1280–1366w shops to 90%.
 - [PRA POS Deals rules](pos-deals-feature.md) — server-enforced price, snapshot-driven stock, billing-only (no hold/KOT); cart→payload builder flattens item_type — new cart types MUST be added to the type mapping + UI-payload tested.

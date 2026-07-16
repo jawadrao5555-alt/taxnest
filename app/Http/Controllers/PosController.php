@@ -4020,6 +4020,7 @@ class PosController extends Controller
             'tax_rate'      => 0,
             'is_active'     => true,
             'is_tax_exempt' => false,
+            'show_on_sale'  => true, // explicit — never trust the DB default (prod drift)
             'category'      => 'Quick',
             'sku'           => 'QC-' . substr((string) time(), -6) . '-' . strtoupper(substr(uniqid(), -3)),
             'uom'           => 'NOS',
@@ -4387,6 +4388,7 @@ class PosController extends Controller
                     'company_id' => $companyId,
                     'name' => $name,
                     'price' => (float) $price,
+                    'show_on_sale' => true, // explicit — never trust the DB default (prod drift)
                     'description' => $descIdx !== false ? trim($data[$descIdx] ?? '') : null,
                     'category' => $catIdx !== false ? trim($data[$catIdx] ?? '') : null,
                     'sku' => $skuIdx !== false ? trim($data[$skuIdx] ?? '') : null,
@@ -5406,6 +5408,7 @@ class PosController extends Controller
                         'uom' => 'NOS',
                         'is_active' => true,
                         'is_tax_exempt' => $userExempt,
+                        'show_on_sale' => true, // explicit — never trust the DB default (prod drift)
                     ]);
                     $itemId = $newProduct->id;
                     $isExempt = $userExempt;

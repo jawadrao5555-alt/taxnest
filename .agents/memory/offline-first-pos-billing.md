@@ -7,7 +7,7 @@ description: PRA POS offline queue design — offline_uuid must ride on EVERY su
 
 **Rule:** The dedupe key `offline_uuid` is generated ONCE per bill at the top of the payload build in `processPaymentManual` and rides on EVERY attempt — including the normal online POST. `queueOfflineBill` must REUSE `payload.offline_uuid`, never mint a fresh one.
 
-**Why:** The classic flaky-WiFi failure is a lost RESPONSE: server committed the bill but the reply never arrived. If the online attempt carried no uuid, the queued retry gets a fresh uuid, the replay guard can't match, and the sync engine creates a duplicate final bill (double quota, double PRA submission, two fiscal serials). Architect review caught this exact window.
+**Why:** The classic flaky-WiFi failure is a lost RESPONSE: server committed the bill but the reply never arrived. If the online attempt carried no uuid, the queued retry gets a fresh uuid, the replay guard can't match, and the sync engine creates a duplicate final bill (double quota, double PRA submission, two fiscal serials).
 
 **How to apply:**
 - Server: `storeInvoice` replay guard = company-scoped lookup on `(company_id, offline_uuid)` with `withoutGlobalScope('hide_archived')` + `Schema::hasColumn` guard, placed AFTER validation but BEFORE card-normalize and quota — replays never re-charge quota; returns same success JSON + `replayed:true`. Unique index `pos_txn_offline_uuid_unique` is the safety net; concurrent two-tab drain self-heals (loser 500s, next cycle hits replay lookup, deletes from IDB).

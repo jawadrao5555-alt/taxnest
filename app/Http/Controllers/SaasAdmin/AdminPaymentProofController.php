@@ -177,18 +177,26 @@ class AdminPaymentProofController extends Controller
                 ? ($plan->name . ($cycleLabel ? ' (' . $cycleLabel . ')' : ''))
                 : null;
 
+            [$panelName, $ctaUrl] = match ($plan?->product_type ?? 'di') {
+                'pos' => ['NestPOS — PRA Point of Sale', url('/pos/login')],
+                'fbrpos' => ['Nest FBR POS', url('/fbr-pos/login')],
+                default => ['Digital Invoicing', url('/login')],
+            };
+
             if ($decision === 'approved') {
                 $title = 'Payment verified — account unlocked';
                 $message = 'Your payment has been verified'
                     . ($planLine ? ' for the ' . $planLine . ' package' : '')
                     . '. Your ' . $productLabel . ' account is now unlocked.';
                 $subject = 'Payment verified — your TaxNest account is unlocked';
-                $body = "Assalam-o-Alaikum,\n\n"
-                    . "Good news! Your payment for {$company->name} has been verified.\n\n"
-                    . ($planLine ? "Package: {$planLine}\n\n" : '')
-                    . "Your {$productLabel} account is now UNLOCKED — you can continue working right away.\n\n"
-                    . "Thank you for choosing TaxNest.\n\n"
-                    . "Team TaxNest";
+                $headline = 'Good news! Your payment has been verified.';
+                $paragraphs = array_values(array_filter([
+                    "We have verified the payment you submitted for {$company->name}.",
+                    $planLine ? "Package: {$planLine}" : null,
+                    "Your {$productLabel} account is now UNLOCKED — you can continue working right away.",
+                    'Thank you for choosing TaxNest.',
+                ]));
+                $ctaLabel = 'Go to My Account';
             } else {
                 $reason = trim((string) $proof->reject_reason);
                 $reasonLine = $reason !== '' ? $reason : 'No reason specified — please contact support.';
@@ -198,12 +206,14 @@ class AdminPaymentProofController extends Controller
                 $title = 'Payment proof rejected';
                 $message = 'Payment rejected: ' . $reasonLine . ' Please submit a new payment proof.';
                 $subject = 'Payment proof rejected — action required';
-                $body = "Assalam-o-Alaikum,\n\n"
-                    . "Unfortunately the payment proof you submitted for {$company->name} could not be verified.\n\n"
-                    . "Reason: {$reasonLine}\n\n"
-                    . "Please log in to your {$productLabel} account and submit a new payment proof. "
-                    . "If you believe this is a mistake, contact our support team on WhatsApp.\n\n"
-                    . "Team TaxNest";
+                $headline = 'Your payment proof could not be verified.';
+                $paragraphs = array_values(array_filter([
+                    "Unfortunately the payment proof you submitted for {$company->name} could not be verified.",
+                    "Reason: {$reasonLine}",
+                    $planLine ? "Package: {$planLine}" : null,
+                    "Please log in to your {$productLabel} account and submit a new payment proof. If you believe this is a mistake, contact our support team on WhatsApp.",
+                ]));
+                $ctaLabel = 'Log In & Resubmit';
             }
 
             Notification::create([
@@ -221,9 +231,15 @@ class AdminPaymentProofController extends Controller
             $email = $this->companyRecipientEmail($company);
             if ($email) {
                 try {
-                    Mail::raw($body, function ($m) use ($email, $subject) {
-                        $m->to($email)->subject($subject);
-                    });
+                    Mail::to($email)->send(new \App\Mail\TrialReminderMail(
+                        subjectLine: $subject,
+                        companyName: $company->name ?? 'your company',
+                        headline: $headline,
+                        paragraphs: $paragraphs,
+                        ctaUrl: $ctaUrl,
+                        ctaLabel: $ctaLabel,
+                        panelName: $panelName,
+                    ));
                 } catch (\Throwable $e) {
                     Log::warning('Payment decision email failed', [
                         'payment_proof_id' => $proof->id,

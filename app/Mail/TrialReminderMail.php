@@ -5,9 +5,11 @@ namespace App\Mail;
 use Illuminate\Mail\Mailable;
 
 /**
- * Branded HTML trial-ending reminder. Sent SYNCHRONOUSLY from the
- * trial:reminders scheduled command (no queue worker required on cPanel) —
- * intentionally NOT ShouldQueue.
+ * Shared branded HTML notification mailable (TaxNest header, headline,
+ * paragraphs, CTA button + plain-text fallback). Used by the trial:reminders
+ * scheduled command AND the payment approve/reject notifications
+ * (AdminPaymentProofController). Sent SYNCHRONOUSLY (no queue worker required
+ * on cPanel) — intentionally NOT ShouldQueue.
  */
 class TrialReminderMail extends Mailable
 {

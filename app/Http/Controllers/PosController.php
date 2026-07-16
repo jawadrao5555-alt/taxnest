@@ -904,7 +904,42 @@ class PosController extends Controller
             // Item #1 (Jul 2026): delivery-address SNAPSHOT — frozen on the bill so
             // later edits to the customer's saved addresses never rewrite receipts.
             'delivery_address' => 'nullable|string|max:500',
+            // OFFLINE-FIRST POS (Jul 2026): client-generated idempotency UUID —
+            // present only on bills queued in IndexedDB while the device was
+            // offline, replayed by the sale screen's sync engine.
+            'offline_uuid' => 'nullable|string|max:64',
         ]);
+
+        // OFFLINE-FIRST replay guard: if an earlier sync attempt already stored
+        // this bill (response was lost mid-flight — network dropped again, tab
+        // closed, etc.), return the SAME success payload instead of creating a
+        // duplicate. withoutGlobalScope so an already-archived bill (day-close
+        // ran between attempts) still dedupes. Schema guard covers the brief
+        // deploy-before-migrate window on PROD.
+        $offlineUuid = trim((string) $request->input('offline_uuid', ''));
+        $offlineUuidColumnExists = $offlineUuid !== '' && \Schema::hasColumn('pos_transactions', 'offline_uuid');
+        if ($offlineUuidColumnExists) {
+            $existing = PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->where('offline_uuid', $offlineUuid)
+                ->first();
+            if ($existing) {
+                $replayMessage = 'Invoice already synced. POS Invoice Number: ' . $existing->invoice_number;
+                if ($request->wantsJson()) {
+                    return response()->json([
+                        'success' => true,
+                        'replayed' => true,
+                        'transaction_id' => $existing->id,
+                        'invoice_number' => $existing->invoice_number,
+                        'total_amount' => (float) $existing->total_amount,
+                        'pra_invoice_number' => $existing->pra_invoice_number,
+                        'pra_status' => $existing->pra_status,
+                        'message' => $replayMessage,
+                    ]);
+                }
+                return redirect()->route('pos.transaction.show', $existing->id)->with('success', $replayMessage);
+            }
+        }
 
         // Normalize 'card' alias → 'debit_card' (front-end Universal POS sends 'card';
         // PosTaxRule + PRA mapping use 'debit_card'). Without this, downstream tax
@@ -1081,6 +1116,8 @@ class PosController extends Controller
                     'status' => 'completed',
                     'pra_status' => $initialPraStatus,
                     'submission_hash' => $submissionHash,
+                    // Offline-first idempotency key (NULL for normal online bills).
+                    'offline_uuid' => $offlineUuidColumnExists ? $offlineUuid : null,
                     'created_by' => auth('pos')->id(),
                     'notes' => $request->input('kitchen_notes'),
                 ]);

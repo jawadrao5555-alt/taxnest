@@ -587,17 +587,18 @@ window.addEventListener('popstate', function() {
         </button>
 
         {{-- ── PROVISIONAL BILLS (Local) — header shortcut. Same pattern as Held. ── --}}
-        {{-- 🟢/🟡/🔴 Auto-Sync status pill — live network + pending-bill indicator --}}
-        <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition"
+        {{-- 🟢/🟡/🔴 Auto-Sync status pill — live network + pending-bill indicator. --}}
+        {{-- Offline-first (Jul 2026): badge now ALSO counts device-queued offline bills; click = sync now. --}}
+        <button type="button" @click="syncOfflineBills(true)" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition"
              :class="syncStatus === 'online' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : (syncStatus === 'syncing' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800')"
-             :title="syncStatus === 'online' ? ('Auto-Sync Online' + (failedBills.length ? ' · ' + failedBills.length + ' pending' : '')) : (syncStatus === 'syncing' ? 'Syncing pending bills to PRA…' : 'Offline — bills will auto-sync when network returns')">
+             :title="offlineNeedsLogin ? 'Session expired — refresh & login to sync bills saved on this device' : (syncStatus === 'online' ? ('Auto-Sync Online' + ((failedBills.length + offlineQueueCount) ? ' · ' + (failedBills.length + offlineQueueCount) + ' pending — click to sync now' : '')) : (syncStatus === 'syncing' ? 'Syncing pending bills…' : 'Offline — bills are saved on this device and auto-sync when internet returns'))">
             <span class="w-2 h-2 rounded-full"
                   :class="syncStatus === 'online' ? 'bg-emerald-500' : (syncStatus === 'syncing' ? 'bg-amber-500 animate-pulse' : 'bg-red-500 animate-pulse')"></span>
             <span x-text="syncStatus === 'online' ? 'Online' : (syncStatus === 'syncing' ? 'Syncing' : 'Offline')"></span>
-            <span x-show="failedBills.length > 0" class="ml-0.5 px-1.5 rounded-full text-[9px] font-black"
+            <span x-show="(failedBills.length + offlineQueueCount) > 0" class="ml-0.5 px-1.5 rounded-full text-[9px] font-black"
                   :class="syncStatus === 'online' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'"
-                  x-text="failedBills.length"></span>
-        </div>
+                  x-text="failedBills.length + offlineQueueCount"></span>
+        </button>
         {{-- Click → modal with Edit / Delete / Make Final actions inline. F10 shortcut. --}}
         <button @click="openLocalBills()" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition" title="Provisional bills (local — not submitted to PRA). Press F10.">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
@@ -1903,10 +1904,10 @@ window.addEventListener('popstate', function() {
                 {{-- PRA fiscal status — the "production" proof the cashier needs to see at a glance --}}
                 <div class="relative mt-2.5 flex items-center justify-center">
                     <span class="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider px-3 py-1 rounded-full shadow-sm"
-                          :class="lastPraStatus === 'submitted' ? 'bg-emerald-600 text-white' : (lastPraStatus === 'pending' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : ((lastPraStatus === 'offline' || lastPraStatus === 'failed') ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'))">
-                        <svg x-show="lastPraStatus === 'submitted'" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.42 0l-3.5-3.5a1 1 0 111.42-1.42l2.79 2.8 6.79-6.8a1 1 0 011.42 0z" clip-rule="evenodd"/></svg>
-                        <svg x-show="lastPraStatus === 'pending'" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                        <span x-text="lastPraStatus === 'submitted' ? 'PRA Verified' : (lastPraStatus === 'pending' ? 'Reporting to PRA' : ((lastPraStatus === 'offline' || lastPraStatus === 'failed') ? 'Saved · will sync to PRA' : 'Local Bill'))"></span>
+                          :class="lastIsOffline ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : (lastPraStatus === 'submitted' ? 'bg-emerald-600 text-white' : (lastPraStatus === 'pending' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : ((lastPraStatus === 'offline' || lastPraStatus === 'failed') ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300')))">
+                        <svg x-show="!lastIsOffline && lastPraStatus === 'submitted'" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.42 0l-3.5-3.5a1 1 0 111.42-1.42l2.79 2.8 6.79-6.8a1 1 0 011.42 0z" clip-rule="evenodd"/></svg>
+                        <svg x-show="!lastIsOffline && lastPraStatus === 'pending'" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                        <span x-text="lastIsOffline ? 'Saved offline · will auto-sync' : (lastPraStatus === 'submitted' ? 'PRA Verified' : (lastPraStatus === 'pending' ? 'Reporting to PRA' : ((lastPraStatus === 'offline' || lastPraStatus === 'failed') ? 'Saved · will sync to PRA' : 'Local Bill')))"></span>
                     </span>
                 </div>
                 {{-- Big total --}}
@@ -1946,14 +1947,33 @@ window.addEventListener('popstate', function() {
                 </div>
             </div>
             <div class="flex-1 overflow-hidden bg-gray-50 dark:bg-gray-800/50 min-h-0" style="max-height: 45vh;">
-                <iframe x-ref="receiptIframe" class="w-full h-full border-0" :src="lastTransactionId ? (isRestaurantMode ? '/pos/restaurant/receipt/' + lastTransactionId : '/pos/transaction/' + lastTransactionId + '/receipt') : ''" style="min-height:300px;"></iframe>
+                <iframe x-show="!lastIsOffline" x-ref="receiptIframe" class="w-full h-full border-0" :src="lastTransactionId ? (isRestaurantMode ? '/pos/restaurant/receipt/' + lastTransactionId : '/pos/transaction/' + lastTransactionId + '/receipt') : ''" style="min-height:300px;"></iframe>
+                {{-- OFFLINE bill (Jul 2026): no server receipt exists yet — render a client-side summary. --}}
+                <div x-show="lastIsOffline" x-cloak class="h-full overflow-y-auto p-4" style="min-height:300px;">
+                    <div class="max-w-xs mx-auto text-xs font-mono text-gray-800 dark:text-gray-200">
+                        <template x-for="(i, idx) in (lastOfflineRec ? lastOfflineRec.items : [])" :key="idx">
+                            <div class="flex justify-between gap-2 py-1 border-b border-dashed border-gray-200 dark:border-gray-700">
+                                <span x-text="i.name + '  × ' + i.qty"></span>
+                                <span class="whitespace-nowrap" x-text="Number(r2(i.qty * i.price)).toLocaleString()"></span>
+                            </div>
+                        </template>
+                        <div class="flex justify-between mt-2 pt-2 border-t-2 border-gray-800 dark:border-gray-200 font-black text-sm">
+                            <span>TOTAL</span>
+                            <span x-text="'Rs. ' + Number(lastTotal).toLocaleString()"></span>
+                        </div>
+                        <p class="mt-3 text-center text-[10px] font-bold text-amber-700 dark:text-amber-400 border border-dashed border-amber-400 rounded-lg p-2 leading-relaxed">
+                            OFFLINE — bill is saved on this device.<br>
+                            It will auto-sync and get its invoice number when internet returns.
+                        </p>
+                    </div>
+                </div>
             </div>
             {{-- Persistent action bar: Print | KOT | New Sale | Close. Print/KOT fire prints      --}}
             {{-- but popup STAYS OPEN so cashier can verify, reprint, or take other actions.       --}}
             <div class="p-3 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
                 <div class="grid grid-cols-4 gap-2">
                     {{-- 1. Print Receipt (P) --}}
-                    <button @click="printReceipt()" :disabled="!lastTransactionId" class="py-3 text-center rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-sm flex items-center justify-center gap-1.5" title="Print customer receipt">
+                    <button @click="lastIsOffline ? printOfflineReceipt() : printReceipt()" :disabled="!lastTransactionId && !lastIsOffline" class="py-3 text-center rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-sm flex items-center justify-center gap-1.5" title="Print customer receipt">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                         Print <kbd class="text-[8px] bg-purple-500/40 px-1 rounded font-mono">P</kbd>
                     </button>
@@ -2364,6 +2384,20 @@ function restaurantPos() {
         syncStatus: navigator.onLine ? 'online' : 'offline',
         _syncTimer: null,
         _autoSyncBusy: false,
+        // ── OFFLINE-FIRST BILLING (Jul 2026) ──
+        // Bills created while the device has NO internet are queued in
+        // IndexedDB ('tn_pos_offline' / 'bills', keyed by client UUID) and
+        // replayed to pos.invoice.store with offline_uuid (server dedupes).
+        // Queue is COMPANY-SCOPED — a shared browser must never post another
+        // company's bills into the current session.
+        offlineQueueCount: 0,
+        offlineSyncing: false,
+        offlineNeedsLogin: false,
+        _idb: null,
+        // Receipt-popup offline variant state: no server transaction yet, so the
+        // popup renders a client-side summary + client-printed interim receipt.
+        lastIsOffline: false,
+        lastOfflineRec: null,
         showReceipt: false,
         showShortcuts: false,
         // Quick Type Mode — type free-form lines like "chai 2, samosa 1" → cart
@@ -2555,8 +2589,10 @@ function restaurantPos() {
         // and silently retry the OLDEST one. One bill per tick = no PRA flood.
         _startAutoSync() {
             if (this._syncTimer) return;
-            window.addEventListener('online', () => { this.syncStatus = 'online'; this._autoSyncTick(true); });
+            window.addEventListener('online', () => { this.syncStatus = 'online'; this.syncOfflineBills(); this._autoSyncTick(true); });
             window.addEventListener('offline', () => { this.syncStatus = 'offline'; });
+            this.refreshOfflineCount();
+            this.syncOfflineBills();
             this._autoSyncTick();
             this._syncTimer = setInterval(() => this._autoSyncTick(), 30000);
         },
@@ -2565,6 +2601,9 @@ function restaurantPos() {
             // Respect navigator.onLine but don't trust it 100% — we still try
             // a lightweight count fetch which doubles as a connectivity probe.
             if (!navigator.onLine) { this.syncStatus = 'offline'; return; }
+            // Offline-first queue drains FIRST — device-local bills must reach the
+            // server before failed-bill PRA retries (they're older by definition).
+            if (this.offlineQueueCount > 0) await this.syncOfflineBills();
             this._autoSyncBusy = true;
             try {
                 // Lightweight refresh of pending count (also serves as ping).
@@ -2594,6 +2633,204 @@ function restaurantPos() {
                 this.syncStatus = navigator.onLine ? 'online' : 'offline';
             }
             this._autoSyncBusy = false;
+        },
+
+        // ─── OFFLINE-FIRST BILLING ENGINE (Jul 2026) ───────────────────────
+        // When the device has NO internet at Pay time, the bill payload is
+        // stored in IndexedDB with a client UUID and replayed automatically
+        // (online event + every auto-sync tick). Server-side offline_uuid
+        // dedupe makes replays idempotent — a lost response never duplicates.
+        _offlineCompanyId: {{ (int) (app('currentCompanyId') ?? 0) }},
+        idbOpen() {
+            return new Promise((resolve, reject) => {
+                if (this._idb) return resolve(this._idb);
+                if (!window.indexedDB) return reject(new Error('IndexedDB unavailable'));
+                const req = indexedDB.open('tn_pos_offline', 1);
+                req.onupgradeneeded = () => {
+                    const db = req.result;
+                    if (!db.objectStoreNames.contains('bills')) db.createObjectStore('bills', { keyPath: 'uuid' });
+                };
+                req.onsuccess = () => { this._idb = req.result; resolve(this._idb); };
+                req.onerror = () => reject(req.error);
+            });
+        },
+        async idbPut(rec) {
+            const db = await this.idbOpen();
+            return new Promise((res, rej) => {
+                const tx = db.transaction('bills', 'readwrite');
+                tx.objectStore('bills').put(rec);
+                tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+            });
+        },
+        async idbAllMine() {
+            const db = await this.idbOpen();
+            return new Promise((res, rej) => {
+                const rq = db.transaction('bills').objectStore('bills').getAll();
+                rq.onsuccess = () => res((rq.result || []).filter(b => b.company_id === this._offlineCompanyId));
+                rq.onerror = () => rej(rq.error);
+            });
+        },
+        async idbDelete(uuid) {
+            const db = await this.idbOpen();
+            return new Promise((res, rej) => {
+                const tx = db.transaction('bills', 'readwrite');
+                tx.objectStore('bills').delete(uuid);
+                tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+            });
+        },
+        async refreshOfflineCount() {
+            try { this.offlineQueueCount = (await this.idbAllMine()).length; } catch (e) {}
+        },
+        _newOfflineUuid() {
+            try { if (crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
+            return 'off-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+        },
+        // Queue a bill that could NOT reach the server (no internet). Mirrors the
+        // success UX: receipt popup (offline variant) + optional auto-print of a
+        // client-rendered interim receipt, cart cleared so billing continues.
+        async queueOfflineBill(payload, method, savedTotal) {
+            // REUSE the uuid already attached by processPaymentManual (it rode on
+            // the failed online attempt too) — minting a fresh one here would
+            // reopen the lost-response duplicate window. Fallback only if absent.
+            const uuid = payload.offline_uuid || this._newOfflineUuid();
+            payload.offline_uuid = uuid;
+            const rec = {
+                uuid,
+                company_id: this._offlineCompanyId,
+                payload,
+                method,
+                provisional: !!payload.save_as_provisional,
+                total: Math.round(savedTotal || 0),
+                customer: this.selectedCustomer?.name || '',
+                // Frozen display snapshot for the popup + interim receipt (as-entered prices).
+                items: this.cart.map(c => ({
+                    name: c.item_name,
+                    qty: this._safeQty(c.quantity),
+                    price: c.unit_price,
+                })),
+                queued_at: Date.now(),
+                tries: 0,
+                last_error: '',
+            };
+            await this.idbPut(rec);
+            await this.refreshOfflineCount();
+            // Offline bills NEVER settle a waiter order (needs the server) — the
+            // order stays in Incoming until an ONLINE final claims it.
+            this.lastIsOffline = true;
+            this.lastOfflineRec = rec;
+            this.lastInvoiceNumber = 'OFFLINE-' + uuid.slice(0, 8).toUpperCase();
+            this.lastTransactionId = null;
+            this.lastOrderId = null;
+            this.lastTotal = rec.total;
+            this.lastPaymentMethod = method;
+            this.lastPraNumber = '';
+            this.lastPraStatus = '';
+            this.lastItemsCount = (this.cart || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
+            this.lastSaleAt = Date.now();
+            this.showReceipt = true;
+            this.scheduleReceiptAutoClose();
+            this.showToast('No internet — bill saved on this device, will auto-sync', 'success');
+            if (this.autoPrintEnabled) {
+                setTimeout(() => this.printOfflineReceipt(), 400);
+            }
+            this.clearCart();
+            this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
+        },
+        // Replay queued offline bills, OLDEST first. Stops on network failure
+        // (still offline) or auth loss (419/401 — session expired; bills stay
+        // safe until the cashier logs in again and the page reloads).
+        async syncOfflineBills(manual = false) {
+            if (this.offlineSyncing) return;
+            if (!navigator.onLine) {
+                if (manual) this.showToast('Still offline — will sync when internet returns', 'error');
+                return;
+            }
+            let bills = [];
+            try { bills = await this.idbAllMine(); } catch (e) { return; }
+            if (!bills.length) {
+                if (manual) this.showToast('All bills are synced', 'success');
+                return;
+            }
+            this.offlineSyncing = true;
+            this.syncStatus = 'syncing';
+            let ok = 0, failed = 0, authStop = false;
+            for (const b of bills.sort((a, z) => a.queued_at - z.queued_at)) {
+                try {
+                    const res = await fetch('{{ route("pos.invoice.store") }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: JSON.stringify(b.payload),
+                    });
+                    let data = null;
+                    try { data = JSON.parse(await res.text()); } catch (_) {}
+                    if (res.ok && data && data.success) {
+                        await this.idbDelete(b.uuid);
+                        ok++;
+                        continue;
+                    }
+                    if (res.status === 419 || res.status === 401) { this.offlineNeedsLogin = true; authStop = true; break; }
+                    b.tries = (b.tries || 0) + 1;
+                    b.last_error = (data && (data.message || data.error)) || ('HTTP ' + res.status);
+                    await this.idbPut(b);
+                    failed++;
+                    // Quota block (403) fails every remaining bill too — stop hammering.
+                    if (res.status === 403) break;
+                } catch (e) {
+                    // Network dropped again mid-sync — keep the rest queued.
+                    break;
+                }
+            }
+            this.offlineSyncing = false;
+            this.syncStatus = navigator.onLine ? 'online' : 'offline';
+            await this.refreshOfflineCount();
+            if (ok > 0) {
+                this.showToast(ok + ' offline bill' + (ok === 1 ? '' : 's') + ' synced ✓', 'success');
+                this.loadLocalBills();
+                this.loadFailedBills();
+            }
+            if (authStop) this.showToast('Session expired — please refresh & login. Offline bills are safe on this device.', 'error');
+            else if (failed > 0 && manual) this.showToast(failed + ' bill(s) could not sync — see pending badge', 'error');
+        },
+        // Client-rendered interim receipt for an OFFLINE bill (no server template
+        // reachable). Grand TOTAL only — never prints subtotal/tax lines, which
+        // also satisfies the strictest "Show Tax on Receipt = OFF" policy.
+        printOfflineReceipt() {
+            const r = this.lastOfflineRec;
+            if (!r) return;
+            const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const rows = (r.items || []).map(i =>
+                '<tr><td>' + esc(i.name) + '<br><span class="m">' + esc(i.qty) + ' x ' + Number(i.price).toLocaleString() + '</span></td>' +
+                '<td class="r">' + Number(this.r2(i.qty * i.price)).toLocaleString() + '</td></tr>'
+            ).join('');
+            const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Offline Receipt</title><style>' +
+                '@page{margin:2mm;}body{font-family:"Courier New",monospace;font-size:12px;color:#000;margin:0;padding:4px;}' +
+                'h1{font-size:14px;text-align:center;margin:0 0 2px;}p{margin:2px 0;text-align:center;}' +
+                'table{width:100%;border-collapse:collapse;margin-top:4px;}td{padding:2px 0;vertical-align:top;}' +
+                '.r{text-align:right;white-space:nowrap;}.m{color:#000;font-size:11px;}' +
+                '.tot{border-top:2px solid #000;border-bottom:2px solid #000;font-weight:bold;font-size:14px;}' +
+                '.note{border:1px dashed #000;padding:3px;margin-top:6px;text-align:center;font-weight:bold;font-size:11px;}' +
+                '</style></head><body>' +
+                '<h1>' + esc(@json($company->name ?? 'NestPOS')) + '</h1>' +
+                '<p>' + new Date(r.queued_at).toLocaleString() + '</p>' +
+                (r.customer ? '<p>Customer: ' + esc(r.customer) + '</p>' : '') +
+                '<p>Ref: ' + esc('OFFLINE-' + r.uuid.slice(0, 8).toUpperCase()) + ' · ' + esc(r.method) + '</p>' +
+                '<table>' + rows +
+                '<tr class="tot"><td>TOTAL</td><td class="r">Rs. ' + Number(r.total).toLocaleString() + '</td></tr></table>' +
+                '<div class="note">OFFLINE PROVISIONAL RECEIPT<br>Final invoice number issues after sync</div>' +
+                '</body></html>';
+            const fr = document.createElement('iframe');
+            fr.style.cssText = 'position:fixed;width:0;height:0;border:0;visibility:hidden;';
+            document.body.appendChild(fr);
+            fr.srcdoc = html;
+            fr.onload = () => {
+                try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (e) {}
+                setTimeout(() => { try { fr.remove(); } catch (e) {} }, 60000);
+            };
         },
 
         cacheProductData() {
@@ -3716,7 +3953,7 @@ function restaurantPos() {
                 // reaches us and dismisses the popup.
                 if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); this.showReceipt = false; return; }
                 if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); return; }
-                if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.printReceipt(); return; }
+                if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.lastIsOffline ? this.printOfflineReceipt() : this.printReceipt(); return; }
                 if ((e.key === 'k' || e.key === 'K') && this.lastOrderId) { e.preventDefault(); this.printKitchenTicket(); return; }
                 return;
             }
@@ -4500,17 +4737,45 @@ function restaurantPos() {
                     // pra_status='local' regardless of company.pra_reporting_enabled
                     // and skips PRA submission. Bill stays editable / deletable.
                     save_as_provisional: !!provisional,
+                    // OFFLINE-FIRST dedupe key rides on EVERY attempt (online too).
+                    // If the response is lost mid-flight (flaky WiFi: server saved
+                    // the bill but the reply never arrived), the queued replay
+                    // carries the SAME uuid → server's replay guard returns the
+                    // existing bill instead of creating a duplicate.
+                    offline_uuid: this._newOfflineUuid(),
                 };
-                const res = await fetch('{{ route("pos.invoice.store") }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                    body: JSON.stringify(payload),
-                });
+                // OFFLINE-FIRST (Jul 2026): no internet → queue the bill on this
+                // device (IndexedDB) and keep billing. Sync engine replays it.
+                if (!navigator.onLine) {
+                    await this.queueOfflineBill(payload, method, savedTotal);
+                    this.showPayModal = false;
+                    this.submitting = false;
+                    this.saveAsProvisional = false;
+                    return;
+                }
+                let res;
+                try {
+                    res = await fetch('{{ route("pos.invoice.store") }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: JSON.stringify(payload),
+                    });
+                } catch (netErr) {
+                    // fetch threw = server unreachable (WiFi says "connected" but
+                    // internet is dead). Same offline path — HTTP errors from a
+                    // REACHABLE server never land here.
+                    console.warn('[storeInvoice] network unreachable — queueing offline', netErr);
+                    await this.queueOfflineBill(payload, method, savedTotal);
+                    this.showPayModal = false;
+                    this.submitting = false;
+                    this.saveAsProvisional = false;
+                    return;
+                }
                 let data = null;
                 let rawBody = '';
                 try { rawBody = await res.text(); data = JSON.parse(rawBody); } catch(_) {}
@@ -4524,6 +4789,8 @@ function restaurantPos() {
                 // Mirror payHeldOrderDirect success path so receipt modal works.
                 console.log('[storeInvoice] OK response:', data);
                 console.log('[storeInvoice] isRestaurantMode=', this.isRestaurantMode, 'transaction_id=', data.transaction_id);
+                this.lastIsOffline = false;
+                this.lastOfflineRec = null;
                 this.lastInvoiceNumber = data.invoice_number || '';
                 this.lastTransactionId = data.transaction_id || null;
                 // P7: waiter-origin sales DO have a restaurant order — keep its id so
@@ -4555,6 +4822,9 @@ function restaurantPos() {
                 if (provisional) { this.loadLocalBills(); }
                 // Refresh failed badge — successful sales might leave a previous fail intact.
                 this.loadFailedBills();
+                // This sale reached the server → we're online. Drain any bills
+                // still queued from an earlier outage.
+                if (this.offlineQueueCount > 0) this.syncOfflineBills();
             } catch (e) {
                 console.error('[processPaymentManual] FAIL', e);
                 this.showToast('Manual pay failed: ' + (e?.message || e?.name || 'unknown') + ' — F12 console', 'error');

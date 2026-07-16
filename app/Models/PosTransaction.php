@@ -15,6 +15,7 @@ class PosTransaction extends Model
         'cash_received', 'change_due',
         'status', 'locked_by_terminal_id', 'lock_time',
         'pra_invoice_number', 'pra_response_code', 'pra_status', 'submission_hash', 'pra_qr_code', 'created_by',
+        'offline_uuid',
         'share_token', 'share_token_created_at',
         'receipt_printed_at', 'reprint_count',
         'notes',

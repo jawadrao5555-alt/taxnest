@@ -27,6 +27,7 @@
 - [Approved landing color formula](landing-color-formula.md) — teal #0A4D5C primary, gold #E7BF3B micro-highlights only, flat confined product colors, no card gradients; use on all marketing pages.
 - [POS whole-rupee rounding convention](pos-rounding-convention.md) — PRA POS header tax+total = whole rupee on ALL write paths (incl. restaurant hold/pay); lines stay 2dp; FBR POS & DI keep decimals; dev held-order test needs restaurant_mode+kot+kitchen flip on company 11.
 - [DomPDF thermal receipt height](dompdf-thermal-receipt-height.md) — DomPDF ignores `@page size:auto`; a fixed setPaper height clips long receipts; compute a content-sized (over-estimated) height, wire into EVERY pdf path.
+- [Thermal receipt printable width](thermal-print-width.md) — @media print must NEVER force body width = physical paper width (80mm prints ~72mm); use width:auto + max-width cap on every receipt/ticket template.
 - [POS buttons no colored glow](pos-button-glow.md) — owner reads button `shadow-<color>/NN` + CSS box-shadow rgba glow as "white blur on sides"; use neutral shadow, keep focus/selected rings.
 - [POS theme gradient white-fade](pos-theme-gradient-white-fade.md) — from-purple-X + unmapped 2nd stop (violet/indigo/fuchsia/to-purple-50/200/to-white) fades to TRANSPARENT under non-purple themes; use solid or remapped-set stops.
 - [PRA Code 112 & Fiscal Device mode](pra-code-112-fiscal-device.md) — new POS IDs can't use cloud PostData; local IMS service localhost:8524 GetInvoiceNumberByModel, single OBJECT payload, agent on same PC.

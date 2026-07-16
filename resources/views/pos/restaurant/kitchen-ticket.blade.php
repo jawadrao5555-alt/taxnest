@@ -7,7 +7,8 @@
     <style>
         @page { size: 80mm auto; margin: 0; }
         @media print {
-            body { width: 80mm; }
+            /* PRINTABLE-WIDTH FIX (Jul 2026): 80mm paper prints only ~72mm. */
+            body { width: auto; max-width: 80mm; }
             .no-print { display: none !important; }
             .station-section { page-break-after: auto; }
         }

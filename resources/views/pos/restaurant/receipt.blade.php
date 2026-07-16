@@ -6,7 +6,9 @@
     <title>Receipt - {{ $transaction->invoice_number }}</title>
     <style>
         @page { size: 80mm auto; margin: 0; }
-        @media print { body { width: 80mm; } .no-print { display: none !important; } }
+        /* PRINTABLE-WIDTH FIX (Jul 2026): 80mm paper prints only ~72mm — forcing full 80mm
+           clips the right edge on real thermal printers. width:auto fits printable width. */
+        @media print { body { width: auto; max-width: 80mm; } .no-print { display: none !important; } }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;

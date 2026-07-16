@@ -74,7 +74,13 @@
         .footer { margin-top: 8px; font-size: 10px; line-height: 1.5; color: #000; font-weight: 600; }
 
         @media print {
-            body { width: 80mm; max-width: 80mm; padding: 2mm; margin: 0; }
+            /* PRINTABLE-WIDTH FIX (owner report Jul 2026 — right edge cut on live thermal):
+               80mm paper has only ~72mm printable width (printer hardware margins on both
+               sides). Forcing body width to the FULL 80mm pushes the right ~8mm into the
+               non-printable strip — totals/time/"Cash" get clipped. width:auto lets the
+               body fill whatever printable width the driver reports; max-width caps it
+               so A4/letter test-prints don't stretch. Never force physical paper width. */
+            body { width: auto; max-width: 80mm; padding: 1mm; margin: 0; }
             .no-print { display: none !important; }
         }
         @media screen {

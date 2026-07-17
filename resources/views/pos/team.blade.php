@@ -71,6 +71,7 @@
                         <th class="px-4 py-3">Name</th>
                         <th class="px-4 py-3">Email</th>
                         <th class="px-4 py-3 hidden sm:table-cell">Phone</th>
+                        <th class="px-4 py-3">Password</th>
                         <th class="px-4 py-3">Role</th>
                         <th class="px-4 py-3">Status</th>
                         <th class="px-4 py-3">Actions</th>
@@ -78,7 +79,7 @@
                 </thead>
                 <tbody>
                     @forelse($team as $member)
-                    <tr class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50" x-data="{ editing: false }">
+                    <tr class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50" x-data="{ editing: false, showPw: false }">
                         <td class="px-4 py-3">
                             <span x-show="!editing" class="font-medium text-gray-900 dark:text-white">{{ $member->name }}</span>
                             <template x-if="editing">
@@ -96,6 +97,25 @@
                             <template x-if="editing">
                                 <input form="edit-{{ $member->id }}" type="text" name="phone" value="{{ $member->phone }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
                             </template>
+                        </td>
+                        <td class="px-4 py-3">
+                            {{-- Owner request (Jul 2026): admin can VIEW team passwords.
+                                 Decrypted server-side (admin-gated page); hidden behind an
+                                 eye toggle. Old accounts have no stored copy until the
+                                 admin sets a new password from the edit row. --}}
+                            @if(isset($teamPasswords[$member->id]))
+                            <div class="flex items-center gap-1.5">
+                                <span class="font-mono text-xs text-gray-700 dark:text-gray-300" x-text="showPw ? {{ \Illuminate\Support\Js::from($teamPasswords[$member->id]) }} : '••••••••'"></span>
+                                <button type="button" @click="showPw = !showPw" class="text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition" :title="showPw ? 'Hide password' : 'Show password'">
+                                    <svg x-show="!showPw" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                    <svg x-show="showPw" x-cloak class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                                </button>
+                            </div>
+                            @elseif(in_array($member->pos_role, ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter'], true))
+                            <span class="text-xs text-gray-400" title="Is account ka password abhi save nahi hua — Edit se naya password set karein, phir yahan nazar aayega.">Set new password to view</span>
+                            @else
+                            <span class="text-xs text-gray-400">—</span>
+                            @endif
                         </td>
                         <td class="px-4 py-3">
                             @if($member->pos_role === 'pos_admin' || $member->role === 'company_admin')
@@ -129,8 +149,9 @@
                                             @csrf
                                             @method('PUT')
                                         </form>
-                                        {{-- Item #7: optional password reset — blank keeps the current one
-                                             (hashes are irreversible, so there is no "show password"). --}}
+                                        {{-- Item #7: optional password reset — blank keeps the current one.
+                                             Setting a new password also refreshes the admin-viewable
+                                             encrypted copy shown in the Password column. --}}
                                         <input form="edit-{{ $member->id }}" type="password" name="password" placeholder="New password (optional)" autocomplete="new-password" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-36 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1.5 focus:ring-purple-500 focus:border-purple-500">
                                         <button form="edit-{{ $member->id }}" type="submit" class="text-emerald-600 hover:text-emerald-700 text-xs font-medium">Save</button>
                                         <button @click="editing = false" class="text-gray-400 hover:text-gray-600 text-xs font-medium">Cancel</button>
@@ -149,7 +170,7 @@
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="6" class="px-4 py-12 text-center text-gray-400">No team members yet. Add your first cashier above.</td></tr>
+                    <tr><td colspan="7" class="px-4 py-12 text-center text-gray-400">No team members yet. Add your first cashier above.</td></tr>
                     @endforelse
                 </tbody>
             </table>

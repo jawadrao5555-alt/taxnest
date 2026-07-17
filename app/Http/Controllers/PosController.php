@@ -3789,7 +3789,24 @@ class PosController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('pos.team', compact('team'));
+        // Owner request (Jul 2026): admin can VIEW team passwords. Decrypt the
+        // stored copy server-side, keyed by user id — ONLY for team roles (the
+        // owner/admin row never shows one) and only on this admin-gated page.
+        // Accounts created before this feature have no copy until the admin
+        // sets a new password (hashes are irreversible).
+        $teamPasswords = [];
+        foreach ($team as $member) {
+            if (in_array($member->pos_role, ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter'], true)
+                && !empty($member->pos_team_password_enc)) {
+                try {
+                    $teamPasswords[$member->id] = \Illuminate\Support\Facades\Crypt::decryptString($member->pos_team_password_enc);
+                } catch (\Throwable $e) {
+                    // APP_KEY rotated or corrupt payload — treat as "not stored".
+                }
+            }
+        }
+
+        return view('pos.team', compact('team', 'teamPasswords'));
     }
 
     public function storeCashier(Request $request)
@@ -3822,7 +3839,7 @@ class PosController extends Controller
             }
         }
 
-        User::create([
+        $newUserData = [
             'name' => $request->name,
             'email' => $request->email,
             'phone' => $request->phone,
@@ -3831,7 +3848,15 @@ class PosController extends Controller
             'role' => 'employee',
             'pos_role' => $newRole,
             'is_active' => true,
-        ]);
+        ];
+        // Owner request (Jul 2026): POS admin can VIEW team passwords on
+        // /pos/team. Hashes are irreversible, so keep an encrypted copy —
+        // decrypted ONLY on the Team page for non-cashier viewers.
+        // PROD schema-drift guard: skip if the migration hasn't landed yet.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_team_password_enc')) {
+            $newUserData['pos_team_password_enc'] = \Illuminate\Support\Facades\Crypt::encryptString($request->password);
+        }
+        User::create($newUserData);
 
         $roleLabel = ['pos_manager' => 'Manager', 'pos_kitchen' => 'Kitchen', 'pos_waiter' => 'Waiter'][$newRole] ?? 'Cashier';
         return back()->with('success', "{$roleLabel} account created successfully.");
@@ -3865,7 +3890,13 @@ class PosController extends Controller
         ]);
 
         if ($request->filled('password')) {
-            $cashier->update(['password' => bcrypt($request->password)]);
+            $pwUpdate = ['password' => bcrypt($request->password)];
+            // Keep the admin-viewable encrypted copy in sync (owner, Jul 2026).
+            // PROD schema-drift guard: skip if the migration hasn't landed yet.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_team_password_enc')) {
+                $pwUpdate['pos_team_password_enc'] = \Illuminate\Support\Facades\Crypt::encryptString($request->password);
+            }
+            $cashier->update($pwUpdate);
         }
 
         return back()->with('success', 'Cashier updated.');
@@ -5673,9 +5704,19 @@ class PosController extends Controller
                     return back()->withErrors(['current_password' => 'Current password is incorrect.']);
                 }
 
-                $user->update([
+                $passwordUpdate = [
                     'password' => \Illuminate\Support\Facades\Hash::make($request->new_password),
-                ]);
+                ];
+                // Team roles keep the admin-viewable encrypted copy in sync
+                // (owner, Jul 2026) — otherwise a self-service change would
+                // show the admin a stale password on /pos/team. The pos_admin
+                // (owner) account never stores a viewable copy.
+                // PROD schema-drift guard: skip if the migration hasn't landed.
+                if (in_array($user->pos_role, ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter'], true)
+                    && \Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_team_password_enc')) {
+                    $passwordUpdate['pos_team_password_enc'] = \Illuminate\Support\Facades\Crypt::encryptString($request->new_password);
+                }
+                $user->update($passwordUpdate);
                 return back()->with('success', 'Password changed successfully.');
             }
         }

@@ -22,6 +22,7 @@ class User extends Authenticatable
         'is_active',
         'dark_mode',
         'pra_reporting_enabled',
+        'pos_team_password_enc',
     ];
 
     /**
@@ -99,6 +100,9 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        // Encrypted copy of a POS team account's password (viewable by the
+        // company's POS admin on /pos/team) — must never leak via JSON.
+        'pos_team_password_enc',
     ];
 
     protected function casts(): array

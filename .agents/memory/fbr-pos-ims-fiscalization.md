@@ -161,6 +161,13 @@ The Code-112 resolution is BUILT. Key non-obvious facts:
   `tnk_` agent key minted (visible on /fbr-pos/settings while impersonating). REMAINING: install FBRIMS.zip
   (needs POS Reg No + IRIS grid Access Code, Production) + Desktop Sync Agent (with the tnk_ key) on the
   shop's Windows PC — owner-side step, e.g. via AnyDesk.
+- **Verified 17 Jul 2026 evening (server side fully OK, agent NOT connected):** polling
+  `/api/agent/pending-invoices` with the tnk_ key returns all 4 bills, mode fiscal_device, POSID 196354,
+  localhost:8524 endpoint, spec-correct IMS payloads. GOTCHA: any manual curl poll UPDATES
+  `agent_last_seen`, so "Last Seen X min ago" on settings can be a prior session's verification poll, not
+  a real agent — confirm by watching it AGE (3→4→5 min) without refreshing. Pre-switch cloud 900901
+  failure rows in FbrPosLog (17 Jul 13:17) are history, not a live guard bug — no cloud attempts since the
+  switch. Bills stay 'pending' untouched until a real agent + FBRIMS run on the shop PC.
 
 ## Web-based POS answer (official, Jul 2026): SDC "locally OR on Cloud" — central Windows VPS is compliant
 Owner's requirement: shopkeeper gives only POS ID + Access Code (+token), zero shop-PC installs (TaxNest is web POS).

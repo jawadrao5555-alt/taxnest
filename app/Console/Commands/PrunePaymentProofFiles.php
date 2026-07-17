@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Company;
 use App\Models\PaymentProof;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -13,6 +14,12 @@ use Illuminate\Support\Facades\Storage;
  * rejected more than N months ago, so storage on the cPanel host stays
  * bounded. The DB row is ALWAYS kept for audit — only the file goes;
  * `file_pruned_at` marks when. Pending proofs are never touched.
+ *
+ * Also sweeps ORPHANED receipt folders: directories under
+ * payment-proofs/{company_id}/ whose company no longer exists (force-deleted
+ * from the bin, so not even soft-deleted) AND that have zero payment_proofs
+ * rows. Those files can never be downloaded by anyone — pure dead weight.
+ * Soft-deleted (binned) companies are NEVER touched.
  *
  * Runs daily from the scheduler (same schedule:run cron as the other jobs).
  */
@@ -109,15 +116,86 @@ class PrunePaymentProofFiles extends Command
 
         if ($dryRun) {
             $this->info("Dry run complete (retention: {$months} months, cutoff {$cutoff->format('Y-m-d')}). Nothing deleted.");
-            return self::SUCCESS;
+        } else {
+            $summary = "Pruned {$deleted} file(s), {$missing} already missing, {$failed} failed (retention: {$months} months).";
+            $this->info($summary);
+            if ($deleted > 0 || $failed > 0) {
+                Log::info('Payment proof retention prune: ' . $summary);
+            }
         }
 
-        $summary = "Pruned {$deleted} file(s), {$missing} already missing, {$failed} failed (retention: {$months} months).";
-        $this->info($summary);
-        if ($deleted > 0 || $failed > 0) {
-            Log::info('Payment proof retention prune: ' . $summary);
-        }
+        $this->sweepOrphanFolders($dryRun);
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Delete payment-proofs/{company_id} folders whose company_id no longer
+     * exists AT ALL (not even soft-deleted) AND has zero payment_proofs rows.
+     * Anything else — live companies, binned companies, folders with any DB
+     * row, non-numeric folder names — is left strictly alone.
+     */
+    private function sweepOrphanFolders(bool $dryRun): void
+    {
+        $disk = Storage::disk('local');
+        $dirs = $disk->directories('payment-proofs');
+
+        $removed = 0;
+        $failed = 0;
+
+        foreach ($dirs as $dir) {
+            $name = basename($dir);
+
+            // Only sweep folders that look exactly like a company id.
+            if (!ctype_digit($name)) {
+                continue;
+            }
+            $companyId = (int) $name;
+
+            // Soft-deleted (binned) companies still exist — never touch them.
+            if (Company::withTrashed()->whereKey($companyId)->exists()) {
+                continue;
+            }
+
+            // Belt & braces: if ANY payment_proofs row still points at this
+            // company, keep the folder (row keeps proof_path for audit).
+            if (PaymentProof::where('company_id', $companyId)->exists()) {
+                continue;
+            }
+
+            $fileCount = count($disk->allFiles($dir));
+
+            if ($dryRun) {
+                $this->line("[dry-run] orphan folder {$dir} ({$fileCount} file(s), company {$companyId} gone) — would delete");
+                continue;
+            }
+
+            if ($disk->deleteDirectory($dir)) {
+                $removed++;
+                Log::info('Payment proof orphan folder deleted', [
+                    'dir' => $dir,
+                    'company_id' => $companyId,
+                    'files' => $fileCount,
+                ]);
+            } else {
+                $failed++;
+                Log::warning('Payment proof orphan folder delete failed', [
+                    'dir' => $dir,
+                    'company_id' => $companyId,
+                    'error' => 'deleteDirectory returned false (permissions/IO?)',
+                ]);
+            }
+        }
+
+        if ($dryRun) {
+            $this->info('Orphan sweep dry run complete. Nothing deleted.');
+            return;
+        }
+
+        $summary = "Orphan folder sweep: removed {$removed}, failed {$failed}.";
+        $this->info($summary);
+        if ($removed > 0 || $failed > 0) {
+            Log::info('Payment proof orphan sweep: ' . $summary);
+        }
     }
 }

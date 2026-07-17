@@ -36,7 +36,11 @@
         <p class="text-lg font-bold text-gray-900 dark:text-white">{{ \Carbon\Carbon::parse($date)->format('l, d F Y') }}</p>
     </div>
 
-    @if($stats->total_invoices > 0)
+    @php
+        // Day can also be closed when ONLY leftover local bills exist (backlog wash).
+        $lbPending = ($localWash->prov_count ?? 0) + ($localWash->final_count ?? 0);
+    @endphp
+    @if($stats->total_invoices > 0 || $lbPending > 0)
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total Invoices</p>
@@ -151,6 +155,42 @@
         </div>
     </div>
 
+    {{-- Local / provisional bills — comprehensive wash preview (owner request Jul 2026).
+         Shows exactly what the day-close wash will touch, INCLUDING backlog bills
+         left over from earlier un-closed dates. --}}
+    @if(!$existingReport && $lbPending > 0)
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-teal-200 dark:border-teal-800 shadow-md p-5 mb-6">
+        <h3 class="font-semibold text-gray-900 dark:text-white mb-1">Local Bills — Will Be Closed With This Day</h3>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">In bills par PRA fiscal number nahi hai — day close par company policy ke mutabiq archive ya delete honge. Purani dates ke bache hue local bills bhi isi close mein shamil hain.</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            @if($localWash->prov_count > 0)
+            <div class="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg border border-teal-100 dark:border-teal-900/40">
+                <div class="flex items-center justify-between">
+                    <p class="text-xs font-bold uppercase text-teal-700 dark:text-teal-300">Provisional Bills (L-series)</p>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ ($company->pos_dayclose_provisional_action ?? 'save') === 'delete' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300' }}">{{ ($company->pos_dayclose_provisional_action ?? 'save') === 'delete' ? 'DELETE' : 'ARCHIVE' }}</span>
+                </div>
+                <p class="text-xl font-bold text-gray-900 dark:text-white mt-1">{{ $localWash->prov_count }} <span class="text-sm font-semibold text-gray-500">bills — PKR {{ number_format($localWash->prov_amount) }}</span></p>
+                @if($localWash->prov_backlog > 0)
+                <p class="text-xs text-amber-700 dark:text-amber-400 font-semibold mt-1">{{ $localWash->prov_backlog }} purani date(s) se pending</p>
+                @endif
+            </div>
+            @endif
+            @if($localWash->final_count > 0)
+            <div class="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg border border-teal-100 dark:border-teal-900/40">
+                <div class="flex items-center justify-between">
+                    <p class="text-xs font-bold uppercase text-teal-700 dark:text-teal-300">Final Bills (Reporting OFF)</p>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ ($company->pos_dayclose_final_local_action ?? 'save') === 'delete' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300' }}">{{ ($company->pos_dayclose_final_local_action ?? 'save') === 'delete' ? 'DELETE' : 'ARCHIVE' }}</span>
+                </div>
+                <p class="text-xl font-bold text-gray-900 dark:text-white mt-1">{{ $localWash->final_count }} <span class="text-sm font-semibold text-gray-500">bills — PKR {{ number_format($localWash->final_amount) }}</span></p>
+                @if($localWash->final_backlog > 0)
+                <p class="text-xs text-amber-700 dark:text-amber-400 font-semibold mt-1">{{ $localWash->final_backlog }} purani date(s) se pending</p>
+                @endif
+            </div>
+            @endif
+        </div>
+    </div>
+    @endif
+
     @if(!$existingReport)
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <h3 class="font-semibold text-gray-900 dark:text-white mb-3">Close Day</h3>
@@ -189,6 +229,32 @@
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-10 text-center mb-6">
         <svg class="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
         <p class="text-gray-500 dark:text-gray-400">No transactions found for {{ \Carbon\Carbon::parse($date)->format('d M Y') }}</p>
+    </div>
+    @endif
+
+    {{-- After close: what the wash actually did (stored on the report). OUTSIDE the
+         sales gate above — a day closed with ONLY backlog local bills has zero PRA
+         sales, yet its wash summary must still show. --}}
+    @if($existingReport && is_array($existingReport->local_summary) && collect($existingReport->local_summary)->sum('count') > 0)
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
+        <h3 class="font-semibold text-gray-900 dark:text-white mb-4">Local Bills Closed With This Day</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            @foreach(['provisional' => 'Provisional Bills (L-series)', 'final_local' => 'Final Bills (Reporting OFF)'] as $kind => $label)
+                @php $ls = $existingReport->local_summary[$kind] ?? null; @endphp
+                @if($ls && ($ls['count'] ?? 0) > 0)
+                <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <div class="flex items-center justify-between">
+                        <p class="text-xs font-bold uppercase text-gray-600 dark:text-gray-300">{{ $label }}</p>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ ($ls['action'] ?? 'save') === 'delete' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300' }}">{{ ($ls['action'] ?? 'save') === 'delete' ? 'DELETED' : 'ARCHIVED' }}</span>
+                    </div>
+                    <p class="text-xl font-bold text-gray-900 dark:text-white mt-1">{{ $ls['count'] }} <span class="text-sm font-semibold text-gray-500">bills — PKR {{ number_format($ls['amount'] ?? 0) }}</span></p>
+                    @if(($ls['backlog'] ?? 0) > 0)
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ $ls['backlog'] }} purani date(s) ke bhi shamil thay</p>
+                    @endif
+                </div>
+                @endif
+            @endforeach
+        </div>
     </div>
     @endif
 

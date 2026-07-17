@@ -127,6 +127,37 @@
         </tfoot>
     </table>
 
+    {{-- Local-bill wash detail (comprehensive Z-report, Jul 2026): what the close
+         did with non-PRA local bills, incl. backlog swept from earlier dates. --}}
+    @if(is_array($report->local_summary) && collect($report->local_summary)->sum('count') > 0)
+    <div class="section-title">Local Bills Closed With This Day (No PRA Fiscal Number)</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>Bill Kind</th>
+                <th class="c">Action</th>
+                <th class="c">Count</th>
+                <th class="c">From Earlier Dates</th>
+                <th class="r">Amount (PKR)</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach(['provisional' => 'Provisional bills (L-series)', 'final_local' => 'Final bills (reporting OFF)'] as $kind => $label)
+                @php $ls = $report->local_summary[$kind] ?? null; @endphp
+                @if($ls && ($ls['count'] ?? 0) > 0)
+                <tr>
+                    <td>{{ $label }}</td>
+                    <td class="c">{{ ($ls['action'] ?? 'save') === 'delete' ? 'Deleted (per policy)' : 'Archived' }}</td>
+                    <td class="c">{{ $ls['count'] }}</td>
+                    <td class="c">{{ $ls['backlog'] ?? 0 }}</td>
+                    <td class="r">{{ number_format($ls['amount'] ?? 0, 2) }}</td>
+                </tr>
+                @endif
+            @endforeach
+        </tbody>
+    </table>
+    @endif
+
     <div class="section-title">Financial Summary</div>
     <table class="data">
         <thead>

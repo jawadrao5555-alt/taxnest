@@ -5695,7 +5695,41 @@ class PosController extends Controller
             ->limit(10)
             ->get();
 
-        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions'));
+        // Comprehensive day-close (owner request Jul 2026): show what the wash WILL
+        // touch — this day's local bills PLUS backlog left over from earlier
+        // un-closed dates. Mirrors the wash selectors in performDayClose exactly
+        // (un-archived + no fiscal number; hide_archived global scope already
+        // filters archived rows).
+        $pendingBase = fn () => PosTransaction::where('company_id', $companyId)
+            ->whereDate('created_at', '<=', $date)
+            ->whereNull('pra_invoice_number');
+        $pendingProv = $pendingBase()
+            ->where('invoice_mode', 'local')
+            ->where('pra_status', 'local')
+            // Draft guard mirrors the wash: earlier-day draft carts survive the
+            // backlog sweep, so keep them out of the preview too.
+            ->where(function ($q) use ($date) {
+                $q->whereDate('created_at', $date)
+                    ->orWhere('status', '!=', 'draft');
+            })
+            ->get(['id', 'created_at', 'total_amount']);
+        $pendingFinal = $pendingBase()
+            ->where('status', 'completed')
+            ->where(function ($q) {
+                $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+            })
+            ->whereNull('pra_status')
+            ->get(['id', 'created_at', 'total_amount']);
+        $localWash = (object) [
+            'prov_count' => $pendingProv->count(),
+            'prov_amount' => (float) $pendingProv->sum('total_amount'),
+            'prov_backlog' => $pendingProv->filter(fn ($t) => $t->created_at && $t->created_at->toDateString() < $date)->count(),
+            'final_count' => $pendingFinal->count(),
+            'final_amount' => (float) $pendingFinal->sum('total_amount'),
+            'final_backlog' => $pendingFinal->filter(fn ($t) => $t->created_at && $t->created_at->toDateString() < $date)->count(),
+        ];
+
+        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash'));
     }
 
     public function closeDayReport(Request $request)
@@ -5724,6 +5758,10 @@ class PosController extends Controller
         }
         if (($result['deleted'] ?? 0) > 0) {
             $msg .= " — {$result['deleted']} local bill(s) deleted per company policy.";
+        }
+        $backlogSwept = array_sum(array_column($result['summary'] ?? [], 'backlog'));
+        if ($backlogSwept > 0) {
+            $msg .= " Includes {$backlogSwept} leftover local bill(s) from earlier dates.";
         }
         return back()->with('success', $msg);
     }
@@ -5771,9 +5809,32 @@ class PosController extends Controller
             ->orderBy('created_at')
             ->get();
 
-        $hasLocalBills = PosTransaction::where('company_id', $companyId)
-            ->whereDate('created_at', $date)
-            ->where('invoice_mode', 'local')
+        // Wash candidates up to AND INCLUDING the close date (owner rule Jul 2026:
+        // leftover local bills from earlier un-closed dates must also get washed —
+        // "purani dates ke local bills bhi close hon"). Matches the wash selectors
+        // below: both kinds, un-archived, no fiscal number.
+        $hasLocalBills = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->whereDate('created_at', '<=', $date)
+            ->whereNull('pra_invoice_number')
+            ->where('is_archived', false)
+            ->where(function ($q) use ($date) {
+                $q->where(function ($qq) use ($date) {
+                    $qq->where('invoice_mode', 'local')->where('pra_status', 'local')
+                        // Draft guard mirrors the wash: backlog counts only
+                        // non-draft provisionals; close-date drafts still wash.
+                        ->where(function ($d) use ($date) {
+                            $d->whereDate('created_at', $date)
+                                ->orWhere('status', '!=', 'draft');
+                        });
+                })->orWhere(function ($qq) {
+                    $qq->where('status', 'completed')
+                        ->where(function ($m) {
+                            $m->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+                        })
+                        ->whereNull('pra_status');
+                });
+            })
             ->exists();
 
         if ($transactions->isEmpty() && !$hasLocalBills) {
@@ -5831,13 +5892,17 @@ class PosController extends Controller
         $archivedCount = 0;
         $deletedCount = 0;
         $report = null;
-        \DB::transaction(function () use ($data, $companyId, $date, $provAction, $finalAction, $spendPersist, &$archivedCount, &$deletedCount, &$report) {
+        $localSummary = [];
+        \DB::transaction(function () use ($data, $companyId, $date, $provAction, $finalAction, $spendPersist, &$archivedCount, &$deletedCount, &$report, &$localSummary) {
             $report = PosDayCloseReport::create($data);
 
+            // BACKLOG SWEEP (owner rule Jul 2026): wash covers bills up to AND
+            // INCLUDING the close date, so local bills left over from earlier
+            // un-closed dates finally get washed instead of lingering forever.
             $baseQuery = function () use ($companyId, $date) {
                 return PosTransaction::withoutGlobalScope('hide_archived')
                     ->where('company_id', $companyId)
-                    ->whereDate('created_at', $date)
+                    ->whereDate('created_at', '<=', $date)
                     ->whereNull('pra_invoice_number')
                     ->where('is_archived', false);
             };
@@ -5847,7 +5912,15 @@ class PosController extends Controller
                     'action' => $provAction,
                     'query' => $baseQuery()
                         ->where('invoice_mode', 'local')
-                        ->where('pra_status', 'local'),
+                        ->where('pra_status', 'local')
+                        // DRAFT GUARD: the close DATE keeps its pre-existing full
+                        // wash (incl. that day's abandoned draft carts), but the
+                        // BACKLOG sweep takes only non-draft provisionals — a saved
+                        // draft cart from an earlier day stays resumable.
+                        ->where(function ($q) use ($date) {
+                            $q->whereDate('created_at', $date)
+                                ->orWhere('status', '!=', 'draft');
+                        }),
                 ],
                 'final_local' => [
                     'action' => $finalAction,
@@ -5861,12 +5934,27 @@ class PosController extends Controller
             ];
 
             $deletedByKind = ['provisional' => 0, 'final_local' => 0];
+            // Quota month bounds: deleted finals from the REPORT month still consume
+            // that month's quota (PlanLimitService adds deleted_final_count back in).
+            // Backlog bills from EARLIER months must NOT inflate the current month's
+            // count — their quota month is already over.
+            $monthStart = \Carbon\Carbon::parse($date)->startOfMonth();
+            $monthEnd = \Carbon\Carbon::parse($date)->endOfMonth();
             foreach ($sets as $billKind => $set) {
+                $rows = $set['query']->get();
+                // Comprehensive Z-report detail (owner request Jul 2026): what was
+                // washed, how much it was worth, and how much of it was backlog
+                // from earlier un-closed dates.
+                $localSummary[$billKind] = [
+                    'action' => $set['action'],
+                    'count' => $rows->count(),
+                    'amount' => round((float) $rows->sum('total_amount'), 2),
+                    'backlog' => $rows->filter(fn ($t) => $t->created_at && $t->created_at->toDateString() < $date)->count(),
+                ];
+                if ($rows->isEmpty()) {
+                    continue;
+                }
                 if ($set['action'] === 'delete') {
-                    $rows = $set['query']->get();
-                    if ($rows->isEmpty()) {
-                        continue;
-                    }
                     if ($spendPersist) {
                         $now = now();
                         $snapshots = $rows
@@ -5898,13 +5986,19 @@ class PosController extends Controller
                     $kindDeleted = PosTransaction::withoutGlobalScope('hide_archived')
                         ->whereIn('id', $ids)->delete();
                     $deletedCount += $kindDeleted;
-                    $deletedByKind[$billKind] += $kindDeleted;
+                    // Quota add-back counts ONLY report-month bills (see note above):
+                    // backlog from earlier months is deleted but not re-counted.
+                    $deletedByKind[$billKind] += $rows
+                        ->filter(fn ($t) => $t->created_at && $t->created_at->between($monthStart, $monthEnd))
+                        ->count();
                 } else {
-                    $archivedCount += $set['query']->update([
-                        'is_archived' => true,
-                        'archived_at' => now(),
-                        'archived_by_report_id' => $report->id,
-                    ]);
+                    $archivedCount += PosTransaction::withoutGlobalScope('hide_archived')
+                        ->whereIn('id', $rows->pluck('id')->all())
+                        ->update([
+                            'is_archived' => true,
+                            'archived_at' => now(),
+                            'archived_by_report_id' => $report->id,
+                        ]);
                 }
             }
 
@@ -5917,9 +6011,19 @@ class PosController extends Controller
                     'deleted_provisional_count' => $deletedByKind['provisional'],
                 ])->save();
             }
+
+            // Comprehensive wash detail for the Z-report view/PDF. try/catch: the
+            // local_summary column may not exist yet on a prod box mid-deploy
+            // (schema-drift self-heal pattern) — the wash itself must never fail
+            // because of a missing reporting column.
+            try {
+                $report->forceFill(['local_summary' => $localSummary])->save();
+            } catch (\Throwable $e) {
+                // column missing pre-migration — report simply has no wash detail
+            }
         });
 
-        return ['status' => 'created', 'report' => $report, 'archived' => $archivedCount, 'deleted' => $deletedCount, 'report_number' => $reportNumber];
+        return ['status' => 'created', 'report' => $report, 'archived' => $archivedCount, 'deleted' => $deletedCount, 'report_number' => $reportNumber, 'summary' => $localSummary];
     }
 
     public function dayCloseReportPdf($id)

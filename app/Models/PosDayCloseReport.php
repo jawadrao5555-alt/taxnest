@@ -14,12 +14,14 @@ class PosDayCloseReport extends Model
         'first_invoice_number', 'last_invoice_number',
         'first_invoice_time', 'last_invoice_time',
         'closed_by', 'notes', 'hash',
+        'deleted_final_count', 'deleted_provisional_count', 'local_summary',
     ];
 
     protected $casts = [
         'report_date' => 'date',
         'first_invoice_time' => 'datetime',
         'last_invoice_time' => 'datetime',
+        'local_summary' => 'array',
     ];
 
     public function company()

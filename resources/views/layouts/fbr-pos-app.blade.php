@@ -277,7 +277,8 @@
                     </div>
 
                     <div class="flex items-center gap-2">
-                        <x-pwa-install color="blue" label="Install" />
+                        {{-- Prominent nav-level Download App button — native prompt first, instructions fallback, installed state --}}
+                        <x-pwa-install-menu-item color="blue" app-name="Nest FBR POS" label="Download App" item-class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/20 transition" />
                         <x-pwa-refresh-btn color="blue" />
 
                         {{-- 🟦 Local Bills (F10) — Provisional / Saved bills --}}
@@ -443,6 +444,7 @@
                      x-transition:leave-end="opacity-0 -translate-y-2"
                      class="md:hidden border-t border-white/10 px-3 py-2 flex flex-wrap gap-1.5" style="background: rgba(12,25,41,0.9)">
                     <a href="{{ route('fbrpos.create') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('fbrpos.create') ? 'active text-white' : 'text-white/90' }}">New Sale</a>
+                    <x-pwa-install-menu-item color="blue" app-name="Nest FBR POS" label="Download App" item-class="nav-pill inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 ring-1 ring-white/20" />
                 </div>
             </header>
 

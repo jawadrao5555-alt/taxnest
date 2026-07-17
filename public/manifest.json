@@ -3,6 +3,8 @@
     "short_name": "Tax DI",
     "description": "Pakistan's Smart FBR-Compliant Tax & Invoice Management Platform",
     "start_url": "/dashboard",
+    "scope": "/",
+    "id": "/dashboard",
     "display": "standalone",
     "background_color": "#f9fafb",
     "theme_color": "#059669",

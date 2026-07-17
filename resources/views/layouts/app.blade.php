@@ -18,7 +18,7 @@
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
         <meta name="apple-mobile-web-app-title" content="Tax DI">
-        <link rel="manifest" href="/manifest.json">
+        <link rel="manifest" href="/manifest.json?v=2">
         <link rel="apple-touch-icon" href="/icons/tax-di/icon-192.png">
         <link rel="icon" type="image/png" sizes="192x192" href="/icons/tax-di/icon-192.png">
         <link rel="icon" type="image/png" sizes="512x512" href="/icons/tax-di/icon-512.png">
@@ -235,10 +235,8 @@
                                 @endif">
                                 {{ ucfirst(str_replace('_', ' ', auth()->user()->role)) }}
                             </span>
-                            <button id="pwa-install-btn" onclick="installPwa()" class="hidden items-center px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 shadow-sm transition">
-                                <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                                Install
-                            </button>
+                            {{-- Prominent nav-level Download App button — native prompt first, instructions fallback, installed state --}}
+                            <x-pwa-install-menu-item color="emerald" app-name="Tax DI" label="Download App" item-class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 shadow-sm transition" />
                             {{-- App update / refresh control — always visible, badges when update available --}}
                             <x-pwa-refresh-btn color="emerald" variant="light" />
                             <x-dropdown align="right" width="48">

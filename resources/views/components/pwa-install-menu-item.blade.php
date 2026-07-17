@@ -23,7 +23,7 @@ Usage: <x-pwa-install-menu-item color="purple" app-name="Nest POS" item-class="m
 <a href="#" id="{{ $uid }}" class="{{ $itemClass }}">
     <svg class="w-4 h-4 opacity-70 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 4v12m0 0l-4-4m4 4l4-4m-9 8h10"/></svg>
     <span data-role="label">{{ $label }}</span>
-    <span data-role="check" style="display:none; margin-left:auto; color:#059669; font-weight:700; font-size:10px;">&#10003;</span>
+    <span data-role="check" style="display:none; margin-left:auto; color:currentColor; font-weight:700; font-size:10px;">&#10003;</span>
 </a>
 
 <div id="{{ $uid }}Modal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.7); backdrop-filter:blur(6px); align-items:center; justify-content:center; padding:16px;">

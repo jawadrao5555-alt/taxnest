@@ -310,8 +310,8 @@
                             <kbd class="text-[9px] font-mono bg-white/10 px-1.5 py-0.5 rounded opacity-90 group-hover:opacity-100">⌘K</kbd>
                         </button>
 
-                        {{-- Premium PWA install + always-on update refresh --}}
-                        <x-pwa-install color="purple" label="Install" />
+                        {{-- Prominent nav-level Download App button — native prompt first, instructions fallback, installed state --}}
+                        <x-pwa-install-menu-item color="teal" app-name="Nest POS" label="Download App" item-class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/20 transition" />
                         <x-pwa-refresh-btn color="purple" />
 
                         <button @click="if(!document.fullscreenElement){document.documentElement.requestFullscreen().catch(()=>{}); document.body.classList.add('is-fullscreen');} else {document.exitFullscreen(); document.body.classList.remove('is-fullscreen');}"
@@ -534,6 +534,7 @@
                      x-transition:leave-end="opacity-0 -translate-y-2"
                      class="md:hidden border-t border-white/10 px-3 py-2 flex flex-wrap gap-1.5" style="background: hsla(var(--accent-h), var(--accent-s), 10%, 0.9)">
                     <a href="{{ route('pos.invoice.create') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">New Sale</a>
+                    <x-pwa-install-menu-item color="teal" app-name="Nest POS" label="Download App" item-class="nav-pill inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 ring-1 ring-white/20" />
                 </div>
             </header>
 

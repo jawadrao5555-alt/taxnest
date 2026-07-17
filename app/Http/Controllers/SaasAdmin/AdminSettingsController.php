@@ -105,8 +105,12 @@ class AdminSettingsController extends Controller
         } catch (\Throwable $e) {
             Log::error('Admin test email failed', ['to' => $email, 'error' => $e->getMessage()]);
 
+            \App\Services\MailHealth::recordFailure('Admin test email', $e);
+
             return back()->with('error', 'Test email FAILED — ' . $e->getMessage());
         }
+
+        \App\Services\MailHealth::recordSuccess();
 
         AdminAuditLog::log(auth('admin')->id(), 'Test email sent', 'SystemSetting', null, [
             'to' => $email,

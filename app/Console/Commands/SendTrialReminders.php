@@ -117,12 +117,16 @@ class SendTrialReminders extends Command
                 ctaLabel: 'Subscribe Now',
                 panelName: $panelName,
             ));
+
+            \App\Services\MailHealth::recordSuccess();
         } catch (\Throwable $e) {
             Log::warning('Trial reminder email failed', [
                 'company_id' => $company->id,
                 'type' => $type,
                 'error' => $e->getMessage(),
             ]);
+
+            \App\Services\MailHealth::recordFailure('Trial reminder email', $e);
         }
 
         Notification::create([

@@ -106,7 +106,7 @@
         </div>
     </form>
 
-    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mt-6">
+    <div id="email-test" class="bg-gray-900 border border-gray-800 rounded-xl p-5 mt-6">
         <h2 class="text-sm font-semibold text-white mb-1 flex items-center gap-2">
             <svg class="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
             Email Delivery Test
@@ -118,6 +118,10 @@
                 Send Test Email
             </button>
         </form>
+        @php($tnMailLastOk = \App\Services\MailHealth::lastSuccessAgo())
+        @if($tnMailLastOk)
+        <p class="text-[11px] text-gray-500 mt-3">Last successful send: {{ $tnMailLastOk }}.</p>
+        @endif
     </div>
 </div>
 </x-admin-layout>

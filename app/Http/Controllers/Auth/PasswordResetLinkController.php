@@ -54,8 +54,11 @@ class PasswordResetLinkController extends Controller
                     ->subject('TaxNest - Password Reset')
                     ->html($this->buildEmailHtml($otp, $resetLink, $request->email));
             });
+
+            \App\Services\MailHealth::recordSuccess();
         } catch (\Exception $e) {
             \Log::error('Mail send failed: ' . $e->getMessage());
+            \App\Services\MailHealth::recordFailure('Password reset email', $e);
             return back()->withErrors(['email' => 'Failed to send email. Please try again later.']);
         }
 

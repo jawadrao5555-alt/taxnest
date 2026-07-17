@@ -124,11 +124,15 @@ class PaymentProofController extends Controller
             Mail::raw($body, function ($m) use ($emails, $companyName) {
                 $m->to($emails->all())->subject("New payment receipt — {$companyName}");
             });
+
+            \App\Services\MailHealth::recordSuccess();
         } catch (\Throwable $e) {
             Log::warning('Payment proof admin alert email failed', [
                 'proof_id' => $proof->id,
                 'error' => $e->getMessage(),
             ]);
+
+            \App\Services\MailHealth::recordFailure('Payment receipt admin alert', $e);
         }
     }
 

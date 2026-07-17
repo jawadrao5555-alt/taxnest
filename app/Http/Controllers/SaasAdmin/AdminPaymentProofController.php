@@ -240,6 +240,8 @@ class AdminPaymentProofController extends Controller
                         ctaLabel: $ctaLabel,
                         panelName: $panelName,
                     ));
+
+                    \App\Services\MailHealth::recordSuccess();
                 } catch (\Throwable $e) {
                     Log::warning('Payment decision email failed', [
                         'payment_proof_id' => $proof->id,
@@ -247,6 +249,8 @@ class AdminPaymentProofController extends Controller
                         'decision' => $decision,
                         'error' => $e->getMessage(),
                     ]);
+
+                    \App\Services\MailHealth::recordFailure('Payment decision email', $e);
                 }
             }
         } catch (\Throwable $e) {

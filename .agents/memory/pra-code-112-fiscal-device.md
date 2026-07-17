@@ -17,4 +17,6 @@ description: Why new PRA POS IDs fail with Code 112 on cloud PostData and how th
 
 **How to apply in TaxNest:** per-company `companies.pra_connection_mode` ('cloud' default | 'fiscal_device'). Fiscal mode: server NEVER direct-submits (queues `pra_status='pending'`), AgentController hands the desktop agent the localhost:8524 endpoint, PRA Settings save force-enables agent + auto-generates agent_api_key. The TaxNest Desktop Agent must run on the SAME PC as PRAL's fiscal-device service. Every read of the column uses `?? 'cloud'` so pre-migration prod never breaks.
 
+**Grandfathered cloud confirmation (Jul 2026):** live company "PIZZA MASTER" (company_id 23, POS ID 195994, cloud mode, production env) still succeeds on cloud PostData — a real fiscal bill submitted from live returned fiscal number + status 'submitted' instantly. Owner explicitly approved that one test bill (Rs 10 item, POS-2026-00017 / 195994FGKP18253160). Old POS IDs on cloud are fine; only NEW registrations hit 112.
+
 **Go-live checklist for a fiscal-device company:** PRAL IMS Fiscal Device installed & responding on shop PC → TaxNest Agent installed with API key → PRA Settings: Connection Mode = Fiscal Device → prod migration run BEFORE saving settings (new column).

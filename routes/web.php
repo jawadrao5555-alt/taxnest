@@ -803,6 +803,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/system-control/{key}/toggle', [AdminSystemController::class, 'toggle'])->name('saas.admin.system.toggle');
     Route::get('/settings', [AdminSettingsController::class, 'index'])->name('saas.admin.settings');
     Route::post('/settings', [AdminSettingsController::class, 'update'])->name('saas.admin.settings.update');
+    Route::post('/settings/test-email', [AdminSettingsController::class, 'sendTestEmail'])->middleware('throttle:5,1')->name('saas.admin.settings.test-email');
     Route::get('/audit-logs', [AdminAuditController::class, 'index'])->name('saas.admin.audit');
 
     // Payment proof verification queue

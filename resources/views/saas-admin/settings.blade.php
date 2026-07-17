@@ -105,5 +105,19 @@
             </button>
         </div>
     </form>
+
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mt-6">
+        <h2 class="text-sm font-semibold text-white mb-1 flex items-center gap-2">
+            <svg class="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+            Email Delivery Test
+        </h2>
+        <p class="text-[11px] text-gray-500 mb-4">Payment-proof alerts and trial reminder emails depend on the server's SMTP settings. Click below to send a test email to your own address ({{ auth('admin')->user()->email }}) — if SMTP is misconfigured, the exact error appears here instead of failing silently.</p>
+        <form method="POST" action="{{ route('saas.admin.settings.test-email') }}">
+            @csrf
+            <button type="submit" class="px-5 py-2.5 rounded-lg text-sm font-semibold bg-amber-600 text-white hover:bg-amber-500 transition">
+                Send Test Email
+            </button>
+        </form>
+    </div>
 </div>
 </x-admin-layout>

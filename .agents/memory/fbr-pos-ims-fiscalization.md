@@ -69,6 +69,12 @@ throwaway `{}` (or minimal body) with the SAME token to BOTH gateways and compar
 - `900901` on both ⇒ token itself invalid/expired/sandbox-on-prod.
 A real prod submission for X-WAY SHOES (POSID 196339) with the owner-supplied production token confirmed the first
 case: 900908 on IMS, 200-with-DI-validation on DI ⇒ it is a DI token, hence every FBR POS bill fails.
+**UPDATE 17 Jul 2026:** the token now in the `FBR_POS_PRODUCTION_TOKEN` secret returns **900901 on BOTH** DI
+production AND DI sandbox validate ⇒ invalid everywhere (token was changed/rotated after the 11 Jul probe — likely
+the IRIS-grid POS Registration code was pasted instead of a WSO2 bearer token). Control probe same payload with
+ZIA's DI token (`FBR_PRODUCTION_TOKEN_C18`) → HTTP 200 + business error 0401 (token not bound to X-WAY's NTN) ⇒
+gateway + payload format fine; blocker is purely a valid X-WAY token. Validate endpoints
+(`di_data/v1/di/validateinvoicedata[_sb]`) are safe non-committing probes — no invoice is created.
 
 **TWO different FBR credentials people confuse (proven, high-value):**
 1. The **POS Registration token** shown in the IRIS *"Point of Sale Registration"* grid (POS-ID row, "Token"

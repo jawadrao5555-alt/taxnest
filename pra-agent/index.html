@@ -200,6 +200,29 @@
     <div id="testResult" style="margin-top:10px; font-size:12px;"></div>
   </div>
 
+  <div class="card">
+    <h3>FBR IMS Fiscal Service (Fiscal Device Mode)</h3>
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+      <span id="imsBadge" class="badge offline"><span class="dot"></span> Checking…</span>
+      <div class="btn-row">
+        <button id="imsCheckBtn" class="btn btn-secondary">↻ Re-check</button>
+        <button id="imsInstallBtn" class="btn btn-primary" style="display:none;">⬇ Install FBR IMS</button>
+      </div>
+    </div>
+    <div id="imsProgress" style="display:none; font-size:12px; color:#c4b5fd; margin-bottom:8px;"></div>
+    <div id="imsSteps" style="display:none; font-size:12px; color:#c4b5fd; line-height:1.7;">
+      FBR bills need FBR's own IMS service running on this PC. Click <b>Install FBR IMS</b> — the agent downloads it
+      from FBR's official server and launches the installer. After installing, open the FBR IMS app once and activate:<br>
+      1️⃣ Enter your <b>POS Registration No</b> &nbsp;
+      2️⃣ Enter the <b>Access Code</b> from IRIS (Point of Sale Registration page) &nbsp;
+      3️⃣ Select <b>Production</b><br>
+      Then press <b>Re-check</b> — when the badge turns green, queued bills sync automatically.
+    </div>
+    <div id="imsOkNote" style="display:none; font-size:12px; color:#10b981;">
+      ✓ FBR IMS service detected on this PC — fiscal bills will submit through it automatically.
+    </div>
+  </div>
+
   <div style="text-align:center; padding:10px; color:#a78bfa; font-size:11px;">
     Agent runs in background. Right-click tray icon to quit.
   </div>
@@ -339,6 +362,55 @@
     const u = await window.agentAPI.checkUpdate();
     showUpdateBanner(u);
   })();
+
+  async function checkIms() {
+    const badge = $('imsBadge');
+    badge.className = 'badge offline';
+    badge.innerHTML = '<span class="dot"></span> Checking…';
+    const r = await window.agentAPI.checkImsService();
+    if (r.running) {
+      badge.className = 'badge online';
+      badge.innerHTML = '<span class="dot"></span> IMS Running';
+      $('imsInstallBtn').style.display = 'none';
+      $('imsSteps').style.display = 'none';
+      $('imsOkNote').style.display = 'block';
+    } else {
+      badge.className = 'badge error';
+      badge.innerHTML = '<span class="dot"></span> IMS Not Found';
+      $('imsInstallBtn').style.display = 'inline-block';
+      $('imsSteps').style.display = 'block';
+      $('imsOkNote').style.display = 'none';
+    }
+  }
+
+  $('imsCheckBtn').addEventListener('click', checkIms);
+
+  $('imsInstallBtn').addEventListener('click', async () => {
+    const btn = $('imsInstallBtn');
+    btn.disabled = true;
+    $('imsProgress').style.display = 'block';
+    $('imsProgress').textContent = 'Starting download from FBR…';
+    const res = await window.agentAPI.installFbrIms();
+    btn.disabled = false;
+    if (!res.ok) {
+      $('imsProgress').style.color = '#fca5a5';
+      $('imsProgress').textContent = '❌ ' + res.error;
+    } else {
+      $('imsProgress').style.color = '#10b981';
+      $('imsProgress').textContent = '✅ FBR installer launched — complete it, activate the IMS app, then press Re-check.';
+    }
+  });
+
+  window.agentAPI.onImsProgress((p) => {
+    $('imsProgress').style.display = 'block';
+    $('imsProgress').style.color = p.stage === 'error' ? '#fca5a5' : '#c4b5fd';
+    $('imsProgress').textContent =
+      p.stage === 'download' ? `⬇ Downloading FBRIMS.zip from FBR… ${p.percent || 0}%`
+      : (p.message || p.stage);
+  });
+
+  checkIms();
+  setInterval(checkIms, 60000);
 
   loadConfig();
   window.agentAPI.getStatus().then(renderStatus);

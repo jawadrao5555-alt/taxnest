@@ -1,5 +1,13 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.2.0 / build 20260717-1 (2026-07-17)
+**New: FBR IMS one-stop setup (Fiscal Device mode)**
+
+- New "FBR IMS Fiscal Service" card on the agent window: live badge shows whether FBR's IMS service is running on this PC (checks `localhost:8524` every 60s, plus a manual Re-check button).
+- One-click **Install FBR IMS**: the agent downloads `FBRIMS.zip` from FBR's official server (`download.fbr.gov.pk`), extracts it, and launches the FBR installer automatically — no separate manual download needed.
+- On-screen activation guide (POS Registration No + IRIS Access Code + Production) shown whenever the service is missing.
+- Note: FBRIMS remains FBR's own software running as a separate Windows service — the agent installs and monitors it, it does not replace it.
+
 ## v20260418-5 (2026-04-18)
 **Fix: Offline status issue + reliable callback retry + self-healing sync**
 

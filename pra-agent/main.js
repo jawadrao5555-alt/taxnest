@@ -6,7 +6,7 @@ const { autoUpdater } = require('electron-updater');
 const { startAgent, stopAgent, getStatus } = require('./src/agent');
 
 const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/taxnest/releases/latest';
-const BUILD_TIMESTAMP = '20260715-1';
+const BUILD_TIMESTAMP = '20260717-1';
 let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
 
 autoUpdater.autoDownload = true;
@@ -242,6 +242,102 @@ ipcMain.handle('install-update-now', async () => {
 });
 
 ipcMain.handle('get-version', () => ({ build: BUILD_TIMESTAMP, version: app.getVersion() }));
+
+// ─── FBR IMS Fiscal Service helper ──────────────────────────────────────────
+// FBRIMS is FBR's OWN software (runs as a separate service on localhost:8524).
+// We cannot merge it into this app, but we CAN detect it, download it from
+// FBR's official server, and launch its installer — one-stop setup for shops.
+const IMS_DOWNLOAD_URL = 'https://download.fbr.gov.pk/IMS_Setup/FBRIMS.zip';
+
+function sendImsProgress(payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('ims-progress', payload);
+  }
+}
+
+ipcMain.handle('check-ims-service', async () => {
+  try {
+    // Any HTTP response (even 404) means the IMS service is listening.
+    await axios.get('http://localhost:8524/', { timeout: 3000, validateStatus: () => true });
+    return { running: true };
+  } catch (e) {
+    return { running: false, error: e.code || e.message };
+  }
+});
+
+ipcMain.handle('install-fbr-ims', async () => {
+  if (process.platform !== 'win32') {
+    return { ok: false, error: 'FBR IMS software only runs on Windows. Use the shop\'s Windows PC.' };
+  }
+  const os = require('os');
+  const fs = require('fs');
+  const { spawn } = require('child_process');
+  const tmpDir = path.join(os.tmpdir(), 'taxnest-fbrims');
+  const zipPath = path.join(tmpDir, 'FBRIMS.zip');
+  const extractDir = path.join(tmpDir, 'extracted');
+  try {
+    fs.mkdirSync(tmpDir, { recursive: true });
+    sendImsProgress({ stage: 'download', percent: 0, message: 'Downloading FBRIMS.zip from FBR...' });
+    // timeout here = connection/response-start timeout; stalled streams are aborted below.
+    const res = await axios.get(IMS_DOWNLOAD_URL, { responseType: 'stream', timeout: 60000 });
+    const total = parseInt(res.headers['content-length'] || '0', 10);
+    let done = 0;
+    await new Promise((resolve, reject) => {
+      const out = fs.createWriteStream(zipPath);
+      let idleTimer = null;
+      const resetIdle = () => {
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          res.data.destroy(new Error('Download stalled (no data for 60s). Check the internet connection and try again.'));
+        }, 60000);
+      };
+      resetIdle();
+      res.data.on('data', (chunk) => {
+        done += chunk.length;
+        resetIdle();
+        if (total) sendImsProgress({ stage: 'download', percent: Math.round((done / total) * 100) });
+      });
+      const fail = (err) => { if (idleTimer) clearTimeout(idleTimer); reject(err); };
+      res.data.on('error', fail);
+      out.on('error', fail);
+      out.on('finish', () => { if (idleTimer) clearTimeout(idleTimer); resolve(); });
+      res.data.pipe(out);
+    });
+    sendImsProgress({ stage: 'extract', message: 'Extracting FBR installer...' });
+    fs.rmSync(extractDir, { recursive: true, force: true });
+    fs.mkdirSync(extractDir, { recursive: true });
+    await new Promise((resolve, reject) => {
+      // Single-quoted PowerShell strings = no $-expansion; ' escaped by doubling.
+      const psq = (s) => `'${String(s).replace(/'/g, "''")}'`;
+      const ps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+        `Expand-Archive -LiteralPath ${psq(zipPath)} -DestinationPath ${psq(extractDir)} -Force`], { windowsHide: true });
+      let err = '';
+      ps.stderr.on('data', (d) => { err += d.toString(); });
+      ps.on('close', (code) => (code === 0 ? resolve() : reject(new Error(err || `Expand-Archive exited ${code}`))));
+      ps.on('error', reject);
+    });
+    const found = [];
+    const walk = (dir, depth) => {
+      if (depth > 3) return;
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(p, depth + 1);
+        else if (/\.(exe|msi)$/i.test(entry.name)) found.push(p);
+      }
+    };
+    walk(extractDir, 0);
+    const setup = found.find((f) => /setup|install/i.test(path.basename(f))) || found[0] || null;
+    sendImsProgress({ stage: 'launch', message: setup ? 'Launching FBR installer...' : 'Opening extracted folder...' });
+    if (setup) {
+      await shell.openPath(setup);
+    }
+    shell.openPath(extractDir);
+    return { ok: true, installer: setup, folder: extractDir };
+  } catch (e) {
+    sendImsProgress({ stage: 'error', message: e.message });
+    return { ok: false, error: e.message };
+  }
+});
 
 ipcMain.handle('test-connection', async (event, config) => {
   const axios = require('axios');

@@ -13,4 +13,8 @@ contextBridge.exposeInMainWorld('agentAPI', {
   getVersion: () => ipcRenderer.invoke('get-version'),
   onUpdateAvailable: (callback) =>
     ipcRenderer.on('update-available', (event, info) => callback(info)),
+  checkImsService: () => ipcRenderer.invoke('check-ims-service'),
+  installFbrIms: () => ipcRenderer.invoke('install-fbr-ims'),
+  onImsProgress: (callback) =>
+    ipcRenderer.on('ims-progress', (event, p) => callback(p)),
 });

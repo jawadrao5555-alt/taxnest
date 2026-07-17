@@ -52,6 +52,12 @@ Sync Agent** — the exact same agent NestPOS already uses for PRA.
 
 ## Step 2 — Install the FBR IMS Fiscal component on the shop PC
 
+> **Shortcut (agent v1.2.0+):** if the TaxNest Desktop Agent is already installed (Step 3),
+> its **"FBR IMS Fiscal Service"** card detects when the service is missing and offers a
+> one-click **Install FBR IMS** button — the agent downloads `FBRIMS.zip` from FBR's official
+> server, extracts it, and launches the FBR installer for you. You then only do the
+> activation entries in point 3 below. Manual steps:
+
 1. On the shop PC (Windows, Pakistan connection), download the FBR fiscal component:
    `https://download.fbr.gov.pk/IMS_Setup/FBRIMS.zip`
 2. Unzip and run the installer.
@@ -72,6 +78,8 @@ The **same** agent used for PRA is reused — no separate FBR build.
 1. Download **TaxNest-Agent-Setup.exe** from the POS panel (POS → Sync Agent) or from your
    TaxNest server's `/downloads` folder.
 2. Install and launch it on the **same shop PC** as the FBR IMS component.
+   (Tip: you can install the agent FIRST and let its "FBR IMS Fiscal Service" card
+   install the FBR component for you — see the shortcut in Step 2.)
 3. Paste the three credentials:
    - **Server URL:** `https://taxnest.com.pk/api/agent`
    - **Company ID:** your numeric company ID

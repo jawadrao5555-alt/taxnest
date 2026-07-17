@@ -76,6 +76,17 @@ ZIA's DI token (`FBR_PRODUCTION_TOKEN_C18`) → HTTP 200 + business error 0401 (
 gateway + payload format fine; blocker is purely a valid X-WAY token. Validate endpoints
 (`di_data/v1/di/validateinvoicedata[_sb]`) are safe non-committing probes — no invoice is created.
 
+**Agent-side IMS one-stop setup (v1.2.0, Jul 2026):** FBRIMS can NEVER be merged into the Desktop Agent (it's
+FBR's own software, separate Windows service) — but the agent now has an "FBR IMS Fiscal Service" card that
+probes localhost:8524 (any HTTP response = running), and a one-click installer that downloads FBRIMS.zip from
+`download.fbr.gov.pk`, extracts via PowerShell Expand-Archive, and launches the setup exe. Activation (POS Reg
+No + IRIS Access Code + Production) stays manual — FBR requires it. Build gotcha: electron-builder NSIS target
+FAILS on this Linux workspace ("wine is required"); the REAL distribution channel is the git-tracked
+`pra-agent/dist/TaxNest-PRA-Agent-Windows.zip` (win-unpacked + install.bat, top folder `TaxNest-PRA-Agent/`) —
+`--dir` packaging works fine, then re-zip. POS panel downloadAgent() prefers GitHub releases/latest assets, falls
+back to `public/downloads/` then the releases page — a new agent version isn't live for shops until the GitHub
+release asset is updated too.
+
 **TWO different FBR credentials people confuse (proven, high-value):**
 1. The **POS Registration token** shown in the IRIS *"Point of Sale Registration"* grid (POS-ID row, "Token"
    column, UUID form). This is **NOT** an OAuth Bearer/access token. Putting it in `Authorization: Bearer`

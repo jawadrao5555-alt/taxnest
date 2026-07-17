@@ -13,6 +13,16 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+// Scheduler heartbeat: records the last time the cron actually fired so the
+// admin System Control page can show whether background jobs run on prod.
+Schedule::call(function () {
+    \App\Models\SystemSetting::set(
+        'scheduler_last_heartbeat',
+        now()->toDateTimeString(),
+        'Last time the Laravel scheduler (schedule:run cron) executed.'
+    );
+})->everyFifteenMinutes()->name('scheduler-heartbeat');
+
 Schedule::job(new NightlyComplianceCronJob)->daily()->at('02:00');
 Schedule::job(new CheckFbrTokenExpiryJob)->daily()->at('06:00');
 Schedule::job(new SyncPosOfflineInvoicesJob)->everyTwoMinutes();

@@ -149,7 +149,12 @@ The Code-112 resolution is BUILT. Key non-obvious facts:
   AND non-empty invoice number. **Shared-agent constraint:** one company cannot run PRA-fiscal AND FBR-fiscal at
   once (agentServesFbr routes ALL agent endpoints to the FBR branch).
 - Shop-PC install guide: `pra-agent/FBR-FISCAL-DEVICE-SETUP.md`. X-WAY SHOES (NTN 2595908-5, POSID 196354) is
-  prod-only (not in dev DB) — enable via the prod UI toggle after deploy; e2e proven in dev on company 16.
+  prod-only (not in dev DB) — e2e proven in dev on company 16.
+- **LIVE STATE (17 Jul 2026): X-WAY SHOES (company 27) SWITCHED to fiscal_device on prod** (owner-approved).
+  Its 4 failed bills FPOS-2026-00001..00004 were re-queued → all now `pending` awaiting agent pickup;
+  `tnk_` agent key minted (visible on /fbr-pos/settings while impersonating). REMAINING: install FBRIMS.zip
+  (needs POS Reg No + IRIS grid Access Code, Production) + Desktop Sync Agent (with the tnk_ key) on the
+  shop's Windows PC — owner-side step, e.g. via AnyDesk.
 
 ## Web-based POS answer (official, Jul 2026): SDC "locally OR on Cloud" — central Windows VPS is compliant
 Owner's requirement: shopkeeper gives only POS ID + Access Code (+token), zero shop-PC installs (TaxNest is web POS).

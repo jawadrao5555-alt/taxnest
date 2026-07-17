@@ -1011,6 +1011,22 @@ class PosController extends Controller
         // via retryPra (the "Submit to PRA — Make Final" button on transaction-show).
         $saveAsProvisional = (bool) $request->input('save_as_provisional', false);
 
+        // Order-type flow rules (owner, Jul 2026): on restaurant-ish companies (order-type
+        // widget visible = any of tables/kot/kitchen/delivery on), provisional bills are
+        // DELIVERY-only — Dine-In uses the Hold/KOT/recall procedure, Takeaway is billed
+        // directly as final. Only enforced when the client sent order_type (older queued
+        // offline payloads lack it — never strand a replay).
+        if ($saveAsProvisional && $request->filled('order_type') && $request->input('order_type') !== 'delivery') {
+            $flowFeatures = PosFeatureService::forCompany($company);
+            if (($flowFeatures->tables ?? false) || ($flowFeatures->kot ?? false) || ($flowFeatures->kitchen ?? false) || ($flowFeatures->delivery ?? false)) {
+                $flowMsg = 'Provisional bills are for Delivery orders only. Dine-In uses Hold / KOT; Takeaway is billed as a final bill.';
+                if ($request->expectsJson()) {
+                    return response()->json(['success' => false, 'error' => $flowMsg, 'message' => $flowMsg], 422);
+                }
+                return back()->withInput()->with('error', $flowMsg);
+            }
+        }
+
         // Monthly bill quota (paid-plan package limits, Jul 2026) — FINAL bills only.
         // Provisionals stay allowed; they consume quota when promoted to final.
         if (!$saveAsProvisional) {
@@ -5485,7 +5501,11 @@ class PosController extends Controller
         // Order by the NUMERIC serial, NOT by id: a promoted local bill (old row,
         // low id) is RENUMBERED to the newest serial — id-ordering would then read
         // a stale max from the latest row and hand out a DUPLICATE serial.
-        $lastTransaction = PosTransaction::where('company_id', $companyId)
+        // withoutGlobalScope('hide_archived'): archived rows still occupy the
+        // UNIQUE(company_id, invoice_number) index — the serial counter must see
+        // them or it re-issues their numbers and every new bill 500s on insert.
+        $lastTransaction = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
             ->where('invoice_number', 'like', "POS-{$year}-%")
             ->orderByRaw(\App\Helpers\DbCompat::cast('SUBSTR(invoice_number, 10)', 'int') . ' DESC')
             ->lockForUpdate()
@@ -5511,7 +5531,11 @@ class PosController extends Controller
         // assign a fresh (max) L number to an OLD row, so id-ordering would re-issue it
         // and trip the UNIQUE(company_id, invoice_number) index (same lesson as
         // generateInvoiceNumber's numeric-ordering fix).
-        $lastTransaction = PosTransaction::where('company_id', $companyId)
+        // withoutGlobalScope('hide_archived'): day-close ARCHIVES local bills (they
+        // stay in the table + unique index, just hidden) — the counter must include
+        // them or the very next provisional collides with an archived L-NNN.
+        $lastTransaction = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
             ->where('invoice_number', 'like', 'L-%')
             ->where('invoice_number', 'not like', 'LOCAL-%')
             ->orderByRaw(\App\Helpers\DbCompat::cast("SUBSTR(invoice_number, 3)", 'int') . ' DESC')

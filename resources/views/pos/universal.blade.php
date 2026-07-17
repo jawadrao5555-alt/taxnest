@@ -308,7 +308,7 @@ window.addEventListener('popstate', function() {
                 <svg x-show="i < {{ $hasTypeStep ? 4 : 3 }}" class="w-3 h-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
             </div>
         </template>
-        <span class="ml-2 text-[10px] font-medium text-gray-500 dark:text-gray-400 hidden md:inline">Enter = add / next · empty Enter = @if($hasTypeStep)type → @endif cart · P = provisional</span>
+        <span class="ml-2 text-[10px] font-medium text-gray-500 dark:text-gray-400 hidden md:inline">Enter = add / next · empty Enter = @if($hasTypeStep)type → @endif cart<span x-show="canProvisional()"> · P = provisional</span></span>
     </div>
 
     {{-- ═══════════ GUIDED FLOW: ORDER-TYPE STEP (opt-in) ═══════════ --}}
@@ -632,14 +632,14 @@ window.addEventListener('popstate', function() {
         </button>
 
         <div class="hidden md:flex items-center gap-1.5">
-            <button @click="holdOrder()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems()" :title="(hasManualItems() || hasDealItems()) ? 'Manual items & deals billing-only — pay first or remove from cart to hold' : 'Hold this order'" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
+            <button @click="holdOrder()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems() || !canHold()" :title="!canHold() ? 'Hold is for Dine-In orders only' : ((hasManualItems() || hasDealItems()) ? 'Manual items & deals billing-only — pay first or remove from cart to hold' : 'Hold this order')" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
                 <svg x-show="submitting" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                 <span x-show="!submitting" class="text-[10px] bg-amber-400/30 px-1 rounded">F5</span> <span x-text="submitting ? 'Holding...' : 'Hold'"></span>
             </button>
 
             {{-- Phase 5 — Send to Kitchen (visible only when feature.kot is on) --}}
             @if($features->kot ?? false)
-            <button @click="sendToKitchen()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems()" :title="(hasManualItems() || hasDealItems()) ? 'Manual items & deals billing-only — pay first or remove from cart' : 'Saves the order and prints the kitchen ticket without taking payment.'" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
+            <button @click="sendToKitchen()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems() || !canHold()" :title="!canHold() ? 'Send to Kitchen is for Dine-In orders only' : ((hasManualItems() || hasDealItems()) ? 'Manual items & deals billing-only — pay first or remove from cart' : 'Saves the order and prints the kitchen ticket without taking payment.')" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
                 <span class="text-base leading-none">🍳</span>
                 <span x-text="submitting ? 'Sending...' : 'Send to Kitchen'"></span>
             </button>
@@ -1047,7 +1047,7 @@ window.addEventListener('popstate', function() {
                 <div class="px-3 pb-3 space-y-2 mobile-sticky-pay">
                     <div class="grid grid-cols-3 gap-2">
                         <button @click="if(cart.length && confirm('Clear entire cart?')) { clearCart(); }" :disabled="cart.length === 0" class="py-2 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-30 transition flex items-center justify-center gap-0.5">Clear <kbd class="text-[8px] bg-red-200/50 dark:bg-red-800/30 px-1 rounded font-mono">F4</kbd></button>
-                        <button @click="holdOrder()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems()" :title="(hasManualItems() || hasDealItems()) ? 'Manual items & deals billing-only — pay first or remove' : ''" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center gap-1">
+                        <button @click="holdOrder()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems() || !canHold()" :title="!canHold() ? 'Hold is for Dine-In orders only' : ((hasManualItems() || hasDealItems()) ? 'Manual items & deals billing-only — pay first or remove' : '')" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center gap-1">
                             <svg x-show="submitting" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                             <span x-text="submitting ? 'Holding...' : 'Hold'"></span>
                             <kbd x-show="!submitting" class="text-[8px] bg-amber-200/50 dark:bg-amber-800/30 px-1 rounded ml-0.5 font-mono">F5</kbd>
@@ -1058,7 +1058,7 @@ window.addEventListener('popstate', function() {
                         </button>
                     </div>
                     <!-- ─── SAVE PROVISIONAL — separate from Pay (no modal, no payment) ─── -->
-                    <button @click="saveProvisionalDirect()" :disabled="cart.length === 0 || submitting" class="w-full py-2.5 mb-2 rounded-xl text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-30 shadow-sm transition flex items-center justify-center gap-2">
+                    <button @click="saveProvisionalDirect()" :disabled="cart.length === 0 || submitting || !canProvisional()" :title="!canProvisional() ? 'Provisional bills are for Delivery orders only' : ''" class="w-full py-2.5 mb-2 rounded-xl text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-30 shadow-sm transition flex items-center justify-center gap-2">
                         <svg x-show="!submitting" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
                         <svg x-show="submitting" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                         <span>Save Provisional</span>
@@ -2295,6 +2295,12 @@ function restaurantPos() {
         gridFocusIndex: 0,
         gridCols: 4,
         orderType: '{{ $selectedTable ? "dine_in" : "takeaway" }}',
+        // Order-type flow rules (owner, Jul 2026) — apply ONLY when the order-type
+        // widget is visible (restaurant-ish company; same condition as the header switcher).
+        // Delivery = final + provisional; Dine-In = Hold/KOT/recall procedure only
+        // (no provisional); Takeaway = direct final bill only (no hold, no provisional).
+        // Plain retail (widget hidden, orderType silently 'takeaway') stays ungated.
+        typeFlowGate: {{ (($features->tables ?? false) || ($features->kot ?? false) || ($features->kitchen ?? false) || ($features->delivery ?? false)) ? 'true' : 'false' }},
         deliveryChargeInput: '',
         customerAddresses: [],
         selectedDeliveryAddress: '',
@@ -4161,6 +4167,13 @@ function restaurantPos() {
             if (type === 'delivery' && this.selectedCustomer && !this.customerAddresses.length) this.loadCustomerAddresses();
         },
 
+        // ── Order-type flow rules (owner, Jul 2026) ────────────────────────────
+        // Gated on typeFlowGate so plain retail (no order-type widget) keeps the
+        // old behaviour. Restaurant companies: Hold/KOT = Dine-In procedure only;
+        // provisional bills = Delivery only; Takeaway = direct final bill only.
+        canHold() { return !this.typeFlowGate || this.orderType === 'dine_in'; },
+        canProvisional() { return !this.typeFlowGate || this.orderType === 'delivery'; },
+
         // ── Item #3: Delivery charges (owner, Jul 2026) ────────────────────────
         // One synthetic MANUAL cart line (item_id=null → _manual:true server-side,
         // no master-product auto-create), TAX-EXEMPT, qty pinned to 1. Manual lines
@@ -4556,6 +4569,13 @@ function restaurantPos() {
         async holdOrder(opts) {
             opts = opts || {};
             if (this.cart.length === 0 || this.submitting) return null;
+            // Order-type flow rule: Hold / Send-to-Kitchen is the Dine-In procedure
+            // ONLY (restaurant companies). Takeaway = direct final; Delivery = final
+            // or provisional. Backend enforces the same rule (defence-in-depth).
+            if (!this.canHold()) {
+                this.showToast(this.orderType === 'takeaway' ? 'Takeaway is billed directly — Hold / KOT is for Dine-In orders only.' : 'Hold / KOT is for Dine-In orders only.', 'error');
+                return null;
+            }
             // Defence-in-depth: backend hold endpoint validates item_id as required|integer
             // and item_type in product,service. Synthetic manual lines (item_id=null,
             // item_type='manual') would 422. Block the action client-side too so the
@@ -4633,6 +4653,13 @@ function restaurantPos() {
         async saveProvisionalDirect() {
             if (this.submitting) return;
             if (this.cart.length === 0) { this.showToast('Cart is empty', 'error'); return; }
+            // Order-type flow rule: provisional bills are DELIVERY-only on restaurant
+            // companies. Dine-In uses Hold/KOT/recall; Takeaway pays direct final.
+            // Backend enforces the same rule (defence-in-depth).
+            if (!this.canProvisional()) {
+                this.showToast(this.orderType === 'dine_in' ? 'Dine-In uses Hold / KOT — provisional bills are for Delivery orders only.' : 'Takeaway is billed directly — provisional bills are for Delivery orders only.', 'error');
+                return;
+            }
             this.saveAsProvisional = true;
             this.showPayModal = false;
             await this.processPayment('cash');
@@ -4678,7 +4705,12 @@ function restaurantPos() {
             try {
                 const holdRes = await fetch('{{ route("pos.restaurant.orders.hold") }}', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount }),
+                    // billing_flow — this is the INTERNAL hold-then-pay billing pass-through
+                    // (normal final sale on restaurant companies), NOT an explicit Hold/KOT
+                    // action. Backend skips the dine_in-only flow gate when this flag is set;
+                    // the explicit Hold button / F5 (holdOrder fn above) sends no flag and
+                    // stays gated client + server.
+                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount, billing_flow: true }),
                 });
                 if (!holdRes.ok) {
                     const bodyText = await holdRes.text().catch(() => '');
@@ -4729,6 +4761,9 @@ function restaurantPos() {
                         _manual: (c.item_type === 'manual' || !c.item_id) ? true : false,
                     })),
                     payment_method: method,
+                    // Order-type flow rules (owner, Jul 2026): backend gates
+                    // provisional saves to Delivery-only for restaurant companies.
+                    order_type: this.orderType,
                     discount_type: this.discountType || 'percentage',
                     discount_value: this.discountAmount > 0 ? this.discountValue : 0,
                     customer_name: this.selectedCustomer?.name || null,

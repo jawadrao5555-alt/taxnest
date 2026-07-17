@@ -54,3 +54,8 @@ description: Retention rules, cashier-gate trap, and midnight auto-close semanti
 - `users.pra_reporting_enabled` nullable: NULL = inherit company flag, non-NULL = the user's OWN switch. togglePra flips ONLY the acting user's row — company flag untouched, so one cashier never affects another.
 - Acting-user decisions (sale/draft/edit/promote/retry gates + all POS views) read `User::praReportingEnabled($company)`; user-less contexts (offline sync job, `PraIntegrationService::isEnabled`, NTN guard) use `Company::praReportingActive()`.
 - **Why NULL-inherit:** zero behavior change on deploy day (no seeding), and pre-migration prod safely falls back to the company flag (getAttributeValue → null; praReportingActive try/catch).
+
+## Serial generators MUST bypass hide_archived (Jul 2026)
+- Day-close ARCHIVES local bills — rows stay in the table AND in UNIQUE(company_id, invoice_number), just hidden by PosTransaction's `hide_archived` global scope. A serial counter that queries through the scope re-issues archived L-NNN numbers and EVERY subsequent provisional 500s on duplicate-key.
+- All four generators (PosController + RestaurantPosController × generateInvoiceNumber/generateLocalInvoiceNumber) use `PosTransaction::withoutGlobalScope('hide_archived')`. Any NEW serial-counter query must do the same.
+- POS- fiscal rows are never archived (non-NULL pra_status guard) so including archived rows only ever CONTINUES a sequence — safe.

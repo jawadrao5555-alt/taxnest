@@ -173,6 +173,24 @@ class RestaurantPosController extends Controller
             'discount_value' => 'nullable|numeric|min:0|max:999999',
         ]);
 
+        // Order-type flow rules (owner, Jul 2026): Hold / Send-to-Kitchen is the Dine-In
+        // procedure ONLY on companies where the order-type widget is visible (any of
+        // tables/kot/kitchen/delivery on). Takeaway = direct final bill; Delivery = final
+        // or provisional. Plain retail (widget hidden) keeps hold unrestricted.
+        // billing_flow EXEMPTION: the universal screen's normal payment pipeline routes
+        // plain-product restaurant sales through hold-then-pay (processPayment →
+        // hold → payOrder) for KOT/restaurant_orders bookkeeping — that internal
+        // pass-through sends billing_flow=true and must NOT be blocked, or every
+        // final Takeaway/Delivery sale 422s. This is a workflow rule (not a security
+        // boundary), so trusting the client flag is acceptable: the explicit Hold
+        // button / F5 sends no flag and stays gated. Provisional abuse is impossible
+        // via this bypass — payOrder has its own delivery-only provisional gate.
+        $flowFeatures = \App\Services\PosFeatureService::forCompany($company);
+        $typeFlowGate = ($flowFeatures->tables ?? false) || ($flowFeatures->kot ?? false) || ($flowFeatures->kitchen ?? false) || ($flowFeatures->delivery ?? false);
+        if ($typeFlowGate && !$request->boolean('billing_flow') && $request->input('order_type') !== 'dine_in') {
+            return response()->json(['success' => false, 'message' => 'Hold / Send to Kitchen is for Dine-In orders only. Takeaway is billed directly; Delivery is final or provisional.'], 422);
+        }
+
         if ($request->table_id) {
             $table = RestaurantTable::where('company_id', $companyId)->where('id', $request->table_id)->first();
             if (!$table) {
@@ -563,6 +581,14 @@ class RestaurantPosController extends Controller
         // promoted to final via PosController::retryPra (the "Submit to PRA — Make Final"
         // button on the transaction-show provisional card).
         $saveAsProvisional = (bool) $request->input('save_as_provisional', false);
+        // Order-type flow rules (owner, Jul 2026): provisional bills are DELIVERY-only on
+        // restaurant-ish companies — Dine-In/Takeaway held orders must settle as FINAL bills.
+        if ($saveAsProvisional && $order->order_type !== 'delivery') {
+            $flowFeatures = \App\Services\PosFeatureService::forCompany($company);
+            if (($flowFeatures->tables ?? false) || ($flowFeatures->kot ?? false) || ($flowFeatures->kitchen ?? false) || ($flowFeatures->delivery ?? false)) {
+                return response()->json(['success' => false, 'message' => 'Provisional bills are for Delivery orders only — this held order must be paid as a final bill.'], 422);
+            }
+        }
         // Per-cashier toggle (owner rule Jul 2026): the ACTING user's own reporting switch.
         $praEnabled = (bool) auth('pos')->user()?->praReportingEnabled($company) && !$saveAsProvisional;
         // Reporting-OFF Finals Invariant — three-branch (mirrors PosController::storeInvoice):
@@ -842,7 +868,10 @@ class RestaurantPosController extends Controller
     {
         $year = date('Y');
         $prefix = "POS-{$year}-";
-        $all = PosTransaction::where('company_id', $companyId)
+        // withoutGlobalScope('hide_archived'): archived rows still occupy the
+        // UNIQUE(company_id, invoice_number) index — the counter must see them.
+        $all = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
             ->where('invoice_mode', 'pra')
             ->where('invoice_number', 'like', "{$prefix}%")
             ->pluck('invoice_number');
@@ -865,7 +894,11 @@ class RestaurantPosController extends Controller
         // Order by NUMERIC serial, not id — mirrors PosController::generateLocalInvoiceNumber
         // (draft-resume POS→L downgrade can put the max L number on an old row; id-ordering
         // would re-issue it and trip UNIQUE(company_id, invoice_number)).
-        $lastTransaction = PosTransaction::where('company_id', $companyId)
+        // withoutGlobalScope('hide_archived'): day-close ARCHIVES local bills (they
+        // stay in the table + unique index, just hidden) — the counter must include
+        // them or the very next provisional collides with an archived L-NNN.
+        $lastTransaction = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
             ->where('invoice_number', 'like', 'L-%')
             ->where('invoice_number', 'not like', 'LOCAL-%')
             ->orderByRaw(\App\Helpers\DbCompat::cast("SUBSTR(invoice_number, 3)", 'int') . ' DESC')

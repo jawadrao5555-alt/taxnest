@@ -20,6 +20,28 @@
         </div>
     </div>
 
+    {{-- Queue worker health: proves queued jobs are actually being processed --}}
+    <div class="mb-6 rounded-xl border p-4 flex items-start gap-3 {{ $queueStale ? 'border-red-800/60 bg-red-900/15' : 'border-emerald-800/50 bg-emerald-900/10' }}">
+        <span class="mt-0.5 inline-block w-2.5 h-2.5 rounded-full flex-shrink-0 {{ $queueStale ? 'bg-red-500' : 'bg-emerald-500' }}"></span>
+        <div>
+            <p class="text-sm font-semibold text-white">Queue Worker (Job Processing)</p>
+            @if($queueHeartbeatAt)
+                <p class="text-xs mt-0.5 {{ $queueStale ? 'text-red-400' : 'text-gray-400' }}">
+                    Queue worker last processed a job: {{ $queueHeartbeatAt->diffForHumans() }} ({{ $queueHeartbeatAt->format('d M Y, h:i A') }})
+                </p>
+            @else
+                <p class="text-xs mt-0.5 {{ $queueStale ? 'text-red-400 font-medium' : 'text-gray-400' }}">No queue heartbeat recorded yet{{ $queueStale ? ' — the queue worker may not be running.' : '.' }}</p>
+            @endif
+            @if($stuckJobs > 0)
+                <p class="text-xs text-red-400 mt-1 font-medium">
+                    Warning: {{ $stuckJobs }} queued {{ Str::plural('job', $stuckJobs) }} waiting for over 10 minutes{{ $oldestStuckAt ? ' (oldest queued ' . $oldestStuckAt->diffForHumans() . ')' : '' }} — the <code class="text-red-300">queue:work</code> worker on the live server may have died. FBR/PRA invoice sync, nightly compliance, trial expiry and FBR token checks will pile up unprocessed until it is restarted.
+                </p>
+            @elseif($queueStale)
+                <p class="text-xs text-red-400 mt-1 font-medium">Warning: no queue activity recorded recently — the <code class="text-red-300">queue:work</code> worker on the live server may have died. Queued jobs (invoice sync, compliance, trial expiry) will not run until it is restarted.</p>
+            @endif
+        </div>
+    </div>
+
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-5">Emergency switches to control platform-wide features. Changes take effect immediately.</p>
 

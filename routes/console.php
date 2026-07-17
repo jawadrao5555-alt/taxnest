@@ -23,6 +23,11 @@ Schedule::call(function () {
     );
 })->everyFifteenMinutes()->name('scheduler-heartbeat');
 
+// Queue heartbeat: dispatched to the database queue every five minutes; the
+// timestamp is only written when a queue WORKER processes the job, so the
+// admin System Control page can detect a dead worker even while cron is fine.
+Schedule::job(new \App\Jobs\QueueHeartbeatJob)->everyFiveMinutes()->name('queue-heartbeat');
+
 Schedule::job(new NightlyComplianceCronJob)->daily()->at('02:00');
 Schedule::job(new CheckFbrTokenExpiryJob)->daily()->at('06:00');
 Schedule::job(new SyncPosOfflineInvoicesJob)->everyTwoMinutes();

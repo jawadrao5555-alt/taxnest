@@ -26,7 +26,45 @@ class AdminSystemController extends Controller
             }
         }
 
-        return view('saas-admin.system-control', compact('controls', 'heartbeatAt', 'heartbeatStale'));
+        // Queue worker health: a queue-processed heartbeat + stuck-job count.
+        $queueHeartbeatRaw = SystemSetting::get('queue_last_heartbeat');
+        $queueHeartbeatAt = null;
+        if ($queueHeartbeatRaw) {
+            try {
+                $queueHeartbeatAt = \Carbon\Carbon::parse($queueHeartbeatRaw);
+            } catch (\Throwable $e) {
+                $queueHeartbeatAt = null;
+            }
+        }
+
+        $stuckJobs = 0;
+        $oldestStuckAt = null;
+        try {
+            $threshold = now()->subMinutes(10)->getTimestamp();
+            $stuckJobs = \Illuminate\Support\Facades\DB::table('jobs')
+                ->where('created_at', '<', $threshold)
+                ->count();
+            if ($stuckJobs > 0) {
+                $oldestTs = \Illuminate\Support\Facades\DB::table('jobs')->min('created_at');
+                if ($oldestTs) {
+                    $oldestStuckAt = \Carbon\Carbon::createFromTimestamp((int) $oldestTs);
+                }
+            }
+        } catch (\Throwable $e) {
+            // jobs table missing or unreadable — treat as no stuck jobs.
+        }
+
+        // Stale if: jobs are stuck, or the queue heartbeat is older than 30
+        // minutes (job is dispatched every 5 min), or never recorded at all
+        // while the scheduler IS running (scheduler dead already flags red above).
+        $queueStale = $stuckJobs > 0
+            || ($queueHeartbeatAt && $queueHeartbeatAt->lt(now()->subMinutes(30)))
+            || (!$queueHeartbeatAt && $heartbeatAt && !$heartbeatStale);
+
+        return view('saas-admin.system-control', compact(
+            'controls', 'heartbeatAt', 'heartbeatStale',
+            'queueHeartbeatAt', 'queueStale', 'stuckJobs', 'oldestStuckAt'
+        ));
     }
 
     public function toggle(Request $request, $key)

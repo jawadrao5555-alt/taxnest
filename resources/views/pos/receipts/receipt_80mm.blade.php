@@ -166,7 +166,9 @@
         }
         $addressLine = trim(($company->address ?? '') . (($company->city) ? ', ' . $company->city : ''));
         $phoneLine = trim(implode(' / ', array_filter([$company->phone ?? null, $company->mobile ?? null])));
-        $rp = $company->displayPrefs('pos');
+        // Owner (Jul 2026): PRA and Local bills each have their OWN display set —
+        // resolved per-transaction (PRA = pra mode + non-NULL status; else Local).
+        $rp = $company->posReceiptPrefsFor($transaction);
     @endphp
     <div class="header text-center">
         @if($logoDataUri)
@@ -232,7 +234,9 @@
         // even though lines then intentionally do NOT sum to the grand total.
         // Tax is ALWAYS submitted to PRA in full regardless; full details remain
         // visible via PRA Sahulat app QR scan.
-        $showTaxLines = (bool) (optional($transaction->company)->pos_receipt_show_tax ?? true);
+        // Per-type since Jul 2026: PRA receipts read the PRA set (pos_receipt_show_tax
+        // column), Local receipts read the Local set — both resolved in $rp above.
+        $showTaxLines = (bool) ($rp['show_tax'] ?? true);
     @endphp
     <table class="items-table">
         <thead>

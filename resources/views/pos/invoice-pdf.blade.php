@@ -135,7 +135,8 @@
                 <div class="lbl">Payment</div>
                 <div class="val">{{ ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</div>
             </div>
-            @php $rpPdf = optional($transaction->company)->displayPrefs('pos') ?? \App\Models\Company::defaultDisplayPrefs(); @endphp
+            {{-- Owner (Jul 2026): PRA and Local bills each have their OWN display set. --}}
+            @php $rpPdf = optional($transaction->company)->posReceiptPrefsFor($transaction) ?? \App\Models\Company::defaultDisplayPrefs(); @endphp
             @if($transaction->creator && $rpPdf['show_cashier'])
             <div class="info-row">
                 <div class="lbl">Cashier</div>
@@ -151,7 +152,8 @@
             // prices (owner update Jul 2026) even though lines then intentionally do not
             // sum to the grand total. Tax is always submitted to PRA; details visible
             // via Sahulat app QR scan.
-            $showTaxLines = (bool) (optional($transaction->company)->pos_receipt_show_tax ?? true);
+            // Per-type since Jul 2026: resolved via posReceiptPrefsFor() in $rpPdf above.
+            $showTaxLines = (bool) ($rpPdf['show_tax'] ?? true);
         @endphp
         <div class="section-label">Order Items</div>
         <table class="items">

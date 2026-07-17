@@ -73,9 +73,28 @@ reporting OFF — bill sat in the fail-queue forever). When auditing, grep every
 Historic prod rows from before these fixes are NOT backfilled (local/'local' finals are
 indistinguishable from deliberate provisionals).
 
+# Per-type receipt display sets — PRA vs Local (owner, Jul 2026)
+
+PRA and Local receipts each carry a FULL independent display set (address, NTN, email, mobile,
+cashier, show_tax, footer + footer_text), both edited on `/pos/receipt-settings` (two tabs, one form —
+both tab panels stay in the DOM via x-show so ONE save submits BOTH sets; `rp_*` = PRA, `lp_*` = Local).
+
+**Storage:** PRA set = legacy `invoice_display_prefs['pos']` + `pos_receipt_show_tax` column (column
+stays the PRA tax source — PRA Settings compatibility). Local set = `invoice_display_prefs['pos_local']`
+incl. its own `show_tax` key; when the `pos_local` key is absent the Local set MIRRORS the PRA set
+(`Company::posReceiptPrefs('local')` falls back), so pre-split companies see zero behavior change.
+
+**Type resolution per bill** (`Company::posReceiptPrefsFor($transaction)`): PRA receipt =
+`invoice_mode==='pra' && pra_status !== NULL` (fiscal POS- serials, incl. pending/failed/offline);
+everything else = Local (deliberate provisionals local/'local' AND reporting-OFF finals 'pra'+NULL —
+exactly the L-series serial split). Templates (receipt_80mm, receipt_58mm, invoice-pdf) read
+`$rp = $company->posReceiptPrefsFor($transaction)` and `$showTaxLines = $rp['show_tax']` — do NOT
+re-point them at `displayPrefs('pos')` or the raw column. Paper size stays GLOBAL (printer property).
+
 # Receipt tax display rule (OWNER OVERRIDE, Jul 2026)
 
-The `companies.pos_receipt_show_tax` toggle applies to ALL receipts — including PRA fiscal ones.
+The show-tax toggle applies to ALL receipts — including PRA fiscal ones (since the per-type split,
+PRA receipts read the `pos_receipt_show_tax` column, Local receipts read `pos_local.show_tax`).
 Toggle OFF = customer copy hides BOTH the Subtotal and Tax lines and shows only the grand TOTAL
 (discount line stays if present). PRA number + QR remain on the receipt.
 
@@ -87,8 +106,8 @@ remain visible via PRA Sahulat app QR scan; tax is ALWAYS submitted to PRA in fu
 **How to apply:** In receipt_80mm, receipt_58mm, invoice-pdf: a single `$showTaxLines` boolean
 (`optional($transaction->company)->pos_receipt_show_tax ?? true`) guards BOTH subtotal and tax rows.
 Do NOT re-add `|| invoice_mode==='pra' || pra_invoice_number` overrides. transaction-show (internal admin
-view) keeps full details. restaurant/receipt.blade.php is DEAD (RestaurantPosController::receipt renders
-the shared receipt_80mm/58mm templates).
+view) keeps full details. restaurant/receipt.blade.php was DELETED (Jul 2026 — it was dead:
+RestaurantPosController::receipt renders the shared receipt_80mm/58mm templates); don't recreate it.
 
 **Tax-hidden mode shows ASAL (as-entered, ex-tax) line prices — owner REVERSED the gross-up (Jul 2026):**
 when the toggle is OFF, item Rate/Amt print the stored `unit_price`/`subtotal` exactly as typed on the

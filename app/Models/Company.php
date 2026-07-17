@@ -187,6 +187,52 @@ class Company extends Model
         return $merged;
     }
 
+    /**
+     * POS receipt display prefs, split by receipt type (owner request Jul 2026):
+     * 'pra'   = bills actually reported to PRA (fiscal POS- serials) — stored in
+     *           invoice_display_prefs['pos'] (legacy key, backward compatible) with
+     *           show_tax from the pos_receipt_show_tax column.
+     * 'local' = L-series bills (provisionals AND reporting-OFF finals) — stored in
+     *           invoice_display_prefs['pos_local']. Until the company customizes the
+     *           local set, it MIRRORS the PRA set (existing behavior unchanged).
+     */
+    public function posReceiptPrefs(string $type = 'pra'): array
+    {
+        $pra = $this->displayPrefs('pos');
+        $pra['show_tax'] = (bool) ($this->pos_receipt_show_tax ?? true);
+        if ($type !== 'local') {
+            return $pra;
+        }
+
+        $all = $this->invoice_display_prefs;
+        $local = is_array($all) ? ($all['pos_local'] ?? null) : null;
+        if (!is_array($local)) {
+            return $pra; // never customized — mirror the PRA set
+        }
+
+        $merged = array_merge(self::defaultDisplayPrefs(), $local);
+        foreach (['show_address', 'show_ntn', 'show_email', 'show_mobile', 'show_cashier', 'show_footer'] as $k) {
+            $merged[$k] = filter_var($merged[$k], FILTER_VALIDATE_BOOLEAN);
+        }
+        $merged['show_tax'] = filter_var($local['show_tax'] ?? $pra['show_tax'], FILTER_VALIDATE_BOOLEAN);
+
+        return $merged;
+    }
+
+    /**
+     * Resolve the receipt-pref set for a specific POS transaction.
+     * PRA receipt = invoice_mode 'pra' AND non-NULL pra_status (reported / queued
+     * for PRA — these carry fiscal POS- serials). Everything else (deliberate
+     * provisionals local/'local' AND reporting-OFF finals 'pra'+NULL, both L-series)
+     * uses the Local receipt set. Mirrors the PRA-serial-split rule.
+     */
+    public function posReceiptPrefsFor($transaction): array
+    {
+        $isPra = (($transaction->invoice_mode ?? 'pra') === 'pra') && $transaction->pra_status !== null;
+
+        return $this->posReceiptPrefs($isPra ? 'pra' : 'local');
+    }
+
     public function isSuspended()
     {
         return $this->company_status === 'suspended';

@@ -120,9 +120,11 @@ class PosController extends Controller
         if ($request->isMethod('post')) {
             $request->validate([
                 'rp_footer_text' => 'nullable|string|max:150',
+                'lp_footer_text' => 'nullable|string|max:150',
                 'rp_printer_size' => 'nullable|in:80mm,58mm',
             ]);
             $prefs = $company->invoice_display_prefs ?? [];
+            // PRA (fiscal) receipt set — legacy 'pos' key, backward compatible.
             $prefs['pos'] = [
                 'show_address' => $request->has('rp_show_address'),
                 'show_ntn' => $request->has('rp_show_ntn'),
@@ -132,11 +134,24 @@ class PosController extends Controller
                 'show_footer' => $request->has('rp_show_footer'),
                 'footer_text' => trim((string) $request->input('rp_footer_text', '')) ?: null,
             ];
+            // Local (L-series) receipt set — owner request Jul 2026: PRA and Local
+            // bills each get their OWN full display set (incl. its own show_tax).
+            $prefs['pos_local'] = [
+                'show_address' => $request->has('lp_show_address'),
+                'show_ntn' => $request->has('lp_show_ntn'),
+                'show_email' => $request->has('lp_show_email'),
+                'show_mobile' => $request->has('lp_show_mobile'),
+                'show_cashier' => $request->has('lp_show_cashier'),
+                'show_footer' => $request->has('lp_show_footer'),
+                'show_tax' => $request->has('lp_show_tax'),
+                'footer_text' => trim((string) $request->input('lp_footer_text', '')) ?: null,
+            ];
             $company->update([
                 'invoice_display_prefs' => $prefs,
                 // Owner decision (Jul 2026): tax display toggle lives HERE (receipt
                 // customization), not on the Features page. OFF = customer copy
                 // shows grand TOTAL only; tax is always submitted to PRA in full.
+                // Since the PRA/Local split this column is the PRA-receipt tax toggle.
                 'pos_receipt_show_tax' => $request->has('rp_show_tax'),
                 // Paper size (owner request Jul 2026): same column PRA Settings writes —
                 // last save from either page wins. Missing/invalid input keeps 80mm default.

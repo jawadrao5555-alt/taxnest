@@ -6,7 +6,7 @@ description: A dedicated NestPOS test company exists on LIVE (cPanel prod) for s
 # Live NestPOS test company (created 17 Jul 2026)
 
 - LIVE has NO seeded POS test company — all live `product_type='pos'` companies are REAL customer restaurants (never test in those without explicit owner approval; PRA bills are real fiscal records).
-- So one was registered via public `/pos/register`: **"NestPOS Live Test Company", company_id 29**, login `poslivetest@taxnest.com` (standard test password the owner uses for dev test accounts). Pro Annual sub, admin-approved, restaurant preset, universal sale screen ON.
+- So one was registered via public `/pos/register`: **"NestPOS Live Test Company" (company_id 29)** — find it in Admin > Companies; owner has the login (standard test-account pattern). Pro Annual sub, admin-approved, restaurant preset, universal sale screen ON.
 - It has ONLY local (L-series) test bills — PRA reporting OFF, nothing submitted to PRA. Safe for repeat testing. Owner may delete it later (follow-up proposed).
 
 ## Live data drift found (important)

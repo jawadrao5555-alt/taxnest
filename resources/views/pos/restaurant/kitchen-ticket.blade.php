@@ -42,7 +42,13 @@
         .items-table td { padding: 5px 2px; vertical-align: top; font-size: 14px; color: #000; }
         .items-table .qty { width: 15%; font-weight: bold; font-size: 17px; text-align: center; color: #000; }
         .items-table .name { width: 85%; color: #000; font-weight: 600; }
-        .items-table .note { font-size: 11px; font-style: italic; color: #000; padding-left: 10px; font-weight: bold; }
+        /* Owner (Jul 2026): kitchen complained notes print too light/small — thermal
+           printers render italic + small text thin. Big, upright, ultra-bold + a text
+           stroke so cheap printers lay down more ink. */
+        .items-table .note {
+            font-size: 15px; font-style: normal; color: #000; padding-left: 10px;
+            font-weight: 900; -webkit-text-stroke: 0.5px #000; letter-spacing: 0.5px;
+        }
         .items-table tr { border-bottom: 1px dashed #000; }
         .items-table tr:last-child { border-bottom: none; }
         .order-type-badge {
@@ -63,8 +69,9 @@
         .station-section { margin-bottom: 8px; }
         .station-item-count { font-size: 11px; text-align: center; color: #000; margin-bottom: 4px; font-weight: bold; }
         .kitchen-notes {
-            border: 2px solid #000; padding: 6px 8px; margin-top: 6px;
-            font-size: 13px; font-weight: bold; background: #fff; color: #000;
+            border: 3px solid #000; padding: 6px 8px; margin-top: 6px;
+            font-size: 16px; font-weight: 900; background: #fff; color: #000;
+            -webkit-text-stroke: 0.5px #000; text-transform: uppercase; letter-spacing: 0.5px;
         }
         .print-btn {
             display: block; width: 100%; padding: 12px; margin-top: 10px;

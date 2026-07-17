@@ -52,7 +52,7 @@
 - [Unicode heredoc writes truncate files](unicode-heredoc-write.md) — \ud-escape emoji in heredoc/python writes can truncate the target file mid-write; use \U0001F5A8 + atomic write; restore via git show HEAD:path.
 - [SaaS admin flash banners](admin-panel-flash-banners.md) — admin layout renders success/error/$errors centrally; pages add none; "form does nothing" = suspect silent validation fail.
 - [PRA POS package limits](pos-package-limits.md) — monthly FINAL-bill quota + team-account quota; four gated final paths (incl. retryPra local-only + toggleCashier reactivation); provisionals free until promoted.
-- [Live POS test company](live-pos-test-company.md) — company 29 on LIVE = safe POS test account (local bills only); "Pro restaurant drift" was a FALSE alarm (x-show banner text fooled a page scan); pos/* CSRF-exempt.
+- [Live POS test company](live-pos-test-company.md) — live test company DELETED 17 Jul 2026; safe create/delete pattern for live POS tests; "Pro restaurant drift" was a FALSE alarm (x-show banner text fooled a page scan); pos/* CSRF-exempt.
 - [POS restaurant module invariants](pos-restaurant-module.md) — gating column rule, station-KOT single resolver, KDS kitchen_status isolation, waiter settle path, deal snapshot stock, QR menu.
 - [POS universal screen features](pos-universal-screen-features.md) — Screen Fit, manual-cart type mapping, receipt popup, F10/F11 modals, PWA update hold; detail moved out of replit.md.
 - [Offline-first POS billing dedupe](offline-first-pos-billing.md) — offline_uuid rides on EVERY submit attempt incl. online (lost-response dupes); replay guard before quota; timestamp/poison-queue gaps open.

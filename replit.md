@@ -6,6 +6,7 @@ Multi-company SaaS for tax + invoice management in Pakistan (FBR/PRA compliant):
 Deep module invariants live in `.agents/memory/` topic files — this file is the short map. ALWAYS read the matching memory topic before editing a subsystem.
 
 ## User Preferences & Business Rules
+- **CURRENT FOCUS (owner, 18 Jul 2026): work ONLY on NestPOS PRA (PRA POS) for now** — DI, FBR POS, admin/SaaS surfaces sirf tab touch karo jab owner kahe. Baaki sab baad mein.
 - ZIA CORPORATION is a REAL production account (not demo) — NTN 3620291786117, owner ZIA UR REHMAN, Digital Invoice ONLY (no POS data).
 - NestPOS Enterprise Store (company_id 11) = dedicated POS test company (posadmin@taxnest.com / Admin@12345). Test Trading Company (company_id 12, test@testtrading.pk / Admin@12345) = admin-approval-workflow testing.
 - DI and POS data are FULLY ISOLATED — no cross-contamination, ever.

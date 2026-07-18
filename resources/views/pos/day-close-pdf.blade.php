@@ -158,6 +158,35 @@
     </table>
     @endif
 
+    {{-- Delivery Riders (Jul 2026): rider day detail stored on the report --}}
+    @if(is_array($report->rider_summary) && !empty($report->rider_summary['riders']))
+    <div class="section-title">Delivery Riders</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>Rider</th>
+                <th class="c">Deliveries</th>
+                <th class="c">Delivered</th>
+                <th class="c">Returned</th>
+                <th class="r">Cash Bills (PKR)</th>
+                <th class="r">Unsettled at Close (PKR)</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($report->rider_summary['riders'] as $rr)
+            <tr>
+                <td>{{ $rr['name'] ?? '-' }}</td>
+                <td class="c">{{ $rr['deliveries'] ?? 0 }}</td>
+                <td class="c">{{ $rr['delivered'] ?? 0 }}</td>
+                <td class="c">{{ $rr['returned'] ?? 0 }}</td>
+                <td class="r">{{ number_format($rr['cash_total'] ?? 0, 2) }}</td>
+                <td class="r" style="{{ ($rr['cash_pending'] ?? 0) > 0 ? 'color:#dc2626; font-weight:bold;' : '' }}">{{ ($rr['cash_pending'] ?? 0) > 0 ? number_format($rr['cash_pending'], 2) : 'Clear' }}</td>
+            </tr>
+            @endforeach
+        </tbody>
+    </table>
+    @endif
+
     <div class="section-title">Financial Summary</div>
     <table class="data">
         <thead>
@@ -237,6 +266,18 @@
                 <td>Cash Sales</td>
                 <td class="r">{{ number_format($report->cash_amount, 2) }}</td>
             </tr>
+            @if(is_array($report->rider_summary) && ($report->rider_summary['cash_out'] ?? 0) > 0)
+            <tr>
+                <td>Cash With Riders (Unsettled at Close)</td>
+                <td class="r" style="color:#dc2626;">-{{ number_format($report->rider_summary['cash_out'], 2) }}</td>
+            </tr>
+            @endif
+            @if(is_array($report->rider_summary) && ($report->rider_summary['cash_in'] ?? 0) > 0)
+            <tr>
+                <td>Rider Settlements Received (Earlier Days' Bills)</td>
+                <td class="r">+{{ number_format($report->rider_summary['cash_in'], 2) }}</td>
+            </tr>
+            @endif
             <tr>
                 <td>Expected Cash in Drawer</td>
                 <td class="r">{{ number_format($report->expected_cash ?? 0, 2) }}</td>

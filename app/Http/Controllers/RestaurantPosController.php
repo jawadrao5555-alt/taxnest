@@ -660,6 +660,21 @@ class RestaurantPosController extends Controller
                 'created_by' => (int) $user->id,
                 'notes' => $order->kitchen_notes,
             ];
+            // Delivery Riders (Jul 2026): snapshot the held order's type + optional
+            // rider from the PAY request. Delivery-only; invalid rider ids silently
+            // dropped (never block a payment). invoice_mode three-branch untouched.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id')) {
+                $payRiderId = null;
+                if ($order->order_type === 'delivery' && $request->filled('rider_id')) {
+                    $payRiderId = \App\Models\PosRider::where('company_id', $companyId)
+                        ->where('id', (int) $request->input('rider_id'))
+                        ->where('is_active', true)
+                        ->value('id');
+                }
+                $transactionData['order_type'] = $order->order_type;
+                $transactionData['rider_id'] = $payRiderId;
+                $transactionData['delivery_status'] = $payRiderId ? 'assigned' : null;
+            }
             $transaction = PosTransaction::create($transactionData);
 
             foreach ($order->items as $item) {

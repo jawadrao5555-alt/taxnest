@@ -78,12 +78,31 @@
     <table>
         <tr><td>Opening Float</td><td class="r">{{ number_format($report->opening_float ?? 0, 2) }}</td></tr>
         <tr><td>Cash Sales</td><td class="r">{{ number_format($report->cash_amount, 2) }}</td></tr>
+        @if(is_array($report->rider_summary) && ($report->rider_summary['cash_out'] ?? 0) > 0)
+        <tr><td>Rider Cash (Unsettled)</td><td class="r">-{{ number_format($report->rider_summary['cash_out'], 2) }}</td></tr>
+        @endif
+        @if(is_array($report->rider_summary) && ($report->rider_summary['cash_in'] ?? 0) > 0)
+        <tr><td>Rider Settlements (Old)</td><td class="r">+{{ number_format($report->rider_summary['cash_in'], 2) }}</td></tr>
+        @endif
         <tr><td>Expected in Drawer</td><td class="r">{{ number_format($report->expected_cash ?? 0, 2) }}</td></tr>
         <tr><td>Counted Cash</td><td class="r">{{ number_format($report->counted_cash, 2) }}</td></tr>
         <tr>
             <td class="b">Variance {{ abs((float) $report->cash_variance) < 0.01 ? '(BALANCED)' : ((float) $report->cash_variance < 0 ? '(SHORT)' : '(OVER)') }}</td>
             <td class="r b">{{ (float) $report->cash_variance > 0 ? '+' : '' }}{{ number_format($report->cash_variance, 2) }}</td>
         </tr>
+    </table>
+    <div class="hr"></div>
+    @endif
+
+    @if(is_array($report->rider_summary) && !empty($report->rider_summary['riders']))
+    <div class="sec">Delivery Riders</div>
+    <table>
+        @foreach($report->rider_summary['riders'] as $rr)
+        <tr>
+            <td>{{ $rr['name'] ?? '-' }} ({{ $rr['deliveries'] ?? 0 }} del)</td>
+            <td class="r">{{ ($rr['cash_pending'] ?? 0) > 0 ? 'Owes ' . number_format($rr['cash_pending'], 2) : 'Clear' }}</td>
+        </tr>
+        @endforeach
     </table>
     <div class="hr"></div>
     @endif

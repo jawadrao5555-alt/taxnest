@@ -1099,6 +1099,17 @@ window.addEventListener('popstate', function() {
                 <p x-show="stockError" class="text-xs text-red-500 mt-2 bg-red-50 dark:bg-red-900/20 p-2 rounded-lg" x-text="stockError"></p>
                 <p x-show="submitting" class="text-xs text-purple-500 mt-2">Processing payment...</p>
             </div>
+            {{-- Delivery Riders (Jul 2026): optional rider pick — Delivery orders only.
+                 Rider name prints on the receipt + cash bills land in the rider khata. --}}
+            <div x-show="orderType === 'delivery' && allRiders.length > 0" class="px-4 pt-3">
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Delivery Rider <span class="normal-case font-medium text-gray-300 dark:text-gray-500">(optional)</span></label>
+                <select x-model="selectedRiderId" :disabled="submitting" class="w-full rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white text-sm py-2 focus:ring-purple-500 focus:border-purple-500">
+                    <option value="">— No rider —</option>
+                    <template x-for="r in allRiders" :key="r.id">
+                        <option :value="String(r.id)" x-text="r.name + (r.phone ? ' • ' + r.phone : '')"></option>
+                    </template>
+                </select>
+            </div>
             <div class="p-4 grid grid-cols-2 gap-3">
                 <button @click="payMethodIndex = 0; processPayment('cash')" :disabled="submitting" :class="payMethodIndex === 0 ? 'ring-2 ring-green-500 ring-offset-2 dark:ring-offset-gray-900 scale-105 shadow-sm border-green-400' : ''" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:bg-green-100 hover:border-green-400">
                     <svg x-show="submitting" class="w-8 h-8 mx-auto mb-1 animate-spin text-green-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
@@ -2221,6 +2232,10 @@ function restaurantPos() {
         // date-range checked in universalCreateInvoice) — never cached client-side,
         // so an off-day deal can never linger past midnight via localStorage.
         allDeals: {!! $jsEnc(collect($dealsForJs ?? [])->values()) !!},
+        // Delivery Riders (Jul 2026): active riders for the payment-modal picker
+        // (delivery orders only; empty when the delivery feature is OFF).
+        allRiders: {!! $jsEnc(collect($ridersForJs ?? [])->values()) !!},
+        selectedRiderId: '',
         allCustomers: {!! $jsEnc($customersJson) !!},
         kitchenSettings: @json($kitchenSettings),
         // Inventory master switch — single source of truth.
@@ -4140,7 +4155,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.incomingOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.fixCartIndex(); this.clearCartStorage(); },
+        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.incomingOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.selectedRiderId = ''; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm('Current order has ' + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast('New sale started', 'success');
@@ -4779,6 +4794,8 @@ function restaurantPos() {
                     // Order-type flow rules (owner, Jul 2026): backend gates
                     // provisional saves to Delivery-only for restaurant companies.
                     order_type: this.orderType,
+                    // Delivery Riders (Jul 2026): optional rider — delivery only.
+                    rider_id: this.orderType === 'delivery' ? (this.selectedRiderId || null) : null,
                     discount_type: this.discountType || 'percentage',
                     discount_value: this.discountAmount > 0 ? this.discountValue : 0,
                     customer_name: this.selectedCustomer?.name || null,
@@ -5381,7 +5398,7 @@ function restaurantPos() {
                 // PROVISIONAL BILL FLOW — when true, RestaurantPosController::payOrder
                 // forces pra_status='local' and skips PRA submission. Bill remains
                 // editable / deletable until promoted via "Submit to PRA — Make Final".
-                const res = await fetch(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method, save_as_provisional: !!provisional, delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || null) : null }) });
+                const res = await fetch(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method, save_as_provisional: !!provisional, delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || null) : null, rider_id: this.orderType === 'delivery' ? (this.selectedRiderId || null) : null }) });
                 if (!res.ok) {
                     const bodyText = await res.text().catch(() => '');
                     console.error('[payOrder] HTTP', res.status, res.statusText, bodyText.slice(0, 500));

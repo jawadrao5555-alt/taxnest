@@ -429,6 +429,19 @@
                                         Kitchen Display
                                     </a>
                                     @endif
+                                    {{-- Delivery Riders (Jul 2026): board visible to cashiers too (they receive rider cash); Riders CRUD admin-only. --}}
+                                    @if(!empty($posFeaturesLayout->delivery))
+                                    <a href="{{ route('pos.deliveries') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 11-4 0m10 0a2 2 0 104 0"/></svg>
+                                        Deliveries
+                                    </a>
+                                    @if(!$isCashierLayout)
+                                    <a href="{{ route('pos.riders') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                        Riders
+                                    </a>
+                                    @endif
+                                    @endif
 
                                     <div class="px-3 pt-3 pb-1">
                                         <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">Reports</p>

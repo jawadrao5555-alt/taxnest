@@ -463,10 +463,14 @@
                 <textarea name="notes" rows="2" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500" placeholder="Any additional notes for this day's report..."></textarea>
             </div>
 
-            {{-- Cash reconciliation (optional, Z-report style): live variance preview via Alpine --}}
+            {{-- Cash reconciliation (optional, Z-report style): live variance preview via Alpine.
+                 Rider adjustment (Jul 2026): unsettled rider cash is OUT of the drawer;
+                 settlements received today for earlier days' bills are IN. --}}
+            @php $rf = $riderFigures ?? ['active' => false, 'cash_out' => 0, 'cash_in' => 0, 'riders' => []]; @endphp
             <div class="mb-4 p-4 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
                  x-data="{ float: '', counted: '', cashSales: {{ (float) $stats->cash_amount }},
-                           get expected() { return (parseFloat(this.float) || 0) + this.cashSales; },
+                           riderOut: {{ (float) ($rf['cash_out'] ?? 0) }}, riderIn: {{ (float) ($rf['cash_in'] ?? 0) }},
+                           get expected() { return (parseFloat(this.float) || 0) + this.cashSales - this.riderOut + this.riderIn; },
                            get variance() { return this.counted === '' ? null : (parseFloat(this.counted) || 0) - this.expected; } }">
                 <p class="text-sm font-bold text-gray-900 dark:text-white mb-1">Cash Reconciliation (Optional)</p>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Drawer ka cash gin kar enter karein — system expected cash se compare kar ke kami/zyadati report mein save karega.</p>
@@ -484,6 +488,12 @@
                 </div>
                 <div class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
                     <span class="text-gray-600 dark:text-gray-400">Cash sales today: <b class="text-gray-900 dark:text-white">PKR {{ number_format($stats->cash_amount, 2) }}</b></span>
+                    @if(!empty($rf['active']) && ($rf['cash_out'] ?? 0) > 0)
+                    <span class="text-amber-700 dark:text-amber-400">Rider ke paas (unsettled): <b>− PKR {{ number_format($rf['cash_out'], 2) }}</b></span>
+                    @endif
+                    @if(!empty($rf['active']) && ($rf['cash_in'] ?? 0) > 0)
+                    <span class="text-emerald-700 dark:text-emerald-400">Rider settlements (purane bills): <b>+ PKR {{ number_format($rf['cash_in'], 2) }}</b></span>
+                    @endif
                     <span class="text-gray-600 dark:text-gray-400">Expected in drawer: <b class="text-gray-900 dark:text-white" x-text="'PKR ' + expected.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></b></span>
                     <template x-if="variance !== null">
                         <span class="font-bold" :class="Math.abs(variance) < 0.01 ? 'text-emerald-600' : (variance < 0 ? 'text-red-600' : 'text-amber-600')"
@@ -543,6 +553,51 @@
                 </div>
                 @endif
             @endforeach
+        </div>
+    </div>
+    @endif
+
+    {{-- Delivery Riders (Jul 2026): rider day detail stored on the closed report.
+         Same placement logic as the wash summary — shows even when PRA sales are zero. --}}
+    @if($existingReport && is_array($existingReport->rider_summary) && !empty($existingReport->rider_summary['riders']))
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
+        <h3 class="font-semibold text-gray-900 dark:text-white mb-1">Delivery Riders — Day Summary</h3>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">
+            Rider ke paas jo cash close ke waqt tha woh drawer ke expected cash se minus hota hai; purane dinon ke bills ki settlement plus hoti hai.
+        </p>
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead>
+                    <tr class="text-left text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        <th class="px-3 py-2">Rider</th>
+                        <th class="px-3 py-2 text-center">Deliveries</th>
+                        <th class="px-3 py-2 text-center">Delivered</th>
+                        <th class="px-3 py-2 text-center">Returned</th>
+                        <th class="px-3 py-2 text-right">Cash Bills</th>
+                        <th class="px-3 py-2 text-right">Unsettled at Close</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    @foreach($existingReport->rider_summary['riders'] as $rr)
+                    <tr>
+                        <td class="px-3 py-2 font-medium text-gray-900 dark:text-white">{{ $rr['name'] ?? '—' }}</td>
+                        <td class="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{{ $rr['deliveries'] ?? 0 }}</td>
+                        <td class="px-3 py-2 text-center text-emerald-600 dark:text-emerald-400">{{ $rr['delivered'] ?? 0 }}</td>
+                        <td class="px-3 py-2 text-center {{ ($rr['returned'] ?? 0) > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-400' }}">{{ $rr['returned'] ?? 0 }}</td>
+                        <td class="px-3 py-2 text-right text-gray-700 dark:text-gray-300">PKR {{ number_format($rr['cash_total'] ?? 0) }}</td>
+                        <td class="px-3 py-2 text-right font-semibold {{ ($rr['cash_pending'] ?? 0) > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400' }}">{{ ($rr['cash_pending'] ?? 0) > 0 ? 'PKR ' . number_format($rr['cash_pending']) : 'Clear' }}</td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs">
+            @if(($existingReport->rider_summary['cash_out'] ?? 0) > 0)
+            <span class="text-amber-700 dark:text-amber-400">Rider ke paas at close: <b>− PKR {{ number_format($existingReport->rider_summary['cash_out'], 2) }}</b></span>
+            @endif
+            @if(($existingReport->rider_summary['cash_in'] ?? 0) > 0)
+            <span class="text-emerald-700 dark:text-emerald-400">Purane bills ki settlement aaj: <b>+ PKR {{ number_format($existingReport->rider_summary['cash_in'], 2) }}</b></span>
+            @endif
         </div>
     </div>
     @endif

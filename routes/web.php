@@ -640,6 +640,24 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/restaurant/api/receipt-printed/{id}', [RestaurantPosController::class, 'markReceiptPrinted'])->name('pos.restaurant.receipt-printed');
     Route::get('/restaurant/api/customer-history/{id}', [RestaurantPosController::class, 'customerHistory'])->name('pos.restaurant.customer-history');
     Route::post('/restaurant/api/save-manager-pin', [RestaurantPosController::class, 'saveManagerPin'])->name('pos.restaurant.save-manager-pin');
+
+    // ── Delivery Riders (Jul 2026) ───────────────────────────────────────────
+    // Board + settlement open to cashiers too (the cashier receives rider cash);
+    // rider CRUD + login management is admin/manager only (PosAdminOnly below).
+    Route::get('/deliveries', [\App\Http\Controllers\PosRiderController::class, 'deliveries'])->name('pos.deliveries');
+    Route::post('/deliveries/{id}/assign', [\App\Http\Controllers\PosRiderController::class, 'assign'])->name('pos.deliveries.assign');
+    Route::post('/deliveries/{id}/status', [\App\Http\Controllers\PosRiderController::class, 'updateStatus'])->name('pos.deliveries.status');
+    Route::post('/riders/{id}/settle', [\App\Http\Controllers\PosRiderController::class, 'settle'])->name('pos.riders.settle');
+    Route::middleware([\App\Http\Middleware\PosAdminOnly::class])->group(function () {
+        Route::get('/riders', [\App\Http\Controllers\PosRiderController::class, 'index'])->name('pos.riders');
+        Route::post('/riders', [\App\Http\Controllers\PosRiderController::class, 'store'])->name('pos.riders.store');
+        Route::put('/riders/{id}', [\App\Http\Controllers\PosRiderController::class, 'update'])->name('pos.riders.update');
+        Route::post('/riders/{id}/login', [\App\Http\Controllers\PosRiderController::class, 'saveLogin'])->name('pos.riders.login');
+    });
+    // Rider portal — pos_rider role is confined to these routes by PosAuth
+    // (exact 'pos/rider' + 'pos/rider/' prefix; /pos/riders stays admin-only).
+    Route::get('/rider', [\App\Http\Controllers\PosRiderController::class, 'portal'])->name('pos.rider.portal');
+    Route::post('/rider/deliveries/{id}/delivered', [\App\Http\Controllers\PosRiderController::class, 'portalMarkDelivered'])->name('pos.rider.delivered');
     });
 });
 

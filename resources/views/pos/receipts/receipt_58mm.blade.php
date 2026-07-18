@@ -194,6 +194,10 @@
         @if($transaction->delivery_address)
         <tr><td class="info-label">Deliver:</td><td class="info-value">{{ $transaction->delivery_address }}</td></tr>
         @endif
+        {{-- Delivery Riders (Jul 2026): assigned rider on delivery receipts (display-only, all branches). --}}
+        @if($transaction->rider)
+        <tr><td class="info-label">Rider:</td><td class="info-value">{{ $transaction->rider->name }}</td></tr>
+        @endif
         <tr><td class="info-label">Pay:</td><td class="info-value">{{ ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</td></tr>
         @if($transaction->creator && $rp['show_cashier'])
         <tr><td class="info-label">Cashier:</td><td class="info-value">{{ $transaction->creator->name }}</td></tr>

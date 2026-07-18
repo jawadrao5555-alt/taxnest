@@ -62,4 +62,5 @@
 - [mobile.css global overrides](mobile-css-global-overrides.md) — mobile.css beats Tailwind on phones: forced table-cell vs .hidden, touch-target blobs on toggle pills, grid collapse needs grid-cols-keep; bump ?v= on edit.
 - [pricing_plans.features = display-only](pos-plan-features-display-only.md) — no code reads the JSON; restaurant gate = restaurant_enabled column; plan cards render limits from columns + cumulative lists.
 - [Silent printer routing](silent-printer-routing.md) — KOT stamping at result-time not render; Electron listener leak = double print; no pageSize for thermal; MySQL NOW() looks offline to Laravel.
+- [PRA POS Delivery Riders](pos-delivery-riders.md) — khata = cash+unsettled+not-returned (bypass hide_archived); riders never touch invoice_mode/serials; day-close recon PRA-set-only; wash archives unsettled rider cash.
 - [Outgoing mail / noreply SMTP](mail-noreply-smtp.md) — working cPanel SMTP block; Replit web SAPI misses mid-session secrets + ${VAR} in .env fails silently (CLI OK, web 535).

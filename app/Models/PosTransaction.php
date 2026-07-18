@@ -20,6 +20,7 @@ class PosTransaction extends Model
         'receipt_printed_at', 'reprint_count',
         'notes',
         'is_archived', 'archived_at', 'archived_by_report_id',
+        'rider_id', 'order_type', 'delivery_status', 'rider_settlement_id', 'rider_settled_at',
     ];
 
     /**
@@ -61,6 +62,11 @@ class PosTransaction extends Model
     public function terminal()
     {
         return $this->belongsTo(PosTerminal::class, 'terminal_id');
+    }
+
+    public function rider()
+    {
+        return $this->belongsTo(PosRider::class, 'rider_id');
     }
 
     public function items()

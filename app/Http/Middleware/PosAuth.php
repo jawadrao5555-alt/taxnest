@@ -102,6 +102,21 @@ class PosAuth
             }
         }
 
+        // Delivery Rider accounts (Jul 2026) are confined to the Rider portal —
+        // today's own deliveries + mark-delivered only. Limit-EXEMPT accounts
+        // created from the Riders page. NOTE: exact-prefix match — /pos/riders
+        // (admin CRUD) must NOT fall inside 'pos/rider' with a bare prefix test.
+        if (($user->pos_role ?? null) === 'pos_rider') {
+            $path = ltrim($request->path(), '/');
+            $allowed = $path === 'pos/rider'
+                || str_starts_with($path, 'pos/rider/')
+                || $path === 'pos/logout'
+                || $path === 'pos/login';
+            if (!$allowed) {
+                return redirect('/pos/rider');
+            }
+        }
+
         // Waiter accounts (P7, F6) are confined to the Waiter Tablet — order
         // composing + send-to-cashier only. Limit-EXEMPT team accounts.
         if (($user->pos_role ?? null) === 'pos_waiter') {

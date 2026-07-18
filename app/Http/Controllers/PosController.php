@@ -755,12 +755,25 @@ class PosController extends Controller
             : (float)($company->cashier_discount_limit ?? 50);
         $hasManagerPin = !empty($company->manager_override_pin);
 
+        // Delivery Riders (Jul 2026): active riders for the payment-modal picker.
+        // Delivery-feature gated — plain retail companies never ship the list.
+        $ridersForJs = [];
+        if (!empty($features->delivery) && \Illuminate\Support\Facades\Schema::hasTable('pos_riders')) {
+            $ridersForJs = \App\Models\PosRider::where('company_id', $companyId)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'phone'])
+                ->map(fn ($r) => ['id' => (int) $r->id, 'name' => (string) $r->name, 'phone' => $r->phone ? (string) $r->phone : null])
+                ->values()
+                ->all();
+        }
+
         return response(view('pos.universal', compact(
             'company', 'features', 'products', 'services', 'categories',
             'recipeLookup', 'tables', 'selectedTable', 'heldOrders',
             'customers', 'taxRate', 'taxRules', 'stockStatus', 'blockOutOfStock',
             'posRole', 'discountLimit', 'hasManagerPin', 'ingredientCosts',
-            'lowStockAlerts', 'inventoryEnabled', 'dealsForJs'
+            'lowStockAlerts', 'inventoryEnabled', 'dealsForJs', 'ridersForJs'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         ->header('Pragma', 'no-cache')
@@ -1060,6 +1073,27 @@ class PosController extends Controller
             $initialPraStatus = null;
         }
 
+        // Delivery Riders (Jul 2026): snapshot order_type + optional rider on the
+        // bill. Rider only rides on Delivery orders; validated company-scoped +
+        // active (invalid ids silently dropped — never block a payment). Purely
+        // additive — the three-branch invoice_mode logic above is untouched.
+        $riderColumnsExist = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id');
+        $orderTypeSnapshot = $request->filled('order_type')
+            ? substr((string) $request->input('order_type'), 0, 20)
+            : null;
+        $riderId = null;
+        if ($riderColumnsExist && $orderTypeSnapshot === 'delivery' && $request->filled('rider_id')) {
+            $riderId = \App\Models\PosRider::where('company_id', $companyId)
+                ->where('id', (int) $request->input('rider_id'))
+                ->where('is_active', true)
+                ->value('id');
+        }
+        $riderFields = $riderColumnsExist ? [
+            'order_type' => $orderTypeSnapshot,
+            'rider_id' => $riderId,
+            'delivery_status' => $riderId ? 'assigned' : null,
+        ] : [];
+
         DB::beginTransaction();
         try {
             $draftId = $request->input('draft_id');
@@ -1111,7 +1145,7 @@ class PosController extends Controller
                     'locked_by_terminal_id' => null,
                     'lock_time' => null,
                     'notes' => $request->input('kitchen_notes'),
-                ]);
+                ] + $riderFields);
 
                 $transaction->items()->delete();
             } else {
@@ -1151,7 +1185,7 @@ class PosController extends Controller
                     'offline_uuid' => $offlineUuidColumnExists ? $offlineUuid : null,
                     'created_by' => auth('pos')->id(),
                     'notes' => $request->input('kitchen_notes'),
-                ]);
+                ] + $riderFields);
             }
 
             foreach ($companyItems as $ri) {
@@ -5847,7 +5881,11 @@ class PosController extends Controller
 
         $analytics = $this->buildDayCloseAnalytics($companyId, $date, $transactions, $company);
 
-        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'analytics'));
+        // Delivery Riders (Jul 2026): live rider cash figures for the recon preview
+        // (unsettled rider cash is OUT of the drawer; earlier-day settlements are IN).
+        $riderFigures = $this->buildRiderDayFigures($companyId, $date);
+
+        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'analytics', 'riderFigures'));
     }
 
     public function closeDayReport(Request $request)
@@ -6311,7 +6349,77 @@ class PosController extends Controller
      *
      * @return array{status:string,report:?\App\Models\PosDayCloseReport,archived:int,deleted:int,report_number:?string}
      *         status is one of 'created' | 'exists' | 'empty'.
+     *
+     * Delivery Riders (Jul 2026) — helper below: per-day rider figures for the Z-report.
+     *
+     * cash_out = TODAY's PRA-set cash delivery bills still unsettled at close —
+     *            that cash sits with the rider, NOT in the drawer.
+     * cash_in  = settlements received TODAY for EARLIER days' PRA-set cash bills —
+     *            cash that entered the drawer today but is not in today's cash sales.
+     * Both stay PRA-set (invoice_mode 'pra'/NULL) for consistency with the stored
+     * cash_amount; the per-rider rows cover ALL rider bills of the day (operational
+     * truth for the shop). Schema-guarded — returns inactive on prod mid-deploy.
      */
+    private function buildRiderDayFigures(int $companyId, string $date): array
+    {
+        $empty = ['active' => false, 'riders' => [], 'cash_out' => 0.0, 'cash_in' => 0.0];
+        try {
+            if (!\Schema::hasTable('pos_riders') || !\Schema::hasColumn('pos_transactions', 'rider_id')) {
+                return $empty;
+            }
+
+            $dayBills = PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->whereDate('created_at', $date)
+                ->whereNotNull('rider_id')
+                ->get();
+
+            $cashIn = (float) PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->whereNotNull('rider_id')
+                ->where('payment_method', 'cash')
+                ->whereNotNull('rider_settlement_id')
+                ->whereDate('rider_settled_at', $date)
+                ->whereDate('created_at', '<', $date)
+                ->where(function ($q) {
+                    $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+                })
+                ->sum('total_amount');
+
+            if ($dayBills->isEmpty() && $cashIn == 0.0) {
+                return $empty;
+            }
+
+            $isOpenCash = fn ($t) => $t->payment_method === 'cash'
+                && !$t->rider_settlement_id
+                && $t->delivery_status !== 'returned';
+
+            $cashOut = (float) $dayBills
+                ->filter(fn ($t) => ($t->invoice_mode === 'pra' || $t->invoice_mode === null) && $isOpenCash($t))
+                ->sum('total_amount');
+
+            $riderNames = \App\Models\PosRider::where('company_id', $companyId)
+                ->whereIn('id', $dayBills->pluck('rider_id')->unique())
+                ->pluck('name', 'id');
+            $riders = [];
+            foreach ($dayBills->groupBy('rider_id') as $rid => $rows) {
+                $riders[] = [
+                    'name' => $riderNames[$rid] ?? ('Rider #' . $rid),
+                    'deliveries' => $rows->count(),
+                    'delivered' => $rows->where('delivery_status', 'delivered')->count(),
+                    'returned' => $rows->where('delivery_status', 'returned')->count(),
+                    'cash_total' => round((float) $rows->filter(fn ($t) => $t->payment_method === 'cash' && $t->delivery_status !== 'returned')->sum('total_amount'), 2),
+                    'cash_pending' => round((float) $rows->filter($isOpenCash)->sum('total_amount'), 2),
+                ];
+            }
+
+            return ['active' => true, 'riders' => $riders, 'cash_out' => round($cashOut, 2), 'cash_in' => round($cashIn, 2)];
+        } catch (\Throwable $e) {
+            // Rider figures are reporting sugar — never let them break day-close.
+            return $empty;
+        }
+    }
+
     public function performDayClose(int $companyId, string $date, ?int $closedBy, ?string $notes = null, ?array $cashRecon = null): array
     {
         $existing = PosDayCloseReport::where('company_id', $companyId)
@@ -6393,13 +6501,20 @@ class PosController extends Controller
             'notes' => $notes,
         ];
 
-        // Cash reconciliation (Z-report): expected = opening float + cash sales;
+        // Delivery Riders (Jul 2026): rider cash figures for this day — computed
+        // BEFORE the wash so archived/deleted local bills still count.
+        $riderFigures = $this->buildRiderDayFigures($companyId, $date);
+
+        // Cash reconciliation (Z-report): expected = opening float + cash sales
+        // − rider cash still out with riders (unsettled today's cash deliveries)
+        // + rider cash received today for earlier days' bills;
         // variance = counted − expected. Columns are nullable + schema-guarded
         // (prod drift self-heal) — auto midnight close passes no $cashRecon.
         if ($cashRecon !== null && \Schema::hasColumn('pos_day_close_reports', 'opening_float')) {
             $openingFloat = $cashRecon['opening_float'] ?? null;
             $countedCash = $cashRecon['counted_cash'] ?? null;
-            $expectedCash = round((float) ($openingFloat ?? 0) + (float) $data['cash_amount'], 2);
+            $expectedCash = round((float) ($openingFloat ?? 0) + (float) $data['cash_amount']
+                - (float) $riderFigures['cash_out'] + (float) $riderFigures['cash_in'], 2);
             $data['opening_float'] = $openingFloat;
             $data['counted_cash'] = $countedCash;
             $data['expected_cash'] = $expectedCash;
@@ -6427,11 +6542,17 @@ class PosController extends Controller
             ? ($company->pos_dayclose_final_local_action ?? 'save') : 'save';
         $spendPersist = (bool) ($company->pos_customer_spend_persist ?? true);
 
+        // Rider wash DELETE-guard (Jul 2026): a cash delivery bill whose rider has
+        // NOT settled yet is a live khata entry — permanent delete would erase the
+        // proof of what the rider owes. Those bills get ARCHIVED instead (recoverable,
+        // khata queries use withoutGlobalScope so they still count). Schema-guarded.
+        $riderGuardReady = \Schema::hasColumn('pos_transactions', 'rider_id');
+
         $archivedCount = 0;
         $deletedCount = 0;
         $report = null;
         $localSummary = [];
-        \DB::transaction(function () use ($data, $companyId, $date, $provAction, $finalAction, $spendPersist, &$archivedCount, &$deletedCount, &$report, &$localSummary) {
+        \DB::transaction(function () use ($data, $companyId, $date, $provAction, $finalAction, $spendPersist, $riderGuardReady, $riderFigures, &$archivedCount, &$deletedCount, &$report, &$localSummary) {
             $report = PosDayCloseReport::create($data);
 
             // BACKLOG SWEEP (owner rule Jul 2026): wash covers bills up to AND
@@ -6491,6 +6612,32 @@ class PosController extends Controller
                 ];
                 if ($rows->isEmpty()) {
                     continue;
+                }
+                // Rider DELETE-guard: unsettled cash delivery bills are ARCHIVED
+                // instead of deleted (khata proof survives). Settled / returned /
+                // non-cash rider bills wash normally.
+                if ($set['action'] === 'delete' && $riderGuardReady) {
+                    $riderGuarded = $rows->filter(fn ($t) => $t->rider_id
+                        && $t->payment_method === 'cash'
+                        && !$t->rider_settlement_id
+                        && $t->delivery_status !== 'returned');
+                    if ($riderGuarded->isNotEmpty()) {
+                        $archivedCount += PosTransaction::withoutGlobalScope('hide_archived')
+                            ->whereIn('id', $riderGuarded->pluck('id')->all())
+                            ->update([
+                                'is_archived' => true,
+                                'archived_at' => now(),
+                                'archived_by_report_id' => $report->id,
+                            ]);
+                        $localSummary[$billKind]['rider_guarded'] = $riderGuarded->count();
+                        $rows = $rows->reject(fn ($t) => $t->rider_id
+                            && $t->payment_method === 'cash'
+                            && !$t->rider_settlement_id
+                            && $t->delivery_status !== 'returned');
+                        if ($rows->isEmpty()) {
+                            continue;
+                        }
+                    }
                 }
                 if ($set['action'] === 'delete') {
                     if ($spendPersist) {
@@ -6558,6 +6705,16 @@ class PosController extends Controller
                 $report->forceFill(['local_summary' => $localSummary])->save();
             } catch (\Throwable $e) {
                 // column missing pre-migration — report simply has no wash detail
+            }
+
+            // Delivery Riders (Jul 2026): rider day detail on the Z-report. Same
+            // schema-drift try/catch pattern — never fail the close over reporting.
+            if (!empty($riderFigures['active'])) {
+                try {
+                    $report->forceFill(['rider_summary' => $riderFigures])->save();
+                } catch (\Throwable $e) {
+                    // rider_summary column missing pre-migration — skip detail
+                }
             }
         });
 

@@ -5826,8 +5826,11 @@ class PosController extends Controller
             'total_tax' => $transactions->sum('tax_amount'),
             'total_amount' => $transactions->sum('total_amount'),
             'cash_amount' => $transactions->where('payment_method', 'cash')->sum('total_amount'),
-            'card_amount' => $transactions->where('payment_method', 'card')->sum('total_amount'),
-            'other_amount' => $transactions->whereNotIn('payment_method', ['cash', 'card'])->sum('total_amount'),
+            // Card bucket must include the stored aliases: universal-screen 'card'
+            // is normalized to 'debit_card' before saving, so matching only 'card'
+            // would always report Rs 0 card sales (and dump them into "Other").
+            'card_amount' => $transactions->whereIn('payment_method', ['card', 'debit_card', 'credit_card'])->sum('total_amount'),
+            'other_amount' => $transactions->whereNotIn('payment_method', ['cash', 'card', 'debit_card', 'credit_card'])->sum('total_amount'),
             'first_invoice' => $transactions->first(),
             'last_invoice' => $transactions->last(),
         ];
@@ -6491,8 +6494,10 @@ class PosController extends Controller
             'total_tax' => $transactions->sum('tax_amount'),
             'total_amount' => $transactions->sum('total_amount'),
             'cash_amount' => $transactions->where('payment_method', 'cash')->sum('total_amount'),
-            'card_amount' => $transactions->where('payment_method', 'card')->sum('total_amount'),
-            'other_amount' => $transactions->whereNotIn('payment_method', ['cash', 'card'])->sum('total_amount'),
+            // Card bucket includes stored aliases ('card' → 'debit_card' normalization)
+            // — matching only 'card' reported Rs 0 card sales on the Z-report.
+            'card_amount' => $transactions->whereIn('payment_method', ['card', 'debit_card', 'credit_card'])->sum('total_amount'),
+            'other_amount' => $transactions->whereNotIn('payment_method', ['cash', 'card', 'debit_card', 'credit_card'])->sum('total_amount'),
             'first_invoice_number' => $transactions->first()->invoice_number ?? null,
             'last_invoice_number' => $transactions->last()->invoice_number ?? null,
             'first_invoice_time' => $transactions->first()->created_at ?? null,

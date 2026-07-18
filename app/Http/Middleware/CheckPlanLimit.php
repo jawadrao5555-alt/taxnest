@@ -56,29 +56,44 @@ class CheckPlanLimit
         $exceeded = false;
         $limitName = '';
 
+        // Limit convention (matches PlanLimitService + the admin plan builder,
+        // which validates min:-1): NULL or any negative value = UNLIMITED.
+        // Only a limit >= 0 is a real cap — treating -1 as a cap blocked Pro
+        // plan companies (max_products = -1) from creating any products.
         switch ($resource) {
             case 'terminals':
-                if ($plan->max_terminals !== null) {
+                if ($plan->max_terminals !== null && (int) $plan->max_terminals >= 0) {
                     $current = PosTerminal::where('company_id', $companyId)->where('is_active', true)->count();
-                    if ($current >= $plan->max_terminals) {
+                    if ($current >= (int) $plan->max_terminals) {
                         $exceeded = true;
                         $limitName = "terminals (max: {$plan->max_terminals})";
                     }
                 }
                 break;
             case 'users':
-                if ($plan->max_users !== null) {
+                if ($plan->max_users !== null && (int) $plan->max_users >= 0) {
                     $current = User::where('company_id', $companyId)->count();
-                    if ($current >= $plan->max_users) {
+                    if ($current >= (int) $plan->max_users) {
                         $exceeded = true;
                         $limitName = "users (max: {$plan->max_users})";
                     }
                 }
                 break;
             case 'products':
-                if ($plan->max_products !== null) {
+                if ($plan->max_products !== null && (int) $plan->max_products >= 0) {
                     $current = Product::where('company_id', $companyId)->where('is_active', true)->count();
-                    if ($current >= $plan->max_products) {
+                    if ($current >= (int) $plan->max_products) {
+                        $exceeded = true;
+                        $limitName = "products (max: {$plan->max_products})";
+                    }
+                }
+                break;
+            case 'pos_products':
+                // POS catalog lives in pos_products — counting the DI `products`
+                // table here meant capped POS plans were never actually enforced.
+                if ($plan->max_products !== null && (int) $plan->max_products >= 0) {
+                    $current = \App\Models\PosProduct::where('company_id', $companyId)->where('is_active', true)->count();
+                    if ($current >= (int) $plan->max_products) {
                         $exceeded = true;
                         $limitName = "products (max: {$plan->max_products})";
                     }

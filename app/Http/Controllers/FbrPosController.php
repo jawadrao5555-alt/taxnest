@@ -314,8 +314,10 @@ class FbrPosController extends Controller
             'total_fbr_fee' => $transactions->sum('fbr_service_charge'),
             'total_amount' => $transactions->sum('total_amount'),
             'cash_amount' => $transactions->where('payment_method', 'cash')->sum('total_amount'),
-            'card_amount' => $transactions->where('payment_method', 'card')->sum('total_amount'),
-            'other_amount' => $transactions->whereNotIn('payment_method', ['cash', 'card'])->sum('total_amount'),
+            // Card bucket includes stored aliases (debit/credit card) so card sales
+            // never silently land in "Other" — mirrors the PRA POS day-close fix.
+            'card_amount' => $transactions->whereIn('payment_method', ['card', 'debit_card', 'credit_card'])->sum('total_amount'),
+            'other_amount' => $transactions->whereNotIn('payment_method', ['cash', 'card', 'debit_card', 'credit_card'])->sum('total_amount'),
             'first_invoice_number' => $transactions->first()->invoice_number ?? null,
             'last_invoice_number' => $transactions->last()->invoice_number ?? null,
             'first_invoice_time' => $transactions->first()->created_at ?? null,
@@ -2311,8 +2313,10 @@ class FbrPosController extends Controller
             'total_fbr_fee' => $transactions->sum('fbr_service_charge'),
             'total_amount' => $transactions->sum('total_amount'),
             'cash_amount' => $transactions->where('payment_method', 'cash')->sum('total_amount'),
-            'card_amount' => $transactions->where('payment_method', 'card')->sum('total_amount'),
-            'other_amount' => $transactions->whereNotIn('payment_method', ['cash', 'card'])->sum('total_amount'),
+            // Card bucket includes stored aliases (debit/credit card) so card sales
+            // never silently land in "Other" — mirrors the PRA POS day-close fix.
+            'card_amount' => $transactions->whereIn('payment_method', ['card', 'debit_card', 'credit_card'])->sum('total_amount'),
+            'other_amount' => $transactions->whereNotIn('payment_method', ['cash', 'card', 'debit_card', 'credit_card'])->sum('total_amount'),
             'first_invoice' => $transactions->first(),
             'last_invoice' => $transactions->last(),
         ];

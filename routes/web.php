@@ -534,7 +534,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::post('/public-profile/menu', [\App\Http\Controllers\PublicProfileController::class, 'saveMenu'])->name('pos.public-profile.menu');
         Route::match(['get', 'post'], '/receipt-settings', [PosController::class, 'receiptSettings'])->name('pos.receipt-settings');
         Route::match(['get', 'post'], '/printer-settings', [PosController::class, 'printerSettings'])->name('pos.printer-settings');
-        Route::post('/products', [PosController::class, 'storeProduct'])->name('pos.products.store')->middleware('plan.limit:products');
+        Route::post('/products', [PosController::class, 'storeProduct'])->name('pos.products.store')->middleware('plan.limit:pos_products');
         Route::get('/products/template', [PosController::class, 'downloadProductTemplate'])->name('pos.products.template');
         Route::post('/products/import', [PosController::class, 'importProducts'])->name('pos.products.import');
         Route::post('/products/bulk', [PosController::class, 'bulkProductAction'])->name('pos.products.bulk');

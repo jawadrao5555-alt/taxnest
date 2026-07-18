@@ -799,7 +799,41 @@ class AdminCompanyController extends Controller
     {
         $company = Company::onlyTrashed()->findOrFail($id);
         $companyName = $company->name;
-        $company->forceDelete();
+
+        // Purge company-scoped OPERATIONAL rows in tables that have no DB-level
+        // company FK cascade (newer tables were created without the FK, so a
+        // hard delete used to leave orphan rows behind). Deliberately EXCLUDED:
+        // audit_logs (immutable audit chain), registered_credentials (ledger
+        // that blocks re-registration), hs_* logs (global HS intelligence).
+        // Schema guards keep this safe during the deploy-before-migrate window.
+        $orphanTables = [
+            'pos_riders', 'pos_rider_settlements', 'pos_day_close_reports',
+            'pos_deals', 'pos_stations', 'pos_menu_items', 'pos_print_jobs',
+            'pos_customer_addresses', 'pos_customer_spend_snapshots',
+            'fbr_day_close_reports', 'fbr_pos_held_sales',
+            'fbr_pos_loyalty_ledger', 'fbr_pos_loyalty_settings',
+            'fbr_pos_promotions', 'fbr_pos_shifts', 'fbr_pos_terminals',
+            'push_subscriptions', 'payment_proofs',
+        ];
+        DB::transaction(function () use ($orphanTables, $id, $company) {
+            // pos_deal_items hangs off pos_deals (deal_id, no company_id) — purge
+            // by parent deal ids BEFORE the deals themselves are removed.
+            if (\Illuminate\Support\Facades\Schema::hasTable('pos_deals')
+                && \Illuminate\Support\Facades\Schema::hasTable('pos_deal_items')) {
+                $dealIds = DB::table('pos_deals')->where('company_id', $id)->pluck('id');
+                if ($dealIds->isNotEmpty()) {
+                    DB::table('pos_deal_items')->whereIn('deal_id', $dealIds)->delete();
+                }
+            }
+            foreach ($orphanTables as $tbl) {
+                if (\Illuminate\Support\Facades\Schema::hasTable($tbl)
+                    && \Illuminate\Support\Facades\Schema::hasColumn($tbl, 'company_id')) {
+                    DB::table($tbl)->where('company_id', $id)->delete();
+                }
+            }
+
+            $company->forceDelete();
+        });
         AdminAuditLog::log(auth('admin')->id(), 'Company permanently deleted', 'Company', $id, ['name' => $companyName]);
         return redirect()->route('saas.admin.companies.bin')->with('success', "Company '{$companyName}' has been permanently deleted.");
     }

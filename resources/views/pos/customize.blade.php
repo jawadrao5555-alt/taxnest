@@ -7,8 +7,14 @@
         // Tax-Inclusive Pricing (Menu-Rate-Final) — effective rates via PosTaxRule
         // helpers ONLY (global defaults + per-company overrides), never raw table reads.
         $taxIncOn  = (bool) ($company->pos_tax_inclusive ?? false);
+        // 3-mode tax pricing (Jul 2026): exclusive | inclusive | inclusive_card_save
+        // (helper validates + falls back to the legacy bool if the column is missing).
+        $taxMode   = $company->posTaxPricingMode();
         $cashRate  = \App\Models\PosTaxRule::getRateForMethod('cash', $company);
         $cardRate  = \App\Models\PosTaxRule::getRateForMethod('card', $company);
+        // Card-save example figures for the option card (Rs 590 menu price).
+        $csBase590 = 590 * 100 / (100 + $cashRate);
+        $csCard590 = round($csBase590 * (1 + $cardRate / 100));
 
         // Card sections — every POS feature reachable from this one hub.
         $sections = [
@@ -61,7 +67,7 @@
         ];
     @endphp
 
-    <div x-data="{ currentTheme: '{{ $company->pos_theme ?? 'purple' }}', guidedOn: {{ ($company->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }}, savingGuided: false, invOn: {{ $invOn ? 'true' : 'false' }}, savingInv: false, restockOn: {{ ($company->pos_restock_on_void ?? true) ? 'true' : 'false' }}, savingRestock: false, autoDaycloseOn: {{ ($company->pos_auto_dayclose_24h ?? false) ? 'true' : 'false' }}, savingDayclose: false, kdsAutoOn: {{ ($company->pos_kds_auto_print ?? false) ? 'true' : 'false' }}, savingKdsAuto: false, lbFinal: '{{ in_array($company->pos_dayclose_final_local_action ?? 'save', ['save','delete'], true) ? ($company->pos_dayclose_final_local_action ?? 'save') : 'save' }}', lbProv: '{{ in_array($company->pos_dayclose_provisional_action ?? 'save', ['save','delete'], true) ? ($company->pos_dayclose_provisional_action ?? 'save') : 'save' }}', lbPersist: {{ ($company->pos_customer_spend_persist ?? true) ? 'true' : 'false' }}, savingLB: false, taxInc: {{ $taxIncOn ? 'true' : 'false' }}, savingTaxInc: false, calcPrice: 590, cashRate: {{ (float) $cashRate }}, cardRate: {{ (float) $cardRate }}, calc(rate) { const p = parseFloat(this.calcPrice) || 0; if (this.taxInc) { const tax = p * rate / (100 + rate); return { base: p - tax, tax: tax, total: Math.round(p) }; } const tax = p * rate / 100; return { base: p, tax: tax, total: Math.round(p + tax) }; }, fmt(n) { return 'Rs ' + (Math.round(n * 100) / 100).toLocaleString(); }, setTaxMode(inc) { if (this.taxInc === inc || this.savingTaxInc) return; const prev = this.taxInc; this.taxInc = inc; this.savingTaxInc = true; fetch('/pos/settings/tax-pricing-mode', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({inclusive:inc})}).then(r=>r.json()).then(d=>{ if (!d || d.success !== true) { this.taxInc = prev; alert((d && d.message) || 'Setting save nahi hui — dobara koshish karein.'); } }).catch(()=>{ this.taxInc = prev; alert('Setting save nahi hui — dobara koshish karein.'); }).finally(()=>{ this.savingTaxInc = false; }); }, saveLB() { this.savingLB = true; fetch('/pos/settings/local-billing', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({final_action:this.lbFinal, provisional_action:this.lbProv, spend_persist:this.lbPersist})}).then(r=>r.json()).catch(()=>{}).finally(()=>{ this.savingLB=false; }) } }"
+    <div x-data="{ currentTheme: '{{ $company->pos_theme ?? 'purple' }}', guidedOn: {{ ($company->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }}, savingGuided: false, invOn: {{ $invOn ? 'true' : 'false' }}, savingInv: false, restockOn: {{ ($company->pos_restock_on_void ?? true) ? 'true' : 'false' }}, savingRestock: false, autoDaycloseOn: {{ ($company->pos_auto_dayclose_24h ?? false) ? 'true' : 'false' }}, savingDayclose: false, kdsAutoOn: {{ ($company->pos_kds_auto_print ?? false) ? 'true' : 'false' }}, savingKdsAuto: false, lbFinal: '{{ in_array($company->pos_dayclose_final_local_action ?? 'save', ['save','delete'], true) ? ($company->pos_dayclose_final_local_action ?? 'save') : 'save' }}', lbProv: '{{ in_array($company->pos_dayclose_provisional_action ?? 'save', ['save','delete'], true) ? ($company->pos_dayclose_provisional_action ?? 'save') : 'save' }}', lbPersist: {{ ($company->pos_customer_spend_persist ?? true) ? 'true' : 'false' }}, savingLB: false, taxMode: '{{ $taxMode }}', savingTaxInc: false, calcPrice: 590, cashRate: {{ (float) $cashRate }}, cardRate: {{ (float) $cardRate }}, get taxInc() { return this.taxMode !== 'exclusive'; }, calc(rate) { const p = parseFloat(this.calcPrice) || 0; if (this.taxMode === 'inclusive_card_save') { const base = p * 100 / (100 + this.cashRate); const tax = base * rate / 100; return { base: base, tax: tax, total: Math.round(base + tax) }; } if (this.taxInc) { const tax = p * rate / (100 + rate); return { base: p - tax, tax: tax, total: Math.round(p) }; } const tax = p * rate / 100; return { base: p, tax: tax, total: Math.round(p + tax) }; }, fmt(n) { return 'Rs ' + (Math.round(n * 100) / 100).toLocaleString(); }, setTaxMode(mode) { if (this.taxMode === mode || this.savingTaxInc) return; const prev = this.taxMode; this.taxMode = mode; this.savingTaxInc = true; fetch('/pos/settings/tax-pricing-mode', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({mode:mode})}).then(r=>r.json()).then(d=>{ if (!d || d.success !== true) { this.taxMode = prev; alert((d && d.message) || 'Setting save nahi hui — dobara koshish karein.'); } }).catch(()=>{ this.taxMode = prev; alert('Setting save nahi hui — dobara koshish karein.'); }).finally(()=>{ this.savingTaxInc = false; }); }, saveLB() { this.savingLB = true; fetch('/pos/settings/local-billing', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({final_action:this.lbFinal, provisional_action:this.lbProv, spend_persist:this.lbPersist})}).then(r=>r.json()).catch(()=>{}).finally(()=>{ this.savingLB=false; }) } }"
          class="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
 
         {{-- ═══════════ HERO ═══════════ --}}
@@ -195,29 +201,41 @@
                     <span class="shrink-0 text-[10px] font-semibold text-gray-400" x-show="savingTaxInc" x-cloak>Saving…</span>
                 </div>
 
-                <div class="grid sm:grid-cols-2 gap-3">
+                <div class="grid sm:grid-cols-3 gap-3">
                     {{-- Option 1: Standard (tax add-on) --}}
-                    <button type="button" @click="setTaxMode(false)"
+                    <button type="button" @click="setTaxMode('exclusive')"
                         class="text-left rounded-xl border-2 p-4 transition"
-                        :class="!taxInc ? 'border-teal-600 bg-teal-50 dark:bg-teal-900/20' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-gray-300'">
+                        :class="taxMode === 'exclusive' ? 'border-teal-600 bg-teal-50 dark:bg-teal-900/20' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-gray-300'">
                         <div class="flex items-center justify-between mb-1.5">
                             <p class="text-sm font-extrabold text-gray-900 dark:text-white">Standard — Tax Upar Se</p>
-                            <span x-show="!taxInc" x-cloak class="px-2 py-0.5 rounded-full bg-teal-600 text-white text-[10px] font-bold">ACTIVE</span>
+                            <span x-show="taxMode === 'exclusive'" x-cloak class="px-2 py-0.5 rounded-full bg-teal-600 text-white text-[10px] font-bold">ACTIVE</span>
                         </div>
                         <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed">Menu price par tax alag se add hota hai. Customer menu price se zyada ada karta hai.</p>
                         <p class="text-[11px] font-semibold text-gray-700 dark:text-gray-300 mt-2">Misal: Rs 500 + {{ rtrim(rtrim(number_format($cashRate, 2), '0'), '.') }}% tax = customer <span class="font-extrabold">Rs {{ number_format(round(500 + 500 * $cashRate / 100)) }}</span> deta hai</p>
                     </button>
 
-                    {{-- Option 2: Tax-Inclusive (Menu-Rate-Final) --}}
-                    <button type="button" @click="setTaxMode(true)"
+                    {{-- Option 2: Tax-Inclusive (Menu-Rate-Final — same total on cash & card) --}}
+                    <button type="button" @click="setTaxMode('inclusive')"
                         class="text-left rounded-xl border-2 p-4 transition"
-                        :class="taxInc ? 'border-teal-600 bg-teal-50 dark:bg-teal-900/20' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-gray-300'">
+                        :class="taxMode === 'inclusive' ? 'border-teal-600 bg-teal-50 dark:bg-teal-900/20' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-gray-300'">
                         <div class="flex items-center justify-between mb-1.5">
-                            <p class="text-sm font-extrabold text-gray-900 dark:text-white">Tax-Inclusive — Menu Rate Final</p>
-                            <span x-show="taxInc" x-cloak class="px-2 py-0.5 rounded-full bg-teal-600 text-white text-[10px] font-bold">ACTIVE</span>
+                            <p class="text-sm font-extrabold text-gray-900 dark:text-white">Menu Rate Final — Sab Same</p>
+                            <span x-show="taxMode === 'inclusive'" x-cloak class="px-2 py-0.5 rounded-full bg-teal-600 text-white text-[10px] font-bold">ACTIVE</span>
                         </div>
-                        <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed">Menu price hi final total hai — tax usi ke andar se nikalta hai. Customer wohi ada karta hai jo menu par likha hai.</p>
-                        <p class="text-[11px] font-semibold text-gray-700 dark:text-gray-300 mt-2">Misal: Rs 590 menu price = customer <span class="font-extrabold">Rs 590</span> hi deta hai (tax andar shamil)</p>
+                        <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed">Menu price hi final total hai — cash ho ya card, customer wohi ada karta hai jo menu par likha hai. Tax andar se nikalta hai.</p>
+                        <p class="text-[11px] font-semibold text-gray-700 dark:text-gray-300 mt-2">Misal: Rs 590 menu price = cash <span class="font-extrabold">Rs 590</span>, card bhi <span class="font-extrabold">Rs 590</span></p>
+                    </button>
+
+                    {{-- Option 3: Card-save (menu inclusive at CASH rate; card = base + card tax) --}}
+                    <button type="button" @click="setTaxMode('inclusive_card_save')"
+                        class="text-left rounded-xl border-2 p-4 transition"
+                        :class="taxMode === 'inclusive_card_save' ? 'border-teal-600 bg-teal-50 dark:bg-teal-900/20' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-gray-300'">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <p class="text-sm font-extrabold text-gray-900 dark:text-white">Menu Rate Final — Card Bachat</p>
+                            <span x-show="taxMode === 'inclusive_card_save'" x-cloak class="px-2 py-0.5 rounded-full bg-teal-600 text-white text-[10px] font-bold">ACTIVE</span>
+                        </div>
+                        <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed">Menu price cash ke hisaab se final hai. Card/digital par tax kam lagta hai, is liye customer ko card par bachat milti hai — receipt par "Card Discount" line dikhti hai.</p>
+                        <p class="text-[11px] font-semibold text-gray-700 dark:text-gray-300 mt-2">Misal: Rs 590 menu price = cash <span class="font-extrabold">Rs 590</span>, card sirf <span class="font-extrabold">Rs {{ number_format($csCard590) }}</span></p>
                     </button>
                 </div>
 
@@ -244,7 +262,8 @@
                             </div>
                         </template>
                     </div>
-                    <p class="text-[10px] text-gray-400 dark:text-gray-500 mt-2" x-show="taxInc" x-cloak>Tax-Inclusive mein cash ho ya card — customer ka total wohi menu price rehta hai; sirf andar ka base/tax split badalta hai.</p>
+                    <p class="text-[10px] text-gray-400 dark:text-gray-500 mt-2" x-show="taxMode === 'inclusive'" x-cloak>Tax-Inclusive mein cash ho ya card — customer ka total wohi menu price rehta hai; sirf andar ka base/tax split badalta hai.</p>
+                    <p class="text-[10px] text-gray-400 dark:text-gray-500 mt-2" x-show="taxMode === 'inclusive_card_save'" x-cloak>Card Bachat mode mein base price cash rate se nikalta hai — cash par customer menu price hi deta hai; card/digital par kam tax lagta hai to total menu price se kam banta hai (farq receipt par "Card Discount" ki soorat mein dikhta hai). Tax har soorat poora PRA ko jata hai.</p>
                 </div>
 
                 {{-- New-bills-only warning --}}

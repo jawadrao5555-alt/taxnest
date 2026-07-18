@@ -318,6 +318,10 @@
                 // Tax-Inclusive (Menu-Rate-Final): BILL SNAPSHOT flag — edits keep the
                 // bill's original pricing mode (backend updateTransaction is authoritative).
                 taxInclusive: {{ (bool) ($transaction->tax_inclusive ?? false) ? 'true' : 'false' }},
+                // Card-save snapshot (mode 3): menu rate the bill's base derives from.
+                // Edits keep the snapshot — method switch re-applies its OWN rate on
+                // the menu-rate base (mirrors backend updateTransaction).
+                taxMenuRate: {{ ($transaction->tax_menu_rate ?? null) !== null ? (float) $transaction->tax_menu_rate : 'null' }},
 
                 customerName: @json($transaction->customer_name ?? ''),
                 customerPhone: @json($transaction->customer_phone ?? ''),
@@ -411,11 +415,18 @@
 
                     this.afterDiscount = Math.round((this.subtotal - this.discountAmount) * 100) / 100;
                     if (this.taxInclusive) {
+                        if (this.taxMenuRate !== null && this.taxMenuRate > 0 && Math.abs(this.taxMenuRate - this.taxRate) >= 0.005) {
+                            // Card-save snapshot: base from the MENU rate, bill's own
+                            // (different) rate applied on top — cheaper total.
+                            this.taxAmount = Math.round(this.afterDiscount * this.taxRate / (100 + this.taxMenuRate) * 100) / 100;
+                            this.total = Math.round(this.afterDiscount * (100 + this.taxRate) / (100 + this.taxMenuRate));
+                        } else {
                         // Menu-Rate-Final: prices are tax-in — back-calculate the included
                         // tax; customer total = discounted menu sum (whole rupee), matching
                         // PosTaxMath on the backend.
                         this.taxAmount = Math.round(this.afterDiscount * this.taxRate / (100 + this.taxRate) * 100) / 100;
                         this.total = Math.round(this.afterDiscount);
+                        }
                     } else {
                         this.taxAmount = Math.round(this.afterDiscount * this.taxRate / 100 * 100) / 100;
                         this.total = Math.round((this.afterDiscount + this.taxAmount) * 100) / 100;

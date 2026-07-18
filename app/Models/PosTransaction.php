@@ -11,7 +11,7 @@ class PosTransaction extends Model
         'company_id', 'branch_id', 'terminal_id', 'invoice_number', 'invoice_mode', 'customer_id', 'customer_name', 'customer_phone',
         'delivery_address',
         'subtotal', 'discount_type', 'discount_value', 'discount_amount',
-        'tax_rate', 'tax_amount', 'exempt_amount', 'total_amount', 'tax_inclusive', 'payment_method',
+        'tax_rate', 'tax_amount', 'exempt_amount', 'total_amount', 'tax_inclusive', 'tax_menu_rate', 'payment_method',
         'cash_received', 'change_due',
         'status', 'locked_by_terminal_id', 'lock_time',
         'pra_invoice_number', 'pra_response_code', 'pra_status', 'submission_hash', 'pra_qr_code', 'created_by',
@@ -52,6 +52,7 @@ class PosTransaction extends Model
         'cash_received' => 'decimal:2',
         'change_due' => 'decimal:2',
         'tax_inclusive' => 'boolean',
+        'tax_menu_rate' => 'decimal:2',
         'lock_time' => 'datetime',
     ];
 

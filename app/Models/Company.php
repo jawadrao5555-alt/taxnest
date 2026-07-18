@@ -74,6 +74,7 @@ class Company extends Model
         'pos_tax_rate_cash',
         'pos_tax_rate_card',
         'pos_tax_inclusive',
+        'pos_tax_pricing_mode',
         'pos_setup_completed',
         'pos_use_legacy_restaurant',
         'fbr_universal_enabled',
@@ -311,6 +312,24 @@ class Company extends Model
     public function users()
     {
         return $this->hasMany(User::class);
+    }
+
+    /**
+     * Effective POS tax pricing mode: 'exclusive' | 'inclusive' | 'inclusive_card_save'.
+     * NULL / unknown / pre-migration column derives from the legacy
+     * pos_tax_inclusive boolean (which stays SYNCED — 1 for both inclusive
+     * variants — so every existing snapshot branch keeps working).
+     */
+    public function posTaxPricingMode(): string
+    {
+        $mode = null;
+        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_tax_pricing_mode')) {
+            $mode = $this->pos_tax_pricing_mode;
+        }
+        if (in_array($mode, ['exclusive', 'inclusive', 'inclusive_card_save'], true)) {
+            return $mode;
+        }
+        return ($this->pos_tax_inclusive ?? false) ? 'inclusive' : 'exclusive';
     }
 
     /**

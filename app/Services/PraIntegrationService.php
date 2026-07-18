@@ -78,6 +78,12 @@ class PraIntegrationService
         // TotalAmount = the inclusive line itself → bill sums to the menu total).
         // Column-missing prod drift → attribute reads null → false (exclusive math).
         $taxInclusive = (bool) ($transaction->tax_inclusive ?? false);
+        // Card-save (mode 3, owner Jul 2026): the bill's SNAPSHOT menu rate — base is
+        // divided out at the MENU (cash) rate, then the bill's own rate is charged on
+        // top (card bills cheaper). NULL / missing column = classic inclusive.
+        $menuRate = $taxInclusive && ($transaction->tax_menu_rate ?? null) !== null
+            ? (float) $transaction->tax_menu_rate
+            : null;
         $shareBase = $taxInclusive ? (float) $transaction->items->sum('subtotal') : $itemsSubtotal;
 
         $items = $transaction->items
@@ -85,7 +91,7 @@ class PraIntegrationService
                 return (float) $item->unit_price > 0 && (float) $item->quantity > 0 && !$item->is_tax_exempt;
             })
             ->values()
-            ->map(function ($item, $index) use ($shareBase, $totalDiscount, $taxRate, $taxInclusive) {
+            ->map(function ($item, $index) use ($shareBase, $totalDiscount, $taxRate, $taxInclusive, $menuRate) {
                 $qty = (float) $item->quantity;
                 $unitPrice = (float) $item->unit_price;
                 $lineSubtotal = (float) $item->subtotal;
@@ -97,7 +103,15 @@ class PraIntegrationService
                 }
                 $lineSaleValue = round($saleValuePerUnit * $qty, 2);
                 $itemTaxRate = $item->is_tax_exempt ? 0 : ($item->tax_rate ?? $taxRate);
-                if ($taxInclusive) {
+                if ($taxInclusive && $menuRate !== null && $menuRate > 0 && abs($menuRate - (float) $itemTaxRate) >= 0.005) {
+                    // Card-save: base divided out at the MENU rate, own rate charged on
+                    // top. TotalAmount MUST be SaleValue + TaxCharged (NOT menu money —
+                    // the customer pays the cheaper card total, bill must sum to it).
+                    $lineInclusive = $lineSaleValue;
+                    $lineSaleValue = round($lineInclusive * 100 / (100 + $menuRate), 2);
+                    $taxCharged = round($lineInclusive * $itemTaxRate / (100 + $menuRate), 2);
+                    $totalAmount = round($lineSaleValue + $taxCharged, 2);
+                } elseif ($taxInclusive) {
                     // $lineSaleValue here = INCLUSIVE line after discount (menu money).
                     $lineInclusive = $lineSaleValue;
                     $lineSaleValue = round($lineInclusive * 100 / (100 + $itemTaxRate), 2);

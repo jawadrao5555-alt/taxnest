@@ -6,7 +6,7 @@ description: Live POS test-company pattern — the temporary test company was DE
 # Live NestPOS test company pattern
 
 ## ACTIVE test company (18 Jul 2026, cleanup pending — follow-up task exists)
-- company_id 31 "TaxNest QA Test Shop", login qa.mrf.test@taxnest.com.pk / Admin@12345, NTN 7654321, phone 03457654321, Pro plan (id 11), retail. PRA reporting OFF, pos_tax_inclusive ON. Test bills: pos_transactions 420 (L-001 cash) + 421 (L-002 card), products 214/215 auto-created. Delete via the admin bin flow below when owner confirms testing done.
+- company_id 31 "TaxNest QA Test Shop", login qa.mrf.test@taxnest.com.pk (standard dev test password), NTN 7654321, phone 03457654321, Pro plan (id 11), retail. PRA reporting OFF, pos_tax_inclusive ON. Test bills: pos_transactions 420 (L-001 cash) + 421 (L-002 card), products 214/215 auto-created. Delete via the admin bin flow below when owner confirms testing done.
 - Registration trial-abuse guard rejects REUSED ntn/phone/email ("already been used to create an account") — deleted test companies' identifiers stay burned; always pick fresh ones.
 - Welcome form gotcha: `pos_ui_density` must be simple|standard|premium (anything else = silent validation fail → redirect loop back to ?welcome=1; no error visible to curl).
 

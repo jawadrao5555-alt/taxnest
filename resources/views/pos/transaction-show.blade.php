@@ -169,19 +169,35 @@
                     // (menu sum − included tax) so the report identity holds. For DISPLAY,
                     // show the menu-price subtotal (matches the item lines) + "incl." tax label.
                     $txInclusive = (bool) ($transaction->tax_inclusive ?? false);
-                    $txDisplaySubtotal = $txInclusive
-                        ? (float) $transaction->subtotal + (float) $transaction->tax_amount
-                        : (float) $transaction->subtotal;
+                    // Card-save (mode 3) card/digital bills: "Menu Total" = item sum
+                    // + explicit "Card Discount" saving line.
+                    $txMenuRate = $txInclusive ? ($transaction->tax_menu_rate ?? null) : null;
+                    $txCardSave = $txMenuRate !== null && (float) $txMenuRate > 0
+                        && abs((float) $txMenuRate - (float) $transaction->tax_rate) >= 0.005;
+                    $txDisplaySubtotal = $txCardSave
+                        ? (float) $transaction->items->sum('subtotal')
+                        : ($txInclusive
+                            ? (float) $transaction->subtotal + (float) $transaction->tax_amount
+                            : (float) $transaction->subtotal);
+                    $txCardSaving = $txCardSave
+                        ? max(0.0, round($txDisplaySubtotal - (float) $transaction->discount_amount - (float) $transaction->total_amount, 2))
+                        : 0.0;
                 @endphp
                 <div class="space-y-3 text-sm">
                     <div class="flex justify-between">
-                        <span class="text-gray-500">Subtotal</span>
+                        <span class="text-gray-500">{{ $txCardSave ? 'Menu Total' : 'Subtotal' }}</span>
                         <span class="text-gray-900 dark:text-white">PKR {{ number_format($txDisplaySubtotal, 2) }}</span>
                     </div>
                     @if($transaction->discount_amount > 0)
                     <div class="flex justify-between">
                         <span class="text-gray-500">Discount ({{ $transaction->discount_type === 'percentage' ? $transaction->discount_value . '%' : 'Fixed' }})</span>
                         <span class="text-red-600">-PKR {{ number_format($transaction->discount_amount, 2) }}</span>
+                    </div>
+                    @endif
+                    @if($txCardSave && $txCardSaving > 0.009)
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Card Discount</span>
+                        <span class="text-red-600">-PKR {{ number_format($txCardSaving, 2) }}</span>
                     </div>
                     @endif
                     <div class="flex justify-between">

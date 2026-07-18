@@ -611,9 +611,17 @@ class RestaurantPosController extends Controller
         // store the header in ex-tax-consistent semantics (see PosTaxMath docblock).
         // Snapshot column guard mirrors PosController::storeInvoice.
         $taxInclusiveColumnExists = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'tax_inclusive');
-        $taxInclusive = $taxInclusiveColumnExists && (bool) ($company->pos_tax_inclusive ?? false);
+        $pricingMode = $company->posTaxPricingMode();
+        $taxInclusive = $taxInclusiveColumnExists && in_array($pricingMode, ['inclusive', 'inclusive_card_save'], true);
+        // Card-save (mode 3): menu inclusive at the CASH rate, this bill's own
+        // method rate applied on the derived base (mirrors PosController::storeInvoice).
+        $menuRateColumnExists = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'tax_menu_rate');
+        $menuRate = null;
+        if ($taxInclusive && $pricingMode === 'inclusive_card_save' && $menuRateColumnExists) {
+            $menuRate = (float) PosTaxRule::getRateForMethod('cash', $company);
+        }
         if ($taxInclusive) {
-            $inc = \App\Services\PosTaxMath::inclusiveHeader((float) $subtotal, (float) $taxableSubtotal, (float) $discountAmount, (float) $taxRate);
+            $inc = \App\Services\PosTaxMath::inclusiveHeader((float) $subtotal, (float) $taxableSubtotal, (float) $discountAmount, (float) $taxRate, $menuRate);
             $taxAmount = $inc['tax_amount'];
             $totalAmount = $inc['total_amount'];
         } else {
@@ -707,6 +715,9 @@ class RestaurantPosController extends Controller
             if ($taxInclusiveColumnExists) {
                 $transactionData['tax_inclusive'] = $taxInclusive;
             }
+            if ($menuRateColumnExists) {
+                $transactionData['tax_menu_rate'] = $menuRate;
+            }
             // Delivery Riders (Jul 2026): snapshot the held order's type + optional
             // rider from the PAY request. Delivery-only; invalid rider ids silently
             // dropped (never block a payment). invoice_mode three-branch untouched.
@@ -727,7 +738,7 @@ class RestaurantPosController extends Controller
             foreach ($order->items as $item) {
                 $lineAfterOrderDisc = $subtotal > 0 ? round($item->subtotal * max(0, $discountRatio), 2) : $item->subtotal;
                 $lineTax = $item->is_tax_exempt ? 0 : ($taxInclusive
-                    ? \App\Services\PosTaxMath::inclusiveLineTax((float) $lineAfterOrderDisc, (float) $taxRate)
+                    ? \App\Services\PosTaxMath::inclusiveLineTax((float) $lineAfterOrderDisc, (float) $taxRate, $menuRate)
                     : round($lineAfterOrderDisc * $taxRate / 100, 2));
                 $itemQty = max(1, (int) $item->quantity);
                 PosTransactionItem::create([

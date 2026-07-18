@@ -1096,6 +1096,8 @@ window.addEventListener('popstate', function() {
                      from payOrder stays authoritative on the receipt). --}}
                 <p class="text-3xl font-extrabold mt-2 text-purple-600 dark:text-purple-400" x-text="'Rs. ' + Number(payModalTotal).toLocaleString()"></p>
                 <p x-show="!payingHeldOrderId && Math.abs(roundOff) > 0.001" class="text-[10px] text-gray-400 mt-0.5" x-text="(roundOff >= 0 ? 'rounded up by ' : 'rounded down by ') + 'Rs. ' + Math.abs(roundOff).toFixed(2)"></p>
+                {{-- Card-save mode: live bachat hint — total above is method-aware. --}}
+                <p x-show="modalCardSaving > 0" x-cloak class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-1" x-text="payMethodIndex === 1 ? ('Card Discount: Rs. ' + Number(modalCardSaving).toLocaleString() + ' bachat mil gayi') : ('Card se dein to Rs. ' + Number(modalCardSaving).toLocaleString() + ' bachat')"></p>
                 <p x-show="stockError" class="text-xs text-red-500 mt-2 bg-red-50 dark:bg-red-900/20 p-2 rounded-lg" x-text="stockError"></p>
                 <p x-show="submitting" class="text-xs text-purple-500 mt-2">Processing payment...</p>
             </div>
@@ -1122,7 +1124,7 @@ window.addEventListener('popstate', function() {
                     <svg x-show="submitting" class="w-8 h-8 mx-auto mb-1 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                     <svg x-show="!submitting" class="w-8 h-8 mx-auto mb-1 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                     <span class="text-sm font-bold text-blue-700 dark:text-blue-400" x-text="submitting ? 'Processing...' : 'Card'"></span>
-                    <span class="block text-[10px] font-semibold mt-0.5 text-blue-600/60" x-text="(taxInclusive ? 'Incl. tax ' : 'Tax: ') + (taxRules['debit_card'] || taxRules['card'] || 8) + '%'"></span>
+                    <span class="block text-[10px] font-semibold mt-0.5 text-blue-600/60" x-text="(taxInclusive ? 'Incl. tax ' : 'Tax: ') + (taxRules['debit_card'] || taxRules['card'] || 8) + '%' + (modalCardSaving > 0 ? ' • Save Rs. ' + Number(modalCardSaving).toLocaleString() : '')"></span>
                     <kbd x-show="!submitting" class="block mt-0.5 text-[9px] font-mono text-blue-500/60">Press 2</kbd>
                 </button>
             </div>
@@ -2260,6 +2262,27 @@ function restaurantPos() {
         // price IS the grand total — tax shown is the INCLUDED portion, total never
         // adds tax on top. Mirrors PosTaxMath backend math.
         taxInclusive: {{ ($company->pos_tax_inclusive ?? false) ? 'true' : 'false' }},
+        // Card-save mode (inclusive_card_save, Jul 2026): menu price is inclusive at
+        // the CASH rate; card/digital bills = same base + their OWN (lower) rate, so
+        // the customer saves on card. taxMenuRate = cash rate when mode 3, else null.
+        taxMenuRate: {{ $company->posTaxPricingMode() === 'inclusive_card_save' ? (float) \App\Models\PosTaxRule::getRateForMethod('cash', $company) : 'null' }},
+        cardSaveMode() { return this.taxInclusive && this.taxMenuRate !== null && this.taxMenuRate > 0; },
+        // Total for a given rate under card-save: base derived at the MENU (cash)
+        // rate, chosen method's rate applied on top. Exempt items pass through.
+        cardSaveTotalForRate(rate) {
+            const after = Math.max(0, this.r2(this.effectiveSubtotal - this.discountAmount));
+            if (Math.abs(this.taxMenuRate - rate) < 0.005) return Math.round(after);
+            const tia = this.taxableSubtotal;
+            const exemptShare = Math.max(0, this.r2(after - tia));
+            return Math.round(exemptShare + tia * (100 + rate) / (100 + this.taxMenuRate));
+        },
+        get modalCardSaving() {
+            if (!this.cardSaveMode()) return 0;
+            const cardRate = this.taxRules['debit_card'] || this.taxRules['card'] || 8;
+            const cashT = this.payingHeldOrderId ? this.heldOrderEstimate('cash') : this.cardSaveTotalForRate(this.taxMenuRate);
+            const cardT = this.payingHeldOrderId ? this.heldOrderEstimate('card') : this.cardSaveTotalForRate(cardRate);
+            return Math.max(0, cashT - cardT);
+        },
         posRole: '{{ $posRole }}',
         discountLimit: {{ (float) ($discountLimit ?? 0) }},
         hasManagerPin: {{ $hasManagerPin ? 'true' : 'false' }},
@@ -2513,12 +2536,27 @@ function restaurantPos() {
         },
         get taxAmount() {
             // Inclusive mode: included portion of the taxable menu money (r/(100+r)).
-            if (this.taxInclusive) return this.r2(this.taxableSubtotal * this.taxRate / (100 + this.taxRate));
+            // Card-save: base always derives from the MENU (cash) rate, the bill's
+            // own rate applies on top — mirrors PosTaxMath backend math.
+            if (this.taxInclusive) {
+                if (this.cardSaveMode() && Math.abs(this.taxMenuRate - this.taxRate) >= 0.005) {
+                    return this.r2(this.taxableSubtotal * this.taxRate / (100 + this.taxMenuRate));
+                }
+                return this.r2(this.taxableSubtotal * this.taxRate / (100 + this.taxRate));
+            }
             return this.r2(this.taxableSubtotal * this.taxRate / 100);
         },
         get totalAmount() {
             // Inclusive mode: menu prices already contain tax — never add it on top.
-            if (this.taxInclusive) return Math.max(0, this.r2(this.effectiveSubtotal - this.discountAmount));
+            // Card-save with a DIFFERENT rate than the menu rate: cheaper total.
+            if (this.taxInclusive) {
+                if (this.cardSaveMode() && Math.abs(this.taxMenuRate - this.taxRate) >= 0.005) {
+                    const after = Math.max(0, this.r2(this.effectiveSubtotal - this.discountAmount));
+                    const exemptShare = Math.max(0, this.r2(after - this.taxableSubtotal));
+                    return Math.max(0, this.r2(exemptShare + this.taxableSubtotal * (100 + this.taxRate) / (100 + this.taxMenuRate)));
+                }
+                return Math.max(0, this.r2(this.effectiveSubtotal - this.discountAmount));
+            }
             return Math.max(0, this.r2(this.effectiveSubtotal - this.discountAmount + this.taxAmount));
         },
         get roundedTotal() { return Math.round(this.totalAmount); },
@@ -4970,13 +5008,29 @@ function restaurantPos() {
             const rate = method === 'card'
                 ? (this.taxRules['debit_card'] || this.taxRules['card'] || 8)
                 : (this.taxRules['cash'] || 16);
-            // Inclusive mode: menu total is method-independent (tax already inside).
-            if (this.taxInclusive) return Math.round(sub - disc);
+            // Inclusive mode: menu total is method-independent (tax already inside) —
+            // EXCEPT card-save mode, where a non-menu rate makes the total cheaper.
+            if (this.taxInclusive) {
+                if (this.taxMenuRate !== null && this.taxMenuRate > 0 && Math.abs(this.taxMenuRate - rate) >= 0.005) {
+                    const after = Math.max(0, sub - disc);
+                    const taxableAfter = taxable * ratio;
+                    const exemptShare = Math.max(0, after - taxableAfter);
+                    return Math.round(exemptShare + taxableAfter * (100 + rate) / (100 + this.taxMenuRate));
+                }
+                return Math.round(sub - disc);
+            }
             const tax = Math.round(taxable * ratio * rate / 100);
             return Math.round(sub - disc + tax);
         },
         get payModalTotal() {
             if (this.payingHeldOrderId) return this.heldOrderEstimate(this.payMethodIndex === 1 ? 'card' : 'cash');
+            // Card-save: the modal total is method-aware (cash = menu, card = cheaper).
+            if (this.cardSaveMode()) {
+                const rate = this.payMethodIndex === 1
+                    ? (this.taxRules['debit_card'] || this.taxRules['card'] || 8)
+                    : (this.taxRules['cash'] || this.taxMenuRate);
+                return this.cardSaveTotalForRate(rate);
+            }
             return this.roundedTotal;
         },
 

@@ -210,14 +210,24 @@
             // Tax-Inclusive (Menu-Rate-Final) bills: display the menu-price subtotal
             // (stored ex-tax header + included tax) so it matches the item lines.
             $pdfInclusive = (bool) ($transaction->tax_inclusive ?? false);
-            $pdfDisplaySubtotal = $pdfInclusive
-                ? (float) $transaction->subtotal + (float) $transaction->tax_amount
-                : (float) $transaction->subtotal;
+            // Card-save (mode 3) card/digital bills: "Menu Total" = item sum + explicit
+            // "Card Discount" saving line (visible even when Show-Tax is OFF).
+            $pdfMenuRate = $pdfInclusive ? ($transaction->tax_menu_rate ?? null) : null;
+            $pdfCardSave = $pdfMenuRate !== null && (float) $pdfMenuRate > 0
+                && abs((float) $pdfMenuRate - (float) $transaction->tax_rate) >= 0.005;
+            $pdfDisplaySubtotal = $pdfCardSave
+                ? (float) $transaction->items->sum('subtotal')
+                : ($pdfInclusive
+                    ? (float) $transaction->subtotal + (float) $transaction->tax_amount
+                    : (float) $transaction->subtotal);
+            $pdfCardSaving = $pdfCardSave
+                ? max(0.0, round($pdfDisplaySubtotal - (float) $transaction->discount_amount - (float) $transaction->total_amount, 2))
+                : 0.0;
         @endphp
         <div class="totals-box">
-            @if($showTaxLines)
+            @if($showTaxLines || $pdfCardSave)
             <div class="total-row">
-                <div class="lbl">Subtotal</div>
+                <div class="lbl">{{ $pdfCardSave ? 'Menu Total' : 'Subtotal' }}</div>
                 <div class="val">PKR {{ number_format($pdfDisplaySubtotal, 2) }}</div>
             </div>
             @endif
@@ -225,6 +235,12 @@
             <div class="total-row discount">
                 <div class="lbl">Discount{{ $transaction->discount_type === 'percentage' ? ' ('.$transaction->discount_value.'%)' : '' }}</div>
                 <div class="val">-PKR {{ number_format($showTaxLines ? $transaction->discount_amount : round((float) $transaction->discount_amount), 2) }}</div>
+            </div>
+            @endif
+            @if($pdfCardSave && $pdfCardSaving > 0.009)
+            <div class="total-row discount">
+                <div class="lbl">Card Discount</div>
+                <div class="val">-PKR {{ number_format($pdfCardSaving, 2) }}</div>
             </div>
             @endif
             @if($showTaxLines)

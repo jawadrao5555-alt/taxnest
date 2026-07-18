@@ -86,10 +86,26 @@ class PosController extends Controller
         if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_tax_inclusive')) {
             return response()->json(['success' => false, 'message' => 'This setting is not available yet — please try again after the pending system update.'], 503);
         }
-        $inclusive = $request->boolean('inclusive');
+        // Three modes (owner Jul 2026): 'exclusive' | 'inclusive' | 'inclusive_card_save'.
+        // Back-compat: older clients send {"inclusive": bool} only.
+        $mode = $request->input('mode');
+        if (!in_array($mode, ['exclusive', 'inclusive', 'inclusive_card_save'], true)) {
+            $mode = $request->boolean('inclusive') ? 'inclusive' : 'exclusive';
+        }
+        $modeColumnExists = \Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_tax_pricing_mode');
+        if ($mode === 'inclusive_card_save'
+            && (!$modeColumnExists || !\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'tax_menu_rate'))) {
+            return response()->json(['success' => false, 'message' => 'This mode is not available yet — please try again after the pending system update.'], 503);
+        }
         $companyId = app('currentCompanyId');
-        Company::where('id', $companyId)->update(['pos_tax_inclusive' => $inclusive]);
-        return response()->json(['success' => true, 'inclusive' => $inclusive]);
+        // pos_tax_inclusive stays SYNCED (1 for both inclusive variants) so every
+        // existing branch on the boolean keeps working.
+        $update = ['pos_tax_inclusive' => $mode !== 'exclusive'];
+        if ($modeColumnExists) {
+            $update['pos_tax_pricing_mode'] = $mode;
+        }
+        Company::where('id', $companyId)->update($update);
+        return response()->json(['success' => true, 'mode' => $mode, 'inclusive' => $mode !== 'exclusive']);
     }
 
     public function updateRestockToggle(Request $request)
@@ -1036,9 +1052,20 @@ class PosController extends Controller
         // Column guard: if the snapshot column is missing (prod drift), fall back to
         // exclusive math — never store inclusive prices under exclusive semantics.
         $taxInclusiveColumnExists = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'tax_inclusive');
-        $taxInclusive = $taxInclusiveColumnExists && (bool) ($company->pos_tax_inclusive ?? false);
+        $pricingMode = $company->posTaxPricingMode();
+        $taxInclusive = $taxInclusiveColumnExists && in_array($pricingMode, ['inclusive', 'inclusive_card_save'], true);
+        // Card-save (mode 3, owner Jul 2026): menu prices are inclusive at the CASH
+        // rate; the bill's OWN method rate is applied on the derived base — card
+        // bills get cheaper. tax_menu_rate SNAPSHOT rides on EVERY mode-3 bill
+        // (cash too). Column missing (prod drift) → classic inclusive fallback
+        // (menu guarantee, no card saving) — never corrupt the stored split.
+        $menuRateColumnExists = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'tax_menu_rate');
+        $menuRate = null;
+        if ($taxInclusive && $pricingMode === 'inclusive_card_save' && $menuRateColumnExists) {
+            $menuRate = (float) PosTaxRule::getRateForMethod('cash', $company);
+        }
         if ($taxInclusive) {
-            $inc = \App\Services\PosTaxMath::inclusiveHeader((float) $subtotal, (float) $taxableSubtotal, (float) $discountAmount, (float) $taxRate);
+            $inc = \App\Services\PosTaxMath::inclusiveHeader((float) $subtotal, (float) $taxableSubtotal, (float) $discountAmount, (float) $taxRate, $menuRate);
             $taxAmount = $inc['tax_amount'];
             $totalAmount = $inc['total_amount'];
             $exemptAfterDiscount = $inc['exempt_amount'];
@@ -1051,6 +1078,10 @@ class PosController extends Controller
             $headerSubtotal = $subtotal;
         }
         $taxInclusiveFields = $taxInclusiveColumnExists ? ['tax_inclusive' => $taxInclusive] : [];
+        if ($menuRateColumnExists) {
+            // NULL for exclusive/classic-inclusive bills; draft-resume overwrites too.
+            $taxInclusiveFields['tax_menu_rate'] = $menuRate;
+        }
 
         if ($request->terminal_id) {
             $terminal = PosTerminal::where('company_id', $companyId)->where('id', $request->terminal_id)->where('is_active', true)->first();
@@ -1236,7 +1267,7 @@ class PosController extends Controller
                 // Inclusive mode: line prices are menu (tax-in) — tax_amount holds the
                 // INCLUDED portion, unit_price/subtotal keep the as-entered menu values.
                 $itemTaxAmount = $taxInclusive
-                    ? \App\Services\PosTaxMath::inclusiveLineTax((float) $itemTaxableAmount, (float) $itemTaxRate)
+                    ? \App\Services\PosTaxMath::inclusiveLineTax((float) $itemTaxableAmount, (float) $itemTaxRate, $menuRate)
                     : round($itemTaxableAmount * $itemTaxRate / 100, 2);
 
                 PosTransactionItem::create([
@@ -1462,8 +1493,15 @@ class PosController extends Controller
         // under (stored item prices are menu/inclusive for inclusive bills).
         $editTaxInclusive = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'tax_inclusive')
             && (bool) $transaction->tax_inclusive;
+        // Card-save (mode 3): the MENU rate rides on the bill's SNAPSHOT —
+        // never re-read company config on an edit (rates are mutable).
+        $editMenuRate = $editTaxInclusive
+            && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'tax_menu_rate')
+            && $transaction->tax_menu_rate !== null
+            ? (float) $transaction->tax_menu_rate
+            : null;
         if ($editTaxInclusive) {
-            $inc = \App\Services\PosTaxMath::inclusiveHeader((float) $subtotal, (float) $taxableSubtotal, (float) $discountAmount, (float) $taxRate);
+            $inc = \App\Services\PosTaxMath::inclusiveHeader((float) $subtotal, (float) $taxableSubtotal, (float) $discountAmount, (float) $taxRate, $editMenuRate);
             $taxAmount = $inc['tax_amount'];
             $totalAmount = $inc['total_amount'];
             $exemptAfterDiscount = $inc['exempt_amount'];
@@ -1542,7 +1580,7 @@ class PosController extends Controller
                 $itemDiscountShare = $subtotal > 0 ? round($discountAmount * ($ri['lineTotal'] / $subtotal), 2) : 0;
                 $itemTaxableAmount = $ri['lineTotal'] - $itemDiscountShare;
                 $itemTaxAmount = $editTaxInclusive
-                    ? \App\Services\PosTaxMath::inclusiveLineTax((float) $itemTaxableAmount, (float) $itemTaxRate)
+                    ? \App\Services\PosTaxMath::inclusiveLineTax((float) $itemTaxableAmount, (float) $itemTaxRate, $editMenuRate)
                     : round($itemTaxableAmount * $itemTaxRate / 100, 2);
 
                 PosTransactionItem::create([
@@ -2177,8 +2215,16 @@ class PosController extends Controller
                 // subtotal column is re-derived too (it depends on the rate).
                 $promoteTaxInclusive = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'tax_inclusive')
                     && (bool) $tx->tax_inclusive;
+                // Card-save (mode 3): promote CAN change the payment method — the
+                // method rate is re-resolved above, but the MENU rate must come from
+                // the bill's SNAPSHOT (never current company config, rates are mutable).
+                $promoteMenuRate = $promoteTaxInclusive
+                    && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'tax_menu_rate')
+                    && $tx->tax_menu_rate !== null
+                    ? (float) $tx->tax_menu_rate
+                    : null;
                 if ($promoteTaxInclusive) {
-                    $inc = \App\Services\PosTaxMath::inclusiveHeader($lineSum, $taxableSubtotal, $discountAmount, (float) $taxRate);
+                    $inc = \App\Services\PosTaxMath::inclusiveHeader($lineSum, $taxableSubtotal, $discountAmount, (float) $taxRate, $promoteMenuRate);
                     $taxAmount = $inc['tax_amount'];
                     $totalAmount = $inc['total_amount'];
                     $exemptAfterDiscount = $inc['exempt_amount'];
@@ -2230,7 +2276,7 @@ class PosController extends Controller
                     $itemDiscountShare = $shareBase > 0 ? round($discountAmount * ((float) $it->subtotal / $shareBase), 2) : 0;
                     $itemTaxableAmount = (float) $it->subtotal - $itemDiscountShare;
                     $itemTaxAmount = $promoteTaxInclusive
-                        ? \App\Services\PosTaxMath::inclusiveLineTax($itemTaxableAmount, (float) $itemTaxRate)
+                        ? \App\Services\PosTaxMath::inclusiveLineTax($itemTaxableAmount, (float) $itemTaxRate, $promoteMenuRate)
                         : round($itemTaxableAmount * $itemTaxRate / 100, 2);
                     $it->update([
                         'tax_rate'   => $itemTaxRate,
@@ -3079,6 +3125,18 @@ class PosController extends Controller
     {
         if (!\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'tax_inclusive')) {
             return 'pos_transaction_items.subtotal';
+        }
+        // Card-save (mode 3): (subtotal − tax_amount) is NOT the base (tax is at the
+        // bill's own rate, base was derived at the MENU rate) — divide out the menu
+        // rate instead. Exempt lines keep their menu amount (no included tax).
+        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'tax_menu_rate')) {
+            return 'CASE WHEN COALESCE(pos_transactions.tax_inclusive, 0) = 1'
+                . ' AND COALESCE(pos_transactions.tax_menu_rate, 0) > 0'
+                . ' AND pos_transaction_items.is_tax_exempt = 0'
+                . ' THEN (pos_transaction_items.subtotal * 100 / (100 + pos_transactions.tax_menu_rate))'
+                . ' WHEN COALESCE(pos_transactions.tax_inclusive, 0) = 1'
+                . ' THEN (pos_transaction_items.subtotal - pos_transaction_items.tax_amount)'
+                . ' ELSE pos_transaction_items.subtotal END';
         }
         return 'CASE WHEN COALESCE(pos_transactions.tax_inclusive, 0) = 1'
             . ' THEN (pos_transaction_items.subtotal - pos_transaction_items.tax_amount)'

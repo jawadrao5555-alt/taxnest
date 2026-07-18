@@ -219,9 +219,19 @@
         // prices; header subtotal is ex-tax-consistent, so the receipt Subtotal
         // re-adds the included tax to read as the menu sum.
         $rcptInclusive = (bool) ($transaction->tax_inclusive ?? false);
-        $rcptSubtotal = $rcptInclusive
-            ? round((float) $transaction->subtotal + (float) $transaction->tax_amount, 2)
-            : (float) $transaction->subtotal;
+        // Card-save (mode 3) card/digital bills: "Menu Total" = item sum + explicit
+        // "Card Disc" saving line (visible even when Show-Tax is OFF).
+        $rcptMenuRate = $rcptInclusive ? ($transaction->tax_menu_rate ?? null) : null;
+        $rcptCardSave = $rcptMenuRate !== null && (float) $rcptMenuRate > 0
+            && abs((float) $rcptMenuRate - (float) $transaction->tax_rate) >= 0.005;
+        $rcptSubtotal = $rcptCardSave
+            ? (float) $transaction->items->sum('subtotal')
+            : ($rcptInclusive
+                ? round((float) $transaction->subtotal + (float) $transaction->tax_amount, 2)
+                : (float) $transaction->subtotal);
+        $rcptCardSaving = $rcptCardSave
+            ? max(0.0, round($rcptSubtotal - (float) $transaction->discount_amount - (float) $transaction->total_amount, 2))
+            : 0.0;
     @endphp
     <table class="items-table">
         <thead>
@@ -269,9 +279,9 @@
     <div class="separator"></div>
 
     <table class="totals-table">
-        @if($showTaxLines)
+        @if($showTaxLines || $rcptCardSave)
         <tr>
-            <td class="tot-label">Subtotal:</td>
+            <td class="tot-label">{{ $rcptCardSave ? 'Menu Total' : 'Subtotal' }}:</td>
             <td class="tot-value">{{ number_format($rcptSubtotal, 2) }}</td>
         </tr>
         @endif
@@ -279,6 +289,12 @@
         <tr>
             <td class="tot-label">Disc:</td>
             <td class="tot-value">-{{ number_format($showTaxLines ? $transaction->discount_amount : round((float) $transaction->discount_amount), 2) }}</td>
+        </tr>
+        @endif
+        @if($rcptCardSave && $rcptCardSaving > 0.009)
+        <tr>
+            <td class="tot-label">Card Disc:</td>
+            <td class="tot-value">-{{ number_format($rcptCardSaving, 2) }}</td>
         </tr>
         @endif
         @if($showTaxLines)

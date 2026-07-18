@@ -30,6 +30,7 @@ class CleanZombieTables extends Command
                     'status' => 'available',
                     'locked_by_user_id' => null,
                     'locked_at' => null,
+                    'occupied_since' => null,
                 ]);
                 $cleaned++;
                 \Log::info("CleanZombieTables: Reset table {$table->table_number} (company_id: {$companyId})");

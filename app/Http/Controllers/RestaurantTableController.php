@@ -242,7 +242,7 @@ class RestaurantTableController extends Controller
         RestaurantTable::where('company_id', $companyId)
             ->where('id', $tableId)
             ->where('status', 'reserved')
-            ->update(['status' => 'available', 'locked_by_user_id' => null, 'locked_at' => null]);
+            ->update(['status' => 'available', 'locked_by_user_id' => null, 'locked_at' => null, 'occupied_since' => null]);
 
         return response()->json(['success' => true]);
     }
@@ -265,6 +265,7 @@ class RestaurantTableController extends Controller
                     'active_orders' => $t->activeOrders->count(),
                     'locked_by' => $t->locked_by_user_id,
                     'locked_at' => $t->locked_at,
+                    'occupied_since' => $t->occupied_since,
                 ];
             });
 

@@ -1113,7 +1113,7 @@ window.addEventListener('popstate', function() {
                     </svg>
                     <p class="text-sm font-bold {{ $t->status === 'occupied' ? 'text-red-600' : 'text-gray-900 dark:text-white' }}">T-{{ $t->table_number }}</p>
                     <p class="text-[10px] text-gray-400">{{ $t->seats }} seats</p>
-                    @if($t->status === 'occupied')<span class="text-[9px] text-red-500 font-medium">Occupied</span>@endif
+                    @if($t->status === 'occupied')<span class="text-[9px] text-red-500 font-medium">Occupied{{ ($t->occupied_since ?? null) ? ' • ' . $t->occupied_since->diffForHumans(null, true) : '' }}</span>@endif
                 </button>
                 @endforeach
             </div>

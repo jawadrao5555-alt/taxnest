@@ -368,7 +368,7 @@ class RestaurantPosController extends Controller
                             ->whereIn('status', ['held', 'preparing', 'ready'])
                             ->exists();
                         if (!$activeOnTable) {
-                            RestaurantTable::where('id', $oldOrder->table_id)->update(['status' => 'available', 'locked_by_user_id' => null, 'locked_at' => null]);
+                            RestaurantTable::where('id', $oldOrder->table_id)->update(['status' => 'available', 'locked_by_user_id' => null, 'locked_at' => null, 'occupied_since' => null]);
                         }
                     }
                 }
@@ -436,6 +436,12 @@ class RestaurantPosController extends Controller
                         'status' => 'occupied',
                         'locked_by_user_id' => null,
                         'locked_at' => null,
+                        // Occupied timer (owner, Jul 2026): keep the ORIGINAL sit-down
+                        // time when appending/recalling on an already-occupied table;
+                        // stamp fresh on a new occupation.
+                        'occupied_since' => ($table && $table->status === 'occupied' && $table->occupied_since)
+                            ? $table->occupied_since
+                            : now(),
                     ]);
             }
 
@@ -497,7 +503,7 @@ class RestaurantPosController extends Controller
                     ->exists();
                 if (!$stillActive) {
                     RestaurantTable::where('company_id', $companyId)->where('id', $tableId)
-                        ->update(['status' => 'available', 'locked_by_user_id' => null, 'locked_at' => null]);
+                        ->update(['status' => 'available', 'locked_by_user_id' => null, 'locked_at' => null, 'occupied_since' => null]);
                 }
             }
             try {
@@ -700,6 +706,7 @@ class RestaurantPosController extends Controller
                         'status' => 'available',
                         'locked_by_user_id' => null,
                         'locked_at' => null,
+                        'occupied_since' => null,
                     ]);
                 }
             }
@@ -1495,13 +1502,42 @@ class RestaurantPosController extends Controller
         $praStatus = (bool) $user?->praReportingEnabled($company);
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
 
+        // ─── Kitchen Efficiency (owner, Jul 2026) ─────────────────────────
+        // Derived from KDS timestamps (kot_sent → started → ready → cleared),
+        // stamped by RestaurantKdsController::kitchenStatus. All averages are
+        // null (view shows "—") until the kitchen actually uses the KDS.
+        // Carbon 3: diffInMinutes is SIGNED — always pass absolute=true.
+        $kdsRows = RestaurantOrder::where('company_id', $companyId)
+            ->whereNotNull('kot_sent_at')
+            ->where('created_at', '>=', $today->copy()->subDays(7))
+            ->get(['id', 'created_at', 'kot_sent_at', 'kitchen_started_at', 'kitchen_ready_at', 'kitchen_cleared_at']);
+
+        $prepPairs = $kdsRows->filter(fn ($o) => $o->kot_sent_at && $o->kitchen_ready_at);
+        $todayPrep = $prepPairs->filter(fn ($o) => $o->created_at >= $today)
+            ->map(fn ($o) => $o->kot_sent_at->diffInMinutes($o->kitchen_ready_at, true));
+        $weekPrep = $prepPairs->map(fn ($o) => $o->kot_sent_at->diffInMinutes($o->kitchen_ready_at, true));
+        $todayClear = $kdsRows->filter(fn ($o) => $o->kitchen_ready_at && $o->kitchen_cleared_at && $o->created_at >= $today)
+            ->map(fn ($o) => $o->kitchen_ready_at->diffInMinutes($o->kitchen_cleared_at, true));
+
+        $kitchenStats = [
+            'avg_prep_today'  => $todayPrep->count() ? round($todayPrep->avg(), 1) : null,
+            'avg_prep_week'   => $weekPrep->count() ? round($weekPrep->avg(), 1) : null,
+            'avg_clear_today' => $todayClear->count() ? round($todayClear->avg(), 1) : null,
+            'cleared_today'   => $kdsRows->filter(fn ($o) => $o->kitchen_cleared_at && $o->kitchen_cleared_at >= $today)->count(),
+            'in_kitchen_now'  => RestaurantOrder::where('company_id', $companyId)
+                ->whereIn('status', ['held', 'preparing', 'ready'])
+                ->whereNotNull('kot_sent_at')
+                ->whereNull('kitchen_cleared_at')
+                ->count(),
+        ];
+
         return view('pos.restaurant.dashboard', compact(
             'company', 'todaySales', 'yesterdaySales', 'todayOrders',
             'heldCount', 'completedCount', 'totalTables', 'occupiedTables',
             'topProducts', 'lowStockItems', 'recentOrders',
             'salesChartLabels', 'salesChartData', 'orderTypeCounts',
             'peakHour', 'todayTax', 'todayDiscount',
-            'todayCost', 'todayProfit',
+            'todayCost', 'todayProfit', 'kitchenStats',
             'dashboardStyle', 'isRestaurant', 'isAdmin', 'praStatus', 'isCashier'
         ));
     }

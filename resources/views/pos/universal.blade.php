@@ -1162,8 +1162,8 @@ window.addEventListener('popstate', function() {
                                     </svg>
                                     <p class="text-sm font-bold" :class="t.status === 'occupied' ? 'text-red-600' : 'text-gray-900 dark:text-white'" x-text="'T-' + t.table_number"></p>
                                     <p class="text-[10px] text-gray-400" x-text="t.seats + ' seats'"></p>
-                                    <span x-show="t.status === 'occupied'" class="text-[9px] text-red-500 font-medium">Occupied</span>
-                                    <span x-show="t.status === 'reserved'" class="text-[9px] text-amber-600 font-medium">Reserved</span>
+                                    <span x-show="t.status === 'occupied'" class="text-[9px] text-red-500 font-medium" x-text="'Occupied' + (elapsedSince(t.occupied_since) ? ' • ' + elapsedSince(t.occupied_since) : '')"></span>
+                                    <span x-show="t.status === 'reserved'" class="text-[9px] text-amber-600 font-medium" x-text="'Reserved' + (elapsedSince(t.locked_at) ? ' • ' + elapsedSince(t.locked_at) : '')"></span>
                                 </button>
                             </template>
                         </div>
@@ -1201,7 +1201,7 @@ window.addEventListener('popstate', function() {
                             </div>
                         </div>
                         <p class="text-xs text-gray-500 mb-1 ml-7" x-text="'Rs. ' + Number(order.total_amount).toLocaleString() + ' • ' + order.items.length + ' item(s)'"></p>
-                        <template x-if="order.table"><p class="text-[10px] text-purple-600 ml-7" x-text="'Table: T-' + order.table.table_number"></p></template>
+                        <template x-if="order.table"><p class="text-[10px] text-purple-600 ml-7" x-text="'Table: T-' + order.table.table_number + (elapsedSince(order.table.occupied_since) ? ' • occupied ' + elapsedSince(order.table.occupied_since) : '')"></p></template>
                         <div class="flex gap-2 mt-2 ml-7">
                             <button @click="recallOrder(order)" class="flex-1 py-2 text-xs font-bold text-purple-600 border border-purple-300 rounded-xl hover:bg-purple-50 transition">Recall</button>
                             @if($features->kot)
@@ -2315,6 +2315,8 @@ function restaurantPos() {
         // F3 Dine-In — live floors/tables for the picker modal (fetched on open).
         tableFloors: [],
         tablesLoading: false,
+        // Occupied-timer tick — bumped every 30s so elapsed labels re-render live.
+        nowTick: Date.now(),
         showPayModal: false,
         // payMethodIndex — which method is highlighted in the Pay modal (0 = Cash,
         // 1 = Card). Arrow keys move it, Enter confirms the highlighted one, and
@@ -2584,6 +2586,8 @@ function restaurantPos() {
             if (this.isRestaurantMode) {
                 setTimeout(() => this.loadIncoming(), 1800);
                 setInterval(() => { if (!document.hidden && !this.showPayModal) this.loadIncoming(); }, 20000);
+                // Occupied-timer tick (table picker + held-orders elapsed labels).
+                setInterval(() => { this.nowTick = Date.now(); }, 30000);
             }
             // 🔄 Auto-Sync — kicks in after 4 sec, then every 30 sec.
             // Live-updates online/offline pill + silently retries pending bills.
@@ -4254,6 +4258,17 @@ function restaurantPos() {
         // keyboard highlight in the picker. Recomputed live so a status refresh
         // can't desync highlight from the rendered grid.
         tablePickerFlat() { return this.tableFloors.flatMap(f => f.tables); },
+        // Elapsed label since a timestamp — "3m" / "1h 20m" / "just now".
+        // Reads nowTick so labels refresh live on the 30s tick.
+        elapsedSince(ts) {
+            if (!ts) return '';
+            const ms = this.nowTick - new Date(ts).getTime();
+            if (isNaN(ms) || ms < 0) return '';
+            const mins = Math.floor(ms / 60000);
+            if (mins < 1) return 'just now';
+            const h = Math.floor(mins / 60), m = mins % 60;
+            return h > 0 ? (h + 'h ' + m + 'm') : (m + 'm');
+        },
         async loadTableStatus() {
             this.tablesLoading = true;
             try {

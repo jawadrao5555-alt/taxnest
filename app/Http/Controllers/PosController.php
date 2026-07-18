@@ -1220,7 +1220,7 @@ class PosController extends Controller
                 RestaurantTable::where('company_id', $companyId)
                     ->where('id', (int) $request->input('table_id'))
                     ->where('status', 'reserved')
-                    ->update(['status' => 'available', 'locked_by_user_id' => null, 'locked_at' => null]);
+                    ->update(['status' => 'available', 'locked_by_user_id' => null, 'locked_at' => null, 'occupied_since' => null]);
             } catch (\Throwable $e) {
                 \Log::warning('Table auto-free failed: ' . $e->getMessage());
             }

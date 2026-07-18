@@ -8,13 +8,14 @@ class RestaurantTable extends Model
 {
     protected $fillable = [
         'company_id', 'floor_id', 'table_number', 'seats', 'status',
-        'locked_by_user_id', 'locked_at', 'reservation_name', 'reservation_time',
+        'locked_by_user_id', 'locked_at', 'occupied_since', 'reservation_name', 'reservation_time',
         'sort_order', 'is_active',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'locked_at' => 'datetime',
+        'occupied_since' => 'datetime',
         'reservation_time' => 'datetime',
     ];
 

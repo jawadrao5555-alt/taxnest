@@ -173,7 +173,7 @@ class RestaurantWaiterController extends Controller
                 if ($table->status === 'occupied') {
                     return response()->json(['success' => false, 'message' => 'Table T-' . $table->table_number . ' is occupied.'], 409);
                 }
-                $table->update(['status' => 'occupied']);
+                $table->update(['status' => 'occupied', 'occupied_since' => $table->occupied_since ?: now()]);
             }
 
             $subtotal = 0;
@@ -351,7 +351,7 @@ class RestaurantWaiterController extends Controller
                 ->exists();
             if (!$stillActive) {
                 RestaurantTable::where('id', $order->table_id)
-                    ->update(['status' => 'available', 'locked_by_user_id' => null, 'locked_at' => null]);
+                    ->update(['status' => 'available', 'locked_by_user_id' => null, 'locked_at' => null, 'occupied_since' => null]);
             }
         }
 

@@ -33,6 +33,15 @@
                 <div class="mt-1 text-xs font-medium {{ $table->status === 'available' ? 'text-green-600 dark:text-green-400' : ($table->status === 'occupied' ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400') }}">
                     {{ ucfirst($table->status) }}
                 </div>
+                @php
+                    // Occupied timer (owner, Jul 2026): occupied → occupied_since; reserved → locked_at.
+                    $sinceTs = $table->status === 'occupied' ? $table->occupied_since : ($table->status === 'reserved' ? $table->locked_at : null);
+                @endphp
+                @if($sinceTs)
+                <div class="text-[10px] {{ $table->status === 'occupied' ? 'text-red-500 dark:text-red-400' : 'text-amber-500 dark:text-amber-400' }}">
+                    {{ $sinceTs->diffForHumans(null, true) }}
+                </div>
+                @endif
             </a>
             @endforeach
         </div>

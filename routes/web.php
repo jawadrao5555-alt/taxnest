@@ -483,9 +483,11 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/reports/csv', [PosController::class, 'exportReportCsv'])->name('pos.reports.csv');
     Route::get('/tax-reports/csv', [PosController::class, 'exportTaxReportCsv'])->name('pos.tax-reports.csv');
     Route::get('/tax-reports/pdf', [PosController::class, 'exportTaxReportPdf'])->name('pos.tax-reports.pdf');
+    Route::get('/reports/analytics-pdf', [PosController::class, 'reportsAnalyticsPdf'])->name('pos.reports.analytics-pdf');
     Route::get('/day-close', [PosController::class, 'dayCloseReport'])->name('pos.day-close');
     Route::post('/day-close', [PosController::class, 'closeDayReport'])->name('pos.close-day');
     Route::get('/day-close/{id}/pdf', [PosController::class, 'dayCloseReportPdf'])->name('pos.day-close-pdf');
+    Route::get('/day-close/{id}/thermal', [PosController::class, 'dayCloseThermal'])->name('pos.day-close-thermal');
     Route::get('/api/tax-rate', [PosController::class, 'getTaxRate'])->name('pos.api.tax-rate');
     Route::post('/api/draft/save', [PosController::class, 'saveDraft'])->name('pos.api.draft.save');
     Route::get('/api/last-order', [PosController::class, 'getLastOrder'])->name('pos.api.last-order');
@@ -878,6 +880,8 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/day-close', [FbrPosController::class, 'dayCloseReport'])->name('fbrpos.day-close');
     Route::post('/day-close', [FbrPosController::class, 'closeDayReport'])->name('fbrpos.close-day');
     Route::get('/day-close/{id}/pdf', [FbrPosController::class, 'dayCloseReportPdf'])->name('fbrpos.day-close-pdf');
+    Route::get('/day-close/{id}/thermal', [FbrPosController::class, 'dayCloseThermal'])->name('fbrpos.day-close-thermal');
+    Route::get('/reports/analytics-pdf', [FbrPosController::class, 'reportsAnalyticsPdf'])->name('fbrpos.reports.analytics-pdf');
     // 🚀 Smart auto-close (rush/holiday recovery — closes any past day with sales but no Z-report)
     Route::post('/api/auto-close-day', [FbrPosController::class, 'apiAutoCloseDay'])->name('fbrpos.api.auto-close-day');
 

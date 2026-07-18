@@ -14,6 +14,7 @@ class FbrDayCloseReport extends Model
         'first_invoice_number', 'last_invoice_number',
         'first_invoice_time', 'last_invoice_time',
         'closed_by', 'notes', 'hash',
+        'opening_float', 'counted_cash', 'expected_cash', 'cash_variance',
     ];
 
     protected $casts = [

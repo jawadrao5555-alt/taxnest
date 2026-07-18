@@ -186,6 +186,31 @@
         </tbody>
     </table>
 
+    @if($report->counted_cash !== null)
+    <div class="section-title">Cash Reconciliation</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th class="r">Opening Float</th>
+                <th class="r">Cash Sales</th>
+                <th class="r">Expected in Drawer</th>
+                <th class="r">Counted Cash</th>
+                <th class="r">Variance</th>
+            </tr>
+        </thead>
+        <tbody>
+            @php $pdfVariance = (float) $report->cash_variance; @endphp
+            <tr>
+                <td class="r">{{ number_format($report->opening_float ?? 0, 2) }}</td>
+                <td class="r">{{ number_format($report->cash_amount, 2) }}</td>
+                <td class="r">{{ number_format($report->expected_cash ?? 0, 2) }}</td>
+                <td class="r">{{ number_format($report->counted_cash, 2) }}</td>
+                <td class="r" style="{{ abs($pdfVariance) < 0.01 ? 'color:#059669;' : ($pdfVariance < 0 ? 'color:#dc2626;' : 'color:#d97706;') }}">{{ $pdfVariance > 0 ? '+' : '' }}{{ number_format($pdfVariance, 2) }} {{ abs($pdfVariance) < 0.01 ? '(BALANCED)' : ($pdfVariance < 0 ? '(SHORT)' : '(OVER)') }}</td>
+            </tr>
+        </tbody>
+    </table>
+    @endif
+
     @if($cashierBreakdown->isNotEmpty())
     <div class="section-title">Cashier Performance</div>
     <table class="data">
@@ -209,6 +234,94 @@
         </tbody>
     </table>
     @endif
+
+    @if($analytics->top_products->isNotEmpty())
+    <div class="section-title">Top Products of the Day</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th class="c" style="width:8%;">#</th>
+                <th>Product</th>
+                <th class="c">Qty</th>
+                <th class="r">Revenue (PKR)</th>
+                <th class="c">Share</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($analytics->top_products as $pname => $p)
+            <tr>
+                <td class="c">{{ $loop->iteration }}</td>
+                <td>{{ $pname }}</td>
+                <td class="c">{{ rtrim(rtrim(number_format($p->qty, 2), '0'), '.') }}</td>
+                <td class="r">{{ number_format($p->revenue, 2) }}</td>
+                <td class="c">{{ $p->share }}%</td>
+            </tr>
+            @endforeach
+        </tbody>
+    </table>
+    @endif
+
+    <div class="section-title">FBR Submission Health</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th class="c">Submitted</th>
+                <th class="c">Pending</th>
+                <th class="c">Failed</th>
+                <th class="c">Local</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="c">{{ $analytics->fbr_health->submitted }}</td>
+                <td class="c">{{ $analytics->fbr_health->pending }}</td>
+                <td class="c">{{ $analytics->fbr_health->failed }}</td>
+                <td class="c">{{ $analytics->fbr_health->local }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    @if($analytics->discounts->total > 0)
+    <div class="section-title">Discount Summary</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th class="c">Bills With Discount</th>
+                <th class="r">Bill-Level (PKR)</th>
+                <th class="r">Item-Level (PKR)</th>
+                <th class="r">Total Discount (PKR)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="c">{{ $analytics->discounts->bill_count }}</td>
+                <td class="r">{{ number_format($analytics->discounts->bill_total, 2) }}</td>
+                <td class="r">{{ number_format($analytics->discounts->item_total, 2) }}</td>
+                <td class="r">{{ number_format($analytics->discounts->total, 2) }}</td>
+            </tr>
+        </tbody>
+    </table>
+    @endif
+
+    <div class="section-title">Day Statistics &amp; Comparison</div>
+    <div class="info-box">
+        <div class="info-row">
+            <div class="lbl">Average Bill:</div>
+            <div class="val">PKR {{ number_format($analytics->avg_bill, 2) }}</div>
+        </div>
+        <div class="info-row">
+            <div class="lbl">Unique Customers (named):</div>
+            <div class="val">{{ $analytics->unique_customers }}</div>
+        </div>
+        <div class="info-row">
+            <div class="lbl">Vs Yesterday ({{ \Carbon\Carbon::parse($analytics->comparison->yesterday->date)->format('d M') }}):</div>
+            <div class="val">PKR {{ number_format($analytics->comparison->yesterday->revenue, 2) }} ({{ $analytics->comparison->yesterday->invoices }} bills){{ $analytics->comparison->vs_yesterday_revenue_pct !== null ? ' — ' . ($analytics->comparison->vs_yesterday_revenue_pct >= 0 ? '+' : '') . $analytics->comparison->vs_yesterday_revenue_pct . '% today' : '' }}</div>
+        </div>
+        <div class="info-row">
+            <div class="lbl">Vs Last Week ({{ \Carbon\Carbon::parse($analytics->comparison->last_week->date)->format('d M') }}):</div>
+            <div class="val">PKR {{ number_format($analytics->comparison->last_week->revenue, 2) }} ({{ $analytics->comparison->last_week->invoices }} bills){{ $analytics->comparison->vs_last_week_revenue_pct !== null ? ' — ' . ($analytics->comparison->vs_last_week_revenue_pct >= 0 ? '+' : '') . $analytics->comparison->vs_last_week_revenue_pct . '% today' : '' }}</div>
+        </div>
+    </div>
 
     <div class="section-title">Invoice Range</div>
     <div class="info-box">

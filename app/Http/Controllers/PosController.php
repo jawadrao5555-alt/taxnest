@@ -2732,7 +2732,37 @@ class PosController extends Controller
                 ->withQueryString();
         }
 
-        return view('pos.reports', compact('dailySales', 'paymentSummary', 'topItems', 'monthlyTrend', 'tab', 'hasPinSet', 'localCount', 'user', 'teamMembers', 'isCashier', 'selectedCashier', 'localBills', 'monthStart'));
+        // ── Range analytics (owner request Jul 2026): date-window deep dive ──
+        [$rangeFrom, $rangeTo] = $this->resolveReportRange($request);
+        $rangeAnalytics = $this->buildReportRangeAnalytics($companyId, $rangeFrom, $rangeTo, $tab, $cashierFilter, $company, $user);
+
+        return view('pos.reports', compact('dailySales', 'paymentSummary', 'topItems', 'monthlyTrend', 'tab', 'hasPinSet', 'localCount', 'user', 'teamMembers', 'isCashier', 'selectedCashier', 'localBills', 'monthStart', 'rangeAnalytics'));
+    }
+
+    /**
+     * A4 PDF export of the range analytics (owner request Jul 2026) — same data
+     * set as the on-page analytics block (tab + cashier + date range aware).
+     */
+    public function reportsAnalyticsPdf(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        $user = auth('pos')->user();
+        $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
+        $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin()) ? 'local' : 'pra';
+        $cashierFilter = $request->get('cashier', 'all');
+        if ($isCashier && $cashierFilter !== 'all' && $cashierFilter != $user->id) {
+            $cashierFilter = $user->id;
+        }
+
+        [$rangeFrom, $rangeTo] = $this->resolveReportRange($request);
+        $analytics = $this->buildReportRangeAnalytics($companyId, $rangeFrom, $rangeTo, $tab, $cashierFilter, $company, $user);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.reports-analytics-pdf', compact('company', 'analytics', 'tab'));
+        $pdf->setPaper('a4', 'portrait');
+
+        return $pdf->download('Sales-Analytics-' . $analytics->from . '-to-' . $analytics->to . '.pdf');
     }
 
     public function exportReportCsv(Request $request)
@@ -2750,9 +2780,15 @@ class PosController extends Controller
             $cashierFilter = $user->id;
         }
 
+        // Custom date range (analytics block) wins; default stays last 30 days.
+        $hasRange = $request->filled('from') || $request->filled('to');
+        [$rangeFrom, $rangeTo] = $this->resolveReportRange($request);
+
         $transactions = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
-            ->where('created_at', '>=', now()->subDays(30))
+            ->when($hasRange,
+                fn ($q) => $q->whereBetween('created_at', [$rangeFrom, $rangeTo]),
+                fn ($q) => $q->where('created_at', '>=', now()->subDays(30)))
             ->tap(fn ($q) => $this->applyReportFilters($q, $tab))
             ->when($cashierFilter && $cashierFilter !== 'all', fn($q) => $q->where('created_by', $cashierFilter))
             ->with('creator')
@@ -5809,7 +5845,9 @@ class PosController extends Controller
             'final_backlog' => $pendingFinal->filter(fn ($t) => $t->created_at && $t->created_at->toDateString() < $date)->count(),
         ];
 
-        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash'));
+        $analytics = $this->buildDayCloseAnalytics($companyId, $date, $transactions, $company);
+
+        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'analytics'));
     }
 
     public function closeDayReport(Request $request)
@@ -5823,7 +5861,19 @@ class PosController extends Controller
         // an admin in Customize POS → Local Billing (save=archive | delete, per bill
         // kind). Cashiers closing the day merely trigger that admin decision — no
         // per-close purge checkbox / cashier authority question anymore.
-        $result = $this->performDayClose($companyId, $date, $user?->id, $request->input('notes'));
+        // Cash reconciliation (optional): opening float + physically-counted cash.
+        $request->validate([
+            'opening_float' => 'nullable|numeric|min:0|max:99999999',
+            'counted_cash' => 'nullable|numeric|min:0|max:99999999',
+        ]);
+        $cashRecon = null;
+        if ($request->filled('opening_float') || $request->filled('counted_cash')) {
+            $cashRecon = [
+                'opening_float' => $request->filled('opening_float') ? (float) $request->input('opening_float') : null,
+                'counted_cash' => $request->filled('counted_cash') ? (float) $request->input('counted_cash') : null,
+            ];
+        }
+        $result = $this->performDayClose($companyId, $date, $user?->id, $request->input('notes'), $cashRecon);
 
         if ($result['status'] === 'exists') {
             return back()->with('error', 'Day Close Report for this date already exists.');
@@ -5847,6 +5897,401 @@ class PosController extends Controller
     }
 
     /**
+     * Comprehensive day-close analytics (owner request Jul 2026) shared by the
+     * day-close page, the A4 PDF and the 80mm thermal Z-report: category-wise
+     * sales, top products, hourly breakdown, PRA submission health, discount &
+     * deals summary, order-type split (restaurant-gated), averages and
+     * yesterday / last-week comparisons. Pure read — computed live from the
+     * already-filtered PRA-mode transaction set (local bills stay excluded).
+     */
+    private function buildDayCloseAnalytics(int $companyId, string $date, $transactions, ?Company $company): object
+    {
+        $ids = $transactions->pluck('id')->all();
+
+        $items = empty($ids) ? collect() : \App\Models\PosTransactionItem::whereIn('transaction_id', $ids)
+            ->get(['transaction_id', 'item_type', 'item_id', 'item_name', 'quantity', 'subtotal', 'tax_amount', 'item_discount_amount', 'deal_snapshot']);
+
+        // Category resolution: product items → pos_products.category (company-scoped
+        // lookup — shared-table trap); services & manual items get fixed buckets.
+        $productIds = $items->where('item_type', 'product')->pluck('item_id')->filter()->unique()->values();
+        $categoryMap = $productIds->isEmpty() ? collect() : \App\Models\PosProduct::where('company_id', $companyId)
+            ->whereIn('id', $productIds)->pluck('category', 'id');
+
+        $items->each(function ($it) use ($categoryMap) {
+            if ($it->item_type === 'product') {
+                $cat = trim((string) ($categoryMap[$it->item_id] ?? ''));
+                $it->resolved_category = $cat !== '' ? $cat : 'Uncategorized';
+            } elseif ($it->item_type === 'service') {
+                $it->resolved_category = 'Services';
+            } else {
+                $it->resolved_category = 'Manual / Other';
+            }
+        });
+
+        $categoryRevenueTotal = (float) $items->sum('subtotal');
+        $categories = $items->groupBy('resolved_category')->map(function ($g) use ($categoryRevenueTotal) {
+            $revenue = (float) $g->sum('subtotal');
+            return (object) [
+                'qty' => (float) $g->sum('quantity'),
+                'revenue' => $revenue,
+                'tax' => (float) $g->sum('tax_amount'),
+                'share' => $categoryRevenueTotal > 0 ? round($revenue / $categoryRevenueTotal * 100, 1) : 0,
+            ];
+        })->sortByDesc('revenue');
+
+        $topProducts = $items->groupBy('item_name')->map(function ($g) {
+            return (object) [
+                'qty' => (float) $g->sum('quantity'),
+                'revenue' => (float) $g->sum('subtotal'),
+            ];
+        })->sortByDesc('revenue')->take(10);
+
+        // Hourly sales — full 24-slot map so the chart x-axis stays stable.
+        $hourly = [];
+        for ($h = 0; $h < 24; $h++) {
+            $hourly[$h] = (object) ['count' => 0, 'revenue' => 0.0];
+        }
+        foreach ($transactions as $t) {
+            if (!$t->created_at) {
+                continue;
+            }
+            $h = (int) $t->created_at->format('G');
+            $hourly[$h]->count++;
+            $hourly[$h]->revenue += (float) $t->total_amount;
+        }
+
+        // PRA submission health — every pipeline state at a glance.
+        $praHealth = (object) [
+            'submitted' => $transactions->where('pra_status', 'submitted')->count(),
+            'pending' => $transactions->where('pra_status', 'pending')->count(),
+            'offline' => $transactions->where('pra_status', 'offline')->count(),
+            'failed' => $transactions->where('pra_status', 'failed')->count(),
+            'not_reported' => $transactions->whereNull('pra_status')->count(),
+        ];
+
+        $discountBills = $transactions->filter(fn ($t) => (float) $t->discount_amount > 0);
+        $itemDiscountTotal = (float) $items->sum('item_discount_amount');
+        $discounts = (object) [
+            'bill_count' => $discountBills->count(),
+            'bill_total' => (float) $discountBills->sum('discount_amount'),
+            'item_total' => $itemDiscountTotal,
+            'total' => (float) $discountBills->sum('discount_amount') + $itemDiscountTotal,
+        ];
+
+        // Restaurant-only extras: deals performance + order-type split.
+        $restaurantEnabled = $company
+            && \App\Services\PosFeatureService::restaurantAllowed($company)
+            && (bool) ($company->restaurant_mode ?? false);
+        $deals = collect();
+        $orderTypes = collect();
+        if ($restaurantEnabled) {
+            $deals = $items->filter(fn ($it) => !empty($it->deal_snapshot))
+                ->groupBy('item_name')->map(function ($g) {
+                    return (object) [
+                        'qty' => (float) $g->sum('quantity'),
+                        'revenue' => (float) $g->sum('subtotal'),
+                    ];
+                })->sortByDesc('revenue')->take(5);
+
+            $orderTypeMap = empty($ids) ? collect() : \App\Models\RestaurantOrder::where('company_id', $companyId)
+                ->whereIn('pos_transaction_id', $ids)
+                ->pluck('order_type', 'pos_transaction_id');
+            $orderTypes = $transactions->groupBy(fn ($t) => $orderTypeMap[$t->id] ?? 'counter')
+                ->map(function ($g) {
+                    return (object) [
+                        'count' => $g->count(),
+                        'revenue' => (float) $g->sum('total_amount'),
+                    ];
+                })->sortByDesc('revenue');
+        }
+
+        $billCount = $transactions->count();
+        $avgBill = $billCount > 0 ? (float) $transactions->sum('total_amount') / $billCount : 0.0;
+        $uniqueCustomers = $transactions
+            ->filter(fn ($t) => $t->customer_id || !empty($t->customer_phone) || !empty($t->customer_name))
+            ->unique(fn ($t) => $t->customer_id ?: ($t->customer_phone ?: mb_strtolower(trim((string) $t->customer_name))))
+            ->count();
+
+        // Yesterday + same-day-last-week comparison (same PRA-mode filter).
+        // withoutGlobalScope('hide_archived'): the day-close wash ARCHIVES
+        // reporting-OFF finals (invoice_mode 'pra' + NULL pra_status), so an
+        // already-closed comparison day would undercount without it.
+        $compareFor = function (string $cmpDate) use ($companyId) {
+            $row = PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->whereDate('created_at', $cmpDate)
+                ->where(function ($q) {
+                    $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+                })
+                ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as revenue, COALESCE(SUM(tax_amount),0) as tax')
+                ->first();
+            return (object) [
+                'date' => $cmpDate,
+                'invoices' => (int) ($row->cnt ?? 0),
+                'revenue' => (float) ($row->revenue ?? 0),
+                'tax' => (float) ($row->tax ?? 0),
+            ];
+        };
+        $todayRevenue = (float) $transactions->sum('total_amount');
+        $pct = function (float $prev, float $cur): ?float {
+            if ($prev <= 0) {
+                return null; // no baseline — view shows "—"
+            }
+            return round(($cur - $prev) / $prev * 100, 1);
+        };
+        $yesterday = $compareFor(\Carbon\Carbon::parse($date)->subDay()->toDateString());
+        $lastWeek = $compareFor(\Carbon\Carbon::parse($date)->subDays(7)->toDateString());
+        $comparison = (object) [
+            'yesterday' => $yesterday,
+            'last_week' => $lastWeek,
+            'vs_yesterday_revenue_pct' => $pct($yesterday->revenue, $todayRevenue),
+            'vs_yesterday_invoices_pct' => $pct((float) $yesterday->invoices, (float) $billCount),
+            'vs_last_week_revenue_pct' => $pct($lastWeek->revenue, $todayRevenue),
+            'vs_last_week_invoices_pct' => $pct((float) $lastWeek->invoices, (float) $billCount),
+        ];
+
+        return (object) [
+            'categories' => $categories,
+            'top_products' => $topProducts,
+            'hourly' => $hourly,
+            'pra_health' => $praHealth,
+            'discounts' => $discounts,
+            'restaurant_enabled' => $restaurantEnabled,
+            'deals' => $deals,
+            'order_types' => $orderTypes,
+            'avg_bill' => $avgBill,
+            'unique_customers' => $uniqueCustomers,
+            'comparison' => $comparison,
+        ];
+    }
+
+    /**
+     * Range analytics for the POS Reports page (owner request Jul 2026):
+     * date-window deep dive — category breakdown w/ product drill-down, profit
+     * (ADMIN-ONLY, pos_products.cost_price based, coverage-aware), previous-
+     * period comparison, daily + hourly chart data, cashier performance, top
+     * customers, payment split. Respects the tab (pra|local) + cashier filter
+     * exactly like the rest of the reports page (applyReportFilters).
+     */
+    private function buildReportRangeAnalytics(int $companyId, \Carbon\Carbon $from, \Carbon\Carbon $to, string $tab, $cashierFilter, ?Company $company, $user): object
+    {
+        $isAdminView = (bool) ($user?->isPosAdmin());
+
+        $transactions = PosTransaction::where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->tap(fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter))
+            ->whereBetween('created_at', [$from, $to])
+            ->get(['id', 'created_at', 'created_by', 'customer_id', 'customer_name', 'customer_phone', 'subtotal', 'total_amount', 'tax_amount', 'discount_amount', 'payment_method']);
+
+        $ids = $transactions->pluck('id')->all();
+        $items = empty($ids) ? collect() : \App\Models\PosTransactionItem::whereIn('transaction_id', $ids)
+            ->get(['transaction_id', 'item_type', 'item_id', 'item_name', 'quantity', 'subtotal', 'tax_amount', 'item_discount_amount']);
+
+        // Category + cost resolution (company-scoped lookup — shared-table trap).
+        $productIds = $items->where('item_type', 'product')->pluck('item_id')->filter()->unique()->values();
+        $productMap = $productIds->isEmpty() ? collect() : \App\Models\PosProduct::where('company_id', $companyId)
+            ->whereIn('id', $productIds)->get(['id', 'category', 'cost_price'])->keyBy('id');
+
+        $items->each(function ($it) use ($productMap, $isAdminView) {
+            $cost = null;
+            if ($it->item_type === 'product') {
+                $p = $productMap[$it->item_id] ?? null;
+                $cat = trim((string) ($p->category ?? ''));
+                $it->resolved_category = $cat !== '' ? $cat : 'Uncategorized';
+                if ($isAdminView && $p && $p->cost_price !== null && (float) $p->cost_price > 0) {
+                    $cost = (float) $p->cost_price * (float) $it->quantity;
+                }
+            } elseif ($it->item_type === 'service') {
+                $it->resolved_category = 'Services';
+            } else {
+                $it->resolved_category = 'Manual / Other';
+            }
+            $it->resolved_cost = $cost;
+        });
+
+        $revenueTotal = (float) $items->sum('subtotal');
+        $categories = $items->groupBy('resolved_category')->map(function ($g) use ($revenueTotal, $isAdminView) {
+            $revenue = (float) $g->sum('subtotal');
+            $withCost = $g->filter(fn ($it) => $it->resolved_cost !== null);
+            $cost = (float) $withCost->sum('resolved_cost');
+            $costedRevenue = (float) $withCost->sum('subtotal');
+            return (object) [
+                'qty' => (float) $g->sum('quantity'),
+                'revenue' => $revenue,
+                'tax' => (float) $g->sum('tax_amount'),
+                'share' => $revenueTotal > 0 ? round($revenue / $revenueTotal * 100, 1) : 0,
+                'profit' => ($isAdminView && $withCost->isNotEmpty()) ? round($costedRevenue - $cost, 2) : null,
+                'products' => $g->groupBy('item_name')->map(function ($pg) {
+                    return (object) [
+                        'qty' => (float) $pg->sum('quantity'),
+                        'revenue' => (float) $pg->sum('subtotal'),
+                    ];
+                })->sortByDesc('revenue')->take(15),
+            ];
+        })->sortByDesc('revenue');
+
+        // Profit summary (ADMIN-ONLY): only items whose product has a cost_price
+        // set count toward cost — coverage_pct tells the admin how complete it is.
+        $profit = null;
+        if ($isAdminView) {
+            $withCost = $items->filter(fn ($it) => $it->resolved_cost !== null);
+            $cost = (float) $withCost->sum('resolved_cost');
+            $costedRevenue = (float) $withCost->sum('subtotal');
+            $productQty = (float) $items->where('item_type', 'product')->sum('quantity');
+            $costedQty = (float) $withCost->sum('quantity');
+            $profit = (object) [
+                'cost' => $cost,
+                'revenue' => $costedRevenue,
+                'profit' => round($costedRevenue - $cost, 2),
+                'margin_pct' => $costedRevenue > 0 ? round(($costedRevenue - $cost) / $costedRevenue * 100, 1) : null,
+                'coverage_pct' => $productQty > 0 ? (int) round($costedQty / $productQty * 100) : 0,
+            ];
+        }
+
+        // Daily trend — zero-filled so the chart x-axis has every day of the range.
+        $daily = [];
+        $cursor = $from->copy()->startOfDay();
+        $endDay = $to->copy()->startOfDay();
+        while ($cursor->lte($endDay)) {
+            $daily[$cursor->toDateString()] = (object) ['count' => 0, 'revenue' => 0.0];
+            $cursor->addDay();
+        }
+        foreach ($transactions as $t) {
+            $d = $t->created_at?->toDateString();
+            if ($d !== null && isset($daily[$d])) {
+                $daily[$d]->count++;
+                $daily[$d]->revenue += (float) $t->total_amount;
+            }
+        }
+
+        $hourly = [];
+        for ($h = 0; $h < 24; $h++) {
+            $hourly[$h] = (object) ['count' => 0, 'revenue' => 0.0];
+        }
+        foreach ($transactions as $t) {
+            if (!$t->created_at) {
+                continue;
+            }
+            $h = (int) $t->created_at->format('G');
+            $hourly[$h]->count++;
+            $hourly[$h]->revenue += (float) $t->total_amount;
+        }
+
+        $cashierNames = User::where('company_id', $companyId)->pluck('name', 'id');
+        $cashiers = $transactions->groupBy('created_by')->map(function ($g) use ($cashierNames) {
+            $revenue = (float) $g->sum('total_amount');
+            return (object) [
+                'name' => $cashierNames[$g->first()->created_by] ?? 'Unknown',
+                'count' => $g->count(),
+                'revenue' => $revenue,
+                'tax' => (float) $g->sum('tax_amount'),
+                'avg' => round($revenue / max(1, $g->count()), 2),
+            ];
+        })->sortByDesc('revenue')->values();
+
+        $topCustomers = $transactions
+            ->filter(fn ($t) => $t->customer_id || !empty($t->customer_phone) || trim((string) $t->customer_name) !== '')
+            ->groupBy(fn ($t) => $t->customer_id ?: ($t->customer_phone ?: mb_strtolower(trim((string) $t->customer_name))))
+            ->map(function ($g) {
+                $t0 = $g->first();
+                return (object) [
+                    'name' => trim((string) $t0->customer_name) !== '' ? $t0->customer_name : ($t0->customer_phone ?: ('Customer #' . $t0->customer_id)),
+                    'count' => $g->count(),
+                    'revenue' => (float) $g->sum('total_amount'),
+                ];
+            })->sortByDesc('revenue')->take(10)->values();
+
+        $payments = $transactions->groupBy('payment_method')->map(function ($g) {
+            return (object) [
+                'count' => $g->count(),
+                'revenue' => (float) $g->sum('total_amount'),
+            ];
+        })->sortByDesc('revenue');
+
+        // Previous equal-length period (immediately before the range, same filters).
+        $days = $from->copy()->startOfDay()->diffInDays($to->copy()->startOfDay()) + 1;
+        $prevFrom = $from->copy()->subDays($days)->startOfDay();
+        $prevTo = $from->copy()->subDay()->endOfDay();
+        $prevRow = PosTransaction::where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->tap(fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter))
+            ->whereBetween('created_at', [$prevFrom, $prevTo])
+            ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as revenue, COALESCE(SUM(tax_amount),0) as tax')
+            ->first();
+        $pct = function (float $prev, float $cur): ?float {
+            return $prev > 0 ? round(($cur - $prev) / $prev * 100, 1) : null;
+        };
+
+        $revenue = (float) $transactions->sum('total_amount');
+        $tax = (float) $transactions->sum('tax_amount');
+        $billCount = $transactions->count();
+        $summary = (object) [
+            'bills' => $billCount,
+            'revenue' => $revenue,
+            'tax' => $tax,
+            'discount' => (float) $transactions->sum('discount_amount') + (float) $items->sum('item_discount_amount'),
+            'avg_bill' => $billCount > 0 ? $revenue / $billCount : 0.0,
+            'unique_customers' => $transactions
+                ->filter(fn ($t) => $t->customer_id || !empty($t->customer_phone) || trim((string) $t->customer_name) !== '')
+                ->unique(fn ($t) => $t->customer_id ?: ($t->customer_phone ?: mb_strtolower(trim((string) $t->customer_name))))
+                ->count(),
+        ];
+        $previous = (object) [
+            'from' => $prevFrom->toDateString(),
+            'to' => $prevTo->toDateString(),
+            'bills' => (int) ($prevRow->cnt ?? 0),
+            'revenue' => (float) ($prevRow->revenue ?? 0),
+            'tax' => (float) ($prevRow->tax ?? 0),
+            'revenue_pct' => $pct((float) ($prevRow->revenue ?? 0), $revenue),
+            'bills_pct' => $pct((float) ($prevRow->cnt ?? 0), (float) $billCount),
+            'tax_pct' => $pct((float) ($prevRow->tax ?? 0), $tax),
+        ];
+
+        return (object) [
+            'from' => $from->toDateString(),
+            'to' => $to->toDateString(),
+            'summary' => $summary,
+            'previous' => $previous,
+            'categories' => $categories,
+            'profit' => $profit,
+            'is_admin_view' => $isAdminView,
+            'daily' => $daily,
+            'hourly' => $hourly,
+            'cashiers' => $cashiers,
+            'top_customers' => $topCustomers,
+            'payments' => $payments,
+        ];
+    }
+
+    /**
+     * Shared range parsing for the reports analytics surfaces: defaults to the
+     * current month, swaps reversed inputs, caps the window at 366 days.
+     *
+     * @return array{0:\Carbon\Carbon,1:\Carbon\Carbon}
+     */
+    private function resolveReportRange(Request $request): array
+    {
+        try {
+            $from = $request->filled('from') ? \Carbon\Carbon::parse($request->input('from'))->startOfDay() : now()->startOfMonth();
+        } catch (\Throwable) {
+            $from = now()->startOfMonth();
+        }
+        try {
+            $to = $request->filled('to') ? \Carbon\Carbon::parse($request->input('to'))->endOfDay() : now()->endOfDay();
+        } catch (\Throwable) {
+            $to = now()->endOfDay();
+        }
+        if ($from->gt($to)) {
+            [$from, $to] = [$to->copy()->startOfDay(), $from->copy()->endOfDay()];
+        }
+        if ($from->diffInDays($to) > 366) {
+            $from = $to->copy()->subDays(366)->startOfDay();
+        }
+
+        return [$from, $to];
+    }
+
+    /**
      * Core day-close logic shared by the HTTP endpoint (closeDayReport) and the
      * midnight auto-close command (pos:auto-dayclose).
      *
@@ -5867,7 +6312,7 @@ class PosController extends Controller
      * @return array{status:string,report:?\App\Models\PosDayCloseReport,archived:int,deleted:int,report_number:?string}
      *         status is one of 'created' | 'exists' | 'empty'.
      */
-    public function performDayClose(int $companyId, string $date, ?int $closedBy, ?string $notes = null): array
+    public function performDayClose(int $companyId, string $date, ?int $closedBy, ?string $notes = null, ?array $cashRecon = null): array
     {
         $existing = PosDayCloseReport::where('company_id', $companyId)
             ->where('report_date', $date)
@@ -5947,6 +6392,19 @@ class PosController extends Controller
             'closed_by' => $closedBy,
             'notes' => $notes,
         ];
+
+        // Cash reconciliation (Z-report): expected = opening float + cash sales;
+        // variance = counted − expected. Columns are nullable + schema-guarded
+        // (prod drift self-heal) — auto midnight close passes no $cashRecon.
+        if ($cashRecon !== null && \Schema::hasColumn('pos_day_close_reports', 'opening_float')) {
+            $openingFloat = $cashRecon['opening_float'] ?? null;
+            $countedCash = $cashRecon['counted_cash'] ?? null;
+            $expectedCash = round((float) ($openingFloat ?? 0) + (float) $data['cash_amount'], 2);
+            $data['opening_float'] = $openingFloat;
+            $data['counted_cash'] = $countedCash;
+            $data['expected_cash'] = $expectedCash;
+            $data['cash_variance'] = $countedCash !== null ? round((float) $countedCash - $expectedCash, 2) : null;
+        }
 
         $hashString = json_encode($data);
         $data['hash'] = hash('sha256', $hashString);
@@ -6133,9 +6591,45 @@ class PosController extends Controller
             ];
         });
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.day-close-pdf', compact('company', 'report', 'transactions', 'cashierBreakdown'));
+        $analytics = $this->buildDayCloseAnalytics($companyId, $report->report_date->toDateString(), $transactions, $company);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.day-close-pdf', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics'));
         $pdf->setPaper('a4', 'portrait');
 
         return $pdf->download("Day-Close-{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf");
+    }
+
+    /**
+     * 80mm thermal Z-report (owner request Jul 2026): browser-printable summary
+     * of a CLOSED day for cheap receipt printers — same historical data set as
+     * the A4 PDF (archived bills included, local bills excluded).
+     */
+    public function dayCloseThermal($id)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $report = PosDayCloseReport::where('company_id', $companyId)->findOrFail($id);
+
+        $transactions = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->whereDate('created_at', $report->report_date)
+            ->where(function ($q) {
+                $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+            })
+            ->with('creator')
+            ->orderBy('created_at')
+            ->get();
+
+        $cashierBreakdown = $transactions->groupBy(fn ($t) => $t->creator ? $t->creator->name : 'Unknown')->map(function ($group) {
+            return (object) [
+                'count' => $group->count(),
+                'revenue' => $group->sum('total_amount'),
+                'tax' => $group->sum('tax_amount'),
+            ];
+        });
+
+        $analytics = $this->buildDayCloseAnalytics($companyId, $report->report_date->toDateString(), $transactions, $company);
+
+        return view('pos.day-close-thermal', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics'));
     }
 }

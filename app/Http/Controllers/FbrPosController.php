@@ -284,7 +284,7 @@ class FbrPosController extends Controller
      *   - Idempotent: returns existing report when already closed (never throws on duplicate intent)
      *   - Returns null only when no transactions exist for that date
      */
-    private function performDayClose(int $companyId, string $date, ?int $userId, ?string $notes = null): ?FbrDayCloseReport
+    private function performDayClose(int $companyId, string $date, ?int $userId, ?string $notes = null, ?array $cashRecon = null): ?FbrDayCloseReport
     {
         // Fast-path: already closed → return without locking
         $existing = FbrDayCloseReport::where('company_id', $companyId)
@@ -323,6 +323,20 @@ class FbrPosController extends Controller
             'closed_by' => $userId,
             'notes' => $notes,
         ];
+
+        // Cash reconciliation (Z-report): expected = opening float + cash sales;
+        // variance = counted − expected. Columns nullable + schema-guarded (prod
+        // drift self-heal) — auto-close paths pass no $cashRecon. Merged BEFORE
+        // the hash so the recon figures are integrity-protected too.
+        if ($cashRecon !== null && \Schema::hasColumn('fbr_day_close_reports', 'opening_float')) {
+            $openingFloat = $cashRecon['opening_float'] ?? null;
+            $countedCash = $cashRecon['counted_cash'] ?? null;
+            $expectedCash = round((float) ($openingFloat ?? 0) + (float) $baseData['cash_amount'], 2);
+            $baseData['opening_float'] = $openingFloat;
+            $baseData['counted_cash'] = $countedCash;
+            $baseData['expected_cash'] = $expectedCash;
+            $baseData['cash_variance'] = $countedCash !== null ? round((float) $countedCash - $expectedCash, 2) : null;
+        }
 
         // Retry loop — max 3 attempts to handle rare concurrent report_number collisions
         for ($attempt = 1; $attempt <= 3; $attempt++) {
@@ -1857,7 +1871,7 @@ class FbrPosController extends Controller
         return view('fbr-pos.receipt', compact('transaction', 'company'));
     }
 
-    public function reports()
+    public function reports(Request $request)
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
@@ -1888,7 +1902,246 @@ class FbrPosController extends Controller
             ->groupBy('payment_method')
             ->get();
 
-        return view('fbr-pos.reports', compact('company', 'todayStats', 'monthStats', 'dailySales', 'paymentBreakdown'));
+        [$from, $to] = $this->resolveFbrReportRange($request);
+        $rangeAnalytics = $this->buildFbrReportRangeAnalytics($companyId, $from, $to, Auth::guard('fbrpos')->user());
+
+        return view('fbr-pos.reports', compact('company', 'todayStats', 'monthStats', 'dailySales', 'paymentBreakdown', 'rangeAnalytics'));
+    }
+
+    /**
+     * A4 PDF export of the range analytics (FBR mirror of the PRA version).
+     */
+    public function reportsAnalyticsPdf(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        [$from, $to] = $this->resolveFbrReportRange($request);
+        $analytics = $this->buildFbrReportRangeAnalytics($companyId, $from, $to, Auth::guard('fbrpos')->user());
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fbr-pos.reports-analytics-pdf', compact('company', 'analytics'));
+        $pdf->setPaper('a4', 'portrait');
+
+        return $pdf->download('FBR-Sales-Analytics-' . $analytics->from . '-to-' . $analytics->to . '.pdf');
+    }
+
+    /**
+     * Shared range parsing for the reports analytics surfaces: defaults to the
+     * current month, swaps reversed inputs, caps the window at 366 days.
+     *
+     * @return array{0:\Carbon\Carbon,1:\Carbon\Carbon}
+     */
+    private function resolveFbrReportRange(Request $request): array
+    {
+        try {
+            $from = $request->filled('from') ? \Carbon\Carbon::parse($request->input('from'))->startOfDay() : now()->startOfMonth();
+        } catch (\Throwable) {
+            $from = now()->startOfMonth();
+        }
+        try {
+            $to = $request->filled('to') ? \Carbon\Carbon::parse($request->input('to'))->endOfDay() : now()->endOfDay();
+        } catch (\Throwable) {
+            $to = now()->endOfDay();
+        }
+        if ($from->gt($to)) {
+            [$from, $to] = [$to->copy()->startOfDay(), $from->copy()->endOfDay()];
+        }
+        if ($from->diffInDays($to) > 366) {
+            $from = $to->copy()->subDays(366)->startOfDay();
+        }
+
+        return [$from, $to];
+    }
+
+    /**
+     * Range analytics for the FBR POS Reports page (owner request Jul 2026 —
+     * mirror of the PRA version): date-window deep dive — product breakdown
+     * (the `products` table has NO category column, so no category layer),
+     * profit (ADMIN-ONLY, products.cost_price based, coverage-aware), previous-
+     * period comparison, daily + hourly chart data, cashier performance, top
+     * customers, payment split, FBR submission health.
+     */
+    private function buildFbrReportRangeAnalytics(int $companyId, \Carbon\Carbon $from, \Carbon\Carbon $to, $user): object
+    {
+        $isAdminView = $user && $user->role === 'company_admin';
+
+        $transactions = FbrPosTransaction::where('company_id', $companyId)
+            ->whereBetween('created_at', [$from, $to])
+            ->get(['id', 'created_at', 'created_by', 'customer_id', 'customer_name', 'customer_phone', 'subtotal', 'total_amount', 'tax_amount', 'discount_amount', 'payment_method', 'fbr_status']);
+
+        $ids = $transactions->pluck('id')->all();
+        $items = empty($ids) ? collect() : FbrPosTransactionItem::whereIn('transaction_id', $ids)
+            ->get(['transaction_id', 'product_id', 'item_name', 'quantity', 'subtotal', 'tax_amount', 'item_discount', 'promotion_discount']);
+
+        // Cost resolution (company-scoped product lookup).
+        $productIds = $items->pluck('product_id')->filter()->unique()->values();
+        $productMap = $productIds->isEmpty() ? collect() : Product::where('company_id', $companyId)
+            ->whereIn('id', $productIds)->get(['id', 'cost_price'])->keyBy('id');
+
+        $items->each(function ($it) use ($productMap, $isAdminView) {
+            $cost = null;
+            if ($isAdminView && $it->product_id) {
+                $p = $productMap[$it->product_id] ?? null;
+                if ($p && $p->cost_price !== null && (float) $p->cost_price > 0) {
+                    $cost = (float) $p->cost_price * (float) $it->quantity;
+                }
+            }
+            $it->resolved_cost = $cost;
+        });
+
+        $revenueTotal = (float) $items->sum('subtotal');
+        $products = $items->groupBy('item_name')->map(function ($g) use ($revenueTotal, $isAdminView) {
+            $revenue = (float) $g->sum('subtotal');
+            $withCost = $g->filter(fn ($it) => $it->resolved_cost !== null);
+            $cost = (float) $withCost->sum('resolved_cost');
+            $costedRevenue = (float) $withCost->sum('subtotal');
+            return (object) [
+                'qty' => (float) $g->sum('quantity'),
+                'revenue' => $revenue,
+                'tax' => (float) $g->sum('tax_amount'),
+                'share' => $revenueTotal > 0 ? round($revenue / $revenueTotal * 100, 1) : 0,
+                'profit' => ($isAdminView && $withCost->isNotEmpty()) ? round($costedRevenue - $cost, 2) : null,
+            ];
+        })->sortByDesc('revenue')->take(25);
+
+        // Profit summary (ADMIN-ONLY): only items whose product has a cost_price
+        // set count toward cost — coverage_pct tells the admin how complete it is.
+        $profit = null;
+        if ($isAdminView) {
+            $withCost = $items->filter(fn ($it) => $it->resolved_cost !== null);
+            $cost = (float) $withCost->sum('resolved_cost');
+            $costedRevenue = (float) $withCost->sum('subtotal');
+            $productQty = (float) $items->where('product_id', '!=', null)->sum('quantity');
+            $costedQty = (float) $withCost->sum('quantity');
+            $profit = (object) [
+                'cost' => $cost,
+                'revenue' => $costedRevenue,
+                'profit' => round($costedRevenue - $cost, 2),
+                'margin_pct' => $costedRevenue > 0 ? round(($costedRevenue - $cost) / $costedRevenue * 100, 1) : null,
+                'coverage_pct' => $productQty > 0 ? (int) round($costedQty / $productQty * 100) : 0,
+            ];
+        }
+
+        // Daily trend — zero-filled so the chart x-axis has every day of the range.
+        $daily = [];
+        $cursor = $from->copy()->startOfDay();
+        $endDay = $to->copy()->startOfDay();
+        while ($cursor->lte($endDay)) {
+            $daily[$cursor->toDateString()] = (object) ['count' => 0, 'revenue' => 0.0];
+            $cursor->addDay();
+        }
+        foreach ($transactions as $t) {
+            $d = $t->created_at?->toDateString();
+            if ($d !== null && isset($daily[$d])) {
+                $daily[$d]->count++;
+                $daily[$d]->revenue += (float) $t->total_amount;
+            }
+        }
+
+        $hourly = [];
+        for ($h = 0; $h < 24; $h++) {
+            $hourly[$h] = (object) ['count' => 0, 'revenue' => 0.0];
+        }
+        foreach ($transactions as $t) {
+            if (!$t->created_at) {
+                continue;
+            }
+            $h = (int) $t->created_at->format('G');
+            $hourly[$h]->count++;
+            $hourly[$h]->revenue += (float) $t->total_amount;
+        }
+
+        $cashierNames = \App\Models\User::where('company_id', $companyId)->pluck('name', 'id');
+        $cashiers = $transactions->groupBy('created_by')->map(function ($g) use ($cashierNames) {
+            $revenue = (float) $g->sum('total_amount');
+            return (object) [
+                'name' => $cashierNames[$g->first()->created_by] ?? 'Unknown',
+                'count' => $g->count(),
+                'revenue' => $revenue,
+                'tax' => (float) $g->sum('tax_amount'),
+                'avg' => round($revenue / max(1, $g->count()), 2),
+            ];
+        })->sortByDesc('revenue')->values();
+
+        $topCustomers = $transactions
+            ->filter(fn ($t) => $t->customer_id || !empty($t->customer_phone) || trim((string) $t->customer_name) !== '')
+            ->groupBy(fn ($t) => $t->customer_id ?: ($t->customer_phone ?: mb_strtolower(trim((string) $t->customer_name))))
+            ->map(function ($g) {
+                $t0 = $g->first();
+                return (object) [
+                    'name' => trim((string) $t0->customer_name) !== '' ? $t0->customer_name : ($t0->customer_phone ?: ('Customer #' . $t0->customer_id)),
+                    'count' => $g->count(),
+                    'revenue' => (float) $g->sum('total_amount'),
+                ];
+            })->sortByDesc('revenue')->take(10)->values();
+
+        $payments = $transactions->groupBy('payment_method')->map(function ($g) {
+            return (object) [
+                'count' => $g->count(),
+                'revenue' => (float) $g->sum('total_amount'),
+            ];
+        })->sortByDesc('revenue');
+
+        // FBR submission health across the range.
+        $fbrHealth = (object) [
+            'submitted' => $transactions->where('fbr_status', 'submitted')->count(),
+            'pending' => $transactions->where('fbr_status', 'pending')->count(),
+            'failed' => $transactions->where('fbr_status', 'failed')->count(),
+            'local' => $transactions->where('fbr_status', 'local')->count(),
+        ];
+
+        // Previous equal-length period (immediately before the range).
+        $days = $from->copy()->startOfDay()->diffInDays($to->copy()->startOfDay()) + 1;
+        $prevFrom = $from->copy()->subDays($days)->startOfDay();
+        $prevTo = $from->copy()->subDay()->endOfDay();
+        $prevRow = FbrPosTransaction::where('company_id', $companyId)
+            ->whereBetween('created_at', [$prevFrom, $prevTo])
+            ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as revenue, COALESCE(SUM(tax_amount),0) as tax')
+            ->first();
+        $pct = function (float $prev, float $cur): ?float {
+            return $prev > 0 ? round(($cur - $prev) / $prev * 100, 1) : null;
+        };
+
+        $revenue = (float) $transactions->sum('total_amount');
+        $tax = (float) $transactions->sum('tax_amount');
+        $billCount = $transactions->count();
+        $summary = (object) [
+            'bills' => $billCount,
+            'revenue' => $revenue,
+            'tax' => $tax,
+            'discount' => (float) $transactions->sum('discount_amount') + (float) $items->sum('item_discount') + (float) $items->sum('promotion_discount'),
+            'avg_bill' => $billCount > 0 ? $revenue / $billCount : 0.0,
+            'unique_customers' => $transactions
+                ->filter(fn ($t) => $t->customer_id || !empty($t->customer_phone) || trim((string) $t->customer_name) !== '')
+                ->unique(fn ($t) => $t->customer_id ?: ($t->customer_phone ?: mb_strtolower(trim((string) $t->customer_name))))
+                ->count(),
+        ];
+        $previous = (object) [
+            'from' => $prevFrom->toDateString(),
+            'to' => $prevTo->toDateString(),
+            'bills' => (int) ($prevRow->cnt ?? 0),
+            'revenue' => (float) ($prevRow->revenue ?? 0),
+            'tax' => (float) ($prevRow->tax ?? 0),
+            'revenue_pct' => $pct((float) ($prevRow->revenue ?? 0), $revenue),
+            'bills_pct' => $pct((float) ($prevRow->cnt ?? 0), (float) $billCount),
+            'tax_pct' => $pct((float) ($prevRow->tax ?? 0), $tax),
+        ];
+
+        return (object) [
+            'from' => $from->toDateString(),
+            'to' => $to->toDateString(),
+            'summary' => $summary,
+            'previous' => $previous,
+            'products' => $products,
+            'profit' => $profit,
+            'is_admin_view' => $isAdminView,
+            'daily' => $daily,
+            'hourly' => $hourly,
+            'cashiers' => $cashiers,
+            'top_customers' => $topCustomers,
+            'payments' => $payments,
+            'fbr_health' => $fbrHealth,
+        ];
     }
 
     public function taxReports()
@@ -2077,7 +2330,112 @@ class FbrPosController extends Controller
             ->limit(10)
             ->get();
 
-        return view('fbr-pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions'));
+        $analytics = $this->buildFbrDayCloseAnalytics($companyId, $date, $transactions);
+
+        return view('fbr-pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'analytics'));
+    }
+
+    /**
+     * Comprehensive day-close analytics (owner request Jul 2026 — FBR mirror of
+     * the PRA version) shared by the day-close page, A4 PDF and 80mm thermal
+     * Z-report: top products, hourly breakdown, FBR submission health, discount
+     * summary, averages and yesterday / last-week comparisons. Pure read.
+     * NOTE: `products` table has NO category column, so the FBR side reports a
+     * product breakdown instead of a category breakdown.
+     */
+    private function buildFbrDayCloseAnalytics(int $companyId, string $date, $transactions): object
+    {
+        $ids = $transactions->pluck('id')->all();
+
+        $items = empty($ids) ? collect() : FbrPosTransactionItem::whereIn('transaction_id', $ids)
+            ->get(['transaction_id', 'product_id', 'item_name', 'quantity', 'subtotal', 'tax_amount', 'item_discount', 'promotion_discount']);
+
+        $itemRevenueTotal = (float) $items->sum('subtotal');
+        $topProducts = $items->groupBy('item_name')->map(function ($g) use ($itemRevenueTotal) {
+            $revenue = (float) $g->sum('subtotal');
+            return (object) [
+                'qty' => (float) $g->sum('quantity'),
+                'revenue' => $revenue,
+                'tax' => (float) $g->sum('tax_amount'),
+                'share' => $itemRevenueTotal > 0 ? round($revenue / $itemRevenueTotal * 100, 1) : 0,
+            ];
+        })->sortByDesc('revenue')->take(10);
+
+        // Hourly sales — full 24-slot map so the chart x-axis stays stable.
+        $hourly = [];
+        for ($h = 0; $h < 24; $h++) {
+            $hourly[$h] = (object) ['count' => 0, 'revenue' => 0.0];
+        }
+        foreach ($transactions as $t) {
+            if (!$t->created_at) {
+                continue;
+            }
+            $h = (int) $t->created_at->format('G');
+            $hourly[$h]->count++;
+            $hourly[$h]->revenue += (float) $t->total_amount;
+        }
+
+        // FBR submission health — every pipeline state at a glance.
+        $fbrHealth = (object) [
+            'submitted' => $transactions->where('fbr_status', 'submitted')->count(),
+            'pending' => $transactions->where('fbr_status', 'pending')->count(),
+            'failed' => $transactions->where('fbr_status', 'failed')->count(),
+            'local' => $transactions->where('fbr_status', 'local')->count(),
+        ];
+
+        $discountBills = $transactions->filter(fn ($t) => (float) $t->discount_amount > 0);
+        $itemDiscountTotal = (float) $items->sum('item_discount') + (float) $items->sum('promotion_discount');
+        $discounts = (object) [
+            'bill_count' => $discountBills->count(),
+            'bill_total' => (float) $discountBills->sum('discount_amount'),
+            'item_total' => $itemDiscountTotal,
+            'total' => (float) $discountBills->sum('discount_amount') + $itemDiscountTotal,
+        ];
+
+        $billCount = $transactions->count();
+        $avgBill = $billCount > 0 ? (float) $transactions->sum('total_amount') / $billCount : 0.0;
+        $uniqueCustomers = $transactions
+            ->filter(fn ($t) => $t->customer_id || !empty($t->customer_phone) || !empty($t->customer_name))
+            ->unique(fn ($t) => $t->customer_id ?: ($t->customer_phone ?: mb_strtolower(trim((string) $t->customer_name))))
+            ->count();
+
+        // Yesterday + same-day-last-week comparison.
+        $compareFor = function (string $cmpDate) use ($companyId) {
+            $row = FbrPosTransaction::where('company_id', $companyId)
+                ->whereDate('created_at', $cmpDate)
+                ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as revenue, COALESCE(SUM(tax_amount),0) as tax')
+                ->first();
+            return (object) [
+                'date' => $cmpDate,
+                'invoices' => (int) ($row->cnt ?? 0),
+                'revenue' => (float) ($row->revenue ?? 0),
+                'tax' => (float) ($row->tax ?? 0),
+            ];
+        };
+        $todayRevenue = (float) $transactions->sum('total_amount');
+        $pct = function (float $prev, float $cur): ?float {
+            return $prev > 0 ? round(($cur - $prev) / $prev * 100, 1) : null;
+        };
+        $yesterday = $compareFor(\Carbon\Carbon::parse($date)->subDay()->toDateString());
+        $lastWeek = $compareFor(\Carbon\Carbon::parse($date)->subDays(7)->toDateString());
+        $comparison = (object) [
+            'yesterday' => $yesterday,
+            'last_week' => $lastWeek,
+            'vs_yesterday_revenue_pct' => $pct($yesterday->revenue, $todayRevenue),
+            'vs_yesterday_invoices_pct' => $pct((float) $yesterday->invoices, (float) $billCount),
+            'vs_last_week_revenue_pct' => $pct($lastWeek->revenue, $todayRevenue),
+            'vs_last_week_invoices_pct' => $pct((float) $lastWeek->invoices, (float) $billCount),
+        ];
+
+        return (object) [
+            'top_products' => $topProducts,
+            'hourly' => $hourly,
+            'fbr_health' => $fbrHealth,
+            'discounts' => $discounts,
+            'avg_bill' => $avgBill,
+            'unique_customers' => $uniqueCustomers,
+            'comparison' => $comparison,
+        ];
     }
 
     public function closeDayReport(Request $request)
@@ -2093,8 +2451,21 @@ class FbrPosController extends Controller
             return back()->with('error', 'Day Close Report for this date already exists.');
         }
 
+        // Cash reconciliation (optional): opening float + physically-counted cash.
+        $request->validate([
+            'opening_float' => 'nullable|numeric|min:0|max:99999999',
+            'counted_cash' => 'nullable|numeric|min:0|max:99999999',
+        ]);
+        $cashRecon = null;
+        if ($request->filled('opening_float') || $request->filled('counted_cash')) {
+            $cashRecon = [
+                'opening_float' => $request->filled('opening_float') ? (float) $request->input('opening_float') : null,
+                'counted_cash' => $request->filled('counted_cash') ? (float) $request->input('counted_cash') : null,
+            ];
+        }
+
         // Route through shared writer (transaction + atomic numbering + race-safe)
-        $report = $this->performDayClose($companyId, $date, $user->id, $request->input('notes'));
+        $report = $this->performDayClose($companyId, $date, $user->id, $request->input('notes'), $cashRecon);
 
         if (!$report) {
             return back()->with('error', 'No transactions found for this date.');
@@ -2123,10 +2494,41 @@ class FbrPosController extends Controller
             ];
         });
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fbr-pos.day-close-pdf', compact('company', 'report', 'transactions', 'cashierBreakdown'));
+        $analytics = $this->buildFbrDayCloseAnalytics($companyId, $report->report_date->toDateString(), $transactions);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fbr-pos.day-close-pdf', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics'));
         $pdf->setPaper('a4', 'portrait');
 
         return $pdf->download("Day-Close-{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf");
+    }
+
+    /**
+     * 80mm thermal Z-report (print-optimized HTML — FBR mirror of the PRA
+     * version). Shares the analytics builder with the page + A4 PDF.
+     */
+    public function dayCloseThermal($id)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $report = FbrDayCloseReport::where('company_id', $companyId)->findOrFail($id);
+
+        $transactions = FbrPosTransaction::where('company_id', $companyId)
+            ->whereDate('created_at', $report->report_date)
+            ->with('creator')
+            ->orderBy('created_at')
+            ->get();
+
+        $cashierBreakdown = $transactions->groupBy(fn ($t) => $t->creator ? $t->creator->name : 'Unknown')->map(function ($group) {
+            return (object) [
+                'count' => $group->count(),
+                'revenue' => $group->sum('total_amount'),
+                'tax' => $group->sum('tax_amount'),
+            ];
+        });
+
+        $analytics = $this->buildFbrDayCloseAnalytics($companyId, $report->report_date->toDateString(), $transactions);
+
+        return view('fbr-pos.day-close-thermal', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics'));
     }
 
     public function products(Request $request)

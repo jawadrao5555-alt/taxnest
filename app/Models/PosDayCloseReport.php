@@ -15,6 +15,7 @@ class PosDayCloseReport extends Model
         'first_invoice_time', 'last_invoice_time',
         'closed_by', 'notes', 'hash',
         'deleted_final_count', 'deleted_provisional_count', 'local_summary',
+        'opening_float', 'counted_cash', 'expected_cash', 'cash_variance',
     ];
 
     protected $casts = [

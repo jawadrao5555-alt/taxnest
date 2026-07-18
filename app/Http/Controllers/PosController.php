@@ -2837,10 +2837,17 @@ class PosController extends Controller
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         ];
 
-        $callback = function () use ($transactions, $filterLabel, $tab, $company) {
+        // Period label so the export is self-describing (range vs default window).
+        $periodLabel = $hasRange
+            ? 'Period: ' . $rangeFrom->format('d M Y') . ' — ' . $rangeTo->format('d M Y')
+            : 'Period: Last 30 days';
+
+        $callback = function () use ($transactions, $filterLabel, $tab, $company, $periodLabel) {
             $file = fopen('php://output', 'w');
+            // CSV numerics must stay Excel-parseable — NO thousands separators.
+            $n = fn ($v) => number_format((float) $v, 2, '.', '');
             fputcsv($file, ['POS Sales Report — ' . $company->name]);
-            fputcsv($file, ['Mode: ' . strtoupper($tab), 'Filter: ' . $filterLabel, 'Generated: ' . now()->format('d M Y H:i')]);
+            fputcsv($file, ['Mode: ' . strtoupper($tab), 'Filter: ' . $filterLabel, $periodLabel, 'Generated: ' . now()->format('d M Y H:i')]);
             fputcsv($file, []);
             fputcsv($file, ['Date', 'Invoice #', 'Customer', 'Payment Method', 'Subtotal', 'Tax', 'Total', 'Staff']);
 
@@ -2850,17 +2857,18 @@ class PosController extends Controller
                     $t->invoice_number,
                     $t->customer_name ?: 'Walk-in',
                     ucwords(str_replace('_', ' ', $t->payment_method)),
-                    number_format($t->subtotal, 2),
-                    number_format($t->tax_amount, 2),
-                    number_format($t->total_amount, 2),
+                    $n($t->subtotal),
+                    $n($t->tax_amount),
+                    $n($t->total_amount),
                     $t->creator?->name ?? '-',
                 ]);
             }
 
+            $totalSubtotal = $transactions->sum('subtotal');
             $totalRevenue = $transactions->sum('total_amount');
             $totalTax = $transactions->sum('tax_amount');
             fputcsv($file, []);
-            fputcsv($file, ['', '', '', 'TOTALS', '', number_format($totalTax, 2), number_format($totalRevenue, 2), '']);
+            fputcsv($file, ['', '', '', 'TOTALS', $n($totalSubtotal), $n($totalTax), $n($totalRevenue), '']);
             fputcsv($file, ['Total Transactions: ' . $transactions->count()]);
             fclose($file);
         };

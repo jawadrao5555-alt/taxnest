@@ -4,7 +4,7 @@
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
             {{ ($tab ?? 'pra') === 'local' ? 'Local Reports' : 'POS Reports' }}
         </h1>
-        <a href="{{ route('pos.reports.csv', ['tab' => $tab, 'cashier' => $selectedCashier]) }}" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition">
+        <a href="{{ route('pos.reports.csv', array_filter(['tab' => $tab, 'cashier' => $selectedCashier, 'from' => request('from'), 'to' => request('to')])) }}" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
             Download CSV
         </a>
@@ -15,6 +15,8 @@
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 mb-6">
         <form method="GET" action="{{ route('pos.reports') }}" class="flex flex-col sm:flex-row items-start sm:items-end gap-3">
             <input type="hidden" name="tab" value="{{ $tab }}">
+            @if(request()->filled('from'))<input type="hidden" name="from" value="{{ request('from') }}">@endif
+            @if(request()->filled('to'))<input type="hidden" name="to" value="{{ request('to') }}">@endif
             <div class="w-full sm:w-auto">
                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">View Sales By</label>
                 <select name="cashier" onchange="this.form.submit()" class="w-full sm:w-56 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500 transition">
@@ -39,7 +41,7 @@
                         Showing: {{ $teamMembers->firstWhere('id', $selectedCashier)?->name ?? 'Staff' }}
                     @endif
                 </span>
-                <a href="{{ route('pos.reports', ['tab' => $tab, 'cashier' => 'all']) }}" class="text-xs text-gray-500 hover:text-purple-600 underline">Clear</a>
+                <a href="{{ route('pos.reports', array_filter(['tab' => $tab, 'cashier' => 'all', 'from' => request('from'), 'to' => request('to')])) }}" class="text-xs text-gray-500 hover:text-purple-600 underline">Clear</a>
             </div>
             @endif
         </form>

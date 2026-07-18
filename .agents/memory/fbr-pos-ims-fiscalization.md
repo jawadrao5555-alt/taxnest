@@ -167,18 +167,13 @@ The Code-112 resolution is BUILT. Key non-obvious facts:
   once (agentServesFbr routes ALL agent endpoints to the FBR branch).
 - Shop-PC install guide: `pra-agent/FBR-FISCAL-DEVICE-SETUP.md`. X-WAY SHOES (NTN 2595908-5, POSID 196354) is
   prod-only (not in dev DB) — e2e proven in dev on company 16.
-- **LIVE STATE (17 Jul 2026): X-WAY SHOES (company 27) SWITCHED to fiscal_device on prod** (owner-approved).
-  Its 4 failed bills FPOS-2026-00001..00004 were re-queued → all now `pending` awaiting agent pickup;
-  `tnk_` agent key minted (visible on /fbr-pos/settings while impersonating). REMAINING: install FBRIMS.zip
-  (needs POS Reg No + IRIS grid Access Code, Production) + Desktop Sync Agent (with the tnk_ key) on the
-  shop's Windows PC — owner-side step, e.g. via AnyDesk.
-- **Verified 17 Jul 2026 evening (server side fully OK, agent NOT connected):** polling
-  `/api/agent/pending-invoices` with the tnk_ key returns all 4 bills, mode fiscal_device, POSID 196354,
-  localhost:8524 endpoint, spec-correct IMS payloads. GOTCHA: any manual curl poll UPDATES
-  `agent_last_seen`, so "Last Seen X min ago" on settings can be a prior session's verification poll, not
-  a real agent — confirm by watching it AGE (3→4→5 min) without refreshing. Pre-switch cloud 900901
-  failure rows in FbrPosLog (17 Jul 13:17) are history, not a live guard bug — no cloud attempts since the
-  switch. Bills stay 'pending' untouched until a real agent + FBRIMS run on the shop PC.
+- X-WAY SHOES (company 27) runs fiscal_device on prod (since 17 Jul 2026); its FBRIMS + Desktop Agent
+  install on the shop Windows PC is an owner-side step (needs POS Reg No + IRIS grid Access Code, Production,
+  + the company's `tnk_` agent key from /fbr-pos/settings).
+- **GOTCHA — agent_last_seen:** ANY manual curl poll of `/api/agent/pending-invoices` updates
+  `agent_last_seen`, so "Last Seen X min ago" on settings can be a verification poll, not a real agent —
+  confirm by watching it AGE (3→4→5 min) without refreshing. Pre-switch cloud 900901 failure rows in
+  FbrPosLog are history, not a live guard bug; bills stay 'pending' untouched until a real agent+FBRIMS run.
 
 ## Web-based POS answer (official, Jul 2026): SDC "locally OR on Cloud" — central Windows VPS is compliant
 Owner's requirement: shopkeeper gives only POS ID + Access Code (+token), zero shop-PC installs (TaxNest is web POS).

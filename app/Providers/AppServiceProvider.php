@@ -22,6 +22,17 @@ class AppServiceProvider extends ServiceProvider
     {
         InvoiceItem::observe(InvoiceItemObserver::class);
 
+        // Rate limit public password-reset endpoints per IP+email to prevent
+        // reset-email bombing, account enumeration, and SMTP reputation abuse.
+        \Illuminate\Support\Facades\RateLimiter::for('password-reset', function (\Illuminate\Http\Request $request) {
+            $email = strtolower((string) $request->input('email', ''));
+
+            return [
+                \Illuminate\Cache\RateLimiting\Limit::perMinute(5)->by('pr-ip:' . $request->ip()),
+                \Illuminate\Cache\RateLimiting\Limit::perMinute(5)->by('pr:' . $request->ip() . '|' . $email),
+            ];
+        });
+
         // Allow any view to be used as an anonymous component (e.g.
         // <x-dynamic-component :component="'pos.archive.layout'"> resolves to
         // resources/views/pos/archive/layout.blade.php). Required by the

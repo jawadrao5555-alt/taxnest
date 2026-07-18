@@ -23,9 +23,13 @@ class PasswordResetLinkController extends Controller
             'email' => ['required', 'email'],
         ]);
 
+        $neutralStatus = 'If that email has an account, a 6-digit code and reset link have been sent.';
+
         $user = User::where('email', $request->email)->first();
         if (!$user) {
-            return back()->withErrors(['email' => 'No account found with this email address.']);
+            // Neutral response: do not reveal whether the email is registered.
+            return redirect()->route('password.verify.otp', ['email' => $request->email])
+                ->with('status', $neutralStatus);
         }
 
         DB::table('password_reset_otps')
@@ -63,7 +67,7 @@ class PasswordResetLinkController extends Controller
         }
 
         return redirect()->route('password.verify.otp', ['email' => $request->email])
-            ->with('status', 'A 6-digit code and reset link have been sent to your email.');
+            ->with('status', $neutralStatus);
     }
 
     public function showOtpForm(Request $request): View

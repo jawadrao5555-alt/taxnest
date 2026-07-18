@@ -4707,9 +4707,17 @@ function restaurantPos() {
 
             if (this.payingHeldOrderId) {
                 this.submitting = true; this.stockError = '';
-                await this.payHeldOrderDirect(this.payingHeldOrderId, method, null, provisional);
+                const paidHeld = await this.payHeldOrderDirect(this.payingHeldOrderId, method, null, provisional);
+                this.submitting = false;
+                if (!paidHeld) {
+                    // Pay failed (stock / already paid / quota) — the order is still
+                    // held and payingHeldOrderId stays set, so the pay modal (with
+                    // the stockError banner when applicable) remains open for retry
+                    // or Escape. Do NOT force-close it here or the banner dies.
+                    return;
+                }
                 this.payingHeldOrderId = null;
-                this.showPayModal = false; this.submitting = false; this.saveAsProvisional = false;
+                this.showPayModal = false; this.saveAsProvisional = false;
                 return;
             }
 
@@ -4749,12 +4757,26 @@ function restaurantPos() {
                 if (!holdRes.ok) {
                     const bodyText = await holdRes.text().catch(() => '');
                     console.error('[holdOrder] HTTP', holdRes.status, holdRes.statusText, bodyText.slice(0, 500));
-                    throw new Error('Hold HTTP ' + holdRes.status + ' ' + holdRes.statusText);
+                    // Surface the backend's real reason (invalid table/customer, manual
+                    // line, product not found) instead of a generic "Hold HTTP 400".
+                    let holdErr = null;
+                    try { holdErr = JSON.parse(bodyText); } catch (_) {}
+                    throw new Error((holdErr && holdErr.message) || ('Hold HTTP ' + holdRes.status + ' ' + holdRes.statusText));
                 }
                 const holdData = await holdRes.json();
                 if (!holdData.success) { this.showToast(holdData.message || 'Failed', 'error'); this.submitting = false; return; }
                 const savedTotal = this.totalAmount;
-                await this.payHeldOrderDirect(holdData.order.id, method, savedTotal, provisional);
+                const paid = await this.payHeldOrderDirect(holdData.order.id, method, savedTotal, provisional);
+                if (!paid) {
+                    // Pay failed — KEEP the cart for instant retry and remember the
+                    // freshly-created held order so the next Pay REUSES it via
+                    // recalled_order_id (hold endpoint cancels+replaces it) instead
+                    // of minting a duplicate 'held' row per attempt (Frost & Brew
+                    // live issue accumulated 4 orphan held orders this way).
+                    this.recalledOrderId = holdData.order.id;
+                    this.submitting = false;
+                    return;
+                }
                 this.clearCart();
                 // Auto-focus phone input → ready for next sale, NO dead focus.
                 this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
@@ -5412,7 +5434,16 @@ function restaurantPos() {
                 if (!res.ok) {
                     const bodyText = await res.text().catch(() => '');
                     console.error('[payOrder] HTTP', res.status, res.statusText, bodyText.slice(0, 500));
-                    throw new Error('Pay HTTP ' + res.status + ' ' + res.statusText);
+                    // Backend sends the REAL reason (insufficient stock / already paid /
+                    // quota) as JSON with a 4xx status — surface data.message instead of
+                    // a useless "Pay HTTP 400" (Frost & Brew live issue, Jul 2026). The
+                    // held order is untouched on failure, so the cashier can fix stock
+                    // and Recall → Pay again.
+                    let errData = null;
+                    try { errData = JSON.parse(bodyText); } catch (_) {}
+                    if (errData && errData.stock_error) { this.stockError = errData.message; this.showPayModal = true; }
+                    this.showToast((errData && errData.message) || ('Payment failed (HTTP ' + res.status + ') — F12 console'), 'error');
+                    return false;
                 }
                 const data = await res.json();
                 if (data.success) {
@@ -5435,10 +5466,12 @@ function restaurantPos() {
                     if (provisional) { this.loadLocalBills(); }
                     // Refresh failed badge so cashier sees pending/failed state in real time.
                     this.loadFailedBills();
-                } else { if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; } this.showToast(data.message || 'Payment failed', 'error'); }
+                    return true;
+                } else { if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; } this.showToast(data.message || 'Payment failed', 'error'); return false; }
             } catch (e) {
                 console.error('[payHeldOrderDirect] FAIL', e);
                 this.showToast('Payment error: ' + (e?.message || e?.name || 'unknown') + ' — F12 console', 'error');
+                return false;
             }
         },
 

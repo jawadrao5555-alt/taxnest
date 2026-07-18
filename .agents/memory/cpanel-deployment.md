@@ -3,6 +3,11 @@ name: cPanel production deployment runbook
 description: Exact paths/commands to deploy TaxNest to the owner's shared cPanel host (git pull + migrate + cache + cron). Non-secret facts only.
 ---
 
+# Direct SSH access (agent can deploy itself — Jul 2026)
+- Agent has key-based SSH: key at `.local/ssh/cpanel_deploy_key` (ed25519, public key authorized in `~/.ssh/authorized_keys` on the server). Connect: `ssh -i /home/runner/workspace/.local/ssh/cpanel_deploy_key -p 22 -o BatchMode=yes taxnestc@taxnest.com.pk`.
+- Host/port/user also in env vars CPANEL_SSH_HOST / CPANEL_SSH_PORT / CPANEL_SSH_USERNAME (no password needed).
+- So the flow is now: `git push origin HEAD:main` from the workspace, then run the deploy runbook below OVER SSH yourself — no more copy-paste blocks for the owner (still offer them as fallback if SSH breaks).
+
 # Where the live site actually is
 - Host: shared cPanel, server node `eu1`, cPanel user `taxnestc`.
 - LIVE Laravel app root: `/home/taxnestc/public_html` — this IS the git repo (remote = GitHub `jawadrao5555-alt/taxnest`, branch `main`). Document root serves from `public_html/public/` (there is NO `public_html/index.php`; the real entry is `public_html/public/index.php`).

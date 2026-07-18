@@ -157,9 +157,12 @@
                                 @csrf
                                 <select name="rider_id" onchange="this.form.submit()" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1 focus:ring-purple-500 focus:border-purple-500">
                                     <option value="">— no rider —</option>
+                                    {{-- Int-cast compare: PDO can return rider_id as a STRING on the
+                                         cPanel host — strict === then never matches and the dropdown
+                                         falls back to "— no rider —" even though the rider is saved. --}}
                                     @foreach($riders as $r)
-                                    @if($r->is_active || $b->rider_id === $r->id)
-                                    <option value="{{ $r->id }}" {{ $b->rider_id === $r->id ? 'selected' : '' }}>{{ $r->name }}{{ $r->is_active ? '' : ' (inactive)' }}</option>
+                                    @if($r->is_active || (int) $b->rider_id === (int) $r->id)
+                                    <option value="{{ $r->id }}" {{ (int) $b->rider_id === (int) $r->id ? 'selected' : '' }}>{{ $r->name }}{{ $r->is_active ? '' : ' (inactive)' }}</option>
                                     @endif
                                     @endforeach
                                 </select>

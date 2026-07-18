@@ -24,6 +24,7 @@ Open cash khata = `payment_method='cash'` + `rider_settlement_id IS NULL` + `del
 - `rider_summary` (TEXT json) persisted on pos_day_close_reports via guarded forceFill; shown on day-close page + PDF + thermal.
 
 ## UX rules learned
+- Blade select "selected" checks on rider_id must INT-CAST both sides (`(int)$b->rider_id === (int)$r->id`) — PDO on the cPanel host can return int columns as STRINGS, strict === never matches and the dropdown silently falls back to "— no rider —" even though the rider is saved. Also: a live page ignoring the delivered/returned plain-text lock while the DB is correct = stale compiled view/OPcache on live, not a code bug (runbook step 7).
 - Deliveries board rider list = active riders + ANY inactive rider with open khata (else deactivation strands his cash — no settle button anywhere). Assign dropdown filters back to active-only in the blade.
 - assign/updateStatus/settle deliberately NOT behind deliveryGate() — feature toggled OFF must not strand in-flight cash (architect finding accepted as intentional).
 - Portal route is `pos/rider/deliveries/{id}/delivered` (not `/pos/rider/delivered/{id}`).

@@ -147,7 +147,10 @@
                             @endif
                         </td>
                         <td class="px-4 py-3">
-                            @if($b->rider_settlement_id)
+                            {{-- Rider LOCKS once settled OR delivered/returned (terminal states) —
+                                 reassign stays open only while assigned/dispatched so a rider who
+                                 suddenly leaves can be swapped (khata follows rider_id). --}}
+                            @if($b->rider_settlement_id || in_array($b->delivery_status, ['delivered', 'returned']))
                                 <span class="text-xs text-gray-600 dark:text-gray-300">{{ $b->rider->name ?? '—' }}</span>
                             @else
                             <form method="POST" action="{{ route('pos.deliveries.assign', $b->id) }}">

@@ -4632,13 +4632,17 @@ function restaurantPos() {
                 });
                 const data = await res.json();
                 if (data.success) {
+                    // KOT delta (owner, Jul 2026): an UPDATED order (recall → re-hold)
+                    // must print ONLY the new/changed lines — kitchen already has the
+                    // rest. Capture before clearCart() nulls recalledOrderId.
+                    const wasRecall = !!this.recalledOrderId;
                     const successMsg = opts.successMessage || data.message;
                     this.showToast(successMsg, 'success'); this.heldOrders.unshift(data.order); this.clearCart();
                     this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
                     // Auto-print KOT when print_on_hold is enabled, OR when the caller explicitly asked
                     // (e.g. "Send to Kitchen" button always prints a ticket).
                     if (this.kitchenSettings.print_on_hold || opts.forcePrintKot) {
-                        this.kotPrintOrPopup(data.order.id);
+                        this.kotPrintOrPopup(data.order.id, wasRecall);
                     }
                     result = data;
                 } else { this.showToast(data.message || 'Failed', 'error'); }
@@ -5045,11 +5049,12 @@ function restaurantPos() {
         },
 
         // KOT gateway for the popup-window call sites (hold / resend-kitchen):
-        // silent first, identical popup fallback.
-        kotPrintOrPopup(orderId) {
-            const popup = () => window.open('/pos/restaurant/orders/' + orderId + '/kitchen-ticket?auto_print=1', '_blank', 'width=380,height=620');
+        // silent first, identical popup fallback. delta=true prints ONLY
+        // not-yet-printed rows (updated orders — kitchen has the rest).
+        kotPrintOrPopup(orderId, delta = false) {
+            const popup = () => window.open('/pos/restaurant/orders/' + orderId + '/kitchen-ticket?auto_print=1' + (delta ? '&delta=1' : ''), '_blank', 'width=380,height=620');
             if (!this.silentKotPrint) { popup(); return; }
-            this.trySilentPrint({ type: 'kot', restaurant_order_id: orderId }).then(ok => {
+            this.trySilentPrint({ type: 'kot', restaurant_order_id: orderId, delta: delta }).then(ok => {
                 if (ok) this.showToast('KOT sent to printer', 'success'); else popup();
             });
         },
@@ -5072,13 +5077,14 @@ function restaurantPos() {
         },
 
         // Silent KOT print via hidden iframe — no popup window blocks the cashier screen.
-        printKitchenTicket(orderId, onAfterPrint) {
+        // delta=true (auto-print chain on recalled orders) prints ONLY unprinted rows.
+        printKitchenTicket(orderId, onAfterPrint, delta = false) {
             const id = orderId || this.lastOrderId;
             if (!id) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
-            const url = '/pos/restaurant/orders/' + id + '/kitchen-ticket?auto_print=1';
+            const url = '/pos/restaurant/orders/' + id + '/kitchen-ticket?auto_print=1' + (delta ? '&delta=1' : '');
             const fallback = () => this._printViaIframe('print-kot-frame', url, 'width=350,height=600', onAfterPrint);
             if (this.silentKotPrint) {
-                this.trySilentPrint({ type: 'kot', restaurant_order_id: id }).then(ok => {
+                this.trySilentPrint({ type: 'kot', restaurant_order_id: id, delta: delta }).then(ok => {
                     if (ok) {
                         this.showToast('KOT sent to printer', 'success');
                         if (typeof onAfterPrint === 'function') onAfterPrint();
@@ -5171,19 +5177,23 @@ function restaurantPos() {
             const hasReceipt = !!this.lastTransactionId;
             const wantsKot = !!this.autoKotEnabled && !!orderId;
             const wantsReceipt = hasReceipt;
+            // KOT delta (owner, Jul 2026): sale settled from a RECALLED order —
+            // kitchen already fired the earlier items, auto-KOT prints only the
+            // new rows. Captured NOW (timers below run after clearCart()).
+            const kotDelta = !!this.recalledOrderId;
             if (!wantsReceipt && !wantsKot) return;
             this.$nextTick(() => {
                 if (wantsReceipt && wantsKot) {
                     this.queuePrintTimer(() => {
                         this.printReceipt(() => {
-                            this.queuePrintTimer(() => this.printKitchenTicket(orderId), 80);
+                            this.queuePrintTimer(() => this.printKitchenTicket(orderId, undefined, kotDelta), 80);
                         });
                     }, 150);
                 } else if (wantsReceipt) {
                     this.queuePrintTimer(() => this.printReceipt(), 150);
                 } else if (wantsKot) {
                     // Pathological case: no transaction (so no receipt possible) but KOT requested.
-                    this.queuePrintTimer(() => this.printKitchenTicket(orderId), 150);
+                    this.queuePrintTimer(() => this.printKitchenTicket(orderId, undefined, kotDelta), 150);
                 }
             });
         },

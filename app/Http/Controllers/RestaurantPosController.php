@@ -351,6 +351,16 @@ class RestaurantPosController extends Controller
             // Phase 5 — KOT tracking. If this is a re-send (recalled order)
             // carry the prior print count forward so the new ticket prints "UPDATED".
             $carriedKotCount = 0;
+            // KOT delta on recall (owner, Jul 2026): recall+re-hold recreates the
+            // order, which used to wipe kot_printed_at on EVERY line — the next
+            // ticket re-fired all dishes. Carry the print stamps forward for
+            // UNCHANGED lines (same type/id/name/qty/notes) so only genuinely
+            // new or changed rows stay unprinted; the delta ticket + KDS
+            // auto-print then cover just those.
+            $printedPool = [];
+            $kotCarryKey = function ($type, $id, $name, $qty, $notes) {
+                return implode('|', [$type, (string) $id, mb_strtolower(trim((string) $name)), (string) (int) $qty, trim((string) $notes)]);
+            };
             if ($request->recalled_order_id) {
                 $oldOrder = RestaurantOrder::where('id', $request->recalled_order_id)
                     ->where('company_id', $companyId)
@@ -359,6 +369,12 @@ class RestaurantPosController extends Controller
                     ->first();
                 if ($oldOrder) {
                     $carriedKotCount = (int) ($oldOrder->kot_print_count ?? 0);
+                    foreach ($oldOrder->items()->whereNotNull('kot_printed_at')->get() as $oi) {
+                        $printedPool[$kotCarryKey($oi->item_type, $oi->item_id, $oi->item_name, $oi->quantity, $oi->special_notes)][] = [
+                            'kot_printed_at' => $oi->kot_printed_at,
+                            'kot_batch_no' => $oi->kot_batch_no,
+                        ];
+                    }
                     $oldOrder->items()->delete();
                     $oldOrder->update(['status' => 'cancelled']);
                     if ($oldOrder->table_id) {
@@ -411,6 +427,14 @@ class RestaurantPosController extends Controller
             ]);
 
             foreach ($resolvedItems as $item) {
+                // Re-apply carried KOT print stamps to unchanged lines (consume
+                // one pool entry per matching row — duplicates handled).
+                $ck = $kotCarryKey($item['item_type'], $item['item_id'], $item['item_name'], $item['quantity'], $item['special_notes'] ?? '');
+                if (!empty($printedPool[$ck])) {
+                    $stamp = array_shift($printedPool[$ck]);
+                    $item['kot_printed_at'] = $stamp['kot_printed_at'];
+                    $item['kot_batch_no'] = $stamp['kot_batch_no'];
+                }
                 RestaurantOrderItem::create(array_merge($item, ['order_id' => $order->id]));
             }
 

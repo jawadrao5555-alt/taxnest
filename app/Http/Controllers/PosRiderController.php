@@ -276,6 +276,14 @@ class PosRiderController extends Controller
         if ($txn->rider_settlement_id) {
             return back()->with('error', 'This bill is already settled — rider cannot be changed.');
         }
+        // Rider is LOCKED once the delivery reached a terminal state (owner,
+        // Jul 2026): delivered/returned bills keep the rider who actually ran
+        // them — reassigning would silently move the cash khata to someone who
+        // never carried the order. Reassign stays open while assigned/dispatched
+        // (rider suddenly unavailable → pick another; khata follows rider_id).
+        if (in_array($txn->delivery_status, ['delivered', 'returned'], true)) {
+            return back()->with('error', 'This delivery is already ' . $txn->delivery_status . ' — rider can no longer be changed.');
+        }
         // Only delivery-shaped bills can carry a rider.
         if ($txn->order_type !== 'delivery' && !$txn->rider_id && !$txn->delivery_address) {
             return back()->with('error', 'Only delivery bills can be assigned to a rider.');
@@ -313,7 +321,19 @@ class PosRiderController extends Controller
             return back()->with('error', 'This bill is already settled — status is locked.');
         }
 
-        $txn->update(['delivery_status' => $request->input('delivery_status')]);
+        // Terminal-state guard (owner, Jul 2026): delivered/returned lock the
+        // rider — re-opening the status would silently unlock reassignment too.
+        // Only forward move allowed from delivered is → returned (matches the
+        // UI's Returned button); returned is fully final.
+        $newStatus = $request->input('delivery_status');
+        if ($txn->delivery_status === 'returned') {
+            return back()->with('error', 'This delivery is already returned — status is final.');
+        }
+        if ($txn->delivery_status === 'delivered' && $newStatus !== 'returned') {
+            return back()->with('error', 'This delivery is already delivered — it can only be marked returned.');
+        }
+
+        $txn->update(['delivery_status' => $newStatus]);
 
         return back()->with('success', 'Delivery status updated.');
     }

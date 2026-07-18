@@ -69,6 +69,29 @@ class PosController extends Controller
         return response()->json(['success' => true, 'enabled' => $enabled]);
     }
 
+    /**
+     * Tax-Inclusive Pricing (Menu-Rate-Final) mode toggle — admin-only.
+     * Applies to NEW bills only: existing bills keep their own tax_inclusive
+     * snapshot, so history/reports/PRA payloads never shift retroactively.
+     */
+    public function updateTaxPricingMode(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->isPosCashier()) {
+            return response()->json(['success' => false, 'message' => 'Only POS administrators can change this setting.'], 403);
+        }
+        // Prod schema drift guard: never accept the switch if the column is
+        // missing — bills would silently store inclusive prices under
+        // exclusive semantics (wrong tax to PRA).
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_tax_inclusive')) {
+            return response()->json(['success' => false, 'message' => 'This setting is not available yet — please try again after the pending system update.'], 503);
+        }
+        $inclusive = $request->boolean('inclusive');
+        $companyId = app('currentCompanyId');
+        Company::where('id', $companyId)->update(['pos_tax_inclusive' => $inclusive]);
+        return response()->json(['success' => true, 'inclusive' => $inclusive]);
+    }
+
     public function updateRestockToggle(Request $request)
     {
         $user = auth('pos')->user();
@@ -1006,10 +1029,28 @@ class PosController extends Controller
         $exemptAfterDiscount = round($afterDiscount - $taxableAfterDiscount, 2);
 
         $taxRate = PosTaxRule::getRateForMethod($request->payment_method, $company);
-        // Round tax to nearest whole rupee — matches frontend Math.round(taxAmount).
-        // Pakistan POS convention: tax + bill always whole rupees, no paisa.
-        $taxAmount = (float) round($taxableAfterDiscount * $taxRate / 100);
-        $totalAmount = (float) round($afterDiscount + $taxAmount);
+        // Tax-Inclusive Pricing (Menu-Rate-Final, owner Jul 2026): when ON, the menu
+        // price IS the grand total — included tax is back-calculated per payment
+        // method and the header is stored in ex-tax-consistent semantics (see
+        // PosTaxMath docblock). Item rows keep the INCLUSIVE menu prices as entered.
+        // Column guard: if the snapshot column is missing (prod drift), fall back to
+        // exclusive math — never store inclusive prices under exclusive semantics.
+        $taxInclusiveColumnExists = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'tax_inclusive');
+        $taxInclusive = $taxInclusiveColumnExists && (bool) ($company->pos_tax_inclusive ?? false);
+        if ($taxInclusive) {
+            $inc = \App\Services\PosTaxMath::inclusiveHeader((float) $subtotal, (float) $taxableSubtotal, (float) $discountAmount, (float) $taxRate);
+            $taxAmount = $inc['tax_amount'];
+            $totalAmount = $inc['total_amount'];
+            $exemptAfterDiscount = $inc['exempt_amount'];
+            $headerSubtotal = $inc['subtotal_col'];
+        } else {
+            // Round tax to nearest whole rupee — matches frontend Math.round(taxAmount).
+            // Pakistan POS convention: tax + bill always whole rupees, no paisa.
+            $taxAmount = (float) round($taxableAfterDiscount * $taxRate / 100);
+            $totalAmount = (float) round($afterDiscount + $taxAmount);
+            $headerSubtotal = $subtotal;
+        }
+        $taxInclusiveFields = $taxInclusiveColumnExists ? ['tax_inclusive' => $taxInclusive] : [];
 
         if ($request->terminal_id) {
             $terminal = PosTerminal::where('company_id', $companyId)->where('id', $request->terminal_id)->where('is_active', true)->first();
@@ -1127,7 +1168,7 @@ class PosController extends Controller
                     'customer_name' => $request->customer_name,
                     'customer_phone' => $request->customer_phone,
                     'delivery_address' => $request->input('delivery_address') ?: null,
-                    'subtotal' => $subtotal,
+                    'subtotal' => $headerSubtotal,
                     'discount_type' => $discountType,
                     'discount_value' => $discountValue,
                     'discount_amount' => $discountAmount,
@@ -1145,7 +1186,7 @@ class PosController extends Controller
                     'locked_by_terminal_id' => null,
                     'lock_time' => null,
                     'notes' => $request->input('kitchen_notes'),
-                ] + $riderFields);
+                ] + $riderFields + $taxInclusiveFields);
 
                 $transaction->items()->delete();
             } else {
@@ -1167,7 +1208,7 @@ class PosController extends Controller
                     'customer_name' => $request->customer_name,
                     'customer_phone' => $request->customer_phone,
                     'delivery_address' => $request->input('delivery_address') ?: null,
-                    'subtotal' => $subtotal,
+                    'subtotal' => $headerSubtotal,
                     'discount_type' => $discountType,
                     'discount_value' => $discountValue,
                     'discount_amount' => $discountAmount,
@@ -1185,14 +1226,18 @@ class PosController extends Controller
                     'offline_uuid' => $offlineUuidColumnExists ? $offlineUuid : null,
                     'created_by' => auth('pos')->id(),
                     'notes' => $request->input('kitchen_notes'),
-                ] + $riderFields);
+                ] + $riderFields + $taxInclusiveFields);
             }
 
             foreach ($companyItems as $ri) {
                 $itemTaxRate = $ri['isExempt'] ? 0 : $taxRate;
                 $itemDiscountShare = $subtotal > 0 ? round($discountAmount * ($ri['lineTotal'] / $subtotal), 2) : 0;
                 $itemTaxableAmount = $ri['lineTotal'] - $itemDiscountShare;
-                $itemTaxAmount = round($itemTaxableAmount * $itemTaxRate / 100, 2);
+                // Inclusive mode: line prices are menu (tax-in) — tax_amount holds the
+                // INCLUDED portion, unit_price/subtotal keep the as-entered menu values.
+                $itemTaxAmount = $taxInclusive
+                    ? \App\Services\PosTaxMath::inclusiveLineTax((float) $itemTaxableAmount, (float) $itemTaxRate)
+                    : round($itemTaxableAmount * $itemTaxRate / 100, 2);
 
                 PosTransactionItem::create([
                     'transaction_id' => $transaction->id,
@@ -1412,10 +1457,24 @@ class PosController extends Controller
         $exemptAfterDiscount = round($afterDiscount - $taxableAfterDiscount, 2);
 
         $taxRate = PosTaxRule::getRateForMethod($request->payment_method, $company);
-        // Round tax to nearest whole rupee — matches frontend Math.round(taxAmount).
-        // Pakistan POS convention: tax + bill always whole rupees, no paisa.
-        $taxAmount = (float) round($taxableAfterDiscount * $taxRate / 100);
-        $totalAmount = (float) round($afterDiscount + $taxAmount);
+        // Tax-Inclusive Pricing: an EDIT branches on the bill's SNAPSHOT flag, never
+        // the current company setting — the bill keeps the semantics it was created
+        // under (stored item prices are menu/inclusive for inclusive bills).
+        $editTaxInclusive = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'tax_inclusive')
+            && (bool) $transaction->tax_inclusive;
+        if ($editTaxInclusive) {
+            $inc = \App\Services\PosTaxMath::inclusiveHeader((float) $subtotal, (float) $taxableSubtotal, (float) $discountAmount, (float) $taxRate);
+            $taxAmount = $inc['tax_amount'];
+            $totalAmount = $inc['total_amount'];
+            $exemptAfterDiscount = $inc['exempt_amount'];
+            $headerSubtotal = $inc['subtotal_col'];
+        } else {
+            // Round tax to nearest whole rupee — matches frontend Math.round(taxAmount).
+            // Pakistan POS convention: tax + bill always whole rupees, no paisa.
+            $taxAmount = (float) round($taxableAfterDiscount * $taxRate / 100);
+            $totalAmount = (float) round($afterDiscount + $taxAmount);
+            $headerSubtotal = $subtotal;
+        }
 
         // Owner rule (Jul 2026 update): an EDIT must NEVER silently change a bill's
         // reporting fate. The bill keeps whatever it was:
@@ -1456,7 +1515,7 @@ class PosController extends Controller
                 'customer_name' => $request->customer_name,
                 'customer_phone' => $request->customer_phone,
                 'delivery_address' => $request->input('delivery_address') ?: null,
-                'subtotal' => $subtotal,
+                'subtotal' => $headerSubtotal,
                 'discount_type' => $discountType,
                 'discount_value' => $discountValue,
                 'discount_amount' => $discountAmount,
@@ -1482,7 +1541,9 @@ class PosController extends Controller
                 $itemTaxRate = $ri['isExempt'] ? 0 : $taxRate;
                 $itemDiscountShare = $subtotal > 0 ? round($discountAmount * ($ri['lineTotal'] / $subtotal), 2) : 0;
                 $itemTaxableAmount = $ri['lineTotal'] - $itemDiscountShare;
-                $itemTaxAmount = round($itemTaxableAmount * $itemTaxRate / 100, 2);
+                $itemTaxAmount = $editTaxInclusive
+                    ? \App\Services\PosTaxMath::inclusiveLineTax((float) $itemTaxableAmount, (float) $itemTaxRate)
+                    : round($itemTaxableAmount * $itemTaxRate / 100, 2);
 
                 PosTransactionItem::create([
                     'transaction_id' => $transaction->id,
@@ -2100,6 +2161,7 @@ class PosController extends Controller
                 // Recompute tax from the STORED bill for the chosen method — mirrors
                 // storeInvoice (stored subtotal, absolute discount, non-exempt lines).
                 $items = $tx->items()->get();
+                $lineSum = (float) $items->sum('subtotal');
                 $subtotal = (float) $tx->subtotal;
                 $discountAmount = (float) $tx->discount_amount;
                 $afterDiscount = $subtotal - $discountAmount;
@@ -2108,9 +2170,27 @@ class PosController extends Controller
                 $exemptAfterDiscount = round($afterDiscount - $taxableAfterDiscount, 2);
 
                 $taxRate = PosTaxRule::getRateForMethod($payMethod, $company);
-                // Whole-rupee tax + total (Pakistan POS convention) — item lines stay 2dp.
-                $taxAmount = (float) round($taxableAfterDiscount * $taxRate / 100);
-                $totalAmount = (float) round($afterDiscount + $taxAmount);
+                // Tax-Inclusive Pricing: promote branches on the bill's SNAPSHOT flag.
+                // Stored item lines are menu (inclusive) prices, so re-deriving at a
+                // DIFFERENT payment method's rate keeps the customer total invariant
+                // (= menu sum − discount) — only the base/tax split moves. The header
+                // subtotal column is re-derived too (it depends on the rate).
+                $promoteTaxInclusive = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'tax_inclusive')
+                    && (bool) $tx->tax_inclusive;
+                if ($promoteTaxInclusive) {
+                    $inc = \App\Services\PosTaxMath::inclusiveHeader($lineSum, $taxableSubtotal, $discountAmount, (float) $taxRate);
+                    $taxAmount = $inc['tax_amount'];
+                    $totalAmount = $inc['total_amount'];
+                    $exemptAfterDiscount = $inc['exempt_amount'];
+                    $headerSubtotal = $inc['subtotal_col'];
+                    $shareBase = $lineSum;
+                } else {
+                    // Whole-rupee tax + total (Pakistan POS convention) — item lines stay 2dp.
+                    $taxAmount = (float) round($taxableAfterDiscount * $taxRate / 100);
+                    $totalAmount = (float) round($afterDiscount + $taxAmount);
+                    $headerSubtotal = $subtotal;
+                    $shareBase = $subtotal;
+                }
 
                 // Serial split (owner rule Jul 2026): a real POS fiscal serial replaces
                 // the provisional L-NNN ONLY when the bill actually goes to PRA
@@ -2125,6 +2205,7 @@ class PosController extends Controller
                 $tx->update([
                     'invoice_number'    => $newInvoiceNumber,
                     'payment_method'    => $payMethod,
+                    'subtotal'          => $headerSubtotal,
                     'tax_rate'          => $taxRate,
                     'tax_amount'        => $taxAmount,
                     'exempt_amount'     => $exemptAfterDiscount,
@@ -2146,9 +2227,11 @@ class PosController extends Controller
                 // Re-tax each line for the new rate — the PRA payload reads per-item tax_rate.
                 foreach ($items as $it) {
                     $itemTaxRate = (bool) $it->is_tax_exempt ? 0 : $taxRate;
-                    $itemDiscountShare = $subtotal > 0 ? round($discountAmount * ((float) $it->subtotal / $subtotal), 2) : 0;
+                    $itemDiscountShare = $shareBase > 0 ? round($discountAmount * ((float) $it->subtotal / $shareBase), 2) : 0;
                     $itemTaxableAmount = (float) $it->subtotal - $itemDiscountShare;
-                    $itemTaxAmount = round($itemTaxableAmount * $itemTaxRate / 100, 2);
+                    $itemTaxAmount = $promoteTaxInclusive
+                        ? \App\Services\PosTaxMath::inclusiveLineTax($itemTaxableAmount, (float) $itemTaxRate)
+                        : round($itemTaxableAmount * $itemTaxRate / 100, 2);
                     $it->update([
                         'tax_rate'   => $itemTaxRate,
                         'tax_amount' => $itemTaxAmount,
@@ -2984,24 +3067,46 @@ class PosController extends Controller
         return 'All Time';
     }
 
+    /**
+     * Tax-Inclusive Pricing (Menu-Rate-Final): item `subtotal` stores the MENU
+     * (tax-in) line amount on inclusive bills, while exclusive bills store the
+     * ex-tax amount. Reports must always aggregate the EX-TAX base so the
+     * subtotal − exempt = taxable identity keeps holding. For inclusive rows the
+     * exact stored base is (subtotal − tax_amount) — identical to the PRA
+     * SaleValue split. Guarded for prod schema drift (column may lag a deploy).
+     */
+    private function itemBaseSqlExpr(): string
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'tax_inclusive')) {
+            return 'pos_transaction_items.subtotal';
+        }
+        return 'CASE WHEN COALESCE(pos_transactions.tax_inclusive, 0) = 1'
+            . ' THEN (pos_transaction_items.subtotal - pos_transaction_items.tax_amount)'
+            . ' ELSE pos_transaction_items.subtotal END';
+    }
+
     private function buildItemLevelSummary($transactionIds, $taxRateFilter)
     {
-        $itemQuery = \App\Models\PosTransactionItem::whereIn('transaction_id', $transactionIds);
+        $base = $this->itemBaseSqlExpr();
+        $itemQuery = \App\Models\PosTransactionItem::query()
+            ->join('pos_transactions', 'pos_transactions.id', '=', 'pos_transaction_items.transaction_id')
+            ->whereIn('pos_transaction_items.transaction_id', $transactionIds);
 
         if ($taxRateFilter === 'exempt') {
-            $itemQuery->where('is_tax_exempt', true);
+            $itemQuery->where('pos_transaction_items.is_tax_exempt', true);
         } elseif ($taxRateFilter !== null && $taxRateFilter !== '') {
             $rate = (float) $taxRateFilter;
-            $itemQuery->where('is_tax_exempt', false)->where('tax_rate', $rate);
+            $itemQuery->where('pos_transaction_items.is_tax_exempt', false)
+                ->where('pos_transaction_items.tax_rate', $rate);
         }
 
-        return $itemQuery->selectRaw('
-            COUNT(DISTINCT transaction_id) as total_invoices,
-            COALESCE(SUM(subtotal), 0) as total_sales,
-            COALESCE(SUM(tax_amount), 0) as total_tax,
-            COALESCE(SUM(CASE WHEN is_tax_exempt = true THEN subtotal ELSE 0 END), 0) as total_exempt,
-            COALESCE(SUM(CASE WHEN is_tax_exempt = false THEN subtotal ELSE 0 END), 0) as total_taxable
-        ')->first();
+        return $itemQuery->selectRaw("
+            COUNT(DISTINCT pos_transaction_items.transaction_id) as total_invoices,
+            COALESCE(SUM({$base}), 0) as total_sales,
+            COALESCE(SUM(pos_transaction_items.tax_amount), 0) as total_tax,
+            COALESCE(SUM(CASE WHEN pos_transaction_items.is_tax_exempt = true THEN {$base} ELSE 0 END), 0) as total_exempt,
+            COALESCE(SUM(CASE WHEN pos_transaction_items.is_tax_exempt = false THEN {$base} ELSE 0 END), 0) as total_taxable
+        ")->first();
     }
 
     private function getItemLevelValuesForTransactions($transactions, $taxRateFilter)
@@ -3009,24 +3114,28 @@ class PosController extends Controller
         $transactionIds = $transactions->pluck('id')->toArray();
         if (empty($transactionIds)) return [];
 
-        $itemQuery = \App\Models\PosTransactionItem::whereIn('transaction_id', $transactionIds);
+        $base = $this->itemBaseSqlExpr();
+        $itemQuery = \App\Models\PosTransactionItem::query()
+            ->join('pos_transactions', 'pos_transactions.id', '=', 'pos_transaction_items.transaction_id')
+            ->whereIn('pos_transaction_items.transaction_id', $transactionIds);
 
         if ($taxRateFilter === 'exempt') {
-            $itemQuery->where('is_tax_exempt', true);
+            $itemQuery->where('pos_transaction_items.is_tax_exempt', true);
         } elseif ($taxRateFilter !== null && $taxRateFilter !== '') {
             $rate = (float) $taxRateFilter;
-            $itemQuery->where('is_tax_exempt', false)->where('tax_rate', $rate);
+            $itemQuery->where('pos_transaction_items.is_tax_exempt', false)
+                ->where('pos_transaction_items.tax_rate', $rate);
         } else {
             return [];
         }
 
-        return $itemQuery->selectRaw('
-            transaction_id,
-            COALESCE(SUM(subtotal), 0) as item_subtotal,
-            COALESCE(SUM(tax_amount), 0) as item_tax,
-            COALESCE(SUM(CASE WHEN is_tax_exempt = true THEN subtotal ELSE 0 END), 0) as item_exempt,
-            COALESCE(SUM(CASE WHEN is_tax_exempt = false THEN subtotal ELSE 0 END), 0) as item_taxable
-        ')->groupBy('transaction_id')->get()->keyBy('transaction_id')->toArray();
+        return $itemQuery->selectRaw("
+            pos_transaction_items.transaction_id,
+            COALESCE(SUM({$base}), 0) as item_subtotal,
+            COALESCE(SUM(pos_transaction_items.tax_amount), 0) as item_tax,
+            COALESCE(SUM(CASE WHEN pos_transaction_items.is_tax_exempt = true THEN {$base} ELSE 0 END), 0) as item_exempt,
+            COALESCE(SUM(CASE WHEN pos_transaction_items.is_tax_exempt = false THEN {$base} ELSE 0 END), 0) as item_taxable
+        ")->groupBy('pos_transaction_items.transaction_id')->get()->keyBy('transaction_id')->toArray();
     }
 
     public function taxReports(Request $request)

@@ -4,6 +4,11 @@
         $praOn   = (bool) (auth('pos')->user()?->praReportingEnabled($company) ?? false);
         $agentOn = (bool) ($company->agent_enabled ?? false);
         $invOn   = (bool) ($company->inventory_enabled ?? false);
+        // Tax-Inclusive Pricing (Menu-Rate-Final) — effective rates via PosTaxRule
+        // helpers ONLY (global defaults + per-company overrides), never raw table reads.
+        $taxIncOn  = (bool) ($company->pos_tax_inclusive ?? false);
+        $cashRate  = \App\Models\PosTaxRule::getRateForMethod('cash', $company);
+        $cardRate  = \App\Models\PosTaxRule::getRateForMethod('card', $company);
 
         // Card sections — every POS feature reachable from this one hub.
         $sections = [
@@ -56,7 +61,7 @@
         ];
     @endphp
 
-    <div x-data="{ currentTheme: '{{ $company->pos_theme ?? 'purple' }}', guidedOn: {{ ($company->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }}, savingGuided: false, invOn: {{ $invOn ? 'true' : 'false' }}, savingInv: false, restockOn: {{ ($company->pos_restock_on_void ?? true) ? 'true' : 'false' }}, savingRestock: false, autoDaycloseOn: {{ ($company->pos_auto_dayclose_24h ?? false) ? 'true' : 'false' }}, savingDayclose: false, kdsAutoOn: {{ ($company->pos_kds_auto_print ?? false) ? 'true' : 'false' }}, savingKdsAuto: false, lbFinal: '{{ in_array($company->pos_dayclose_final_local_action ?? 'save', ['save','delete'], true) ? ($company->pos_dayclose_final_local_action ?? 'save') : 'save' }}', lbProv: '{{ in_array($company->pos_dayclose_provisional_action ?? 'save', ['save','delete'], true) ? ($company->pos_dayclose_provisional_action ?? 'save') : 'save' }}', lbPersist: {{ ($company->pos_customer_spend_persist ?? true) ? 'true' : 'false' }}, savingLB: false, saveLB() { this.savingLB = true; fetch('/pos/settings/local-billing', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({final_action:this.lbFinal, provisional_action:this.lbProv, spend_persist:this.lbPersist})}).then(r=>r.json()).catch(()=>{}).finally(()=>{ this.savingLB=false; }) } }"
+    <div x-data="{ currentTheme: '{{ $company->pos_theme ?? 'purple' }}', guidedOn: {{ ($company->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }}, savingGuided: false, invOn: {{ $invOn ? 'true' : 'false' }}, savingInv: false, restockOn: {{ ($company->pos_restock_on_void ?? true) ? 'true' : 'false' }}, savingRestock: false, autoDaycloseOn: {{ ($company->pos_auto_dayclose_24h ?? false) ? 'true' : 'false' }}, savingDayclose: false, kdsAutoOn: {{ ($company->pos_kds_auto_print ?? false) ? 'true' : 'false' }}, savingKdsAuto: false, lbFinal: '{{ in_array($company->pos_dayclose_final_local_action ?? 'save', ['save','delete'], true) ? ($company->pos_dayclose_final_local_action ?? 'save') : 'save' }}', lbProv: '{{ in_array($company->pos_dayclose_provisional_action ?? 'save', ['save','delete'], true) ? ($company->pos_dayclose_provisional_action ?? 'save') : 'save' }}', lbPersist: {{ ($company->pos_customer_spend_persist ?? true) ? 'true' : 'false' }}, savingLB: false, taxInc: {{ $taxIncOn ? 'true' : 'false' }}, savingTaxInc: false, calcPrice: 590, cashRate: {{ (float) $cashRate }}, cardRate: {{ (float) $cardRate }}, calc(rate) { const p = parseFloat(this.calcPrice) || 0; if (this.taxInc) { const tax = p * rate / (100 + rate); return { base: p - tax, tax: tax, total: Math.round(p) }; } const tax = p * rate / 100; return { base: p, tax: tax, total: Math.round(p + tax) }; }, fmt(n) { return 'Rs ' + (Math.round(n * 100) / 100).toLocaleString(); }, setTaxMode(inc) { if (this.taxInc === inc || this.savingTaxInc) return; const prev = this.taxInc; this.taxInc = inc; this.savingTaxInc = true; fetch('/pos/settings/tax-pricing-mode', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({inclusive:inc})}).then(r=>r.json()).then(d=>{ if (!d || d.success !== true) { this.taxInc = prev; alert((d && d.message) || 'Setting save nahi hui — dobara koshish karein.'); } }).catch(()=>{ this.taxInc = prev; alert('Setting save nahi hui — dobara koshish karein.'); }).finally(()=>{ this.savingTaxInc = false; }); }, saveLB() { this.savingLB = true; fetch('/pos/settings/local-billing', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({final_action:this.lbFinal, provisional_action:this.lbProv, spend_persist:this.lbPersist})}).then(r=>r.json()).catch(()=>{}).finally(()=>{ this.savingLB=false; }) } }"
          class="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
 
         {{-- ═══════════ HERO ═══════════ --}}
@@ -169,6 +174,84 @@
                     </button>
                 </div>
                 @endif
+            </div>
+        </section>
+
+        {{-- ═══════════ TAX PRICING MODE (Menu-Rate-Final) ═══════════ --}}
+        <section>
+            <div class="px-1 mb-3">
+                <h2 class="text-sm font-extrabold text-gray-900 dark:text-white uppercase tracking-wide">Tax Pricing Mode</h2>
+                <p class="text-[12px] text-gray-500 dark:text-gray-400">Menu price mein tax upar se lage ya andar hi shamil ho — apni shop ka style chunein</p>
+            </div>
+            <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400 flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21l-2-1-2 1-2-1-2 1-2-1-2 1V5a2 2 0 012-2h10a2 2 0 012 2v16z"/></svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">Bill par tax kaise lage?</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">Tax hamesha poora PRA ko jata hai — farq sirf yeh hai ke customer se kitna wusool hota hai</p>
+                    </div>
+                    <span class="shrink-0 text-[10px] font-semibold text-gray-400" x-show="savingTaxInc" x-cloak>Saving…</span>
+                </div>
+
+                <div class="grid sm:grid-cols-2 gap-3">
+                    {{-- Option 1: Standard (tax add-on) --}}
+                    <button type="button" @click="setTaxMode(false)"
+                        class="text-left rounded-xl border-2 p-4 transition"
+                        :class="!taxInc ? 'border-teal-600 bg-teal-50 dark:bg-teal-900/20' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-gray-300'">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <p class="text-sm font-extrabold text-gray-900 dark:text-white">Standard — Tax Upar Se</p>
+                            <span x-show="!taxInc" x-cloak class="px-2 py-0.5 rounded-full bg-teal-600 text-white text-[10px] font-bold">ACTIVE</span>
+                        </div>
+                        <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed">Menu price par tax alag se add hota hai. Customer menu price se zyada ada karta hai.</p>
+                        <p class="text-[11px] font-semibold text-gray-700 dark:text-gray-300 mt-2">Misal: Rs 500 + {{ rtrim(rtrim(number_format($cashRate, 2), '0'), '.') }}% tax = customer <span class="font-extrabold">Rs {{ number_format(round(500 + 500 * $cashRate / 100)) }}</span> deta hai</p>
+                    </button>
+
+                    {{-- Option 2: Tax-Inclusive (Menu-Rate-Final) --}}
+                    <button type="button" @click="setTaxMode(true)"
+                        class="text-left rounded-xl border-2 p-4 transition"
+                        :class="taxInc ? 'border-teal-600 bg-teal-50 dark:bg-teal-900/20' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-gray-300'">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <p class="text-sm font-extrabold text-gray-900 dark:text-white">Tax-Inclusive — Menu Rate Final</p>
+                            <span x-show="taxInc" x-cloak class="px-2 py-0.5 rounded-full bg-teal-600 text-white text-[10px] font-bold">ACTIVE</span>
+                        </div>
+                        <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed">Menu price hi final total hai — tax usi ke andar se nikalta hai. Customer wohi ada karta hai jo menu par likha hai.</p>
+                        <p class="text-[11px] font-semibold text-gray-700 dark:text-gray-300 mt-2">Misal: Rs 590 menu price = customer <span class="font-extrabold">Rs 590</span> hi deta hai (tax andar shamil)</p>
+                    </button>
+                </div>
+
+                {{-- Live calculator --}}
+                <div class="mt-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 p-4">
+                    <div class="flex items-center justify-between gap-3 flex-wrap mb-3">
+                        <p class="text-[12px] font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wide">Live Calculator</p>
+                        <div class="flex items-center gap-2">
+                            <label class="text-[11px] font-semibold text-gray-500 dark:text-gray-400">Menu price:</label>
+                            <input type="number" min="0" step="1" x-model="calcPrice"
+                                autocomplete="off" name="tax_calc_price_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                                class="w-28 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <template x-for="m in [{label: 'Cash', rate: cashRate}, {label: 'Card / Digital', rate: cardRate}]" :key="m.label">
+                            <div class="rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-3">
+                                <p class="text-[11px] font-extrabold text-gray-900 dark:text-white mb-2" x-text="m.label + ' (' + m.rate + '% tax)'"></p>
+                                <div class="space-y-1 text-[11px]">
+                                    <div class="flex justify-between text-gray-500 dark:text-gray-400"><span>Base price</span><span x-text="fmt(calc(m.rate).base)"></span></div>
+                                    <div class="flex justify-between text-gray-500 dark:text-gray-400"><span x-text="taxInc ? 'Tax (andar shamil)' : 'Tax (upar se)'"></span><span x-text="fmt(calc(m.rate).tax)"></span></div>
+                                    <div class="flex justify-between font-extrabold text-gray-900 dark:text-white pt-1 border-t border-gray-100 dark:border-gray-800"><span>Customer deta hai</span><span x-text="fmt(calc(m.rate).total)"></span></div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    <p class="text-[10px] text-gray-400 dark:text-gray-500 mt-2" x-show="taxInc" x-cloak>Tax-Inclusive mein cash ho ya card — customer ka total wohi menu price rehta hai; sirf andar ka base/tax split badalta hai.</p>
+                </div>
+
+                {{-- New-bills-only warning --}}
+                <div class="mt-4 flex items-start gap-2.5 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3">
+                    <svg class="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    <p class="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed"><span class="font-bold">Sirf naye bills par lagu hoga.</span> Purane bills, un ki receipts aur reports apne waqt ke mode ke mutabiq hi rahenge — kuch bhi peechhe ja kar tabdeel nahi hota. Tax har soorat poora PRA ko report hota hai.</p>
+                </div>
             </div>
         </section>
 

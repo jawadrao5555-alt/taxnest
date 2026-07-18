@@ -70,16 +70,26 @@ class PraIntegrationService
         $totalDiscount = (float) $transaction->discount_amount;
         $taxRate = (float) $transaction->tax_rate;
 
+        // Tax-Inclusive Pricing (Menu-Rate-Final, owner Jul 2026): on inclusive bills
+        // the stored item lines are MENU (tax-in) prices and the header subtotal is
+        // ex-tax-consistent — so the discount-share denominator must be the INCLUSIVE
+        // line sum, and per-line SaleValue/TaxCharged are back-calculated out of the
+        // inclusive line (SaleValue = line×100/(100+r); TaxCharged = line − SaleValue;
+        // TotalAmount = the inclusive line itself → bill sums to the menu total).
+        // Column-missing prod drift → attribute reads null → false (exclusive math).
+        $taxInclusive = (bool) ($transaction->tax_inclusive ?? false);
+        $shareBase = $taxInclusive ? (float) $transaction->items->sum('subtotal') : $itemsSubtotal;
+
         $items = $transaction->items
             ->filter(function ($item) {
                 return (float) $item->unit_price > 0 && (float) $item->quantity > 0 && !$item->is_tax_exempt;
             })
             ->values()
-            ->map(function ($item, $index) use ($itemsSubtotal, $totalDiscount, $taxRate) {
+            ->map(function ($item, $index) use ($shareBase, $totalDiscount, $taxRate, $taxInclusive) {
                 $qty = (float) $item->quantity;
                 $unitPrice = (float) $item->unit_price;
                 $lineSubtotal = (float) $item->subtotal;
-                $itemDiscount = $itemsSubtotal > 0 ? round($totalDiscount * ($lineSubtotal / $itemsSubtotal), 2) : 0;
+                $itemDiscount = $shareBase > 0 ? round($totalDiscount * ($lineSubtotal / $shareBase), 2) : 0;
                 $perUnitDiscount = $qty > 0 ? round($itemDiscount / $qty, 2) : 0;
                 $saleValuePerUnit = round($unitPrice - $perUnitDiscount, 2);
                 if ($saleValuePerUnit <= 0) {
@@ -87,8 +97,16 @@ class PraIntegrationService
                 }
                 $lineSaleValue = round($saleValuePerUnit * $qty, 2);
                 $itemTaxRate = $item->is_tax_exempt ? 0 : ($item->tax_rate ?? $taxRate);
-                $taxCharged = round($lineSaleValue * $itemTaxRate / 100, 2);
-                $totalAmount = round($lineSaleValue + $taxCharged, 2);
+                if ($taxInclusive) {
+                    // $lineSaleValue here = INCLUSIVE line after discount (menu money).
+                    $lineInclusive = $lineSaleValue;
+                    $lineSaleValue = round($lineInclusive * 100 / (100 + $itemTaxRate), 2);
+                    $taxCharged = round($lineInclusive - $lineSaleValue, 2);
+                    $totalAmount = $lineInclusive;
+                } else {
+                    $taxCharged = round($lineSaleValue * $itemTaxRate / 100, 2);
+                    $totalAmount = round($lineSaleValue + $taxCharged, 2);
+                }
 
                 return [
                     'ItemCode' => $item->item_id ? sprintf('%04d', $item->item_id) : sprintf('IT_%04d', $index + 1),

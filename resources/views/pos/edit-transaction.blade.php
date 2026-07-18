@@ -243,7 +243,7 @@
                             <span class="font-medium text-gray-800 dark:text-gray-200" x-text="'Rs ' + afterDiscount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
                         </div>
                         <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-                            <span>Tax (<span x-text="taxRate + '%'"></span>)</span>
+                            <span>Tax (<span x-text="taxRate + '%' + (taxInclusive ? ' incl.' : '')"></span>)</span>
                             <span class="font-medium text-gray-800 dark:text-gray-200" x-text="'Rs ' + taxAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
                         </div>
                         <div class="flex justify-between text-base font-bold text-gray-900 dark:text-white border-t-2 border-gray-200 dark:border-gray-700 pt-3 mt-2">
@@ -315,6 +315,9 @@
                 services: @json($services),
                 taxRules: @json($taxRules),
                 praEnabled: {{ (auth('pos')->user()?->praReportingEnabled($company) ?? false) ? 'true' : 'false' }},
+                // Tax-Inclusive (Menu-Rate-Final): BILL SNAPSHOT flag — edits keep the
+                // bill's original pricing mode (backend updateTransaction is authoritative).
+                taxInclusive: {{ (bool) ($transaction->tax_inclusive ?? false) ? 'true' : 'false' }},
 
                 customerName: @json($transaction->customer_name ?? ''),
                 customerPhone: @json($transaction->customer_phone ?? ''),
@@ -407,8 +410,16 @@
                     }
 
                     this.afterDiscount = Math.round((this.subtotal - this.discountAmount) * 100) / 100;
-                    this.taxAmount = Math.round(this.afterDiscount * this.taxRate / 100 * 100) / 100;
-                    this.total = Math.round((this.afterDiscount + this.taxAmount) * 100) / 100;
+                    if (this.taxInclusive) {
+                        // Menu-Rate-Final: prices are tax-in — back-calculate the included
+                        // tax; customer total = discounted menu sum (whole rupee), matching
+                        // PosTaxMath on the backend.
+                        this.taxAmount = Math.round(this.afterDiscount * this.taxRate / (100 + this.taxRate) * 100) / 100;
+                        this.total = Math.round(this.afterDiscount);
+                    } else {
+                        this.taxAmount = Math.round(this.afterDiscount * this.taxRate / 100 * 100) / 100;
+                        this.total = Math.round((this.afterDiscount + this.taxAmount) * 100) / 100;
+                    }
                 },
 
                 submitForm(event) {

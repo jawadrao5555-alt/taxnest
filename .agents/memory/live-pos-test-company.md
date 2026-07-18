@@ -5,6 +5,11 @@ description: Live POS test-company pattern — the temporary test company was DE
 
 # Live NestPOS test company pattern
 
+## ACTIVE test company (18 Jul 2026, cleanup pending — follow-up task exists)
+- company_id 31 "TaxNest QA Test Shop", login qa.mrf.test@taxnest.com.pk / Admin@12345, NTN 7654321, phone 03457654321, Pro plan (id 11), retail. PRA reporting OFF, pos_tax_inclusive ON. Test bills: pos_transactions 420 (L-001 cash) + 421 (L-002 card), products 214/215 auto-created. Delete via the admin bin flow below when owner confirms testing done.
+- Registration trial-abuse guard rejects REUSED ntn/phone/email ("already been used to create an account") — deleted test companies' identifiers stay burned; always pick fresh ones.
+- Welcome form gotcha: `pos_ui_density` must be simple|standard|premium (anything else = silent validation fail → redirect loop back to ?welcome=1; no error visible to curl).
+
 - LIVE has NO standing POS test company — all live `product_type='pos'` companies are REAL customer restaurants (never test in those without explicit owner approval; PRA bills are real fiscal records). Temporary test companies used in Jul 2026 sessions were fully deleted afterward.
 - Safe pattern for live testing: register via public `/pos/register`, admin-approve, keep PRA reporting OFF the whole time (only L-series local bills, nothing submitted to PRA), delete when done. Admin delete flow: POST `/admin/companies/{id}/delete` (bin), then POST `_method=DELETE` to `/admin/bin/{id}/destroy` (forceDelete now also purges non-FK tables — see company-hard-delete-purge.md).
 

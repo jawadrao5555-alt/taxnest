@@ -1028,7 +1028,7 @@ window.addEventListener('popstate', function() {
                         <span x-text="'-Rs. ' + Number(discountAmount).toLocaleString()"></span>
                     </div>
                     <div x-show="exemptAmount > 0" class="flex justify-between text-xs text-green-600 dark:text-green-400"><span>Tax-Exempt</span><span x-text="'-Rs. ' + Number(exemptAmount).toLocaleString()"></span></div>
-                    <div class="flex justify-between text-xs text-gray-500"><span x-text="'Tax (' + taxRate + '%)'"></span><span x-text="'Rs. ' + Number(taxAmount).toLocaleString()"></span></div>
+                    <div class="flex justify-between text-xs text-gray-500"><span x-text="taxInclusive ? ('Tax (' + taxRate + '% incl.)') : ('Tax (' + taxRate + '%)')"></span><span x-text="'Rs. ' + Number(taxAmount).toLocaleString()"></span></div>
                     <div x-show="Math.abs(roundOff) > 0.001" class="flex justify-between text-xs text-blue-500 dark:text-blue-400">
                         <span>Round Off</span>
                         <span x-text="(roundOff >= 0 ? '+ Rs. ' : '− Rs. ') + Math.abs(roundOff).toFixed(2)"></span>
@@ -1115,14 +1115,14 @@ window.addEventListener('popstate', function() {
                     <svg x-show="submitting" class="w-8 h-8 mx-auto mb-1 animate-spin text-green-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                     <svg x-show="!submitting" class="w-8 h-8 mx-auto mb-1 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                     <span class="text-sm font-bold text-green-700 dark:text-green-400" x-text="submitting ? 'Processing...' : 'Cash'"></span>
-                    <span class="block text-[10px] font-semibold mt-0.5 text-green-600/60" x-text="'Tax: ' + (taxRules['cash'] || 16) + '%'"></span>
+                    <span class="block text-[10px] font-semibold mt-0.5 text-green-600/60" x-text="(taxInclusive ? 'Incl. tax ' : 'Tax: ') + (taxRules['cash'] || 16) + '%'"></span>
                     <kbd x-show="!submitting" class="block mt-0.5 text-[9px] font-mono text-green-500/60">Press 1</kbd>
                 </button>
                 <button @click="payMethodIndex = 1; processPayment('card')" :disabled="submitting" :class="payMethodIndex === 1 ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900 scale-105 shadow-sm border-blue-400' : ''" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 hover:border-blue-400">
                     <svg x-show="submitting" class="w-8 h-8 mx-auto mb-1 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                     <svg x-show="!submitting" class="w-8 h-8 mx-auto mb-1 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                     <span class="text-sm font-bold text-blue-700 dark:text-blue-400" x-text="submitting ? 'Processing...' : 'Card'"></span>
-                    <span class="block text-[10px] font-semibold mt-0.5 text-blue-600/60" x-text="'Tax: ' + (taxRules['debit_card'] || taxRules['card'] || 8) + '%'"></span>
+                    <span class="block text-[10px] font-semibold mt-0.5 text-blue-600/60" x-text="(taxInclusive ? 'Incl. tax ' : 'Tax: ') + (taxRules['debit_card'] || taxRules['card'] || 8) + '%'"></span>
                     <kbd x-show="!submitting" class="block mt-0.5 text-[9px] font-mono text-blue-500/60">Press 2</kbd>
                 </button>
             </div>
@@ -1379,11 +1379,11 @@ window.addEventListener('popstate', function() {
             <div class="p-5 grid grid-cols-2 gap-3">
                 <button @click="promoteMethodIndex = 0; promoteProvisional(promoteTarget, 'cash')" :disabled="promoteSubmitting" :class="promoteMethodIndex === 0 ? 'ring-2 ring-green-500 ring-offset-2 dark:ring-offset-gray-900 scale-105 border-green-400' : ''" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:bg-green-100 hover:border-green-400">
                     <span class="block text-sm font-black text-green-700 dark:text-green-400">Cash</span>
-                    <span class="block text-[10px] font-semibold mt-0.5 text-green-600/60" x-text="'Tax: ' + (taxRules['cash'] || 16) + '%'"></span>
+                    <span class="block text-[10px] font-semibold mt-0.5 text-green-600/60" x-text="(taxInclusive ? 'Incl. tax ' : 'Tax: ') + (taxRules['cash'] || 16) + '%'"></span>
                 </button>
                 <button @click="promoteMethodIndex = 1; promoteProvisional(promoteTarget, 'card')" :disabled="promoteSubmitting" :class="promoteMethodIndex === 1 ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900 scale-105 border-blue-400' : ''" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 hover:border-blue-400">
                     <span class="block text-sm font-black text-blue-700 dark:text-blue-400">Card</span>
-                    <span class="block text-[10px] font-semibold mt-0.5 text-blue-600/60" x-text="'Tax: ' + (taxRules['debit_card'] || taxRules['card'] || 8) + '%'"></span>
+                    <span class="block text-[10px] font-semibold mt-0.5 text-blue-600/60" x-text="(taxInclusive ? 'Incl. tax ' : 'Tax: ') + (taxRules['debit_card'] || taxRules['card'] || 8) + '%'"></span>
                 </button>
             </div>
             <div class="px-5 pb-3">
@@ -2256,6 +2256,10 @@ function restaurantPos() {
         blockOutOfStock: {{ $blockOutOfStock ? 'true' : 'false' }},
         taxRate: {{ (float) ($taxRate ?? 0) }},
         taxRules: {!! $jsEnc($taxRules->mapWithKeys(fn($r) => [$r->payment_method => (float) $r->tax_rate]), '{}') !!},
+        // Tax-Inclusive Pricing (Menu-Rate-Final, owner Jul 2026): when true, menu
+        // price IS the grand total — tax shown is the INCLUDED portion, total never
+        // adds tax on top. Mirrors PosTaxMath backend math.
+        taxInclusive: {{ ($company->pos_tax_inclusive ?? false) ? 'true' : 'false' }},
         posRole: '{{ $posRole }}',
         discountLimit: {{ (float) ($discountLimit ?? 0) }},
         hasManagerPin: {{ $hasManagerPin ? 'true' : 'false' }},
@@ -2507,8 +2511,16 @@ function restaurantPos() {
             const discountRatio = this.effectiveSubtotal > 0 ? (this.effectiveSubtotal - this.discountAmount) / this.effectiveSubtotal : 1;
             return Math.max(0, this.r2(taxable * Math.max(0, discountRatio)));
         },
-        get taxAmount() { return this.r2(this.taxableSubtotal * this.taxRate / 100); },
-        get totalAmount() { return Math.max(0, this.r2(this.effectiveSubtotal - this.discountAmount + this.taxAmount)); },
+        get taxAmount() {
+            // Inclusive mode: included portion of the taxable menu money (r/(100+r)).
+            if (this.taxInclusive) return this.r2(this.taxableSubtotal * this.taxRate / (100 + this.taxRate));
+            return this.r2(this.taxableSubtotal * this.taxRate / 100);
+        },
+        get totalAmount() {
+            // Inclusive mode: menu prices already contain tax — never add it on top.
+            if (this.taxInclusive) return Math.max(0, this.r2(this.effectiveSubtotal - this.discountAmount));
+            return Math.max(0, this.r2(this.effectiveSubtotal - this.discountAmount + this.taxAmount));
+        },
         get roundedTotal() { return Math.round(this.totalAmount); },
         get roundOff() { return this.r2(this.roundedTotal - this.totalAmount); },
         get exemptAmount() { return this.cart.filter(i => i.is_tax_exempt).reduce((s, i) => s + this.getItemTotal(i), 0); },
@@ -4958,6 +4970,8 @@ function restaurantPos() {
             const rate = method === 'card'
                 ? (this.taxRules['debit_card'] || this.taxRules['card'] || 8)
                 : (this.taxRules['cash'] || 16);
+            // Inclusive mode: menu total is method-independent (tax already inside).
+            if (this.taxInclusive) return Math.round(sub - disc);
             const tax = Math.round(taxable * ratio * rate / 100);
             return Math.round(sub - disc + tax);
         },

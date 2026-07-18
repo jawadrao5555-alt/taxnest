@@ -206,11 +206,19 @@
             </tbody>
         </table>
 
+        @php
+            // Tax-Inclusive (Menu-Rate-Final) bills: display the menu-price subtotal
+            // (stored ex-tax header + included tax) so it matches the item lines.
+            $pdfInclusive = (bool) ($transaction->tax_inclusive ?? false);
+            $pdfDisplaySubtotal = $pdfInclusive
+                ? (float) $transaction->subtotal + (float) $transaction->tax_amount
+                : (float) $transaction->subtotal;
+        @endphp
         <div class="totals-box">
             @if($showTaxLines)
             <div class="total-row">
                 <div class="lbl">Subtotal</div>
-                <div class="val">PKR {{ number_format($transaction->subtotal, 2) }}</div>
+                <div class="val">PKR {{ number_format($pdfDisplaySubtotal, 2) }}</div>
             </div>
             @endif
             @if($transaction->discount_amount > 0)
@@ -221,7 +229,7 @@
             @endif
             @if($showTaxLines)
             <div class="total-row">
-                <div class="lbl">Tax ({{ number_format($transaction->tax_rate, 0) }}%)</div>
+                <div class="lbl">Tax ({{ number_format($transaction->tax_rate, 0) }}%{{ $pdfInclusive ? ' incl.' : '' }})</div>
                 <div class="val">PKR {{ number_format($transaction->tax_amount, 2) }}</div>
             </div>
             @endif

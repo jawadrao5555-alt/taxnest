@@ -164,10 +164,19 @@
         <div class="space-y-6">
             <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Summary</h3>
+                @php
+                    // Tax-Inclusive (Menu-Rate-Final) bills: header subtotal is stored ex-tax
+                    // (menu sum − included tax) so the report identity holds. For DISPLAY,
+                    // show the menu-price subtotal (matches the item lines) + "incl." tax label.
+                    $txInclusive = (bool) ($transaction->tax_inclusive ?? false);
+                    $txDisplaySubtotal = $txInclusive
+                        ? (float) $transaction->subtotal + (float) $transaction->tax_amount
+                        : (float) $transaction->subtotal;
+                @endphp
                 <div class="space-y-3 text-sm">
                     <div class="flex justify-between">
                         <span class="text-gray-500">Subtotal</span>
-                        <span class="text-gray-900 dark:text-white">PKR {{ number_format($transaction->subtotal, 2) }}</span>
+                        <span class="text-gray-900 dark:text-white">PKR {{ number_format($txDisplaySubtotal, 2) }}</span>
                     </div>
                     @if($transaction->discount_amount > 0)
                     <div class="flex justify-between">
@@ -176,7 +185,7 @@
                     </div>
                     @endif
                     <div class="flex justify-between">
-                        <span class="text-gray-500">Tax ({{ $transaction->tax_rate }}%)</span>
+                        <span class="text-gray-500">Tax ({{ $transaction->tax_rate }}%{{ $txInclusive ? ' incl.' : '' }})</span>
                         <span class="text-gray-900 dark:text-white">PKR {{ number_format($transaction->tax_amount, 2) }}</span>
                     </div>
                     <div class="flex justify-between pt-3 border-t border-gray-200 dark:border-gray-700">

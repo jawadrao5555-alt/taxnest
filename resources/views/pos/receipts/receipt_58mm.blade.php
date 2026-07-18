@@ -215,6 +215,13 @@
         // Per-type since Jul 2026: PRA receipts read the PRA set (pos_receipt_show_tax
         // column), Local receipts read the Local set — both resolved in $rp above.
         $showTaxLines = (bool) ($rp['show_tax'] ?? true);
+        // Tax-Inclusive Pricing (Menu-Rate-Final): item lines are MENU (tax-in)
+        // prices; header subtotal is ex-tax-consistent, so the receipt Subtotal
+        // re-adds the included tax to read as the menu sum.
+        $rcptInclusive = (bool) ($transaction->tax_inclusive ?? false);
+        $rcptSubtotal = $rcptInclusive
+            ? round((float) $transaction->subtotal + (float) $transaction->tax_amount, 2)
+            : (float) $transaction->subtotal;
     @endphp
     <table class="items-table">
         <thead>
@@ -265,7 +272,7 @@
         @if($showTaxLines)
         <tr>
             <td class="tot-label">Subtotal:</td>
-            <td class="tot-value">{{ number_format($transaction->subtotal, 2) }}</td>
+            <td class="tot-value">{{ number_format($rcptSubtotal, 2) }}</td>
         </tr>
         @endif
         @if($transaction->discount_amount > 0)
@@ -276,7 +283,7 @@
         @endif
         @if($showTaxLines)
         <tr>
-            <td class="tot-label">Tax ({{ number_format($transaction->tax_rate, 0) }}%):</td>
+            <td class="tot-label">Tax ({{ number_format($transaction->tax_rate, 0) }}%{{ $rcptInclusive ? ' incl.' : '' }}):</td>
             <td class="tot-value">{{ number_format($transaction->tax_amount, 2) }}</td>
         </tr>
         @endif

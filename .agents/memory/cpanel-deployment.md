@@ -15,6 +15,11 @@ description: Exact paths/commands to deploy TaxNest to the owner's shared cPanel
 - PHP 8.4 binary: `/usr/local/bin/ea-php84`. Plain `php` may be the wrong version on this host — prefer the full binary path in cron and when in doubt.
 - `.env` is gitignored, so it (and the prod DB credentials inside it) survives every `git pull`. Never commit/overwrite it.
 
+# Dirty server worktree & uncommitted-feature deploys (18 Jul 2026)
+- The live worktree is often DIRTY (tracked files modified by past scp hot-fixes). `git pull` then aborts ("Please commit or stash"). Safe fix ONCE the hot-fix content is committed upstream: verify `git diff origin/main --stat` shows NO app-code differences (only docs/memory), then `git stash && git pull origin main` — stash kept as backup, content identical.
+- Feature not yet committed in the workspace (checkpoint commits only happen at turn end): deploy by streaming files over SSH — `tar czf - <paths> | ssh ... "cd /home/taxnestc/public_html && tar xzf -"` preserves relative paths in one shot; then migrate+caches+opcache as usual. Next turn's checkpoint commit makes a later pull a clean no-op (identical content).
+- Workspace-side: a stale `.git/refs/remotes/origin/main.lock` makes `git push` error AFTER succeeding ("Everything up-to-date" = remote already has it); sandbox blocks removing the lock — verify true remote state with `git ls-remote origin main` instead.
+
 # Deploy runbook (run inside /home/taxnestc/public_html)
 1. (Recommended) Back up the prod DB first: cPanel → phpMyAdmin → Export (or cPanel Backup).
 2. `cd /home/taxnestc/public_html`

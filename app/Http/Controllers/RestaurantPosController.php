@@ -340,11 +340,19 @@ class RestaurantPosController extends Controller
         $adjustedTaxable = round($taxableSubtotal * $discountRatio, 2);
 
         $taxRate = PosTaxRule::getRateForMethod('cash', $company);
-        // Whole-rupee rounding — matches PosController::storeInvoice and the universal
-        // cart's roundedTotal getter (Math.round). Pakistan POS convention: tax + bill
-        // always whole rupees, no paisa. Was round(...,2) → 533.60 vs frontend 534.
-        $taxAmount = (float) round($adjustedTaxable * $taxRate / 100);
-        $totalAmount = (float) round($subtotal - $discountAmount + $taxAmount);
+        // Tax-Inclusive Pricing (Menu-Rate-Final): held-order totals are ESTIMATES at
+        // the cash rate — final math happens in payOrder. Inclusive mode: menu price
+        // IS the total, tax shown is the included portion.
+        if ((bool) ($company->pos_tax_inclusive ?? false)) {
+            $taxAmount = \App\Services\PosTaxMath::inclusiveLineTax((float) $adjustedTaxable, (float) $taxRate);
+            $totalAmount = (float) round($subtotal - $discountAmount);
+        } else {
+            // Whole-rupee rounding — matches PosController::storeInvoice and the universal
+            // cart's roundedTotal getter (Math.round). Pakistan POS convention: tax + bill
+            // always whole rupees, no paisa. Was round(...,2) → 533.60 vs frontend 534.
+            $taxAmount = (float) round($adjustedTaxable * $taxRate / 100);
+            $totalAmount = (float) round($subtotal - $discountAmount + $taxAmount);
+        }
 
         DB::beginTransaction();
         try {
@@ -598,11 +606,23 @@ class RestaurantPosController extends Controller
         $discountRatio = $subtotal > 0 ? ($subtotal - $discountAmount) / $subtotal : 1;
         $taxableSubtotal = $order->items->where('is_tax_exempt', false)->sum('subtotal');
         $adjustedTaxable = round($taxableSubtotal * max(0, $discountRatio), 2);
-        // Whole-rupee rounding — matches PosController::storeInvoice and the universal
-        // cart's roundedTotal getter (Math.round). Was round(...,2) → decimal totals on
-        // held/table-order bills while direct cart bills were whole-rupee.
-        $taxAmount = (float) round($adjustedTaxable * $taxRate / 100);
-        $totalAmount = (float) round($subtotal - $discountAmount + $taxAmount);
+        // Tax-Inclusive Pricing (Menu-Rate-Final, owner Jul 2026): order lines are menu
+        // (tax-in) prices — back-calculate the included tax for the CHOSEN method and
+        // store the header in ex-tax-consistent semantics (see PosTaxMath docblock).
+        // Snapshot column guard mirrors PosController::storeInvoice.
+        $taxInclusiveColumnExists = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'tax_inclusive');
+        $taxInclusive = $taxInclusiveColumnExists && (bool) ($company->pos_tax_inclusive ?? false);
+        if ($taxInclusive) {
+            $inc = \App\Services\PosTaxMath::inclusiveHeader((float) $subtotal, (float) $taxableSubtotal, (float) $discountAmount, (float) $taxRate);
+            $taxAmount = $inc['tax_amount'];
+            $totalAmount = $inc['total_amount'];
+        } else {
+            // Whole-rupee rounding — matches PosController::storeInvoice and the universal
+            // cart's roundedTotal getter (Math.round). Was round(...,2) → decimal totals on
+            // held/table-order bills while direct cart bills were whole-rupee.
+            $taxAmount = (float) round($adjustedTaxable * $taxRate / 100);
+            $totalAmount = (float) round($subtotal - $discountAmount + $taxAmount);
+        }
         $totalItemDiscounts = $order->items->sum('item_discount_amount');
 
         // PROVISIONAL BILL FLOW — when cashier saves as provisional, the bill is created
@@ -669,13 +689,13 @@ class RestaurantPosController extends Controller
                 'delivery_address' => $request->filled('delivery_address')
                     ? substr((string) $request->input('delivery_address'), 0, 500)
                     : null,
-                'subtotal' => (float) $subtotal,
+                'subtotal' => $taxInclusive ? $inc['subtotal_col'] : (float) $subtotal,
                 'discount_type' => $order->discount_type ?? 'amount',
                 'discount_value' => (float)($order->discount_value ?? 0),
                 'discount_amount' => (float) $discountAmount,
                 'tax_rate' => (float) $taxRate,
                 'tax_amount' => (float) $taxAmount,
-                'exempt_amount' => (float) ($subtotal - $taxableSubtotal),
+                'exempt_amount' => $taxInclusive ? $inc['exempt_amount'] : (float) ($subtotal - $taxableSubtotal),
                 'total_amount' => (float) $totalAmount,
                 'payment_method' => $paymentMethod,
                 'status' => 'completed',
@@ -684,6 +704,9 @@ class RestaurantPosController extends Controller
                 'created_by' => (int) $user->id,
                 'notes' => $order->kitchen_notes,
             ];
+            if ($taxInclusiveColumnExists) {
+                $transactionData['tax_inclusive'] = $taxInclusive;
+            }
             // Delivery Riders (Jul 2026): snapshot the held order's type + optional
             // rider from the PAY request. Delivery-only; invalid rider ids silently
             // dropped (never block a payment). invoice_mode three-branch untouched.
@@ -703,7 +726,9 @@ class RestaurantPosController extends Controller
 
             foreach ($order->items as $item) {
                 $lineAfterOrderDisc = $subtotal > 0 ? round($item->subtotal * max(0, $discountRatio), 2) : $item->subtotal;
-                $lineTax = $item->is_tax_exempt ? 0 : round($lineAfterOrderDisc * $taxRate / 100, 2);
+                $lineTax = $item->is_tax_exempt ? 0 : ($taxInclusive
+                    ? \App\Services\PosTaxMath::inclusiveLineTax((float) $lineAfterOrderDisc, (float) $taxRate)
+                    : round($lineAfterOrderDisc * $taxRate / 100, 2));
                 $itemQty = max(1, (int) $item->quantity);
                 PosTransactionItem::create([
                     'transaction_id' => (int) $transaction->id,

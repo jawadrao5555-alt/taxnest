@@ -28,6 +28,10 @@ class AppServiceProvider extends ServiceProvider
         // Archive Portal and Local Bills Portal layouts.
         \Illuminate\Support\Facades\Blade::anonymousComponentPath(resource_path('views'));
 
+        // Admin-saved SMTP settings (SaaS admin → Settings) override .env
+        // MAIL_* at runtime. Silent no-op when unset/disabled/DB down.
+        \App\Services\SmtpRuntimeConfig::apply();
+
         $dbDefault = config('database.default');
         Log::info('DB_DRIVER', [
             'default' => $dbDefault,

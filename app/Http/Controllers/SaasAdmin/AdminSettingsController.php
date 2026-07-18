@@ -35,7 +35,19 @@ class AdminSettingsController extends Controller
             $settings[$key] = SystemSetting::get($key, '');
         }
 
-        return view('saas-admin.settings', compact('settings'));
+        $smtpRaw = \App\Services\SmtpRuntimeConfig::settings() ?? [];
+        $smtp = [
+            'enabled' => (bool) ($smtpRaw['enabled'] ?? false),
+            'host' => (string) ($smtpRaw['host'] ?? ''),
+            'port' => (string) ($smtpRaw['port'] ?? ''),
+            'encryption' => (string) ($smtpRaw['encryption'] ?? 'ssl'),
+            'username' => (string) ($smtpRaw['username'] ?? ''),
+            'from_address' => (string) ($smtpRaw['from_address'] ?? ''),
+            'from_name' => (string) ($smtpRaw['from_name'] ?? ''),
+            'has_password' => \App\Services\SmtpRuntimeConfig::hasPassword(),
+        ];
+
+        return view('saas-admin.settings', compact('settings', 'smtp'));
     }
 
     public function update(Request $request)
@@ -69,6 +81,61 @@ class AdminSettingsController extends Controller
         ]);
 
         return back()->with('success', 'Settings saved successfully.');
+    }
+
+    /**
+     * Save the admin-managed SMTP (outgoing email) settings.
+     *
+     * Stored as one encrypted-password JSON SystemSetting and applied at
+     * runtime by SmtpRuntimeConfig::apply() — .env stays the fallback when
+     * disabled/incomplete. Leaving the password blank keeps the saved one.
+     */
+    public function updateSmtp(Request $request)
+    {
+        $enabled = $request->boolean('smtp_enabled');
+
+        $data = $request->validate([
+            'smtp_host' => [$enabled ? 'required' : 'nullable', 'string', 'max:190'],
+            'smtp_port' => [$enabled ? 'required' : 'nullable', 'integer', 'between:1,65535'],
+            'smtp_encryption' => ['nullable', 'in:ssl,tls'],
+            'smtp_username' => [$enabled ? 'required' : 'nullable', 'string', 'max:190'],
+            'smtp_password' => ['nullable', 'string', 'max:190'],
+            'smtp_from_address' => ['nullable', 'email', 'max:190'],
+            'smtp_from_name' => ['nullable', 'string', 'max:120'],
+        ], [], [
+            'smtp_host' => 'SMTP host',
+            'smtp_port' => 'SMTP port',
+            'smtp_username' => 'SMTP username',
+            'smtp_password' => 'SMTP password',
+            'smtp_from_address' => 'From email',
+        ]);
+
+        $newPassword = (string) ($data['smtp_password'] ?? '');
+
+        if ($enabled && $newPassword === '' && !\App\Services\SmtpRuntimeConfig::hasPassword()) {
+            return back()->withInput()->withErrors(['smtp_password' => 'Enter the mailbox password (none saved yet).']);
+        }
+
+        \App\Services\SmtpRuntimeConfig::save([
+            'enabled' => $enabled,
+            'host' => $data['smtp_host'] ?? '',
+            'port' => $data['smtp_port'] ?? 465,
+            'encryption' => $data['smtp_encryption'] ?? 'ssl',
+            'username' => $data['smtp_username'] ?? '',
+            'from_address' => $data['smtp_from_address'] ?? '',
+            'from_name' => $data['smtp_from_name'] ?? '',
+        ], $newPassword);
+
+        AdminAuditLog::log(auth('admin')->id(), 'SMTP settings updated', 'SystemSetting', null, [
+            'enabled' => $enabled,
+            'host' => $data['smtp_host'] ?? '',
+            'username' => $data['smtp_username'] ?? '',
+            'password_changed' => $newPassword !== '',
+        ]);
+
+        return back()->with('success', $enabled
+            ? 'Email (SMTP) settings saved and ACTIVE — use "Send Test Email" below to confirm delivery.'
+            : 'Email (SMTP) settings saved but DISABLED — the server\'s .env settings will be used.');
     }
 
     /**

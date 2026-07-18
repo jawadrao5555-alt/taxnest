@@ -64,4 +64,4 @@ Isolated POS with own auth/layouts/models; PRA integration with offline billing 
 - **PRA / PRAL IMS API v1.2** — POS fiscal integration (cloud + local fiscal-device service).
 - **Laravel Breeze**, **Tailwind CSS**, **Alpine.js**, **Chart.js**.
 - **Unsplash / Picsum** — fallback for `ProductImageService`.
-- **cPanel SMTP (noreply@taxnest.com.pk)** — ALL outgoing email (forgot-password OTP, payment-proof alerts, approve/reject, trial reminders). Settings → memory `mail-noreply-smtp.md`; admin panel has Send Test Email + red MailHealth banner.
+- **cPanel SMTP (noreply@taxnest.com.pk)** — ALL outgoing email (forgot-password OTP, payment-proof alerts, approve/reject, trial reminders). Settings → memory `mail-noreply-smtp.md`; admin panel has Send Test Email + red MailHealth banner + admin-managed SMTP override (SystemSetting `smtp_settings`, .env = fallback).

@@ -106,6 +106,91 @@
         </div>
     </form>
 
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mt-6">
+        <h2 class="text-sm font-semibold text-white mb-1 flex items-center gap-2">
+            <svg class="w-5 h-5 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
+            Email (SMTP) Settings
+        </h2>
+        <p class="text-[11px] text-gray-500 mb-4">
+            The mailbox all system emails are sent from (password resets, payment-proof alerts, approval emails, trial reminders).
+            When enabled, these settings are used instead of the server's <span class="font-mono">.env</span> file — no server access needed to change them.
+            When disabled or incomplete, the server's own settings keep working as the fallback.
+        </p>
+
+        <form method="POST" action="{{ route('saas.admin.settings.smtp') }}" class="space-y-4">
+            @csrf
+
+            <label class="flex items-center gap-3 cursor-pointer select-none">
+                <input type="checkbox" name="smtp_enabled" value="1" {{ old('smtp_enabled', $smtp['enabled'] ? '1' : '') ? 'checked' : '' }}
+                       class="rounded bg-gray-800 border-gray-600 text-emerald-600 focus:ring-emerald-500 w-4 h-4" />
+                <span class="text-sm text-white font-medium">Use these settings for outgoing email</span>
+            </label>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">SMTP Host</label>
+                    <input type="text" name="smtp_host" value="{{ old('smtp_host', $smtp['host']) }}"
+                           placeholder="e.g. mail.taxnest.com.pk"
+                           class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
+                    @error('smtp_host') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-1">Port</label>
+                        <input type="number" name="smtp_port" value="{{ old('smtp_port', $smtp['port'] ?: '465') }}"
+                               class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
+                        @error('smtp_port') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-1">Security</label>
+                        <select name="smtp_encryption"
+                                class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500">
+                            <option value="ssl" {{ old('smtp_encryption', $smtp['encryption']) === 'ssl' ? 'selected' : '' }}>SSL (port 465)</option>
+                            <option value="tls" {{ old('smtp_encryption', $smtp['encryption']) === 'tls' ? 'selected' : '' }}>TLS (port 587)</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Username (email account)</label>
+                    <input type="text" name="smtp_username" value="{{ old('smtp_username', $smtp['username']) }}"
+                           placeholder="e.g. noreply@taxnest.com.pk" autocomplete="off"
+                           class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
+                    @error('smtp_username') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">
+                        Mailbox Password
+                        @if($smtp['has_password'])<span class="text-emerald-400 font-semibold">(saved — leave blank to keep)</span>@endif
+                    </label>
+                    <input type="password" name="smtp_password" value=""
+                           placeholder="{{ $smtp['has_password'] ? '••••••••••••' : 'Mailbox password' }}" autocomplete="new-password"
+                           class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
+                    @error('smtp_password') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">From Email (optional)</label>
+                    <input type="text" name="smtp_from_address" value="{{ old('smtp_from_address', $smtp['from_address']) }}"
+                           placeholder="Defaults to the username above"
+                           class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
+                    @error('smtp_from_address') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">From Name (optional)</label>
+                    <input type="text" name="smtp_from_name" value="{{ old('smtp_from_name', $smtp['from_name']) }}"
+                           placeholder="e.g. TaxNest"
+                           class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-3">
+                <p class="text-[11px] text-gray-500">The password is stored encrypted. After saving, click "Send Test Email" below to confirm delivery.</p>
+                <button type="submit" class="px-5 py-2.5 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-500 transition shrink-0">
+                    Save Email Settings
+                </button>
+            </div>
+        </form>
+    </div>
+
     <div id="email-test" class="bg-gray-900 border border-gray-800 rounded-xl p-5 mt-6">
         <h2 class="text-sm font-semibold text-white mb-1 flex items-center gap-2">
             <svg class="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>

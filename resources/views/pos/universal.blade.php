@@ -4607,7 +4607,13 @@ function restaurantPos() {
                 this.$nextTick(() => { this.$refs.searchInput?.focus(); });
                 return;
             }
-            if (!q) return;
+            // NON-guided mode: empty box + Enter = walk-in too (owner, Jul 2026) — jump
+            // straight to product search instead of a dead key. Mirrors the guided branch.
+            if (!q) {
+                this.customerPhoneDropdown = false;
+                this.$nextTick(() => { this.$refs.searchInput?.focus(); });
+                return;
+            }
             if (this.customerPhoneResults.length > 0) {
                 this.selectCustomerFromPhone(this.customerPhoneResults[this.custHiIndex] || this.customerPhoneResults[0]);
             } else if (q.length >= 4 && /^\d+$/.test(q)) {

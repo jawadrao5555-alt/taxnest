@@ -57,6 +57,28 @@
                 <div class="text-lg font-bold text-emerald-600 dark:text-emerald-400">Clear</div>
                 <div class="text-[11px] text-gray-400">No cash pending</div>
             @endif
+            {{-- Bulk update: mark ALL of this rider's open (assigned/dispatched)
+                 deliveries in one go. Delivered/returned bills stay untouched. --}}
+            @php $openDel = (int) ($openDeliveryCounts[$rider->id] ?? 0); @endphp
+            @if($openDel > 0)
+            <div class="mt-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                <div class="text-[11px] text-gray-400 mb-1.5">{{ $openDel }} {{ $openDel === 1 ? 'order' : 'orders' }} out for delivery</div>
+                <div class="flex gap-1.5">
+                    <form method="POST" action="{{ route('pos.deliveries.bulk', $rider->id) }}" class="flex-1"
+                          onsubmit="return confirm('Mark ALL {{ $openDel }} open {{ $openDel === 1 ? 'delivery' : 'deliveries' }} of this rider as DELIVERED?');">
+                        @csrf
+                        <input type="hidden" name="delivery_status" value="delivered">
+                        <button type="submit" class="w-full px-2 py-1.5 rounded-lg bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700 transition">All Delivered</button>
+                    </form>
+                    <form method="POST" action="{{ route('pos.deliveries.bulk', $rider->id) }}" class="flex-1"
+                          onsubmit="return confirm('Mark ALL {{ $openDel }} open {{ $openDel === 1 ? 'delivery' : 'deliveries' }} of this rider as RETURNED? Cash comes off the khata — bills stay recorded.');">
+                        @csrf
+                        <input type="hidden" name="delivery_status" value="returned">
+                        <button type="submit" class="w-full px-2 py-1.5 rounded-lg bg-red-600 text-white text-[11px] font-semibold hover:bg-red-700 transition">All Returned</button>
+                    </form>
+                </div>
+            </div>
+            @endif
         </div>
 
         {{-- Settle modal (one per rider with open bills) --}}

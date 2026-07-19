@@ -5267,6 +5267,16 @@ function restaurantPos() {
                     if (invoked) return;
                     invoked = true;
                     removeHandler();
+                    // FOCUS RECOVERY (customer report Jul 2026 — "direct print shortcut
+                    // not working properly"): after the print dialog closes, focus can
+                    // stay INSIDE the hidden print iframe. Our shortcuts live on the
+                    // PARENT document's keydown listener, so P (reprint) / Enter / Esc
+                    // all go dead until the cashier clicks the page. Pull focus back.
+                    try {
+                        const ae = document.activeElement;
+                        if (ae && ae.tagName === 'IFRAME') ae.blur();
+                        window.focus();
+                    } catch (err) {}
                     if (isStale()) return;
                     if (typeof onAfterPrint === 'function') onAfterPrint();
                 };

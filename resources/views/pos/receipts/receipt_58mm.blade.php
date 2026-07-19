@@ -10,6 +10,10 @@
             margin: 0;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* FONT SIMPLIFICATION (customer feedback Jul 2026): plain drafting —
+           no italics, bold ONLY on business name / invoice numbers / grand total.
+           Tighter spacing so the slip prints shorter; 58mm sizes already minimal
+           so only weights and margins are trimmed here. */
         body {
             font-family: 'Courier New', 'Lucida Console', monospace;
             font-size: 10px;
@@ -19,59 +23,59 @@
             padding: 2mm;
             background: #fff;
             color: #000;
-            line-height: 1.35;
+            line-height: 1.3;
             word-wrap: break-word;
             overflow-wrap: break-word;
-            font-weight: 500;
+            font-weight: normal;
         }
         .text-center { text-align: center; }
         .text-right { text-align: right; }
         .bold { font-weight: bold; }
-        .separator { border-top: 1px dashed #000; margin: 5px 0; }
-        .double-separator { border-top: 2px solid #000; margin: 5px 0; }
+        .separator { border-top: 1px dashed #000; margin: 4px 0; }
+        .double-separator { border-top: 2px solid #000; margin: 4px 0; }
 
-        .header { margin-bottom: 5px; }
+        .header { margin-bottom: 4px; }
         .header h1 { font-size: 12px; font-weight: bold; margin-bottom: 2px; word-wrap: break-word; color: #000; }
-        .header p { font-size: 9px; line-height: 1.3; word-wrap: break-word; color: #000; font-weight: 600; }
+        .header p { font-size: 8px; line-height: 1.3; word-wrap: break-word; color: #000; font-weight: normal; }
 
         .info-table { width: 100%; border-collapse: collapse; margin: 2px 0; }
-        .info-table td { font-size: 9px; padding: 2px 0; vertical-align: top; color: #000; font-weight: 600; }
-        .info-table .info-label { width: 30%; font-weight: bold; white-space: nowrap; color: #000; }
+        .info-table td { font-size: 9px; padding: 1px 0; vertical-align: top; color: #000; font-weight: normal; }
+        .info-table .info-label { width: 30%; white-space: nowrap; color: #000; }
         .info-table .info-value { width: 70%; text-align: right; word-wrap: break-word; color: #000; }
 
-        .invoice-numbers { border: 1.5px solid #000; padding: 4px; margin: 5px 0; }
+        .invoice-numbers { border: 1.5px solid #000; padding: 4px; margin: 4px 0; }
         .inv-table { width: 100%; border-collapse: collapse; }
-        .inv-table td { font-size: 9px; padding: 2px 0; vertical-align: top; color: #000; }
-        .inv-table .inv-label { font-weight: bold; white-space: nowrap; width: 30%; color: #000; }
+        .inv-table td { font-size: 9px; padding: 1px 0; vertical-align: top; color: #000; }
+        .inv-table .inv-label { white-space: nowrap; width: 30%; color: #000; }
         .inv-table .inv-value { text-align: right; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; font-family: 'Courier New', monospace; font-size: 8px; font-weight: bold; color: #000; }
 
         .items-table { width: 100%; margin: 3px 0; border-collapse: collapse; table-layout: fixed; }
-        .items-table th { font-size: 8px; text-transform: uppercase; border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 3px 1px; text-align: left; font-weight: bold; color: #000; }
-        .items-table td { font-size: 9px; padding: 3px 1px; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; color: #000; font-weight: 600; }
+        .items-table th { font-size: 8px; text-transform: uppercase; border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 2px 1px; text-align: left; font-weight: normal; color: #000; }
+        .items-table td { font-size: 9px; padding: 2px 1px; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; color: #000; font-weight: normal; }
         .items-table .col-item { width: 44%; text-align: left; }
         .items-table .col-qty { width: 16%; text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
         .items-table .col-rate { width: 18%; text-align: right; }
-        .items-table .col-total { width: 22%; text-align: right; font-weight: bold; }
+        .items-table .col-total { width: 22%; text-align: right; }
         .items-table tbody tr { border-bottom: 1px dashed #000; }
         .items-table tbody tr:last-child { border-bottom: none; }
-        .exempt-tag { font-size: 7px; font-weight: 800; color: #000; border: 1px solid #000; padding: 0 2px; margin-left: 2px; vertical-align: middle; }
-        .exempt-note { font-size: 8px; font-weight: 700; color: #000; text-align: center; margin: 3px 0 2px; padding: 2px 0; border-top: 1px dashed #000; border-bottom: 1px dashed #000; letter-spacing: 0.3px; }
+        .exempt-tag { font-size: 7px; font-weight: bold; color: #000; border: 1px solid #000; padding: 0 2px; margin-left: 2px; vertical-align: middle; }
+        .exempt-note { font-size: 8px; font-weight: normal; color: #000; text-align: center; margin: 3px 0 2px; padding: 2px 0; border-top: 1px dashed #000; border-bottom: 1px dashed #000; letter-spacing: 0.3px; }
 
         .totals-table { width: 100%; border-collapse: collapse; margin: 3px 0; }
-        .totals-table td { font-size: 9px; padding: 2px 0; vertical-align: top; color: #000; font-weight: 600; }
+        .totals-table td { font-size: 9px; padding: 1px 0; vertical-align: top; color: #000; font-weight: normal; }
         .totals-table .tot-label { text-align: left; color: #000; }
-        .totals-table .tot-value { text-align: right; white-space: nowrap; color: #000; font-weight: bold; }
-        .totals-table .grand-total td { font-size: 14px; font-weight: 900; padding: 6px 3px; color: #000; border-top: 2px solid #000; border-bottom: 2px solid #000; letter-spacing: 0.3px; }
+        .totals-table .tot-value { text-align: right; white-space: nowrap; color: #000; }
+        .totals-table .grand-total td { font-size: 13px; font-weight: bold; padding: 5px 3px; color: #000; border-top: 2px solid #000; border-bottom: 2px solid #000; letter-spacing: 0.3px; }
 
-        .pra-badge { border: 1.5px solid #000; padding: 4px; margin: 5px 0; text-align: center; font-size: 9px; overflow: hidden; color: #000; font-weight: 600; }
+        .pra-badge { border: 1.5px solid #000; padding: 4px; margin: 4px 0; text-align: center; font-size: 9px; overflow: hidden; color: #000; font-weight: normal; }
         .pra-badge .pra-title { font-size: 10px; font-weight: bold; margin-bottom: 2px; color: #000; }
         .pra-badge .pra-number { font-size: 8px; font-weight: bold; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; max-width: 100%; display: block; color: #000; }
-        .local-badge { border: 1.5px dashed #000; padding: 4px; margin: 5px 0; text-align: center; font-size: 9px; color: #000; font-weight: 700; }
-        .qr-code { text-align: center; margin: 5px 0; }
+        .local-badge { border: 1.5px dashed #000; padding: 4px; margin: 4px 0; text-align: center; font-size: 9px; color: #000; font-weight: normal; }
+        .qr-code { text-align: center; margin: 4px 0; }
         .qr-code img { width: 75px; height: 75px; }
-        .qr-code p { font-size: 8px; margin-top: 1px; color: #000; font-weight: 600; }
+        .qr-code p { font-size: 8px; margin-top: 1px; color: #000; font-weight: normal; }
 
-        .footer { margin-top: 6px; font-size: 9px; line-height: 1.4; color: #000; font-weight: 600; }
+        .footer { margin-top: 5px; font-size: 8px; line-height: 1.35; color: #000; font-weight: normal; }
 
         @media print {
             /* PRINTABLE-WIDTH FIX v2 (Jul 2026): 58mm paper prints only ~48mm. Drivers
@@ -152,13 +156,24 @@
         $rp = $company->posReceiptPrefsFor($transaction);
     @endphp
     <div class="header text-center">
+        {{-- Logo placement (customer request Jul 2026): logo sits to the RIGHT of the
+             business name on one row (was stacked above it) — the header prints
+             shorter. Table layout (not flex) so DomPDF renders it identically. --}}
         @if($logoDataUri)
-        <div style="margin-bottom: 3px;">
-            <img src="{{ $logoDataUri }}" style="max-width: 110px; max-height: 40px; margin: 0 auto; display: block; object-fit: contain;">
-        </div>
-        @endif
+        <table style="width:100%; border-collapse:collapse; margin-bottom:2px;">
+            <tr>
+                <td style="text-align:left; vertical-align:middle; width:62%; padding:0;">
+                    <h1 style="text-align:left; margin:0;">{{ $company->name }}</h1>
+                </td>
+                <td style="text-align:right; vertical-align:middle; width:38%; padding:0;">
+                    <img src="{{ $logoDataUri }}" style="max-width:60px; max-height:32px; object-fit:contain;">
+                </td>
+            </tr>
+        </table>
+        @else
         <h1>{{ $company->name }}</h1>
-        @if($company->business_activity)<p style="font-style:italic;">{{ $company->business_activity }}</p>@endif
+        @endif
+        @if($company->business_activity)<p>{{ $company->business_activity }}</p>@endif
         @if(!empty($addressLine) && $rp['show_address'])<p>{{ $addressLine }}</p>@endif
         @if($phoneLine && $rp['show_mobile'])<p>Tel: {{ $phoneLine }}</p>@endif
         @if($company->email && $rp['show_email'])<p>{{ $company->email }}</p>@endif
@@ -273,7 +288,7 @@
 
     @if(!empty($transaction->notes))
     <div class="separator"></div>
-    <div style="font-size:9px; font-weight:700; color:#000; padding:1px 0; font-style:italic;">Note: {{ $transaction->notes }}</div>
+    <div style="font-size:9px; font-weight:normal; color:#000; padding:1px 0;">Note: {{ $transaction->notes }}</div>
     @endif
 
     <div class="separator"></div>
@@ -352,14 +367,14 @@
             $qrCaption = 'Scan for details';
         }
     @endphp
-    <div class="local-badge" style="border: 1.5px dashed #000; color: #000; padding: 6px; font-weight: 700;">
+    <div class="local-badge" style="border: 1.5px dashed #000; color: #000; padding: 5px;">
         <strong style="font-size: 10px; color: #000;">PROVISIONAL BILL</strong><br>
         <span style="font-size: 9px; font-weight: bold;">{{ $transaction->invoice_number }}</span>
     </div>
     @if($qrUrl)
     <div class="qr-code">
         <img src="{{ $qrUrl }}" alt="Invoice QR" style="width: 80px; height: 80px; margin: 3px auto;">
-        <p style="font-size: 8px; color: #000; font-weight: 600;">{{ $qrCaption }}</p>
+        <p style="font-size: 8px; color: #000;">{{ $qrCaption }}</p>
     </div>
     @endif
     @endif

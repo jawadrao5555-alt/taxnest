@@ -263,7 +263,19 @@ class PosRiderController extends Controller
             ->get()
             ->groupBy('rider_id');
 
-        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day'));
+        // Open (assigned/dispatched, unsettled) delivery counts per rider — ALL
+        // dates, any payment method — powers the bulk "All Delivered / All
+        // Returned" buttons on rider cards (customer request Jul 2026).
+        $openDeliveryCounts = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->whereIn('rider_id', $riders->pluck('id'))
+            ->whereNull('rider_settlement_id')
+            ->whereIn('delivery_status', ['assigned', 'dispatched'])
+            ->selectRaw('rider_id, COUNT(*) as c')
+            ->groupBy('rider_id')
+            ->pluck('c', 'rider_id');
+
+        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts'));
     }
 
     /** Assign / reassign / unassign a rider on a delivery bill. */
@@ -336,6 +348,34 @@ class PosRiderController extends Controller
         $txn->update(['delivery_status' => $newStatus]);
 
         return back()->with('success', 'Delivery status updated.');
+    }
+
+    /** Bulk mark ALL of one rider's OPEN (assigned/dispatched) deliveries as
+     *  delivered or returned in one go (customer request Jul 2026 — flow:
+     *  Deliveries → Rider → orders → All → Mark Delivered/Returned).
+     *  Scope deliberately mirrors updateStatus guards: settled bills are locked
+     *  out by the whereNull, terminal delivered/returned rows are untouched
+     *  (bulk-returned must never silently flip already-delivered bills), and
+     *  'returned' stays a khata drop ONLY — it never voids a PRA bill. */
+    public function bulkStatus(Request $request, $riderId)
+    {
+        $companyId = app('currentCompanyId');
+        $request->validate(['delivery_status' => 'required|in:delivered,returned']);
+        $rider = PosRider::where('company_id', $companyId)->findOrFail($riderId);
+        $newStatus = $request->input('delivery_status');
+
+        $count = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->where('rider_id', $rider->id)
+            ->whereNull('rider_settlement_id')
+            ->whereIn('delivery_status', ['assigned', 'dispatched'])
+            ->update(['delivery_status' => $newStatus]);
+
+        if ($count === 0) {
+            return back()->with('error', 'No open deliveries for ' . $rider->name . '.');
+        }
+
+        return back()->with('success', $count . ' ' . ($count === 1 ? 'delivery' : 'deliveries') . ' marked ' . $newStatus . ' for ' . $rider->name . '.');
     }
 
     /** Settle selected open CASH bills for one rider (partial = per-bill selection). */

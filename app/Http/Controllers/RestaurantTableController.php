@@ -10,6 +10,20 @@ use Illuminate\Support\Facades\Auth;
 
 class RestaurantTableController extends Controller
 {
+    /**
+     * Floors/tables setup is an admin surface (owner rule: every POS
+     * settings-style write path must 403 cashiers). pos_manager passes —
+     * only pos_cashier is blocked. Lock/reserve/release stay open to
+     * cashiers (they legitimately use those during service).
+     */
+    private function denyCashier(): void
+    {
+        $user = auth('pos')->user();
+        if ($user && $user->isPosCashier()) {
+            abort(403, 'Only POS administrators can manage floors and tables.');
+        }
+    }
+
     public function index()
     {
         $companyId = app('currentCompanyId');
@@ -27,6 +41,7 @@ class RestaurantTableController extends Controller
 
     public function manage()
     {
+        $this->denyCashier();
         $companyId = app('currentCompanyId');
 
         $floors = RestaurantFloor::where('company_id', $companyId)
@@ -41,6 +56,7 @@ class RestaurantTableController extends Controller
 
     public function storeFloor(Request $request)
     {
+        $this->denyCashier();
         $companyId = app('currentCompanyId');
 
         $request->validate(['name' => 'required|string|max:100']);
@@ -58,6 +74,7 @@ class RestaurantTableController extends Controller
 
     public function updateFloor(Request $request, $floorId)
     {
+        $this->denyCashier();
         $companyId = app('currentCompanyId');
         $request->validate(['name' => 'required|string|max:100']);
 
@@ -69,6 +86,7 @@ class RestaurantTableController extends Controller
 
     public function deleteFloor($floorId)
     {
+        $this->denyCashier();
         $companyId = app('currentCompanyId');
         $floor = RestaurantFloor::where('company_id', $companyId)->findOrFail($floorId);
 
@@ -83,6 +101,7 @@ class RestaurantTableController extends Controller
 
     public function storeTable(Request $request)
     {
+        $this->denyCashier();
         $companyId = app('currentCompanyId');
 
         $request->validate([
@@ -116,6 +135,7 @@ class RestaurantTableController extends Controller
 
     public function updateTable(Request $request, $tableId)
     {
+        $this->denyCashier();
         $companyId = app('currentCompanyId');
 
         $request->validate([
@@ -145,6 +165,7 @@ class RestaurantTableController extends Controller
 
     public function deleteTable($tableId)
     {
+        $this->denyCashier();
         $companyId = app('currentCompanyId');
         $table = RestaurantTable::where('company_id', $companyId)->findOrFail($tableId);
 

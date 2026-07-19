@@ -1,11 +1,17 @@
 ---
 name: Live POS test company
-description: Live POS test-company pattern — the temporary test company was DELETED 17 Jul 2026; how to safely create/delete one for live tests, plus the false "Pro-plan restaurant drift" alarm to not repeat.
+description: Live POS test-company pattern — STANDING test company id 35 (cleanup pending, follow-up #43); safe create/delete flow, burned identifiers, and the false "Pro-plan restaurant drift" alarm to not repeat.
 ---
 
 # Live NestPOS test company pattern
 
-## No standing live test company (19 Jul 2026 — companies 31 & 34 both hard-deleted via bin flow)
+## STANDING test company: id 35 "QA Full Audit Restaurant" (created 19 Jul 2026, cleanup pending — follow-up #43)
+- Pro plan (live plan id 11), PRA reporting OFF whole life (only L-series local bills — nothing ever went to PRA). Owner-approved full-audit company.
+- Logins: qa.fullaudit@taxnest.com.pk / QaAudit@2026 (admin); team qa.mgr/qa.cash/qa.kit/qa.wtr .audit35@taxnest.com.pk / QaTeam@2026; local viewer qa.lview.audit35@taxnest.com.pk / QaView@2026. Identifiers NTN 7899001 / 03427899001 will BURN on delete.
+- Artifacts to purge with it: products 5232-5235, deal 3, rider 4 (QA Rider One), customer "QA Walkin Customer", bills L-001..L-011 (ids 518-527), day-close #6, held order 491.
+- POS login POST field is `login` (not `email`) — posting `email` silently bounces back to /pos/login.
+
+## Earlier deletions (companies 31 & 34 hard-deleted via bin flow)
 - Registration trial-abuse guard rejects REUSED ntn/phone/email ("already been used to create an account") — deleted test companies' identifiers stay burned; always pick fresh ones. Burned so far: qa.mrf.test@… (NTN 7654321 / 03457654321), qa.excel.import@… (7822334 / 03467822334), qa.scale.test@… (7833445 / 03467833445), qa.bulkhide.test@… (7866778 / 03497866778) + qa.bulkhide.cashier@….
 - Register POST needs `pricing_plan_id` of a REAL non-trial POS plan (live ids: 9 Starter, 10 Business, …) — Starter's team quota is admin-only, so pick Business+ when the test needs a cashier login.
 - `storeProduct` treats `show_on_sale` as a CHECKBOX (`$request->has()`): a curl POST without the field creates the product HIDDEN from the sale screen — not a bug; include `show_on_sale=1` when scripting product creation.

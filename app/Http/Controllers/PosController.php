@@ -5260,8 +5260,10 @@ class PosController extends Controller
     public function storeCustomer(Request $request)
     {
         $companyId = app('currentCompanyId');
+        // Name is OPTIONAL when a phone is given (owner request, Jul 2026):
+        // blank name = the phone number doubles as the display name.
         $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => 'nullable|required_without:phone|string|max:255',
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:500',
@@ -5273,6 +5275,7 @@ class PosController extends Controller
 
         $customer = PosCustomer::create(array_merge($request->only(['name', 'email', 'phone', 'address', 'city', 'ntn', 'cnic', 'type']), [
             'company_id' => $companyId,
+            'name' => trim((string) $request->name) !== '' ? trim($request->name) : $request->phone,
         ]));
 
         if ($request->expectsJson()) {

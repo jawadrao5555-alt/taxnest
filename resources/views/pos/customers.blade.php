@@ -49,8 +49,8 @@
         <form method="POST" action="{{ route('pos.customers.store') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             @csrf
             <div>
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Customer Name *</label>
-                <input type="text" name="name" required placeholder="Full name" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Customer Name</label>
+                <input type="text" name="name" placeholder="Full name (optional if phone given)" class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
             </div>
             <div>
                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Phone</label>

@@ -1070,7 +1070,7 @@ class RestaurantPosController extends Controller
 
         $customer = PosCustomer::create([
             'company_id' => $companyId,
-            'name' => $request->name,
+            'name' => trim((string) $request->name) !== '' ? trim($request->name) : $request->phone,
             'phone' => $request->phone,
             'email' => $request->email,
             'address' => $request->address,

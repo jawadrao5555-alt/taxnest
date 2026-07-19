@@ -19,3 +19,5 @@ Rule: shopkeeper-facing bulk import/export must be a real .xlsx round-trip, neve
 - Known tradeoff (architect-accepted): row matched by barcode/sku also updates NAME — copy-paste-row-forgot-to-change-sku silently renames instead of creating.
 
 POS customers import (`importCustomers`) is still old-style CSV-only — give it this same treatment if the owner asks.
+
+**Scale verified (19 Jul 2026, 5000 products):** import 4500 rows ≈ 2.3s on live cPanel / 45s in dev (live CPU is faster — don't extrapolate dev timings); sale screen with 5000 products = ~1.7MB HTML, ~1s server render, search stays instant because suggestions cap at 12 (early-break loop), grid renders max 60, 60ms debounce. No pagination/chunking needed at this size.

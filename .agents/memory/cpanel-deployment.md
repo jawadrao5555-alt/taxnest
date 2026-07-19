@@ -15,7 +15,9 @@ description: Exact paths/commands to deploy TaxNest to the owner's shared cPanel
 - PHP 8.4 binary: `/usr/local/bin/ea-php84`. Plain `php` may be the wrong version on this host — prefer the full binary path in cron and when in doubt.
 - `.env` is gitignored, so it (and the prod DB credentials inside it) survives every `git pull`. Never commit/overwrite it.
 
-# Dirty server worktree & uncommitted-feature deploys (18 Jul 2026)
+# Partial tar-deploy = live 500 for EVERYONE (19 Jul 2026 incident)
+- A tar-deploy that ships a VIEW but not its MODEL/MIGRATION silently breaks live: universal.blade.php (calls `Company::posTaxPricingMode()`) was live but Company.php + the pos_tax_pricing_mode migration were NOT → every POS sale-screen load 500'd for ALL live companies until the gap was found.
+- **How to apply:** after ANY tar-deploy, treat the FEATURE (not the file) as the deploy unit — md5-compare every file the feature touched (models, services, migrations, views, receipts) local vs live, run `git status --porcelain` on live to see the full drift list, run `migrate --force`, then curl the affected page expecting 200. Never assume an earlier session deployed its whole feature.
 - The live worktree is often DIRTY (tracked files modified by past scp hot-fixes). `git pull` then aborts ("Please commit or stash"). Safe fix ONCE the hot-fix content is committed upstream: verify `git diff origin/main --stat` shows NO app-code differences (only docs/memory), then `git stash && git pull origin main` — stash kept as backup, content identical.
 - Feature not yet committed in the workspace (checkpoint commits only happen at turn end): deploy by streaming files over SSH — `tar czf - <paths> | ssh ... "cd /home/taxnestc/public_html && tar xzf -"` preserves relative paths in one shot; then migrate+caches+opcache as usual. Next turn's checkpoint commit makes a later pull a clean no-op (identical content).
 - Workspace-side: a stale `.git/refs/remotes/origin/main.lock` makes `git push` error AFTER succeeding ("Everything up-to-date" = remote already has it); sandbox blocks removing the lock — verify true remote state with `git ls-remote origin main` instead.

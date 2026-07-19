@@ -2642,6 +2642,47 @@ class FbrPosController extends Controller
         return redirect()->route('fbrpos.products')->with('success', 'Product status updated.');
     }
 
+    /**
+     * Toggle a single product's sale-screen visibility (show_on_sale).
+     * Hidden products stay searchable + billable — they only leave the grid.
+     */
+    public function toggleProductSale($id)
+    {
+        if (Auth::guard('fbrpos')->user()->role !== 'company_admin') abort(403, 'Only admin can manage products.');
+        $companyId = app('currentCompanyId');
+        $product = Product::where('company_id', $companyId)->findOrFail($id);
+        $product->update(['show_on_sale' => !$product->show_on_sale]);
+        return back()->with('success', $product->show_on_sale ? 'Product is now visible on the sale screen.' : 'Product hidden from the sale screen.');
+    }
+
+    /**
+     * Bulk hide/show ALL products on the sale-screen grid (port of the PRA
+     * NestPOS bulk toggle). Admin-only. Uses the show_on_sale flag, so hidden
+     * products stay searchable + billable exactly like single-hide.
+     * NOTE: FBR products have no category column, so there is no category scope.
+     */
+    public function bulkToggleSale(Request $request)
+    {
+        if (Auth::guard('fbrpos')->user()->role !== 'company_admin') {
+            abort(403, 'Only admin can bulk-change sale screen visibility.');
+        }
+        $request->validate([
+            'action' => 'required|in:hide,show',
+        ]);
+        $companyId = app('currentCompanyId');
+        $show = $request->action === 'show';
+
+        // Only flip rows actually in the opposite state so the flashed
+        // count = products genuinely affected.
+        $count = Product::where('company_id', $companyId)
+            ->where('show_on_sale', !$show)
+            ->update(['show_on_sale' => $show]);
+
+        $msg = number_format($count) . ' products sale screen '
+            . ($show ? 'par show kar diye.' : 'se hide kar diye.');
+        return back()->with('success', $msg);
+    }
+
     public function destroyProduct($id)
     {
         if (Auth::guard('fbrpos')->user()->role !== 'company_admin') abort(403, 'Only admin can manage products.');

@@ -23,11 +23,13 @@ class Product extends Model
         'default_price',
         'is_price_editable',
         'is_active',
+        'show_on_sale',
     ];
 
     protected $casts = [
         'is_price_editable' => 'boolean',
         'is_active' => 'boolean',
+        'show_on_sale' => 'boolean',
     ];
 
     protected static function booted()

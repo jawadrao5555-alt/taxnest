@@ -2021,7 +2021,7 @@ $productsJson = $products->map(function($p) {
     return [
         'id' => $p->id, 'type' => 'product', 'name' => $p->name,
         'price' => (float) ($p->default_price ?? 0), 'category' => null,
-        'show_on_sale' => true,
+        'show_on_sale' => (bool) ($p->show_on_sale ?? true),
         'cost_price' => 0.0,
         'is_tax_exempt' => ($p->tax_type ?? 'standard') === 'exempt',
         'tax_rate' => (float) ($p->default_tax_rate ?? 18),

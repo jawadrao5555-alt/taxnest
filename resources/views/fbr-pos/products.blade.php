@@ -27,6 +27,26 @@
         </form>
     </div>
 
+    @if(auth('fbrpos')->user() && auth('fbrpos')->user()->role === 'company_admin')
+    {{-- ═══ SALE-SCREEN VISIBILITY (bulk hide/show — admin only) ═══ --}}
+    <div class="flex flex-wrap items-center gap-2 mb-4 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
+        <span class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Sale Screen Visibility</span>
+        <form method="POST" action="{{ route('fbrpos.products.bulk-sale') }}" class="inline"
+              onsubmit="return confirm('Kya waqai SAB products sale screen se hide karne hain? (Search se phir bhi mil jayenge)')">
+            @csrf
+            <input type="hidden" name="action" value="hide">
+            <button type="submit" class="px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-800 text-white text-xs font-semibold">Sab Hide Karo</button>
+        </form>
+        <form method="POST" action="{{ route('fbrpos.products.bulk-sale') }}" class="inline"
+              onsubmit="return confirm('Kya waqai SAB products sale screen par show karne hain?')">
+            @csrf
+            <input type="hidden" name="action" value="show">
+            <button type="submit" class="px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-semibold">Sab Show Karo</button>
+        </form>
+        <span class="text-[11px] text-gray-400">Hidden products grid se hat jate hain magar search se milte rehte hain aur bill ho sakte hain.</span>
+    </div>
+    @endif
+
     <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 overflow-hidden">
         <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-cards">
@@ -70,9 +90,18 @@
                         @else
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">Inactive</span>
                         @endif
+                        @if(!($product->show_on_sale ?? true))
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300 ml-1" title="Hidden from the sale screen grid — still searchable and billable">Hidden</span>
+                        @endif
                     </td>
                     <td class="px-4 py-3 whitespace-nowrap text-right text-sm space-x-2">
                         <a href="{{ route('fbrpos.products.edit', $product->id) }}" class="text-blue-600 hover:text-blue-800 font-medium">Edit</a>
+                        <form method="POST" action="{{ route('fbrpos.products.toggle-sale', $product->id) }}" class="inline">
+                            @csrf
+                            <button type="submit" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 font-medium" title="{{ ($product->show_on_sale ?? true) ? 'Hide from sale screen grid (still searchable & billable)' : 'Show on sale screen grid' }}">
+                                {{ ($product->show_on_sale ?? true) ? 'Hide' : 'Show' }}
+                            </button>
+                        </form>
                         <form method="POST" action="{{ route('fbrpos.products.toggle', $product->id) }}" class="inline">
                             @csrf
                             <button type="submit" class="text-{{ $product->is_active ? 'red' : 'green' }}-600 hover:text-{{ $product->is_active ? 'red' : 'green' }}-800 font-medium">

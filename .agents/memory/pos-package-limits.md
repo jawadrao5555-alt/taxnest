@@ -15,7 +15,7 @@ description: Monthly bill quota + team-account quota semantics for PRA POS paid 
 3. `retryPra` ONLY when `pra_status==='local'` (promote). Plain retries of failed/offline/pending bills are NOT re-charged — they consumed quota at creation.
 4. Restaurant `payOrder`
 
-**Account quota:** counts active users with pos_role in (pos_admin, pos_cashier); local_viewer/archive_viewer exempt. Gate BOTH `storeCashier` AND `toggleCashier` reactivation (deactivate→create→reactivate was a bypass found by review).
+**Account quota:** counts ADDED team accounts only — active pos_manager + pos_cashier; the owner's pos_admin account is EXEMPT (owner rule 19 Jul 2026: Starter 1 = owner + 1 team account). Kitchen/waiter/rider limit-exempt confined roles; local_viewer/archive_viewer exempt. Gate BOTH `storeCashier` AND `toggleCashier` reactivation (deactivate→create→reactivate was a bypass found by review).
 
 **Why:** owner package restructure Jul 2026; limit-reached behavior = BLOCK new finals with upgrade message (mirrors DI), provisionals stay allowed so the shop never deadlocks mid-day.
 

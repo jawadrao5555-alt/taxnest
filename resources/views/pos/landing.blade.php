@@ -396,7 +396,7 @@
                         <span class="font-serif text-lg text-gray-900">What do the plans include?</span>
                         <span class="text-gray-400 font-mono text-xl" x-text="open === 4 ? '-' : '+'">+</span>
                     </button>
-                    <div x-show="open === 4" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Starter covers a single account with up to 500 PRA bills per month. Business adds up to 5 team accounts and 2,000 bills per month. Pro gives you 10 team accounts, 2 branch accounts and unlimited monthly billing. Unlimited is fully unrestricted — unlimited team accounts, unlimited branches, unlimited billing, every feature unlocked.</div>
+                    <div x-show="open === 4" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Starter covers your owner account plus 1 team account with up to 500 PRA bills per month. Business adds up to 5 team accounts and 2,000 bills per month. Pro gives you 10 team accounts, 2 branch accounts and unlimited monthly billing. Unlimited is fully unrestricted — unlimited team accounts, unlimited branches, unlimited billing, every feature unlocked.</div>
                 </div>
             </div>
         </div>

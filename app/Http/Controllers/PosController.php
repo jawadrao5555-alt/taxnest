@@ -4159,7 +4159,8 @@ class PosController extends Controller
         $newRole = $request->input('pos_role') ?: 'pos_cashier';
 
         // Team-account quota (paid-plan package limits, Jul 2026):
-        // Starter 1 (admin only), Business 5, Pro 10, Unlimited unlimited.
+        // user_limit counts ADDED accounts only — the owner's pos_admin account
+        // is EXEMPT. Starter 1 = owner + 1, Business 5, Pro 10, Unlimited -1.
         // Managers count toward the limit exactly like cashiers.
         // Kitchen (P5, F4) + Waiter (P7, F6) accounts are limit-EXEMPT — confined roles.
         if (!in_array($newRole, ['pos_kitchen', 'pos_waiter'], true)) {

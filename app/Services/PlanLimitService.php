@@ -147,10 +147,12 @@ class PlanLimitService
     }
 
     /**
-     * PRA POS team-account quota: plan user_limit counts the POS panel accounts
-     * (pos_admin + pos_cashier) — Starter 1 (admin only), Business 5, Pro -1.
-     * Read-only portal accounts (local_viewer / archive_viewer) are super-admin
-     * provisioned and never consume the quota.
+     * PRA POS team-account quota: plan user_limit counts ADDED team accounts
+     * only (pos_manager + pos_cashier). The company owner's pos_admin account
+     * is EXEMPT (owner rule, Jul 2026) — Starter 1 = owner + 1 team account.
+     * Kitchen/waiter/rider are limit-exempt confined roles; read-only portal
+     * accounts (local_viewer / archive_viewer) are super-admin provisioned
+     * and never consume the quota.
      */
     public static function canAddPosUser(int $companyId): array
     {
@@ -161,7 +163,7 @@ class PlanLimitService
 
         $count = User::where('company_id', $companyId)
             ->where('is_active', true)
-            ->whereIn('pos_role', ['pos_admin', 'pos_manager', 'pos_cashier'])
+            ->whereIn('pos_role', ['pos_manager', 'pos_cashier'])
             ->count();
 
         if ($company && $company->user_limit_override !== null) {

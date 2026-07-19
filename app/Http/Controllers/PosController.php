@@ -2013,18 +2013,21 @@ class PosController extends Controller
             ->where('pra_status', 'local')
             ->orderBy('id', 'desc')
             ->limit(100)
-            ->get(['id', 'invoice_number', 'customer_name', 'total_amount', 'payment_method', 'created_at']);
+            ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'order_type', 'delivery_address', 'total_amount', 'payment_method', 'created_at']);
 
         $data = $bills->map(function ($b) {
             return [
-                'id'             => $b->id,
-                'invoice_number' => $b->invoice_number,
-                'customer_name'  => $b->customer_name,
-                'total_amount'   => (float) $b->total_amount,
-                'payment_method' => $b->payment_method,
-                'items_count'    => PosTransactionItem::where('transaction_id', $b->id)->count(),
-                'created_human'  => $b->created_at?->diffForHumans(),
-                'created_at'     => $b->created_at?->toDateTimeString(),
+                'id'               => $b->id,
+                'invoice_number'   => $b->invoice_number,
+                'customer_name'    => $b->customer_name,
+                'customer_phone'   => $b->customer_phone,
+                'order_type'       => $b->order_type,
+                'delivery_address' => $b->delivery_address,
+                'total_amount'     => (float) $b->total_amount,
+                'payment_method'   => $b->payment_method,
+                'items_count'      => PosTransactionItem::where('transaction_id', $b->id)->count(),
+                'created_human'    => $b->created_at?->diffForHumans(),
+                'created_at'       => $b->created_at?->toDateTimeString(),
             ];
         });
 

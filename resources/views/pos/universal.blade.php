@@ -1274,12 +1274,29 @@ window.addEventListener('popstate', function() {
                                 <span class="text-[10px] font-mono text-gray-400 w-5" x-text="bi + 1"></span>
                                 <span class="text-sm font-bold text-gray-900 dark:text-white" x-text="bill.invoice_number"></span>
                                 <span class="text-[9px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">Local</span>
-                                <template x-if="bill.customer_name">
-                                    <span class="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full font-medium" x-text="bill.customer_name"></span>
+                                <template x-if="bill.order_type">
+                                    <span class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide"
+                                          :class="bill.order_type === 'delivery' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : (bill.order_type === 'dine_in' ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300')"
+                                          x-text="bill.order_type === 'dine_in' ? 'Dine In' : (bill.order_type === 'delivery' ? 'Delivery' : 'Takeaway')"></span>
                                 </template>
                             </div>
                             <span class="text-sm font-bold text-purple-700 dark:text-purple-400" x-text="'Rs. ' + Number(bill.total_amount).toLocaleString()"></span>
                         </div>
+                        <template x-if="bill.customer_name || bill.customer_phone">
+                            <p class="text-[11px] font-semibold text-gray-700 dark:text-gray-300 ml-7 flex items-center gap-1.5 flex-wrap">
+                                <svg class="w-3 h-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                <span x-text="bill.customer_name || 'Customer'"></span>
+                                <template x-if="bill.customer_phone">
+                                    <span class="font-mono font-medium text-gray-500" x-text="bill.customer_phone"></span>
+                                </template>
+                            </p>
+                        </template>
+                        <template x-if="bill.delivery_address">
+                            <p class="text-[11px] text-gray-500 ml-7 flex items-start gap-1.5">
+                                <svg class="w-3 h-3 mt-0.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                <span x-text="bill.delivery_address"></span>
+                            </p>
+                        </template>
                         <p class="text-[11px] text-gray-500 ml-7 mb-2" x-text="bill.items_count + ' item(s) • ' + bill.created_human"></p>
                         <div class="flex gap-2 ml-7">
                             <a :href="'{{ url('/pos/transaction') }}/' + bill.id + '/edit?from=sale'" class="flex-1 py-2 text-xs font-bold text-blue-700 border border-blue-300 rounded-xl hover:bg-blue-50 transition text-center flex items-center justify-center gap-1">

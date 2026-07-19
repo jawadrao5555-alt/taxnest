@@ -443,12 +443,14 @@ class FbrPosController extends Controller
             $orderClause = 'FIELD(id,' . implode(',', array_map('intval', $topIds)) . ')';
             $frequentProducts = Product::where('company_id', $companyId)
                 ->where('is_active', true)
+                ->where('show_on_sale', true)
                 ->whereIn('id', $topIds)
                 ->orderByRaw($orderClause)
                 ->get();
         } else {
             // Cold start (no sales yet) — fall back to the first 12 active products by name
-            $frequentProducts = $products->take(12)->values();
+            // (grid tiles respect show_on_sale; hidden products stay searchable + billable)
+            $frequentProducts = $products->where('show_on_sale', true)->take(12)->values();
         }
 
         // Phase 2: terminals, shift, loyalty, promotions

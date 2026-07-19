@@ -428,8 +428,10 @@
                         this.total = Math.round(this.afterDiscount);
                         }
                     } else {
-                        this.taxAmount = Math.round(this.afterDiscount * this.taxRate / 100 * 100) / 100;
-                        this.total = Math.round((this.afterDiscount + this.taxAmount) * 100) / 100;
+                        // Whole-rupee convention (matches backend updateTransaction):
+                        // tax + total both round to whole rupees — no paisa on the bill.
+                        this.taxAmount = Math.round(this.afterDiscount * this.taxRate / 100);
+                        this.total = Math.round(this.afterDiscount + this.taxAmount);
                     }
                 },
 

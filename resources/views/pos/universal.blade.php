@@ -870,6 +870,17 @@ window.addEventListener('popstate', function() {
                 </div>
             </template>
 
+            <!-- ─── EDIT MODE BANNER — visible whenever a provisional bill is loaded for editing ─── -->
+            <template x-if="editingBillId">
+                <div class="px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-amber-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs font-bold text-amber-700 dark:text-amber-400 truncate">Editing Bill <span x-text="editingBillNumber"></span></p>
+                        <p class="text-[10px] text-amber-600/80 dark:text-amber-500/80">F9 Update Bill se save hoga — bill provisional hi rahega</p>
+                    </div>
+                    <button @click="cancelEditMode()" class="text-[10px] font-bold px-2 py-1 rounded-lg bg-white dark:bg-gray-800 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700 hover:bg-amber-100 transition whitespace-nowrap">Cancel</button>
+                </div>
+            </template>
             <div class="flex-1 min-h-0 overflow-y-auto" x-ref="cartList">
                 <template x-if="cart.length === 0">
                     <div class="tn-empty flex flex-col items-center justify-center h-full text-gray-400 py-16 px-6 text-center">
@@ -1058,10 +1069,10 @@ window.addEventListener('popstate', function() {
                         </button>
                     </div>
                     <!-- ─── SAVE PROVISIONAL — separate from Pay (no modal, no payment) ─── -->
-                    <button @click="saveProvisionalDirect()" :disabled="cart.length === 0 || submitting || !canProvisional()" :title="!canProvisional() ? 'Provisional bills are for Delivery orders only' : ''" class="w-full py-2.5 mb-2 rounded-xl text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-30 shadow-sm transition flex items-center justify-center gap-2">
+                    <button @click="saveProvisionalDirect()" :disabled="cart.length === 0 || submitting || (!editingBillId && !canProvisional())" :title="(!editingBillId && !canProvisional()) ? 'Provisional bills are for Delivery orders only' : ''" class="w-full py-2.5 mb-2 rounded-xl text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-30 shadow-sm transition flex items-center justify-center gap-2">
                         <svg x-show="!submitting" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
                         <svg x-show="submitting" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                        <span>Save Provisional</span>
+                        <span x-text="editingBillId ? ('Update Bill ' + editingBillNumber) : 'Save Provisional'"></span>
                         <kbd class="text-[9px] bg-amber-700/40 px-1.5 py-0.5 rounded font-mono">F9</kbd>
                     </button>
                     <button @click="showPayModal = true" :disabled="cart.length === 0 || submitting" class="pay-btn-premium btn-ripple w-full py-4 rounded-2xl text-base font-extrabold text-white disabled:opacity-30">
@@ -1299,7 +1310,7 @@ window.addEventListener('popstate', function() {
                         </template>
                         <p class="text-[11px] text-gray-500 ml-7 mb-2" x-text="bill.items_count + ' item(s) • ' + bill.created_human"></p>
                         <div class="flex gap-2 ml-7">
-                            <a :href="'{{ url('/pos/transaction') }}/' + bill.id + '/edit?from=sale'" class="flex-1 py-2 text-xs font-bold text-blue-700 border border-blue-300 rounded-xl hover:bg-blue-50 transition text-center flex items-center justify-center gap-1">
+                            <a :href="'{{ route('pos.invoice.create') }}?edit_bill=' + bill.id" class="flex-1 py-2 text-xs font-bold text-blue-700 border border-blue-300 rounded-xl hover:bg-blue-50 transition text-center flex items-center justify-center gap-1">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                 Edit
                             </a>
@@ -2255,6 +2266,12 @@ function restaurantPos() {
         // (delivery orders only; empty when the delivery feature is OFF).
         allRiders: {!! $jsEnc(collect($ridersForJs ?? [])->values()) !!},
         selectedRiderId: '',
+        // EDIT PROVISIONAL IN SALE SCREEN (Jul 2026): ?edit_bill={id} → server ships
+        // the bill here; init() loads it into the cart. Update goes through
+        // updateTransaction (JSON) — bill stays provisional, keeps its L-serial.
+        editingBillData: {!! $jsEnc($editBillForJs ?? null, 'null') !!},
+        editingBillId: null,
+        editingBillNumber: '',
         allCustomers: {!! $jsEnc($customersJson) !!},
         kitchenSettings: @json($kitchenSettings),
         // Inventory master switch — single source of truth.
@@ -2660,6 +2677,16 @@ function restaurantPos() {
             setTimeout(() => this.cacheProductData(), 800);
             document.addEventListener('keydown', (e) => this.handleKey(e));
             this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
+            // EDIT MODE (Jul 2026): ?edit_bill= → load the provisional bill into the
+            // cart. Also show the "updated" toast after a successful edit-reload.
+            this._initEditMode();
+            try {
+                const up = new URLSearchParams(window.location.search).get('updated');
+                if (up) {
+                    history.replaceState({}, '', '{{ route('pos.invoice.create') }}');
+                    setTimeout(() => this.showToast('Bill ' + up + ' updated — F10 se Make Final kar sakte hain', 'success'), 400);
+                }
+            } catch (e) {}
             // Lazy-load provisional bill list on mount (for header badge count).
             // Failures are silent — badge just won't show until next refresh.
             setTimeout(() => this.loadLocalBills(), 1200);
@@ -2949,9 +2976,14 @@ function restaurantPos() {
         get notesKey() { return 'rpos_notes_{{ auth("pos")->id() ?? 0 }}_{{ app("currentCompanyId") ?? 0 }}'; },
         _saveCartTimer: null,
         saveCart() {
+            // EDIT MODE: never persist the loaded bill's items over the cashier's own
+            // in-progress cart — after the edit (or Cancel) their cart restores intact,
+            // and the edited bill's items can never resurrect as a duplicate new sale.
+            if (this.editingBillId) return;
             // Debounced localStorage write — avoids hot-path JSON.stringify on every qty keystroke / cart mutation.
             if (this._saveCartTimer) clearTimeout(this._saveCartTimer);
             this._saveCartTimer = setTimeout(() => {
+                if (this.editingBillId) return; // re-check at fire time (debounce race on edit-mode entry)
                 try { localStorage.setItem(this.storageKey, JSON.stringify(this.cart)); localStorage.setItem(this.notesKey, this.kitchenNotes); } catch(e) {}
             }, 400);
         },
@@ -4110,7 +4142,7 @@ function restaurantPos() {
                 if (e.key === 'ArrowDown') { e.preventDefault(); this.activeLocalIndex = Math.min(this.activeLocalIndex + 1, this.localBills.length - 1); }
                 else if (e.key === 'ArrowUp') { e.preventDefault(); this.activeLocalIndex = Math.max(this.activeLocalIndex - 1, 0); }
                 else if (e.key === 'Enter') { e.preventDefault(); this.askPromoteMethod(this.localBills[this.activeLocalIndex]); }
-                else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); window.location.href = '{{ url('/pos/transaction') }}/' + this.localBills[this.activeLocalIndex].id + '/edit?from=sale'; }
+                else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); window.location.href = '{{ route('pos.invoice.create') }}?edit_bill=' + this.localBills[this.activeLocalIndex].id; }
                 else if ((e.key === 'd' || e.key === 'D') && this.posRole !== 'pos_cashier') { e.preventDefault(); this.deleteProvisional(this.localBills[this.activeLocalIndex]); }
                 else if (e.key === 'Escape') { e.preventDefault(); this.showLocalBills = false; }
                 return;
@@ -4664,6 +4696,12 @@ function restaurantPos() {
         },
 
         async holdOrder(opts) {
+            // EDIT MODE: a provisional bill can't be turned into a held order —
+            // F9 Update Bill is the only save path while editing.
+            if (this.editingBillId) {
+                this.showToast('Edit mode — F9 Update Bill se save karein', 'error');
+                return;
+            }
             opts = opts || {};
             if (this.cart.length === 0 || this.submitting) return null;
             // Order-type flow rule: Hold / Send-to-Kitchen is the Dine-In procedure
@@ -4751,9 +4789,113 @@ function restaurantPos() {
         // through the existing processPayment pipeline. No modal opens, no
         // keyboard conflict, no checkbox confusion. User can later edit /
         // delete / promote-to-final from F10 (Local) shortcut.
+        // ─── EDIT PROVISIONAL IN SALE SCREEN (Jul 2026) ────────────────────
+        // ?edit_bill={id} → the server ships the provisional bill (editingBillData);
+        // this loads it into the cart. F9 becomes "Update Bill" → PUT updateTransaction
+        // (JSON) — the bill STAYS provisional and KEEPS its L-serial. Pay/Hold/KOT are
+        // blocked in edit mode: update first, then F10 → Make Final as usual.
+        _initEditMode() {
+            const eb = this.editingBillData;
+            if (!eb || !eb.id) return;
+            this.editingBillId = eb.id;
+            this.editingBillNumber = eb.invoice_number || '';
+            this.cart = (eb.items || []).map(i => ({
+                cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9),
+                item_id: i.item_id || null,
+                item_type: i.item_type || 'product',
+                item_name: i.item_name,
+                quantity: parseFloat(i.quantity) || 1,
+                unit_price: parseFloat(i.unit_price) || 0,
+                special_notes: i.special_notes || '',
+                is_tax_exempt: !!i.is_tax_exempt,
+                item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false,
+            }));
+            this.orderType = eb.order_type || 'takeaway';
+            if (eb.customer_name || eb.customer_phone) {
+                this.selectedCustomer = { id: eb.customer_id || null, name: eb.customer_name || 'Customer', phone: eb.customer_phone || '' };
+            }
+            this.discountType = eb.discount_type || 'percentage';
+            this.discountValue = parseFloat(eb.discount_value) || 0;
+            if (this.discountValue > 0) this.showDiscount = true;
+            this.kitchenNotes = eb.notes || '';
+            this.recalcDiscount();
+            if (this.orderType === 'delivery') {
+                // Bill's snapshot address shows instantly; saved address book merges in
+                // behind it (loadCustomerAddresses resets the list, so re-pin after).
+                const snap = eb.delivery_address || '';
+                if (snap) {
+                    this.customerAddresses = [{ id: null, label: null, address: snap }];
+                    this.selectedDeliveryAddress = snap;
+                }
+                if (eb.customer_id) {
+                    this.loadCustomerAddresses().then(() => {
+                        if (snap) {
+                            if (!this.customerAddresses.some(a => (a.address || '') === snap)) {
+                                this.customerAddresses.unshift({ id: null, label: null, address: snap });
+                            }
+                            this.selectedDeliveryAddress = snap;
+                        }
+                    });
+                }
+            }
+        },
+        cancelEditMode() {
+            window.location.href = '{{ route('pos.invoice.create') }}';
+        },
+        async updateProvisionalBill() {
+            if (this.submitting || !this.editingBillId) return;
+            if (this.cart.length === 0) { this.showToast('Cart is empty — item add karein ya bill delete karein', 'error'); return; }
+            if (!navigator.onLine) { this.showToast('No internet — bill update sirf online ho sakta hai', 'error'); return; }
+            this.submitting = true;
+            try {
+                const payload = {
+                    items: this.cart.map(c => ({
+                        name: c.item_name,
+                        quantity: c.quantity,
+                        unit_price: c.unit_price,
+                        type: c.item_type === 'service' ? 'service' : (c.item_type === 'deal' ? 'deal' : 'product'),
+                        item_id: c.item_id || null,
+                        is_tax_exempt: !!c.is_tax_exempt,
+                        special_notes: c.special_notes || null,
+                        _manual: (c.item_type === 'manual' || !c.item_id) ? true : false,
+                    })),
+                    // Payment method is chosen at Make Final time — keep the bill's own.
+                    payment_method: (this.editingBillData && this.editingBillData.payment_method) || 'cash',
+                    discount_type: this.discountType || 'percentage',
+                    discount_value: this.discountAmount > 0 ? this.discountValue : 0,
+                    customer_name: this.selectedCustomer?.name || null,
+                    customer_phone: this.selectedCustomer?.phone || null,
+                    delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || null) : null,
+                    kitchen_notes: this.kitchenNotes,
+                    terminal_id: (this.editingBillData && this.editingBillData.terminal_id) || null,
+                };
+                const res = await fetch('{{ url('/pos/transaction') }}/' + this.editingBillId, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json().catch(() => null);
+                if (res.ok && data && data.success) {
+                    // Clean reload = guaranteed fresh state; toast rides the ?updated= param.
+                    window.location.href = '{{ route('pos.invoice.create') }}?updated=' + encodeURIComponent(data.invoice_number || this.editingBillNumber);
+                    return;
+                }
+                const msg = (data && (data.message || (data.errors && Object.values(data.errors)[0] && Object.values(data.errors)[0][0]))) || 'Update failed — dobara koshish karein';
+                this.showToast(msg, 'error');
+            } catch (e) {
+                console.error('[edit-bill] update failed', e);
+                this.showToast('Network error — update save nahi hua', 'error');
+            } finally {
+                this.submitting = false;
+            }
+        },
+
         async saveProvisionalDirect() {
             if (this.submitting) return;
             if (this.cart.length === 0) { this.showToast('Cart is empty', 'error'); return; }
+            // EDIT MODE: F9 = Update Bill (canProvisional gate skipped — the bill
+            // already IS provisional, whatever its order type).
+            if (this.editingBillId) return this.updateProvisionalBill();
             // Order-type flow rule: provisional bills are DELIVERY-only on restaurant
             // companies. Dine-In uses Hold/KOT/recall; Takeaway pays direct final.
             // Backend enforces the same rule (defence-in-depth).
@@ -4768,6 +4910,13 @@ function restaurantPos() {
 
         async processPayment(method) {
             if (this.submitting) return;
+            // EDIT MODE: payments are blocked — update the bill (F9), then use
+            // F10 → Make Final (the promote path owns quota/serial/PRA rules).
+            if (this.editingBillId) {
+                this.showPayModal = false;
+                this.showToast('Edit mode — F9 Update Bill se save karein, phir F10 se Make Final', 'error');
+                return;
+            }
             // Capture provisional flag once at submission start so a stray
             // re-render/checkbox toggle mid-flight cannot flip the path.
             const provisional = !!this.saveAsProvisional;

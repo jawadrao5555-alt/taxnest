@@ -29,5 +29,11 @@ Restaurant screen retired: `RestaurantPosController::pos()` early-redirects to `
 - Cashier saves "Provisional" from Pay modal (local status, no PRA submit), later promoted.
 - F10 header "Local" modal (list/edit/delete/promote via `/pos/api/provisional-bills*`); F11 "Failed" modal (retry/edit/delete via `/pos/api/failed-bills*`, race-safe atomic claim on retry).
 
+## Edit-provisional-in-sale-screen (Jul 2026)
+- `?edit_bill={id}` on the sale screen loads a PROVISIONAL ONLY (local/local, NULL fiscal serial, company-scoped); anything else redirects to the classic edit page whose own guards apply. F10 modal Edit links + 'e' key use this; F11 FAILED-bill edits stay on the classic page (deliberate).
+- In edit mode: F9 becomes "Update Bill L-XXX" → PUT `/pos/transaction/{id}` JSON (updateTransaction is wantsJson-aware); Pay + Hold are toast-BLOCKED — finalizing must go through the F10 promote path (owns quota/serial/PRA rules). Bill keeps its L-serial and stays provisional on update.
+- **saveCart is double-guarded** (entry + inside debounce timer) in edit mode — without the timer re-check the edited bill's cart clobbers the cashier's own saved localStorage cart and resurrects as a duplicate new sale.
+- Deal lines in an edited provisional get RE-PRICED at the current deal price server-side (`resolveItemExemptions` enforces); a deleted deal falls back to client price with item_id nulled — pre-existing behavior, more reachable now.
+
 ## PWA update hold (Jul 2026)
 `window.tnPwaUpdateHold` registered in `_startAutoSync` init: returns true while cart non-empty, pay modal open, submitting, or receipt popup open — pwa-update toast defers auto-reload (retries every 30s; manual Refresh bypasses). Mirrored in FBR universal.

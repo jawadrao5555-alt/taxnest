@@ -807,12 +807,71 @@ class PosController extends Controller
                 ->all();
         }
 
+        // EDIT PROVISIONAL IN SALE SCREEN (Jul 2026): ?edit_bill={id} loads a
+        // provisional bill (completed + invoice_mode='local' + pra_status='local',
+        // never PRA-fiscalized) straight into the sale-screen cart. Saving goes
+        // through updateTransaction (fate preserved: stays provisional, KEEPS its
+        // L-serial). Non-provisional bills keep the classic edit-transaction page.
+        $editBillForJs = null;
+        if ($request->filled('edit_bill')) {
+            $editTxn = PosTransaction::where('company_id', $companyId)
+                ->where('id', (int) $request->input('edit_bill'))
+                ->where('invoice_mode', 'local')
+                ->where('pra_status', 'local')
+                ->whereNull('pra_invoice_number')
+                ->with('items')
+                ->first();
+            if (!$editTxn) {
+                // Not a provisional (already promoted / PRA-fiscalized / wrong company)
+                // → hand off to the classic edit page, which has its own guards.
+                return redirect()->route('pos.transaction.edit', (int) $request->input('edit_bill'));
+            }
+            if ($editTxn) {
+                // Best-effort customer re-link (bills snapshot name/phone only) so
+                // the address book loads for delivery edits.
+                $editCustomer = null;
+                if ($editTxn->customer_phone) {
+                    $editCustomer = PosCustomer::where('company_id', $companyId)
+                        ->where('phone', $editTxn->customer_phone)
+                        ->first();
+                }
+                $editBillForJs = [
+                    'id' => (int) $editTxn->id,
+                    'invoice_number' => (string) $editTxn->invoice_number,
+                    'order_type' => $editTxn->order_type ?: 'takeaway',
+                    'customer_id' => $editCustomer ? (int) $editCustomer->id : null,
+                    'customer_name' => $editTxn->customer_name,
+                    'customer_phone' => $editTxn->customer_phone,
+                    'delivery_address' => $editTxn->delivery_address,
+                    'discount_type' => $editTxn->discount_type ?: 'percentage',
+                    'discount_value' => (float) ($editTxn->discount_value ?? 0),
+                    // Normalized to updateTransaction's validation enum — a legacy /
+                    // unexpected stored method must never brick the update.
+                    'payment_method' => in_array($editTxn->payment_method, ['cash', 'card', 'debit_card', 'credit_card', 'qr_payment'], true)
+                        ? $editTxn->payment_method
+                        : 'cash',
+                    'terminal_id' => $editTxn->terminal_id,
+                    'notes' => $editTxn->notes,
+                    'items' => $editTxn->items->map(fn ($i) => [
+                        'item_id' => $i->item_id ? (int) $i->item_id : null,
+                        'item_type' => $i->item_type ?: 'product',
+                        'item_name' => (string) $i->item_name,
+                        'quantity' => (float) $i->quantity,
+                        'unit_price' => (float) $i->unit_price,
+                        'special_notes' => $i->special_notes,
+                        'is_tax_exempt' => (bool) $i->is_tax_exempt,
+                    ])->values()->all(),
+                ];
+            }
+        }
+
         return response(view('pos.universal', compact(
             'company', 'features', 'products', 'services', 'categories',
             'recipeLookup', 'tables', 'selectedTable', 'heldOrders',
             'customers', 'taxRate', 'taxRules', 'stockStatus', 'blockOutOfStock',
             'posRole', 'discountLimit', 'hasManagerPin', 'ingredientCosts',
-            'lowStockAlerts', 'inventoryEnabled', 'dealsForJs', 'ridersForJs'
+            'lowStockAlerts', 'inventoryEnabled', 'dealsForJs', 'ridersForJs',
+            'editBillForJs'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         ->header('Pragma', 'no-cache')
@@ -1423,6 +1482,9 @@ class PosController extends Controller
         $transaction = PosTransaction::where('company_id', $companyId)->with('items')->findOrFail($id);
 
         if ($transaction->pra_invoice_number) {
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => 'Cannot edit — this invoice has been submitted to PRA. PRA Fiscal #: ' . $transaction->pra_invoice_number], 422);
+            }
             return redirect()->route('pos.transaction.show', $id)
                 ->with('error', 'Cannot edit — this invoice has been submitted to PRA.');
         }
@@ -1529,9 +1591,15 @@ class PosController extends Controller
             // Explicit promote-on-save: admin-only + current month only — the exact
             // same gates as the per-bill "Submit to PRA" promote paths.
             if (!$posEditUser?->isPosAdmin()) {
+                if ($request->wantsJson()) {
+                    return response()->json(['success' => false, 'message' => 'Sirf POS admin local bill ko PRA par report kar sakta hai.'], 403);
+                }
                 return back()->withInput()->with('error', 'Sirf POS admin local bill ko PRA par report kar sakta hai.');
             }
             if ($transaction->created_at && $transaction->created_at->lt(now()->startOfMonth())) {
+                if ($request->wantsJson()) {
+                    return response()->json(['success' => false, 'message' => 'Sirf CURRENT month ke local bills PRA par submit ho sakte hain.'], 422);
+                }
                 return back()->withInput()->with('error', 'Sirf CURRENT month ke local bills PRA par submit ho sakte hain — pichhle month ke bills close ho chuke hain.');
             }
         }
@@ -1629,6 +1697,9 @@ class PosController extends Controller
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => 'Failed to update invoice: ' . $e->getMessage()], 500);
+            }
             return back()->withInput()->with('error', 'Failed to update invoice: ' . $e->getMessage());
         }
 
@@ -1656,6 +1727,17 @@ class PosController extends Controller
                     $praMessage = ' | Offline: Will sync automatically.';
                 }
             }
+        }
+
+        // Sale-screen edit mode (Kaam 5, Jul 2026): JSON callers get a JSON result —
+        // the sale screen shows a toast + reloads clean instead of following redirects.
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'invoice_number' => $transaction->invoice_number,
+                'total_amount' => (float) $transaction->total_amount,
+                'message' => 'Invoice updated successfully!' . $praMessage,
+            ]);
         }
 
         // Edited from the sale screen (F10/F11 modals pass from=sale) → return the cashier

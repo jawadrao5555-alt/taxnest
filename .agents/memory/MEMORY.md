@@ -63,6 +63,7 @@
 - [mobile.css global overrides](mobile-css-global-overrides.md) — mobile.css beats Tailwind on phones: forced table-cell vs .hidden, touch-target blobs on toggle pills, grid collapse needs grid-cols-keep; bump ?v= on edit.
 - [pricing_plans.features = display-only](pos-plan-features-display-only.md) — no code reads the JSON; restaurant gate = restaurant_enabled column; plan cards render limits from columns + cumulative lists.
 - [Silent printer routing](silent-printer-routing.md) — KOT stamping at result-time not render; Electron listener leak = double print; no pageSize for thermal; MySQL NOW() looks offline to Laravel.
+- [POS product Excel import/export](pos-excel-import.md) — bulk import/export = real .xlsx round-trip (CSV mangles barcodes to 8.9E+12); TEXT+explicit-string code columns; row-cap BEFORE toArray().
 - [POS card bucket normalization](pos-card-bucket-normalization.md) — card sales stored as 'debit_card'; every cash/card/other aggregation must whereIn the full card alias set, never ='card'.
 - [Company hard-delete purge](company-hard-delete-purge.md) — new company_id tables need FK cascade OR a forceDelete purge-list entry, else hard delete leaves orphan rows; audit_logs/credentials ledger exempt.
 - [PRA POS Delivery Riders](pos-delivery-riders.md) — khata = cash+unsettled+not-returned (bypass hide_archived); riders never touch invoice_mode/serials; day-close recon PRA-set-only; wash archives unsettled rider cash.

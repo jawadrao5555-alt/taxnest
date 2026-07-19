@@ -4655,48 +4655,91 @@ class PosController extends Controller
         return back()->with('success', $msg);
     }
 
+    // Sample rows shown in the blank template. importProducts() silently skips a row
+    // that still matches one of these EXACTLY (name+price+sku) so an untouched sample
+    // never becomes a real product in the shop's list.
+    private const IMPORT_SAMPLE_ROWS = [
+        ['Chicken Biryani', 450.0, 'CB-001'],
+        ['Pepsi 500ml', 120.0, 'PEP-500'],
+        ['Naan', 30.0, 'NAN-001'],
+    ];
+
     public function downloadProductTemplate()
     {
         $companyId = app('currentCompanyId');
         $existingProducts = PosProduct::where('company_id', $companyId)->orderBy('name')->get();
 
+        // Real .xlsx (not CSV) — shopkeepers edit in Excel and upload the SAME file
+        // back. The old CSV round-trip mangled long barcodes into scientific notation
+        // (8.9E+12) and Excel's "save as .xlsx" default made uploads fail (Pizza Master).
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Products');
+
         $headers = ['Name', 'Price', 'Description', 'Category', 'SKU', 'Barcode', 'Tax Rate %', 'Unit (UOM)'];
+        $sheet->fromArray($headers, null, 'A1');
+        $sheet->getStyle('A1:H1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:H1')->getFill()
+            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            ->getStartColor()->setRGB('E9D5FF');
+        foreach (['A' => 32, 'B' => 10, 'C' => 32, 'D' => 16, 'E' => 14, 'F' => 18, 'G' => 11, 'H' => 12] as $col => $w) {
+            $sheet->getColumnDimension($col)->setWidth($w);
+        }
+        // SKU + Barcode columns forced to TEXT so Excel never converts long codes
+        // to scientific notation or strips leading zeros.
+        $sheet->getStyle('E:F')->getNumberFormat()
+            ->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
 
-        $callback = function() use ($headers, $existingProducts) {
-            $file = fopen('php://output', 'w');
-            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
-            fputcsv($file, $headers);
-
-            if ($existingProducts->isEmpty()) {
-                fputcsv($file, ['Chicken Biryani', '450', 'Full plate biryani with raita', 'Food', 'CB-001', '8901234567890', '16', 'NOS']);
-                fputcsv($file, ['Pepsi 500ml', '120', 'Cold drink bottle', 'Beverages', 'PEP-500', '8901234567891', '5', 'NOS']);
-                fputcsv($file, ['Naan', '30', 'Tandoori naan', 'Food', 'NAN-001', '', '0', 'NOS']);
-            } else {
-                foreach ($existingProducts as $p) {
-                    fputcsv($file, [
-                        $p->name,
-                        $p->price,
-                        $p->description ?? '',
-                        $p->category ?? '',
-                        $p->sku ?? '',
-                        $p->barcode ?? '',
-                        $p->tax_rate ?? 0,
-                        $p->uom ?? 'NOS',
-                    ]);
-                }
+        $rowNum = 2;
+        if ($existingProducts->isEmpty()) {
+            $samples = [
+                ['Chicken Biryani', 450, 'Full plate biryani with raita', 'Food', 'CB-001', '8901234567890', 16, 'NOS'],
+                ['Pepsi 500ml', 120, 'Cold drink bottle', 'Beverages', 'PEP-500', '8901234567891', 5, 'NOS'],
+                ['Naan', 30, 'Tandoori naan', 'Food', 'NAN-001', '', 0, 'NOS'],
+            ];
+            foreach ($samples as $s) {
+                $this->writeProductRow($sheet, $rowNum++, $s);
             }
+        } else {
+            foreach ($existingProducts as $p) {
+                $this->writeProductRow($sheet, $rowNum++, [
+                    $p->name,
+                    (float) $p->price,
+                    $p->description ?? '',
+                    $p->category ?? '',
+                    $p->sku ?? '',
+                    $p->barcode ?? '',
+                    (float) ($p->tax_rate ?? 0),
+                    $p->uom ?? 'NOS',
+                ]);
+            }
+        }
 
-            fclose($file);
-        };
+        $filename = $existingProducts->isEmpty() ? 'pos_products_template.xlsx' : 'pos_products_export.xlsx';
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
 
-        $filename = $existingProducts->isEmpty() ? 'pos_products_template.csv' : 'pos_products_export.csv';
-
-        return response()->stream($callback, 200, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Cache-Control' => 'no-store, no-cache, must-revalidate',
             'Pragma' => 'no-cache',
         ]);
+    }
+
+    private function writeProductRow($sheet, int $rowNum, array $vals): void
+    {
+        // A..H = Name, Price, Description, Category, SKU, Barcode, Tax %, UOM.
+        // SKU/Barcode written as EXPLICIT strings (Excel would otherwise turn
+        // 8901234567890 into 8.90123E+12 the moment the file is opened).
+        $sheet->setCellValue('A' . $rowNum, $vals[0]);
+        $sheet->setCellValue('B' . $rowNum, $vals[1]);
+        $sheet->setCellValue('C' . $rowNum, $vals[2]);
+        $sheet->setCellValue('D' . $rowNum, $vals[3]);
+        $sheet->setCellValueExplicit('E' . $rowNum, (string) $vals[4], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+        $sheet->setCellValueExplicit('F' . $rowNum, (string) $vals[5], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+        $sheet->setCellValue('G' . $rowNum, $vals[6]);
+        $sheet->setCellValue('H' . $rowNum, $vals[7]);
     }
 
     public function importProducts(Request $request)
@@ -4704,102 +4747,220 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
 
         $request->validate([
-            'csv_file' => 'required|file|mimes:csv,txt|max:2048',
+            'csv_file' => 'required|file|mimes:csv,txt,xlsx,xls|max:5120',
+        ], [
+            'csv_file.mimes' => 'File Excel (.xlsx) ya CSV honi chahiye.',
+            'csv_file.max' => 'File 5 MB se choti honi chahiye.',
         ]);
 
         $file = $request->file('csv_file');
-        $handle = fopen($file->getRealPath(), 'r');
+        $ext = strtolower($file->getClientOriginalExtension());
 
-        if (!$handle) {
-            return back()->with('error', 'Could not read file.');
+        try {
+            $rows = in_array($ext, ['xlsx', 'xls'], true)
+                ? $this->readImportRowsExcel($file->getRealPath())
+                : $this->readImportRowsCsv($file->getRealPath());
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('POS product import parse failed: ' . $e->getMessage());
+            return back()->with('error', 'File parhi nahi ja saki — file kharab ya password-protected lag rahi hai. Template dobara download kar ke usi file mein products likhein.');
         }
 
-        $header = fgetcsv($handle);
-        if (!$header) {
-            fclose($handle);
-            return back()->with('error', 'Empty file or invalid format.');
+        if (count($rows) < 2) {
+            return back()->with('error', 'File khali hai — header ke neeche products ki rows likhein.');
+        }
+        if (count($rows) > 5001) {
+            return back()->with('error', 'Ek waqt mein zyada se zyada 5000 products import karein — file ko do hisson mein baant lein.');
         }
 
-        $header = array_map(function($h) {
-            return strtolower(trim(preg_replace('/[\x{FEFF}]/u', '', $h)));
-        }, $header);
+        $header = array_map(function ($h) {
+            return strtolower(trim(preg_replace('/[\x{FEFF}]/u', '', (string) $h)));
+        }, $rows[0]);
 
-        $nameIdx = array_search('name', $header);
-        $priceIdx = array_search('price', $header);
+        $nameIdx = $this->findColumn($header, ['name', 'product name', 'product', 'item name', 'item']);
+        $priceIdx = $this->findColumn($header, ['price', 'sale price', 'rate', 'unit price', 'price (rs)', 'price rs']);
 
         if ($nameIdx === false || $priceIdx === false) {
-            fclose($handle);
-            return back()->with('error', 'CSV must have "Name" and "Price" columns. Download the template for the correct format.');
+            return back()->with('error', 'File mein "Name" aur "Price" columns nahi mile. Template download karein aur USI file mein products likh kar wapis upload karein — headers wali pehli row mat delete karein.');
         }
 
-        $descIdx = $this->findColumn($header, ['description']);
-        $catIdx = $this->findColumn($header, ['category']);
-        $skuIdx = $this->findColumn($header, ['sku']);
-        $barcodeIdx = $this->findColumn($header, ['barcode']);
-        $taxIdx = $this->findColumn($header, ['tax rate %', 'tax rate', 'tax_rate', 'tax']);
+        $descIdx = $this->findColumn($header, ['description', 'details']);
+        $catIdx = $this->findColumn($header, ['category', 'group']);
+        $skuIdx = $this->findColumn($header, ['sku', 'code', 'item code', 'product code']);
+        $barcodeIdx = $this->findColumn($header, ['barcode', 'bar code', 'ean']);
+        $taxIdx = $this->findColumn($header, ['tax rate %', 'tax rate', 'tax_rate', 'tax', 'tax %']);
         $uomIdx = $this->findColumn($header, ['unit (uom)', 'unit', 'uom']);
 
-        $imported = 0;
-        $skipped = 0;
+        // Preload the whole catalog ONCE (bounded per company) — match precedence
+        // barcode → SKU → name. Maps updated after each create so a duplicate row
+        // in the same file updates instead of double-creating.
+        $catalog = PosProduct::where('company_id', $companyId)->get();
+        $byBarcode = []; $bySku = []; $byName = [];
+        foreach ($catalog as $p) {
+            if (trim((string) $p->barcode) !== '') $byBarcode[strtolower(trim($p->barcode))] = $p;
+            if (trim((string) $p->sku) !== '') $bySku[strtolower(trim($p->sku))] = $p;
+            $byName[strtolower(trim($p->name))] = $p;
+        }
+
+        $added = 0; $updated = 0; $skipped = 0; $samplesSkipped = 0;
         $errors = [];
-        $row = 1;
 
-        while (($data = fgetcsv($handle)) !== false) {
-            $row++;
-            $name = trim($data[$nameIdx] ?? '');
-            $price = trim($data[$priceIdx] ?? '');
+        for ($i = 1; $i < count($rows); $i++) {
+            $data = $rows[$i];
+            $rowNo = $i + 1;
 
-            if ($name === '' || $price === '') {
+            $name = trim((string) ($data[$nameIdx] ?? ''));
+            $priceRaw = $data[$priceIdx] ?? '';
+            $rowEmpty = true;
+            foreach ($data as $cell) { if (trim((string) $cell) !== '') { $rowEmpty = false; break; } }
+            if ($rowEmpty) continue;
+
+            if ($name === '') { $errors[] = "Row {$rowNo}: naam khali hai"; $skipped++; continue; }
+
+            $price = $this->cleanImportNumber($priceRaw);
+            if ($price === null || $price < 0) {
+                $errors[] = "Row {$rowNo}: '{$name}' ki price samajh nahi aayi (" . trim((string) $priceRaw) . ")";
                 $skipped++;
                 continue;
             }
 
-            if (!is_numeric($price) || $price < 0) {
-                $errors[] = "Row {$row}: Invalid price for '{$name}'";
-                $skipped++;
-                continue;
+            $sku = $skuIdx !== false ? $this->cleanImportCode($data[$skuIdx] ?? null) : null;
+            $barcode = $barcodeIdx !== false ? $this->cleanImportCode($data[$barcodeIdx] ?? null) : null;
+            $desc = $descIdx !== false ? trim((string) ($data[$descIdx] ?? '')) : '';
+            $cat = $catIdx !== false ? trim((string) ($data[$catIdx] ?? '')) : '';
+            $tax = $taxIdx !== false ? $this->cleanImportNumber($data[$taxIdx] ?? '') : null;
+            $uom = $uomIdx !== false ? strtoupper(trim((string) ($data[$uomIdx] ?? ''))) : '';
+
+            // Untouched template sample rows never become real products.
+            foreach (self::IMPORT_SAMPLE_ROWS as $s) {
+                if (strcasecmp($name, $s[0]) === 0 && abs($price - $s[1]) < 0.001 && strcasecmp((string) $sku, $s[2]) === 0) {
+                    $samplesSkipped++;
+                    continue 2;
+                }
             }
 
-            $existing = PosProduct::where('company_id', $companyId)
-                ->whereRaw('LOWER(name) = ?', [strtolower($name)])
-                ->first();
+            $existing = null;
+            if ($barcode !== null && isset($byBarcode[strtolower($barcode)])) $existing = $byBarcode[strtolower($barcode)];
+            if (!$existing && $sku !== null && isset($bySku[strtolower($sku)])) $existing = $bySku[strtolower($sku)];
+            if (!$existing && isset($byName[strtolower($name)])) $existing = $byName[strtolower($name)];
 
             if ($existing) {
                 $existing->update([
-                    'price' => (float) $price,
-                    'description' => $descIdx !== false ? trim($data[$descIdx] ?? '') ?: $existing->description : $existing->description,
-                    'category' => $catIdx !== false ? trim($data[$catIdx] ?? '') ?: $existing->category : $existing->category,
-                    'sku' => $skuIdx !== false ? trim($data[$skuIdx] ?? '') ?: $existing->sku : $existing->sku,
-                    'barcode' => $barcodeIdx !== false ? trim($data[$barcodeIdx] ?? '') ?: $existing->barcode : $existing->barcode,
-                    'tax_rate' => $taxIdx !== false && is_numeric(trim($data[$taxIdx] ?? '')) ? (float) trim($data[$taxIdx]) : $existing->tax_rate,
-                    'uom' => $uomIdx !== false && trim($data[$uomIdx] ?? '') !== '' ? strtoupper(trim($data[$uomIdx])) : $existing->uom,
+                    'name' => $name,
+                    'price' => $price,
+                    'description' => $desc !== '' ? $desc : $existing->description,
+                    'category' => $cat !== '' ? $cat : $existing->category,
+                    'sku' => $sku !== null ? $sku : $existing->sku,
+                    'barcode' => $barcode !== null ? $barcode : $existing->barcode,
+                    'tax_rate' => $tax !== null ? $tax : $existing->tax_rate,
+                    'uom' => $uom !== '' ? $uom : $existing->uom,
                 ]);
-                $imported++;
+                $updated++;
+                $product = $existing;
             } else {
-                PosProduct::create([
+                $product = PosProduct::create([
                     'company_id' => $companyId,
                     'name' => $name,
-                    'price' => (float) $price,
+                    'price' => $price,
                     'show_on_sale' => true, // explicit — never trust the DB default (prod drift)
-                    'description' => $descIdx !== false ? trim($data[$descIdx] ?? '') : null,
-                    'category' => $catIdx !== false ? trim($data[$catIdx] ?? '') : null,
-                    'sku' => $skuIdx !== false ? trim($data[$skuIdx] ?? '') : null,
-                    'barcode' => $barcodeIdx !== false ? trim($data[$barcodeIdx] ?? '') : null,
-                    'tax_rate' => $taxIdx !== false && is_numeric(trim($data[$taxIdx] ?? '')) ? (float) trim($data[$taxIdx]) : 0,
-                    'uom' => $uomIdx !== false && trim($data[$uomIdx] ?? '') !== '' ? strtoupper(trim($data[$uomIdx])) : 'NOS',
+                    'description' => $desc !== '' ? $desc : null,
+                    'category' => $cat !== '' ? $cat : null,
+                    'sku' => $sku,
+                    'barcode' => $barcode,
+                    'tax_rate' => $tax !== null ? $tax : 0,
+                    'uom' => $uom !== '' ? $uom : 'NOS',
                     'is_active' => true,
                 ]);
-                $imported++;
+                $added++;
             }
+
+            // Keep maps fresh so later rows in the same file match this product.
+            if ($barcode !== null) $byBarcode[strtolower($barcode)] = $product;
+            if ($sku !== null) $bySku[strtolower($sku)] = $product;
+            $byName[strtolower($name)] = $product;
         }
 
-        fclose($handle);
+        $parts = [];
+        if ($added > 0) $parts[] = "{$added} naye products add hue";
+        if ($updated > 0) $parts[] = "{$updated} update hue";
+        if ($samplesSkipped > 0) $parts[] = "{$samplesSkipped} sample rows skip hui";
+        if ($skipped > 0) $parts[] = "{$skipped} rows skip hui";
+        $msg = $parts ? implode(', ', $parts) . '.' : 'File mein koi import karne wali row nahi mili.';
+        if (!empty($errors)) $msg .= ' Masail: ' . implode('; ', array_slice($errors, 0, 5)) . (count($errors) > 5 ? ' …aur ' . (count($errors) - 5) . ' mazeed.' : '');
 
-        $msg = "{$imported} products imported successfully.";
-        if ($skipped > 0) $msg .= " {$skipped} rows skipped.";
-        if (!empty($errors)) $msg .= " Issues: " . implode('; ', array_slice($errors, 0, 3));
-
+        if ($added === 0 && $updated === 0) {
+            return back()->with('error', $msg);
+        }
         return back()->with('success', $msg);
+    }
+
+    private function readImportRowsExcel(string $path): array
+    {
+        $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($path);
+        $reader->setReadDataOnly(true);
+        $spreadsheet = $reader->load($path);
+        $sheet = $spreadsheet->getActiveSheet();
+
+        // Row-cap BEFORE materializing the sheet — a 5MB xlsx can hold hundreds of
+        // thousands of rows (zip compression); toArray() on that would OOM shared
+        // cPanel PHP before the post-parse count check ever ran.
+        if ($sheet->getHighestDataRow() > 5001) {
+            $spreadsheet->disconnectWorksheets();
+            return array_fill(0, 5002, []); // triggers the friendly >5000 error upstream
+        }
+
+        // calculateFormulas=true, formatData=false (raw values), returnCellRef=false
+        $rows = $sheet->toArray(null, true, false, false);
+        $spreadsheet->disconnectWorksheets();
+        return $rows;
+    }
+
+    private function readImportRowsCsv(string $path): array
+    {
+        $handle = fopen($path, 'r');
+        if (!$handle) throw new \RuntimeException('Could not open file');
+
+        // Excel (regional settings) sometimes saves CSV with ; or TAB — auto-detect
+        // from the header line instead of assuming comma.
+        $firstLine = fgets($handle) ?: '';
+        $delims = [',' => substr_count($firstLine, ','), ';' => substr_count($firstLine, ';'), "\t" => substr_count($firstLine, "\t")];
+        arsort($delims);
+        $delim = array_key_first($delims);
+        if ($delims[$delim] === 0) $delim = ',';
+        rewind($handle);
+
+        $rows = [];
+        while (($data = fgetcsv($handle, 0, $delim)) !== false) {
+            $rows[] = $data;
+            if (count($rows) > 5002) break;
+        }
+        fclose($handle);
+        return $rows;
+    }
+
+    // "Rs 1,200", "1200.50", "16%" → float; anything non-numeric → null.
+    private function cleanImportNumber($raw): ?float
+    {
+        if (is_int($raw) || is_float($raw)) return (float) $raw;
+        $s = trim((string) $raw);
+        if ($s === '') return null;
+        $s = str_ireplace(['rs.', 'rs', 'pkr', '%'], '', $s);
+        $s = str_replace([',', ' '], '', $s);
+        if (!is_numeric($s)) return null;
+        return (float) $s;
+    }
+
+    // SKU/Barcode cleaner: Excel numeric cells arrive as floats (8901234567890.0)
+    // and CSV round-trips arrive as scientific notation ("8.90123E+12") — both are
+    // restored to plain digit strings. Empty → null (never overwrite with blank).
+    private function cleanImportCode($raw): ?string
+    {
+        if ($raw === null) return null;
+        if (is_int($raw) || is_float($raw)) return sprintf('%.0f', (float) $raw);
+        $s = trim((string) $raw);
+        if ($s === '') return null;
+        if (preg_match('/^\d+(\.\d+)?E\+?\d+$/i', $s)) return sprintf('%.0f', (float) $s);
+        if (preg_match('/^\d+\.0+$/', $s)) return preg_replace('/\.0+$/', '', $s);
+        return $s;
     }
 
     private function findColumn(array $header, array $names): int|false

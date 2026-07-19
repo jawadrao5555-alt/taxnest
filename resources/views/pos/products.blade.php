@@ -19,35 +19,35 @@
     @endif
 
     <div id="importSection" class="hidden mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-md p-5">
-        <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">Bulk Import Products from Excel/CSV</h3>
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">Bulk Import Products (Excel)</h3>
 
         <div class="mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg px-4 py-3">
-            <p class="text-xs text-blue-800 dark:text-blue-300"><strong>How it works:</strong> Sirf woh products update honge jinki aap ne price ya details change ki hain. Baqi sab products jaise hain waise hi rahenge. Agar koi naya product CSV mein hai jo list mein nahi, woh add ho jayega. Agar same naam ka product hai, uski price/details update ho jayengi.</p>
+            <p class="text-xs text-blue-800 dark:text-blue-300"><strong>Aasan tareeqa:</strong> Excel file download karein &rarr; usi file mein products likhein ya prices badlein &rarr; wahi file wapis upload kar dein. Bas! Naye products add ho jayenge, purane update ho jayenge, baqi sab waise hi rahenge. CSV banane ki koi zaroorat NAHI.</p>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                <h4 class="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-2">Step 1: Download {{ $products->count() > 0 ? 'Your Products' : 'Template' }}</h4>
+                <h4 class="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-2">Step 1: Excel File Download Karein</h4>
                 @if($products->count() > 0)
-                <p class="text-xs text-gray-500 mb-3">Apni current product list download karein. Excel mein kholein, prices change karein, naye products add karein, phir CSV save karke upload karein.</p>
+                <p class="text-xs text-gray-500 mb-3">Aap ki poori product list Excel file mein aa jayegi. Excel mein kholein, prices badlein ya neeche naye products likhein.</p>
                 @else
-                <p class="text-xs text-gray-500 mb-3">Blank template download karein. Excel mein kholein, products fill karein, phir CSV save karke upload karein.</p>
+                <p class="text-xs text-gray-500 mb-3">Khali template download karein — usme 3 example products likhe hain, unki jagah apne products likhein (example rows khud skip ho jati hain).</p>
                 @endif
                 <a href="{{ route('pos.products.template') }}" class="inline-flex items-center gap-1.5 bg-gradient-to-r from-purple-500 to-purple-700 text-white px-5 py-2 rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition no-underline">
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                    {{ $products->count() > 0 ? 'Export Products CSV (' . $products->count() . ')' : 'Download Empty Template' }}
+                    {{ $products->count() > 0 ? 'Download Excel (' . $products->count() . ' Products)' : 'Download Excel Template' }}
                 </a>
                 <div class="mt-3 text-[11px] text-gray-400">
-                    <p class="font-semibold text-gray-500 mb-1">CSV Columns:</p>
-                    <p><strong>Name</strong> (required), <strong>Price</strong> (required), Description, Category, SKU, Barcode, Tax Rate %, Unit (UOM)</p>
+                    <p class="font-semibold text-gray-500 mb-1">Sirf 2 cheezein zaroori hain:</p>
+                    <p><strong>Name</strong> aur <strong>Price</strong> — baqi columns (Description, Category, SKU, Barcode, Tax Rate %, Unit) chahein to bharein, warna khali chhor dein.</p>
                 </div>
             </div>
             <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                <h4 class="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-2">Step 2: Upload Updated File</h4>
-                <p class="text-xs text-gray-500 mb-3">CSV file upload karein. Changed products update honge, naye products add honge, baqi untouched rahenge.</p>
+                <h4 class="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-2">Step 2: Wahi File Wapis Upload Karein</h4>
+                <p class="text-xs text-gray-500 mb-3">Excel (.xlsx) file seedha upload ho jati hai — CSV bhi chalti hai agar aap ke paas purani file hai.</p>
                 <form method="POST" action="{{ route('pos.products.import') }}" enctype="multipart/form-data" class="space-y-3">
                     @csrf
-                    <input type="file" name="csv_file" accept=".csv,.txt" required class="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 dark:file:bg-purple-900/30 dark:file:text-purple-300">
+                    <input type="file" name="csv_file" accept=".xlsx,.xls,.csv,.txt" required class="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 dark:file:bg-purple-900/30 dark:file:text-purple-300">
                     <button type="submit" class="inline-flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white px-5 py-2 rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition">
                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
                         Upload & Import

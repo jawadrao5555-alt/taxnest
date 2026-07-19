@@ -5,7 +5,18 @@
      x-data="{ editRider: null, loginRider: null }">
 
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Delivery Riders</h1>
+        <div class="flex items-center gap-3">
+            {{-- Back (owner request Jul 2026): return to whatever screen the user came from;
+                 direct-open fallback = POS dashboard. --}}
+            <button type="button"
+                    onclick="if (history.length > 1) { history.back(); } else { window.location = '{{ route('pos.dashboard') }}'; }"
+                    class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-semibold hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+                    title="Go back">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                Back
+            </button>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Delivery Riders</h1>
+        </div>
         <a href="{{ route('pos.deliveries') }}" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold shadow-sm hover:bg-purple-700 transition">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 11-4 0m10 0a2 2 0 104 0"/></svg>
             Deliveries Board

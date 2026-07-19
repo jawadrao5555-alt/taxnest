@@ -10,7 +10,18 @@
      } }">
 
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Deliveries</h1>
+        <div class="flex items-center gap-3">
+            {{-- Back (owner request Jul 2026): return to whatever screen the user came from;
+                 direct-open fallback = POS dashboard. --}}
+            <button type="button"
+                    onclick="if (history.length > 1) { history.back(); } else { window.location = '{{ route('pos.dashboard') }}'; }"
+                    class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-semibold hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+                    title="Go back">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                Back
+            </button>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Deliveries</h1>
+        </div>
         <form method="GET" action="{{ route('pos.deliveries') }}" class="flex items-center gap-2">
             <input type="date" name="date" value="{{ $day->format('Y-m-d') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
             <button type="submit" class="px-3 py-2 rounded-lg bg-purple-600 text-white text-xs font-semibold shadow-sm hover:bg-purple-700 transition">Go</button>

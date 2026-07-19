@@ -508,6 +508,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::match(['get', 'post'], '/my-profile', [PosController::class, 'userProfile'])->name('pos.user-profile');
     Route::get('/products', [PosController::class, 'products'])->name('pos.products');
     Route::get('/products/labels', [PosController::class, 'productLabels'])->name('pos.products.labels');
+    // Bulk sale-screen visibility: OUTSIDE PosAdminOnly on purpose — that middleware
+    // redirects instead of 403ing; controller enforces a strict admin/manager allowlist
+    // (isPosAdmin) and returns a true 403 to everyone else, cashiers included.
+    Route::post('/products/bulk-sale', [PosController::class, 'bulkToggleSale'])->name('pos.products.bulk-sale');
     Route::get('/customers', [PosController::class, 'customers'])->name('pos.customers');
     Route::post('/customers', [PosController::class, 'storeCustomer'])->name('pos.customers.store');
 

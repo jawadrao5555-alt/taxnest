@@ -5146,6 +5146,43 @@ class PosController extends Controller
     }
 
     /**
+     * Bulk hide/show ALL products (or one category) on the sale-screen grid.
+     * STRICT allowlist: only pos_admin / pos_manager / company_admin (isPosAdmin)
+     * may run this — every other role (cashier, kitchen, waiter, rider, viewers)
+     * gets a true 403. Uses the existing show_on_sale flag, so hidden products
+     * stay searchable + billable exactly like single-hide.
+     */
+    public function bulkToggleSale(Request $request)
+    {
+        $user = auth('pos')->user();
+        // pos_role wins over the base role column: a user assigned pos_cashier is a
+        // cashier inside the POS panel even if their base role is company_admin.
+        if (!$user || $user->isPosCashier() || !$user->isPosAdmin()) {
+            abort(403, 'Only POS administrators can bulk-change sale screen visibility.');
+        }
+        $request->validate([
+            'action' => 'required|in:hide,show',
+            'category' => 'nullable|string|max:100',
+        ]);
+        $companyId = app('currentCompanyId');
+        $show = $request->action === 'show';
+
+        // Only flip rows that are actually in the opposite state so the
+        // flashed count = products genuinely affected.
+        $query = PosProduct::where('company_id', $companyId)
+            ->where('show_on_sale', !$show);
+        if ($request->filled('category')) {
+            $query->where('category', $request->input('category'));
+        }
+        $count = $query->update(['show_on_sale' => $show]);
+
+        $scope = $request->filled('category') ? '"' . $request->input('category') . '" category ke ' : '';
+        $msg = number_format($count) . ' ' . $scope . 'products sale screen '
+            . ($show ? 'par show kar diye.' : 'se hide kar diye.');
+        return back()->with('success', $msg);
+    }
+
+    /**
      * Bulk actions on selected products (company-scoped).
      * action: activate | deactivate | delete | category (with category_value).
      */

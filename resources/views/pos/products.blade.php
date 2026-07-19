@@ -504,6 +504,20 @@
             </a>
         </div>
 
+        @if(auth('pos')->user() && !auth('pos')->user()->isPosCashier() && auth('pos')->user()->isPosAdmin())
+        {{-- ═══ SALE-SCREEN VISIBILITY (bulk hide/show — admin/manager only) ═══ --}}
+        <div class="flex flex-wrap items-center gap-2 mb-3 p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
+            <span class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Sale Screen Visibility</span>
+            <select x-model="bulkSaleCat" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5 focus:ring-2 focus:ring-purple-500">
+                <option value="">Sab Categories</option>
+                <template x-for="c in categories" :key="'bs'+c"><option :value="c" x-text="c"></option></template>
+            </select>
+            <button @click="doBulkSale('hide')" class="px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-800 text-white text-xs font-semibold">Sab Hide Karo</button>
+            <button @click="doBulkSale('show')" class="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold">Sab Show Karo</button>
+            <span class="text-[11px] text-gray-400">Hidden products grid se hat jate hain magar search se milte rehte hain aur bill ho sakte hain.</span>
+        </div>
+        @endif
+
         {{-- ═══ BULK ACTION BAR ═══ --}}
         <div x-show="selected.length > 0" x-transition
              class="flex flex-wrap items-center gap-2 mb-3 p-3 rounded-xl bg-purple-600 text-white shadow-lg">
@@ -761,6 +775,8 @@
                 toggleBase: '{{ route('pos.products.toggle', ['id' => '__ID__']) }}',
                 saleBase: '{{ route('pos.products.toggle-sale', ['id' => '__ID__']) }}',
                 bulkUrl: '{{ route('pos.products.bulk') }}',
+                bulkSaleUrl: '{{ route('pos.products.bulk-sale') }}',
+                bulkSaleCat: '',
                 labelsBase: '{{ route('pos.products.labels') }}',
 
                 updateUrl(id) { return this.updateBase.replace('__ID__', id); },
@@ -853,6 +869,16 @@
                         fields.category_value = cat;
                     }
                     this.postForm(this.bulkUrl, fields);
+                },
+                doBulkSale(action) {
+                    const scope = this.bulkSaleCat ? '"' + this.bulkSaleCat + '" category ke products' : 'SAB products';
+                    const q = action === 'hide'
+                        ? 'Kya waqai ' + scope + ' sale screen se hide karne hain? (Search se phir bhi mil jayenge)'
+                        : 'Kya waqai ' + scope + ' sale screen par show karne hain?';
+                    if (!confirm(q)) return;
+                    const fields = { action: action };
+                    if (this.bulkSaleCat) fields.category = this.bulkSaleCat;
+                    this.postForm(this.bulkSaleUrl, fields);
                 },
             };
         }

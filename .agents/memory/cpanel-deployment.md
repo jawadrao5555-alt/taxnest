@@ -26,9 +26,11 @@ description: Exact paths/commands to deploy TaxNest to the owner's shared cPanel
 1. (Recommended) Back up the prod DB first: cPanel → phpMyAdmin → Export (or cPanel Backup).
 2. `cd /home/taxnestc/public_html`
 3. `git pull origin main`  (clean fast-forward expected; untracked server files like `error_log`, `.ftpquota`, `taxnest/` do NOT block it)
+   - **Untracked build assets DO block the pull** (19 Jul 2026): if a past tar-deploy shipped `public/build/assets/*` files that the incoming commit now TRACKS, pull aborts "untracked working tree files would be overwritten". md5-verify they match the workspace copies, `rm` them, re-pull. ALWAYS confirm success with `git log -1` — the abort message can scroll past and the pull silently never happened.
 4. `php artisan migrate --force`  (REQUIRED whenever the gap includes new migrations — the server is often many commits behind, not just the last push; check `git diff --name-only <oldcommit> HEAD | grep migrations` to decide)
 5. `php artisan config:clear && php artisan cache:clear && php artisan route:clear && php artisan view:clear`
 6. (Optional, for speed) `php artisan config:cache && php artisan route:cache && php artisan view:cache`
+   - **route:clear/route:cache is NOT optional when the gap adds routes** (19 Jul 2026): live keeps a route cache, so a new route 500s with "Route [name] not defined" from views even though routes/web.php md5-matches. view:clear alone does NOT fix it. Always rebuild the route cache after any pull that touches routes/web.php.
 7. **Reset the WEB OPcache — the step everyone forgets; it burned us for many rounds.** `optimize:clear`/`view:clear` run under CLI PHP and do NOT touch the PHP-FPM (web) OPcache. With `opcache.validate_timestamps=0` the web server keeps serving the OLD compiled blade forever even though source is updated and CLI caches are cleared — the live page looks frozen on old code. Fix: `echo '<?php opcache_reset(); echo "OK ".__DIR__; ?>' > public/r.php`, then OPEN `https://<domain>/r.php` in a browser (must be a WEB hit, not CLI), then `rm public/r.php`. The printed `__DIR__` also proves the true served docroot.
 - CONFIRMED served docroot (via the r.php probe) = `/home/taxnestc/public_html/public` — so public_html IS the live app; decoys are not served.
 - `composer install` only when `composer.json/lock` changed in the gap (usually not).

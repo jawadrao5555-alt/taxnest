@@ -394,7 +394,7 @@ window.addEventListener('popstate', function() {
                 <input type="text" x-ref="newCustomerNameInput" x-model="newCustomerName"
                     autocomplete="one-time-code" name="pos_newcust_name_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                     @keydown.enter.prevent="$refs.newCustomerAddressInput?.focus()"
-                    placeholder="Customer name *"
+                    placeholder="Customer name (optional)"
                     class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400">
                 <input type="text" x-ref="newCustomerAddressInput" x-model="newCustomerAddress"
                     autocomplete="one-time-code" name="pos_newcust_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
@@ -1567,7 +1567,7 @@ window.addEventListener('popstate', function() {
                     <button @click="showQuickAdd = true" class="w-full py-2.5 text-sm font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 rounded-xl hover:bg-purple-100 transition">+ Add New Customer</button>
                 </div>
                 <div x-show="showQuickAdd" class="space-y-2">
-                    <input type="text" x-model="quickCustomerName" placeholder="Customer name *" autocomplete="one-time-code" name="pos_quickcust_name_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-purple-500">
+                    <input type="text" x-model="quickCustomerName" placeholder="Customer name (optional)" autocomplete="one-time-code" name="pos_quickcust_name_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-purple-500">
                     <input type="text" x-model="quickCustomerPhone" placeholder="Phone *" autocomplete="one-time-code" name="pos_quickcust_phone_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-purple-500">
                     @if($features->delivery)
                     <input type="text" x-model="quickCustomerAddress" placeholder="Address (for delivery)" autocomplete="one-time-code" name="pos_quickcust_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-purple-500">
@@ -4660,13 +4660,14 @@ function restaurantPos() {
 
         async saveNewCustomer() {
             if (this.savingCustomer) return;
+            // Name is OPTIONAL (owner request, Jul 2026): phone is the real identifier —
+            // blank name = backend stores the phone number as the display name.
             const name = this.newCustomerName.trim();
-            if (!name) { this.showToast('Customer name is required', 'error'); this.$refs.newCustomerNameInput?.focus(); return; }
             this.savingCustomer = true;
             try {
                 const res = await fetch('{{ route("pos.restaurant.customer-store") }}', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: JSON.stringify({ name: name, phone: this.newCustomerPhone, address: this.newCustomerAddress.trim() || null })
+                    body: JSON.stringify({ name: name || null, phone: this.newCustomerPhone, address: this.newCustomerAddress.trim() || null })
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -5740,17 +5741,18 @@ function restaurantPos() {
         },
 
         async addQuickCustomer() {
-            if (!this.quickCustomerName.trim() || !this.quickCustomerPhone.trim()) {
-                this.showToast('Name and phone are required', 'error'); return;
+            // Name is OPTIONAL (owner request, Jul 2026) — phone is the identifier.
+            if (!this.quickCustomerPhone.trim()) {
+                this.showToast('Phone number is required', 'error'); return;
             }
             try {
                 const res = await fetch('{{ route("pos.restaurant.customer-store") }}', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                    body: JSON.stringify({ name: this.quickCustomerName.trim(), phone: this.quickCustomerPhone.trim(), address: this.quickCustomerAddress.trim() || null }),
+                    body: JSON.stringify({ name: this.quickCustomerName.trim() || null, phone: this.quickCustomerPhone.trim(), address: this.quickCustomerAddress.trim() || null }),
                 });
                 const data = await res.json();
                 if (data.customer || data.success) {
-                    const cust = data.customer || { id: Date.now(), name: this.quickCustomerName.trim(), phone: this.quickCustomerPhone.trim(), address: this.quickCustomerAddress.trim() };
+                    const cust = data.customer || { id: Date.now(), name: this.quickCustomerName.trim() || this.quickCustomerPhone.trim(), phone: this.quickCustomerPhone.trim(), address: this.quickCustomerAddress.trim() };
                     if (!data.existing) this.allCustomers.push(cust);
                     this.selectedCustomer = cust; this.showQuickAdd = false;
                     this.customerPhoneQuery = cust.phone || cust.name;

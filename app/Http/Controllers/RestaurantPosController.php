@@ -1047,8 +1047,12 @@ class RestaurantPosController extends Controller
     {
         $companyId = app('currentCompanyId');
 
+        // Name is OPTIONAL (owner request, Jul 2026): shops always capture the phone
+        // number, but asking every walk-in for a name is awkward. Blank name = the
+        // phone number doubles as the display name (pos_customers.name is NOT NULL,
+        // and receipts/ledgers expect a printable name).
         $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => 'nullable|string|max:255',
             'phone' => 'required|string|max:30',
             'address' => 'nullable|string|max:500',
         ]);

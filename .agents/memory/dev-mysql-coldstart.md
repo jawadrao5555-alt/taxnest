@@ -30,6 +30,17 @@ from an unclean workspace sleep.
 when the port is open. Confirm the DB with `/dev/tcp/127.0.0.1/9000` or a real
 `mysql -h 127.0.0.1 -P 9000 -uroot -e 'SELECT 1'`, not with `ss | grep 9000`.
 
+**Wake-window can also present as a DEAD POS sale screen (Jul 2026):** owner
+loaded /pos/invoice/create right in the warm-up window → browser console flooded
+with "Alpine Expression Error: X is not defined" for EVERY binding (console
+buffer keeps only the tail, so it looks like just the receipt-popup section
+died). Root x-data eval failed because the page/script arrived broken during
+warm-up (truncated response). Server HTML verified clean (curl + node --check +
+html5lib DOM balance) and a fresh Playwright login reproduced ZERO errors —
+self-heals on refresh. Do NOT hunt for a Blade/Alpine regression before
+re-testing with a fresh browser context; also check the "artifact crashed"
+banner timestamps against workflow restart times first.
+
 **Hardening applied:** `SystemSetting::get()` wraps its query in try/catch and
 returns the `$default` on any `\Throwable`. So a transient DB blip during warm-up
 just hides the optional WhatsApp/trial-lock widgets instead of 500-ing the whole

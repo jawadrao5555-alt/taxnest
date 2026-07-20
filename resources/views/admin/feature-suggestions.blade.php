@@ -16,8 +16,8 @@
             @if(!empty($hotGroups))
                 <div class="mb-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
                     <div class="px-5 py-3.5 border-b border-gray-100 dark:border-gray-700 bg-amber-50 dark:bg-amber-900/10">
-                        <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100">🔥 Zyada Demand Wale Features</h3>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Milti-julti requests jo 2 ya zyada companies se aayi hain — 3+ companies = banane ka waqt ("3 customer rule").</p>
+                        <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100">🔥 High-Demand Features</h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Similar requests from 2 or more companies — 3+ companies means it's time to build ("3 customer rule").</p>
                     </div>
                     <div class="divide-y divide-gray-100 dark:divide-gray-700">
                         @foreach($hotGroups as $grp)
@@ -26,7 +26,7 @@
                                     <div class="flex items-center gap-2 flex-wrap">
                                         <span class="text-sm font-semibold text-gray-800 dark:text-gray-100 capitalize">{{ $grp['label'] }}</span>
                                         @if($grp['companies'] >= 3)
-                                            <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-600 text-white">AB BANA DO — {{ $grp['companies'] }} companies!</span>
+                                            <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-600 text-white">BUILD NOW — {{ $grp['companies'] }} companies!</span>
                                         @else
                                             <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">Trending — {{ $grp['companies'] }} companies</span>
                                         @endif

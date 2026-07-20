@@ -10,6 +10,7 @@ Deep module invariants live in `.agents/memory/` topic files — this file is th
 - ZIA CORPORATION is a REAL production account (not demo) — NTN 3620291786117, owner ZIA UR REHMAN, Digital Invoice ONLY (no POS data).
 - NestPOS Enterprise Store (company_id 11) = dedicated POS test company (posadmin@taxnest.com / Admin@12345). Test Trading Company (company_id 12, test@testtrading.pk / Admin@12345) = admin-approval-workflow testing.
 - DI and POS data are FULLY ISOLATED — no cross-contamination, ever.
+- **UI language rule (owner, 20 Jul 2026)**: admin panel UI text = ENGLISH only (working language); customer-facing POS surfaces may use Roman Urdu; customer-submitted content (e.g. suggestions) shown as-is.
 - Billing: POS = ANNUAL-ONLY (6% discount baked in, no cycle toggle). DI = full toggle: Monthly / Quarterly(-1%) / Semi-Annual(-3%) / Annual(-6%).
 - Auth guards isolated per panel: DI=`web`, PRA POS=`pos`, FBR POS=`fbrpos`. Company users can NEVER cross-login (wrong panel = "Invalid credentials", no redirect). Only ADMIN creds auto-detect on any login form → admin guard → /admin/dashboard. Rate-limited (5 attempts/key). POS admin on DI /login auto-redirects to /pos/login. Login identifiers: Email, Phone, Username, CNIC, NTN (CNIC/NTN → company_admin of matching company).
 - Login pages: premium dark glassmorphism — POS purple, DI modal emerald, Admin indigo-navy, FBR POS deep blue. FBR POS routes: /fbr-pos/login, /fbr-pos/register, /fbr-pos/logout.

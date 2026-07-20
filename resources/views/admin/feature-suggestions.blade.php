@@ -12,6 +12,44 @@
                 <div class="mb-4 p-4 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 rounded-lg">{{ session('error') }}</div>
             @endif
 
+            {{-- High-demand detector: similar open suggestions from 2+ companies --}}
+            @if(!empty($hotGroups))
+                <div class="mb-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+                    <div class="px-5 py-3.5 border-b border-gray-100 dark:border-gray-700 bg-amber-50 dark:bg-amber-900/10">
+                        <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100">🔥 Zyada Demand Wale Features</h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Milti-julti requests jo 2 ya zyada companies se aayi hain — 3+ companies = banane ka waqt ("3 customer rule").</p>
+                    </div>
+                    <div class="divide-y divide-gray-100 dark:divide-gray-700">
+                        @foreach($hotGroups as $grp)
+                            <div class="px-5 py-3.5 flex items-start justify-between gap-4 flex-wrap">
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="text-sm font-semibold text-gray-800 dark:text-gray-100 capitalize">{{ $grp['label'] }}</span>
+                                        @if($grp['companies'] >= 3)
+                                            <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-600 text-white">AB BANA DO — {{ $grp['companies'] }} companies!</span>
+                                        @else
+                                            <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">Trending — {{ $grp['companies'] }} companies</span>
+                                        @endif
+                                    </div>
+                                    <ul class="mt-1.5 space-y-0.5">
+                                        @foreach($grp['titles'] as $gt)
+                                            <li class="text-xs text-gray-500 dark:text-gray-400 truncate max-w-xl">• {{ $gt }}</li>
+                                        @endforeach
+                                        @if($grp['requests'] > count($grp['titles']))
+                                            <li class="text-xs text-gray-400">+{{ $grp['requests'] - count($grp['titles']) }} more…</li>
+                                        @endif
+                                    </ul>
+                                </div>
+                                <div class="text-right flex-shrink-0">
+                                    <div class="text-lg font-bold text-gray-800 dark:text-gray-100">{{ $grp['requests'] }}</div>
+                                    <div class="text-[11px] text-gray-400">requests</div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             {{-- Status filter tabs with counts --}}
             @php
                 $tabs = [

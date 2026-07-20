@@ -2259,6 +2259,9 @@ $selectedTableJson = $selectedTable ? ['id' => $selectedTable->id, 'table_number
 $customersJson = $customers->map(fn($c) => ['id' => $c->id, 'name' => $c->name, 'phone' => $c->phone])->values();
 $kitchenSettings = [
     'kds_enabled' => (bool)($company->kds_enabled ?? true),
+    // KDS Auto-Print (owner, Jul 2026): when the KDS station itself prints
+    // tickets, cashier-side AUTO KOT fires are duplicates and get suppressed.
+    'kds_auto_print' => (bool)($company->pos_kds_auto_print ?? false),
     'printer_enabled' => (bool)($company->kitchen_printer_enabled ?? false),
     'print_on_hold' => (bool)($company->print_on_hold ?? false),
     'print_on_pay' => (bool)($company->print_on_pay ?? true),
@@ -4786,7 +4789,9 @@ function restaurantPos() {
                     this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
                     // Auto-print KOT when print_on_hold is enabled, OR when the caller explicitly asked
                     // (e.g. "Send to Kitchen" button always prints a ticket).
-                    if (this.kitchenSettings.print_on_hold || opts.forcePrintKot) {
+                    // SKIPPED when KDS Auto-Print owns ticket printing (owner, Jul 2026) —
+                    // the KDS station fires the same ticket, cashier-side = duplicate.
+                    if ((this.kitchenSettings.print_on_hold || opts.forcePrintKot) && !this.kdsHandlesKot()) {
                         this.kotPrintOrPopup(data.order.id, wasRecall);
                     }
                     result = data;
@@ -5354,6 +5359,12 @@ function restaurantPos() {
             } catch (e) { return false; }
         },
 
+        // TRUE when the KDS station auto-prints tickets itself — cashier-side
+        // AUTOMATIC KOT fires (hold-time + pay-time chain) are duplicates and
+        // must be skipped. Explicit reprints (Resend, receipt-popup KOT button)
+        // intentionally bypass this.
+        kdsHandlesKot() { return !!(this.kitchenSettings.kds_enabled && this.kitchenSettings.kds_auto_print); },
+
         // KOT gateway for the popup-window call sites (hold / resend-kitchen):
         // silent first, identical popup fallback. delta=true prints ONLY
         // not-yet-printed rows (updated orders — kitchen has the rest).
@@ -5481,12 +5492,17 @@ function restaurantPos() {
             // MASTER GATE — auto-print OFF means NOTHING fires automatically.
             if (!this.autoPrintEnabled) return;
             const hasReceipt = !!this.lastTransactionId;
-            const wantsKot = !!this.autoKotEnabled && !!orderId;
+            // KDS Auto-Print owns ticket printing → cashier auto-KOT suppressed
+            // (owner, Jul 2026). Manual Resend / receipt-popup KOT button stay.
+            const wantsKot = !!this.autoKotEnabled && !!orderId && !this.kdsHandlesKot();
             const wantsReceipt = hasReceipt;
-            // KOT delta (owner, Jul 2026): sale settled from a RECALLED order —
-            // kitchen already fired the earlier items, auto-KOT prints only the
-            // new rows. Captured NOW (timers below run after clearCart()).
-            const kotDelta = !!this.recalledOrderId;
+            // KOT delta = ALWAYS in the auto chain (owner, Jul 2026): the kitchen
+            // already has every line that printed at hold / waiter-send / recall —
+            // auto-KOT at pay must fire ONLY still-unprinted rows (fresh takeaway
+            // pass-through orders have no stamps, so delta prints the full ticket
+            // there; a fully-printed order prints NOTHING — no duplicate KOT when
+            // the cashier settles a waiter/held bill).
+            const kotDelta = true;
             if (!wantsReceipt && !wantsKot) return;
             this.$nextTick(() => {
                 if (wantsReceipt && wantsKot) {

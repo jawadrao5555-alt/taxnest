@@ -74,6 +74,7 @@
                         <th class="px-4 py-3">Password</th>
                         <th class="px-4 py-3">Role</th>
                         <th class="px-4 py-3">Status</th>
+                        <th class="px-4 py-3">PRA Reporting</th>
                         <th class="px-4 py-3">Actions</th>
                     </tr>
                 </thead>
@@ -138,6 +139,36 @@
                             @endif
                         </td>
                         <td class="px-4 py-3">
+                            {{-- Owner rule (20 Jul 2026): admin ASSIGNS each cashier Online (PRA
+                                 reporting) / Offline here — the sale-screen toggle is read-only
+                                 for cashiers. Admin/Manager keep their own sale-screen toggle. --}}
+                            @if(($company->pos_integration_mode ?? 'pra') === 'standalone')
+                            <span class="text-xs text-gray-400">—</span>
+                            @elseif($member->pos_role === 'pos_cashier')
+                            @php $memberPraOn = (bool) $member->praReportingEnabled($company); @endphp
+                            <form method="POST" action="{{ route('pos.team.set-pra', $member->id) }}" class="inline">
+                                @csrf
+                                <input type="hidden" name="enabled" value="{{ $memberPraOn ? 0 : 1 }}">
+                                <button type="submit"
+                                    title="{{ $memberPraOn ? 'Click: is cashier ko OFFLINE karein (bills sirf local banenge)' : 'Click: is cashier ko ONLINE karein (bills PRA ko report honge)' }}"
+                                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide transition {{ $memberPraOn ? 'bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50' : 'bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700' }}">
+                                    <span class="w-2 h-2 rounded-full {{ $memberPraOn ? 'bg-emerald-500' : 'bg-gray-400' }}"></span>
+                                    {{ $memberPraOn ? 'Online' : 'Offline' }}
+                                    <svg class="w-3 h-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                                </button>
+                            </form>
+                            @elseif($member->pos_role === 'pos_admin' || $member->pos_role === 'pos_manager' || $member->role === 'company_admin')
+                            @php $memberPraOn = (bool) $member->praReportingEnabled($company); @endphp
+                            <span title="Admin/Manager apna PRA Reporting toggle sale screen par khud control karte hain."
+                                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide {{ $memberPraOn ? 'bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400' }}">
+                                <span class="w-2 h-2 rounded-full {{ $memberPraOn ? 'bg-emerald-500' : 'bg-gray-400' }}"></span>
+                                {{ $memberPraOn ? 'Online' : 'Offline' }}
+                            </span>
+                            @else
+                            <span class="text-xs text-gray-400">—</span>
+                            @endif
+                        </td>
+                        <td class="px-4 py-3">
                             @if(in_array($member->pos_role, ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter'], true))
                             <div class="flex items-center gap-2">
                                 <button x-show="!editing" @click="editing = true" class="text-amber-600 hover:text-amber-700 text-xs font-medium" title="Edit">
@@ -170,7 +201,7 @@
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="7" class="px-4 py-12 text-center text-gray-400">No team members yet. Add your first cashier above.</td></tr>
+                    <tr><td colspan="8" class="px-4 py-12 text-center text-gray-400">No team members yet. Add your first cashier above.</td></tr>
                     @endforelse
                 </tbody>
             </table>

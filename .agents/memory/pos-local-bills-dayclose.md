@@ -58,6 +58,7 @@ description: Retention rules, cashier-gate trap, and midnight auto-close semanti
 
 ## Per-cashier PRA Reporting toggle — Jul 2026
 - `users.pra_reporting_enabled` nullable: NULL = inherit company flag, non-NULL = the user's OWN switch. togglePra flips ONLY the acting user's row — company flag untouched, so one cashier never affects another.
+- **Cashier self-toggle BLOCKED (owner rule 20 Jul 2026)**: `togglePra` 403s `isPosCashier()`; sale screen + dashboard style-picker render a read-only Online/Offline pill for cashiers. Admin ASSIGNS each cashier's status from /pos/team (`setCashierPra`, route pos.team.set-pra — company-scoped, pos_cashier targets only, NTN + standalone guards mirror togglePra). Once assigned, the row holds explicit 1/0 — NULL-inherit is not recoverable from the UI (intentional). Admin/manager keep their own sale-screen toggle.
 - Acting-user decisions (sale/draft/edit/promote/retry gates + all POS views) read `User::praReportingEnabled($company)`; user-less contexts (offline sync job, `PraIntegrationService::isEnabled`, NTN guard) use `Company::praReportingActive()`.
 - **Why NULL-inherit:** zero behavior change on deploy day (no seeding), and pre-migration prod safely falls back to the company flag (getAttributeValue → null; praReportingActive try/catch).
 

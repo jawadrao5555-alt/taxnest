@@ -5,6 +5,22 @@
         <span class="w-2 h-2 rounded-full" style="background:#0d9488;"></span>
         <span class="text-xs font-extrabold text-gray-900 dark:text-white uppercase tracking-wide">Standalone Mode</span>
     </div>
+    @elseif(auth('pos')->user()?->isPosCashier())
+    {{-- Owner rule (20 Jul 2026): cashiers get a READ-ONLY badge — the admin assigns
+         Online/Offline from /pos/team; togglePra rejects cashier POSTs server-side. --}}
+    @php $praAssignedOn = (bool) ($praStatus ?? auth('pos')->user()?->praReportingEnabled($company)); @endphp
+    <div class="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 shadow-md" title="Aap ka PRA Reporting status admin ne set kiya hai — change karwane ke liye admin se rabta karein.">
+        <span class="text-xs font-extrabold text-gray-900 dark:text-white uppercase tracking-wide">PRA Reporting</span>
+        @if($praAssignedOn)
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-black uppercase tracking-wide">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Online
+        </span>
+        @else
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 text-xs font-black uppercase tracking-wide">
+            <span class="w-2 h-2 rounded-full bg-gray-400"></span> Offline
+        </span>
+        @endif
+    </div>
     @else
     <div x-data="{ praEnabled: {{ ($praStatus ?? auth('pos')->user()?->praReportingEnabled($company) ?? false) ? 'true' : 'false' }}, praLoading: false }" class="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 shadow-md">
         <span class="text-xs font-extrabold text-gray-900 dark:text-white uppercase tracking-wide">PRA Reporting</span>

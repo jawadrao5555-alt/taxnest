@@ -234,6 +234,26 @@ window.addEventListener('popstate', function() {
              government integration): flipping it ON would queue every sale for PRA
              submission that can only fail. togglePra also rejects server-side. --}}
         @if(($company->pos_integration_mode ?? 'pra') !== 'standalone')
+        @if(auth('pos')->user()?->isPosCashier())
+        {{-- Owner rule (20 Jul 2026): cashiers do NOT get the PRA toggle — the admin
+             ASSIGNS each cashier Online/Offline from /pos/team. Read-only badge only;
+             togglePra also rejects cashier POSTs server-side. --}}
+        @php $praAssignedOn = (bool) (auth('pos')->user()?->praReportingEnabled($company)); @endphp
+        <div class="flex items-center gap-2" title="Aap ka PRA Reporting status admin ne set kiya hai — change karwane ke liye admin se rabta karein.">
+            <span class="text-[10px] uppercase tracking-wider font-extrabold text-purple-700 dark:text-purple-300">PRA Reporting</span>
+            @if($praAssignedOn)
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-[10px] font-black uppercase tracking-wide">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Online
+            </span>
+            @else
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-[10px] font-black uppercase tracking-wide">
+                <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span> Offline
+            </span>
+            @endif
+        </div>
+
+        <div class="w-px h-4 bg-purple-200 dark:bg-purple-800/40"></div>
+        @else
         <div class="flex items-center gap-2">
             <span class="text-[10px] uppercase tracking-wider font-extrabold text-purple-700 dark:text-purple-300">PRA Reporting</span>
             <button type="button"
@@ -248,6 +268,7 @@ window.addEventListener('popstate', function() {
         </div>
 
         <div class="w-px h-4 bg-purple-200 dark:bg-purple-800/40"></div>
+        @endif
         @endif
 
         {{-- Auto-Print on Sale (Phase 4) — bound to parent restaurantPos() scope --}}

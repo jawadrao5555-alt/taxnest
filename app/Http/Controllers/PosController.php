@@ -3794,6 +3794,17 @@ class PosController extends Controller
         $togglingUser = auth('pos')->user();
         $effectiveNow = $togglingUser->praReportingEnabled($company);
 
+        // Owner rule (20 Jul 2026): cashiers can NOT flip their own PRA reporting —
+        // the admin ASSIGNS each cashier Online/Offline from the Team page. The sale
+        // screen shows cashiers a read-only badge; this guards direct POSTs.
+        if ($togglingUser->isPosCashier()) {
+            return response()->json([
+                'success' => false,
+                'enabled' => (bool) $effectiveNow,
+                'message' => 'PRA Reporting aap ke liye admin set karta hai — status change karwane ke liye admin se rabta karein.',
+            ], 403);
+        }
+
         // Turning PRA Reporting ON requires an NTN on file (submitted with every fiscal
         // invoice). Turning it OFF is always allowed. NTN is optional at registration.
         if (!$effectiveNow && empty($company->ntn)) {
@@ -4188,7 +4199,12 @@ class PosController extends Controller
             }
         }
 
-        return view('pos.team', compact('team', 'teamPasswords'));
+        // PRA assignment column (owner rule 20 Jul 2026): the team page shows and
+        // sets each cashier's Online/Offline PRA status, so it needs the company
+        // for the inherit-fallback in praReportingEnabled().
+        $company = Company::find($companyId);
+
+        return view('pos.team', compact('team', 'teamPasswords', 'company'));
     }
 
     public function storeCashier(Request $request)
@@ -4243,6 +4259,47 @@ class PosController extends Controller
 
         $roleLabel = ['pos_manager' => 'Manager', 'pos_kitchen' => 'Kitchen', 'pos_waiter' => 'Waiter'][$newRole] ?? 'Cashier';
         return back()->with('success', "{$roleLabel} account created successfully.");
+    }
+
+    /**
+     * Team page — ASSIGN a cashier's PRA Reporting status (owner rule 20 Jul 2026):
+     * cashiers can no longer flip their own toggle on the sale screen; the admin
+     * sets each cashier Online (PRA reporting) or Offline here. Managers/admins
+     * keep their own sale-screen toggle, so this endpoint covers cashiers only.
+     */
+    public function setCashierPra(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $user = auth('pos')->user();
+
+        if (!$user || $user->isPosCashier()) {
+            return back()->with('error', 'Access denied.');
+        }
+
+        $request->validate(['enabled' => 'required|boolean']);
+        $enable = (bool) $request->boolean('enabled');
+
+        $cashier = User::where('company_id', $companyId)
+            ->where('pos_role', 'pos_cashier')
+            ->findOrFail($id);
+
+        $company = Company::find($companyId);
+
+        // Standalone edition has no PRA integration; and turning reporting ON
+        // requires an NTN on file (mirrors togglePra's server-side guards).
+        if ($enable && ($company->pos_integration_mode ?? 'pra') === 'standalone') {
+            return back()->with('error', 'PRA Reporting is not available on the Standalone edition.');
+        }
+        if ($enable && empty($company->ntn)) {
+            return back()->with('error', 'Cashier ko Online karne se pehle apna NTN Business Profile mein daalein.');
+        }
+
+        $cashier->pra_reporting_enabled = $enable;
+        $cashier->save();
+
+        return back()->with('success', $enable
+            ? "{$cashier->name} ab ONLINE hai — is ke bills PRA ko report honge."
+            : "{$cashier->name} ab OFFLINE hai — is ke bills sirf local (L-series) banenge.");
     }
 
     public function updateCashier(Request $request, $id)

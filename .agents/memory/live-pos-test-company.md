@@ -11,7 +11,8 @@ description: Live POS test-company pattern — STANDING test company id 35 (RETA
 - Artifacts to purge with it: products 5232-5235, deal 3, rider 4 (QA Rider One), customer "QA Walkin Customer", bills L-001..L-011 (ids 518-527), day-close #6, held order 491.
 - POS login POST field is `login` (not `email`) — posting `email` silently bounces back to /pos/login.
 
-## Earlier deletions (companies 31 & 34 hard-deleted via bin flow)
+## Earlier deletions (companies 29, 31 & 34 hard-deleted via bin flow — CLEANUP COMPLETE)
+- Company 29 (the 17 Jul 2026 temporary POS test company) was fully hard-deleted with its test artifacts. Verified on live DB 20 Jul 2026: no `companies` row for 29 (not even soft-deleted), 0 `pos_transactions`, 0 `users` with company_id 29. Nothing left to clean.
 - Registration trial-abuse guard rejects REUSED ntn/phone/email ("already been used to create an account") — deleted test companies' identifiers stay burned; always pick fresh ones. Burned so far: qa.mrf.test@… (NTN 7654321 / 03457654321), qa.excel.import@… (7822334 / 03467822334), qa.scale.test@… (7833445 / 03467833445), qa.bulkhide.test@… (7866778 / 03497866778) + qa.bulkhide.cashier@….
 - Register POST needs `pricing_plan_id` of a REAL non-trial POS plan (live ids: 9 Starter, 10 Business, …) — Starter's team quota is admin-only, so pick Business+ when the test needs a cashier login.
 - `storeProduct` treats `show_on_sale` as a CHECKBOX (`$request->has()`): a curl POST without the field creates the product HIDDEN from the sale screen — not a bug; include `show_on_sale=1` when scripting product creation.

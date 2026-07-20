@@ -63,6 +63,7 @@
 - [mobile.css global overrides](mobile-css-global-overrides.md) — mobile.css beats Tailwind on phones: forced table-cell vs .hidden, touch-target blobs on toggle pills, grid collapse needs grid-cols-keep; bump ?v= on edit.
 - [pricing_plans.features = display-only](pos-plan-features-display-only.md) — no code reads the JSON; restaurant gate = restaurant_enabled column; plan cards render limits from columns + cumulative lists.
 - [Silent printer routing](silent-printer-routing.md) — KOT stamping at result-time not render; Electron listener leak = double print; no pageSize for thermal; MySQL NOW() looks offline to Laravel.
+- [POS What's New updates](pos-whats-new-updates.md) — popup/bell in pos-app layout; MUST skip confined roles + pending companies (seen POST blocked = dismiss loop); after each POS deploy create an AppUpdate row.
 - [POS receipt plain style](pos-receipt-plain-style.md) — receipts stay plain (no italic, bold only name/numbers/total), logo RIGHT of name via table; hidden print iframe must give focus back or shortcuts die.
 - [Owner voice-note STT](elevenlabs-voice-note-stt.md) — transcribe .m4a via ElevenLabs scribe_v1: temp public URL on live + chmod 644, manual multipart STRING body, delete after.
 - [POS product Excel import/export](pos-excel-import.md) — bulk import/export = real .xlsx round-trip (CSV mangles barcodes to 8.9E+12); TEXT+explicit-string code columns; row-cap BEFORE toArray().

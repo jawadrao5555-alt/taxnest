@@ -442,6 +442,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/dashboard', [PosController::class, 'dashboard'])->name('pos.dashboard');
     Route::post('/notifications/{id}/dismiss', [PosController::class, 'dismissNotification'])->name('pos.notifications.dismiss');
     Route::post('/notifications/dismiss-all', [PosController::class, 'dismissAllNotifications'])->name('pos.notifications.dismiss-all');
+    Route::post('/whats-new/seen', [\App\Http\Controllers\AppUpdateController::class, 'markSeen'])->name('pos.whats-new.seen');
     Route::post('/payment-proof', [\App\Http\Controllers\PaymentProofController::class, 'store'])
         ->name('pos.payment-proof.store')->middleware('throttle:6,1');
     Route::post('/settings/theme', [PosController::class, 'updateTheme'])->name('pos.settings.theme');
@@ -736,6 +737,14 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/announcements', [AnnouncementController::class, 'store'])->name('admin.announcements.store');
     Route::post('/announcements/{id}/toggle', [AnnouncementController::class, 'toggle'])->name('admin.announcements.toggle');
     Route::delete('/announcements/{id}/delete', [AnnouncementController::class, 'destroy'])->name('admin.announcements.destroy');
+
+    // POS "What's New" app updates (popup + bell) — owner request 20 Jul 2026
+    Route::get('/app-updates', [\App\Http\Controllers\AppUpdateController::class, 'index'])->name('admin.app-updates');
+    Route::post('/app-updates', [\App\Http\Controllers\AppUpdateController::class, 'store'])->name('admin.app-updates.store');
+    Route::post('/app-updates/feature-toggle', [\App\Http\Controllers\AppUpdateController::class, 'toggleFeature'])->name('admin.app-updates.feature-toggle');
+    Route::post('/app-updates/{id}/update', [\App\Http\Controllers\AppUpdateController::class, 'update'])->name('admin.app-updates.update');
+    Route::post('/app-updates/{id}/toggle', [\App\Http\Controllers\AppUpdateController::class, 'toggle'])->name('admin.app-updates.toggle');
+    Route::delete('/app-updates/{id}/delete', [\App\Http\Controllers\AppUpdateController::class, 'destroy'])->name('admin.app-updates.destroy');
 
     Route::get('/invoice-override', [AdminController::class, 'invoiceSearch'])->name('admin.invoice-override');
     Route::post('/invoice-override/{id}', [AdminController::class, 'invoiceOverride'])->name('admin.invoice-override.action');

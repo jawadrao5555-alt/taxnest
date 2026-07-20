@@ -377,7 +377,7 @@
             @endif
 
             {{-- Cash reconciliation (stored on closed report) --}}
-            @if($existingReport && $existingReport->counted_cash !== null)
+            @if($existingReport && ($existingReport->counted_cash !== null || $existingReport->opening_float !== null))
             @php $variance = (float) $existingReport->cash_variance; @endphp
             <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                 <h3 class="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
@@ -399,9 +399,10 @@
                     </div>
                     <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                         <p class="text-xs text-gray-500 uppercase font-medium">Counted Cash</p>
-                        <p class="font-bold text-gray-900 dark:text-white mt-0.5">PKR {{ number_format($existingReport->counted_cash, 2) }}</p>
+                        <p class="font-bold text-gray-900 dark:text-white mt-0.5">{{ $existingReport->counted_cash !== null ? 'PKR ' . number_format($existingReport->counted_cash, 2) : '— (nahin gina gaya)' }}</p>
                     </div>
                 </div>
+                @if($existingReport->counted_cash !== null)
                 <div class="mt-3 p-3 rounded-lg {{ abs($variance) < 0.01 ? 'bg-emerald-50 dark:bg-emerald-900/20' : ($variance < 0 ? 'bg-red-50 dark:bg-red-900/20' : 'bg-amber-50 dark:bg-amber-900/20') }}">
                     <div class="flex items-center justify-between">
                         <p class="text-sm font-bold {{ abs($variance) < 0.01 ? 'text-emerald-700 dark:text-emerald-400' : ($variance < 0 ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400') }}">
@@ -410,6 +411,7 @@
                         <p class="text-lg font-bold {{ abs($variance) < 0.01 ? 'text-emerald-700 dark:text-emerald-400' : ($variance < 0 ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400') }}">{{ $variance > 0 ? '+' : '' }}{{ number_format($variance, 2) }}</p>
                     </div>
                 </div>
+                @endif
             </div>
             @endif
         </div>
@@ -467,8 +469,9 @@
                  Rider adjustment (Jul 2026): unsettled rider cash is OUT of the drawer;
                  settlements received today for earlier days' bills are IN. --}}
             @php $rf = $riderFigures ?? ['active' => false, 'cash_out' => 0, 'cash_in' => 0, 'riders' => []]; @endphp
+            @php $openingFromDayStart = ($dayOpening ?? null) !== null ? (float) $dayOpening->opening_cash : null; @endphp
             <div class="mb-4 p-4 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
-                 x-data="{ float: '', counted: '', cashSales: {{ (float) $stats->cash_amount }},
+                 x-data="{ float: '{{ $openingFromDayStart !== null ? $openingFromDayStart : '' }}', counted: '', cashSales: {{ (float) $stats->cash_amount }},
                            riderOut: {{ (float) ($rf['cash_out'] ?? 0) }}, riderIn: {{ (float) ($rf['cash_in'] ?? 0) }},
                            get expected() { return (parseFloat(this.float) || 0) + this.cashSales - this.riderOut + this.riderIn; },
                            get variance() { return this.counted === '' ? null : (parseFloat(this.counted) || 0) - this.expected; } }">
@@ -479,6 +482,9 @@
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Opening Float (subah drawer mein rakha cash)</label>
                         <input type="number" name="opening_float" x-model="float" step="0.01" min="0" placeholder="0.00"
                             class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                        @if($openingFromDayStart !== null)
+                        <p class="text-[11px] text-teal-700 dark:text-teal-400 font-semibold mt-1">✓ Subah ka opening cash (Rs {{ number_format($openingFromDayStart, 2) }}) khud-ba-khud aa gaya hai</p>
+                        @endif
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Counted Cash (ginti ke baad total)</label>

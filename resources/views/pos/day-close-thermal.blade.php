@@ -73,7 +73,7 @@
     </table>
     <div class="hr"></div>
 
-    @if($report->counted_cash !== null)
+    @if($report->counted_cash !== null || $report->opening_float !== null)
     <div class="sec">Cash Reconciliation</div>
     <table>
         <tr><td>Opening Float</td><td class="r">{{ number_format($report->opening_float ?? 0, 2) }}</td></tr>
@@ -85,11 +85,13 @@
         <tr><td>Rider Settlements (Old)</td><td class="r">+{{ number_format($report->rider_summary['cash_in'], 2) }}</td></tr>
         @endif
         <tr><td>Expected in Drawer</td><td class="r">{{ number_format($report->expected_cash ?? 0, 2) }}</td></tr>
-        <tr><td>Counted Cash</td><td class="r">{{ number_format($report->counted_cash, 2) }}</td></tr>
+        <tr><td>Counted Cash</td><td class="r">{{ $report->counted_cash !== null ? number_format($report->counted_cash, 2) : '-' }}</td></tr>
+        @if($report->counted_cash !== null)
         <tr>
             <td class="b">Variance {{ abs((float) $report->cash_variance) < 0.01 ? '(BALANCED)' : ((float) $report->cash_variance < 0 ? '(SHORT)' : '(OVER)') }}</td>
             <td class="r b">{{ (float) $report->cash_variance > 0 ? '+' : '' }}{{ number_format($report->cash_variance, 2) }}</td>
         </tr>
+        @endif
     </table>
     <div class="hr"></div>
     @endif

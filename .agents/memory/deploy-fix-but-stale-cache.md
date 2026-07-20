@@ -22,6 +22,10 @@ Once the deploy gap is CLOSED — live `git log -1` is on the correct commit, th
 - The same `public/r.php` that prints `__DIR__` doubles as the docroot probe — the printed dir is the TRUE served docroot, so it also catches decoy-copy docroots.
 **Why:** spent many owner round-trips assuming a deploy/push gap when the code was already correct on the live server at the right commit; the live site stayed frozen purely because the web OPcache never got reset. After confirming the live commit is correct, reset the web OPcache before anything else.
 
+# Third look-alike: the feature's OWN STATE GATE (neither deploy nor cache)
+- New UI "missing" on live can simply be the feature hiding itself by design. Confirmed case: a new dashboard card gated on day-state rendered NOTHING because the QA company's day was already closed (a 1:26 AM close had locked the new date) — files on live were md5-identical, compiled views contained the new markup, route registered. Hours of deploy/cache chasing for correct behavior.
+- **How to apply:** after md5-matching live files + finding the new markup in `storage/framework/views`, STOP suspecting deploy/cache — query the DB for the feature's gating state (e.g. does a day-close report exist for today?) before anything else. Also: design UI states so a "locked/blocked" state renders a visible note rather than nothing — silent-empty states cause exactly this misdiagnosis.
+
 # Why the service worker is a RED HERRING for sale-screen bugs
 - `public/sw.js` `skipPatterns` includes `/pos/invoice/create` (and `/login`, `/api/`, `/admin/`...). The SW returns early for these — **the POS sale screen is never cached; it's always network-first/fresh.** So search/cart/keyboard bugs on the sale screen are NEVER a client SW-cache problem.
 - `CACHE_VERSION` in sw.js is NOT a reliable deploy marker: `taxnest-v31` was set 2026-05-08 and was NOT bumped when later fixes landed. "Live serves vNN" only proves live is >= the commit that set vNN, not that any later fix is present.

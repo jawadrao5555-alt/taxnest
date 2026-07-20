@@ -61,6 +61,78 @@
         </div>
         @endif
 
+        {{-- ━━━ Opening Cash Balance (Jul 2026) — day-start drawer entry; auto-fills day-close reconciliation ━━━ --}}
+        @if(isset($dayOpening) || isset($todayClosed))
+        <div class="mb-4" x-data="{ editing: false }">
+            @if(!empty($todayClosed))
+                @if($dayOpening)
+                <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 flex items-center gap-3 shadow-sm">
+                    <div class="w-9 h-9 rounded-xl bg-teal-600 flex items-center justify-center flex-shrink-0">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">Opening Cash: Rs {{ number_format((float) $dayOpening->opening_cash, 2) }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Aaj ka din close ho chuka hai — opening cash lock hai.</p>
+                    </div>
+                </div>
+                @else
+                <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 flex items-center gap-3 shadow-sm">
+                    <div class="w-9 h-9 rounded-xl bg-gray-500 flex items-center justify-center flex-shrink-0">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">Opening Cash</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Aaj ka din close ho chuka hai — ab opening cash enter nahi ho sakta. Kal subah naye din par enter karein.</p>
+                    </div>
+                </div>
+                @endif
+            @elseif($dayOpening)
+            <div class="rounded-2xl bg-white dark:bg-gray-900 border border-teal-200 dark:border-teal-800 p-4 shadow-sm">
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-teal-600 flex items-center justify-center flex-shrink-0">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">Aaj ka Opening Cash: <span class="text-teal-700 dark:text-teal-400">Rs {{ number_format((float) $dayOpening->opening_cash, 2) }}</span></p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ $dayOpening->enteredBy?->name ? $dayOpening->enteredBy->name . ' ne enter kiya' : 'Day start par enter kiya gaya' }} · day close par khud-ba-khud istemal hoga</p>
+                    </div>
+                    <button type="button" @click="editing = !editing" class="px-3 py-1.5 rounded-lg text-xs font-bold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-900/30 hover:bg-teal-100 dark:hover:bg-teal-900/50 transition">Change</button>
+                </div>
+                <form method="POST" action="{{ route('pos.day-opening.save') }}" x-show="editing" x-cloak class="mt-3 flex flex-wrap items-end gap-2">
+                    @csrf
+                    <div class="flex-1 min-w-[160px]">
+                        <label class="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Naya opening cash (Rs)</label>
+                        <input type="number" name="opening_cash" step="0.01" min="0" max="99999999" required value="{{ (float) $dayOpening->opening_cash }}"
+                            class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-teal-500 focus:border-teal-500">
+                    </div>
+                    <button type="submit" class="px-4 py-2 rounded-lg bg-teal-600 text-white text-xs font-bold hover:bg-teal-700 transition">Update</button>
+                </form>
+            </div>
+            @else
+            <div class="rounded-2xl bg-white dark:bg-gray-900 border border-amber-300 dark:border-amber-700 p-4 shadow-sm">
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center flex-shrink-0">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">Din ka Aghaz — Opening Cash</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Subah drawer mein jitna cash (khulla/change) rakha hai woh enter karein — raat ko day close par hisaab khud-ba-khud milega.</p>
+                    </div>
+                </div>
+                <form method="POST" action="{{ route('pos.day-opening.save') }}" class="mt-3 flex flex-wrap items-end gap-2">
+                    @csrf
+                    <div class="flex-1 min-w-[160px]">
+                        <label class="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Opening cash (Rs)</label>
+                        <input type="number" name="opening_cash" step="0.01" min="0" max="99999999" required placeholder="e.g. 5000"
+                            class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-teal-500 focus:border-teal-500">
+                    </div>
+                    <button type="submit" class="px-4 py-2 rounded-lg bg-teal-600 text-white text-xs font-bold hover:bg-teal-700 transition">Save Opening</button>
+                </form>
+            </div>
+            @endif
+        </div>
+        @endif
+
         {{-- ─── PROFIT + BI WIDGETS (v18) — admin only, sits above the chosen dashboard style ─── --}}
         @if(!$isCashier && isset($profitStats))
         @php

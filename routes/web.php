@@ -491,6 +491,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/reports/analytics-pdf', [PosController::class, 'reportsAnalyticsPdf'])->name('pos.reports.analytics-pdf');
     Route::get('/day-close', [PosController::class, 'dayCloseReport'])->name('pos.day-close');
     Route::post('/day-close', [PosController::class, 'closeDayReport'])->name('pos.close-day');
+    Route::post('/day-opening', [PosController::class, 'saveDayOpening'])->name('pos.day-opening.save');
     Route::get('/day-close/{id}/pdf', [PosController::class, 'dayCloseReportPdf'])->name('pos.day-close-pdf');
     Route::get('/day-close/{id}/thermal', [PosController::class, 'dayCloseThermal'])->name('pos.day-close-thermal');
     Route::get('/api/tax-rate', [PosController::class, 'getTaxRate'])->name('pos.api.tax-rate');

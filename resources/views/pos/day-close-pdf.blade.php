@@ -248,7 +248,7 @@
         </tbody>
     </table>
 
-    @if($report->counted_cash !== null)
+    @if($report->counted_cash !== null || $report->opening_float !== null)
     <div class="section-title">Cash Reconciliation</div>
     <table class="data">
         <thead>
@@ -284,12 +284,14 @@
             </tr>
             <tr>
                 <td>Counted Cash (Physical)</td>
-                <td class="r">{{ number_format($report->counted_cash, 2) }}</td>
+                <td class="r">{{ $report->counted_cash !== null ? number_format($report->counted_cash, 2) : '&mdash;' }}</td>
             </tr>
+            @if($report->counted_cash !== null)
             <tr>
                 <td style="font-weight:bold;">Variance {{ abs((float) $report->cash_variance) < 0.01 ? '(Balanced)' : ((float) $report->cash_variance < 0 ? '(Short)' : '(Over)') }}</td>
                 <td class="r" style="font-weight:bold; {{ abs((float) $report->cash_variance) < 0.01 ? '' : 'color:#dc2626;' }}">{{ (float) $report->cash_variance > 0 ? '+' : '' }}{{ number_format($report->cash_variance, 2) }}</td>
             </tr>
+            @endif
         </tbody>
     </table>
     @endif

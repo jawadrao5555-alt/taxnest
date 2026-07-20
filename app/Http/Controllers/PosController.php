@@ -584,11 +584,63 @@ class PosController extends Controller
             ->take(5)
             ->get();
 
+        // Opening Cash Balance (Jul 2026): today's drawer opening — card on the
+        // dashboard prompts entry at day start; locked once today is closed.
+        $todayDate = today()->format('Y-m-d');
+        $dayOpening = \App\Models\PosDayOpening::forDate($companyId, $todayDate);
+        $todayClosed = PosDayCloseReport::where('company_id', $companyId)
+            ->where('report_date', $todayDate)
+            ->exists();
+
         return view('pos.dashboard', compact(
             'company', 'todayStats', 'monthStats', 'recentTransactions', 'paymentBreakdown', 'praStatus', 'drafts', 'isCashier',
             'dashboardStyle', 'isRestaurant', 'isAdmin', 'notifications',
-            'profitStats', 'topSold', 'topProfit', 'lowMargin', 'costCoverage'
+            'profitStats', 'topSold', 'topProfit', 'lowMargin', 'costCoverage',
+            'dayOpening', 'todayClosed'
         ));
+    }
+
+    /**
+     * Opening Cash Balance — save/update the drawer's opening cash for a date
+     * (default today). Cashiers ARE allowed (it's their day-start job); the
+     * entry locks once that date's day-close report exists. Upsert: one row
+     * per company per business date.
+     */
+    public function saveDayOpening(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $user = \Illuminate\Support\Facades\Auth::guard('pos')->user();
+
+        $request->validate([
+            'opening_cash' => 'required|numeric|min:0|max:99999999',
+            'notes' => 'nullable|string|max:500',
+        ]);
+        // Opening cash is a TODAY-only entry — the UI never sends a date, and
+        // accepting one would let a raw POST seed arbitrary future/past days.
+        $date = today()->format('Y-m-d');
+
+        if (!\Schema::hasTable('pos_day_openings')) {
+            return back()->with('error', 'Opening cash feature is being set up. Try again shortly.');
+        }
+
+        // Once the day is closed the Z-report is immutable — opening locks too.
+        $closed = PosDayCloseReport::where('company_id', $companyId)
+            ->where('report_date', $date)
+            ->exists();
+        if ($closed) {
+            return back()->with('error', 'Yeh din close ho chuka hai — opening cash ab change nahi ho sakta.');
+        }
+
+        \App\Models\PosDayOpening::updateOrCreate(
+            ['company_id' => $companyId, 'business_date' => $date],
+            [
+                'opening_cash' => round((float) $request->input('opening_cash'), 2),
+                'entered_by' => $user?->id,
+                'notes' => $request->input('notes'),
+            ]
+        );
+
+        return back()->with('success', 'Opening cash Rs ' . number_format((float) $request->input('opening_cash'), 2) . ' save ho gaya — day close par khud-ba-khud istemal hoga.');
     }
 
     /**
@@ -6423,7 +6475,11 @@ class PosController extends Controller
         // (unsettled rider cash is OUT of the drawer; earlier-day settlements are IN).
         $riderFigures = $this->buildRiderDayFigures($companyId, $date);
 
-        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'analytics', 'riderFigures'));
+        // Opening Cash Balance (Jul 2026): day-start entry auto-fills the
+        // reconciliation's opening float for this date.
+        $dayOpening = \App\Models\PosDayOpening::forDate($companyId, $date);
+
+        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'analytics', 'riderFigures', 'dayOpening'));
     }
 
     public function closeDayReport(Request $request)
@@ -6448,6 +6504,17 @@ class PosController extends Controller
                 'opening_float' => $request->filled('opening_float') ? (float) $request->input('opening_float') : null,
                 'counted_cash' => $request->filled('counted_cash') ? (float) $request->input('counted_cash') : null,
             ];
+        }
+        // Opening Cash Balance (Jul 2026): if the cashier left the opening blank,
+        // fall back to the day-start recorded opening (performDayClose also
+        // self-heals this, but doing it here keeps the request payload honest).
+        if (($cashRecon['opening_float'] ?? null) === null) {
+            $recordedOpening = \App\Models\PosDayOpening::forDate($companyId, $date);
+            if ($recordedOpening !== null) {
+                $cashRecon = $cashRecon ?? [];
+                $cashRecon['opening_float'] = (float) $recordedOpening->opening_cash;
+                $cashRecon['counted_cash'] = $cashRecon['counted_cash'] ?? null;
+            }
         }
         $result = $this->performDayClose($companyId, $date, $user?->id, $request->input('notes'), $cashRecon);
 
@@ -7049,16 +7116,28 @@ class PosController extends Controller
         // − rider cash still out with riders (unsettled today's cash deliveries)
         // + rider cash received today for earlier days' bills;
         // variance = counted − expected. Columns are nullable + schema-guarded
-        // (prod drift self-heal) — auto midnight close passes no $cashRecon.
-        if ($cashRecon !== null && \Schema::hasColumn('pos_day_close_reports', 'opening_float')) {
+        // (prod drift self-heal).
+        // Opening Cash Balance (Jul 2026): the day-start recorded opening is the
+        // fallback when the close request didn't carry one — this also covers the
+        // MIDNIGHT AUTO close ($cashRecon null), so the Z-report still shows the
+        // opening + expected cash even without an evening count.
+        if (\Schema::hasColumn('pos_day_close_reports', 'opening_float')) {
             $openingFloat = $cashRecon['opening_float'] ?? null;
             $countedCash = $cashRecon['counted_cash'] ?? null;
-            $expectedCash = round((float) ($openingFloat ?? 0) + (float) $data['cash_amount']
-                - (float) $riderFigures['cash_out'] + (float) $riderFigures['cash_in'], 2);
-            $data['opening_float'] = $openingFloat;
-            $data['counted_cash'] = $countedCash;
-            $data['expected_cash'] = $expectedCash;
-            $data['cash_variance'] = $countedCash !== null ? round((float) $countedCash - $expectedCash, 2) : null;
+            if ($openingFloat === null) {
+                $recordedOpening = \App\Models\PosDayOpening::forDate($companyId, $date);
+                if ($recordedOpening !== null) {
+                    $openingFloat = (float) $recordedOpening->opening_cash;
+                }
+            }
+            if ($openingFloat !== null || $countedCash !== null) {
+                $expectedCash = round((float) ($openingFloat ?? 0) + (float) $data['cash_amount']
+                    - (float) $riderFigures['cash_out'] + (float) $riderFigures['cash_in'], 2);
+                $data['opening_float'] = $openingFloat;
+                $data['counted_cash'] = $countedCash;
+                $data['expected_cash'] = $expectedCash;
+                $data['cash_variance'] = $countedCash !== null ? round((float) $countedCash - $expectedCash, 2) : null;
+            }
         }
 
         $hashString = json_encode($data);

@@ -5488,13 +5488,17 @@ function restaurantPos() {
         //
         // ✅ FIX (May-07): Tightened gap between receipt-finish → KOT-start (300ms → 80ms)
         // and initial chain start (400ms → 150ms) to feel snappier on thermal printers.
-        runAutoPrintChain(orderId) {
+        runAutoPrintChain(orderId, orderType = null) {
             // MASTER GATE — auto-print OFF means NOTHING fires automatically.
             if (!this.autoPrintEnabled) return;
             const hasReceipt = !!this.lastTransactionId;
             // KDS Auto-Print owns ticket printing → cashier auto-KOT suppressed
             // (owner, Jul 2026). Manual Resend / receipt-popup KOT button stay.
-            const wantsKot = !!this.autoKotEnabled && !!orderId && !this.kdsHandlesKot();
+            // DINE-IN finals NEVER auto-KOT (owner, Jul 2026): the kitchen got its
+            // ticket at hold — by final the food is already served, the receipt
+            // carries the items. Takeaway/Delivery counter sales keep Auto-KOT
+            // (kitchen cooks AFTER payment there).
+            const wantsKot = !!this.autoKotEnabled && !!orderId && orderType !== 'dine_in' && !this.kdsHandlesKot();
             const wantsReceipt = hasReceipt;
             // KOT delta = ALWAYS in the auto chain (owner, Jul 2026): the kitchen
             // already has every line that printed at hold / waiter-send / recall —
@@ -5726,6 +5730,12 @@ function restaurantPos() {
         },
 
         async payHeldOrderDirect(orderId, method, savedTotal, provisional = false) {
+            // Order type captured NOW (owner, Jul 2026): held-modal pays read it from
+            // the heldOrders entry (removed from the list on success below); billing
+            // pass-through orders are never in heldOrders → falls back to the current
+            // order-type widget. Drives the dine-in no-KOT-at-final rule in the chain.
+            const heldOrd = this.heldOrders.find(o => o.id === orderId);
+            const payOrderType = (heldOrd && heldOrd.order_type) || this.orderType || null;
             try {
                 // PROVISIONAL BILL FLOW — when true, RestaurantPosController::payOrder
                 // forces pra_status='local' and skips PRA submission. Bill remains
@@ -5761,7 +5771,7 @@ function restaurantPos() {
                     // Uses postMessage-chained engine — KOT never fires before the receipt
                     // print dialog is dismissed (was a race in the old setTimeout(200/1800) impl
                     // on slow networks where KOT iframe loaded before receipt iframe).
-                    this.runAutoPrintChain(orderId);
+                    this.runAutoPrintChain(orderId, payOrderType);
                     // Refresh provisional badge count when this save was provisional.
                     if (provisional) { this.loadLocalBills(); }
                     // Refresh failed badge so cashier sees pending/failed state in real time.

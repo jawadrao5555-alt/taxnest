@@ -37,6 +37,7 @@
             </div>
             <button @click="openCamera()" class="px-3 py-1.5 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-medium">📷 Camera Scan</button>
             <button @click="refreshOrders()" class="px-3 py-1.5 text-sm rounded-lg bg-purple-600 text-white hover:bg-purple-700 font-medium">Refresh</button>
+            <button @click="clearAll()" x-show="filteredOrders.length > 0" class="px-3 py-1.5 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 font-medium">🧹 Clear All</button>
         </div>
     </div>
 
@@ -46,7 +47,7 @@
         <div class="flex items-center gap-3">
             <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7V5a2 2 0 012-2h2M4 17v2a2 2 0 002 2h2m8-18h2a2 2 0 012 2v2m-4 14h2a2 2 0 002-2v-2M8 12h.01M12 12h.01M16 12h.01"/></svg>
             <div>
-                <div class="text-sm font-bold text-emerald-800 dark:text-emerald-300">📡 Scanner Active — Scan KOT barcode/QR to CLEAR order from board</div>
+                <div class="text-sm font-bold text-emerald-800 dark:text-emerald-300">📡 Scanner Active — Scan KOT barcode to CLEAR order from board</div>
                 <div class="text-xs text-emerald-700 dark:text-emerald-400">Buffer: <span x-text="scanBuffer || '(waiting…)'" class="font-mono"></span> &nbsp;|&nbsp; Click anywhere to refocus &nbsp;|&nbsp; 📷 button for camera scan</div>
             </div>
         </div>
@@ -439,7 +440,8 @@ function kdsScreen() {
                 if (!this.cameraScanner) this.cameraScanner = new Html5Qrcode('kdsCameraReader');
                 await this.cameraScanner.start(
                     { facingMode: 'environment' },
-                    { fps: 10, qrbox: { width: 220, height: 220 } },
+                    {{-- Wider, shorter scan box — KOT tickets now carry a CODE128 barcode only (QR removed per owner, 20 Jul 2026) --}}
+                    { fps: 10, qrbox: { width: 250, height: 140 } },
                     (decodedText) => { this.onCameraScan(decodedText); },
                     () => {}
                 );
@@ -505,6 +507,33 @@ function kdsScreen() {
                 gain.gain.value = 0.18;
                 osc.start(); osc.stop(ctx.currentTime + (ok ? 0.08 : 0.25));
             } catch(e) {}
+        },
+
+        // Clear All (owner, 20 Jul 2026): wipes THIS board's visible orders only
+        // (station-pinned display never clears other counters). Kitchen-side only —
+        // cashiers' held bills survive, exactly like per-card Clear.
+        async clearAll() {
+            const ids = this.filteredOrders.map(o => o.id);
+            if (!ids.length) return;
+            const label = (this.hasStations && this.stationFilter !== 'all') ? 'this counter\'s' : 'ALL';
+            if (!confirm(`Clear ${label} ${ids.length} order(s) from the kitchen board?\n\nBills stay with the cashier — this only clears the kitchen display.`)) return;
+            try {
+                const res = await fetch('{{ route("pos.restaurant.kds.clear-all") }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
+                    body: JSON.stringify({ ids: ids }),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    this.orders = this.orders.filter(o => !ids.includes(o.id));
+                    this.showToast(data.message, 'success');
+                    this.refreshOrders();
+                } else {
+                    this.showToast(data.message || 'Clear all failed', 'error');
+                }
+            } catch (e) {
+                this.showToast('Network error — clear all failed', 'error');
+            }
         },
 
         // Kitchen-side status change — hits the kitchen-status endpoint which NEVER

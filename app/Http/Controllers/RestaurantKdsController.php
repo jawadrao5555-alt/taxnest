@@ -185,6 +185,38 @@ class RestaurantKdsController extends Controller
         ]);
     }
 
+    /**
+     * Clear All (owner, 20 Jul 2026) — bulk manual clear of the kitchen board.
+     * Client sends the EXPLICIT ids currently visible on ITS board (a station-pinned
+     * display must never clear other counters' orders). Company-scoped, race-safe:
+     * already-cleared rows are excluded by the WHERE, never double-stamped.
+     * NEVER touches restaurant_orders.status — cashiers' held bills survive.
+     */
+    public function clearAll(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+
+        $request->validate([
+            'ids' => 'required|array|min:1|max:200',
+            'ids.*' => 'integer',
+        ]);
+
+        $cleared = RestaurantOrder::where('company_id', $companyId)
+            ->whereIn('id', $request->ids)
+            ->whereIn('status', ['held', 'preparing', 'ready'])
+            ->whereNull('kitchen_cleared_at')
+            ->update([
+                'kitchen_status' => 'cleared',
+                'kitchen_cleared_at' => now(),
+            ]);
+
+        return response()->json([
+            'success' => true,
+            'cleared' => $cleared,
+            'message' => $cleared > 0 ? "{$cleared} order(s) cleared from the board" : 'Nothing to clear',
+        ]);
+    }
+
     public function liveOrders()
     {
         $companyId = app('currentCompanyId');

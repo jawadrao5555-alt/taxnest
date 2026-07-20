@@ -89,7 +89,6 @@
         .kot-barcode-hint { font-size: 9px; color: #000; font-weight: bold; letter-spacing: 1px; margin-top: 2px; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 </head>
 <body>
     <div class="text-center">
@@ -196,8 +195,7 @@
     <div class="separator"></div>
     <div class="kot-barcode-box">
         <svg id="kotBarcode"></svg>
-        <div id="kotQr" style="display:inline-block; margin-top:6px;"></div>
-        <div class="kot-barcode-hint">SCAN (BARCODE OR QR) TO CLEAR</div>
+        <div class="kot-barcode-hint">SCAN BARCODE TO CLEAR</div>
     </div>
     <p class="text-center bold text-sm">{{ $company->name ?? 'Restaurant' }}</p>
 
@@ -250,20 +248,9 @@
                     });
                 }
             } catch (e) { console.warn('Barcode render failed', e); }
-            // P5: QR alongside CODE128 — same "KOT-{id}" payload, scannable by the
-            // KDS camera scanner (phones/tablets read QR far better than 1D codes).
-            try {
-                if (typeof QRCode === 'function') {
-                    new QRCode(document.getElementById('kotQr'), {
-                        text: 'KOT-{{ $order->id }}',
-                        width: 90,
-                        height: 90,
-                        colorDark: '#000000',
-                        colorLight: '#ffffff',
-                        correctLevel: QRCode.CorrectLevel.M
-                    });
-                }
-            } catch (e) { console.warn('QR render failed', e); }
+            // QR removed per owner (20 Jul 2026) — CODE128 barcode is the ONLY code
+            // on the ticket. KDS camera scanner reads 1D CODE128 too (html5-qrcode
+            // scans all formats by default), so scan-to-clear keeps working.
         }
 
         // Counter/Station routing: when the server already filtered this ticket to one

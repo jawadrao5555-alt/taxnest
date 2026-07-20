@@ -627,6 +627,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/restaurant/kds/{id}/status', [RestaurantKdsController::class, 'updateStatus'])->name('pos.restaurant.kds.status');
     Route::post('/restaurant/kds/{id}/kitchen-status', [RestaurantKdsController::class, 'kitchenStatus'])->name('pos.restaurant.kds.kitchen-status');
     Route::post('/restaurant/kds/scan', [RestaurantKdsController::class, 'scanComplete'])->name('pos.restaurant.kds.scan');
+    Route::post('/restaurant/kds/clear-all', [RestaurantKdsController::class, 'clearAll'])->name('pos.restaurant.kds.clear-all');
     Route::get('/restaurant/api/live-orders', [RestaurantKdsController::class, 'liveOrders'])->name('pos.restaurant.live-orders');
     Route::get('/restaurant/orders/{id}/kitchen-ticket', [RestaurantPosController::class, 'kitchenTicket'])->name('pos.restaurant.kitchen-ticket');
 

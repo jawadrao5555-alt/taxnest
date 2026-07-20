@@ -122,6 +122,9 @@
                                 <option value="{{ $c->id }}">{{ $c->name }}</option>
                             @endforeach
                         </select>
+                        {{-- Once-per-day cashier (owner, 20 Jul 2026): pick once, sticks all day on this tablet --}}
+                        <p x-show="cashierId" class="mt-1 text-[11px] text-teal-600 dark:text-teal-400 font-medium">✓ Aaj ke liye yaad rahega — kal dobara select hoga</p>
+                        <p x-show="!cashierId" class="mt-1 text-[11px] text-gray-400">Aik dafa select karein — poora din yehi cashier raha ga</p>
                     </div>
                 </div>
             </template>
@@ -228,8 +231,31 @@ function waiterApp() {
         init() {
             this.categories = [...new Set(this.products.map(p => p.category))].sort();
             this.filterProducts();
+            this.initDayCashier();
             this.loadMyOrders();
             setInterval(() => { if (!document.hidden) this.loadMyOrders(); }, 30000);
+        },
+
+        // Once-per-day cashier (owner, 20 Jul 2026): the waiter picks a cashier
+        // ONCE — it sticks for the whole day on this tablet (per waiter login).
+        // New day (LOCAL date, not UTC) = fresh pick. Stale/removed cashier ids
+        // are dropped so the select never silently posts to a dead account.
+        _dayCashierKey: 'waiter_day_cashier_{{ auth("pos")->id() }}',
+        validCashierIds: @json($cashiers->pluck('id')->map(fn ($i) => (string) $i)),
+        _today() { return new Date().toLocaleDateString('en-CA'); },
+        initDayCashier() {
+            try {
+                const saved = JSON.parse(localStorage.getItem(this._dayCashierKey) || 'null');
+                if (saved && saved.date === this._today() && this.validCashierIds.includes(String(saved.id))) {
+                    this.cashierId = String(saved.id);
+                }
+            } catch (e) { /* corrupt storage — start fresh */ }
+            this.$watch('cashierId', id => {
+                try {
+                    if (id) localStorage.setItem(this._dayCashierKey, JSON.stringify({ date: this._today(), id: String(id) }));
+                    else localStorage.removeItem(this._dayCashierKey);
+                } catch (e) {}
+            });
         },
 
         filterProducts() {

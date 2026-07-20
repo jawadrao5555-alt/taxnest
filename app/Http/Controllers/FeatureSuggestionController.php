@@ -13,7 +13,13 @@ class FeatureSuggestionController extends Controller
     {
         $user = auth('pos')->user();
 
-        // Company-scoped: the whole team sees their own shop's suggestions + status.
+        // ADMIN/MANAGER ONLY (owner rule, Jul 2026): suggestions are the owner's
+        // channel — cashiers/confined roles never see the page, even by direct URL.
+        if (!$user || !$user->isPosAdmin()) {
+            return redirect()->route('pos.dashboard');
+        }
+
+        // Company-scoped: admins/managers see their own shop's suggestions + status.
         $suggestions = FeatureSuggestion::with('user')
             ->where('company_id', $user->company_id)
             ->where('product', 'pos')
@@ -27,6 +33,11 @@ class FeatureSuggestionController extends Controller
     public function store(Request $request)
     {
         $user = auth('pos')->user();
+
+        // ADMIN/MANAGER ONLY (owner rule, Jul 2026) — mirrors index().
+        if (!$user || !$user->isPosAdmin()) {
+            return redirect()->route('pos.dashboard');
+        }
 
         $request->validate([
             'title' => 'required|string|max:150',

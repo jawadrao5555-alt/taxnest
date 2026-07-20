@@ -28,12 +28,15 @@
     // (schema-drift self-heal convention) — fail silent.
     $whatsNewList = collect(); $whatsNewUnseenCount = 0; $whatsNewPopup = null; $whatsNewSeenIds = [];
     try {
-        // Confined roles (kitchen/waiter/rider) can't POST /pos/whats-new/seen (PosAuth
-        // path whitelist) — never show them the popup/bell or they get a dismiss loop.
+        // ADMIN/MANAGER ONLY (owner rule, Jul 2026): "What's New" popup + bell must
+        // NEVER show on cashier screens — updates are the admin/manager's job to
+        // read and pass on. isPosAdmin() = pos_admin / pos_manager / company_admin;
+        // this also keeps confined roles (kitchen/waiter/rider) out (they can't
+        // POST /pos/whats-new/seen anyway — dismiss loop).
         // Pending companies: approval middleware blocks POSTs too — skip them as well.
-        $wnConfined = in_array($posUserLayout->pos_role ?? null, ['pos_kitchen', 'pos_waiter', 'pos_rider'], true);
+        $wnAllowed = $posUserLayout && $posUserLayout->isPosAdmin();
         $wnPending = ($companyLayout->status ?? null) === 'pending';
-        if ($posUserLayout && !$wnConfined && !$wnPending
+        if ($wnAllowed && !$wnPending
             && \Illuminate\Support\Facades\Schema::hasTable('app_updates')
             && \App\Models\SystemSetting::get('pos_whats_new_enabled', '1') === '1') {
             $whatsNewList = \App\Models\AppUpdate::where('audience', 'pos')->where('is_published', true)
@@ -390,10 +393,12 @@
                         @endif
 
                         @php
-                            // Confined roles never see the suggestion box (their portal is locked down).
-                            $suggConfined = in_array($posUserLayout->pos_role ?? null, ['pos_kitchen', 'pos_waiter', 'pos_rider'], true);
+                            // ADMIN/MANAGER ONLY (owner rule, Jul 2026): the suggestion box is
+                            // the owner's channel — cashier screens never show it. This also
+                            // keeps confined roles (kitchen/waiter/rider) out as before.
+                            $suggAllowed = $posUserLayout && $posUserLayout->isPosAdmin();
                         @endphp
-                        @if(!$suggConfined)
+                        @if($suggAllowed)
                         {{-- Feature Suggestion box — customers tell us what to build next --}}
                         <a href="{{ route('pos.suggestions') }}" title="Feature Suggestion — apni tajweez bhejein"
                            class="relative p-2 rounded-xl text-white hover:bg-white/10 transition cursor-pointer {{ request()->is('pos/suggestions') ? 'bg-white/15' : '' }}">

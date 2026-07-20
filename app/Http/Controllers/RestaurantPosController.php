@@ -1229,12 +1229,18 @@ class RestaurantPosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
-        $company->update([
+        $updates = [
             'kds_enabled' => (bool) $request->kds_enabled,
             'kitchen_printer_enabled' => (bool) $request->kitchen_printer_enabled,
             'print_on_hold' => (bool) $request->print_on_hold,
             'print_on_pay' => (bool) $request->print_on_pay,
-        ]);
+        ];
+        // Dine-In Auto KOT (owner, Jul 2026): table select auto-holds + fires KOT.
+        // hasColumn guard = prod self-heal parity (code may land before migrate --force).
+        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'dine_in_auto_kot')) {
+            $updates['dine_in_auto_kot'] = (bool) $request->dine_in_auto_kot;
+        }
+        $company->update($updates);
 
         return back()->with('success', 'Kitchen settings updated successfully.');
     }

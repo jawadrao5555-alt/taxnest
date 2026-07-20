@@ -168,7 +168,11 @@
 @php
 $stationItemMap = $stationItemMap ?? [];
 $kdsOrdersJson = $orders->map(function($o) use ($stationItemMap) {
-    $elapsed = now()->diffInMinutes($o->created_at);
+    // Kitchen timer starts at KOT time (owner, Jul 2026): clock runs from
+    // kot_sent_at (ticket sent), created_at only as legacy fallback. Carbon 3
+    // signed diff — measure FROM start TO now so elapsed is positive.
+    $kdsStart = $o->kot_sent_at ?: $o->created_at;
+    $elapsed = (int) $kdsStart->diffInMinutes(now());
     $items = $o->items->map(function($i) use ($stationItemMap) {
         return ['name' => $i->item_name, 'qty' => $i->quantity, 'notes' => $i->special_notes, 'station_id' => $stationItemMap[$i->id] ?? 0];
     })->values();
@@ -187,7 +191,7 @@ $kdsOrdersJson = $orders->map(function($o) use ($stationItemMap) {
             ->map->count()->toArray(),
         'elapsed_minutes' => $elapsed,
         'is_urgent' => $elapsed > 15,
-        'created_at' => $o->created_at->format('H:i'),
+        'created_at' => $kdsStart->format('H:i'),
     ];
 })->values();
 @endphp

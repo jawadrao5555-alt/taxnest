@@ -236,8 +236,12 @@ class RestaurantKdsController extends Controller
             : \App\Models\PosStation::mapItems($companyId, $stations, $orders->pluck('items')->flatten(1));
 
         $orders = $orders->map(function ($o) use ($stationItemMap) {
-                // Carbon 3 signed diff — measure FROM created_at TO now so elapsed is positive.
-                $elapsed = (int) $o->created_at->diffInMinutes(now());
+                // Kitchen timer starts at KOT time (owner, Jul 2026): the kitchen's
+                // clock runs from when the ticket was SENT (kot_sent_at), not when
+                // the order row was created — fallback for legacy rows without it.
+                // Carbon 3 signed diff — measure FROM start TO now so elapsed is positive.
+                $kdsStart = $o->kot_sent_at ?: $o->created_at;
+                $elapsed = (int) $kdsStart->diffInMinutes(now());
                 return [
                     'id' => $o->id,
                     'order_number' => $o->order_number,
@@ -266,7 +270,7 @@ class RestaurantKdsController extends Controller
                     'created_by' => $o->creator?->name ?? 'Unknown',
                     'elapsed_minutes' => $elapsed,
                     'is_urgent' => $elapsed > 15,
-                    'created_at' => $o->created_at->format('H:i'),
+                    'created_at' => $kdsStart->format('H:i'),
                 ];
             });
 

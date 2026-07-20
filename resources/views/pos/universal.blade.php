@@ -2262,6 +2262,7 @@ $kitchenSettings = [
     'printer_enabled' => (bool)($company->kitchen_printer_enabled ?? false),
     'print_on_hold' => (bool)($company->print_on_hold ?? false),
     'print_on_pay' => (bool)($company->print_on_pay ?? true),
+    'dine_in_auto_kot' => (bool)($company->dine_in_auto_kot ?? false),
 ];
 // UTF-8-SAFE JSON for x-data: a single product/customer/order with a broken byte
 // sequence makes json_encode() return false → @json emits NOTHING → "allProducts: ,"
@@ -4437,6 +4438,17 @@ function restaurantPos() {
             this.orderType = 'dine_in';
             this.showTablePicker = false;
             this.showToast('Table T-' + table.table_number + ' reserved', 'success');
+            // Dine-In Auto KOT (owner, Jul 2026): with the setting ON and a filled
+            // cart, table select is the LAST step — the order auto-holds, the KOT
+            // auto-fires, and the bill lands in Recall. Skips when the cart is
+            // empty (table picked before products), while editing a bill, when a
+            // waiter order is loaded, or with manual/deal lines (billing-only —
+            // hold would 422). On failure fall through to the normal flow so the
+            // cashier keeps the cart and can press Hold/F5 manually.
+            if (this.kitchenSettings.dine_in_auto_kot && this.cart.length > 0 && !this.editingBillId && !this.incomingOrderId && !this.hasManualItems() && !this.hasDealItems()) {
+                const held = await this.holdOrder({ forcePrintKot: true, successMessage: 'T-' + table.table_number + ' — KOT sent, bill saved in Recall' });
+                if (held) return;
+            }
             // Guided keyboard flow paused at the type step waiting for a table —
             // resume the chain into cart mode now that the table is locked in.
             if (this.guidedFlow && this.flowStep === 'cart' && !this.cartMode) this.enterCartMode('last');

@@ -11,12 +11,44 @@ class AppUpdateController extends Controller
 {
     // ============ ADMIN SIDE ============
 
-    public function index()
+    public function index(Request $request)
     {
-        $updates = AppUpdate::withCount('seens')->orderByDesc('created_at')->paginate(20);
-        $featureOn = SystemSetting::get('pos_whats_new_enabled', '1') === '1';
+        $query = AppUpdate::withCount('seens');
 
-        return view('admin.app-updates', compact('updates', 'featureOn'));
+        // Search: title OR any feature point (points is a JSON column — LIKE works on the raw text)
+        $q = trim((string) $request->query('q', ''));
+        if ($q !== '') {
+            $query->where(function ($w) use ($q) {
+                $w->where('title', 'like', '%' . $q . '%')
+                    ->orWhere('points', 'like', '%' . $q . '%');
+            });
+        }
+
+        // Status filter
+        $status = $request->query('status', '');
+        if ($status === 'published') {
+            $query->where('is_published', 1);
+        } elseif ($status === 'hidden') {
+            $query->where('is_published', 0);
+        }
+
+        // Date range filter (invalid dates are silently ignored)
+        foreach (['from' => '>=', 'to' => '<='] as $key => $op) {
+            $val = $request->query($key);
+            if ($val) {
+                try {
+                    $query->whereDate('created_at', $op, \Carbon\Carbon::parse($val)->toDateString());
+                } catch (\Throwable $e) {
+                    // ignore unparseable date input
+                }
+            }
+        }
+
+        $updates = $query->orderByDesc('created_at')->paginate(10)->withQueryString();
+        $featureOn = SystemSetting::get('pos_whats_new_enabled', '1') === '1';
+        $filtersActive = $q !== '' || in_array($status, ['published', 'hidden'], true) || $request->filled('from') || $request->filled('to');
+
+        return view('admin.app-updates', compact('updates', 'featureOn', 'filtersActive'));
     }
 
     public function store(Request $request)

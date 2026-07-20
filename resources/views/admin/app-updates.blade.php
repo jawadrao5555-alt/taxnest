@@ -33,6 +33,41 @@
                 </form>
             </div>
 
+            {{-- Search + filters (owner, 20 Jul 2026) --}}
+            <form method="GET" action="/admin/app-updates" class="mb-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
+                <div class="flex flex-wrap items-end gap-3">
+                    <div class="flex-1 min-w-[200px]">
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Search</label>
+                        <input type="text" name="q" value="{{ request('q') }}" placeholder="Search title or points…" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Status</label>
+                        <select name="status" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                            <option value="">All</option>
+                            <option value="published" {{ request('status') === 'published' ? 'selected' : '' }}>Published</option>
+                            <option value="hidden" {{ request('status') === 'hidden' ? 'selected' : '' }}>Hidden</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">From</label>
+                        <input type="date" name="from" value="{{ request('from') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">To</label>
+                        <input type="date" name="to" value="{{ request('to') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="submit" class="px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700">Filter</button>
+                        @if($filtersActive ?? false)
+                            <a href="/admin/app-updates" class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200">Reset</a>
+                        @endif
+                    </div>
+                </div>
+                @if($filtersActive ?? false)
+                    <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">{{ number_format($updates->total()) }} {{ $updates->total() === 1 ? 'result' : 'results' }} found</p>
+                @endif
+            </form>
+
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm text-left table-cards">
@@ -86,7 +121,13 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">No updates yet. Click "New Update" to announce something to POS users.</td>
+                                    <td colspan="6" class="px-4 py-10 text-center text-gray-500 dark:text-gray-400">
+                                        @if($filtersActive ?? false)
+                                            No updates match your search/filters. <a href="/admin/app-updates" class="text-emerald-600 hover:underline">Clear filters</a>
+                                        @else
+                                            No updates yet. Click "New Update" to announce something to POS users.
+                                        @endif
+                                    </td>
                                 </tr>
                             @endforelse
                         </tbody>

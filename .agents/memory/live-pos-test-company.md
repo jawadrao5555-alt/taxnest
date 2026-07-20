@@ -1,11 +1,11 @@
 ---
 name: Live POS test company
-description: Live POS test-company pattern — STANDING test company id 35 (cleanup pending, follow-up #43); safe create/delete flow, burned identifiers, and the false "Pro-plan restaurant drift" alarm to not repeat.
+description: Live POS test-company pattern — STANDING test company id 35 (RETAINED for QA until owner asks to clean it up); safe create/delete flow, burned identifiers, and the false "Pro-plan restaurant drift" alarm to not repeat.
 ---
 
 # Live NestPOS test company pattern
 
-## STANDING test company: id 35 "QA Full Audit Restaurant" (created 19 Jul 2026, cleanup pending — follow-up #43)
+## STANDING test company: id 35 "QA Full Audit Restaurant" (created 19 Jul 2026, RETAINED — currently the live QA company; delete only when the owner asks)
 - Pro plan (live plan id 11), PRA reporting OFF whole life (only L-series local bills — nothing ever went to PRA). Owner-approved full-audit company.
 - Logins: admin qa.fullaudit@taxnest.com.pk; team qa.mgr/qa.cash/qa.kit/qa.wtr .audit35@taxnest.com.pk; local viewer qa.lview.audit35@taxnest.com.pk (passwords NOT stored here — reset via admin panel if a future session needs access). Identifiers NTN 7899001 / 03427899001 will BURN on delete.
 - Artifacts to purge with it: products 5232-5235, deal 3, rider 4 (QA Rider One), customer "QA Walkin Customer", bills L-001..L-011 (ids 518-527), day-close #6, held order 491.
@@ -17,7 +17,7 @@ description: Live POS test-company pattern — STANDING test company id 35 (clea
 - `storeProduct` treats `show_on_sale` as a CHECKBOX (`$request->has()`): a curl POST without the field creates the product HIDDEN from the sale screen — not a bug; include `show_on_sale=1` when scripting product creation.
 - Welcome form gotcha: `pos_ui_density` must be simple|standard|premium (anything else = silent validation fail → redirect loop back to ?welcome=1; no error visible to curl).
 
-- LIVE has NO standing POS test company — all live `product_type='pos'` companies are REAL customer restaurants (never test in those without explicit owner approval; PRA bills are real fiscal records). Temporary test companies used in Jul 2026 sessions were fully deleted afterward.
+- Apart from company 35 above, ALL other live `product_type='pos'` companies are REAL customer restaurants (never test in those without explicit owner approval; PRA bills are real fiscal records). Earlier temporary test companies (31, 34) were fully deleted after use.
 - Safe pattern for live testing: register via public `/pos/register`, admin-approve, keep PRA reporting OFF the whole time (only L-series local bills, nothing submitted to PRA), delete when done. Admin delete flow: POST `/admin/companies/{id}/delete` (bin), then POST `_method=DELETE` to `/admin/bin/{id}/destroy` (forceDelete now also purges non-FK tables — see company-hard-delete-purge.md).
 
 ## FALSE ALARM: "Pro-plan restaurant drift" (corrected 17 Jul 2026)

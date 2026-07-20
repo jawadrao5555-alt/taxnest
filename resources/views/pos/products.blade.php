@@ -526,6 +526,10 @@
             <button @click="doBulk('activate')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">Activate</button>
             <button @click="doBulk('deactivate')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">Deactivate</button>
             <button @click="doBulk('category')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">Set Category</button>
+            <button @click="doBulk('price')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">Set Price</button>
+            <button @click="doBulk('price_percent')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">Price % +/-</button>
+            <button @click="doBulk('exempt_on')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">Tax Exempt ON</button>
+            <button @click="doBulk('exempt_off')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">Tax Exempt OFF</button>
             <button @click="doBulk('delete')" class="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-xs font-semibold">Delete</button>
             <button @click="clearSelect()" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold">Clear</button>
         </div>
@@ -868,6 +872,24 @@
                         if (cat === null) return;
                         fields.category_value = cat;
                     }
+                    if (action === 'price') {
+                        const v = prompt('Nayi price (Rs) — ' + this.selected.length + ' selected product(s) par lagegi:', '');
+                        if (v === null) return;
+                        const num = parseFloat(String(v).replace(/[^0-9.]/g, ''));
+                        if (isNaN(num) || num < 0) { alert('Sahi price likhein (sirf number, masalan 550).'); return; }
+                        if (!confirm(this.selected.length + ' product(s) ki price Rs ' + num + ' set karni hai?')) return;
+                        fields.price_value = num;
+                    }
+                    if (action === 'price_percent') {
+                        const v = prompt('Kitne percent? (masalan 10 = +10% izafa, -5 = 5% kami):', '');
+                        if (v === null) return;
+                        const num = parseFloat(v);
+                        if (isNaN(num) || num === 0 || num < -90 || num > 500) { alert('Sahi percent likhein — masalan 10 ya -5 (range -90 se 500).'); return; }
+                        if (!confirm(this.selected.length + ' product(s) ki price ' + (num > 0 ? '+' : '') + num + '% change karni hai?')) return;
+                        fields.percent_value = num;
+                    }
+                    if (action === 'exempt_on' && !confirm(this.selected.length + ' product(s) ko TAX EXEMPT karna hai? Bill par in par tax nahi lagega.')) return;
+                    if (action === 'exempt_off' && !confirm(this.selected.length + ' product(s) par tax dobara ON karna hai?')) return;
                     this.postForm(this.bulkUrl, fields);
                 },
                 doBulkSale(action) {

@@ -4677,13 +4677,13 @@ class PosController extends Controller
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Products');
 
-        $headers = ['Name', 'Price', 'Description', 'Category', 'SKU', 'Barcode', 'Tax Rate %', 'Unit (UOM)'];
+        $headers = ['Name', 'Price', 'Description', 'Category', 'SKU', 'Barcode', 'Tax Rate %', 'Unit (UOM)', 'Tax Exempt (Yes/No)'];
         $sheet->fromArray($headers, null, 'A1');
-        $sheet->getStyle('A1:H1')->getFont()->setBold(true);
-        $sheet->getStyle('A1:H1')->getFill()
+        $sheet->getStyle('A1:I1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:I1')->getFill()
             ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
             ->getStartColor()->setRGB('E9D5FF');
-        foreach (['A' => 32, 'B' => 10, 'C' => 32, 'D' => 16, 'E' => 14, 'F' => 18, 'G' => 11, 'H' => 12] as $col => $w) {
+        foreach (['A' => 32, 'B' => 10, 'C' => 32, 'D' => 16, 'E' => 14, 'F' => 18, 'G' => 11, 'H' => 12, 'I' => 18] as $col => $w) {
             $sheet->getColumnDimension($col)->setWidth($w);
         }
         // SKU + Barcode columns forced to TEXT so Excel never converts long codes
@@ -4694,9 +4694,9 @@ class PosController extends Controller
         $rowNum = 2;
         if ($existingProducts->isEmpty()) {
             $samples = [
-                ['Chicken Biryani', 450, 'Full plate biryani with raita', 'Food', 'CB-001', '8901234567890', 16, 'NOS'],
-                ['Pepsi 500ml', 120, 'Cold drink bottle', 'Beverages', 'PEP-500', '8901234567891', 5, 'NOS'],
-                ['Naan', 30, 'Tandoori naan', 'Food', 'NAN-001', '', 0, 'NOS'],
+                ['Chicken Biryani', 450, 'Full plate biryani with raita', 'Food', 'CB-001', '8901234567890', 16, 'NOS', 'No'],
+                ['Pepsi 500ml', 120, 'Cold drink bottle', 'Beverages', 'PEP-500', '8901234567891', 5, 'NOS', 'No'],
+                ['Naan', 30, 'Tandoori naan', 'Food', 'NAN-001', '', 0, 'NOS', 'Yes'],
             ];
             foreach ($samples as $s) {
                 $this->writeProductRow($sheet, $rowNum++, $s);
@@ -4712,6 +4712,7 @@ class PosController extends Controller
                     $p->barcode ?? '',
                     (float) ($p->tax_rate ?? 0),
                     $p->uom ?? 'NOS',
+                    !empty($p->is_tax_exempt) ? 'Yes' : 'No',
                 ]);
             }
         }
@@ -4730,7 +4731,7 @@ class PosController extends Controller
 
     private function writeProductRow($sheet, int $rowNum, array $vals): void
     {
-        // A..H = Name, Price, Description, Category, SKU, Barcode, Tax %, UOM.
+        // A..I = Name, Price, Description, Category, SKU, Barcode, Tax %, UOM, Tax Exempt.
         // SKU/Barcode written as EXPLICIT strings (Excel would otherwise turn
         // 8901234567890 into 8.90123E+12 the moment the file is opened).
         $sheet->setCellValue('A' . $rowNum, $vals[0]);
@@ -4741,6 +4742,7 @@ class PosController extends Controller
         $sheet->setCellValueExplicit('F' . $rowNum, (string) $vals[5], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
         $sheet->setCellValue('G' . $rowNum, $vals[6]);
         $sheet->setCellValue('H' . $rowNum, $vals[7]);
+        $sheet->setCellValue('I' . $rowNum, $vals[8] ?? 'No');
     }
 
     public function importProducts(Request $request)
@@ -4790,6 +4792,10 @@ class PosController extends Controller
         $barcodeIdx = $this->findColumn($header, ['barcode', 'bar code', 'ean']);
         $taxIdx = $this->findColumn($header, ['tax rate %', 'tax rate', 'tax_rate', 'tax', 'tax %']);
         $uomIdx = $this->findColumn($header, ['unit (uom)', 'unit', 'uom']);
+        // Tax Exempt column (owner request Jul 2026): Yes/No round-trip so bulk
+        // exempting via Excel works. Older files without the column keep the
+        // existing flag untouched.
+        $exemptIdx = $this->findColumn($header, ['tax exempt (yes/no)', 'tax exempt', 'exempt (yes/no)', 'exempt', 'tax_exempt', 'is_tax_exempt']);
 
         // Preload the whole catalog ONCE (bounded per company) — match precedence
         // barcode → SKU → name. Maps updated after each create so a duplicate row
@@ -4831,6 +4837,37 @@ class PosController extends Controller
             $tax = $taxIdx !== false ? $this->cleanImportNumber($data[$taxIdx] ?? '') : null;
             $uom = $uomIdx !== false ? strtoupper(trim((string) ($data[$uomIdx] ?? ''))) : '';
 
+            // Exempt cell: Yes/No (tolerant); blank = leave existing flag as-is
+            // (new products default No). Unrecognized value → clear warning, not
+            // a silent ignore.
+            $exempt = null;
+            if ($exemptIdx !== false) {
+                $exRaw = strtolower(trim((string) ($data[$exemptIdx] ?? '')));
+                if ($exRaw !== '') {
+                    if (in_array($exRaw, ['yes', 'y', '1', 'true', 'haan', 'han', 'exempt'], true)) {
+                        $exempt = true;
+                    } elseif (in_array($exRaw, ['no', 'n', '0', 'false', 'nahi'], true)) {
+                        $exempt = false;
+                    } else {
+                        $errors[] = "Row {$rowNo}: '{$name}' ke Tax Exempt column mein '" . trim((string) ($data[$exemptIdx] ?? '')) . "' samajh nahi aaya — Yes ya No likhein (value ignore hui)";
+                    }
+                }
+            }
+            // Tax Rate cell must be a number; 'exempt' written there is understood
+            // (flag ON, rate 0), anything else non-numeric gets a clear warning
+            // instead of the old silent ignore.
+            if ($taxIdx !== false && $tax === null) {
+                $taxRaw = trim((string) ($data[$taxIdx] ?? ''));
+                if ($taxRaw !== '') {
+                    if (strcasecmp($taxRaw, 'exempt') === 0) {
+                        $exempt = $exempt ?? true;
+                        $tax = 0.0;
+                    } else {
+                        $errors[] = "Row {$rowNo}: '{$name}' ka Tax Rate '{$taxRaw}' samajh nahi aaya — number likhein (masalan 16), exempt ke liye Tax Exempt column mein Yes likhein";
+                    }
+                }
+            }
+
             // Untouched template sample rows never become real products.
             foreach (self::IMPORT_SAMPLE_ROWS as $s) {
                 if (strcasecmp($name, $s[0]) === 0 && abs($price - $s[1]) < 0.001 && strcasecmp((string) $sku, $s[2]) === 0) {
@@ -4854,6 +4891,7 @@ class PosController extends Controller
                     'barcode' => $barcode !== null ? $barcode : $existing->barcode,
                     'tax_rate' => $tax !== null ? $tax : $existing->tax_rate,
                     'uom' => $uom !== '' ? $uom : $existing->uom,
+                    'is_tax_exempt' => $exempt !== null ? $exempt : (bool) $existing->is_tax_exempt,
                 ]);
                 $updated++;
                 $product = $existing;
@@ -4869,6 +4907,7 @@ class PosController extends Controller
                     'barcode' => $barcode,
                     'tax_rate' => $tax !== null ? $tax : 0,
                     'uom' => $uom !== '' ? $uom : 'NOS',
+                    'is_tax_exempt' => $exempt === true,
                     'is_active' => true,
                 ]);
                 $added++;
@@ -5191,10 +5230,13 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $request->validate([
-            'action' => 'required|string|in:activate,deactivate,delete,category',
+            'action' => 'required|string|in:activate,deactivate,delete,category,price,price_percent,exempt_on,exempt_off',
             'ids' => 'required|array|min:1',
             'ids.*' => 'integer',
             'category_value' => 'nullable|string|max:100',
+            // Bulk pricing (owner request Jul 2026): fixed price OR percent change.
+            'price_value' => 'nullable|numeric|min:0|max:10000000',
+            'percent_value' => 'nullable|numeric|min:-90|max:500',
         ]);
 
         $query = PosProduct::where('company_id', $companyId)->whereIn('id', $request->ids);
@@ -5212,6 +5254,37 @@ class PosController extends Controller
             case 'category':
                 $query->update(['category' => $request->category_value ?: null]);
                 $msg = "{$count} product(s) re-categorized.";
+                break;
+            case 'price':
+                // Fixed price for all selected (small same-price groups).
+                if ($request->input('price_value') === null || $request->input('price_value') === '') {
+                    return back()->with('error', 'Nayi price likhein.');
+                }
+                $newPrice = round((float) $request->input('price_value'), 2);
+                $query->update(['price' => $newPrice]);
+                $msg = "{$count} product(s) ki price Rs {$newPrice} set ho gayi.";
+                break;
+            case 'price_percent':
+                // Percent increase/decrease — inflation reprice across a list.
+                // Validated numeric (-90..500); SQL-side so 5000 selected rows
+                // stay one UPDATE (no per-row loop on shared cPanel PHP).
+                $pct = (float) $request->input('percent_value');
+                if ($request->input('percent_value') === null || $request->input('percent_value') === '' || abs($pct) < 0.001) {
+                    return back()->with('error', 'Percent likhein — masalan 10 (izafa) ya -5 (kami).');
+                }
+                $factor = sprintf('%.6F', 1 + $pct / 100);
+                $query->update(['price' => DB::raw("ROUND(GREATEST(price * {$factor}, 0), 2)")]);
+                $msg = "{$count} product(s) ki price " . ($pct > 0 ? "+{$pct}%" : "{$pct}%") . " update ho gayi.";
+                break;
+            case 'exempt_on':
+                // Flag only — sale math reads is_tax_exempt (tax_rate untouched so
+                // switching back OFF restores the product's own rate).
+                $query->update(['is_tax_exempt' => true]);
+                $msg = "{$count} product(s) TAX EXEMPT ho gaye — bill par in par tax nahi lagega.";
+                break;
+            case 'exempt_off':
+                $query->update(['is_tax_exempt' => false]);
+                $msg = "{$count} product(s) par tax dobara ON ho gaya.";
                 break;
             case 'delete':
                 // Clean up images before delete

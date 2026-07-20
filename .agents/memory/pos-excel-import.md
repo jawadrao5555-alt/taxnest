@@ -17,6 +17,7 @@ Rule: shopkeeper-facing bulk import/export must be a real .xlsx round-trip, neve
 - Match precedence barcode → sku → name against a preloaded per-company map (no per-row queries); update maps after create so in-file duplicates update.
 - Excel row-cap must be enforced via `getHighestDataRow()` BEFORE `toArray()` — a 5MB xlsx can hold 100k+ rows and OOM shared cPanel PHP (OOM is fatal, try/catch can't save you).
 - Known tradeoff (architect-accepted): row matched by barcode/sku also updates NAME — copy-paste-row-forgot-to-change-sku silently renames instead of creating.
+- Tax Exempt column (col I, Jul 2026): BLANK cell = leave existing flag UNCHANGED (never treat blank as "No" — old files without the column must not un-exempt products); 'exempt' written in the Tax Rate cell = flag ON + rate 0; unrecognized exempt/tax values warn in errors[] instead of silent ignore.
 
 POS customers import (`importCustomers`) is still old-style CSV-only — give it this same treatment if the owner asks.
 

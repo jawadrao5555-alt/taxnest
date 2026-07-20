@@ -7,7 +7,7 @@ description: Live POS test-company pattern — STANDING test company id 35 (clea
 
 ## STANDING test company: id 35 "QA Full Audit Restaurant" (created 19 Jul 2026, cleanup pending — follow-up #43)
 - Pro plan (live plan id 11), PRA reporting OFF whole life (only L-series local bills — nothing ever went to PRA). Owner-approved full-audit company.
-- Logins: qa.fullaudit@taxnest.com.pk / QaAudit@2026 (admin); team qa.mgr/qa.cash/qa.kit/qa.wtr .audit35@taxnest.com.pk / QaTeam@2026; local viewer qa.lview.audit35@taxnest.com.pk / QaView@2026. Identifiers NTN 7899001 / 03427899001 will BURN on delete.
+- Logins: admin qa.fullaudit@taxnest.com.pk; team qa.mgr/qa.cash/qa.kit/qa.wtr .audit35@taxnest.com.pk; local viewer qa.lview.audit35@taxnest.com.pk (passwords NOT stored here — reset via admin panel if a future session needs access). Identifiers NTN 7899001 / 03427899001 will BURN on delete.
 - Artifacts to purge with it: products 5232-5235, deal 3, rider 4 (QA Rider One), customer "QA Walkin Customer", bills L-001..L-011 (ids 518-527), day-close #6, held order 491.
 - POS login POST field is `login` (not `email`) — posting `email` silently bounces back to /pos/login.
 

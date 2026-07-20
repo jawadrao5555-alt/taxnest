@@ -846,18 +846,8 @@ class PosController extends Controller
             : (float)($company->cashier_discount_limit ?? 50);
         $hasManagerPin = !empty($company->manager_override_pin);
 
-        // Delivery Riders (Jul 2026): active riders for the payment-modal picker.
-        // Delivery-feature gated — plain retail companies never ship the list.
-        $ridersForJs = [];
-        if (!empty($features->delivery) && \Illuminate\Support\Facades\Schema::hasTable('pos_riders')) {
-            $ridersForJs = \App\Models\PosRider::where('company_id', $companyId)
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get(['id', 'name', 'phone'])
-                ->map(fn ($r) => ['id' => (int) $r->id, 'name' => (string) $r->name, 'phone' => $r->phone ? (string) $r->phone : null])
-                ->values()
-                ->all();
-        }
+        // Delivery Riders: pay-modal rider picker REMOVED (owner, 20 Jul 2026) —
+        // rider assignment happens ONLY on the /pos/deliveries board after payment.
 
         // EDIT PROVISIONAL IN SALE SCREEN (Jul 2026): ?edit_bill={id} loads a
         // provisional bill (completed + invoice_mode='local' + pra_status='local',
@@ -922,7 +912,7 @@ class PosController extends Controller
             'recipeLookup', 'tables', 'selectedTable', 'heldOrders',
             'customers', 'taxRate', 'taxRules', 'stockStatus', 'blockOutOfStock',
             'posRole', 'discountLimit', 'hasManagerPin', 'ingredientCosts',
-            'lowStockAlerts', 'inventoryEnabled', 'dealsForJs', 'ridersForJs',
+            'lowStockAlerts', 'inventoryEnabled', 'dealsForJs',
             'editBillForJs'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
@@ -4177,7 +4167,7 @@ class PosController extends Controller
         }
 
         $team = User::where('company_id', $companyId)
-            ->whereIn('pos_role', ['pos_admin', 'pos_manager', 'pos_cashier', 'pos_kitchen', 'pos_waiter'])
+            ->whereIn('pos_role', ['pos_admin', 'pos_manager', 'pos_cashier', 'pos_kitchen', 'pos_waiter', 'pos_delivery'])
             ->orderByRaw("CASE WHEN pos_role = 'pos_admin' THEN 0 WHEN pos_role = 'pos_manager' THEN 1 WHEN pos_role = 'pos_cashier' THEN 2 ELSE 3 END")
             ->orderBy('name')
             ->get();
@@ -4189,7 +4179,7 @@ class PosController extends Controller
         // sets a new password (hashes are irreversible).
         $teamPasswords = [];
         foreach ($team as $member) {
-            if (in_array($member->pos_role, ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter'], true)
+            if (in_array($member->pos_role, ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter', 'pos_delivery'], true)
                 && !empty($member->pos_team_password_enc)) {
                 try {
                     $teamPasswords[$member->id] = \Illuminate\Support\Facades\Crypt::decryptString($member->pos_team_password_enc);
@@ -4221,7 +4211,7 @@ class PosController extends Controller
             'email' => 'required|email|unique:users,email',
             'phone' => 'nullable|string|max:20',
             'password' => 'required|string|min:6',
-            'pos_role' => 'nullable|in:pos_cashier,pos_manager,pos_kitchen,pos_waiter',
+            'pos_role' => 'nullable|in:pos_cashier,pos_manager,pos_kitchen,pos_waiter,pos_delivery',
         ]);
 
         $newRole = $request->input('pos_role') ?: 'pos_cashier';
@@ -4230,8 +4220,9 @@ class PosController extends Controller
         // user_limit counts ADDED accounts only — the owner's pos_admin account
         // is EXEMPT. Starter 1 = owner + 1, Business 5, Pro 10, Unlimited -1.
         // Managers count toward the limit exactly like cashiers.
-        // Kitchen (P5, F4) + Waiter (P7, F6) accounts are limit-EXEMPT — confined roles.
-        if (!in_array($newRole, ['pos_kitchen', 'pos_waiter'], true)) {
+        // Kitchen (P5, F4) + Waiter (P7, F6) + Delivery Manager accounts are
+        // limit-EXEMPT — confined roles (owner, 20 Jul 2026).
+        if (!in_array($newRole, ['pos_kitchen', 'pos_waiter', 'pos_delivery'], true)) {
             $quota = \App\Services\PlanLimitService::canAddPosUser($companyId);
             if (!($quota['allowed'] ?? true)) {
                 return back()->with('error', $quota['reason']);
@@ -4257,7 +4248,7 @@ class PosController extends Controller
         }
         User::create($newUserData);
 
-        $roleLabel = ['pos_manager' => 'Manager', 'pos_kitchen' => 'Kitchen', 'pos_waiter' => 'Waiter'][$newRole] ?? 'Cashier';
+        $roleLabel = ['pos_manager' => 'Manager', 'pos_kitchen' => 'Kitchen', 'pos_waiter' => 'Waiter', 'pos_delivery' => 'Delivery Manager'][$newRole] ?? 'Cashier';
         return back()->with('success', "{$roleLabel} account created successfully.");
     }
 
@@ -4311,7 +4302,7 @@ class PosController extends Controller
             return back()->with('error', 'Access denied.');
         }
 
-        $cashier = User::where('company_id', $companyId)->whereIn('pos_role', ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter'])->findOrFail($id);
+        $cashier = User::where('company_id', $companyId)->whereIn('pos_role', ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter', 'pos_delivery'])->findOrFail($id);
 
         $request->validate([
             'name' => 'required|string|max:100',
@@ -4418,12 +4409,12 @@ class PosController extends Controller
             return back()->with('error', 'Access denied.');
         }
 
-        $cashier = User::where('company_id', $companyId)->whereIn('pos_role', ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter'])->findOrFail($id);
+        $cashier = User::where('company_id', $companyId)->whereIn('pos_role', ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter', 'pos_delivery'])->findOrFail($id);
 
         // Reactivating a cashier re-consumes a team-account slot — same gate as
         // storeCashier, otherwise deactivate→create→reactivate bypasses the limit.
-        // Kitchen + Waiter accounts are limit-EXEMPT (never consume a slot).
-        if (!$cashier->is_active && !in_array($cashier->pos_role, ['pos_kitchen', 'pos_waiter'], true)) {
+        // Kitchen + Waiter + Delivery Manager accounts are limit-EXEMPT (never consume a slot).
+        if (!$cashier->is_active && !in_array($cashier->pos_role, ['pos_kitchen', 'pos_waiter', 'pos_delivery'], true)) {
             $quota = \App\Services\PlanLimitService::canAddPosUser($companyId);
             if (!($quota['allowed'] ?? true)) {
                 return back()->with('error', $quota['reason']);

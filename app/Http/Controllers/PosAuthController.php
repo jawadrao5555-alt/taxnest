@@ -118,6 +118,12 @@ class PosAuthController extends Controller
                     return redirect('/pos/waiter');
                 }
 
+                // Delivery Manager → straight to the Deliveries board.
+                // PosAuth middleware confines this role to /pos/deliveries*.
+                if (($user->pos_role ?? null) === 'pos_delivery') {
+                    return redirect('/pos/deliveries');
+                }
+
                 return redirect('/pos/invoice/create');
             }
             // Wrong panel → fall through to generic failure (no info leak)

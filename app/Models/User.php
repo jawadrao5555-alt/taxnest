@@ -92,6 +92,13 @@ class User extends Authenticatable
         return $this->pos_role === 'pos_waiter';
     }
 
+    public function isPosDelivery()
+    {
+        // Delivery Manager (owner, 20 Jul 2026): limit-EXEMPT team account
+        // confined to the /pos/deliveries board (assign/status/settle only).
+        return $this->pos_role === 'pos_delivery';
+    }
+
     public function company()
     {
         return $this->belongsTo(Company::class);

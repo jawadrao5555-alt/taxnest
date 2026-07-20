@@ -205,8 +205,17 @@ class PosRiderController extends Controller
 
     public function deliveries(Request $request)
     {
-        if ($gate = $this->deliveryGate()) return $gate;
+        // Delivery Manager (pos_delivery) is CONFINED to this board by PosAuth —
+        // redirecting them to pos.features/pos.dashboard would bounce straight
+        // back here (infinite redirect loop). They always see the board (same
+        // rationale as assign/settle staying open: in-flight rider cash must
+        // never be stranded behind a feature toggle).
+        $isDeliveryMgr = ((auth('pos')->user()->pos_role ?? null) === 'pos_delivery');
+        if (!$isDeliveryMgr && ($gate = $this->deliveryGate())) return $gate;
         if (!$this->schemaReady()) {
+            if ($isDeliveryMgr) {
+                return response('Riders module is not available yet (database update pending). Please contact your admin.', 503);
+            }
             return redirect()->route('pos.dashboard')->with('error', 'Riders module is not available yet (database update pending).');
         }
         $companyId = app('currentCompanyId');

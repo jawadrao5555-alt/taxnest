@@ -117,6 +117,24 @@ class PosAuth
             }
         }
 
+        // Delivery Manager accounts (owner, 20 Jul 2026) are confined to the
+        // Deliveries board — rider assignment, delivery status, bulk actions
+        // (/pos/deliveries*) + rider cash settlement (/pos/riders/{id}/settle).
+        // Limit-EXEMPT team accounts created from the Team page. NOTE: settle
+        // lives under /pos/riders/ — allow ONLY the settle POST, never the
+        // rider CRUD pages (those stay admin/manager-only via PosAdminOnly).
+        if (($user->pos_role ?? null) === 'pos_delivery') {
+            $path = ltrim($request->path(), '/');
+            $allowed = $path === 'pos/deliveries'
+                || str_starts_with($path, 'pos/deliveries/')
+                || preg_match('#^pos/riders/\d+/settle$#', $path)
+                || $path === 'pos/logout'
+                || $path === 'pos/login';
+            if (!$allowed) {
+                return redirect('/pos/deliveries');
+            }
+        }
+
         // Waiter accounts (P7, F6) are confined to the Waiter Tablet — order
         // composing + send-to-cashier only. Limit-EXEMPT team accounts.
         if (($user->pos_role ?? null) === 'pos_waiter') {

@@ -55,6 +55,7 @@
                     <option value="pos_manager">Manager — full admin access</option>
                     <option value="pos_kitchen">Kitchen — Kitchen Display only (free, no team-slot)</option>
                     <option value="pos_waiter">Waiter — tablet ordering only (free, no team-slot)</option>
+                    <option value="pos_delivery">Delivery Manager — Deliveries board only (free, no team-slot)</option>
                 </select>
             </div>
             <div class="sm:col-span-2">
@@ -112,7 +113,7 @@
                                     <svg x-show="showPw" x-cloak class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
                                 </button>
                             </div>
-                            @elseif(in_array($member->pos_role, ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter'], true))
+                            @elseif(in_array($member->pos_role, ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter', 'pos_delivery'], true))
                             <span class="text-xs text-gray-400" title="Is account ka password abhi save nahi hua — Edit se naya password set karein, phir yahan nazar aayega.">Set new password to view</span>
                             @else
                             <span class="text-xs text-gray-400">—</span>
@@ -127,6 +128,8 @@
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">Kitchen</span>
                             @elseif($member->pos_role === 'pos_waiter')
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">Waiter</span>
+                            @elseif($member->pos_role === 'pos_delivery')
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">Delivery Manager</span>
                             @else
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">Cashier</span>
                             @endif
@@ -169,7 +172,7 @@
                             @endif
                         </td>
                         <td class="px-4 py-3">
-                            @if(in_array($member->pos_role, ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter'], true))
+                            @if(in_array($member->pos_role, ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter', 'pos_delivery'], true))
                             <div class="flex items-center gap-2">
                                 <button x-show="!editing" @click="editing = true" class="text-amber-600 hover:text-amber-700 text-xs font-medium" title="Edit">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>

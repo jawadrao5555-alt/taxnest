@@ -51,13 +51,11 @@
                                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-900/30">
                                     <td class="px-4 py-3 font-medium text-gray-800 dark:text-gray-100">{{ $upd->title }}</td>
                                     <td class="px-4 py-3 text-gray-600 dark:text-gray-300">
-                                        <ul class="list-disc list-inside space-y-0.5">
-                                            @foreach(array_slice($upd->points ?? [], 0, 3) as $pt)
-                                                <li class="truncate max-w-xs">{{ $pt }}</li>
+                                        {{-- Owner (20 Jul 2026): show FULL point text — no truncation, no "+N more" --}}
+                                        <ul class="list-disc list-inside space-y-1 max-w-xl">
+                                            @foreach($upd->points ?? [] as $pt)
+                                                <li class="whitespace-normal break-words">{{ $pt }}</li>
                                             @endforeach
-                                            @if(count($upd->points ?? []) > 3)
-                                                <li class="text-gray-400">+{{ count($upd->points) - 3 }} more…</li>
-                                            @endif
                                         </ul>
                                     </td>
                                     <td class="px-4 py-3">

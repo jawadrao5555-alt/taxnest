@@ -63,6 +63,10 @@
         {{-- Printer pickers --}}
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">Choose Printers</h3>
+            {{-- Pickers stay VISIBLE even before the agent reports printers
+                 (customer feedback Jul 2026 — Pizza Master couldn't find where
+                 the kitchen printer is set). Empty list = dropdowns show only
+                 "Not set" + the amber hint explains how to fill them. --}}
             @if(count($settings['available_printers']))
                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">
                     Printers found on the agent PC
@@ -70,6 +74,11 @@
                         (updated {{ \Carbon\Carbon::parse($settings['printers_reported_at'])->diffForHumans() }})
                     @endif
                 </p>
+            @else
+                <div class="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300">
+                    No printers reported yet — the lists below fill automatically within a few minutes once the <a href="{{ route('pos.agent') }}" class="font-semibold underline">Desktop Agent</a> is running on your shop PC. Set your Bill printer here, and your Kitchen printer so KOTs print in the kitchen instead of the counter.
+                </div>
+            @endif
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Bill / Receipt Printer</label>
@@ -79,6 +88,7 @@
                             <option value="{{ $p['name'] }}" {{ $settings['receipt_printer'] === $p['name'] ? 'selected' : '' }}>{{ $p['displayName'] ?? $p['name'] }}{{ !empty($p['isDefault']) ? ' (default)' : '' }}</option>
                             @endforeach
                         </select>
+                        <p class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">Customer bills print here (counter thermal printer).</p>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Kitchen (KOT) Printer</label>
@@ -88,13 +98,9 @@
                             <option value="{{ $p['name'] }}" {{ $settings['kot_printer'] === $p['name'] ? 'selected' : '' }}>{{ $p['displayName'] ?? $p['name'] }}{{ !empty($p['isDefault']) ? ' (default)' : '' }}</option>
                             @endforeach
                         </select>
+                        <p class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">Kitchen tickets (KOT) go straight to this printer in the kitchen.</p>
                     </div>
                 </div>
-            @else
-                <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400">
-                    No printers reported yet. Start the Desktop Agent on your shop PC — it sends the printer list automatically within a few minutes of starting.
-                </div>
-            @endif
         </div>
 
         <button type="submit" class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold transition shadow-sm">Save Printer Settings</button>

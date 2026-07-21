@@ -29,6 +29,7 @@
     @php
         $rp = $company->posReceiptPrefs('pra');
         $lp = $company->posReceiptPrefs('local');
+        $ps = $company->posReceiptStyle();
     @endphp
     <form method="POST" action="{{ route('pos.receipt-settings') }}" class="space-y-6" x-data="{ tab: 'pra' }">
         @csrf
@@ -151,6 +152,28 @@
                 <option value="58mm" {{ ($company->receipt_printer_size ?? '80mm') === '58mm' ? 'selected' : '' }}>58mm (Compact)</option>
             </select>
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Match your thermal printer's paper roll. The print automatically fits your printer's actual printable width — no fine-tuning needed.</p>
+        </div>
+
+        {{-- Print Style (customer feedback Jul 2026 — Pizza Master): GLOBAL like
+             paper size — it's the printer/brand look, not a bill-type setting.
+             Applies to both PRA and Local receipts. --}}
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-6 space-y-5">
+            <h3 class="text-sm font-bold text-gray-900 dark:text-white">🖋️ Receipt Print Style <span class="text-xs font-normal text-gray-500 dark:text-gray-400">(applies to both receipt types)</span></h3>
+            <label class="flex items-start gap-2.5 cursor-pointer p-3 rounded-lg border {{ $ps['bold'] ? 'border-purple-400 bg-purple-50/40 dark:bg-purple-900/10' : 'border-gray-200 dark:border-gray-700' }} transition">
+                <input type="checkbox" name="rp_style_bold" value="1" {{ $ps['bold'] ? 'checked' : '' }} class="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4">
+                <span class="flex-1 min-w-0">
+                    <span class="block text-sm font-bold text-gray-900 dark:text-white">Bold Receipt Print</span>
+                    <span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">Print the whole bill in a bold, dark font (like the kitchen ticket). Recommended if your thermal printer prints too light or thin.</span>
+                </span>
+            </label>
+            <div>
+                <label class="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">Logo Style on Receipt</label>
+                <select name="rp_logo_style" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-purple-500 focus:ring-purple-500">
+                    <option value="side" {{ $ps['logo'] === 'side' ? 'selected' : '' }}>Compact — small logo beside the business name (default)</option>
+                    <option value="center" {{ $ps['logo'] === 'center' ? 'selected' : '' }}>Large — big centered logo at the top of the bill</option>
+                </select>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Upload your logo on the Business Profile page. "Large" prints it big and centered like classic printed bills.</p>
+            </div>
         </div>
 
         <div class="flex items-center justify-between gap-3">

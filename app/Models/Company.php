@@ -238,6 +238,28 @@ class Company extends Model
         return $this->posReceiptPrefs($isPra ? 'pra' : 'local');
     }
 
+    /**
+     * POS receipt PRINT STYLE (customer feedback Jul 2026 — Pizza Master):
+     * global like paper size (it's the printer/brand look, not a bill-type
+     * setting). Stored in invoice_display_prefs['pos_style'].
+     * - bold: whole receipt prints in bold/dark (like the KOT font) — some
+     *   thermal heads print the plain font too thin. Default OFF (an earlier
+     *   customer asked for the thin "plain drafting" look — must stay opt-in).
+     * - logo: 'side' (compact, next to business name — default) or 'center'
+     *   (large centered logo above the name, like classic printed bills).
+     */
+    public function posReceiptStyle(): array
+    {
+        $all = $this->invoice_display_prefs;
+        $style = is_array($all) ? ($all['pos_style'] ?? []) : [];
+        if (!is_array($style)) { $style = []; }
+
+        return [
+            'bold' => filter_var($style['bold'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'logo' => in_array(($style['logo'] ?? 'side'), ['side', 'center'], true) ? ($style['logo'] ?? 'side') : 'side',
+        ];
+    }
+
     public function isSuspended()
     {
         return $this->company_status === 'suspended';

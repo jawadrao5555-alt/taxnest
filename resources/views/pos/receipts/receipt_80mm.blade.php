@@ -84,8 +84,11 @@
                80mm and the right ~8mm falls in the unprintable strip. Cap content at the
                SAFE printable width (72mm) and center it: drivers reporting 72mm get an
                exact fit; drivers reporting 80mm get 4mm side margins that line up with
-               the hardware margins. Never force physical paper width. */
-            body { width: auto; max-width: 72mm; padding: 1mm; margin: 0 auto; }
+               the hardware margins. Never force physical paper width.
+               v3 (Pizza Master Jul 2026): LEFT edge clipped too ("Customer" lost its
+               'C') — 1mm side padding sat inside the head's dead zone on some
+               printers. Side padding raised to 2.5mm both sides (content ~67mm). */
+            body { width: auto; max-width: 72mm; padding: 1mm 2.5mm; margin: 0 auto; }
             .no-print { display: none !important; }
         }
         @media screen {
@@ -101,6 +104,17 @@
            Let the body fill the PDF page instead, and hide screen-only chrome. */
         body { width: auto !important; max-width: none !important; margin: 0 !important; padding: 3mm !important; }
         .no-print { display: none !important; }
+    </style>
+    @endif
+    @php $printStyle = $company->posReceiptStyle(); @endphp
+    @if($printStyle['bold'])
+    <style>
+        /* BOLD PRINT STYLE (customer request Jul 2026 — Pizza Master): whole
+           receipt in bold like the KOT font — cheap thermal heads print the
+           plain weight too thin/light. Opt-in per company (Receipt Settings);
+           the text stroke lays down extra ink like the KOT notes fix. */
+        body, td, th, p, span, div, h1, strong { font-weight: bold !important; }
+        body { -webkit-text-stroke: 0.2px #000; }
     </style>
     @endif
 </head>
@@ -177,8 +191,16 @@
     <div class="header text-center">
         {{-- Logo placement (customer request Jul 2026): logo sits to the RIGHT of the
              business name on one row (was stacked above it) — the header prints
-             shorter. Table layout (not flex) so DomPDF renders it identically. --}}
+             shorter. Table layout (not flex) so DomPDF renders it identically.
+             'center' style (Pizza Master Jul 2026): LARGE centered logo above the
+             name, like classic printed bills — opt-in via Receipt Settings. --}}
         @if($logoDataUri)
+        @if($printStyle['logo'] === 'center')
+        <div style="text-align:center; margin-bottom:3px;">
+            <img src="{{ $logoDataUri }}" style="width:42mm; max-height:36mm; object-fit:contain;">
+        </div>
+        <h1>{{ $company->name }}</h1>
+        @else
         <table style="width:100%; border-collapse:collapse; margin-bottom:2px;">
             <tr>
                 <td style="text-align:left; vertical-align:middle; width:64%; padding:0;">
@@ -189,6 +211,7 @@
                 </td>
             </tr>
         </table>
+        @endif
         @else
         <h1>{{ $company->name }}</h1>
         @endif

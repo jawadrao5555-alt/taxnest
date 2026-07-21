@@ -81,8 +81,10 @@
             /* PRINTABLE-WIDTH FIX v2 (Jul 2026): 58mm paper prints only ~48mm. Drivers
                that report the FULL 58mm page clip the right edge with width:auto — cap
                content at the SAFE 48mm printable width and center it (also fits 52mm
-               rolls, ~48mm printable). Never force physical paper width. */
-            body { width: auto; max-width: 48mm; padding: 1mm; margin: 0 auto; }
+               rolls, ~48mm printable). Never force physical paper width.
+               v3 (Pizza Master Jul 2026): LEFT edge clipped too — side padding
+               raised to 2mm both sides so the first column clears the dead zone. */
+            body { width: auto; max-width: 48mm; padding: 1mm 2mm; margin: 0 auto; }
             .no-print { display: none !important; }
         }
         @media screen {
@@ -96,6 +98,16 @@
            never a fixed mm width that overflows and clips the right edge. */
         body { width: auto !important; max-width: none !important; margin: 0 !important; padding: 2mm !important; }
         .no-print { display: none !important; }
+    </style>
+    @endif
+    @php $printStyle = $company->posReceiptStyle(); @endphp
+    @if($printStyle['bold'])
+    <style>
+        /* BOLD PRINT STYLE (customer request Jul 2026 — Pizza Master): whole
+           receipt in bold like the KOT font — cheap thermal heads print the
+           plain weight too thin/light. Opt-in per company (Receipt Settings). */
+        body, td, th, p, span, div, h1, strong { font-weight: bold !important; }
+        body { -webkit-text-stroke: 0.2px #000; }
     </style>
     @endif
 </head>
@@ -160,6 +172,14 @@
              business name on one row (was stacked above it) — the header prints
              shorter. Table layout (not flex) so DomPDF renders it identically. --}}
         @if($logoDataUri)
+        @if($printStyle['logo'] === 'center')
+        {{-- 'center' style (Pizza Master Jul 2026): LARGE centered logo above the
+             name, like classic printed bills — opt-in via Receipt Settings. --}}
+        <div style="text-align:center; margin-bottom:3px;">
+            <img src="{{ $logoDataUri }}" style="width:30mm; max-height:26mm; object-fit:contain;">
+        </div>
+        <h1>{{ $company->name }}</h1>
+        @else
         <table style="width:100%; border-collapse:collapse; margin-bottom:2px;">
             <tr>
                 <td style="text-align:left; vertical-align:middle; width:62%; padding:0;">
@@ -170,6 +190,7 @@
                 </td>
             </tr>
         </table>
+        @endif
         @else
         <h1>{{ $company->name }}</h1>
         @endif

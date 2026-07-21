@@ -120,3 +120,16 @@ Tax% column remain hidden in this mode.
 (`/pos/receipt-settings`, field `rp_show_tax`, saved in `receiptSettings()`), NOT on the Features page.
 `updateFeatureSettings()` must NEVER write `pos_receipt_show_tax` — a checkbox absent from that form
 would silently force it off on every Features save.
+
+**Receipt PRINT STYLE = per-company opt-in (Jul 2026):** customers have OPPOSITE font preferences —
+one wanted the thin "plain drafting" look, another (pizza shop) wanted the whole bill BOLD like the KOT.
+Resolution: `invoice_display_prefs['pos_style']` (read ONLY via `Company::posReceiptStyle()`), GLOBAL
+like paper size (printer/brand property, not per-bill-type): `bold` (default OFF — never make bold the
+default) and `logo` 'side'|'center' ('center' = large centered logo above the name; 'side' = compact
+row, default). UI = "Receipt Print Style" card on /pos/receipt-settings. Any new writer of
+invoice_display_prefs must merge, never replace, or it wipes pos_style.
+**Left-edge clipping:** @media print side padding is 2.5mm (80mm) / 2mm (58mm) — 1mm sat inside some
+printers' dead zone and ate the first character. Don't shrink it back.
+**Printer pickers always visible:** /pos/printer-settings Bill/KOT dropdowns render even with an empty
+available_printers list (hidden pickers made the kitchen-printer setting undiscoverable); empty submit
+is harmless (controller only accepts agent-reported names).

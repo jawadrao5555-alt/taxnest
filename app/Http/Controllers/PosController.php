@@ -161,6 +161,7 @@ class PosController extends Controller
                 'rp_footer_text' => 'nullable|string|max:150',
                 'lp_footer_text' => 'nullable|string|max:150',
                 'rp_printer_size' => 'nullable|in:80mm,58mm',
+                'rp_logo_style' => 'nullable|in:side,center',
             ]);
             $prefs = $company->invoice_display_prefs ?? [];
             // PRA (fiscal) receipt set — legacy 'pos' key, backward compatible.
@@ -184,6 +185,12 @@ class PosController extends Controller
                 'show_footer' => $request->has('lp_show_footer'),
                 'show_tax' => $request->has('lp_show_tax'),
                 'footer_text' => trim((string) $request->input('lp_footer_text', '')) ?: null,
+            ];
+            // Print Style (Pizza Master Jul 2026): GLOBAL like paper size — bold
+            // whole-receipt font + logo size/placement. Applies to both bill types.
+            $prefs['pos_style'] = [
+                'bold' => $request->has('rp_style_bold'),
+                'logo' => $request->input('rp_logo_style', 'side') === 'center' ? 'center' : 'side',
             ];
             $company->update([
                 'invoice_display_prefs' => $prefs,

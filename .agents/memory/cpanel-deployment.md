@@ -55,5 +55,6 @@ Five files on live = FULL scp copies of workspace files (same content committed 
 - `app/Http/Controllers/PosController.php` (estimateReceiptHeightPt chrome 490→520pt for the PAYMENT banner)
 - (receipt_80mm/58mm re-scp'd with the boxed PAYMENT: CASH/CARD banner under TOTAL)
 - `resources/views/layouts/pos-app.blade.php` (What's New popup shows ALL unseen updates in one scrollable 62vh body)
+- `app/Models/PosStation.php` (zero-station KOT = flat list, no category sections) + kitchen-ticket.blade.php re-scp'd (station-header black-on-white, no reversed block)
 
-Before the NEXT `git pull` on live, restore them first (`git checkout -- resources/views/pos/universal.blade.php resources/views/pos/receipts/receipt_80mm.blade.php resources/views/pos/receipts/receipt_58mm.blade.php resources/views/pos/invoice-pdf.blade.php resources/views/pos/restaurant/kitchen-ticket.blade.php app/Http/Controllers/PosController.php resources/views/layouts/pos-app.blade.php` — safe, the commit carries the same fixes). Remove this note once deployed via git.
+Before the NEXT `git pull` on live, restore them first (`git checkout -- resources/views/pos/universal.blade.php resources/views/pos/receipts/receipt_80mm.blade.php resources/views/pos/receipts/receipt_58mm.blade.php resources/views/pos/invoice-pdf.blade.php resources/views/pos/restaurant/kitchen-ticket.blade.php app/Http/Controllers/PosController.php resources/views/layouts/pos-app.blade.php app/Models/PosStation.php` — safe, the commit carries the same fixes). Remove this note once deployed via git.

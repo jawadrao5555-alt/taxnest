@@ -116,19 +116,13 @@ class PosStation extends Model
         $stations = static::activeFor($companyId);
 
         if ($stations->isEmpty()) {
-            // Legacy grouping (raw category), bulk lookup.
-            $productIds = $ticketItems->where('item_type', 'product')
-                ->pluck('item_id')->filter()->unique()->values();
-            $prodCats = $productIds->isEmpty()
-                ? collect()
-                : PosProduct::where('company_id', $companyId)
-                    ->whereIn('id', $productIds)
-                    ->pluck('category', 'id');
-            $grouped = $ticketItems->groupBy(function ($item) use ($prodCats) {
-                if ($item->item_type === 'service') return 'Services';
-                $cat = trim((string) ($prodCats[$item->item_id] ?? ''));
-                return $cat !== '' ? $cat : 'General';
-            });
+            // ZFC feedback (Jul 2026): NO category sections on the KOT when the
+            // company has no stations configured — the reversed (white-on-black)
+            // category headers printed blurry on cheap thermal printers and the
+            // kitchen doesn't need them. One flat list; the blade hides the
+            // section header whenever there is only a single group. Station
+            // grouping (real routing) below stays untouched.
+            $grouped = $ticketItems->isEmpty() ? collect() : collect(['ALL' => $ticketItems->values()]);
             return ['items' => $ticketItems, 'grouped' => $grouped, 'stationLabel' => null, 'stations' => $stations];
         }
 

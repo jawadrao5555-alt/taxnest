@@ -67,10 +67,13 @@
             font-weight: bold; font-size: 16px; text-transform: uppercase; letter-spacing: 2px;
             background: #000; color: #fff;
         }
+        /* ZFC feedback Jul 2026: reversed (white-on-black) blocks print blurry on
+           cheap thermal printers — station headers now solid black text on white. */
         .station-header {
-            font-size: 15px; font-weight: bold; text-transform: uppercase;
+            font-size: 15px; font-weight: 900; text-transform: uppercase;
             padding: 5px 8px; margin: 0 0 4px 0; border: 2px solid #000;
-            text-align: center; letter-spacing: 2px; background: #000; color: #fff;
+            text-align: center; letter-spacing: 2px; background: #fff; color: #000;
+            -webkit-text-stroke: 0.5px #000;
         }
         .station-section { margin-bottom: 8px; }
         .station-item-count { font-size: 11px; text-align: center; color: #000; margin-bottom: 4px; font-weight: bold; }
@@ -160,8 +163,9 @@
         // Counter/Station routing (Jul 2026): grouping is resolved in the
         // CONTROLLER (PosStation::prepareTicket — bulk lookup, no per-item
         // queries). Stations configured => sections are STATION names;
-        // zero stations => legacy raw-category sections. $stationLabel set
-        // means this ticket is already server-filtered to ONE station.
+        // zero stations => ONE flat 'ALL' group, NO category sections
+        // (ZFC feedback 21 Jul 2026). $stationLabel set means this ticket
+        // is already server-filtered to ONE station.
         $grouped = $grouped ?? collect();
         $stationNames = $grouped->keys()->toArray();
     @endphp

@@ -1054,3 +1054,4 @@ Route::get('/api/fbr/hs-detail', [\App\Http\Controllers\FbrReferenceController::
 
 require __DIR__.'/auth.php';
 
+

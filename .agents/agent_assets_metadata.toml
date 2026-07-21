@@ -168,3 +168,15 @@ id = "CQr3DSMa1lYct3CXp8Fne"
 uri = "file://screenshots/printer-settings.jpg"
 type = "image"
 title = "Printer Settings Screenshot (jo notification mein lagi hai)"
+
+[[outputs]]
+id = "qAJrTaN9sqCuThlQrylSe"
+uri = "file://screenshots/agent-guide-popup-preview.jpg"
+type = "image"
+title = "Agent Setup Guide — Popup Preview"
+
+[[outputs]]
+id = "_fKZexM3jEVqijZFk38W5"
+uri = "file://screenshots/agent-download-section.jpg"
+type = "image"
+title = "Guide ke andar lagi tasveer (Download section)"

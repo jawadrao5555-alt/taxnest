@@ -3,24 +3,30 @@ name: POS thermal receipt plain style
 description: Customer-approved receipt typography + logo placement rules for receipt_80mm/receipt_58mm — what must stay plain and where bold is allowed.
 ---
 
-# Thermal receipt plain style (customer request, Jul 2026)
+# Thermal receipt plain style (customer request, Jul 2026) — SUPERSEDED in part
 
-Rule: both PRA POS receipt templates (`receipt_80mm` / `receipt_58mm`) use PLAIN drafting —
-NO `font-style:italic` anywhere, `font-weight: normal` as the default. Bold is allowed ONLY on:
-business name (h1), invoice/fiscal numbers (`.inv-value`, `.pra-number`), grand total row,
-PRA badge title, and PROVISIONAL BILL label. Sizes/margins are deliberately trimmed
-(80mm body 11px, tighter separators) so the slip prints shorter.
+**SUPERSEDED (21 Jul 2026):** whole-receipt BOLD + large CENTERED logo are now the UNIVERSAL
+DEFAULT (owner: "universal kr do") via `Company::posReceiptStyle()` — see
+`pos-provisional-and-receipt-rules.md` (Receipt PRINT STYLE section) for the current rule.
+The plain look below is still selectable per company (bold OFF + logo 'side' on
+/pos/receipt-settings) and its BASE typography rules still apply.
 
-Logo sits to the RIGHT of the business name in a 2-cell TABLE row (never flex — DomPDF),
-only when `$logoDataUri` exists; no-logo fallback = centered h1. 80mm logo max 80x42px,
-58mm max 60x32px.
+Still-valid base rules: NO `font-style:italic` anywhere, no decorative extra weights beyond
+the bold-style override. In the non-bold (plain) style, bold appears ONLY on: business name
+(h1), invoice/fiscal numbers (`.inv-value`, `.pra-number`), grand total row, PRA badge title,
+and PROVISIONAL BILL label. Sizes/margins deliberately trimmed (80mm body 11px, tighter
+separators) so the slip prints shorter.
 
-**Why:** a live customer's handwritten feedback — italic/heavy-bold fonts looked messy and
-the stacked logo made the slip long. Owner approved this exact spec.
+Logo in 'side' style sits to the RIGHT of the business name in a 2-cell TABLE row (never
+flex — DomPDF); 'center' style = large centered logo above the name (42mm/80mm, 30mm/58mm).
+Either way only when `$logoDataUri` exists; no-logo fallback = plain h1.
 
-**How to apply:** any future receipt edit must not re-add decorative bold/italic weights or
-move the logo back above the name. Both templates + the `$pdfMode` DomPDF path share the
-same markup — test both after edits.
+**Why:** one live customer's handwritten feedback wanted the plain drafting look; a pizza
+shop wanted bold+big logo. Owner first made it opt-in, then flipped the default to bold ON
+for everyone — the plain-look customer can opt out.
+
+**How to apply:** never re-add italic; keep the plain style intact as the opt-out; both
+templates + the `$pdfMode` DomPDF path share the same markup — test both after edits.
 
 Related: iframe print focus — after the hidden print iframe's dialog closes, focus can stay
 inside the iframe and the parent document's keydown shortcuts (P reprint / Enter / Esc) go

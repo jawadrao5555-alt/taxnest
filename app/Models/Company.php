@@ -243,10 +243,14 @@ class Company extends Model
      * global like paper size (it's the printer/brand look, not a bill-type
      * setting). Stored in invoice_display_prefs['pos_style'].
      * - bold: whole receipt prints in bold/dark (like the KOT font) — some
-     *   thermal heads print the plain font too thin. Default OFF (an earlier
-     *   customer asked for the thin "plain drafting" look — must stay opt-in).
-     * - logo: 'side' (compact, next to business name — default) or 'center'
-     *   (large centered logo above the name, like classic printed bills).
+     *   thermal heads print the plain font too thin. Default ON for everyone
+     *   (owner decision 21 Jul 2026: "universal kr do") — a company that
+     *   prefers the thin "plain drafting" look can still switch it OFF on
+     *   Receipt Settings (explicit saved false is respected).
+     * - logo: 'center' (large centered logo above the name, like classic
+     *   printed bills — the new universal default) or 'side' (compact, next
+     *   to business name). Companies without a logo just get the plain name
+     *   header (blade guards on $logoDataUri).
      */
     public function posReceiptStyle(): array
     {
@@ -255,8 +259,8 @@ class Company extends Model
         if (!is_array($style)) { $style = []; }
 
         return [
-            'bold' => filter_var($style['bold'] ?? false, FILTER_VALIDATE_BOOLEAN),
-            'logo' => in_array(($style['logo'] ?? 'side'), ['side', 'center'], true) ? ($style['logo'] ?? 'side') : 'side',
+            'bold' => filter_var($style['bold'] ?? true, FILTER_VALIDATE_BOOLEAN),
+            'logo' => in_array(($style['logo'] ?? 'center'), ['side', 'center'], true) ? ($style['logo'] ?? 'center') : 'center',
         ];
     }
 

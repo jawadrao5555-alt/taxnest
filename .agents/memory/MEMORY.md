@@ -66,7 +66,7 @@
 - [Silent printer routing](silent-printer-routing.md) — KOT stamping at result-time not render; Electron listener leak = double print; no pageSize for thermal; MySQL NOW() looks offline to Laravel.
 - [Mockup sandbox setup quirks](mockup-sandbox-setup.md) — fresh sandbox npm install dies with "Invalid Version"; rm node_modules+lockfile then install; previews are path-based /__mockup/, no port.
 - [POS What's New updates](pos-whats-new-updates.md) — popup/bell in pos-app layout; MUST skip confined roles + pending companies (seen POST blocked = dismiss loop); after each POS deploy create an AppUpdate row.
-- [POS receipt plain style](pos-receipt-plain-style.md) — receipts stay plain (no italic, bold only name/numbers/total), logo RIGHT of name via table; hidden print iframe must give focus back or shortcuts die.
+- [POS receipt plain style](pos-receipt-plain-style.md) — bold+center-logo now UNIVERSAL default (opt-out per company); plain style rules kept for opt-outs; hidden print iframe must give focus back or shortcuts die.
 - [Owner voice-note STT](elevenlabs-voice-note-stt.md) — transcribe .m4a via ElevenLabs scribe_v1: temp public URL on live + chmod 644, manual multipart STRING body, delete after.
 - [POS product Excel import/export](pos-excel-import.md) — bulk import/export = real .xlsx round-trip (CSV mangles barcodes to 8.9E+12); TEXT+explicit-string code columns; row-cap BEFORE toArray().
 - [POS card bucket normalization](pos-card-bucket-normalization.md) — card sales stored as 'debit_card'; every cash/card/other aggregation must whereIn the full card alias set, never ='card'.

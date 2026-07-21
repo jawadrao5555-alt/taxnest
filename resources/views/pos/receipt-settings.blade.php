@@ -169,8 +169,8 @@
             <div>
                 <label class="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">Logo Style on Receipt</label>
                 <select name="rp_logo_style" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-purple-500 focus:ring-purple-500">
-                    <option value="side" {{ $ps['logo'] === 'side' ? 'selected' : '' }}>Compact — small logo beside the business name (default)</option>
-                    <option value="center" {{ $ps['logo'] === 'center' ? 'selected' : '' }}>Large — big centered logo at the top of the bill</option>
+                    <option value="side" {{ $ps['logo'] === 'side' ? 'selected' : '' }}>Compact — small logo beside the business name</option>
+                    <option value="center" {{ $ps['logo'] === 'center' ? 'selected' : '' }}>Large — big centered logo at the top of the bill (default)</option>
                 </select>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Upload your logo on the Business Profile page. "Large" prints it big and centered like classic printed bills.</p>
             </div>

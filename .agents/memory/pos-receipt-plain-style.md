@@ -28,6 +28,12 @@ for everyone — the plain-look customer can opt out.
 **How to apply:** never re-add italic; keep the plain style intact as the opt-out; both
 templates + the `$pdfMode` DomPDF path share the same markup — test both after edits.
 
+**Font family (owner, 21 Jul 2026 "laser pe clear print ho"):** receipt font = Arial /
+Helvetica sans stack, NOT 'Courier New' — Courier's hairline strokes print faint/thin on
+laser printers (some shops print receipts on laser, not thermal). Don't revert to a
+monospace body font; DomPDF maps Arial → Helvetica core font (same Unicode limits as the
+old Courier mapping, no regression).
+
 Related: iframe print focus — after the hidden print iframe's dialog closes, focus can stay
 inside the iframe and the parent document's keydown shortcuts (P reprint / Enter / Esc) go
 dead. `_printViaIframe`'s fireOnce must blur the iframe + `window.focus()` — keep that

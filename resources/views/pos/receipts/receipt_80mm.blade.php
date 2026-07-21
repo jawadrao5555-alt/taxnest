@@ -15,7 +15,7 @@
            Sizes trimmed ~1px + tighter spacing so the slip prints shorter while
            staying readable on cheap thermal heads. */
         body {
-            font-family: 'Courier New', 'Lucida Console', monospace;
+            font-family: Arial, 'Helvetica Neue', Helvetica, 'Segoe UI', sans-serif;
             font-size: 11px;
             width: 80mm;
             max-width: 80mm;
@@ -47,7 +47,7 @@
         .inv-table { width: 100%; border-collapse: collapse; }
         .inv-table td { font-size: 10px; padding: 1px 0; vertical-align: top; color: #000; }
         .inv-table .inv-label { white-space: nowrap; width: 35%; color: #000; }
-        .inv-table .inv-value { text-align: right; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; font-family: 'Courier New', monospace; font-size: 9px; font-weight: bold; color: #000; }
+        .inv-table .inv-value { text-align: right; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 9px; font-weight: bold; color: #000; }
 
         .items-table { width: 100%; margin: 3px 0; border-collapse: collapse; table-layout: fixed; }
         .items-table th { font-size: 9px; text-transform: uppercase; border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 3px 1px; text-align: left; font-weight: normal; color: #000; }

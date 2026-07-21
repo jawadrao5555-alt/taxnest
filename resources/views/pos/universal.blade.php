@@ -506,7 +506,7 @@ window.addEventListener('popstate', function() {
                             </div>
                         </template>
                         <div class="flex-1 min-w-0">
-                            <span class="text-sm font-semibold truncate block" :style="i === highlightIndex ? 'color:white;' : 'color:#1f2937;'" x-text="s.name"></span>
+                            <span class="text-sm font-semibold block leading-snug" :style="i === highlightIndex ? 'color:white;' : 'color:#1f2937;'" x-text="s.name"></span>
                             <div class="flex items-center gap-1.5">
                                 <span class="text-[10px]" :style="i === highlightIndex ? 'color:rgba(255,255,255,0.7);' : 'color:#9ca3af;'" x-text="s.type === 'service' ? 'Service' : s.category"></span>
                                 @if($company->inventory_enabled)

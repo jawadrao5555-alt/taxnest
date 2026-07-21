@@ -1,0 +1,237 @@
+Name,Price,Description,Category,SKU,Barcode,"Tax Rate %","Unit (UOM)","Tax Exempt (Yes/No)"
+"Al Baik Deal No.1",690,,"Al Baik",0001,0001,,NOS,No
+"AL Baik Deal No.2",1500,,"Al Baik",0002,0002,,NOS,No
+"AL Baik Deal No.3",1700,,"Al Baik",0003,0003,,,No
+"Al Baik Nuggets 10 Pcs+Sauce",800,,"Al Baik",0004,0004,,,No
+"Al Baik Nuggets 5 Pcs+Sauce",450,,"Al Baik",0005,0005,,,No
+"Al Baik Petty Burger",350,,"Al Baik",0006,0006,,,No
+"Al Baik Double Petty Burger",550,,"Al Baik",0007,0007,,,No
+"Beast Burger",690,,Burgers,0008,0008,,,No
+"Beef Burger",500,,Burgers,0009,0009,,,No
+"Beef Lacha Burger",550,,Burgers,0010,0010,,,No
+"Beef Lacha Tower Burger",850,,Burgers,0011,0011,,,No
+"Beef Tower Burger",850,,Burgers,0012,0012,,,No
+"Cheese Slice",80,,Burgers,0013,0013,,,No
+"Double Petty Cheese Burger",550,,Burgers,0014,0014,,,No
+"Fish Burger",690,,Burgers,0015,0015,,,No
+"Grill Burger",470,,Burgers,0016,0016,,,No
+"Grill Tower Burger",690,,Burgers,0017,0017,,,No
+"Mighty Burger",690,,Burgers,0018,0018,,,No
+"Petty Burger",320,,Burgers,0019,0019,,,No
+"Petty Cheese Burger",400,,Burgers,0020,0020,,,No
+"Tender Cheese Burger",540,,Burgers,0021,0021,,,No
+"Tender Fillet Burger",460,,Burgers,0022,0022,,,No
+"Tower Burger",650,,Burgers,0023,0023,,,No
+"Zinger Burger",400,,Burgers,0024,0024,,,No
+"Zinger Cheese Burger",480,,Burgers,0025,0025,,,No
+"Zingster Lacha Burger",450,,Burgers,0026,0026,,,No
+"Calzone Chunks",1390,,"Calzone Chunks",0027,0027,,,No
+"Chicken Cheese Sticks",950,,"Chicken Cheese Sticks",0028,0028,,,No
+"Crown Speical Deal",1300,,"Crown Speical Deal",0029,0029,,,No
+"Choco Bites",700,,"Choco Bites",0030,0030,,,No
+"Bafflo Crust Pizza L",1890,,"Crust Pizza",0031,0031,,,No
+"Bafflo Crust Pizza M",1490,,"Crust Pizza",0032,0032,,,No
+"Bafflo Crust Pizza S",790,,"Crust Pizza",0033,0033,,,No
+"Beef Pizza L",1890,,"Crust Pizza",0034,0034,,,No
+"Beef Pizza M",1490,,"Crust Pizza",0035,0035,,,No
+"Beef Pizza S",790,,"Crust Pizza",0036,0036,,,No
+"Behari Kabab Pizza L",1890,,"Crust Pizza",0037,0037,,,No
+"Behari Kabab Pizza M",1490,,"Crust Pizza",0038,0038,,,No
+"Behari Kabab Pizza S",790,,"Crust Pizza",0039,0039,,,No
+"Cheese Stuffer Pizza L",1890,,"Crust Pizza",0040,0040,,,No
+"Cheese Stuffer Pizza M",1490,,"Crust Pizza",0041,0041,,,No
+"Cheese Stuffer Pizza S",790,,"Crust Pizza",0042,0042,,,No
+"Chicken Crust Pizza L",1890,,"Crust Pizza",0043,0043,,,No
+"Chicken Crust Pizza M",1490,,"Crust Pizza",0044,0044,,,No
+"Chicken Crust Pizza S",790,,"Crust Pizza",0045,0045,,,No
+"Crispy Chicken Pizza L",1890,,"Crust Pizza",0046,0046,,,No
+"Crispy Chicken Pizza M",1490,,"Crust Pizza",0047,0047,,,No
+"Crispy Chicken Pizza S",790,,"Crust Pizza",0048,0048,,,No
+"Crown Crust Pizza L",1890,,"Crust Pizza",0049,0049,,,No
+"Crown Crust Pizza M",1490,,"Crust Pizza",0050,0050,,,No
+"Crown Crust Pizza S",790,,"Crust Pizza",0051,0051,,,No
+"Kabab Stuffer Pizza L",1890,,"Crust Pizza",0052,0052,,,No
+"Kabab Stuffer Pizza M",1490,,"Crust Pizza",0053,0053,,,No
+"Kabab Stuffer Pizza S",790,,"Crust Pizza",0054,0054,,,No
+"Royal Crust Pizza L",1890,,"Crust Pizza",0055,0055,,,No
+"Royal Crust Pizza M",1490,,"Crust Pizza",0056,0056,,,No
+"Royal Crust Pizza S",790,,"Crust Pizza",0057,0057,,,No
+"Deal No. 01",450,,Deals,0058,0058,,,No
+"Deal No. 02",630,,Deals,0059,0059,,,No
+"Deal No. 03",690,,Deals,0060,0060,,,No
+"Deal No. 04",730,,Deals,0061,0061,,,No
+"Deal No. 05",1250,,Deals,0062,0062,,,No
+"Deal No. 06",1690,,Deals,0063,0063,,,No
+"Deal No. 07",1750,,Deals,0064,0064,,,No
+"Deal No. 08",2290,,Deals,0065,0065,,,No
+"Deal No. 09",3350,,Deals,0066,0066,,,No
+"Deal No. 10",3350,,Deals,0067,0067,,,No
+"Deal No. 11",3440,,Deals,0068,0068,,,No
+"Deal No. 12",5820,,Deals,0069,0069,,,No
+"Deal No. 13",1470,,Deals,0070,0070,,,No
+"Deal No. 14",740,,Deals,0071,0071,,,No
+"Deal No. 15",1500,,Deals,0072,0072,,,No
+"Deal No. 16",640,,Deals,0073,0073,,,No
+"Xtreme Crunchy Pizza L",2290,,"Double Dough Pizza",0074,0074,,,No
+"Xtreme Crunchy Pizza M",1790,,"Double Dough Pizza",0075,0075,,,No
+"Xtreme Crunchy Pizza S",1190,,"Double Dough Pizza",0076,0076,,,No
+"Xtreme Jamican Pizza L",2290,,"Double Dough Pizza",0077,0077,,,No
+"Xtreme Jamican Pizza M",1790,,"Double Dough Pizza",0078,0078,,,No
+"Xtreme Jamican Pizza S",1190,,"Double Dough Pizza",0079,0079,,,No
+"Xtreme Peri Peri Pizza L",2290,,"Double Dough Pizza",0080,0080,,,No
+"Xtreme Peri Peri Pizza M",1790,,"Double Dough Pizza",0081,0081,,,No
+"Xtreme Peri Peri Pizza S",1190,,"Double Dough Pizza",0082,0082,,,No
+"Xtreme Tikka Pizza L",2290,,"Double Dough Pizza",0083,0083,,,No
+"Xtreme Tikka Pizza M",1790,,"Double Dough Pizza",0084,0084,,,No
+"Xtreme Tikka Pizza S",1190,,"Double Dough Pizza",0085,0085,,,No
+"Beef Loaded Fries Large",860,,Fries,0086,0086,,,No
+"Chicken Chese Loded Fries L",700,,Fries,0087,0087,,,No
+"Chicken Chese Loded Fries S",450,,Fries,0088,0088,,,No
+"Family Fries",390,,Fries,0089,0089,,,No
+"Fries Large",290,,Fries,0090,0090,,,No
+"Fries Small",200,,Fries,0091,0091,,,No
+"Masala Fries Dip Sauce",500,,Fries,0092,0092,,,No
+"Mayo Fries Large",450,,Fries,0093,0093,,,No
+"Mayo Fries Small",330,,Fries,0094,0094,,,No
+"Pizza Fries Large",750,,Fries,0095,0095,,,No
+"Pizza Fries Small",480,,Fries,0096,0096,,,No
+"Kabab Bites",640,,"Kabab Bites",0097,0097,,,No
+"Al Frado Pasta Large",900,,"Oven Baked Pasta",0098,0098,,,No
+"Al Frado Pasta Small",500,,"Oven Baked Pasta",0099,0099,,,No
+"Creamy Pasta Large",800,,"Oven Baked Pasta",0100,0100,,,No
+"Creamy Pasta Small",450,,"Oven Baked Pasta",0101,0101,,,No
+"Crunchy Pasta Large",800,,"Oven Baked Pasta",0102,0102,,,No
+"Crunchy Pasta Small",450,,"Oven Baked Pasta",0103,0103,,,No
+"Flamming Pasta Large",800,,"Oven Baked Pasta",0104,0104,,,No
+"Flamming Pasta Small",450,,"Oven Baked Pasta",0105,0105,,,No
+"Beef Paratha Roll",560,,"Paratha Rolls",0106,0106,,,No
+"Chicken Cheese Paratha Roll",450,,"Paratha Rolls",0107,0107,,,No
+"Kababish Paratha Roll",400,,"Paratha Rolls",0108,0108,,,No
+"Tender Cheese Paratha Roll",540,,"Paratha Rolls",0109,0109,,,No
+"Tender Paratha Roll",460,,"Paratha Rolls",0110,0110,,,No
+"Zinger Cheese Paratha Roll",460,,"Paratha Rolls",0111,0111,,,No
+"Zinger Paratha Roll",400,,"Paratha Rolls",0112,0112,,,No
+"Pizza Staker",950,,"Pizza Staker",0113,0113,,,No
+"Malai Special Platter",1250,,Platters,0114,0114,,,No
+"Our Special Platter",1150,,Platters,0115,0115,,,No
+"Cheese Lover Pizza L",1650,,"Regular Pizza",0116,0116,,,No
+"Cheese Lover Pizza M",1150,,"Regular Pizza",0117,0117,,,No
+"Cheese Lover Pizza S",650,,"Regular Pizza",0118,0118,,,No
+"Fajita Chicken Pizza L",1650,,"Regular Pizza",0119,0119,,,No
+"Fajita Chicken Pizza M",1150,,"Regular Pizza",0120,0120,,,No
+"Fajita Chicken Pizza S",650,,"Regular Pizza",0121,0121,,,No
+"Chicken Lover Pizza L",1650,,"Regular Pizza",0122,0122,,,No
+"Chicken Lover Pizza M",1150,,"Regular Pizza",0123,0123,,,No
+"Chicken Lover Pizza S",650,,"Regular Pizza",0124,0124,,,No
+"Supreme Chicken Pizza L",1650,,"Regular Pizza",0125,0125,,,No
+"Supreme Chicken Pizza M",1150,,"Regular Pizza",0126,0126,,,No
+"Supreme Chicken Pizza S",650,,"Regular Pizza",0127,0127,,,No
+"Tikka Chicken Pizza L",1650,,"Regular Pizza",0128,0128,,,No
+"Tikka Chicken Pizza M",1150,,"Regular Pizza",0129,0129,,,No
+"Tikka Chicken Pizza S",650,,"Regular Pizza",0130,0130,,,No
+"Hot & Spicy Pizza L",1650,,"Regular Pizza",0131,0131,,,No
+"Hot & Spicy Pizza M",1150,,"Regular Pizza",0132,0132,,,No
+"Hot & Spicy Pizza S",650,,"Regular Pizza",0133,0133,,,No
+"Vegetable Pizza L",1650,,"Regular Pizza",0134,0134,,,No
+"Vegetable Pizza M",1150,,"Regular Pizza",0135,0135,,,No
+"Vegetable Pizza S",650,,"Regular Pizza",0136,0136,,,No
+"Chilli Milli Roll",560,,Rolls,0137,0137,,,No
+"Malai Boti Roll",570,,Rolls,0138,0138,,,No
+"Spin Roll",550,,Rolls,0139,0139,,,No
+"Hot Crispy Sandwich",590,,Sandwich,0140,0140,,,No
+"Maxican Sandwich",880,,Sandwich,0141,0141,,,No
+"Tikka Sandwich",530,,Sandwich,0142,0142,,,No
+"Bonfire Pizza L",1750,,"Special Pizza",0143,0143,,,No
+"Bonfire Pizza M",1250,,"Special Pizza",0144,0144,,,No
+"Bonfire Pizza S",700,,"Special Pizza",0145,0145,,,No
+"Creamy Tikka Pizza L",1750,,"Special Pizza",0146,0146,,,No
+"Creamy Tikka Pizza M",1250,,"Special Pizza",0147,0147,,,No
+"Creamy Tikka Pizza S",700,,"Special Pizza",0148,0148,,,No
+"Hot Muglai Pizza L",1750,,"Special Pizza",0149,0149,,,No
+"Hot Muglai Pizza M",1250,,"Special Pizza",0150,0150,,,No
+"Hot Muglai Pizza S",700,,"Special Pizza",0151,0151,,,No
+"Jamican Chicken Pizza L",1750,,"Special Pizza",0152,0152,,,No
+"Jamican Chicken Pizza M",1250,,"Special Pizza",0153,0153,,,No
+"Jamican Chicken Pizza S",700,,"Special Pizza",0154,0154,,,No
+"Malai Boti Pizza L",1750,,"Special Pizza",0155,0155,,,No
+"Malai Boti Pizza M",1250,,"Special Pizza",0156,0156,,,No
+"Malai Boti Pizza S",700,,"Special Pizza",0157,0157,,,No
+"Nawabi Pizza L",1750,,"Special Pizza",0158,0158,,,No
+"Nawabi Pizza M",1250,,"Special Pizza",0159,0159,,,No
+"Nawabi Pizza S",700,,"Special Pizza",0160,0160,,,No
+"Peri Peri Pizza L",1750,,"Special Pizza",0161,0161,,,No
+"Peri Peri Pizza M",1250,,"Special Pizza",0162,0162,,,No
+"Peri Peri Pizza S",700,,"Special Pizza",0163,0163,,,No
+"Shahi Pizza L",1750,,"Special Pizza",0164,0164,,,No
+"Shahi Pizza M",1250,,"Special Pizza",0165,0165,,,No
+"Shahi Pizza S",700,,"Special Pizza",0166,0166,,,No
+"ZFC Sp Pizza L",1750,,"Special Pizza",0167,0167,,,No
+"ZFC Sp Pizza M",1250,,"Special Pizza",0168,0168,,,No
+"ZFC Sp Pizza S",700,,"Special Pizza",0169,0169,,,No
+"Square Shape Pizza L",1950,,"Square Shape Pizza",0170,0170,,,No
+"Square Shape Pizza M",1450,,"Square Shape Pizza",0171,0171,,,No
+"Square Shape Pizza S",850,,"Square Shape Pizza",0172,0172,,,No
+"Finger Fish 220 Gram",850,,"Wings & Nuggets",0173,0173,,,No
+"Hot Wings 10 Pcs",690,,"Wings & Nuggets",0174,0174,,,No
+"Hot Wings 5 Pcs",390,,"Wings & Nuggets",0175,0175,,,No
+"Malai Wings 10 Pcs Dip Sauce",780,,"Wings & Nuggets",0176,0176,,,No
+"Malai Wings 5 Pcs Dip Sauce",450,,"Wings & Nuggets",0177,0177,,,No
+"Nuggets 10 Pcs",590,,"Wings & Nuggets",0178,0178,,,No
+"Nuggets 5 Pcs",320,,"Wings & Nuggets",0179,0179,,,No
+"Oven Baked Wings 10 Pcs",750,,"Wings & Nuggets",0180,0180,,,No
+"Oven Baked Wings 5 Pcs",400,,"Wings & Nuggets",0181,0181,,,No
+"Peri Peri Wings 10 Pcs",780,,"Wings & Nuggets",0182,0182,,,No
+"Peri Peri Wings 5 Pcs",450,,"Wings & Nuggets",0183,0183,,,No
+"Seekh Kebab Dip Sause 5 Pcs",580,,"Wings & Nuggets",0184,0184,,,No
+"Chicken Strips 10 Pcs",750,,"Wings & Nuggets",0185,0185,,,No
+"Chicken Strips 5 Pcs",400,,"Wings & Nuggets",0186,0186,,,No
+"Dynamite Wings 8 Pcs",690,,"Wings & Nuggets",0187,0187,,,No
+"Dynamite Chicken 10 Pcs",550,,"Wings & Nuggets",0188,0188,,,No
+"Behari Wraps",450,,Wraps,0189,0189,,,No
+"Kababish Wraps",450,,Wraps,0190,0190,,,No
+"Dip Sauce",90,,Sauces,0191,0191,,,Yes
+"Mayo Sauce",90,,Sauces,0192,0192,,,Yes
+"Peri Peri Sauce",90,,Sauces,0193,0193,,,Yes
+"Special Sauce",90,,Sauces,0194,0194,,,Yes
+"Delivery Charges 10",10,,"Delivery Charges",0195,0195,,,Yes
+"Delivery Charges 50",50,,"Delivery Charges",0196,0196,,,Yes
+"Delivery Charges 100",100,,"Delivery Charges",0197,0197,,,Yes
+"Delivery Charges 150",150,,"Delivery Charges",0198,0198,,,Yes
+"Delivery Charges 200",200,,"Delivery Charges",0199,0199,,,Yes
+"Delivery Charges 250",250,,"Delivery Charges",0200,0200,,,Yes
+"Delivery Charges 300",300,,"Delivery Charges",0201,0201,,,Yes
+"Delivery Charges 350",350,,"Delivery Charges",0202,0202,,,Yes
+"Delivery Charges 400",400,,"Delivery Charges",0203,0203,,,Yes
+"Delivery Charges 450",450,,"Delivery Charges",0204,0204,,,Yes
+"Delivery Charges 500",500,,"Delivery Charges",0205,0205,,,Yes
+"1 Ltr Coca Cola",180,,"Drinks & Water",0206,0206,,,Yes
+"1 Ltr Sprite",180,,"Drinks & Water",0207,0207,,,Yes
+"1 Ltr Next Cola",130,,"Drinks & Water",0208,0208,,,Yes
+"1.5 Ltr Coca Cola",220,,"Drinks & Water",0209,0209,,,Yes
+"1.5 Ltr Sprite",220,,"Drinks & Water",0210,0210,,,Yes
+"1.5 Ltr Next Cola",170,,"Drinks & Water",0211,0211,,,Yes
+"Disposable Glass",10,,"Drinks & Water",0212,0212,,,Yes
+"Reg Coca Cola 345ml",80,,"Drinks & Water",0213,0213,,,Yes
+"Reg Sprite 345ml",80,,"Drinks & Water",0214,0214,,,Yes
+"Reg Next Cola 345ml",80,,"Drinks & Water",0215,0215,,,Yes
+"Water Large",120,,"Drinks & Water",0216,0216,,,Yes
+"Water Small",70,,"Drinks & Water",0217,0217,,,Yes
+"2 In 1 Flavor Charges L",150,,"Extra Charge",0218,0218,,,Yes
+"2 In 1 Flavor Charges M",100,,"Extra Charge",0219,0219,,,Yes
+"2 In 1 Flavor Charges S",50,,"Extra Charge",0220,0220,,,Yes
+"Ex. Charge Change Pizza 10",10,,"Extra Charge",0221,0221,,,Yes
+"Ex. Charge Change Pizza 100",100,,"Extra Charge",0222,0222,,,Yes
+"Ex. Charge Change Pizza 300",300,,"Extra Charge",0223,0223,,,Yes
+"Ex. Charge Change Pizza 50",50,,"Extra Charge",0224,0224,,,Yes
+"Extra Ketchup Packet",20,,"Extra Charge",0225,0225,,,Yes
+"Ex. Topping Cheese L",350,,"Extra Topping",0226,0226,,,Yes
+"Ex. Topping Cheese M",230,,"Extra Topping",0227,0227,,,Yes
+"Ex. Topping Cheese S",170,,"Extra Topping",0228,0228,,,Yes
+"Ex. Topping Chicken L",350,,"Extra Topping",0229,0229,,,Yes
+"Ex. Topping Chicken M",230,,"Extra Topping",0230,0230,,,Yes
+"Ex. Topping Chicken S",170,,"Extra Topping",0231,0231,,,Yes
+"Ex. Topping Sauce L",350,,"Extra Topping",0232,0232,,,Yes
+"Ex. Topping Sauce M",230,,"Extra Topping",0233,0233,,,Yes
+"Ex. Topping Sauce S",170,,"Extra Topping",0234,0234,,,Yes
+"Only Chilli Garlic Ketchup",0,,Ketchup,0235,0235,,,Yes
+"Only Tomato Ketchup",0,,Ketchup,0236,0236,,,Yes

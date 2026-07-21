@@ -180,3 +180,9 @@ id = "_fKZexM3jEVqijZFk38W5"
 uri = "file://screenshots/agent-download-section.jpg"
 type = "image"
 title = "Guide ke andar lagi tasveer (Download section)"
+
+[[outputs]]
+id = "BUkuMDc8_F07lAcX4Tats"
+uri = "file://exports/zfc_products_checked.csv"
+type = "table"
+title = "ZFC Products — Checked CSV (236 products)"

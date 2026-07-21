@@ -48,8 +48,9 @@ See `prod-scheduled-jobs-cron.md` for why this is mandatory.
 - **OPcache reset from SSH needs NO browser:** `curl -s https://taxnest.com.pk/r.php` IS a real web (PHP-FPM) hit, so it resets the web OPcache just like opening it in a browser. Bake it into the one-liner: `... && echo '<?php opcache_reset(); ?>' > public/r.php && curl -s https://taxnest.com.pk/r.php ; rm -f public/r.php ; echo DONE` (use `;` before rm so r.php is always cleaned up even if curl fails).
 
 ## PENDING live local edits (21 Jul 2026)
-Four files on live = FULL scp copies of workspace files (same content committed in workspace at checkpoint):
+Five files on live = FULL scp copies of workspace files (same content committed in workspace at checkpoint):
 - `resources/views/pos/universal.blade.php` (search-suggestion `block leading-snug` fix + address-picker font bumps text-[9px]/[10px]→text-xs/text-sm)
 - `resources/views/pos/receipts/receipt_80mm.blade.php`, `receipt_58mm.blade.php`, `resources/views/pos/invoice-pdf.blade.php` (provisional-badge three-branch fix: SALE RECEIPT for non-local finals + `font-style: normal !important` hardening on thermal)
+- `resources/views/pos/restaurant/kitchen-ticket.blade.php` (KOT fixes: ADDED-ITEMS banner only on genuine additions, "Order by:", ticket-scoped item count + Total Qty, note prefix)
 
-Before the NEXT `git pull` on live, restore them first (`git checkout -- resources/views/pos/universal.blade.php resources/views/pos/receipts/receipt_80mm.blade.php resources/views/pos/receipts/receipt_58mm.blade.php resources/views/pos/invoice-pdf.blade.php` — safe, the commit carries the same fixes). Remove this note once deployed via git.
+Before the NEXT `git pull` on live, restore them first (`git checkout -- resources/views/pos/universal.blade.php resources/views/pos/receipts/receipt_80mm.blade.php resources/views/pos/receipts/receipt_58mm.blade.php resources/views/pos/invoice-pdf.blade.php resources/views/pos/restaurant/kitchen-ticket.blade.php` — safe, the commit carries the same fixes). Remove this note once deployed via git.

@@ -131,7 +131,20 @@
 
     <div class="separator"></div>
 
-    @if(!empty($delta))
+    @php
+        // "ADDED ITEMS" banner (ZFC feedback Jul 2026): delta=1 is sent on EVERY
+        // universal-screen KOT — including the very FIRST send — so keying the
+        // banner on $delta alone stamped "ADDED ITEMS" on brand-new orders and
+        // confused the kitchen. Real test: does the order have items ALREADY
+        // printed in an earlier batch that are NOT on this ticket? Only then is
+        // this ticket an addition.
+        $isAdditionTicket = !empty($delta) && $order->items
+            ->whereNotNull('kot_printed_at')
+            ->pluck('id')
+            ->diff(($ticketItems ?? collect())->pluck('id'))
+            ->isNotEmpty();
+    @endphp
+    @if($isAdditionTicket)
     <div class="mt-1" style="border: 2px solid #000; padding: 4px; text-align: center;">
         <span class="bold text-lg">++ ADDED ITEMS{{ !empty($kotBatchNo) ? ' — KOT #'.$kotBatchNo : '' }} ++</span>
     </div>
@@ -166,7 +179,7 @@
                     <td class="name">
                         <span class="bold">{{ $item->item_name }}</span>
                         @if($item->special_notes)
-                            <br><span class="note">!! {{ $item->special_notes }}</span>
+                            <br><span class="note">&raquo; NOTE: {{ $item->special_notes }}</span>
                         @endif
                     </td>
                 </tr>
@@ -188,8 +201,17 @@
     <div class="separator"></div>
 
     <div class="text-center text-sm">
-        <p>Prepared by: {{ $order->creator->name ?? 'Staff' }}</p>
-        <p class="mt-1">{{ $order->items->count() }} item(s) total</p>
+        {{-- ZFC feedback Jul 2026: creator = the CASHIER who took the order, not the
+             cook — "Prepared by" read backwards on the pass. Count from the TICKET's
+             rows (delta/station prints show fewer than the whole order) and show the
+             total QUANTITY too — "1 item(s)" with x2 on the line made the kitchen
+             second-guess how many to fire. --}}
+        @php
+            $kotRows = ($ticketItems ?? $order->items);
+            $kotQty  = $kotRows->sum('quantity');
+        @endphp
+        <p>Order by: {{ $order->creator->name ?? 'Staff' }}</p>
+        <p class="mt-1">{{ $kotRows->count() }} item(s) &mdash; Total Qty: {{ $kotQty == intval($kotQty) ? intval($kotQty) : number_format($kotQty, 2) }}</p>
     </div>
 
     <div class="separator"></div>

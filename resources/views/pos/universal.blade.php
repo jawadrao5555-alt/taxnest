@@ -382,8 +382,8 @@ window.addEventListener('popstate', function() {
                         <div class="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-blue-600" x-text="cr.name.charAt(0)"></span></div>
                         <div class="flex-1 min-w-0">
                             <p class="text-xs font-semibold text-gray-900 dark:text-white truncate" x-text="cr.name"></p>
-                            <p class="text-[10px] text-gray-400" x-text="cr.phone + (cr.stats ? ' • ' + cr.stats.total_orders + ' orders • Rs.' + Number(cr.stats.total_spent).toLocaleString() : '')"></p>
-                            <template x-if="cr.address"><p class="text-[9px] text-gray-400 truncate" x-text="cr.address"></p></template>
+                            <p class="text-xs text-gray-400" x-text="cr.phone + (cr.stats ? ' • ' + cr.stats.total_orders + ' orders • Rs.' + Number(cr.stats.total_spent).toLocaleString() : '')"></p>
+                            <template x-if="cr.address"><p class="text-xs text-gray-400 truncate" x-text="cr.address"></p></template>
                         </div>
                         <template x-if="cr.stats && cr.stats.is_frequent"><span class="freq-badge">VIP</span></template>
                     </button>
@@ -850,9 +850,9 @@ window.addEventListener('popstate', function() {
                             <p class="text-xs font-semibold text-blue-800 dark:text-blue-200 truncate" x-text="selectedCustomer.name"></p>
                             <template x-if="customerStats && customerStats.is_frequent"><span class="freq-badge">VIP</span></template>
                         </div>
-                        <p class="text-[10px] text-blue-600 dark:text-blue-400" x-text="selectedCustomer.phone || 'No phone'"></p>
+                        <p class="text-xs text-blue-600 dark:text-blue-400" x-text="selectedCustomer.phone || 'No phone'"></p>
                         <template x-if="selectedCustomer.address">
-                            <p class="text-[10px] text-blue-500 dark:text-blue-400 truncate" x-text="'📍 ' + selectedCustomer.address"></p>
+                            <p class="text-xs text-blue-500 dark:text-blue-400 truncate" x-text="'📍 ' + selectedCustomer.address"></p>
                         </template>
                         {{-- Item #1 (Jul 2026): delivery-address picker — Delivery orders only.
                              Saved addresses (address #1 + extras) in a dropdown; "+ New" saves an
@@ -860,17 +860,17 @@ window.addEventListener('popstate', function() {
                         <template x-if="orderType === 'delivery'">
                             <div class="mt-1 space-y-1">
                                 <div class="flex items-center gap-1">
-                                    <select x-model="selectedDeliveryAddress" class="flex-1 min-w-0 text-[10px] rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1 px-1.5 focus:ring-blue-500 focus:border-blue-400">
+                                    <select x-model="selectedDeliveryAddress" class="flex-1 min-w-0 text-sm font-medium rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
                                         <option value="">— Delivery address —</option>
                                         <template x-for="(a, ai) in customerAddresses" :key="a.id ?? ('t' + ai)">
                                             <option :value="a.address" x-text="(a.label ? a.label + ': ' : '') + a.address"></option>
                                         </template>
                                     </select>
-                                    <button @click="showAddrNew = !showAddrNew; if (showAddrNew) $nextTick(() => document.getElementById('tnNewAddrInput')?.focus())" class="text-[10px] font-bold text-blue-600 dark:text-blue-300 px-1.5 py-1 rounded-md border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 whitespace-nowrap">+ New</button>
+                                    <button @click="showAddrNew = !showAddrNew; if (showAddrNew) $nextTick(() => document.getElementById('tnNewAddrInput')?.focus())" class="text-xs font-bold text-blue-600 dark:text-blue-300 px-2 py-1.5 rounded-md border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 whitespace-nowrap">+ New</button>
                                 </div>
                                 <div x-show="showAddrNew" x-cloak class="flex items-center gap-1">
-                                    <input id="tnNewAddrInput" type="text" x-model="newAddrText" @keydown.enter.prevent="saveNewAddress()" @keydown.escape.prevent="showAddrNew = false" placeholder="Full delivery address..." autocomplete="off" name="pos_new_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="flex-1 min-w-0 text-[10px] rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1 px-1.5 focus:ring-blue-500 focus:border-blue-400">
-                                    <button @click="saveNewAddress()" class="text-[10px] font-bold text-white bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded-md">Save</button>
+                                    <input id="tnNewAddrInput" type="text" x-model="newAddrText" @keydown.enter.prevent="saveNewAddress()" @keydown.escape.prevent="showAddrNew = false" placeholder="Full delivery address..." autocomplete="off" name="pos_new_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="flex-1 min-w-0 text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
+                                    <button @click="saveNewAddress()" class="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-2 py-1.5 rounded-md">Save</button>
                                 </div>
                             </div>
                         </template>
@@ -1543,9 +1543,9 @@ window.addEventListener('popstate', function() {
                             <div class="w-8 h-8 rounded-full bg-green-200 dark:bg-green-800 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-green-700" x-text="customerLookupResult.customer.name.charAt(0)"></span></div>
                             <div class="flex-1 min-w-0">
                                 <p class="text-xs font-bold text-green-800 dark:text-green-200" x-text="customerLookupResult.customer.name"></p>
-                                <p class="text-[10px] text-green-600" x-text="customerLookupResult.stats.total_orders + ' orders • Rs. ' + Number(customerLookupResult.stats.total_spent).toLocaleString() + ' spent'"></p>
+                                <p class="text-xs text-green-600" x-text="customerLookupResult.stats.total_orders + ' orders • Rs. ' + Number(customerLookupResult.stats.total_spent).toLocaleString() + ' spent'"></p>
                                 <template x-if="customerLookupResult.customer.address">
-                                    <p class="text-[10px] text-green-500 truncate" x-text="'📍 ' + customerLookupResult.customer.address"></p>
+                                    <p class="text-xs text-green-500 truncate" x-text="'📍 ' + customerLookupResult.customer.address"></p>
                                 </template>
                             </div>
                             <template x-if="customerLookupResult.stats.is_frequent"><span class="freq-badge">VIP</span></template>
@@ -1566,7 +1566,7 @@ window.addEventListener('popstate', function() {
                             <div class="text-left min-w-0">
                                 <p class="text-sm font-medium text-gray-900 dark:text-white truncate" x-text="c.name"></p>
                                 <p class="text-xs text-gray-400" x-text="c.phone || 'No phone'"></p>
-                                <template x-if="c.address"><p class="text-[10px] text-gray-400 truncate" x-text="'📍 ' + c.address"></p></template>
+                                <template x-if="c.address"><p class="text-xs text-gray-400 truncate" x-text="'📍 ' + c.address"></p></template>
                             </div>
                         </button>
                         <button @click="loadCustomerHistory(c.id)" class="flex-shrink-0 text-[9px] font-bold text-purple-600 hover:text-purple-800 bg-purple-50 dark:bg-purple-900/30 px-2 py-1 rounded-lg transition" title="View history">

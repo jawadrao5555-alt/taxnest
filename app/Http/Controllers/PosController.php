@@ -2784,7 +2784,7 @@ class PosController extends Controller
             $itemLines += max(1, (int) ceil($len / max(1, $charsPerLine)));
         }
 
-        $height  = 490.0;                                          // header + info + totals + footer chrome (+ header-field wrap headroom)
+        $height  = 520.0;                                          // header + info + totals + footer chrome (+ header-field wrap headroom + PAYMENT banner, Jul 2026)
         $height += ($company && $company->logo_path) ? 70.0 : 0.0; // logo block
         $height += $itemLines * $perLine;                          // item rows
         $height += ($transaction->discount_amount > 0) ? 26.0 : 0.0;

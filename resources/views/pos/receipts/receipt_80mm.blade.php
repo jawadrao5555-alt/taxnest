@@ -382,6 +382,18 @@
         </tr>
     </table>
 
+    @php
+        // ZFC feedback Jul 2026: delivery riders must see AT A GLANCE whether the
+        // bill is cash-to-collect or already paid by card/online — the small
+        // "Payment:" info line above wasn't readable enough. Boxed method under
+        // TOTAL. Stored card bucket = 'debit_card' (+aliases); QR = 'qr_payment'.
+        $rcptPayRaw = strtolower((string) $transaction->payment_method);
+        $rcptPayLabel = $rcptPayRaw === 'cash' ? 'CASH'
+            : (in_array($rcptPayRaw, ['card', 'debit_card', 'credit_card'], true) ? 'CARD'
+            : ($rcptPayRaw === 'qr_payment' ? 'ONLINE / QR' : strtoupper(str_replace('_', ' ', $rcptPayRaw))));
+    @endphp
+    <div style="border: 2px solid #000; text-align: center; font-weight: bold; font-size: 14px; letter-spacing: 2px; padding: 4px 2px; margin: 5px 0; color: #000;">PAYMENT: {{ $rcptPayLabel }}</div>
+
     <div class="separator"></div>
 
     @if($transaction->pra_status === 'submitted' && $transaction->pra_invoice_number)

@@ -40,8 +40,14 @@
         .flex { display: flex; justify-content: space-between; align-items: center; }
         .items-table { width: 100%; border-collapse: collapse; margin: 4px 0; }
         .items-table td { padding: 5px 2px; vertical-align: top; font-size: 14px; color: #000; }
-        .items-table .qty { width: 15%; font-weight: bold; font-size: 17px; text-align: center; color: #000; }
+        /* ZFC feedback Jul 2026: match the familiar "Item | Qty" slip layout —
+           name LEFT, qty RIGHT as a plain number under a ruled header row
+           (the old "x2" prefix on the left read as part of the item name). */
+        .items-table .qty { width: 15%; font-weight: bold; font-size: 17px; text-align: right; padding-right: 4px; color: #000; }
         .items-table .name { width: 85%; color: #000; font-weight: 600; }
+        .items-table tr.items-head { border-top: 2px solid #000; border-bottom: 2px solid #000; }
+        .items-table tr.items-head td { font-weight: bold; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; padding: 3px 2px; }
+        .items-table tr.items-head .qty { font-size: 12px; }
         /* Owner (Jul 2026): kitchen complained notes print too light/small — thermal
            printers render italic + small text thin. Big, upright, ultra-bold + a text
            stroke so cheap printers lay down more ink. */
@@ -173,15 +179,19 @@
                 <div class="station-item-count">{{ $items->count() }} item(s)</div>
             @endif
             <table class="items-table">
+                <tr class="items-head">
+                    <td class="name">Item</td>
+                    <td class="qty">Qty</td>
+                </tr>
                 @foreach($items as $item)
                 <tr>
-                    <td class="qty">x{{ number_format($item->quantity, $item->quantity == intval($item->quantity) ? 0 : 2) }}</td>
                     <td class="name">
                         <span class="bold">{{ $item->item_name }}</span>
                         @if($item->special_notes)
                             <br><span class="note">&raquo; NOTE: {{ $item->special_notes }}</span>
                         @endif
                     </td>
+                    <td class="qty">{{ number_format($item->quantity, $item->quantity == intval($item->quantity) ? 0 : 2) }}</td>
                 </tr>
                 @endforeach
             </table>

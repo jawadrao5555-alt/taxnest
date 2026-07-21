@@ -350,6 +350,16 @@
         </tr>
     </table>
 
+    @php
+        // ZFC feedback Jul 2026: riders must see AT A GLANCE cash vs card/online —
+        // boxed method under TOTAL (mirrors receipt_80mm; keep in sync).
+        $rcptPayRaw = strtolower((string) $transaction->payment_method);
+        $rcptPayLabel = $rcptPayRaw === 'cash' ? 'CASH'
+            : (in_array($rcptPayRaw, ['card', 'debit_card', 'credit_card'], true) ? 'CARD'
+            : ($rcptPayRaw === 'qr_payment' ? 'ONLINE / QR' : strtoupper(str_replace('_', ' ', $rcptPayRaw))));
+    @endphp
+    <div style="border: 2px solid #000; text-align: center; font-weight: bold; font-size: 12px; letter-spacing: 2px; padding: 3px 2px; margin: 4px 0; color: #000;">PAYMENT: {{ $rcptPayLabel }}</div>
+
     <div class="separator"></div>
 
     @if($transaction->pra_status === 'submitted' && $transaction->pra_invoice_number)

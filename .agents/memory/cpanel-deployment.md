@@ -54,5 +54,6 @@ Five files on live = FULL scp copies of workspace files (same content committed 
 - `resources/views/pos/restaurant/kitchen-ticket.blade.php` (KOT fixes: ADDED-ITEMS banner only on genuine additions, "Order by:", ticket-scoped item count + Total Qty, note prefix, Item|Qty header layout)
 - `app/Http/Controllers/PosController.php` (estimateReceiptHeightPt chrome 490→520pt for the PAYMENT banner)
 - (receipt_80mm/58mm re-scp'd with the boxed PAYMENT: CASH/CARD banner under TOTAL)
+- `resources/views/layouts/pos-app.blade.php` (What's New popup shows ALL unseen updates in one scrollable 62vh body)
 
-Before the NEXT `git pull` on live, restore them first (`git checkout -- resources/views/pos/universal.blade.php resources/views/pos/receipts/receipt_80mm.blade.php resources/views/pos/receipts/receipt_58mm.blade.php resources/views/pos/invoice-pdf.blade.php resources/views/pos/restaurant/kitchen-ticket.blade.php app/Http/Controllers/PosController.php` — safe, the commit carries the same fixes). Remove this note once deployed via git.
+Before the NEXT `git pull` on live, restore them first (`git checkout -- resources/views/pos/universal.blade.php resources/views/pos/receipts/receipt_80mm.blade.php resources/views/pos/receipts/receipt_58mm.blade.php resources/views/pos/invoice-pdf.blade.php resources/views/pos/restaurant/kitchen-ticket.blade.php app/Http/Controllers/PosController.php resources/views/layouts/pos-app.blade.php` — safe, the commit carries the same fixes). Remove this note once deployed via git.

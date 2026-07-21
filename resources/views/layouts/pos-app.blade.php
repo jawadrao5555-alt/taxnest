@@ -26,7 +26,7 @@
     // "What's New" app updates (popup + bell). Admin-controlled via SystemSetting
     // pos_whats_new_enabled. NEVER break POS pages if the table is missing on prod
     // (schema-drift self-heal convention) — fail silent.
-    $whatsNewList = collect(); $whatsNewUnseenCount = 0; $whatsNewPopup = null; $whatsNewSeenIds = [];
+    $whatsNewList = collect(); $whatsNewUnseenCount = 0; $whatsNewPopup = null; $whatsNewSeenIds = []; $whatsNewPopupList = collect();
     try {
         // ADMIN/MANAGER ONLY (owner rule, Jul 2026): "What's New" popup + bell must
         // NEVER show on cashier screens — updates are the admin/manager's job to
@@ -47,6 +47,9 @@
                 $whatsNewUnseen = $whatsNewList->reject(fn ($u) => in_array($u->id, $whatsNewSeenIds));
                 $whatsNewUnseenCount = $whatsNewUnseen->count();
                 $whatsNewPopup = $whatsNewUnseen->first();
+                // Owner (21 Jul 2026): popup shows ALL unseen updates stacked in one
+                // scrollable body (newest first) — not just the latest one.
+                $whatsNewPopupList = $whatsNewUnseen->values();
             }
         }
     } catch (\Throwable $e) { /* keep POS pages alive */ }
@@ -820,28 +823,39 @@
                  x-transition:enter-end="opacity-100 scale-100">
                 <div class="px-6 py-5 text-center" style="background: linear-gradient(135deg, hsl(var(--accent-h), var(--accent-s), 42%), hsl(var(--accent-h), var(--accent-s), 28%));">
                     <div class="text-4xl mb-1">🎉</div>
-                    <h2 class="text-xl font-extrabold text-white">Naya Update Aya Hai!</h2>
-                    <p class="text-[12px] text-white/80 mt-1">{{ $whatsNewPopup->title }} · {{ $whatsNewPopup->created_at->format('d M Y') }}</p>
+                    <h2 class="text-xl font-extrabold text-white">{{ $whatsNewUnseenCount > 1 ? $whatsNewUnseenCount . ' Naye Updates Aye Hain!' : 'Naya Update Aya Hai!' }}</h2>
+                    @if($whatsNewUnseenCount === 1)
+                        <p class="text-[12px] text-white/80 mt-1">{{ $whatsNewPopup->title }} · {{ $whatsNewPopup->created_at->format('d M Y') }}</p>
+                    @else
+                        <p class="text-[12px] text-white/80 mt-1">Neeche scroll kar ke sab dekhein</p>
+                    @endif
                 </div>
-                <div class="px-6 py-5 overflow-y-auto" style="max-height: {{ ($whatsNewPopup->image_path ?? null) ? '62vh' : '18rem' }};">
-                    @if($whatsNewPopup->image_path ?? null)
-                        <img src="{{ asset('storage/' . $whatsNewPopup->image_path) }}" alt="Update image" loading="lazy"
-                             class="w-full rounded-xl border border-gray-200 dark:border-gray-700 mb-4 cursor-zoom-in"
-                             onclick="window.open(this.src, '_blank')">
-                    @endif
-                    <ul class="space-y-2.5">
-                        @foreach(($whatsNewPopup->points ?? []) as $wnpt)
-                            <li class="flex items-start gap-2.5 text-sm text-gray-700 dark:text-gray-200">
-                                <span class="flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center mt-0.5">
-                                    <svg class="w-3 h-3 text-purple-600 dark:text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                                </span>
-                                <span>{{ $wnpt }}</span>
-                            </li>
-                        @endforeach
-                    </ul>
-                    @if($whatsNewUnseenCount > 1)
-                        <p class="mt-3 text-[11px] text-gray-400">+ {{ $whatsNewUnseenCount - 1 }} aur update — bell 🔔 icon mein poori history dekhein</p>
-                    @endif
+                {{-- Owner (21 Jul 2026): ALL unseen updates stacked (newest first) in one
+                     scrollable body — pehle sirf latest dikhta tha. Inline max-height
+                     (arbitrary Tailwind classes need a Vite rebuild). --}}
+                <div class="px-6 py-5 overflow-y-auto" style="max-height: 62vh;">
+                    @foreach($whatsNewPopupList as $wnp)
+                    <div class="{{ $loop->first ? '' : 'mt-5 pt-4 border-t border-gray-200 dark:border-gray-700' }}">
+                        @if($whatsNewUnseenCount > 1)
+                            <p class="text-sm font-extrabold text-gray-900 dark:text-white mb-2">{{ $wnp->title }} <span class="font-normal text-[11px] text-gray-400">· {{ $wnp->created_at->format('d M Y') }}</span></p>
+                        @endif
+                        @if($wnp->image_path ?? null)
+                            <img src="{{ asset('storage/' . $wnp->image_path) }}" alt="Update image" loading="lazy"
+                                 class="w-full rounded-xl border border-gray-200 dark:border-gray-700 mb-4 cursor-zoom-in"
+                                 onclick="window.open(this.src, '_blank')">
+                        @endif
+                        <ul class="space-y-2.5">
+                            @foreach(($wnp->points ?? []) as $wnpt)
+                                <li class="flex items-start gap-2.5 text-sm text-gray-700 dark:text-gray-200">
+                                    <span class="flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center mt-0.5">
+                                        <svg class="w-3 h-3 text-purple-600 dark:text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                    </span>
+                                    <span>{{ $wnpt }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                    @endforeach
                 </div>
                 <div class="px-6 pb-5">
                     <button @click="wnDismiss()" x-ref="wnBtn" x-init="$nextTick(() => $refs.wnBtn.focus())"

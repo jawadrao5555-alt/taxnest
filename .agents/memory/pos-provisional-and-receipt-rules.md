@@ -73,6 +73,19 @@ reporting OFF — bill sat in the fail-queue forever). When auditing, grep every
 Historic prod rows from before these fixes are NOT backfilled (local/'local' finals are
 indistinguishable from deliberate provisionals).
 
+# Receipt PROVISIONAL badge = invoice_mode 'local' ONLY (client bug, Jul 2026)
+
+The receipt templates' non-fiscal fallback branch (not submitted, not offline) must NOT
+unconditionally print "PROVISIONAL BILL" — reporting-OFF finals ('pra'+NULL) land there too and
+they are REAL completed sales. A ZFC client paid-as-final and the slip still said PROVISIONAL.
+
+**How to apply:** in receipt_80mm, receipt_58mm, invoice-pdf the @else branch computes
+`$rcptIsProvisional = ($transaction->invoice_mode ?? 'pra') === 'local'` — true → PROVISIONAL BILL
+(dashed box), false → neutral "SALE RECEIPT" box + invoice number (QR payload 'type' follows the
+same ternary). pending/failed fiscal bills also read SALE RECEIPT (acceptable — they are finals).
+Fiscal + offline branches untouched. Any new receipt surface must use the same invoice_mode test,
+never "not fiscal ⇒ provisional".
+
 # Per-type receipt display sets — PRA vs Local (owner, Jul 2026)
 
 PRA and Local receipts each carry a FULL independent display set (address, NTN, email, mobile,

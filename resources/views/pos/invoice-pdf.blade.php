@@ -280,8 +280,13 @@
         </div>
         @else
         @php
+            // Reporting-OFF FINALS vs provisionals (client report Jul 2026 — ZFC):
+            // finals with PRA reporting OFF are invoice_mode 'pra' + NULL pra_status —
+            // they are REAL completed sales, NOT provisionals. Only deliberate
+            // provisionals (invoice_mode 'local') may carry the PROVISIONAL badge.
+            $rcptIsProvisional = ($transaction->invoice_mode ?? 'pra') === 'local';
             $qrData = json_encode([
-                'type' => 'Provisional Bill',
+                'type' => $rcptIsProvisional ? 'Provisional Bill' : 'Sale Receipt',
                 'inv' => $transaction->invoice_number,
                 'date' => $transaction->created_at->format('d/m/Y H:i'),
                 'total' => number_format($transaction->total_amount, 2),
@@ -289,11 +294,18 @@
             ]);
             $qrUrl = \App\Support\QrImage::dataUri($qrData);
         @endphp
+        @if($rcptIsProvisional)
         <div class="local-box" style="border: 1.5px dashed #7c3aed; color: #5b21b6;">
             <strong style="font-size: 12px;">PROVISIONAL BILL</strong><br>
             {{ $transaction->invoice_number }}<br>
             <span style="font-size: 9px;">This is a provisional bill for your reference</span>
         </div>
+        @else
+        <div class="local-box" style="border: 1.5px solid #374151; color: #111827;">
+            <strong style="font-size: 12px;">SALE RECEIPT</strong><br>
+            {{ $transaction->invoice_number }}
+        </div>
+        @endif
         @if($qrUrl)
         <div class="qr-section" style="text-align: center; margin: 8px 0;">
             <img src="{{ $qrUrl }}" alt="Invoice QR" style="width: 120px; height: 120px; margin: 0 auto;">

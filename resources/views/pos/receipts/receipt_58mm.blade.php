@@ -9,11 +9,13 @@
             size: 58mm auto;
             margin: 0;
         }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-style: normal !important; }
         /* FONT SIMPLIFICATION (customer feedback Jul 2026): plain drafting —
            no italics, bold ONLY on business name / invoice numbers / grand total.
            Tighter spacing so the slip prints shorter; 58mm sizes already minimal
-           so only weights and margins are trimmed here. */
+           so only weights and margins are trimmed here.
+           font-style hardening (ZFC Jul 2026): some printer drivers substitute an
+           oblique face when Arial is missing — force upright on EVERY element. */
         body {
             font-family: Arial, 'Helvetica Neue', Helvetica, 'Segoe UI', sans-serif;
             font-size: 10px;
@@ -370,6 +372,11 @@
     <div class="local-badge">OFFLINE - Will sync to PRA</div>
     @else
     @php
+        // Reporting-OFF FINALS vs provisionals (client report Jul 2026 — ZFC):
+        // finals with PRA reporting OFF are invoice_mode 'pra' + NULL pra_status —
+        // they are REAL completed sales, NOT provisionals. Only deliberate
+        // provisionals (invoice_mode 'local') may carry the PROVISIONAL badge.
+        $rcptIsProvisional = ($transaction->invoice_mode ?? 'pra') === 'local';
         // F8: local/provisional receipts carry the PUBLIC profile QR when the
         // company enabled its public page (PRA fiscal branch above is untouched).
         $publicUrl = \App\Http\Controllers\PublicProfileController::publicUrlFor($transaction->company);
@@ -378,7 +385,7 @@
             $qrCaption = 'Scan for menu & info';
         } else {
             $qrData = json_encode([
-                'type' => 'Provisional Bill',
+                'type' => $rcptIsProvisional ? 'Provisional Bill' : 'Sale Receipt',
                 'inv' => $transaction->invoice_number,
                 'date' => $transaction->created_at->format('d/m/Y H:i'),
                 'total' => number_format($transaction->total_amount, 2),
@@ -388,10 +395,17 @@
             $qrCaption = 'Scan for details';
         }
     @endphp
+    @if($rcptIsProvisional)
     <div class="local-badge" style="border: 1.5px dashed #000; color: #000; padding: 5px;">
         <strong style="font-size: 10px; color: #000;">PROVISIONAL BILL</strong><br>
         <span style="font-size: 9px; font-weight: bold;">{{ $transaction->invoice_number }}</span>
     </div>
+    @else
+    <div class="local-badge" style="border: 1.5px solid #000; color: #000; padding: 5px;">
+        <strong style="font-size: 10px; color: #000;">SALE RECEIPT</strong><br>
+        <span style="font-size: 9px; font-weight: bold;">{{ $transaction->invoice_number }}</span>
+    </div>
+    @endif
     @if($qrUrl)
     <div class="qr-code">
         <img src="{{ $qrUrl }}" alt="Invoice QR" style="width: 80px; height: 80px; margin: 3px auto;">

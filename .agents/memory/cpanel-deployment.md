@@ -47,5 +47,9 @@ See `prod-scheduled-jobs-cron.md` for why this is mandatory.
 - **Give ONE `&&`-chained one-liner that STARTS with `cd /home/taxnestc/public_html`, never a multi-line block.** A multi-line paste can run the `artisan` lines from the home dir (the `cd` line gets separated / pasted out of order) → every artisan call prints `Could not open input file: artisan` while git pull/migrate silently never happen. The single cd-prefixed one-liner guarantees cwd.
 - **OPcache reset from SSH needs NO browser:** `curl -s https://taxnest.com.pk/r.php` IS a real web (PHP-FPM) hit, so it resets the web OPcache just like opening it in a browser. Bake it into the one-liner: `... && echo '<?php opcache_reset(); ?>' > public/r.php && curl -s https://taxnest.com.pk/r.php ; rm -f public/r.php ; echo DONE` (use `;` before rm so r.php is always cleaned up even if curl fails).
 
-## PENDING live local edit (21 Jul 2026)
-- `resources/views/pos/universal.blade.php` on live = FULL scp copy of the workspace file (search-suggestion `block leading-snug` fix + address-picker font bumps text-[9px]/[10px]→text-xs/text-sm). Same content committed in workspace at checkpoint. Before the NEXT `git pull` on live, restore the file first (`git checkout -- resources/views/pos/universal.blade.php` on live — safe, the commit carries the same fixes). Remove this note once deployed via git.
+## PENDING live local edits (21 Jul 2026)
+Four files on live = FULL scp copies of workspace files (same content committed in workspace at checkpoint):
+- `resources/views/pos/universal.blade.php` (search-suggestion `block leading-snug` fix + address-picker font bumps text-[9px]/[10px]→text-xs/text-sm)
+- `resources/views/pos/receipts/receipt_80mm.blade.php`, `receipt_58mm.blade.php`, `resources/views/pos/invoice-pdf.blade.php` (provisional-badge three-branch fix: SALE RECEIPT for non-local finals + `font-style: normal !important` hardening on thermal)
+
+Before the NEXT `git pull` on live, restore them first (`git checkout -- resources/views/pos/universal.blade.php resources/views/pos/receipts/receipt_80mm.blade.php resources/views/pos/receipts/receipt_58mm.blade.php resources/views/pos/invoice-pdf.blade.php` — safe, the commit carries the same fixes). Remove this note once deployed via git.

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class AppUpdate extends Model
 {
     protected $fillable = [
-        'title', 'points', 'audience', 'is_published', 'created_by',
+        'title', 'points', 'image_path', 'audience', 'is_published', 'created_by',
     ];
 
     protected $casts = [

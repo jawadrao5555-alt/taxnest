@@ -156,3 +156,15 @@ id = "IXPdXaNUA0nKTajnki41O"
 uri = "file://exports/nestpos_video_series_scripts.txt"
 type = "text"
 title = "NestPOS Tutorial Video Series — 5 Scripts"
+
+[[outputs]]
+id = "mmIT-Sm7j-2I_Ghhtpf6o"
+uri = "file://screenshots/whats-new-popup-preview.jpg"
+type = "image"
+title = "Notification Popup Preview (image ke saath)"
+
+[[outputs]]
+id = "CQr3DSMa1lYct3CXp8Fne"
+uri = "file://screenshots/printer-settings.jpg"
+type = "image"
+title = "Printer Settings Screenshot (jo notification mein lagi hai)"

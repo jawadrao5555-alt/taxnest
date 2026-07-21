@@ -445,6 +445,11 @@
                                                 @endif
                                             </div>
                                             <p class="text-[10px] text-gray-400 mt-0.5">{{ $wnu->created_at->format('d M Y') }}</p>
+                                            @if($wnu->image_path ?? null)
+                                                <img src="{{ asset('storage/' . $wnu->image_path) }}" alt="Update image" loading="lazy"
+                                                     class="w-full rounded-lg border border-gray-200 dark:border-gray-700 mt-1.5 cursor-zoom-in"
+                                                     onclick="window.open(this.src, '_blank')">
+                                            @endif
                                             <ul class="mt-1.5 space-y-1">
                                                 @foreach(($wnu->points ?? []) as $wnp)
                                                     <li class="flex items-start gap-1.5 text-[12px] text-gray-600 dark:text-gray-300">
@@ -818,7 +823,12 @@
                     <h2 class="text-xl font-extrabold text-white">Naya Update Aya Hai!</h2>
                     <p class="text-[12px] text-white/80 mt-1">{{ $whatsNewPopup->title }} · {{ $whatsNewPopup->created_at->format('d M Y') }}</p>
                 </div>
-                <div class="px-6 py-5 max-h-72 overflow-y-auto">
+                <div class="px-6 py-5 overflow-y-auto" style="max-height: {{ ($whatsNewPopup->image_path ?? null) ? '62vh' : '18rem' }};">
+                    @if($whatsNewPopup->image_path ?? null)
+                        <img src="{{ asset('storage/' . $whatsNewPopup->image_path) }}" alt="Update image" loading="lazy"
+                             class="w-full rounded-xl border border-gray-200 dark:border-gray-700 mb-4 cursor-zoom-in"
+                             onclick="window.open(this.src, '_blank')">
+                    @endif
                     <ul class="space-y-2.5">
                         @foreach(($whatsNewPopup->points ?? []) as $wnpt)
                             <li class="flex items-start gap-2.5 text-sm text-gray-700 dark:text-gray-200">

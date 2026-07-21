@@ -103,7 +103,7 @@
                                     <td class="px-4 py-3">
                                         <div class="flex items-center gap-1.5 flex-wrap">
                                             <button type="button"
-                                                onclick='openEditModal(@json($upd->id), @json($upd->title), @json(implode("\n", $upd->points ?? [])))'
+                                                onclick='openEditModal(@json($upd->id), @json($upd->title), @json(implode("\n", $upd->points ?? [])), @json($upd->image_path ? asset("storage/" . $upd->image_path) : null))'
                                                 class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200">Edit</button>
                                             <form method="POST" action="/admin/app-updates/{{ $upd->id }}/toggle" class="inline">
                                                 @csrf
@@ -147,7 +147,7 @@
                 <h3 class="font-bold text-gray-800 dark:text-gray-100">New POS Update</h3>
                 <button onclick="document.getElementById('addUpdateModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
             </div>
-            <form method="POST" action="/admin/app-updates" class="px-6 py-5 space-y-4">
+            <form method="POST" action="/admin/app-updates" enctype="multipart/form-data" class="px-6 py-5 space-y-4">
                 @csrf
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
@@ -156,6 +156,11 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Feature points <span class="text-gray-400 font-normal">(one per line, max 15)</span></label>
                     <textarea name="points_text" required rows="6" maxlength="3000" placeholder="Excel import mein Tax Exempt column aya&#10;Bulk price update ka option aya&#10;Receipt printing behtar hui" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Image <span class="text-gray-400 font-normal">(optional — screenshot/banner, JPG/PNG/WebP, max 3MB)</span></label>
+                    <input type="file" name="image" accept="image/jpeg,image/png,image/webp" class="w-full text-sm text-gray-600 dark:text-gray-300 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-emerald-50 file:text-emerald-700 file:text-sm file:font-medium">
+                    <p class="mt-1 text-[11px] text-gray-400">Popup mein points ke upar dikhegi. Landscape screenshot best rehta hai.</p>
                 </div>
                 <div class="flex items-center gap-2">
                     <input type="checkbox" name="is_published" value="1" checked id="pubNew" class="rounded border-gray-300 text-emerald-600">
@@ -176,7 +181,7 @@
                 <h3 class="font-bold text-gray-800 dark:text-gray-100">Edit Update</h3>
                 <button onclick="document.getElementById('editUpdateModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
             </div>
-            <form method="POST" id="editUpdateForm" action="" class="px-6 py-5 space-y-4">
+            <form method="POST" id="editUpdateForm" action="" enctype="multipart/form-data" class="px-6 py-5 space-y-4">
                 @csrf
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
@@ -185,6 +190,17 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Feature points <span class="text-gray-400 font-normal">(one per line, max 15)</span></label>
                     <textarea name="points_text" id="editPoints" required rows="6" maxlength="3000" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Image <span class="text-gray-400 font-normal">(optional — JPG/PNG/WebP, max 3MB)</span></label>
+                    <div id="editCurrentImageWrap" class="hidden mb-2">
+                        <img id="editCurrentImage" src="" alt="Current image" class="max-h-32 rounded-lg border border-gray-200 dark:border-gray-600">
+                        <label class="mt-1.5 flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                            <input type="checkbox" name="remove_image" value="1" class="rounded border-gray-300 text-red-600"> Remove current image
+                        </label>
+                    </div>
+                    <input type="file" name="image" accept="image/jpeg,image/png,image/webp" class="w-full text-sm text-gray-600 dark:text-gray-300 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-emerald-50 file:text-emerald-700 file:text-sm file:font-medium">
+                    <p class="mt-1 text-[11px] text-gray-400">Nayi image upload karne se purani replace ho jayegi.</p>
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" onclick="document.getElementById('editUpdateModal').classList.add('hidden')" class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">Cancel</button>
@@ -195,10 +211,21 @@
     </div>
 
     <script>
-        function openEditModal(id, title, pointsText) {
+        function openEditModal(id, title, pointsText, imageUrl) {
             document.getElementById('editUpdateForm').action = '/admin/app-updates/' + id + '/update';
             document.getElementById('editTitle').value = title;
             document.getElementById('editPoints').value = pointsText;
+            var wrap = document.getElementById('editCurrentImageWrap');
+            var img = document.getElementById('editCurrentImage');
+            if (imageUrl) {
+                img.src = imageUrl;
+                wrap.classList.remove('hidden');
+            } else {
+                img.src = '';
+                wrap.classList.add('hidden');
+            }
+            var rm = document.querySelector('#editUpdateForm input[name="remove_image"]');
+            if (rm) rm.checked = false;
             document.getElementById('editUpdateModal').classList.remove('hidden');
         }
     </script>

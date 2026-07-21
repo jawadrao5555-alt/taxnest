@@ -56,6 +56,7 @@ class AppUpdateController extends Controller
         $request->validate([
             'title' => 'required|string|max:150',
             'points_text' => 'required|string|max:3000',
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
         ]);
 
         $points = $this->parsePoints($request->points_text);
@@ -66,6 +67,7 @@ class AppUpdateController extends Controller
         AppUpdate::create([
             'title' => $request->title,
             'points' => $points,
+            'image_path' => $this->storeImage($request),
             'audience' => 'pos',
             'is_published' => $request->boolean('is_published', true),
             'created_by' => auth()->id(),
@@ -81,6 +83,7 @@ class AppUpdateController extends Controller
         $request->validate([
             'title' => 'required|string|max:150',
             'points_text' => 'required|string|max:3000',
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
         ]);
 
         $points = $this->parsePoints($request->points_text);
@@ -88,10 +91,20 @@ class AppUpdateController extends Controller
             return redirect('/admin/app-updates')->with('error', 'At least one feature point is required.');
         }
 
-        $appUpdate->update([
+        $data = [
             'title' => $request->title,
             'points' => $points,
-        ]);
+        ];
+
+        if ($request->boolean('remove_image')) {
+            $this->deleteImage($appUpdate->image_path);
+            $data['image_path'] = null;
+        } elseif ($request->hasFile('image')) {
+            $this->deleteImage($appUpdate->image_path);
+            $data['image_path'] = $this->storeImage($request);
+        }
+
+        $appUpdate->update($data);
 
         return redirect('/admin/app-updates')->with('success', 'Update saved.');
     }
@@ -108,9 +121,32 @@ class AppUpdateController extends Controller
     {
         $appUpdate = AppUpdate::findOrFail($id);
         AppUpdateSeen::where('app_update_id', $appUpdate->id)->delete();
+        $this->deleteImage($appUpdate->image_path);
         $appUpdate->delete();
 
         return redirect('/admin/app-updates')->with('success', 'Update deleted.');
+    }
+
+    /**
+     * Store the uploaded notification image on the public disk.
+     * Returns the relative path (e.g. app-updates/xyz.png) or null.
+     */
+    private function storeImage(Request $request): ?string
+    {
+        if (!$request->hasFile('image')) {
+            return null;
+        }
+        $name = time() . '_' . uniqid() . '.' . $request->file('image')->extension();
+        $request->file('image')->storeAs('app-updates', $name, 'public');
+
+        return 'app-updates/' . $name;
+    }
+
+    private function deleteImage(?string $path): void
+    {
+        if ($path && \Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($path);
+        }
     }
 
     public function toggleFeature()

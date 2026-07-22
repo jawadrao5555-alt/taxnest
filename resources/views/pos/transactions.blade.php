@@ -1,5 +1,6 @@
 <x-pos-layout>
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    @include('pos.partials.back-link')
     @php
         $__company = \App\Models\Company::find(app('currentCompanyId'));
         $__agentEnabled = $__company && $__company->agent_enabled;

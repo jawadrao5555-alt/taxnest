@@ -1,5 +1,6 @@
 <x-pos-layout>
 <div class="max-w-7xl mx-auto">
+    @include('pos.partials.back-link')
     <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Day Close Report (Z-Report)</h1>

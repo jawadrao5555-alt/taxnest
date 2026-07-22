@@ -1,5 +1,6 @@
 <x-pos-layout>
 <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    @include('pos.partials.back-link')
 
     <div class="mb-5">
         <h1 class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">

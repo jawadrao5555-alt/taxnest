@@ -84,6 +84,25 @@ class AppServiceProvider extends ServiceProvider
 
         Event::listen(Login::class, function (Login $event) {
             SecurityLogService::log('login', $event->user->id);
+
+            // Last-login stamp for company users (web/pos/fbrpos guards).
+            // SKIP when a SaaS admin session is active in the same browser —
+            // that is the impersonation ("View as Company") flow, which calls
+            // auth($guard)->login() and must never look like a real customer
+            // login. AdminUser logins are excluded by the instanceof check.
+            // Direct DB update: no model events, no updated_at churn.
+            try {
+                if ($event->user instanceof \App\Models\User
+                    && !\Illuminate\Support\Facades\Auth::guard('admin')->check()) {
+                    DB::table('users')->where('id', $event->user->id)->update([
+                        'last_login_at' => now(),
+                        'last_login_ip' => request()->ip(),
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                // Column not migrated yet or DB hiccup — never block a login.
+                Log::warning('last_login stamp failed: ' . $e->getMessage());
+            }
         });
 
         if (app()->environment('production')) {

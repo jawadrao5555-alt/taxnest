@@ -263,7 +263,13 @@ class AdminCompanyController extends Controller
         // Main login account for the "Login Credentials" card (password reset).
         $companyAdmin = $this->findCompanyAdmin($id);
 
-        return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers', 'localViewers', 'companyAdmin'));
+        // Team & Last Logins card: every login (DI/POS/FBR POS guards) stamps
+        // users.last_login_at via the Login event listener in AppServiceProvider.
+        $teamUsers = User::where('company_id', $id)
+            ->orderByRaw('last_login_at IS NULL, last_login_at DESC')
+            ->get(['id', 'name', 'email', 'role', 'pos_role', 'last_login_at', 'last_login_ip']);
+
+        return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers', 'localViewers', 'companyAdmin', 'teamUsers'));
     }
 
     /**

@@ -234,6 +234,47 @@
     </div>
     @endif
 
+    {{-- Team & Last Logins: stamped on every successful login (all panels). --}}
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6">
+        <h3 class="text-sm font-semibold text-white mb-3">Team &amp; Last Logins</h3>
+        @if(($teamUsers ?? collect())->isEmpty())
+        <p class="text-xs text-gray-500">No user accounts for this company.</p>
+        @else
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-xs text-gray-500 border-b border-gray-800">
+                        <th class="py-2 pr-4 font-medium">User</th>
+                        <th class="py-2 pr-4 font-medium">Role</th>
+                        <th class="py-2 pr-4 font-medium">Last Login</th>
+                        <th class="py-2 font-medium">IP</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($teamUsers as $tu)
+                    <tr class="border-b border-gray-800/60">
+                        <td class="py-2 pr-4">
+                            <span class="text-white font-medium">{{ $tu->name }}</span>
+                            <span class="block text-xs text-gray-500">{{ $tu->email }}</span>
+                        </td>
+                        <td class="py-2 pr-4 text-gray-300">{{ ucwords(str_replace('_', ' ', $tu->pos_role ?: ($tu->role ?? '—'))) }}</td>
+                        <td class="py-2 pr-4">
+                            @if($tu->last_login_at)
+                            <span class="text-emerald-400">{{ \Carbon\Carbon::parse($tu->last_login_at)->format('d M Y, h:i A') }}</span>
+                            <span class="block text-xs text-gray-500">{{ \Carbon\Carbon::parse($tu->last_login_at)->diffForHumans() }}</span>
+                            @else
+                            <span class="text-gray-500">Never (not tracked before this feature)</span>
+                            @endif
+                        </td>
+                        <td class="py-2 text-gray-400 text-xs font-mono">{{ $tu->last_login_ip ?? '—' }}</td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+        @endif
+    </div>
+
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-white mb-3">Usage & Revenue</h3>

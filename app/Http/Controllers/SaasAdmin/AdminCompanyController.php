@@ -814,6 +814,7 @@ class AdminCompanyController extends Controller
             'fbr_pos_loyalty_ledger', 'fbr_pos_loyalty_settings',
             'fbr_pos_promotions', 'fbr_pos_shifts', 'fbr_pos_terminals',
             'push_subscriptions', 'payment_proofs', 'feature_suggestions',
+            'madadgar_messages',
         ];
         DB::transaction(function () use ($orphanTables, $id, $company) {
             // pos_deal_items hangs off pos_deals (deal_id, no company_id) — purge

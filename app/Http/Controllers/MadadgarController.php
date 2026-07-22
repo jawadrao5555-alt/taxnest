@@ -67,7 +67,7 @@ class MadadgarController extends Controller
             return response()->json(['error' => 'Aaj ke sawalat ki limit poori ho gayi — kal dobara pooch sakte hain, ya WhatsApp par rabta karein.'], 429);
         }
 
-        MadadgarMessage::create([
+        $userRow = MadadgarMessage::create([
             'company_id' => $user->company_id,
             'user_id' => $user->id,
             'session_id' => $sessionId,
@@ -89,6 +89,9 @@ class MadadgarController extends Controller
         try {
             $result = MadadgarService::chat($history);
         } catch (\Throwable $e) {
+            // Failed turn must not eat the daily cap or leave a reply-less row.
+            $userRow->delete();
+
             return response()->json(['error' => 'Maazrat, is waqt jawab nahi mil saka — thori der baad koshish karein ya WhatsApp par rabta karein.'], 502);
         }
 
@@ -110,6 +113,10 @@ class MadadgarController extends Controller
     public function escalate(Request $request)
     {
         $user = auth('pos')->user();
+
+        if (!MadadgarService::enabled()) {
+            return response()->json(['error' => 'Madadgar abhi dastyab nahi — WhatsApp par rabta karein.'], 503);
+        }
 
         $request->validate([
             'title' => 'required|string|max:150',

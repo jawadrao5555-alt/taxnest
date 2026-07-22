@@ -10,6 +10,7 @@ Restaurant screen retired: `RestaurantPosController::pos()` early-redirects to `
 ## Screen & search features
 - **Screen Fit**: root binds `:style="fitStyleStr"` — CSS zoom + px-height compensation (auto by viewport; manual 80–125% via action-bar "Fit" dropdown; localStorage `tn_screen_fit`).
 - Barcode/SKU exact-match search with fast-path add; scans stay GLOBAL (never category-narrowed).
+- FIRST-LETTER PRIORITY ranking (customer suggestion, Jul 2026): name-prefix matches rank ABOVE mid-word matches in BOTH matchers (grid `filterProducts` stable sort + dropdown `onSearchInput` pref/other buckets, loop stops only at 12 PREFIX hits) — mid-word matches stay listed below, exact barcode/SKU still jumps to top (scanner sort runs AFTER the bucketing). Mirrored in FBR universal port — any change to one matcher must hit all FOUR spots (2 files × grid+dropdown).
 - Category dropdown next to search (optional, default All — same `activeCategory` as pills, always visible ≥sm; search/grid narrow to it; quick-create has exact-name duplicate guard; grid-OFF toggle resets to All).
 - Customer phone filters-as-you-type; per-item NO TAX/TAX toggle; Quick Type manual entry (inventory-OFF).
 - Order-type widget renders only when a restaurant-ish feature is on.

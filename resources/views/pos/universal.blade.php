@@ -3121,16 +3121,24 @@ function restaurantPos() {
                     else if (this.activeCategory === 'deals') all = [...this.allDeals];
                     else if (this.activeCategory !== 'all') all = this.allProducts.filter(p => p.category === this.activeCategory);
                     else all = [...this.allDeals, ...this.allProducts, ...this.allServices];
-                    const out = [];
-                    for (let i = 0; i < all.length && out.length < 12; i++) {
+                    // FIRST-LETTER PRIORITY (customer suggestion, 21 Jul 2026): names that
+                    // START with the typed text rank above mid-word matches. Two buckets —
+                    // the scan can't stop at 12 total hits, because a LATER prefix match must
+                    // still outrank an EARLIER mid-word one; stop only once 12 prefix hits exist.
+                    const pref = [], other = [];
+                    for (let i = 0; i < all.length && pref.length < 12; i++) {
                         const it = all[i];
                         if (!it.name || !(parseFloat(it.price) > 0)) continue;
                         // Match by NAME, BARCODE or SKU — scanners type the barcode digits,
                         // which never match a product name; without this, every scan "fails".
                         if (it.name.toLowerCase().includes(q)
                             || (it.barcode && String(it.barcode).toLowerCase().includes(q))
-                            || (it.sku && String(it.sku).toLowerCase().includes(q))) out.push(it);
+                            || (it.sku && String(it.sku).toLowerCase().includes(q))) {
+                            if (it.name.toLowerCase().startsWith(q)) pref.push(it);
+                            else if (other.length < 12) other.push(it);
+                        }
                     }
+                    const out = [...pref, ...other].slice(0, 12);
                     // SCANNER SAFETY: an exact barcode/SKU match from ANY category still
                     // surfaces while a category filter is active — a scan must never "fail"
                     // just because the dropdown was left on some other category.
@@ -3251,6 +3259,9 @@ function restaurantPos() {
                 items = items.filter(i => i.name.toLowerCase().includes(q)
                     || (i.barcode && String(i.barcode).toLowerCase().includes(q))
                     || (i.sku && String(i.sku).toLowerCase().includes(q)));
+                // FIRST-LETTER PRIORITY (customer suggestion, 21 Jul 2026): prefix matches
+                // float to the top; stable sort keeps the original order within each group.
+                items.sort((a, b) => (b.name.toLowerCase().startsWith(q) ? 1 : 0) - (a.name.toLowerCase().startsWith(q) ? 1 : 0));
             }
             this.filteredItems = items;
             this.displayCount = 60;

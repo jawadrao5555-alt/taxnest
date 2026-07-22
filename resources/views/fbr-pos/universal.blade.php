@@ -2563,12 +2563,18 @@ function restaurantPos() {
                     if (this.activeCategory === 'services') all = [...this.allServices];
                     else if (this.activeCategory !== 'all') all = this.allProducts.filter(p => p.category === this.activeCategory);
                     else all = [...this.allProducts, ...this.allServices];
-                    const out = [];
-                    for (let i = 0; i < all.length && out.length < 12; i++) {
+                    // FIRST-LETTER PRIORITY (mirrors PRA universal, 22 Jul 2026): prefix
+                    // matches rank above mid-word matches; scan stops only at 12 prefix hits.
+                    const pref = [], other = [];
+                    for (let i = 0; i < all.length && pref.length < 12; i++) {
                         const it = all[i];
                         if (!it.name || !(parseFloat(it.price) > 0)) continue;
-                        if (it.name.toLowerCase().includes(q)) out.push(it);
+                        if (it.name.toLowerCase().includes(q)) {
+                            if (it.name.toLowerCase().startsWith(q)) pref.push(it);
+                            else if (other.length < 12) other.push(it);
+                        }
                     }
+                    const out = [...pref, ...other].slice(0, 12);
                     this.searchSuggestions = out;
                     this.highlightIndex = 0;
                     this.showSearchDropdown = true;
@@ -2651,7 +2657,12 @@ function restaurantPos() {
             // Hidden products stay OUT of the browsable grid (when NOT searching) but remain fully
             // searchable above — so only drop show_on_sale=false items when there is no search.
             if (!hasSearch) { items = items.filter(i => i.show_on_sale !== false); }
-            if (this.searchQuery) { const q = this.searchQuery.toLowerCase(); items = items.filter(i => i.name.toLowerCase().includes(q)); }
+            if (this.searchQuery) {
+                const q = this.searchQuery.toLowerCase();
+                items = items.filter(i => i.name.toLowerCase().includes(q));
+                // FIRST-LETTER PRIORITY (mirrors PRA universal, 22 Jul 2026): prefix matches first.
+                items.sort((a, b) => (b.name.toLowerCase().startsWith(q) ? 1 : 0) - (a.name.toLowerCase().startsWith(q) ? 1 : 0));
+            }
             this.filteredItems = items;
             this.displayCount = 60;
             this.updateDisplayItems();

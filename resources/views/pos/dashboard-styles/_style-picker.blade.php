@@ -1,4 +1,7 @@
-<div class="flex items-center gap-3 flex-shrink-0" x-data="{ styleOpen: false, currentStyle: '{{ $dashboardStyle ?? 'default' }}' }">
+{{-- Owner (22 Jul 2026): the dashboard style DROPDOWN was removed — style choice now
+     lives ONLY in Customize POS → "POS Ka Style" (#style). This partial keeps the PRA
+     toggle + a plain admin-only link to that section. Do NOT re-add the dropdown here. --}}
+<div class="flex items-center gap-3 flex-shrink-0">
     @if(($company->pos_integration_mode ?? 'pra') === 'standalone')
     {{-- Standalone (no-integration) edition: no PRA toggle, no nag — just a calm badge. --}}
     <div class="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 shadow-md" title="Standalone POS — no government integration">
@@ -30,44 +33,9 @@
         <span x-text="praEnabled ? 'ON' : 'OFF'" :class="praEnabled ? 'text-purple-700 font-black' : 'text-gray-600 font-extrabold'" class="text-xs"></span>
     </div>
     @endif
-    <div class="relative">
-        <button @click.stop="styleOpen = !styleOpen" class="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white hover:text-purple-600 dark:hover:text-purple-400 transition shadow-md" title="Dashboard Style">
-            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
-        </button>
-        <template x-teleport="body">
-        <div x-show="styleOpen" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0 scale-95" @click.away="styleOpen = false" @keydown.escape.window="styleOpen = false" class="fixed top-20 right-6 w-80 rounded-2xl shadow-2xl border border-gray-300 dark:border-gray-600 p-4" style="background-color: #ffffff; z-index: 9999;" :style="document.documentElement.classList.contains('dark') ? 'background-color: #111827; z-index: 9999;' : 'background-color: #ffffff; z-index: 9999;'" x-cloak>
-            <p class="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider mb-3 px-1">Dashboard Design</p>
-            <div class="space-y-1.5">
-                @php
-                $styles = [
-                    ['id' => 'saaf', 'name' => 'Saaf — Simple', 'desc' => 'Aasaan & clean', 'icon' => '🌿', 'colors' => ['#0A4D5C','#0d9488','#99f6e4']],
-                    ['id' => 'default', 'name' => 'Square Classic', 'desc' => 'Clean & minimal', 'icon' => '◻', 'colors' => ['#f3f4f6','#e5e7eb','#d1d5db']],
-                    ['id' => 'toast', 'name' => 'Toast Analytics', 'desc' => 'Data-rich insights', 'icon' => '📊', 'colors' => ['#fbbf24','#f59e0b','#d97706']],
-                    ['id' => 'lightspeed', 'name' => 'Lightspeed Grid', 'desc' => 'Colorful tiles', 'icon' => '⚡', 'colors' => ['#8b5cf6','#6366f1','#4f46e5']],
-                    ['id' => 'clover', 'name' => 'Clover Insights', 'desc' => 'Card analytics', 'icon' => '🍀', 'colors' => ['#22c55e','#16a34a','#15803d']],
-                    ['id' => 'oscar', 'name' => 'Oscar Pakistan', 'desc' => 'Tax compliance', 'icon' => '🇵🇰', 'colors' => ['#0ea5e9','#0284c7','#0369a1']],
-                    ['id' => 'shopify', 'name' => 'Shopify Modern', 'desc' => 'Ultra premium', 'icon' => '✨', 'colors' => ['#1e293b','#334155','#475569']],
-                ];
-                @endphp
-                @foreach($styles as $s)
-                <button @click="currentStyle='{{ $s['id'] }}'; styleOpen=false; fetch('{{ route('pos.settings.dashboard-style') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({style:'{{ $s['id'] }}'})}).then(()=>window.location.reload())" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all" :class="currentStyle === '{{ $s['id'] }}' ? 'bg-purple-100 dark:bg-purple-900/30 ring-2 ring-purple-500' : 'hover:bg-gray-100 dark:hover:bg-gray-800'">
-                    <span class="text-2xl w-9 text-center flex-shrink-0">{{ $s['icon'] }}</span>
-                    <div class="flex-1 text-left min-w-0">
-                        <p class="text-sm font-black text-gray-900 dark:text-white">{{ $s['name'] }}</p>
-                        <p class="text-xs text-gray-600 dark:text-gray-300 font-semibold">{{ $s['desc'] }}</p>
-                    </div>
-                    <div class="flex gap-1.5 flex-shrink-0">
-                        @foreach($s['colors'] as $c)
-                        <span class="w-5 h-5 rounded-full border-2 border-gray-300 dark:border-gray-500" style="background: {{ $c }}"></span>
-                        @endforeach
-                    </div>
-                    <span x-show="currentStyle === '{{ $s['id'] }}'" class="text-purple-600 flex-shrink-0">
-                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                    </span>
-                </button>
-                @endforeach
-            </div>
-        </div>
-        </template>
-    </div>
+    @unless(auth('pos')->user()?->isPosCashier())
+    <a href="{{ route('pos.customize') }}#style" class="p-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white hover:text-purple-600 dark:hover:text-purple-400 transition shadow-md" title="Style & Themes — Customize POS">
+        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
+    </a>
+    @endunless
 </div>

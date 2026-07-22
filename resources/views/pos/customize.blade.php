@@ -65,6 +65,20 @@
             'midnight' => ['#171717', '#404040'],
             'rose'     => ['#881337', '#e11d48'],
         ];
+
+        // POS Style (owner, 22 Jul 2026): the dashboard style choice lives HERE now —
+        // two main packages (Full / Saaf) + legacy fancy styles tucked away below.
+        // The old dashboard style-picker dropdown was removed; this is the only place.
+        $allowedStyles = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify', 'saaf'];
+        $curStyle = in_array($company->pos_dashboard_style, $allowedStyles, true) ? $company->pos_dashboard_style : 'default';
+        $fancyStyles = [
+            'toast'      => ['Toast Analytics', '#f59e0b'],
+            'lightspeed' => ['Lightspeed Grid', '#6366f1'],
+            'clover'     => ['Clover Insights', '#16a34a'],
+            'oscar'      => ['Oscar Pakistan', '#0ea5e9'],
+            'shopify'    => ['Shopify Modern', '#334155'],
+        ];
+        $onFancy = array_key_exists($curStyle, $fancyStyles);
     @endphp
 
     <div x-data="{ currentTheme: '{{ $company->pos_theme ?? 'purple' }}', guidedOn: {{ ($company->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }}, savingGuided: false, invOn: {{ $invOn ? 'true' : 'false' }}, savingInv: false, restockOn: {{ ($company->pos_restock_on_void ?? true) ? 'true' : 'false' }}, savingRestock: false, autoDaycloseOn: {{ ($company->pos_auto_dayclose_24h ?? false) ? 'true' : 'false' }}, savingDayclose: false, kdsAutoOn: {{ ($company->pos_kds_auto_print ?? false) ? 'true' : 'false' }}, savingKdsAuto: false, lbFinal: '{{ in_array($company->pos_dayclose_final_local_action ?? 'save', ['save','delete'], true) ? ($company->pos_dayclose_final_local_action ?? 'save') : 'save' }}', lbProv: '{{ in_array($company->pos_dayclose_provisional_action ?? 'save', ['save','delete'], true) ? ($company->pos_dayclose_provisional_action ?? 'save') : 'save' }}', lbPersist: {{ ($company->pos_customer_spend_persist ?? true) ? 'true' : 'false' }}, savingLB: false, taxMode: '{{ $taxMode }}', savingTaxInc: false, calcPrice: 590, cashRate: {{ (float) $cashRate }}, cardRate: {{ (float) $cardRate }}, get taxInc() { return this.taxMode !== 'exclusive'; }, calc(rate) { const p = parseFloat(this.calcPrice) || 0; if (this.taxMode === 'inclusive_card_save') { const base = p * 100 / (100 + this.cashRate); const tax = base * rate / 100; return { base: base, tax: tax, total: Math.round(base + tax) }; } if (this.taxInc) { const tax = p * rate / (100 + rate); return { base: p - tax, tax: tax, total: Math.round(p) }; } const tax = p * rate / 100; return { base: p, tax: tax, total: Math.round(p + tax) }; }, fmt(n) { return 'Rs ' + (Math.round(n * 100) / 100).toLocaleString(); }, setTaxMode(mode) { if (this.taxMode === mode || this.savingTaxInc) return; const prev = this.taxMode; this.taxMode = mode; this.savingTaxInc = true; fetch('/pos/settings/tax-pricing-mode', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({mode:mode})}).then(r=>r.json()).then(d=>{ if (!d || d.success !== true) { this.taxMode = prev; alert((d && d.message) || 'Setting save nahi hui — dobara koshish karein.'); } }).catch(()=>{ this.taxMode = prev; alert('Setting save nahi hui — dobara koshish karein.'); }).finally(()=>{ this.savingTaxInc = false; }); }, saveLB() { this.savingLB = true; fetch('/pos/settings/local-billing', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({final_action:this.lbFinal, provisional_action:this.lbProv, spend_persist:this.lbPersist})}).then(r=>r.json()).catch(()=>{}).finally(()=>{ this.savingLB=false; }) } }"
@@ -83,6 +97,108 @@
                 <p class="text-sm sm:text-base text-white/85 max-w-2xl">Aapki POS ki saari settings ab ek hi jagah. Look &amp; feel, billing flow, modules, business info, compliance, team aur account — sab yahin se control karein.</p>
             </div>
         </div>
+
+        {{-- ═══════════ POS STYLE — Full vs Saaf (owner, 22 Jul 2026) ═══════════ --}}
+        <section id="style" x-data="{ curStyle: '{{ $curStyle }}', savingStyle: false, moreStyles: {{ $onFancy ? 'true' : 'false' }},
+            setStyle(s) {
+                if (this.curStyle === s || this.savingStyle) return;
+                this.savingStyle = true;
+                fetch('{{ route('pos.settings.dashboard-style') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({style:s})})
+                    .then(r=>r.json())
+                    .then(d=>{ if (d && d.success) { this.curStyle = s; window.location.reload(); } else { this.savingStyle = false; alert((d && d.message) || 'Style save nahi hua — dobara koshish karein.'); } })
+                    .catch(()=>{ this.savingStyle = false; alert('Style save nahi hua — internet check kar ke dobara koshish karein.'); });
+            } }">
+            <div class="px-1 mb-3 flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                    <h2 class="text-sm font-extrabold text-gray-900 dark:text-white uppercase tracking-wide">POS Ka Style</h2>
+                    <p class="text-[12px] text-gray-500 dark:text-gray-400">Ek click par poora andaz badal jata hai — dashboard aur navigation dono. Aap ka data aur sale screen bilkul wohi rehte hain.</p>
+                </div>
+                <span class="shrink-0 text-[10px] font-semibold text-gray-400" x-show="savingStyle" x-cloak>Badla ja raha hai…</span>
+            </div>
+            <div class="grid sm:grid-cols-2 gap-4">
+
+                {{-- FULL (default) --}}
+                <button type="button" @click="setStyle('default')"
+                    class="text-left rounded-2xl border-2 p-4 transition bg-white dark:bg-gray-900"
+                    :class="curStyle === 'default' ? 'border-teal-600' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <p class="text-sm font-extrabold text-gray-900 dark:text-white">Full — Poora Dashboard</p>
+                        <span x-show="curStyle === 'default'" x-cloak class="px-2 py-0.5 rounded-full bg-teal-600 text-white text-[10px] font-bold">ACTIVE</span>
+                    </div>
+                    <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed mb-3">Saare widgets, analytics aur quick actions — poori detail ek nazar mein. Zyada maloomat pasand karne walon ke liye.</p>
+                    {{-- mini preview (pure CSS mockup) --}}
+                    <div class="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden pointer-events-none select-none" aria-hidden="true">
+                        <div class="h-6 bg-purple-900 flex items-center gap-1 px-2">
+                            <span class="w-2 h-2 rounded-full bg-white/50 shrink-0"></span>
+                            @for($i = 0; $i < 7; $i++)<span class="h-2 w-7 rounded-full bg-white/25"></span>@endfor
+                        </div>
+                        <div class="bg-gray-100 dark:bg-gray-800 p-2 space-y-1.5">
+                            <div class="h-5 rounded-md bg-purple-600"></div>
+                            <div class="grid grid-cols-4 gap-1.5">
+                                @for($i = 0; $i < 4; $i++)
+                                <div class="h-9 rounded-md bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-1">
+                                    <div class="h-1.5 w-2/3 rounded bg-purple-300 mb-1"></div>
+                                    <div class="h-2 w-1/2 rounded bg-gray-300 dark:bg-gray-600"></div>
+                                </div>
+                                @endfor
+                            </div>
+                            <div class="grid grid-cols-2 gap-1.5">
+                                <div class="h-10 rounded-md bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700"></div>
+                                <div class="h-10 rounded-md bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700"></div>
+                            </div>
+                        </div>
+                    </div>
+                </button>
+
+                {{-- SAAF (simple) --}}
+                <button type="button" @click="setStyle('saaf')"
+                    class="text-left rounded-2xl border-2 p-4 transition bg-white dark:bg-gray-900"
+                    :class="curStyle === 'saaf' ? 'border-teal-600' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <p class="text-sm font-extrabold text-gray-900 dark:text-white">Saaf — Simple</p>
+                        <span x-show="curStyle === 'saaf'" x-cloak class="px-2 py-0.5 rounded-full bg-teal-600 text-white text-[10px] font-bold">ACTIVE</span>
+                    </div>
+                    <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed mb-3">Bilkul saaf dashboard + simple 5-button navigation. Kam cheezein, seedhi baat — tez kaam karne walon ke liye.</p>
+                    {{-- mini preview (pure CSS mockup) --}}
+                    <div class="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden pointer-events-none select-none" aria-hidden="true">
+                        <div class="h-6 flex items-center gap-1.5 px-2" style="background:#0A4D5C">
+                            <span class="w-2 h-2 rounded-full bg-white/50 shrink-0"></span>
+                            @for($i = 0; $i < 5; $i++)<span class="h-2.5 w-10 rounded-full bg-white/25"></span>@endfor
+                        </div>
+                        <div class="bg-gray-100 dark:bg-gray-800 p-2 space-y-1.5">
+                            <div class="grid grid-cols-3 gap-1.5">
+                                @for($i = 0; $i < 3; $i++)
+                                <div class="h-12 rounded-md bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-1.5">
+                                    <div class="h-1.5 w-2/3 rounded mb-1.5" style="background:#99f6e4"></div>
+                                    <div class="h-2.5 w-1/2 rounded" style="background:#0d9488"></div>
+                                </div>
+                                @endfor
+                            </div>
+                            <div class="h-9 rounded-md bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700"></div>
+                        </div>
+                    </div>
+                </button>
+            </div>
+
+            {{-- Legacy fancy styles — tucked away so the main choice stays 2 cards --}}
+            <div class="mt-3 px-1">
+                <button type="button" @click="moreStyles = !moreStyles" class="inline-flex items-center gap-1.5 text-[12px] font-semibold text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition">
+                    <svg class="w-3.5 h-3.5 transition-transform" :class="moreStyles && 'rotate-90'" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+                    Mazeed styles (purane designs)
+                </button>
+                <div x-show="moreStyles" x-cloak class="mt-2 flex flex-wrap gap-2">
+                    @foreach($fancyStyles as $fid => [$fname, $fcolor])
+                    <button type="button" @click="setStyle('{{ $fid }}')"
+                        class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border-2 text-[12px] font-bold transition bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300"
+                        :class="curStyle === '{{ $fid }}' ? 'border-teal-600' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'">
+                        <span class="w-3 h-3 rounded-full shrink-0" style="background: {{ $fcolor }}"></span>
+                        {{ $fname }}
+                        <span x-show="curStyle === '{{ $fid }}'" x-cloak class="px-1.5 py-0.5 rounded-full bg-teal-600 text-white text-[9px] font-bold">ACTIVE</span>
+                    </button>
+                    @endforeach
+                </div>
+            </div>
+        </section>
 
         {{-- ═══════════ APPEARANCE & EXPERIENCE ═══════════ --}}
         <section>

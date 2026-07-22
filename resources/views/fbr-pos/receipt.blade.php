@@ -16,7 +16,9 @@
         @endif
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Courier New', 'Lucida Console', monospace;
+            /* Owner (22 Jul 2026, mirrors PRA receipt): Arial/Helvetica — Courier's
+               hairline strokes print faint on laser printers. */
+            font-family: Arial, Helvetica, sans-serif;
             font-size: 12px;
             width: 80mm;
             max-width: 80mm;
@@ -32,10 +34,10 @@
         .text-center { text-align: center; }
         .text-right { text-align: right; }
         .bold { font-weight: bold; }
-        .separator { border-top: 1px dashed #000; margin: 6px 0; }
-        .double-separator { border-top: 2px solid #000; margin: 6px 0; }
+        .separator { border-top: 1px dashed #000; margin: 3px 0; }
+        .double-separator { border-top: 2px solid #000; margin: 3px 0; }
 
-        .header { margin-bottom: 8px; }
+        .header { margin-bottom: 3px; }
         .header h1 { font-size: 15px; font-weight: bold; margin-bottom: 3px; word-wrap: break-word; color: #000; }
         .header p { font-size: 10px; line-height: 1.4; word-wrap: break-word; color: #000; font-weight: 600; }
 
@@ -48,7 +50,11 @@
         .inv-table { width: 100%; border-collapse: collapse; }
         .inv-table td { font-size: 10px; padding: 2px 0; vertical-align: top; color: #000; }
         .inv-table .inv-label { font-weight: bold; white-space: nowrap; width: 35%; color: #000; }
-        .inv-table .inv-value { text-align: right; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; font-family: 'Courier New', monospace; font-size: 9px; font-weight: bold; color: #000; }
+        .inv-table .inv-value { text-align: right; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; font-size: 9px; font-weight: bold; color: #000; }
+
+        .top-badge { border: 2px solid #000; padding: 5px 4px; margin: 5px 0 4px; text-align: center; color: #000; }
+        .top-badge .tb-title { font-size: 12px; font-weight: bold; letter-spacing: 1px; }
+        .top-badge .tb-serial { font-size: 11px; font-weight: bold; margin-top: 2px; word-break: break-all; }
 
         .items-table { width: 100%; margin: 4px 0; border-collapse: collapse; table-layout: fixed; }
         .items-table th { font-size: 10px; text-transform: uppercase; border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 4px 1px; text-align: left; font-weight: bold; color: #000; }
@@ -70,9 +76,7 @@
         .fbr-badge { border: 2px solid #000; padding: 6px; margin: 6px 0; text-align: center; font-size: 10px; overflow: hidden; color: #000; font-weight: 600; }
         .fbr-badge .fbr-title { font-size: 12px; font-weight: bold; margin-bottom: 3px; color: #000; }
         .fbr-badge .fbr-number { font-size: 9px; font-weight: bold; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; max-width: 100%; display: block; color: #000; }
-        .local-badge { border: 1.5px dashed #000; padding: 6px; margin: 6px 0; text-align: center; font-size: 10px; color: #000; font-weight: 700; }
-
-        .footer { margin-top: 8px; font-size: 10px; line-height: 1.5; color: #000; font-weight: 600; }
+        .footer { margin-top: 4px; font-size: 10px; line-height: 1.5; color: #000; font-weight: 600; }
 
         @media print {
             /* PRINTABLE-WIDTH FIX v2 (Jul 2026): 80mm paper prints only ~72mm — cap at
@@ -118,7 +122,8 @@
     <div class="receipt-wrap">
     <div class="header text-center">
         @if($company->logo_path)
-        <div style="margin-bottom: 5px;">
+        {{-- line-height:0 wrapper + block img: no inline-descender gap under the logo (mirrors PRA receipts, 22 Jul 2026) --}}
+        <div style="line-height: 0; margin: 0;">
             <img src="{{ asset('storage/' . $company->logo_path) }}" alt="{{ $company->name }}" style="max-width: 150px; max-height: 55px; margin: 0 auto; display: block; object-fit: contain;">
         </div>
         @endif
@@ -130,6 +135,21 @@
 
     <div class="separator"></div>
 
+    @php
+        // Serial box at TOP (owner, 22 Jul 2026 — mirrors PRA receipts):
+        // bills NOT going to FBR (reporting-OFF finals fbr/NULL + legacy 'local'
+        // + deliberate provisionals local/'local') show a centered SALE RECEIPT /
+        // PROVISIONAL BILL badge here. Submitted/pending/failed keep the classic
+        // FBR POS # box (their bottom FBR badge stays).
+        $fbrRcptTopBadge = ($transaction->fbr_status === null || $transaction->fbr_status === 'local');
+        $fbrRcptTopProvisional = $fbrRcptTopBadge && (($transaction->invoice_mode ?? 'fbr') === 'local');
+    @endphp
+    @if($fbrRcptTopBadge)
+    <div class="top-badge" @if($fbrRcptTopProvisional) style="border-style: dashed;" @endif>
+        <div class="tb-title">{{ $fbrRcptTopProvisional ? 'PROVISIONAL BILL' : 'SALE RECEIPT' }}</div>
+        <div class="tb-serial">{{ $transaction->invoice_number }}</div>
+    </div>
+    @else
     <div class="invoice-numbers">
         <table class="inv-table">
             <tr>
@@ -144,6 +164,7 @@
             @endif
         </table>
     </div>
+    @endif
 
     <table class="info-table">
         <tr><td class="info-label">Date:</td><td class="info-value">{{ $transaction->created_at->format('d/m/Y h:i A') }}</td></tr>
@@ -262,13 +283,7 @@
         <div style="font-size:9px; margin-top:3px;">POS Reg #: {{ $company->fbr_pos_id }}</div>
         @endif
     </div>
-    @elseif($transaction->fbr_status === 'local')
-    <div class="local-badge">
-        LOCAL INVOICE<br>
-        (FBR Reporting OFF)<br>
-        {{ $transaction->invoice_number }}
-    </div>
-    @else
+    @elseif(!$fbrRcptTopBadge)
     <div class="fbr-badge" style="border-style: dashed;">
         <div class="fbr-title">⏳ FBR PENDING</div>
         <div style="margin: 6px 0;">

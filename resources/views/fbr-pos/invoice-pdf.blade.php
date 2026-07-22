@@ -227,10 +227,14 @@
             <div style="font-size:9px; margin-top:3px;">POS Reg #: {{ $company->fbr_pos_id }}</div>
             @endif
         </div>
-        @elseif($transaction->fbr_status === 'local')
+        @elseif($transaction->fbr_status === null || $transaction->fbr_status === 'local')
         @php
+            // Mirrors thermal receipt (22 Jul 2026): PROVISIONAL only for deliberate
+            // provisionals (invoice_mode 'local'); reporting-OFF finals (fbr/NULL)
+            // and legacy fbr/'local' finals are REAL sales => SALE RECEIPT.
+            $pdfIsProvisional = ($transaction->invoice_mode ?? 'fbr') === 'local';
             $qrData = json_encode([
-                'type' => 'Provisional Bill',
+                'type' => $pdfIsProvisional ? 'Provisional Bill' : 'Sale Receipt',
                 'inv' => $transaction->invoice_number,
                 'date' => $transaction->created_at->format('d/m/Y H:i'),
                 'total' => number_format($transaction->total_amount, 2),
@@ -238,11 +242,18 @@
             ]);
             $qrUrl = \App\Support\QrImage::dataUri($qrData);
         @endphp
+        @if($pdfIsProvisional)
         <div class="local-box" style="border: 1.5px dashed #1e3a5f; color: #1e3a5f;">
             <strong style="font-size: 12px;">PROVISIONAL BILL</strong><br>
             {{ $transaction->invoice_number }}<br>
             <span style="font-size: 9px;">This is a provisional bill for your reference</span>
         </div>
+        @else
+        <div class="local-box" style="border: 1.5px solid #1e3a5f; color: #1e3a5f;">
+            <strong style="font-size: 12px;">SALE RECEIPT</strong><br>
+            {{ $transaction->invoice_number }}
+        </div>
+        @endif
         @if($qrUrl)
         <div style="text-align: center; margin: 8px 0;">
             <img src="{{ $qrUrl }}" alt="Invoice QR" style="width: 120px; height: 120px; margin: 0 auto;">

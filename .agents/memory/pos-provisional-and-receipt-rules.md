@@ -93,6 +93,14 @@ offline bills KEEP the classic "POS Invoice #" box (+ OFFLINE badge). The old bo
 were REMOVED — don't re-add a second serial box at the bottom (QR stays at the bottom). Every
 branch must still print the serial somewhere — no serial-less path.
 
+**FBR POS mirrored (owner "dono version", 22 Jul 2026):** fbr-pos/receipt.blade.php +
+fbr-pos/invoice-pdf.blade.php follow the SAME rules — fbr_status NULL (reporting-OFF final) or
+legacy 'local' with invoice_mode 'fbr' → SALE RECEIPT; local+'local' → PROVISIONAL BILL (dashed);
+submitted/pending/failed keep classic FBR POS # box + their bottom FBR/PENDING badges. Receipt
+also got the Arial font, logo line-height:0 wrapper, top badge, margin trims. FBR has NO boxed
+PAYMENT (plain info row only — no delivery/rider module there). Old bottom LOCAL INVOICE badge
+removed. "FBR PENDING" must NEVER show on NULL/'local' bills (they will never be submitted).
+
 **PAYMENT box = DELIVERY bills ONLY (owner, 22 Jul 2026):** the boxed "PAYMENT: CASH/CARD" prints
 only when `order_type==='delivery' || delivery_address || rider` (order_type is the primary gate —
 riders are assigned board-only AFTER payment and address is optional, so the fallbacks alone miss

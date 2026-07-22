@@ -1,0 +1,175 @@
+/* ============================================================
+   POS SAAF SKIN — visual-only overrides for the universal sale
+   screen when the company style is 'saaf'.
+   Loaded ONLY when companies.pos_dashboard_style = 'saaf'
+   (gated <link> in pos/universal.blade.php); every selector is
+   additionally scoped under body[data-saaf] for safety.
+   RULES: features/markup untouched — look only. Teal family
+   (#0d9488 / #0f766e / brand #0A4D5C), flat & clean, no
+   gradients, no glows, no entry animations, bigger touch
+   targets. NEVER use display:none on focus-target inputs
+   (guided flow calls .focus()).
+   ============================================================ */
+
+/* ---------- 1. Motion off: calm, instant UI ---------- */
+body[data-saaf] .prod-card,
+body[data-saaf] .fade-in,
+body[data-saaf] .cart-item-enter,
+body[data-saaf] .slide-in,
+body[data-saaf] .cart-pop,
+body[data-saaf] .qty-pop,
+body[data-saaf] .cart-qty-badge {
+    animation: none !important;
+}
+body[data-saaf] .prod-card:hover,
+body[data-saaf] .prod-card:active {
+    transform: none !important;
+}
+body[data-saaf] .cat-pill:hover,
+body[data-saaf] .cat-pill.active {
+    transform: none !important;
+}
+body[data-saaf] .quick-add {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: background-color 0.15s ease !important;
+}
+
+/* ---------- 2. Product tiles: flat white, thin border ---------- */
+body[data-saaf] .prod-card {
+    border-radius: 10px !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: none !important;
+}
+body[data-saaf] .prod-card:hover {
+    border-color: #0d9488 !important;
+    box-shadow: none !important;
+}
+.dark body[data-saaf] .prod-card,
+body[data-saaf].dark .prod-card {
+    border-color: #374151 !important;
+}
+/* product name a touch bigger for readability */
+body[data-saaf] .prod-card p.font-bold.text-sm,
+body[data-saaf] .prod-card p.font-bold.text-xs {
+    font-size: 0.9rem !important;
+    line-height: 1.25 !important;
+}
+
+/* ---------- 3. Teal accents replace purple on the sale screen ---------- */
+/* price */
+body[data-saaf] .price-badge {
+    color: #0f766e !important;
+}
+/* solid action buttons (+ add, primary CTAs) */
+body[data-saaf] .bg-purple-600 {
+    background-color: #0d9488 !important;
+    background-image: none !important;
+}
+body[data-saaf] .hover\:bg-purple-700:hover {
+    background-color: #0f766e !important;
+}
+/* qty-in-cart badge: solid teal, no gradient */
+body[data-saaf] .cart-qty-badge {
+    background: #0d9488 !important;
+}
+/* focus / highlight rings */
+body[data-saaf] .ring-purple-500,
+body[data-saaf] .focus\:ring-purple-500:focus {
+    --tw-ring-color: #0d9488 !important;
+}
+body[data-saaf] .focus\:border-purple-400:focus,
+body[data-saaf] .hover\:border-purple-300:hover,
+body[data-saaf] .hover\:border-purple-600:hover {
+    border-color: #0d9488 !important;
+}
+/* subtle hover tints */
+body[data-saaf] .hover\:bg-purple-50:hover {
+    background-color: #f0fdfa !important;
+}
+body[data-saaf] .hover\:text-purple-600:hover {
+    color: #0f766e !important;
+}
+/* selected/active text + soft backgrounds */
+body[data-saaf] .text-purple-600 { color: #0f766e !important; }
+body[data-saaf] .text-purple-700 { color: #115e59 !important; }
+body[data-saaf] .text-purple-400 { color: #2dd4bf !important; }
+body[data-saaf] .bg-purple-50 { background-color: #f0fdfa !important; }
+body[data-saaf] .bg-purple-100 { background-color: #ccfbf1 !important; }
+body[data-saaf] .border-purple-300 { border-color: #5eead4 !important; }
+body[data-saaf] .border-purple-400 { border-color: #2dd4bf !important; }
+/* gradients used on small accents → flat teal */
+body[data-saaf] .from-purple-500.to-purple-700,
+body[data-saaf] .from-purple-600.to-purple-700,
+body[data-saaf] .from-purple-600 {
+    background-image: none !important;
+    background-color: #0d9488 !important;
+}
+
+/* ---------- 4. Category pills: flat, solid active ---------- */
+body[data-saaf] .cat-pill {
+    border-radius: 8px !important;
+    min-height: 42px !important;
+    box-shadow: none !important;
+}
+body[data-saaf] .cat-pill:hover {
+    box-shadow: none !important;
+}
+body[data-saaf] .cat-pill.active {
+    background: #0d9488 !important;
+    box-shadow: none !important;
+}
+
+/* ---------- 5. Search: big, calm, obvious ---------- */
+body[data-saaf] input[name="pos_product_search_nofill"] {
+    min-height: 48px !important;
+    font-size: 16px !important;
+    background-color: #f4f4f5 !important;
+    border-color: transparent !important;
+    border-radius: 10px !important;
+    box-shadow: none !important;
+}
+body[data-saaf] input[name="pos_product_search_nofill"]:focus {
+    background-color: #ffffff !important;
+    border-color: #0d9488 !important;
+}
+.dark body[data-saaf] input[name="pos_product_search_nofill"],
+body[data-saaf].dark input[name="pos_product_search_nofill"] {
+    background-color: #1f2937 !important;
+}
+/* kill the animated search glow if present */
+body[data-saaf] .search-glow {
+    animation: none !important;
+    box-shadow: none !important;
+}
+
+/* ---------- 6. Cart: flat rows, neutral hover, big +/- ---------- */
+body[data-saaf] .cart-item {
+    border-radius: 8px !important;
+}
+body[data-saaf] .cart-item:hover {
+    background: rgba(13, 148, 136, 0.05) !important;
+}
+body[data-saaf] .cart-item button {
+    min-width: 40px;
+    min-height: 40px;
+    border-radius: 8px !important;
+}
+
+/* ---------- 7. Toolbar & generic buttons: square-ish, solid ---------- */
+body[data-saaf] .rounded-xl { border-radius: 10px !important; }
+body[data-saaf] .rounded-2xl { border-radius: 12px !important; }
+body[data-saaf] .shadow-2xl { box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.18) !important; }
+
+/* ---------- 8. "Mazeed" collapse: secondary toolbar buttons hidden until
+   the cashier taps Mazeed. Buttons stay in the DOM — Alpine state and
+   window-level F-key shortcuts keep working (F1 help, F7 quick type,
+   screen-fit) even while their buttons are hidden. ---------- */
+body[data-saaf]:not(.saaf-show-all) [data-saaf-secondary] {
+    display: none !important;
+}
+body[data-saaf].saaf-show-all .saaf-more-btn {
+    background-color: #0d9488 !important;
+    border-color: #0d9488 !important;
+    color: #ffffff !important;
+}

@@ -158,7 +158,7 @@
                         <p class="text-sm font-extrabold text-gray-900 dark:text-white">Saaf — Simple</p>
                         <span x-show="curStyle === 'saaf'" x-cloak class="px-2 py-0.5 rounded-full bg-teal-600 text-white text-[10px] font-bold">ACTIVE</span>
                     </div>
-                    <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed mb-3">Bilkul saaf dashboard + simple 5-button navigation. Kam cheezein, seedhi baat — tez kaam karne walon ke liye.</p>
+                    <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed mb-3">Bilkul saaf dashboard + simple 5-button navigation. Sale screen bhi saada look mein — faltu buttons "Mazeed" ke peechay, lekin saare features waise hi kaam karte hain. Kam cheezein, seedhi baat — tez kaam karne walon ke liye.</p>
                     {{-- mini preview (pure CSS mockup) --}}
                     <div class="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden pointer-events-none select-none" aria-hidden="true">
                         <div class="h-6 flex items-center gap-1.5 px-2" style="background:#0A4D5C">

@@ -1,4 +1,8 @@
 <x-pos-layout>
+@php
+    $isSaaf = ($company->pos_dashboard_style ?? 'default') === 'saaf';
+@endphp
+@if($isSaaf)<link rel="stylesheet" href="{{ asset('css/pos-saaf.css') }}?v=1">@endif
 <style>
 *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
 @keyframes cartPop { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1); } }
@@ -450,7 +454,7 @@ window.addEventListener('popstate', function() {
 
         <div class="flex-1 relative" style="min-width:170px;">
             <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input type="search" x-ref="searchInput" x-model="searchQuery" @input="onSearchInput()" @keydown.arrow-down.prevent="moveHighlight(1)" @keydown.arrow-up.prevent="moveHighlight(-1)" @keydown.enter.prevent.stop="addHighlightedItem($event)" @keydown.tab="if(flowStep === 'type'){ $event.preventDefault(); } else if(!searchQuery && cart.length > 0){ $event.preventDefault(); enterCartMode('last'); }" @focus="if(searchQuery) showSearchDropdown = true" @click.away="showSearchDropdown = false" placeholder="Search products... (type to filter, Enter to add, Tab → cart)" class="search-glow w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-400 transition shadow-sm" autocomplete="one-time-code" name="pos_product_search_nofill" data-lpignore="true" data-form-type="other" role="combobox">
+            <input type="search" x-ref="searchInput" x-model="searchQuery" @input="onSearchInput()" @keydown.arrow-down.prevent="moveHighlight(1)" @keydown.arrow-up.prevent="moveHighlight(-1)" @keydown.enter.prevent.stop="addHighlightedItem($event)" @keydown.tab="if(flowStep === 'type'){ $event.preventDefault(); } else if(!searchQuery && cart.length > 0){ $event.preventDefault(); enterCartMode('last'); }" @focus="if(searchQuery) showSearchDropdown = true" @click.away="showSearchDropdown = false" placeholder="{{ $isSaaf ? 'Cheez ka naam likhein ya barcode scan karein — Enter se add' : 'Search products... (type to filter, Enter to add, Tab → cart)' }}" class="search-glow w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-400 transition shadow-sm" autocomplete="one-time-code" name="pos_product_search_nofill" data-lpignore="true" data-form-type="other" role="combobox">
             <kbd x-show="!searchQuery" class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 font-mono">Ctrl+S</kbd>
             <button x-show="searchQuery" @click="searchQuery = ''; showSearchDropdown = false; filterProducts(); $refs.searchInput.focus()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -558,14 +562,23 @@ window.addEventListener('popstate', function() {
 
         <div class="w-px h-6 bg-gray-200 dark:bg-gray-700 hidden sm:block flex-shrink-0"></div>
 
-        <button @click="priorityOrder = !priorityOrder" class="hidden sm:flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-semibold border transition" :class="priorityOrder ? 'bg-red-50 dark:bg-red-900/20 border-red-300 text-red-600' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50'">
+        @if($isSaaf)
+        {{-- SAAF: "Mazeed" toggle — reveals the secondary toolbar buttons (hidden by
+             pos-saaf.css via [data-saaf-secondary]) without removing them from the DOM,
+             so ALL features + F-key shortcuts keep working exactly as on the Full look. --}}
+        <button type="button" onclick="document.body.classList.toggle('saaf-show-all')" class="saaf-more-btn flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition flex-shrink-0" title="Mazeed options dikhayein / chhupayein">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z"/></svg>
+            <span>Mazeed</span>
+        </button>
+        @endif
+        <button @if($isSaaf) data-saaf-secondary="1" @endif @click="priorityOrder = !priorityOrder" class="hidden sm:flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-semibold border transition" :class="priorityOrder ? 'bg-red-50 dark:bg-red-900/20 border-red-300 text-red-600' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50'">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
             <span>Rush</span>
         </button>
 
         {{-- Screen Fit control (Jul 2026): cashier picks Auto or a fixed % for THIS display; saved per device.
              Visible on ALL sizes including mobile (owner request Jul 2026) — icon-only below lg. --}}
-        <div class="relative block flex-shrink-0" @click.away="showFitMenu = false">
+        <div @if($isSaaf) data-saaf-secondary="1" @endif class="relative block flex-shrink-0" @click.away="showFitMenu = false">
             <button @click="showFitMenu = !showFitMenu" class="flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-purple-50 hover:text-purple-600 hover:border-purple-300 transition" title="Screen Fit — adjust the sale screen to this display">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V5a1 1 0 011-1h3m8 0h3a1 1 0 011 1v3m0 8v3a1 1 0 01-1 1h-3m-8 0H5a1 1 0 01-1-1v-3"/></svg>
                 <span class="hidden lg:inline" x-text="fitLabel()"></span>
@@ -581,7 +594,7 @@ window.addEventListener('popstate', function() {
             </div>
         </div>
 
-        <button @click="showShortcuts = true" class="hidden sm:flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-purple-50 hover:text-purple-600 hover:border-purple-300 transition flex-shrink-0" title="Keyboard Shortcuts (F1)">
+        <button @if($isSaaf) data-saaf-secondary="1" @endif @click="showShortcuts = true" class="hidden sm:flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-purple-50 hover:text-purple-600 hover:border-purple-300 transition flex-shrink-0" title="Keyboard Shortcuts (F1)">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3C6.5 3 2 6.58 2 11c0 2.24 1.12 4.27 2.94 5.72L4 21l4.28-2.55c1.15.35 2.4.55 3.72.55 5.5 0 10-3.58 10-8s-4.5-8-10-8z"/></svg>
             <span class="hidden lg:inline">Keys</span>
             <span class="text-[8px] font-mono bg-gray-200 dark:bg-gray-700 px-1 rounded hidden sm:inline">F1</span>
@@ -589,7 +602,7 @@ window.addEventListener('popstate', function() {
 
         {{-- Quick Type — OPT-IN (Customize POS toggle); hidden server-side when OFF. --}}
         @if($company->pos_quick_type_enabled ?? false)
-        <button @click="openQuickType()" class="flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 hover:border-sky-300 transition flex-shrink-0" title="Quick Type Mode (F7) — type 'chai 2, samosa 1' or pick random product">
+        <button @if($isSaaf) data-saaf-secondary="1" @endif @click="openQuickType()" class="flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 hover:border-sky-300 transition flex-shrink-0" title="Quick Type Mode (F7) — type 'chai 2, samosa 1' or pick random product">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
             <span class="hidden lg:inline">Quick</span>
             <span class="text-[8px] font-mono bg-sky-200 dark:bg-sky-800/50 px-1 rounded hidden sm:inline">F7</span>
@@ -1037,7 +1050,7 @@ window.addEventListener('popstate', function() {
                             <button @click="discountType = 'amount'" class="flex-1 text-[10px] font-bold py-1 rounded-lg transition" :class="discountType === 'amount' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-500'">Rs.</button>
                         </div>
                         <div class="flex items-center gap-1.5">
-                            <input type="number" x-model.number="discountValue" @input="if(!checkDiscountLimit(discountValue, discountType)) { discountValue = discountType === 'percentage' ? effectiveDiscountLimit : effectiveSubtotal; showToast(discountType === 'percentage' ? 'Discount capped at ' + effectiveDiscountLimit + '%' : 'Discount cannot exceed subtotal', 'error'); } recalcDiscount()" min="0" :max="discountType === 'percentage' ? effectiveDiscountLimit : effectiveSubtotal" step="any" :placeholder="discountType === 'percentage' ? 'Max ' + effectiveDiscountLimit + '%' : 'Direct amount Rs.'" class="flex-1 text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-gray-900 dark:text-white focus:ring-purple-500">
+                            <input type="number" x-model.number="discountValue" @input="if(!checkDiscountLimit(discountValue, discountType)) { discountValue = discountType === 'percentage' ? effectiveDiscountLimit : maxAmountDiscount; showToast('Discount capped at ' + effectiveDiscountLimit + '%' + (discountType === 'amount' ? ' of bill (Rs. ' + maxAmountDiscount.toLocaleString() + ')' : ''), 'error'); } recalcDiscount()" min="0" :max="discountType === 'percentage' ? effectiveDiscountLimit : maxAmountDiscount" step="any" :placeholder="discountType === 'percentage' ? 'Max ' + effectiveDiscountLimit + '%' : 'Direct amount Rs.'" class="flex-1 text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-gray-900 dark:text-white focus:ring-purple-500">
                             <button @click="discountValue = 0; recalcDiscount(); showDiscount = false" class="text-[10px] text-red-500 hover:text-red-700 px-1.5">Clear</button>
                         </div>
                         <div x-show="discountType === 'percentage'" class="flex gap-1 flex-wrap">
@@ -5841,14 +5854,19 @@ function restaurantPos() {
             if (this.posRole === 'pos_admin') return 100;
             return this.managerOverrideActive ? {{ (float) ($hasManagerPin ? ($company->manager_discount_limit ?? 50) : 100) }} : this.discountLimit;
         },
+        get maxAmountDiscount() {
+            // Rs cap for amount-type discounts = limit% of the subtotal (owner rule, Jul 2026:
+            // discount capped at the SAME percentage limit on BOTH types). pos_admin has
+            // limit=100 → cap equals the full subtotal (unchanged behavior for admins).
+            return Math.min(this.effectiveSubtotal, Math.round(this.effectiveSubtotal * this.effectiveDiscountLimit) / 100);
+        },
         checkDiscountLimit(val, type) {
-            // Percentage discounts respect the role-based cap (cashier vs manager-override).
-            // Amount discounts allow ANY value up to the subtotal — cashier can give a Rs-based
-            // discount of any size as long as it's not larger than the order itself.
+            // BOTH discount types respect the role-based cap (owner rule, Jul 2026):
+            // percentage capped at limit%, amount capped at limit% of the subtotal.
             // Use 2-dp integer comparison to dodge JS float precision (0.1 + 0.2 = 0.30000…04).
             const valCents = Math.round((Number(val) || 0) * 100);
             if (type === 'percentage' && valCents > Math.round(this.effectiveDiscountLimit * 100)) return false;
-            if (type === 'amount' && this.effectiveSubtotal > 0 && valCents > Math.round(this.effectiveSubtotal * 100)) return false;
+            if (type === 'amount' && this.effectiveSubtotal > 0 && valCents > Math.round(this.maxAmountDiscount * 100)) return false;
             return true;
         },
         async requestManagerOverride() {

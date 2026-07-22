@@ -37,5 +37,11 @@ Restaurant screen retired: `RestaurantPosController::pos()` early-redirects to `
 - **saveCart is double-guarded** (entry + inside debounce timer) in edit mode — without the timer re-check the edited bill's cart clobbers the cashier's own saved localStorage cart and resurrects as a duplicate new sale.
 - Deal lines in an edited provisional get RE-PRICED at the current deal price server-side (`resolveItemExemptions` enforces); a deleted deal falls back to client price with item_id nulled — pre-existing behavior, more reachable now.
 
+## Saaf skin (Jul 2026) — CSS-only, no fork
+- Companies with `pos_dashboard_style='saaf'` get a SKIN, not a fork: `body[data-saaf="1"]` set in pos-app layout + gated `<link>` to `public/css/pos-saaf.css` (all selectors scoped under `body[data-saaf]`) + a handful of `@if($isSaaf)` blade tweaks ($isSaaf defined in a block `@php` at the top of universal.blade.php — inline `@php(...)` with nested parens does NOT compile).
+- Secondary toolbar buttons (Rush, Screen Fit, Keys/F1, Quick/F7) carry gated `data-saaf-secondary="1"`; CSS hides them unless `body.saaf-show-all` (toggled by the saaf-only "Mazeed" button). Buttons stay in the DOM so Alpine state + window-level F-keys keep working. Guided-flow focus targets must NEVER get `display:none`.
+- **Invariant: Full-style companies' sale-screen HTML stays byte-identical** (modulo whitespace inside tags) — verify any saaf edit by diffing a Full-company curl snapshot before/after.
+- Discount rule (owner, 22 Jul 2026, ALL styles): limit% applies to BOTH discount types — amount capped at limit%×subtotal via client `maxAmountDiscount` getter + server clamps in storeInvoice/updateTransaction (cashier-only, mirrors percentage semantics) + RestaurantPosController::holdOrder `$maxAmountFromPct`.
+
 ## PWA update hold (Jul 2026)
 `window.tnPwaUpdateHold` registered in `_startAutoSync` init: returns true while cart non-empty, pay modal open, submitting, or receipt popup open — pwa-update toast defers auto-reload (retries every 30s; manual Refresh bypasses). Mirrored in FBR universal.

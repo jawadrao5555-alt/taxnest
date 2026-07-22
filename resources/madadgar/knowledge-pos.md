@@ -28,6 +28,8 @@ Yeh NestPOS ka mukammal guide hai. Sirf is guide ki maloomat se jawab do.
 - Customer select karna OPTIONAL hai — walk-in customer ke liye chhor dein.
 - Screen Fit: action bar mein "Fit" dropdown se poori screen ka size 80–125% adjust karein (chhoti screens par khud 90% ho jata hai).
 - Receipt popup: payment ke baad receipt ka popup khulta hai — print karein ya khud band karein; yeh khud gayab nahi hota taake receipt miss na ho.
+- Saaf style (Jul 2026): agar company ka POS style "Saaf — Simple" ho to sale screen bhi saada look mein khulti hai — teal rang, bade search box ke saath. Kam-istemaal buttons (Rush, Fit, Keys, Quick) "Mazeed" button ke peechay chhupe hote hain — Mazeed dabane se dikh jate hain. SAARE features (shortcuts, hold, kitchen, local bills) waise hi kaam karte hain.
+- Discount limit DONO types par lagti hai (Jul 2026): percentage bhi aur Rs. amount bhi — amount discount subtotal ke limit% se zyada nahi ho sakta (default 50%). Manager PIN override se limit barh sakti hai.
 
 ## Keyboard Shortcuts (Sale Screen)
 - Guided Flow (default ON): sirf Enter dabate jayen — search → item → qty → payment tak seedha chain chalta hai. Customer step optional hai.
@@ -119,7 +121,7 @@ Yeh NestPOS ka mukammal guide hai. Sirf is guide ki maloomat se jawab do.
 - PRA ko tax hamesha poora aur sahi submit hota hai, chahe receipt par tax dikhaya jaye ya nahi.
 
 ## Customize POS (/pos/customize)
-- POS Ka Style: dashboard ka style (Full ya Saaf + fancy styles).
+- POS Ka Style: dashboard ka style (Full ya Saaf + fancy styles). Saaf chunne par dashboard ke saath sale screen bhi saada teal look mein aa jati hai.
 - Theme colors.
 - Local Billing policy (day-close par local bills save ya delete).
 - Tax Pricing mode.

@@ -114,7 +114,7 @@ class RestaurantPosController extends Controller
         $posRole = $user->pos_role ?? 'pos_cashier';
         $discountLimit = $posRole === 'pos_admin'
             ? (float)($company->manager_discount_limit ?? 50)
-            : (float)($company->cashier_discount_limit ?? 10);
+            : (float)($company->cashier_discount_limit ?? 50);
         $hasManagerPin = !empty($company->manager_override_pin);
 
         $ingredientCosts = [];
@@ -328,9 +328,10 @@ class RestaurantPosController extends Controller
             $discountValue = min($discountValue, $maxDiscountPct);
             $discountAmount = round($subtotal * min(100, $discountValue) / 100, 2);
         } elseif ($discountType === 'amount' && $discountValue > 0) {
-            // Amount discounts are NOT capped by the percentage limit anymore — cashier may apply
-            // any Rs amount up to the order subtotal (matches the cart UI's checkDiscountLimit logic).
-            $maxAmountFromPct = $subtotal;
+            // Amount discounts follow the SAME percentage cap (owner rule, Jul 2026:
+            // both discount types limited alike) — cashier capped at limit% of subtotal;
+            // matches the cart UI's checkDiscountLimit / maxAmountDiscount logic.
+            $maxAmountFromPct = round($subtotal * min(100, $maxDiscountPct) / 100, 2);
             $discountAmount = min($subtotal, min($maxAmountFromPct, round($discountValue, 2)));
         }
         $discountAmount = max(0, $discountAmount);

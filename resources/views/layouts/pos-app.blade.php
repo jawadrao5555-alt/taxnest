@@ -278,7 +278,7 @@
             }
         </script>
     </head>
-    <body class="pos-layout-root h-screen overflow-hidden antialiased" data-theme="{{ $posTheme }}">
+    <body class="pos-layout-root h-screen overflow-hidden antialiased" data-theme="{{ $posTheme }}"@if(($companyLayout->pos_dashboard_style ?? 'default') === 'saaf') data-saaf="1"@endif>
         @include('partials.impersonation-banner')
         <x-pwa-init />
         <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false, themeOpen: false, currentTheme: '{{ $posTheme }}', guidedOn: {{ ($companyLayout->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }} }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false">

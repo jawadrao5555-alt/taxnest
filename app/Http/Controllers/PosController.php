@@ -1181,7 +1181,13 @@ class PosController extends Controller
         if ($discountType === 'percentage') {
             $discountAmount = round($subtotal * $discountValue / 100, 2);
         } else {
-            $discountAmount = min($discountValue, $subtotal);
+            // Amount-type cashier guardrail (owner rule, Jul 2026): capped at
+            // cashier_discount_limit% of the subtotal — mirrors the percentage rule.
+            $maxAmountDiscount = $subtotal;
+            if ($posUser && ($posUser->pos_role ?? null) === 'pos_cashier') {
+                $maxAmountDiscount = round($subtotal * ((float) ($company->cashier_discount_limit ?? 50)) / 100, 2);
+            }
+            $discountAmount = min($discountValue, $maxAmountDiscount);
         }
 
         $afterDiscount = $subtotal - $discountAmount;
@@ -1627,7 +1633,13 @@ class PosController extends Controller
         if ($discountType === 'percentage') {
             $discountAmount = round($subtotal * $discountValue / 100, 2);
         } else {
-            $discountAmount = min($discountValue, $subtotal);
+            // Amount-type cashier guardrail (owner rule, Jul 2026): capped at
+            // cashier_discount_limit% of the subtotal — mirrors the percentage rule.
+            $maxAmountDiscount = $subtotal;
+            if ($posUser && ($posUser->pos_role ?? null) === 'pos_cashier') {
+                $maxAmountDiscount = round($subtotal * ((float) ($company->cashier_discount_limit ?? 50)) / 100, 2);
+            }
+            $discountAmount = min($discountValue, $maxAmountDiscount);
         }
 
         $afterDiscount = $subtotal - $discountAmount;

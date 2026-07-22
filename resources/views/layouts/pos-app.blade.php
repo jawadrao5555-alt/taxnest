@@ -305,6 +305,21 @@
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
                                 New Sale
                             </a>
+                            @if(($companyLayout->pos_dashboard_style ?? 'default') === 'saaf')
+                            {{-- Saaf dashboard (Jul 2026): simplified always-visible nav — 5 core links; everything else stays in the profile menu. --}}
+                            <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}"
+                               class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.dashboard') || request()->routeIs('pos.restaurant.dashboard') ? 'active text-white' : 'text-white' }}">Home</a>
+                            <a href="{{ route('pos.transactions') }}"
+                               class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.transactions') ? 'active text-white' : 'text-white' }}">Bills</a>
+                            <a href="{{ route('pos.products') }}"
+                               class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.products') ? 'active text-white' : 'text-white' }}">Products</a>
+                            <a href="{{ route('pos.reports') }}"
+                               class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.reports') ? 'active text-white' : 'text-white' }}">Reports</a>
+                            @if(!$isCashierLayout)
+                            <a href="{{ route('pos.customize') }}"
+                               class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.customize') ? 'active text-white' : 'text-white' }}">Settings</a>
+                            @endif
+                            @endif
                         </nav>
 
                         <div class="hidden md:block ml-1">
@@ -650,6 +665,15 @@
                      x-transition:leave-end="opacity-0 -translate-y-2"
                      class="md:hidden border-t border-white/10 px-3 py-2 flex flex-wrap gap-1.5" style="background: hsla(var(--accent-h), var(--accent-s), 10%, 0.9)">
                     <a href="{{ route('pos.invoice.create') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">New Sale</a>
+                    @if(($companyLayout->pos_dashboard_style ?? 'default') === 'saaf')
+                    <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">Home</a>
+                    <a href="{{ route('pos.transactions') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">Bills</a>
+                    <a href="{{ route('pos.products') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">Products</a>
+                    <a href="{{ route('pos.reports') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">Reports</a>
+                    @if(!$isCashierLayout)
+                    <a href="{{ route('pos.customize') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">Settings</a>
+                    @endif
+                    @endif
                     <x-pwa-install-menu-item color="teal" app-name="Nest POS" label="Download App" item-class="nav-pill inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 ring-1 ring-white/20" />
                 </div>
             </header>

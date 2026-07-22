@@ -48,7 +48,7 @@ class PosController extends Controller
             return response()->json(['success' => false, 'message' => 'Only admin can change dashboard style.'], 403);
         }
         $style = $request->json('style') ?? $request->input('style', 'default');
-        $allowed = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify'];
+        $allowed = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify', 'saaf'];
         if (!in_array($style, $allowed)) {
             return response()->json(['success' => false, 'message' => 'Invalid style'], 422);
         }
@@ -578,10 +578,29 @@ class PosController extends Controller
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
 
-        $allowedStyles = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify'];
+        $allowedStyles = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify', 'saaf'];
         $dashboardStyle = in_array($company->pos_dashboard_style, $allowedStyles) ? $company->pos_dashboard_style : 'default';
         $isRestaurant = false;
         $isAdmin = !$isCashier;
+
+        // Saaf style extras (lazy — only queried when the clean dashboard is active):
+        // yesterday's revenue for the vs-kal delta + today's PRA-synced bill count.
+        $yesterdayRevenue = null;
+        $praSyncedToday = null;
+        if ($dashboardStyle === 'saaf') {
+            $yesterdayRevenue = (float) PosTransaction::where('company_id', $companyId)
+                ->where('status', 'completed')
+                ->where('created_at', '>=', $today->copy()->subDay())
+                ->where('created_at', '<', $today)
+                ->where($excludeLocal)
+                ->sum('total_amount');
+            $praSyncedToday = PosTransaction::where('company_id', $companyId)
+                ->where('status', 'completed')
+                ->where('created_at', '>=', $today)
+                ->where($excludeLocal)
+                ->where('pra_status', 'submitted')
+                ->count();
+        }
 
         // Same pattern as DI dashboard: unread company notifications, 30-day auto-expiry.
         $notifications = \App\Models\Notification::where('company_id', $companyId)
@@ -603,7 +622,7 @@ class PosController extends Controller
             'company', 'todayStats', 'monthStats', 'recentTransactions', 'paymentBreakdown', 'praStatus', 'drafts', 'isCashier',
             'dashboardStyle', 'isRestaurant', 'isAdmin', 'notifications',
             'profitStats', 'topSold', 'topProfit', 'lowMargin', 'costCoverage',
-            'dayOpening', 'todayClosed'
+            'dayOpening', 'todayClosed', 'yesterdayRevenue', 'praSyncedToday'
         ));
     }
 

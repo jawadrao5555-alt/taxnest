@@ -33,8 +33,8 @@
         </div>
         @endif
 
-        {{-- ━━━ PRA POS Universal v2 — Customize CTA (dismissible) ━━━ --}}
-        @if(!$isCashier)
+        {{-- ━━━ PRA POS Universal v2 — Customize CTA (dismissible; hidden on the Saaf clean dashboard) ━━━ --}}
+        @if(!$isCashier && ($dashboardStyle ?? 'default') !== 'saaf')
         <div x-data="{ show: localStorage.getItem('hide_universal_cta_v1') !== '1' }" x-show="show" x-cloak class="mb-4 rounded-2xl bg-purple-600 p-4 sm:p-5 text-white shadow-xl relative overflow-hidden">
             <button @click="show=false; localStorage.setItem('hide_universal_cta_v1','1')" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition" aria-label="Dismiss">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -61,8 +61,9 @@
         </div>
         @endif
 
-        {{-- ━━━ Opening Cash Balance (Jul 2026) — day-start drawer entry; auto-fills day-close reconciliation ━━━ --}}
-        @if(isset($dayOpening) || isset($todayClosed))
+        {{-- ━━━ Opening Cash Balance (Jul 2026) — day-start drawer entry; auto-fills day-close reconciliation.
+             Saaf style: KPI card shows the saved value, so this block appears only while entry is still needed. ━━━ --}}
+        @if((isset($dayOpening) || isset($todayClosed)) && (($dashboardStyle ?? 'default') !== 'saaf' || (empty($dayOpening) && empty($todayClosed))))
         <div class="mb-4" x-data="{ editing: false }">
             @if(!empty($todayClosed))
                 @if($dayOpening)
@@ -133,8 +134,8 @@
         </div>
         @endif
 
-        {{-- ─── PROFIT + BI WIDGETS (v18) — admin only, sits above the chosen dashboard style ─── --}}
-        @if(!$isCashier && isset($profitStats))
+        {{-- ─── PROFIT + BI WIDGETS (v18) — admin only, sits above the chosen dashboard style (hidden on Saaf: its own profit KPI covers this) ─── --}}
+        @if(!$isCashier && isset($profitStats) && ($dashboardStyle ?? 'default') !== 'saaf')
         @php
             $period = $profitStats['period'] ?? 'today';
             $periodLabel = ['today' => 'Today', 'week' => 'This Week', 'month' => 'This Month'][$period] ?? 'Today';

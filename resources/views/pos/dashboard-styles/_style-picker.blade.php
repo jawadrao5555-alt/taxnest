@@ -40,6 +40,7 @@
             <div class="space-y-1.5">
                 @php
                 $styles = [
+                    ['id' => 'saaf', 'name' => 'Saaf — Simple', 'desc' => 'Aasaan & clean', 'icon' => '🌿', 'colors' => ['#0A4D5C','#0d9488','#99f6e4']],
                     ['id' => 'default', 'name' => 'Square Classic', 'desc' => 'Clean & minimal', 'icon' => '◻', 'colors' => ['#f3f4f6','#e5e7eb','#d1d5db']],
                     ['id' => 'toast', 'name' => 'Toast Analytics', 'desc' => 'Data-rich insights', 'icon' => '📊', 'colors' => ['#fbbf24','#f59e0b','#d97706']],
                     ['id' => 'lightspeed', 'name' => 'Lightspeed Grid', 'desc' => 'Colorful tiles', 'icon' => '⚡', 'colors' => ['#8b5cf6','#6366f1','#4f46e5']],

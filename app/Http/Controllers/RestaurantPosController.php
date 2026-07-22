@@ -1580,7 +1580,7 @@ class RestaurantPosController extends Controller
             ->sum('estimated_cost');
         $todayProfit = $todaySales - $todayCost;
 
-        $allowedStyles = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify'];
+        $allowedStyles = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify', 'saaf'];
         $dashboardStyle = in_array($company->pos_dashboard_style, $allowedStyles) ? $company->pos_dashboard_style : 'default';
         $isRestaurant = true;
         $isAdmin = in_array($user->pos_role ?? $user->role ?? '', ['pos_admin', 'pos_manager', 'company_admin']);

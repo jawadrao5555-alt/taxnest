@@ -186,3 +186,9 @@ id = "BUkuMDc8_F07lAcX4Tats"
 uri = "file://exports/zfc_products_checked.csv"
 type = "table"
 title = "ZFC Products — Checked CSV (236 products)"
+
+[[outputs]]
+id = "bRK9ti0W6BL0klDohvnLs"
+uri = "file://screenshots/whats-new-bell-22jul.jpeg"
+type = "image"
+title = "What's New notifications — aaj ke 3 updates"

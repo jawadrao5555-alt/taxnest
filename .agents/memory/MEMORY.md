@@ -73,3 +73,4 @@
 - [Company hard-delete purge](company-hard-delete-purge.md) — new company_id tables need FK cascade OR a forceDelete purge-list entry, else hard delete leaves orphan rows; audit_logs/credentials ledger exempt.
 - [PRA POS Delivery Riders](pos-delivery-riders.md) — khata = cash+unsettled+not-returned (bypass hide_archived); riders never touch invoice_mode/serials; day-close recon PRA-set-only; wash archives unsettled rider cash.
 - [Outgoing mail / noreply SMTP](mail-noreply-smtp.md) — working cPanel SMTP block; Replit web SAPI misses mid-session secrets + ${VAR} in .env fails silently (CLI OK, web 535).
+- [POS feature upgrade backlog](pos-upgrade-backlog.md) — owner-deferred upgrade list (22 Jul 2026) + split-payment tax options (PRA = ONE payModeCode per bill); build nothing until owner picks.

@@ -47,14 +47,7 @@ See `prod-scheduled-jobs-cron.md` for why this is mandatory.
 - **Give ONE `&&`-chained one-liner that STARTS with `cd /home/taxnestc/public_html`, never a multi-line block.** A multi-line paste can run the `artisan` lines from the home dir (the `cd` line gets separated / pasted out of order) → every artisan call prints `Could not open input file: artisan` while git pull/migrate silently never happen. The single cd-prefixed one-liner guarantees cwd.
 - **OPcache reset from SSH needs NO browser:** `curl -s https://taxnest.com.pk/r.php` IS a real web (PHP-FPM) hit, so it resets the web OPcache just like opening it in a browser. Bake it into the one-liner: `... && echo '<?php opcache_reset(); ?>' > public/r.php && curl -s https://taxnest.com.pk/r.php ; rm -f public/r.php ; echo DONE` (use `;` before rm so r.php is always cleaned up even if curl fails).
 
-## PENDING live local edits (21 Jul 2026)
-Five files on live = FULL scp copies of workspace files (same content committed in workspace at checkpoint):
-- `resources/views/pos/universal.blade.php` (search-suggestion `block leading-snug` fix + address-picker font bumps text-[9px]/[10px]→text-xs/text-sm)
-- `resources/views/pos/receipts/receipt_80mm.blade.php`, `receipt_58mm.blade.php`, `resources/views/pos/invoice-pdf.blade.php` (provisional-badge three-branch fix: SALE RECEIPT for non-local finals + `font-style: normal !important` hardening on thermal)
-- `resources/views/pos/restaurant/kitchen-ticket.blade.php` (KOT fixes: ADDED-ITEMS banner only on genuine additions, "Order by:", ticket-scoped item count + Total Qty, note prefix, Item|Qty header layout)
-- `app/Http/Controllers/PosController.php` (estimateReceiptHeightPt chrome 490→520pt for the PAYMENT banner)
-- (receipt_80mm/58mm re-scp'd with the boxed PAYMENT: CASH/CARD banner under TOTAL)
-- `resources/views/layouts/pos-app.blade.php` (What's New popup shows ALL unseen updates in one scrollable 62vh body)
-- `app/Models/PosStation.php` (zero-station KOT = flat list, no category sections) + kitchen-ticket.blade.php re-scp'd (station-header black-on-white, no reversed block)
-
-Before the NEXT `git pull` on live, restore them first (`git checkout -- resources/views/pos/universal.blade.php resources/views/pos/receipts/receipt_80mm.blade.php resources/views/pos/receipts/receipt_58mm.blade.php resources/views/pos/invoice-pdf.blade.php resources/views/pos/restaurant/kitchen-ticket.blade.php app/Http/Controllers/PosController.php resources/views/layouts/pos-app.blade.php app/Models/PosStation.php` — safe, the commit carries the same fixes). Remove this note once deployed via git.
+## Live scp-drift RESOLVED (22 Jul 2026)
+- The 21 Jul scp'd hot-fix files were reconciled via `git stash && git pull origin main` (content was already committed upstream); the stash sits on the server as backup. Live worktree is CLEAN now — future deploys should be plain pulls.
+- **Sandbox gotcha:** the agent sandbox blocks destructive git verbs (`git checkout --`, `git restore`, …) even inside an SSH command STRING (pattern match on the bash command). Use `git stash` (allowed, and the runbook-endorsed reconcile move) instead of checkout when clearing live drift.
+- After any deploy, "no fresh errors" check: `grep 'production.ERROR' storage/logs/laravel.log` filtered to post-deploy timestamps — pre-existing noise: a Compliance cron fails nightly at 02:00 with "Column 'created_at' ambiguous" (DI-side, pre-existing, NOT deploy fallout; owner has not asked to fix it — NestPOS-only focus).

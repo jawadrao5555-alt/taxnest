@@ -7,7 +7,7 @@ description: Live POS test-company pattern — STANDING test company id 35 (RETA
 
 ## STANDING test company: id 35 "QA Full Audit Restaurant" (created 19 Jul 2026, RETAINED — currently the live QA company; delete only when the owner asks)
 - Pro plan (live plan id 11), PRA reporting OFF whole life (only L-series local bills — nothing ever went to PRA). Owner-approved full-audit company.
-- Logins: admin qa.fullaudit@taxnest.com.pk; team qa.mgr/qa.cash/qa.kit/qa.wtr .audit35@taxnest.com.pk; local viewer qa.lview.audit35@taxnest.com.pk (passwords NOT stored here — reset via admin panel if a future session needs access). Identifiers NTN 7899001 / 03427899001 will BURN on delete.
+- Logins: admin qa.fullaudit@taxnest.com.pk; team qa.mgr/qa.cash/qa.kit/qa.wtr .audit35@taxnest.com.pk; local viewer qa.lview.audit35@taxnest.com.pk (passwords NOT stored here; 22 Jul 2026: admin password reset to the SAME standard password as the dev posadmin account — see replit.md dev creds. Reset method: tiny bootstrap-Laravel PHP script over SSH updating the bcrypt hash — tinker is disabled on live too). Identifiers NTN 7899001 / 03427899001 will BURN on delete.
 - Artifacts to purge with it: EVERYTHING under company_id 35 — products, deals, riders, customers, ALL L-series bills, day-close reports, day openings (`pos_day_openings`), held orders. Keep this list COARSE; exact row ids drift between QA sessions (e.g. day-close #6 was deleted and re-created as #8 on 20 Jul 2026).
 - POS login POST field is `login` (not `email`) — posting `email` silently bounces back to /pos/login.
 

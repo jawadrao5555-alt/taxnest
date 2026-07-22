@@ -6284,30 +6284,41 @@ class PosController extends Controller
 
     private function generateLocalInvoiceNumber(int $companyId): string
     {
-        // Vendor-requested short format: L-001 (lifetime sequence per company, 3-digit pad,
-        // grows naturally past 999). Distinct from "POS-{year}-NNNNN" final invoices so cashiers
-        // can spot provisional bills at a glance in lists/receipts/PDFs.
-        // Exclude legacy "LOCAL-YYYY-NNNNN" rows from the new "L-NNN" sequence — the LIKE 'L-%'
-        // pattern would otherwise match both formats and corrupt the counter.
-        // Order by NUMERIC serial, not id — the draft-resume POS→L downgrade path can
-        // assign a fresh (max) L number to an OLD row, so id-ordering would re-issue it
-        // and trip the UNIQUE(company_id, invoice_number) index (same lesson as
-        // generateInvoiceNumber's numeric-ordering fix).
-        // withoutGlobalScope('hide_archived'): day-close ARCHIVES local bills (they
-        // stay in the table + unique index, just hidden) — the counter must include
-        // them or the very next provisional collides with an archived L-NNN.
-        $lastTransaction = PosTransaction::withoutGlobalScope('hide_archived')
+        // Vendor-requested short format: L-001 (per-company, 3-digit pad, grows naturally
+        // past 999). Distinct from "POS-{year}-NNNNN" final invoices so cashiers can spot
+        // provisional bills at a glance in lists/receipts/PDFs.
+        //
+        // Owner rule (22 Jul 2026) — SMALLEST FREE NUMBER, not max+1: a new local bill
+        // takes the lowest L-number not held by ANY existing row. Two effects the owner
+        // asked for: (a) when day-close DELETES local bills, the series restarts from
+        // L-001 the next day; (b) when bills are kept, a mid-series deletion frees its
+        // number and the next new bill fills that gap, then the series continues upward.
+        // Existing bills are NEVER renumbered — only NEW bills take free numbers.
+        // Numbers held by day-close ARCHIVED rows are NOT free (they stay in the table
+        // + unique index — hence withoutGlobalScope('hide_archived')).
+        // Exclude legacy "LOCAL-YYYY-NNNNN" rows — the LIKE 'L-%' pattern would
+        // otherwise match both formats and corrupt the counter.
+        // lockForUpdate serializes concurrent generators inside the caller's
+        // transaction; UNIQUE(company_id, invoice_number) is the final guard.
+        // Keep IDENTICAL to RestaurantPosController::generateLocalInvoiceNumber —
+        // retail + restaurant share one sequence per company.
+        $taken = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->where('invoice_number', 'like', 'L-%')
             ->where('invoice_number', 'not like', 'LOCAL-%')
-            ->orderByRaw(\App\Helpers\DbCompat::cast("SUBSTR(invoice_number, 3)", 'int') . ' DESC')
             ->lockForUpdate()
-            ->first();
+            ->pluck('invoice_number');
 
-        if ($lastTransaction && preg_match('/^L-(\d+)$/', $lastTransaction->invoice_number, $matches)) {
-            $next = (int) $matches[1] + 1;
-        } else {
-            $next = 1;
+        $used = [];
+        foreach ($taken as $serial) {
+            if (preg_match('/^L-(\d+)$/', $serial, $matches)) {
+                $used[(int) $matches[1]] = true;
+            }
+        }
+
+        $next = 1;
+        while (isset($used[$next])) {
+            $next++;
         }
 
         return 'L-' . str_pad($next, 3, '0', STR_PAD_LEFT);

@@ -969,28 +969,32 @@ class RestaurantPosController extends Controller
 
     private function generateLocalInvoiceNumber($companyId)
     {
-        // T004 — vendor-requested short L-NNN provisional invoice format, identical to
-        // PosController::generateLocalInvoiceNumber so retail + restaurant share one sequence
-        // per company. Exclude legacy "LOCAL-YYYY-NNNNN" rows from the new "L-%" pattern so
-        // the counter is not corrupted on companies that have legacy provisional bills.
-        // Order by NUMERIC serial, not id — mirrors PosController::generateLocalInvoiceNumber
-        // (draft-resume POS→L downgrade can put the max L number on an old row; id-ordering
-        // would re-issue it and trip UNIQUE(company_id, invoice_number)).
-        // withoutGlobalScope('hide_archived'): day-close ARCHIVES local bills (they
-        // stay in the table + unique index, just hidden) — the counter must include
-        // them or the very next provisional collides with an archived L-NNN.
-        $lastTransaction = PosTransaction::withoutGlobalScope('hide_archived')
+        // T004 — vendor-requested short L-NNN provisional invoice format, IDENTICAL to
+        // PosController::generateLocalInvoiceNumber so retail + restaurant share one
+        // sequence per company (keep both in sync).
+        // Owner rule (22 Jul 2026) — SMALLEST FREE NUMBER, not max+1: deleted numbers
+        // are reused by NEW bills (gap-fill / daily restart after day-close delete);
+        // archived rows keep their numbers (withoutGlobalScope('hide_archived'));
+        // existing bills are never renumbered. Exclude legacy "LOCAL-YYYY-NNNNN" rows
+        // so the counter is not corrupted. lockForUpdate + UNIQUE(company_id,
+        // invoice_number) guard concurrent generators.
+        $taken = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->where('invoice_number', 'like', 'L-%')
             ->where('invoice_number', 'not like', 'LOCAL-%')
-            ->orderByRaw(\App\Helpers\DbCompat::cast("SUBSTR(invoice_number, 3)", 'int') . ' DESC')
             ->lockForUpdate()
-            ->first();
+            ->pluck('invoice_number');
 
-        if ($lastTransaction && preg_match('/^L-(\d+)$/', $lastTransaction->invoice_number, $matches)) {
-            $next = (int) $matches[1] + 1;
-        } else {
-            $next = 1;
+        $used = [];
+        foreach ($taken as $serial) {
+            if (preg_match('/^L-(\d+)$/', $serial, $matches)) {
+                $used[(int) $matches[1]] = true;
+            }
+        }
+
+        $next = 1;
+        while (isset($used[$next])) {
+            $next++;
         }
 
         return 'L-' . str_pad($next, 3, '0', STR_PAD_LEFT);

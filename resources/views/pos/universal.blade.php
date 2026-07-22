@@ -2,7 +2,7 @@
 @php
     $isSaaf = ($company->pos_dashboard_style ?? 'default') === 'saaf';
 @endphp
-@if($isSaaf)<link rel="stylesheet" href="{{ asset('css/pos-saaf.css') }}?v=1">@endif
+@if($isSaaf)<link rel="stylesheet" href="{{ asset('css/pos-saaf.css') }}?v=2">@endif
 <style>
 *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
 @keyframes cartPop { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1); } }
@@ -366,82 +366,22 @@ window.addEventListener('popstate', function() {
          being clipped off-screen (overflow-hidden root swallows anything past the edge). --}}
     <div class="tn-action-bar flex flex-wrap items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0 shadow-sm">
 
-        <div class="relative flex-shrink-0" style="min-width:180px;max-width:220px;">
-            <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-            <input type="search" x-ref="customerPhoneInput" x-model="customerPhoneQuery" @input="onCustomerPhoneInput()" @keydown.enter.prevent="if(!$event.repeat) onCustomerPhoneEnter()" @keydown.down.prevent="custNav(1)" @keydown.up.prevent="custNav(-1)" @keydown.escape.prevent="customerPhoneDropdown = false" @keydown.tab.prevent="$refs.searchInput?.focus()" @click.away="customerPhoneDropdown = false" placeholder="Customer name or mobile..." class="w-full pl-9 pr-7 py-2.5 rounded-xl text-sm border-2 transition shadow-sm" :class="selectedCustomer ? 'font-bold border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200' : 'font-medium border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400'" autocomplete="one-time-code" name="pos_customer_phone_nofill" data-lpignore="true" data-form-type="other">
-            <kbd x-show="!customerPhoneQuery && !selectedCustomer && !customerSearching" class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded font-mono">Alt+P</kbd>
-            {{-- Inline search spinner --}}
-            <svg x-show="customerSearching && !selectedCustomer" x-cloak class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            <button x-show="(customerPhoneQuery || selectedCustomer) && !customerSearching" @click="clearCustomerInput()" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 transition">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-            <div x-show="customerPhoneDropdown && customerPhoneResults.length > 0 && !showNewCustomerInline" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 max-h-52 overflow-y-auto" style="min-width:280px;">
-                {{-- Item #2 (owner, Jul 2026): ↑↓ arrow-key navigation — custHiIndex is the
-                     keyboard-highlighted row; Enter picks IT (not always the first result). --}}
-                <template x-for="(cr, ci) in customerPhoneResults" :key="cr.id">
-                    <button @click="selectCustomerFromPhone(cr)" @mouseenter="custHiIndex = ci" :data-cust-row="ci" class="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 transition border-b border-gray-50 dark:border-gray-800" :class="ci === custHiIndex ? 'bg-blue-100 dark:bg-blue-900/30' : ''">
-                        <div class="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-blue-600" x-text="cr.name.charAt(0)"></span></div>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-xs font-semibold text-gray-900 dark:text-white truncate" x-text="cr.name"></p>
-                            <p class="text-xs text-gray-400" x-text="cr.phone + (cr.stats ? ' • ' + cr.stats.total_orders + ' orders • Rs.' + Number(cr.stats.total_spent).toLocaleString() : '')"></p>
-                            <template x-if="cr.address"><p class="text-xs text-gray-400 truncate" x-text="cr.address"></p></template>
-                        </div>
-                        <template x-if="cr.stats && cr.stats.is_frequent"><span class="freq-badge">VIP</span></template>
-                    </button>
-                </template>
-            </div>
-
-            {{-- Inline "no match → quick add" hint (NO popup, INLINE only) --}}
-            <div x-show="customerPhoneDropdown && !showNewCustomerInline && customerPhoneResults.length === 0 && customerPhoneQuery.length >= 4 && /^[0-9]+$/.test(customerPhoneQuery.trim()) && !customerSearching" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-800 rounded-xl shadow-2xl z-50 overflow-hidden" style="min-width:280px;">
-                <button @click="openInlineNewCustomer()" class="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 transition">
-                    <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
-                        <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="text-xs font-bold text-blue-700 dark:text-blue-300">Add new customer</p>
-                        <p class="text-[10px] text-gray-500" x-text="customerPhoneQuery + ' · press Enter'"></p>
-                    </div>
-                </button>
-            </div>
-
-            {{-- Inline new-customer quick form (NO popup) --}}
-            <div x-show="showNewCustomerInline" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border-2 border-blue-400 dark:border-blue-600 rounded-xl shadow-2xl z-50 p-3 space-y-2" style="min-width:300px;" @keydown.escape.prevent="cancelInlineNewCustomer()">
-                <div class="flex items-center justify-between">
-                    <p class="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">+ New Customer</p>
-                    <button type="button" @click="cancelInlineNewCustomer()" class="text-gray-400 hover:text-red-500 text-[10px] font-semibold">Cancel</button>
-                </div>
-                <div class="text-[10px] font-semibold text-gray-600 dark:text-gray-400 px-2 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                    <span class="text-gray-400">Mobile:</span> <span class="text-gray-900 dark:text-white font-bold" x-text="newCustomerPhone"></span>
-                </div>
-                <input type="text" x-ref="newCustomerNameInput" x-model="newCustomerName"
-                    autocomplete="one-time-code" name="pos_newcust_name_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
-                    @keydown.enter.prevent="$refs.newCustomerAddressInput?.focus()"
-                    placeholder="Customer name (optional)"
-                    class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400">
-                <input type="text" x-ref="newCustomerAddressInput" x-model="newCustomerAddress"
-                    autocomplete="one-time-code" name="pos_newcust_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
-                    @keydown.enter.prevent="saveNewCustomer()"
-                    placeholder="Address (optional)"
-                    class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400">
-                <button type="button" @click="saveNewCustomer()" :disabled="savingCustomer" class="w-full py-2 text-xs font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60 transition">
-                    <span x-show="!savingCustomer">Save & Select (Enter)</span>
-                    <span x-show="savingCustomer">Saving…</span>
-                </button>
-            </div>
-        </div>
+        {{-- Customer box: Full styles keep it here in the action bar; SAAF renders the
+             SAME partial at the top of the Current Order panel instead (customer request,
+             22 Jul 2026) — see the cart column below. --}}
+        @if(!$isSaaf)
+        @include('pos.partials.sale-customer-box')
 
         <div class="w-px h-6 bg-gray-200 dark:bg-gray-700 hidden sm:block flex-shrink-0"></div>
+        @endif
 
         {{-- CATEGORY DROPDOWN (optional filter) — same activeCategory as the grid pills, so the two
              stay in sync. Default "All Categories" = old behavior, byte-identical. Unlike the pills
-             it is ALWAYS visible (even when the grid is hidden), so a chosen category is never an
-             invisible/stale filter — search deliberately narrows to it. Hidden automatically when
-             the company has no categories/services/deals to pick. --}}
+             it is ALWAYS visible (even when the grid is hidden). NOTE (22 Jul 2026): category scopes
+             the browsable GRID only — search is always GLOBAL (whole catalog), per customer request.
+             Hidden automatically when the company has no categories/services/deals to pick. --}}
         <div class="relative flex-shrink-0 hidden sm:block" x-show="catOptions().length > 0 || allServices.length > 0 || allDeals.length > 0" x-cloak>
-            <select x-model="activeCategory" title="Category chunein — grid aur search sirf usi category ke products dikhayenge"
+            <select x-model="activeCategory" title="Category chunein — grid usi category ke products dikhayega (search hamesha poore catalog mein chalti hai)"
                     class="appearance-none pl-3 pr-8 py-2.5 rounded-xl text-xs font-bold border-2 cursor-pointer max-w-[150px] shadow-sm transition focus:ring-2 focus:ring-purple-500 focus:border-purple-400"
                     :class="activeCategory !== 'all' ? 'border-purple-400 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300'">
                 <option value="all">All Categories</option>
@@ -512,7 +452,7 @@ window.addEventListener('popstate', function() {
                         <div class="flex-1 min-w-0">
                             <span class="text-sm font-semibold block leading-snug" :style="i === highlightIndex ? 'color:white;' : 'color:#1f2937;'" x-text="s.name"></span>
                             <div class="flex items-center gap-1.5">
-                                <span class="text-[10px]" :style="i === highlightIndex ? 'color:rgba(255,255,255,0.7);' : 'color:#9ca3af;'" x-text="s.type === 'service' ? 'Service' : s.category"></span>
+                                <span class="sugg-cat text-[10px]" :style="i === highlightIndex ? 'color:rgba(255,255,255,0.7);' : 'color:#9ca3af;'" x-text="s.type === 'service' ? 'Service' : s.category"></span>
                                 @if($company->inventory_enabled)
                                 <template x-if="s.stockStatus && s.stockStatus !== 'available'"><span class="stock-dot" :class="'stock-' + s.stockStatus"></span></template>
                                 @endif
@@ -692,7 +632,7 @@ window.addEventListener('popstate', function() {
 
         <div class="flex-1 flex flex-col overflow-hidden" :class="mobileView === 'menu' ? 'flex' : 'hidden md:flex'">
 
-            <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+            <div class="tn-cat-strip flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
                 <div class="flex items-center gap-2 overflow-x-auto hide-scrollbar flex-1 min-w-0">
                     <button @click="activeCategory = 'all'; filterProducts()" x-show="showProducts" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === 'all' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">
                         All <span class="ml-1 text-[10px] opacity-70" x-text="'(' + (allProducts.filter(p => p.show_on_sale !== false).length + allServices.length + allDeals.length) + ')'"></span>
@@ -857,6 +797,14 @@ window.addEventListener('popstate', function() {
                     <span class="text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-semibold" x-text="'T-' + selectedTable.table_number"></span>
                 </template>
             </div>
+
+            @if($isSaaf)
+            {{-- SAAF: customer box lives at the top of the Current Order panel (customer
+                 request, 22 Jul 2026) — same partial/Alpine state as the Full action bar. --}}
+            <div class="px-3 pt-2 pb-2 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+                @include('pos.partials.sale-customer-box', ['inCart' => true])
+            </div>
+            @endif
 
             <template x-if="selectedCustomer">
                 <div class="px-3 py-2 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/20 flex items-start gap-2">
@@ -3134,13 +3082,12 @@ function restaurantPos() {
                 // cashier can search a saved product and add it to the cart. No catalog
                 // match falls through to the inline "Create" prompt (inventory-OFF only).
                 if (q.length > 0) {
-                    // CATEGORY DROPDOWN: a chosen category narrows the suggestion pool to it.
-                    // "all" = whole catalog (old behavior, byte-identical).
-                    let all;
-                    if (this.activeCategory === 'services') all = [...this.allServices];
-                    else if (this.activeCategory === 'deals') all = [...this.allDeals];
-                    else if (this.activeCategory !== 'all') all = this.allProducts.filter(p => p.category === this.activeCategory);
-                    else all = [...this.allDeals, ...this.allProducts, ...this.allServices];
+                    // GLOBAL SEARCH (customer request, 22 Jul 2026): search ALWAYS covers the
+                    // whole catalog — deals + products + services — no matter which category is
+                    // selected. The category dropdown/pills only scope the browsable GRID; a
+                    // cashier typing a name must never get "not found" because a filter was left
+                    // on some other category.
+                    const all = [...this.allDeals, ...this.allProducts, ...this.allServices];
                     // FIRST-LETTER PRIORITY (customer suggestion, 21 Jul 2026): names that
                     // START with the typed text rank above mid-word matches. Two buckets —
                     // the scan can't stop at 12 total hits, because a LATER prefix match must
@@ -3159,13 +3106,8 @@ function restaurantPos() {
                         }
                     }
                     const out = [...pref, ...other].slice(0, 12);
-                    // SCANNER SAFETY: an exact barcode/SKU match from ANY category still
-                    // surfaces while a category filter is active — a scan must never "fail"
-                    // just because the dropdown was left on some other category.
-                    if (this.activeCategory !== 'all') {
-                        const exact = this.findExactCodeItem(q);
-                        if (exact && !out.includes(exact)) out.unshift(exact);
-                    }
+                    // (Scanner safety: pool is global now, so an exact barcode/SKU match is
+                    // always already in scope — the old category-filter rescue is unnecessary.)
                     // Exact barcode/SKU match jumps to the top so the scanner's trailing
                     // Enter always adds the right product (not an accidental name match).
                     out.sort((a, b) => (this.isExactCodeMatch(b, q) ? 1 : 0) - (this.isExactCodeMatch(a, q) ? 1 : 0));
@@ -3260,19 +3202,17 @@ function restaurantPos() {
             }
             let items = [...this.allDeals, ...this.allProducts, ...this.allServices];
             items = items.filter(i => parseFloat(i.price) > 0 && i.name && i.name.trim().length > 0);
-            // CATEGORY: the dropdown next to the search box is ALWAYS visible (unlike the pills),
-            // so a chosen category is never an invisible/stale filter — search now deliberately
-            // narrows to it ("All Categories" = whole catalog, old behavior). Search still includes
-            // products marked "Hidden from sale screen" (show_on_sale=false) within that scope —
-            // the hidden flag ONLY declutters the browsable grid, it must never stop a cashier
-            // from finding a saved product by name. Barcode scans stay GLOBAL via the exact-match
-            // fast path in addHighlightedItem/onSearchInput (never category-filtered).
-            if (this.activeCategory === 'services') { items = this.allServices.filter(s => parseFloat(s.price) > 0 && s.name && s.name.trim().length > 0); }
-            else if (this.activeCategory === 'deals') { items = this.allDeals.filter(d => parseFloat(d.price) > 0 && d.name && d.name.trim().length > 0); }
-            else if (this.activeCategory !== 'all') { items = this.allProducts.filter(p => p.category === this.activeCategory && parseFloat(p.price) > 0 && p.name && p.name.trim().length > 0); }
-            // Hidden products stay OUT of the browsable grid (when NOT searching) but remain fully
-            // searchable above — so only drop show_on_sale=false items when there is no search.
-            if (!hasSearch) { items = items.filter(i => i.show_on_sale !== false); }
+            // CATEGORY narrows the BROWSABLE grid only (GLOBAL SEARCH, customer request,
+            // 22 Jul 2026): while the cashier is typing a search, the grid shows matches from
+            // the WHOLE catalog — any category, hidden items included — mirroring the dropdown
+            // matcher. The category filter applies only to idle browsing (no search text), and
+            // hidden (show_on_sale=false) products stay out of that idle grid too.
+            if (!hasSearch) {
+                if (this.activeCategory === 'services') { items = this.allServices.filter(s => parseFloat(s.price) > 0 && s.name && s.name.trim().length > 0); }
+                else if (this.activeCategory === 'deals') { items = this.allDeals.filter(d => parseFloat(d.price) > 0 && d.name && d.name.trim().length > 0); }
+                else if (this.activeCategory !== 'all') { items = this.allProducts.filter(p => p.category === this.activeCategory && parseFloat(p.price) > 0 && p.name && p.name.trim().length > 0); }
+                items = items.filter(i => i.show_on_sale !== false);
+            }
             if (this.searchQuery) {
                 const q = this.searchQuery.toLowerCase();
                 // Grid search matches NAME, BARCODE or SKU (mirrors the dropdown matcher).

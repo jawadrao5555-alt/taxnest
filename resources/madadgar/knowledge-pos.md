@@ -18,7 +18,7 @@ Yeh NestPOS ka mukammal guide hai. Sirf is guide ki maloomat se jawab do.
 - Sale screen kholne ke liye: Dashboard par "Nayi Sale" ya menu se POS/Invoice Create.
 - Item add karne ke 3 tareeqay: (1) search box mein naam/barcode/SKU type karein, (2) product grid se click karein, (3) barcode scanner se scan karein — scan exact match foran cart mein daal deta hai (chahe koi category filter lagi ho).
 - Search mein pehle harf ko priority milti hai: jo items aap ke likhe harf se shuru hote hain wo sab se upar aate hain.
-- Category dropdown se items filter hote hain; search us waqt selected category ke andar hoti hai — item na mile to category "All" par rakhein.
+- Search hamesha GLOBAL hai (Jul 2026 update): category dropdown sirf GRID ko filter karta hai — search box mein type karein to har category ka item mil jata hai, chahe koi bhi category selected ho. Deals aur services bhi search mein aate hain.
 - Product grid ON/OFF toggle bhi hai — grid OFF ho to search se hi kaam chalta hai.
 - Quantity badhane ke liye cart row mein qty par click kar ke type karein, ya same item dobara add karein.
 - Item hatane ke liye cart row ke delete (X) par click karein.
@@ -28,7 +28,7 @@ Yeh NestPOS ka mukammal guide hai. Sirf is guide ki maloomat se jawab do.
 - Customer select karna OPTIONAL hai — walk-in customer ke liye chhor dein.
 - Screen Fit: action bar mein "Fit" dropdown se poori screen ka size 80–125% adjust karein (chhoti screens par khud 90% ho jata hai).
 - Receipt popup: payment ke baad receipt ka popup khulta hai — print karein ya khud band karein; yeh khud gayab nahi hota taake receipt miss na ho.
-- Saaf style (Jul 2026): agar company ka POS style "Saaf — Simple" ho to sale screen bhi saada look mein khulti hai — teal rang, bade search box ke saath. Kam-istemaal buttons (Rush, Fit, Keys, Quick) "Mazeed" button ke peechay chhupe hote hain — Mazeed dabane se dikh jate hain. SAARE features (shortcuts, hold, kitchen, local bills) waise hi kaam karte hain.
+- Saaf style (Jul 2026): agar company ka POS style "Saaf — Simple" ho to sale screen bhi saada look mein khulti hai — teal rang, bade search box ke saath. Kam-istemaal buttons (Rush, Fit, Keys, Quick), guided-flow ki steps wali patti aur category pills ki qatar "Mazeed" button ke peechay chhupi hoti hain — Mazeed dabane se dikh jati hain (category dropdown hamesha nazar aata hai). Saaf mein customer ka box "Current Order" panel ke upar hota hai. SAARE features (shortcuts, hold, kitchen, local bills) waise hi kaam karte hain.
 - Discount limit DONO types par lagti hai (Jul 2026): percentage bhi aur Rs. amount bhi — amount discount subtotal ke limit% se zyada nahi ho sakta (default 50%). Manager PIN override se limit barh sakti hai.
 
 ## Keyboard Shortcuts (Sale Screen)
@@ -49,6 +49,14 @@ Yeh NestPOS ka mukammal guide hai. Sirf is guide ki maloomat se jawab do.
 - PRA receipt aur Local receipt ki settings ALAG ALAG hain — dono ka apna set /pos/receipt-settings par hai.
 - "Show Tax" OFF karne se customer copy par Subtotal aur Tax chhup jate hain — sirf grand TOTAL nazar aata hai; items apni asal (as-entered) price par dikhte hain. Lekin PRA ko tax hamesha POORA submit hota hai.
 - Receipt ka default style: bold + center logo. Company chahe to plain style bhi choose kar sakti hai.
+
+## Printer aur Hardware (Setup)
+- NestPOS kisi bhi aam thermal receipt printer (80mm ya 58mm) ke saath chalta hai — USB, network ya Bluetooth; printer Windows/browser mein install ho to NestPOS se print ho jayegi.
+- Printer setup ka tareeqa: (1) printer PC se connect kar ke uska driver install karein, (2) browser ke print dialog mein wohi printer select karein, (3) /pos/receipt-settings par paper size (80mm/58mm) set karein — print khud printer ki asal width par fit ho jata hai.
+- Bina print dialog ke (silent) printing chahiye to Desktop Sync Agent install karein — receipt aur KOT seedha printer par jate hain, har bar dialog nahi khulta.
+- Barcode scanner: koi bhi aam USB/Bluetooth scanner jo keyboard ki tarah type karta hai, seedha chal jata hai — sale screen ke search box mein scan karein, exact match foran cart mein aa jata hai. Alag setup ki zaroorat nahi.
+- Cash drawer aksar printer ke saath juda hota hai (printer kick port) — receipt print par khul jata hai; yeh printer ki apni setting hai.
+- Printer sahi print nahi kar raha (kat raha hai, chhota print, ghayab lines) to pehle paper size setting check karein, phir printer driver — NestPOS receipts saste generic printers ke liye bhi tayyar ki gayi hain.
 
 ## PRA Reporting (Fiscal)
 - PRA reporting ON ho to har final bill PRA ko report hota hai aur usay POS-YYYY-NNNNN fiscal serial milta hai; receipt par PRA ka fiscal number aur QR aata hai.
@@ -87,6 +95,7 @@ Yeh NestPOS ka mukammal guide hai. Sirf is guide ki maloomat se jawab do.
 - Kitchen account: alag login jo KDS (Kitchen Display Screen) par orders dekhta hai aur ready mark karta hai.
 - Waiter tablets: waiter apne login se orders le sakta hai (F6 se held orders).
 - QR Menu: public QR profile se customer apne phone par menu dekh sakta hai (F8).
+- Recipes / Ingredients (Pro/Unlimited): /pos/restaurant/ingredients par kachha maal (ingredients) banayen — naam, unit, stock; /pos/restaurant/recipes par har dish ki recipe set karein (kaunsa ingredient kitna lagta hai). Dish bikne par ingredients ka stock recipe ke hisab se khud katta hai. Stock adjust karne ka option bhi ingredients page par hai.
 
 ## Delivery Riders
 - Riders /pos/deliveries board se manage hote hain — rider ki assignment BILL BANNE KE BAAD board se hoti hai (payment modal mein nahi).
@@ -149,7 +158,7 @@ Yeh NestPOS ka mukammal guide hai. Sirf is guide ki maloomat se jawab do.
 - "Login nahi ho raha": sahi panel use karein (/pos/login); password reset ke liye Forgot Password; 5 ghalat koshishon par thori der lock.
 - "Receipt par tax nahi dikh raha": /pos/receipt-settings par "Show Tax" ON karein.
 - "Printer poora width use nahi kar raha / kat raha hai": receipt-settings mein paper size (80mm/58mm) check karein.
-- "Item search mein nahi mil raha": category filter "All" par rakhein; product ka naam/barcode /pos/products par check karein.
+- "Item search mein nahi mil raha": search ab har category mein dhoondti hai (Jul 2026) — item phir bhi na mile to product ka naam/barcode /pos/products par check karein (kahin product inactive ya delete to nahi).
 - "Bills ki limit khatam ho gayi": package upgrade karein ya filhal provisional bills banayen (baad mein promote).
 - "Team member add nahi ho raha": package ki account limit poori ho chuki hai — upgrade karein.
 - "Restaurant features nazar nahi aa rahe": Pro ya Unlimited package chahiye, phir POS Features se ON karein.

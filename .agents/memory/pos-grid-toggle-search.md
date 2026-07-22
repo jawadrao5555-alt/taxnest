@@ -13,11 +13,10 @@ description: How the inventory-OFF showProducts toggle interacts with the two se
 # The rule (updated Jul 2026 — category dropdown)
 `filterProducts()` must populate the grid when `showProducts=false` AND a search query is present; clearing the search must re-enter the early return so the grid hides again.
 
-**Category scoping (owner request Jul 2026):** search now RESPECTS `activeCategory` (grid + suggestions) — the old "ignore stale category while searching" rule was retired because a category `<select>` next to the search bar (bound to the same `activeCategory` as the pills) is always visible ≥sm, so the filter is never invisible. Guards that keep it safe:
-- Barcode/SKU scans stay GLOBAL: `findExactCodeItem` fast path unfiltered + exact code matches from any category unshifted into suggestions (PRA only; FBR search is name-only).
-- Quick-create DUPLICATE GUARD: before `quickCreateProduct()`, an exact-NAME lookup across the whole catalog adds the existing item instead of creating a 'Quick' copy.
-- `toggleShowProducts()` OFF resets `activeCategory='all'` (on <sm the dropdown is `hidden sm:block`, so a pill-picked category would become an invisible filter — the one place the old stale-category trap still applied).
-- Esc resets category to 'all' (pre-existing).
+**Search is GLOBAL again (customer complaint, 22 Jul 2026 — PRA only):** the earlier category-scoped search caused real shops to think items were missing. Final rule: `activeCategory` (pills + dropdown) filters the GRID only; the moment a search query exists, BOTH surfaces search the WHOLE catalog (deals + products + services, `show_on_sale` hidden items included). In `filterProducts()` the category filter AND the show_on_sale filter live inside the `if (!hasSearch)` branch; `onSearchInput()` pool is always `[...allDeals, ...allProducts, ...allServices]`. FBR port NOT changed (owner focus = PRA only) — its search stays name-only/as-is; mirror there only when the owner asks.
+- Barcode/SKU scans were already global; the scanner unshift-guard became redundant and was removed with the pool change.
+- Quick-create DUPLICATE GUARD stays: exact-NAME lookup across the whole catalog before `quickCreateProduct()`.
+- `toggleShowProducts()` OFF still resets `activeCategory='all'` (grid-off UX, not a search correctness need anymore).
 
-**Why:** took several attempts originally — the dropdown-only fix didn't satisfy the owner; later the owner explicitly asked for category-scoped browse/search, which inverted the stale-category rule but required the scan/duplicate/mobile guards above.
-**How to apply:** any change to grid visibility / search gating / category filtering on either sale screen must keep BOTH surfaces working, keep scans global, and mirror PRA ↔ FBR port.
+**Why:** this rule has now FLIPPED TWICE (global → category-scoped on owner request → global on customer complaints). Search scope is a customer-facing sore spot — never narrow search silently; if scoping is ever requested again, keep the grid scoped but leave typed search global.
+**How to apply:** any change to grid visibility / search gating / category filtering must keep BOTH surfaces working and keep typed search + scans global; Madadgar KB "Sale Screen" + troubleshooting lines describe search behavior — update them in the same deploy.

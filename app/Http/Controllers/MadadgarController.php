@@ -95,6 +95,22 @@ class MadadgarController extends Controller
             return response()->json(['error' => 'Maazrat, is waqt jawab nahi mil saka — thori der baad koshish karein ya WhatsApp par rabta karein.'], 502);
         }
 
+        // Escalation-limit pre-check (customer report, 22 Jul 2026): agar aaj ki
+        // escalation limit poori ho chuki hai to confirm card BILKUL mat bhejo —
+        // warna user "Haan, bhej dein" dabata hai aur upar red error, neeche
+        // phir bhi card — confusing. Card ki jagah reply mein hi saaf bata do.
+        if ($result['escalation'] !== null) {
+            $todayEsc = FeatureSuggestion::where('user_id', $user->id)
+                ->where('source', 'madadgar')
+                ->whereDate('created_at', now()->toDateString())
+                ->count();
+            if ($todayEsc >= self::DAILY_ESCALATION_CAP) {
+                $result['escalation'] = null;
+                $result['text'] = rtrim($result['text'])
+                    ."\n\nNote: aaj admin team ko bhejne ki limit poori ho chuki hai — kal dobara bhej sakte hain, ya foran madad ke liye WhatsApp par rabta karein.";
+            }
+        }
+
         MadadgarMessage::create([
             'company_id' => $user->company_id,
             'user_id' => $user->id,

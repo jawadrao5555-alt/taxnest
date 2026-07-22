@@ -173,3 +173,34 @@ body[data-saaf].saaf-show-all .saaf-more-btn {
     border-color: #0d9488 !important;
     color: #ffffff !important;
 }
+
+/* ---------- 9. Declutter (customer feedback, 22 Jul 2026) ----------
+   Guided-flow stepper strip ("1 · Customer …") + category pills row are
+   hidden by default — they ate vertical space; "Mazeed" reveals BOTH
+   (same toggle as the secondary toolbar buttons). Category filtering
+   stays available via the always-visible dropdown next to search; the
+   grid ON/OFF toggle lives in the pills row, so Mazeed reveals it too. */
+body[data-saaf]:not(.saaf-show-all) .tn-flow-strip,
+body[data-saaf]:not(.saaf-show-all) .tn-cat-strip {
+    display: none !important;
+}
+
+/* ---------- 10. Compact search dropdown (customer feedback) ----------
+   One line per product (category sub-label hidden), tighter rows, taller
+   list — more results visible without scrolling. Stock dots stay. */
+body[data-saaf] .sugg-cat {
+    display: none !important;
+}
+body[data-saaf] [x-ref="searchDropdown"] {
+    max-height: min(60vh, 480px) !important;
+}
+body[data-saaf] [x-ref="searchDropdown"] button {
+    padding-top: 5px !important;
+    padding-bottom: 5px !important;
+}
+
+/* ---------- 11. Customer box atop Current Order panel (saaf) ---------- */
+body[data-saaf] input[name="pos_customer_phone_nofill"] {
+    min-height: 44px !important;
+    font-size: 15px !important;
+}

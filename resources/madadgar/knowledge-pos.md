@@ -23,7 +23,8 @@ Yeh NestPOS ka mukammal guide hai. Sirf is guide ki maloomat se jawab do.
 - Quantity badhane ke liye cart row mein qty par click kar ke type karein, ya same item dobara add karein.
 - Item hatane ke liye cart row ke delete (X) par click karein.
 - Har cart row par per-item TAX/NO TAX toggle, Discount aur Note ka option hai.
-- Quick Type / Manual entry: agar item inventory mein nahi (ya inventory OFF hai) to naam + price khud type kar ke bill mein daal sakte hain — yeh bhi normal bill ki tarah process hota hai.
+- Manual entry: agar item inventory mein nahi (ya inventory OFF hai) to naam + price khud type kar ke bill mein daal sakte hain — yeh bhi normal bill ki tarah process hota hai.
+- Quick Type Mode (F7): "chai 2, samosa 1" type karein aur pura order seedha cart mein aa jata hai — khaane-peene ki dukaano ke liye behtareen. Yeh feature DEFAULT BAND hai; admin Customize POS (/pos/customize) se "Quick Type Mode" toggle ON kar sakta hai. Toggle OFF ho to sale screen par Quick button aur F7 dono kaam nahi karte.
 - Customer select karna OPTIONAL hai — walk-in customer ke liye chhor dein.
 - Screen Fit: action bar mein "Fit" dropdown se poori screen ka size 80–125% adjust karein (chhoti screens par khud 90% ho jata hai).
 - Receipt popup: payment ke baad receipt ka popup khulta hai — print karein ya khud band karein; yeh khud gayab nahi hota taake receipt miss na ho.

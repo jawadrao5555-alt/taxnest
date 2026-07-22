@@ -12,7 +12,8 @@ Restaurant screen retired: `RestaurantPosController::pos()` early-redirects to `
 - Barcode/SKU exact-match search with fast-path add; scans stay GLOBAL (never category-narrowed).
 - FIRST-LETTER PRIORITY ranking (customer suggestion, Jul 2026): name-prefix matches rank ABOVE mid-word matches in BOTH matchers (grid `filterProducts` stable sort + dropdown `onSearchInput` pref/other buckets, loop stops only at 12 PREFIX hits) — mid-word matches stay listed below, exact barcode/SKU still jumps to top (scanner sort runs AFTER the bucketing). Mirrored in FBR universal port — any change to one matcher must hit all FOUR spots (2 files × grid+dropdown).
 - Category dropdown next to search (optional, default All — same `activeCategory` as pills, always visible ≥sm; search/grid narrow to it; quick-create has exact-name duplicate guard; grid-OFF toggle resets to All).
-- Customer phone filters-as-you-type; per-item NO TAX/TAX toggle; Quick Type manual entry (inventory-OFF).
+- Customer phone filters-as-you-type; per-item NO TAX/TAX toggle; Manual Item entry (inventory-OFF).
+- Quick Type Mode (F7 "chai 2, samosa 1" → cart) is OPT-IN per company, default OFF (customers called the button clutter); enable via Customize POS. NEVER re-add it unconditionally. FBR universal port deliberately NOT gated (owner PRA-only focus) — its always-visible Quick button is intentional, not a gap.
 - Order-type widget renders only when a restaurant-ish feature is on.
 
 ## Cart mechanics (critical)

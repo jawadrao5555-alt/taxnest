@@ -587,11 +587,14 @@ window.addEventListener('popstate', function() {
             <span class="text-[8px] font-mono bg-gray-200 dark:bg-gray-700 px-1 rounded hidden sm:inline">F1</span>
         </button>
 
+        {{-- Quick Type — OPT-IN (Customize POS toggle); hidden server-side when OFF. --}}
+        @if($company->pos_quick_type_enabled ?? false)
         <button @click="openQuickType()" class="flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 hover:border-sky-300 transition flex-shrink-0" title="Quick Type Mode (F7) — type 'chai 2, samosa 1' or pick random product">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
             <span class="hidden lg:inline">Quick</span>
             <span class="text-[8px] font-mono bg-sky-200 dark:bg-sky-800/50 px-1 rounded hidden sm:inline">F7</span>
         </button>
+        @endif
 
         {{-- Manual Item — only when inventory mode is OFF (Simple Mode).
              Lets the cashier bill an ad-hoc item that isn't in the product list.
@@ -2440,6 +2443,10 @@ function restaurantPos() {
         // existing functions (addHighlightedItem, enterCartMode, showPayModal,
         // clearCart). It NEVER rewrites handleKey or changes F-key bindings.
         guidedFlow: {{ ($company->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }},
+        // Quick Type Mode is OPT-IN per company (default OFF — owner 22 Jul 2026:
+        // customers found the button cluttering; dhaba/food shops enable it on
+        // /pos/customize). Gates the toolbar button, F7 shortcut and modal entry.
+        quickTypeEnabled: {{ ($company->pos_quick_type_enabled ?? false) ? 'true' : 'false' }},
         flowStep: 'customer',
         // flowTypeIndex — highlighted choice in the guided Order-Type step (0-based into
         // guidedOrderTypes()). Seeded from the current orderType when the step opens.
@@ -3323,6 +3330,7 @@ function restaurantPos() {
         // by case-insensitive substring on this.products[].name.
         // ──────────────────────────────────────────────────────────────
         openQuickType() {
+            if (!this.quickTypeEnabled) return; // opt-in feature — OFF companies never open it
             this.showQuickType = true;
             this.parseQuickTypeText();
         },
@@ -3937,7 +3945,8 @@ function restaurantPos() {
             if (e.key === 'F4') { e.preventDefault(); if (this.cart.length && confirm('Clear entire cart?')) { this.clearCart(); } return; }
             if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); return; }
             if (e.key === 'F6') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode('last'); this.mobileView = 'cart'; } return; }
-            // F7 → Quick Type (was customer-phone-focus, moved to Alt+P)
+            // F7 → Quick Type (was customer-phone-focus, moved to Alt+P).
+            // Opt-in gate: when the company toggle is OFF, F7 is a no-op.
             if (e.key === 'F7') { e.preventDefault(); this.openQuickType(); return; }
             if (e.key === 'F8') { e.preventDefault(); if (this.cart.length) { this.submitting = false; this.showPayModal = true; } return; }
             // F9 → Save Provisional (was Quick Type, moved to F7)

@@ -70,6 +70,23 @@ class PosController extends Controller
     }
 
     /**
+     * Quick Type Mode toggle — admin-only, OPT-IN (default OFF).
+     * Owner 22 Jul 2026: customers found the sale-screen "Quick" button
+     * cluttering; dhaba/food shops that want it enable it here.
+     */
+    public function updateQuickType(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->isPosCashier()) {
+            return response()->json(['success' => false, 'message' => 'Only POS administrators can change this setting.'], 403);
+        }
+        $enabled = $request->boolean('enabled');
+        $companyId = app('currentCompanyId');
+        Company::where('id', $companyId)->update(['pos_quick_type_enabled' => $enabled]);
+        return response()->json(['success' => true, 'enabled' => $enabled]);
+    }
+
+    /**
      * Tax-Inclusive Pricing (Menu-Rate-Final) mode toggle — admin-only.
      * Applies to NEW bills only: existing bills keep their own tax_inclusive
      * snapshot, so history/reports/PRA payloads never shift retroactively.

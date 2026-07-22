@@ -432,6 +432,15 @@ Route::middleware('auth')->group(function () {
         ->name('payment-proof.store')->middleware('throttle:6,1');
 });
 
+// Madadgar AI support bot (owner request 22 Jul 2026) — pos.auth ONLY, NO
+// company.approval: pending companies may chat (their POSTs would be 403'd
+// otherwise). ALL POS roles allowed, including cashiers (owner explicit).
+Route::middleware(['pos.auth'])->prefix('pos/madadgar')->group(function () {
+    Route::get('/history', [\App\Http\Controllers\MadadgarController::class, 'history'])->name('pos.madadgar.history');
+    Route::post('/message', [\App\Http\Controllers\MadadgarController::class, 'message'])->name('pos.madadgar.message')->middleware('throttle:20,1');
+    Route::post('/escalate', [\App\Http\Controllers\MadadgarController::class, 'escalate'])->name('pos.madadgar.escalate')->middleware('throttle:10,1');
+});
+
 Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(function () {
     Route::get('/agent', [\App\Http\Controllers\AgentManagementController::class, 'show'])->name('pos.agent');
     Route::post('/agent/generate-key', [\App\Http\Controllers\AgentManagementController::class, 'generateKey'])->name('pos.agent.generate');
@@ -756,6 +765,10 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/feature-suggestions', [\App\Http\Controllers\FeatureSuggestionController::class, 'adminIndex'])->name('admin.feature-suggestions');
     Route::post('/feature-suggestions/{id}/status', [\App\Http\Controllers\FeatureSuggestionController::class, 'setStatus'])->name('admin.feature-suggestions.status');
     Route::delete('/feature-suggestions/{id}/delete', [\App\Http\Controllers\FeatureSuggestionController::class, 'destroy'])->name('admin.feature-suggestions.destroy');
+
+    // Madadgar AI bot — chat logs + settings (owner request 22 Jul 2026)
+    Route::get('/madadgar-chats', [\App\Http\Controllers\MadadgarController::class, 'adminChats'])->name('admin.madadgar-chats');
+    Route::post('/madadgar-settings', [\App\Http\Controllers\MadadgarController::class, 'adminSettings'])->name('admin.madadgar-settings');
 
     Route::get('/invoice-override', [AdminController::class, 'invoiceSearch'])->name('admin.invoice-override');
     Route::post('/invoice-override/{id}', [AdminController::class, 'invoiceOverride'])->name('admin.invoice-override.action');

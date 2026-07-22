@@ -90,7 +90,12 @@
                                         <div class="text-xs text-gray-500 dark:text-gray-400">{{ $sugg->user->name ?? 'User #' . $sugg->user_id }}</div>
                                     </td>
                                     <td class="px-4 py-3">
-                                        <div class="font-medium text-gray-800 dark:text-gray-100">{{ $sugg->title }}</div>
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <span class="font-medium text-gray-800 dark:text-gray-100">{{ $sugg->title }}</span>
+                                            @if(($sugg->source ?? 'user') === 'madadgar')
+                                                <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">🤖 Madadgar Bot</span>
+                                            @endif
+                                        </div>
                                         @if($sugg->details)
                                             <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-md whitespace-pre-line">{{ $sugg->details }}</div>
                                         @endif

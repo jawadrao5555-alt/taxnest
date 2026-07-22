@@ -892,7 +892,8 @@
         @endif
         <x-pwa-update color="purple" />
         <x-trial-lock-modal />
-        <x-whatsapp-support />
+        {{-- Madadgar unified support bubble (AI chat + WhatsApp) — replaces the plain WhatsApp bubble on POS (owner, 22 Jul 2026) --}}
+        <x-madadgar-support />
         <script src="{{ asset('js/wheel-scroll.js') }}?v=1" defer></script>
     </body>
 </html>

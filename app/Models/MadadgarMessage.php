@@ -4,13 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class FeatureSuggestion extends Model
+class MadadgarMessage extends Model
 {
     protected $fillable = [
-        'company_id', 'user_id', 'product', 'title', 'details', 'status', 'admin_note', 'source',
+        'company_id', 'user_id', 'session_id', 'role', 'content', 'escalation_id',
     ];
-
-    public const STATUSES = ['pending', 'planned', 'completed', 'rejected'];
 
     public function user()
     {

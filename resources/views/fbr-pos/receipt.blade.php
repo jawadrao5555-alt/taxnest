@@ -4,12 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Receipt - {{ $transaction->invoice_number }}</title>
-    @php $paperSize = $company->print_paper_size ?? 'thermal'; @endphp
+    @php
+        $paperSize = $company->print_paper_size ?? 'thermal';
+        $is58 = $paperSize === 'thermal58';
+        // Receipt Display toggles (owner, 22 Jul 2026) — business-profile Print Settings.
+        $rd = $company->displayPrefs('fbrpos');
+    @endphp
     <style>
         @if($paperSize === 'a4')
             /* 📄 A4 mode — thermal-width receipt centered on full A4.
                15mm side + 18mm bottom margins prevent corner-cut on consumer printers. */
             @page { size: A4 portrait; margin: 15mm 15mm 18mm 15mm; }
+        @elseif($is58)
+            /* 🧾 Small thermal — 58mm continuous roll */
+            @page { size: 58mm auto; margin: 0; }
         @else
             /* 🧾 Thermal mode — 80mm continuous roll, auto-cut */
             @page { size: 80mm auto; margin: 0; }
@@ -19,14 +27,14 @@
             /* Owner (22 Jul 2026, mirrors PRA receipt): Arial/Helvetica — Courier's
                hairline strokes print faint on laser printers. */
             font-family: Arial, Helvetica, sans-serif;
-            font-size: 12px;
-            width: 80mm;
-            max-width: 80mm;
+            font-size: {{ $is58 ? '11px' : '12px' }};
+            width: {{ $is58 ? '58mm' : '80mm' }};
+            max-width: {{ $is58 ? '58mm' : '80mm' }};
             margin: 0 auto;
-            padding: 3mm;
+            padding: {{ $is58 ? '2mm' : '3mm' }};
             background: #fff;
             color: #000;
-            line-height: 1.4;
+            line-height: 1.35;
             word-wrap: break-word;
             overflow-wrap: break-word;
             font-weight: 500;
@@ -42,7 +50,7 @@
         .header p { font-size: 10px; line-height: 1.4; word-wrap: break-word; color: #000; font-weight: 600; }
 
         .info-table { width: 100%; border-collapse: collapse; margin: 2px 0; }
-        .info-table td { font-size: 11px; padding: 2px 0; vertical-align: top; color: #000; font-weight: 600; }
+        .info-table td { font-size: 11px; padding: 1px 0; vertical-align: top; color: #000; font-weight: 600; }
         .info-table .info-label { width: 32%; font-weight: bold; white-space: nowrap; color: #000; }
         .info-table .info-value { width: 68%; text-align: right; word-wrap: break-word; color: #000; }
 
@@ -57,8 +65,8 @@
         .top-badge .tb-serial { font-size: 11px; font-weight: bold; margin-top: 2px; word-break: break-all; }
 
         .items-table { width: 100%; margin: 4px 0; border-collapse: collapse; table-layout: fixed; }
-        .items-table th { font-size: 10px; text-transform: uppercase; border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 4px 1px; text-align: left; font-weight: bold; color: #000; }
-        .items-table td { font-size: 11px; padding: 4px 1px; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; color: #000; font-weight: 600; }
+        .items-table th { font-size: 10px; text-transform: uppercase; border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 3px 1px; text-align: left; font-weight: bold; color: #000; }
+        .items-table td { font-size: 11px; padding: 3px 1px; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; color: #000; font-weight: 600; }
         .items-table .col-item { width: 38%; text-align: left; }
         .items-table .col-uom { width: 10%; text-align: center; }
         .items-table .col-qty { width: 10%; text-align: center; }
@@ -68,10 +76,10 @@
         .items-table tbody tr:last-child { border-bottom: none; }
 
         .totals-table { width: 100%; border-collapse: collapse; margin: 4px 0; }
-        .totals-table td { font-size: 11px; padding: 3px 0; vertical-align: top; color: #000; font-weight: 600; }
+        .totals-table td { font-size: 11px; padding: 2px 0; vertical-align: top; color: #000; font-weight: 600; }
         .totals-table .tot-label { text-align: left; color: #000; }
         .totals-table .tot-value { text-align: right; white-space: nowrap; color: #000; font-weight: bold; }
-        .totals-table .grand-total td { font-size: 17px; font-weight: 900; padding: 8px 4px; color: #000; border-top: 2.5px solid #000; border-bottom: 2.5px solid #000; letter-spacing: 0.3px; }
+        .totals-table .grand-total td { font-size: {{ $is58 ? '15px' : '17px' }}; font-weight: 900; padding: 6px 4px; color: #000; border-top: 2.5px solid #000; border-bottom: 2.5px solid #000; letter-spacing: 0.3px; }
 
         .fbr-badge { border: 2px solid #000; padding: 6px; margin: 6px 0; text-align: center; font-size: 10px; overflow: hidden; color: #000; font-weight: 600; }
         .fbr-badge .fbr-title { font-size: 12px; font-weight: bold; margin-bottom: 3px; color: #000; }
@@ -81,9 +89,9 @@
         @media print {
             /* PRINTABLE-WIDTH FIX v2 (Jul 2026): 80mm paper prints only ~72mm — cap at
                the SAFE printable width and center; drivers reporting the full 80mm page
-               no longer clip the right edge. A4 branch below re-fixes width for A4
-               (centered on the big page, so no clipping there). */
-            body { width: auto; max-width: 72mm; padding: 1mm; margin: 0 auto; }
+               no longer clip the right edge (58mm prints ~48mm). A4 branch below
+               re-fixes width for A4 (centered on the big page, so no clipping there). */
+            body { width: auto; max-width: {{ $is58 ? '48mm' : '72mm' }}; padding: 1mm; margin: 0 auto; }
             .no-print { display: none !important; }
             @if($paperSize === 'a4')
                 /* A4: centered on page, no page break inside the receipt so it stays intact */
@@ -128,9 +136,9 @@
         </div>
         @endif
         <h1>{{ $company->name }}</h1>
-        @if($company->address)<p>{{ $company->address }}</p>@endif
-        @if($company->phone)<p>Tel: {{ $company->phone }}</p>@endif
-        @if($company->ntn)<p>NTN: {{ $company->ntn }}</p>@endif
+        @if($rd['show_address'] && $company->address)<p>{{ $company->address }}</p>@endif
+        @if($rd['show_mobile'] && $company->phone)<p>Tel: {{ $company->phone }}</p>@endif
+        @if($rd['show_ntn'] && $company->ntn)<p>NTN: {{ $company->ntn }}</p>@endif
     </div>
 
     <div class="separator"></div>
@@ -179,7 +187,7 @@
         @endif
         <tr><td class="info-label">Tax Period:</td><td class="info-value">{{ $transaction->created_at->format('M Y') }}</td></tr>
         <tr><td class="info-label">Payment:</td><td class="info-value">{{ ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</td></tr>
-        @if($transaction->creator)
+        @if($rd['show_cashier'] && $transaction->creator)
         <tr><td class="info-label">Cashier:</td><td class="info-value">{{ $transaction->creator->name }}</td></tr>
         @endif
         @if($company->fbr_pos_id)
@@ -295,12 +303,21 @@
         <div style="font-size:9px; margin-top:3px;">POS Reg #: {{ $company->fbr_pos_id }}</div>
         @endif
     </div>
+    @else
+    {{-- Owner (22 Jul 2026): SALE RECEIPT / PROVISIONAL bills also carry a QR at the
+         bottom — same as PRA finals — so every bill is scannable. --}}
+    <div style="text-align: center; margin: 4px 0;">
+        <img src="{{ $qrUrl }}" alt="QR Code" style="width:{{ $is58 ? '85px' : '100px' }}; height:{{ $is58 ? '85px' : '100px' }}; margin:0 auto; display:block;">
+        <div style="font-size:9px; margin-top:2px;">Scan for bill details</div>
+    </div>
     @endif
 
     <div class="footer text-center">
+        @if($rd['show_footer'])
         <p>Thank you for your purchase!</p>
         @if(!empty($company->receipt_footer_note))
         <p style="font-style: italic; margin-top:2px;">{{ $company->receipt_footer_note }}</p>
+        @endif
         @endif
         @if($company->fbr_pos_id)
         <p style="font-weight:bold;">Integrated with FBR | Reg #: {{ $company->fbr_pos_id }}</p>

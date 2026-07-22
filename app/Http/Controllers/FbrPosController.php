@@ -2192,7 +2192,7 @@ class FbrPosController extends Controller
                 'phone' => 'nullable|string|max:20',
                 'email' => 'nullable|email|max:255',
                 'ntn' => 'nullable|string|max:20',
-                'print_paper_size' => 'nullable|in:thermal,a4',
+                'print_paper_size' => 'nullable|in:thermal,thermal58,a4',
                 'receipt_footer_note' => 'nullable|string|max:255',
                 'logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
                 'remove_logo' => 'nullable|boolean',
@@ -2210,6 +2210,18 @@ class FbrPosController extends Controller
                 $company->logo_path = $request->file('logo')->store('company-logos', 'public');
             }
 
+            // Receipt Display toggles (owner, 22 Jul 2026): stored under the
+            // 'fbrpos' key of invoice_display_prefs — same generic set the PRA
+            // receipt-settings page uses ('pos'/'pos_local' keys untouched).
+            $prefs = $company->invoice_display_prefs ?? [];
+            $prefs['fbrpos'] = [
+                'show_address' => $request->has('rd_show_address'),
+                'show_ntn' => $request->has('rd_show_ntn'),
+                'show_mobile' => $request->has('rd_show_phone'),
+                'show_cashier' => $request->has('rd_show_cashier'),
+                'show_footer' => $request->has('rd_show_footer'),
+            ];
+
             $company->fill([
                 'name' => $validated['name'],
                 'address' => $validated['address'] ?? null,
@@ -2218,6 +2230,7 @@ class FbrPosController extends Controller
                 'ntn' => $validated['ntn'] ?? null,
                 'print_paper_size' => $validated['print_paper_size'] ?? 'thermal',
                 'receipt_footer_note' => $validated['receipt_footer_note'] ?? null,
+                'invoice_display_prefs' => $prefs,
             ])->save();
 
             return redirect()->route('fbrpos.business-profile')->with('success', 'Business profile updated successfully.');

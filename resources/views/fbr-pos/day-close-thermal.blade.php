@@ -28,8 +28,10 @@
     @media print {
         html, body { background: #fff; }
         .toolbar { display: none; }
-        .receipt { width: 100%; max-width: 80mm; margin: 0; padding: 0 2mm; }
-        @page { margin: 3mm; size: 80mm auto; }
+        @php $zIs58 = ($company->print_paper_size ?? 'thermal') === 'thermal58'; @endphp
+        {{-- 58mm rolls print ~48mm — cap at printable width, never the physical width. --}}
+        .receipt { width: 100%; max-width: {{ $zIs58 ? '48mm' : '80mm' }}; margin: 0; padding: 0 2mm; {{ $zIs58 ? 'font-size: 10px;' : '' }} }
+        @page { margin: 3mm; size: {{ $zIs58 ? '58mm' : '80mm' }} auto; }
     }
 </style>
 </head>

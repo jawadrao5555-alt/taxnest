@@ -101,6 +101,26 @@ also got the Arial font, logo line-height:0 wrapper, top badge, margin trims. FB
 PAYMENT (plain info row only — no delivery/rider module there). Old bottom LOCAL INVOICE badge
 removed. "FBR PENDING" must NEVER show on NULL/'local' bills (they will never be submitted).
 
+**FBR receipt improvements batch (owner, 22 Jul 2026):**
+- **QR on EVERY bill**: top-badge bills (SALE RECEIPT / PROVISIONAL) get a bottom centered QR
+  ("Scan for bill details") in the receipt's bottom three-branch: `@if(submitted)` FBR badge /
+  `@elseif(!$fbrRcptTopBadge)` FBR PENDING / `@else` plain QR. invoice-pdf already had QR for
+  these (QrImage::dataUri, PNG for DomPDF). Never remove the QR from any branch.
+- **58mm paper**: `companies.print_paper_size` third value `'thermal58'` (validation
+  `in:thermal,thermal58,a4`; col string(20), no migration). Read ONLY in fbr-pos receipt.blade
+  + day-close-thermal + business-profile radio. Print CSS caps at **48mm** printable width
+  (thermal-print-width rule — never force physical 58mm). PRA side uses a different column
+  (`receipt_printer_size` 80mm/58mm) — do not mix them up.
+- **FBR Receipt Display toggles**: stored `invoice_display_prefs['fbrpos']` via generic
+  `Company::displayPrefs('fbrpos')` (defaults all-true ⇒ untouched companies unchanged). Edited on
+  /fbr-pos/business-profile Print Settings (`rd_show_*` checkboxes; phone maps to `show_mobile`).
+  Gates: header address/Tel/NTN (+email in PDF), Cashier row, footer thank-you + receipt_footer_note
+  — in BOTH receipt.blade + invoice-pdf.blade. FBR badge/QR/serials/POS Reg#/Powered-by ALWAYS
+  shown (regulatory). Controller must merge-read prefs (`?? []`) — never clobber 'pos'/'pos_local'/
+  'pos_style' keys. NO show_tax toggle on FBR (owner never asked; PRA-only concept).
+- FBR has NO separate receipt-settings page — toggles live on business-profile (which is
+  NOT role-gated, pre-existing; other FBR admin actions check role==='company_admin').
+
 **PAYMENT box = DELIVERY bills ONLY (owner, 22 Jul 2026):** the boxed "PAYMENT: CASH/CARD" prints
 only when `order_type==='delivery' || delivery_address || rider` (order_type is the primary gate —
 riders are assigned board-only AFTER payment and address is optional, so the fallbacks alone miss

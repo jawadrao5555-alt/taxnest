@@ -88,7 +88,7 @@
 
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Receipt Paper Size</label>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     @php $current = old('print_paper_size', $company->print_paper_size ?? 'thermal'); @endphp
 
                     <label class="relative flex cursor-pointer rounded-lg border-2 p-4 transition
@@ -99,6 +99,18 @@
                             <div>
                                 <div class="font-bold text-sm text-gray-900 dark:text-white">Thermal Printer (80mm)</div>
                                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Standard POS thermal roll. Auto-cut after each receipt.</p>
+                            </div>
+                        </div>
+                    </label>
+
+                    <label class="relative flex cursor-pointer rounded-lg border-2 p-4 transition
+                                 {{ $current === 'thermal58' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-300' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-blue-400' }}">
+                        <input type="radio" name="print_paper_size" value="thermal58" class="sr-only" {{ $current === 'thermal58' ? 'checked' : '' }}>
+                        <div class="flex items-start gap-3">
+                            <span class="text-3xl">🧾</span>
+                            <div>
+                                <div class="font-bold text-sm text-gray-900 dark:text-white">Small Thermal (58mm)</div>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Compact 58mm roll for small/portable thermal printers.</p>
                             </div>
                         </div>
                     </label>
@@ -116,6 +128,27 @@
                     </label>
                 </div>
                 @error('print_paper_size') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+            </div>
+
+            {{-- Receipt Display toggles (owner, 22 Jul 2026 — mirrors PRA /pos/receipt-settings) --}}
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Receipt Display — show / hide on printed receipt</label>
+                @php $rd = $company->displayPrefs('fbrpos'); @endphp
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    @foreach([
+                        'rd_show_address' => ['Show Address', $rd['show_address']],
+                        'rd_show_phone' => ['Show Phone', $rd['show_mobile']],
+                        'rd_show_ntn' => ['Show NTN', $rd['show_ntn']],
+                        'rd_show_cashier' => ['Show Cashier', $rd['show_cashier']],
+                        'rd_show_footer' => ['Show Footer / Thank-you', $rd['show_footer']],
+                    ] as $name => [$label, $checked])
+                    <label class="flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 cursor-pointer text-sm text-gray-800 dark:text-gray-200">
+                        <input type="checkbox" name="{{ $name }}" value="1" {{ $checked ? 'checked' : '' }} class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                        <span>{{ $label }}</span>
+                    </label>
+                    @endforeach
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">FBR verification badge, QR code aur invoice numbers hamesha receipt pe rehte hain.</p>
             </div>
 
             <div>

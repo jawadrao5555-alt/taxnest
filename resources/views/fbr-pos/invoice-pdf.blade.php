@@ -90,11 +90,16 @@
                 <img src="{{ public_path('storage/' . $company->logo_path) }}" alt="{{ $company->name }}">
             </div>
             @endif
+            @php
+                // Receipt Display toggles (owner, 22 Jul 2026) — same 'fbrpos' pref
+                // set the thermal receipt reads (business-profile Print Settings).
+                $rd = $company->displayPrefs('fbrpos');
+            @endphp
             <h1>{{ $company->name }}</h1>
-            @if($company->address)<p>{{ $company->address }}</p>@endif
-            @if($company->phone)<p>Tel: {{ $company->phone }}</p>@endif
-            @if($company->email)<p>{{ $company->email }}</p>@endif
-            @if($company->ntn)<p>NTN: {{ $company->ntn }}</p>@endif
+            @if($rd['show_address'] && $company->address)<p>{{ $company->address }}</p>@endif
+            @if($rd['show_mobile'] && $company->phone)<p>Tel: {{ $company->phone }}</p>@endif
+            @if($rd['show_email'] && $company->email)<p>{{ $company->email }}</p>@endif
+            @if($rd['show_ntn'] && $company->ntn)<p>NTN: {{ $company->ntn }}</p>@endif
         </div>
 
         <div class="invoice-box">
@@ -145,7 +150,7 @@
                 <div class="lbl">Payment</div>
                 <div class="val">{{ ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</div>
             </div>
-            @if($transaction->creator)
+            @if($rd['show_cashier'] && $transaction->creator)
             <div class="info-row">
                 <div class="lbl">Cashier</div>
                 <div class="val">{{ $transaction->creator->name }}</div>
@@ -268,7 +273,12 @@
         @endif
 
         <div class="footer">
+            @if($rd['show_footer'])
             <p>Thank you for your purchase!</p>
+            @if(!empty($company->receipt_footer_note))
+            <p style="font-style: italic;">{{ $company->receipt_footer_note }}</p>
+            @endif
+            @endif
             @if($company->fbr_pos_id)
             <p style="font-weight:bold; color:#1e3a5f;">Integrated with FBR | Reg #: {{ $company->fbr_pos_id }}</p>
             @endif

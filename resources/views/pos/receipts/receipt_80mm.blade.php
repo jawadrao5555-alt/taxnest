@@ -33,10 +33,12 @@
         .text-center { text-align: center; }
         .text-right { text-align: right; }
         .bold { font-weight: bold; }
-        .separator { border-top: 1px dashed #000; margin: 4px 0; }
-        .double-separator { border-top: 2px solid #000; margin: 4px 0; }
+        /* Paper-waste trim (owner, Jul 2026): tighter separators/margins so the
+           slip prints shorter — readability sizes unchanged. */
+        .separator { border-top: 1px dashed #000; margin: 3px 0; }
+        .double-separator { border-top: 2px solid #000; margin: 3px 0; }
 
-        .header { margin-bottom: 5px; }
+        .header { margin-bottom: 3px; }
         .header h1 { font-size: 14px; font-weight: bold; margin-bottom: 2px; word-wrap: break-word; color: #000; }
         .header p { font-size: 9px; line-height: 1.35; word-wrap: break-word; color: #000; font-weight: normal; }
 
@@ -73,11 +75,11 @@
         .pra-badge .pra-title { font-size: 11px; font-weight: bold; margin-bottom: 2px; color: #000; }
         .pra-badge .pra-number { font-size: 9px; font-weight: bold; letter-spacing: 0; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; max-width: 100%; display: block; color: #000; }
         .local-badge { border: 1.5px dashed #000; padding: 5px; margin: 5px 0; text-align: center; font-size: 10px; color: #000; font-weight: normal; }
-        .qr-code { text-align: center; margin: 5px 0; }
+        .qr-code { text-align: center; margin: 4px 0; }
         .qr-code img { width: 100px; height: 100px; }
         .qr-code p { font-size: 9px; margin-top: 2px; color: #000; font-weight: normal; }
 
-        .footer { margin-top: 6px; font-size: 9px; line-height: 1.4; color: #000; font-weight: normal; }
+        .footer { margin-top: 4px; font-size: 9px; line-height: 1.35; color: #000; font-weight: normal; }
 
         @media print {
             /* PRINTABLE-WIDTH FIX v2 (owner report Jul 2026 — right edge STILL cut):
@@ -189,6 +191,14 @@
         // Owner (Jul 2026): PRA and Local bills each have their OWN display set —
         // resolved per-transaction (PRA = pra mode + non-NULL status; else Local).
         $rp = $company->posReceiptPrefsFor($transaction);
+        // Owner (Jul 2026, Pizza Master feedback): serial badge moves to the TOP box —
+        // non-fiscal receipts merge "SALE RECEIPT / PROVISIONAL BILL" + serial into the
+        // top invoice box (no duplicate badge at the bottom = shorter slip).
+        // PRA fiscal + offline bills keep the classic POS/PRA number box.
+        $rcptPraFiscal = $transaction->pra_status === 'submitted' && $transaction->pra_invoice_number;
+        $rcptOffline = $transaction->pra_status === 'offline';
+        $rcptTopBadge = !$rcptPraFiscal && !$rcptOffline;
+        $rcptTopProvisional = ($transaction->invoice_mode ?? 'pra') === 'local';
     @endphp
     <div class="header text-center">
         {{-- Logo placement (customer request Jul 2026): logo sits to the RIGHT of the
@@ -198,8 +208,10 @@
              name, like classic printed bills — opt-in via Receipt Settings. --}}
         @if($logoDataUri)
         @if($printStyle['logo'] === 'center')
-        <div style="text-align:center; margin-bottom:3px;">
-            <img src="{{ $logoDataUri }}" style="width:42mm; max-height:36mm; object-fit:contain;">
+        {{-- display:block kills the inline-image baseline gap under the logo
+             (owner report Jul 2026: "remove space under logo"). --}}
+        <div style="text-align:center; margin:0; padding:0; line-height:0;">
+            <img src="{{ $logoDataUri }}" style="width:42mm; max-height:36mm; object-fit:contain; display:block; margin:0 auto;">
         </div>
         <h1>{{ $company->name }}</h1>
         @else
@@ -228,6 +240,13 @@
 
     <div class="separator"></div>
 
+    @if($rcptTopBadge)
+    <div class="invoice-numbers" style="text-align:center; padding:4px 5px;">
+        <strong style="font-size:12px; color:#000;">{{ $rcptTopProvisional ? 'PROVISIONAL BILL' : 'SALE RECEIPT' }}</strong><br>
+        <span style="font-size:13px; font-weight:bold; color:#000;">{{ $transaction->invoice_number }}</span>
+        @if($rcptTopProvisional)<br><span style="font-size:9px; color:#000;">This is a provisional bill for your reference</span>@endif
+    </div>
+    @else
     <div class="invoice-numbers">
         <table class="inv-table">
             <tr>
@@ -242,6 +261,7 @@
             @endif
         </table>
     </div>
+    @endif
 
     <table class="info-table">
         <tr><td class="info-label">Date:</td><td class="info-value">{{ $transaction->created_at->format('d/m/Y h:i A') }}</td></tr>
@@ -382,17 +402,20 @@
         </tr>
     </table>
 
+    @if(($transaction->order_type ?? '') === 'delivery' || !empty($transaction->delivery_address) || $transaction->rider)
     @php
         // ZFC feedback Jul 2026: delivery riders must see AT A GLANCE whether the
-        // bill is cash-to-collect or already paid by card/online — the small
-        // "Payment:" info line above wasn't readable enough. Boxed method under
-        // TOTAL. Stored card bucket = 'debit_card' (+aliases); QR = 'qr_payment'.
+        // bill is cash-to-collect or already paid by card/online. Owner update
+        // (Pizza Master, Jul 2026): boxed method prints on DELIVERY bills ONLY —
+        // counter/takeaway bills drop it (paper saving; "Payment:" info line stays).
+        // Stored card bucket = 'debit_card' (+aliases); QR = 'qr_payment'.
         $rcptPayRaw = strtolower((string) $transaction->payment_method);
         $rcptPayLabel = $rcptPayRaw === 'cash' ? 'CASH'
             : (in_array($rcptPayRaw, ['card', 'debit_card', 'credit_card'], true) ? 'CARD'
             : ($rcptPayRaw === 'qr_payment' ? 'ONLINE / QR' : strtoupper(str_replace('_', ' ', $rcptPayRaw))));
     @endphp
-    <div style="border: 2px solid #000; text-align: center; font-weight: bold; font-size: 14px; letter-spacing: 2px; padding: 4px 2px; margin: 5px 0; color: #000;">PAYMENT: {{ $rcptPayLabel }}</div>
+    <div style="border: 2px solid #000; text-align: center; font-weight: bold; font-size: 14px; letter-spacing: 1px; padding: 4px 2px; margin: 4px 0; color: #000;">PAYMENT: {{ $rcptPayLabel }}</div>
+    @endif
 
     <div class="separator"></div>
 
@@ -445,18 +468,8 @@
             $qrCaption = 'Scan for invoice details';
         }
     @endphp
-    @if($rcptIsProvisional)
-    <div class="local-badge" style="border: 2px dashed #000; color: #000; padding: 6px;">
-        <strong style="font-size: 12px; color: #000;">PROVISIONAL BILL</strong><br>
-        <span style="font-weight: bold;">{{ $transaction->invoice_number }}</span><br>
-        <span style="font-size: 10px; color: #000;">This is a provisional bill for your reference</span>
-    </div>
-    @else
-    <div class="local-badge" style="border: 1.5px solid #000; color: #000; padding: 6px;">
-        <strong style="font-size: 12px; color: #000;">SALE RECEIPT</strong><br>
-        <span style="font-weight: bold;">{{ $transaction->invoice_number }}</span>
-    </div>
-    @endif
+    {{-- Bottom SALE RECEIPT / PROVISIONAL badge removed (owner, Jul 2026) — the
+         serial badge now prints in the TOP box; only the QR remains down here. --}}
     @if($qrUrl)
     <div class="qr-code">
         <img src="{{ $qrUrl }}" alt="Invoice QR" style="width: 100px; height: 100px; margin: 4px auto;">

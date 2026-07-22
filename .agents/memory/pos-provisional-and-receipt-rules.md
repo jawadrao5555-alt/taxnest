@@ -79,12 +79,25 @@ The receipt templates' non-fiscal fallback branch (not submitted, not offline) m
 unconditionally print "PROVISIONAL BILL" — reporting-OFF finals ('pra'+NULL) land there too and
 they are REAL completed sales. A ZFC client paid-as-final and the slip still said PROVISIONAL.
 
-**How to apply:** in receipt_80mm, receipt_58mm, invoice-pdf the @else branch computes
-`$rcptIsProvisional = ($transaction->invoice_mode ?? 'pra') === 'local'` — true → PROVISIONAL BILL
-(dashed box), false → neutral "SALE RECEIPT" box + invoice number (QR payload 'type' follows the
-same ternary). pending/failed fiscal bills also read SALE RECEIPT (acceptable — they are finals).
+**How to apply:** in receipt_80mm, receipt_58mm, invoice-pdf the non-fiscal branch computes
+`$rcptIsProvisional = ($transaction->invoice_mode ?? 'pra') === 'local'` — true → PROVISIONAL BILL,
+false → neutral "SALE RECEIPT" + invoice number (QR payload 'type' follows the same ternary).
+pending/failed fiscal bills also read SALE RECEIPT (acceptable — they are finals).
 Fiscal + offline branches untouched. Any new receipt surface must use the same invoice_mode test,
 never "not fiscal ⇒ provisional".
+
+**Badge position (owner + Pizza Master photo, 22 Jul 2026):** the SALE RECEIPT / PROVISIONAL BILL
+serial box prints at the TOP of the slip (right under the shop header, via `$rcptTopBadge` /
+`$rcptTopProvisional` set in the header @php) for non-fiscal, non-offline bills. PRA-submitted and
+offline bills KEEP the classic "POS Invoice #" box (+ OFFLINE badge). The old bottom badge boxes
+were REMOVED — don't re-add a second serial box at the bottom (QR stays at the bottom). Every
+branch must still print the serial somewhere — no serial-less path.
+
+**PAYMENT box = DELIVERY bills ONLY (owner, 22 Jul 2026):** the boxed "PAYMENT: CASH/CARD" prints
+only when `order_type==='delivery' || delivery_address || rider` (order_type is the primary gate —
+riders are assigned board-only AFTER payment and address is optional, so the fallbacks alone miss
+address-less delivery bills). Non-delivery receipts show no payment box (Local set shows a plain
+Payment info row instead). Purpose: riders must see cash-to-collect at a glance.
 
 # Per-type receipt display sets — PRA vs Local (owner, Jul 2026)
 

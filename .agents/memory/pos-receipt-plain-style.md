@@ -28,6 +28,12 @@ for everyone — the plain-look customer can opt out.
 **How to apply:** never re-add italic; keep the plain style intact as the opt-out; both
 templates + the `$pdfMode` DomPDF path share the same markup — test both after edits.
 
+**Paper-saving trims (owner + Pizza Master photo, 22 Jul 2026):** center-logo img is
+`display:block` inside a `line-height:0; margin:0` wrapper (kills the inline-descender gap under
+the logo — don't revert to inline img); separators 3px margins, header mb 3px, footer mt 4px;
+badge/box letter-spacing max 1px (2px+ read as "phaila hua" waste). Serial badge sits at TOP,
+PAYMENT box is delivery-only — see pos-provisional-and-receipt-rules.md for the branch rules.
+
 **Font family (owner, 21 Jul 2026 "laser pe clear print ho"):** receipt font = Arial /
 Helvetica sans stack, NOT 'Courier New' — Courier's hairline strokes print faint/thin on
 laser printers (some shops print receipts on laser, not thermal). Don't revert to a

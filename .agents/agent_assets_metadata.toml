@@ -192,3 +192,9 @@ id = "bRK9ti0W6BL0klDohvnLs"
 uri = "file://screenshots/whats-new-bell-22jul.jpeg"
 type = "image"
 title = "What's New notifications — aaj ke 3 updates"
+
+[[outputs]]
+id = "FZuhG5WAmqvUfQsD6e4cc"
+uri = "file://screenshots/receipt_before_after.jpg"
+type = "image"
+title = "Receipt: Pehle vs Baad (preview)"

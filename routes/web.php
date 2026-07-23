@@ -1072,3 +1072,34 @@ Route::get('/api/fbr/hs-detail', [\App\Http\Controllers\FbrReferenceController::
 require __DIR__.'/auth.php';
 
 
+
+// ── TEMP DEV-ONLY: receipt before/after preview (REMOVE after owner decision) ──
+Route::get('/dev-receipt-preview/{which}', function ($which) {
+    $company = \App\Models\Company::find(11);
+    $company->name = 'MALIK CHICKEN BROAST';
+    $company->logo_path = 'preview_logo.png';
+    $t = \App\Models\PosTransaction::with(['items', 'payments', 'creator', 'terminal'])->find(990016);
+    $t->invoice_number = 'POS-2026-00137';
+    $t->pra_invoice_number = '191963FGQP20441472';
+    $t->pra_status = 'submitted';
+    $t->invoice_mode = 'pra';
+    $t->customer_name = 'Muhamamd Jawad Saeed';
+    $t->delivery_address = 'Old Ghalla Mandi Lodhran';
+    $t->order_type = 'delivery';
+    $t->payment_method = 'cash';
+    $t->setRelation('company', $company);
+    $view = $which === 'after' ? 'pos.receipts.receipt_80mm_preview_after' : 'pos.receipts.receipt_80mm';
+    return view($view, ['transaction' => $t, 'company' => $company]);
+});
+Route::get('/dev-receipt-compare', function () {
+    return '<html><head><style>body{margin:0;background:#e5e7eb;font-family:Arial}
+    .wrap{display:flex;gap:20px;justify-content:center;padding:10px}
+    .col{text-align:center}
+    .col h2{font-size:15px;margin:0 0 4px}
+    .frame{height:680px;overflow:hidden}
+    iframe{width:340px;height:1250px;border:1px solid #9ca3af;background:#fff;transform:scale(0.54);transform-origin:top center}
+    </style></head><body><div class="wrap">
+    <div class="col"><h2>ABHI (pehle)</h2><div class="frame"><iframe src="/dev-receipt-preview/before"></iframe></div></div>
+    <div class="col"><h2>NAYA (baad)</h2><div class="frame"><iframe src="/dev-receipt-preview/after"></iframe></div></div>
+    </div></body></html>';
+});

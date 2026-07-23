@@ -1,86 +1,188 @@
 const { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shell, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
+const { spawn } = require('child_process');
 const axios = require('axios');
 const Store = require('electron-store');
-const { autoUpdater } = require('electron-updater');
 const { startAgent, stopAgent, getStatus } = require('./src/agent');
 
 const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/taxnest/releases/latest';
-const BUILD_TIMESTAMP = '20260717-1';
+const BUILD_TIMESTAMP = '20260723-2';
 let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
 
-autoUpdater.autoDownload = true;
-autoUpdater.autoInstallOnAppQuit = true;
-autoUpdater.allowPrerelease = false;
-autoUpdater.logger = { info: (m) => console.log('[updater]', m), warn: (m) => console.log('[updater warn]', m), error: (m) => console.log('[updater err]', m), debug: () => {} };
+// ─── Zip-based SELF-UPDATE ──────────────────────────────────────────────────
+// The TaxNest server's heartbeat response carries `agent_update`
+// = { version, zip_url, zip_size } (server-side cached GitHub latest-release
+// info — agents never hit api.github.com directly, so shared-ISP rate limits
+// can't break update checks; the zip itself downloads from GitHub's CDN).
+// When the server advertises a NEWER version we download the portable zip,
+// extract it with PowerShell (no extra deps), then hand off to a detached
+// updater .cmd that kills this app, robocopies the new files over the install
+// folder and relaunches. No NSIS installer / code-signing needed.
+let updateInProgress = false;
+const attemptedVersions = new Set();
 
-autoUpdater.on('checking-for-update', () => {
-  updateInfo = { ...updateInfo, checking: true };
-  sendUpdateState();
-});
+function parseVer(v) {
+  const m = String(v || '').trim().replace(/^v/i, '').match(/^(\d+)\.(\d+)\.(\d+)$/);
+  return m ? [+m[1], +m[2], +m[3]] : null;
+}
 
-autoUpdater.on('update-available', (info) => {
-  updateInfo = {
-    available: true,
-    checking: false,
-    downloading: true,
-    latestBuild: info.version,
-    currentBuild: BUILD_TIMESTAMP,
-    downloadUrl: DOWNLOAD_URL,
-    progress: 0,
-  };
-  sendUpdateState();
-  console.log('[updater] Update found, downloading silently in background:', info.version);
-});
-
-autoUpdater.on('update-not-available', () => {
-  updateInfo = { available: false, checking: false, currentBuild: BUILD_TIMESTAMP };
-  sendUpdateState();
-});
-
-autoUpdater.on('download-progress', (p) => {
-  updateInfo = { ...updateInfo, downloading: true, progress: Math.round(p.percent || 0) };
-  sendUpdateState();
-});
-
-autoUpdater.on('update-downloaded', (info) => {
-  updateInfo = {
-    available: true,
-    checking: false,
-    downloading: false,
-    downloaded: true,
-    latestBuild: info.version,
-    currentBuild: BUILD_TIMESTAMP,
-    progress: 100,
-  };
-  sendUpdateState();
-  console.log('[updater] Update downloaded silently. Will install on next app quit:', info.version);
-  if (tray) {
-    try { tray.setToolTip(`TaxNest PRA Sync Agent — v${info.version} ready (auto-installs on next start)`); } catch (e) {}
+function isNewerVersion(remote, local) {
+  const r = parseVer(remote);
+  const l = parseVer(local);
+  if (!r || !l) return false;
+  for (let i = 0; i < 3; i++) {
+    if (r[i] > l[i]) return true;
+    if (r[i] < l[i]) return false;
   }
-});
+  return false;
+}
 
-autoUpdater.on('error', (err) => {
-  console.log('[updater] error:', err && err.message);
-  updateInfo = { ...updateInfo, checking: false, downloading: false, error: (err && err.message) || 'Update failed' };
-  sendUpdateState();
-});
+async function handleAgentUpdate(info) {
+  try {
+    if (!info || !info.version || !info.zip_url) return;
+    // Host pin: only ever download update zips from our own GitHub releases.
+    // (No code-signing available, so a compromised/misconfigured server must
+    // not be able to point agents at an arbitrary zip.)
+    if (!String(info.zip_url).startsWith('https://github.com/jawadrao5555-alt/taxnest/releases/download/')) {
+      console.log(`[self-update] REJECTED zip_url outside trusted release host: ${info.zip_url}`);
+      return;
+    }
+    if (process.platform !== 'win32' || !app.isPackaged) return;
+    if (updateInProgress) return;
+    if (!isNewerVersion(info.version, app.getVersion())) return;
+    // One attempt per version per app run — a bad zip can never cause a
+    // download/restart loop.
+    if (attemptedVersions.has(info.version)) return;
+    attemptedVersions.add(info.version);
+    updateInProgress = true;
+
+    console.log(`[self-update] v${app.getVersion()} -> v${info.version} — downloading ${info.zip_url}`);
+    updateInfo = {
+      available: true,
+      downloading: true,
+      latestBuild: info.version,
+      currentBuild: BUILD_TIMESTAMP,
+      downloadUrl: DOWNLOAD_URL,
+      progress: 0,
+    };
+    sendUpdateState();
+    if (tray) {
+      try { tray.setToolTip(`TaxNest PRA Sync Agent — updating to v${info.version}…`); } catch (e) {}
+    }
+
+    const workDir = path.join(os.tmpdir(), 'taxnest-agent-update');
+    fs.rmSync(workDir, { recursive: true, force: true });
+    fs.mkdirSync(workDir, { recursive: true });
+    const zipPath = path.join(workDir, 'update.zip');
+    const extractDir = path.join(workDir, 'extracted');
+
+    // Download with stall protection (mirrors the FBR IMS downloader below).
+    const res = await axios.get(info.zip_url, { responseType: 'stream', timeout: 60000, maxRedirects: 10 });
+    const total = parseInt(res.headers['content-length'] || '0', 10) || info.zip_size || 0;
+    let done = 0;
+    await new Promise((resolve, reject) => {
+      const out = fs.createWriteStream(zipPath);
+      let idleTimer = null;
+      const resetIdle = () => {
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          res.data.destroy(new Error('Update download stalled (no data for 90s)'));
+        }, 90000);
+      };
+      resetIdle();
+      res.data.on('data', (chunk) => {
+        done += chunk.length;
+        resetIdle();
+        if (total) {
+          const pct = Math.round((done / total) * 100);
+          if (pct !== updateInfo.progress) {
+            updateInfo = { ...updateInfo, progress: pct };
+            sendUpdateState();
+          }
+        }
+      });
+      const fail = (err) => { if (idleTimer) clearTimeout(idleTimer); reject(err); };
+      res.data.on('error', fail);
+      out.on('error', fail);
+      out.on('finish', () => { if (idleTimer) clearTimeout(idleTimer); resolve(); });
+      res.data.pipe(out);
+    });
+
+    const gotSize = fs.statSync(zipPath).size;
+    if (info.zip_size && gotSize !== info.zip_size) {
+      throw new Error(`Downloaded size ${gotSize} != expected ${info.zip_size}`);
+    }
+
+    // Extract with PowerShell — zero extra npm dependencies.
+    await new Promise((resolve, reject) => {
+      const psq = (s) => `'${String(s).replace(/'/g, "''")}'`;
+      const ps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+        `Expand-Archive -LiteralPath ${psq(zipPath)} -DestinationPath ${psq(extractDir)} -Force`], { windowsHide: true });
+      let err = '';
+      ps.stderr.on('data', (d) => { err += d.toString(); });
+      ps.on('close', (code) => (code === 0 ? resolve() : reject(new Error(err || `Expand-Archive exited ${code}`))));
+      ps.on('error', reject);
+    });
+
+    // Locate the folder holding the new exe (zip root folder = TaxNest-PRA-Agent).
+    const exeName = path.basename(process.execPath);
+    let srcDir = null;
+    const candidates = [extractDir,
+      ...fs.readdirSync(extractDir, { withFileTypes: true })
+        .filter((e) => e.isDirectory())
+        .map((e) => path.join(extractDir, e.name))];
+    for (const dir of candidates) {
+      if (fs.existsSync(path.join(dir, exeName))) { srcDir = dir; break; }
+    }
+    if (!srcDir) throw new Error(`${exeName} not found inside the update zip`);
+
+    const destDir = path.dirname(process.execPath);
+    const cmdPath = path.join(workDir, 'apply-update.cmd');
+    // NOTE: no parenthesized if-blocks around %RETRIES% — plain %VAR% expansion
+    // inside ( ) reads the stale value (classic batch pitfall).
+    const script = [
+      '@echo off',
+      'timeout /t 3 /nobreak >nul',
+      `taskkill /F /IM "${exeName}" >nul 2>&1`,
+      'timeout /t 2 /nobreak >nul',
+      'set RETRIES=0',
+      ':copyloop',
+      `robocopy "${srcDir}" "${destDir}" /E /R:5 /W:2 >nul`,
+      'if %ERRORLEVEL% LSS 8 goto copydone',
+      'set /a RETRIES+=1',
+      'if %RETRIES% GEQ 5 goto copydone',
+      'timeout /t 3 /nobreak >nul',
+      'goto copyloop',
+      ':copydone',
+      `start "" "${path.join(destDir, exeName)}"`,
+      'exit',
+    ].join('\r\n');
+    fs.writeFileSync(cmdPath, script);
+
+    console.log('[self-update] handing off to updater script, quitting…');
+    updateInfo = { ...updateInfo, downloading: false, downloaded: true, progress: 100 };
+    sendUpdateState();
+
+    const child = spawn('cmd.exe', ['/c', cmdPath], { detached: true, stdio: 'ignore', windowsHide: true, cwd: workDir });
+    child.unref();
+    isQuitting = true;
+    stopAgent();
+    setTimeout(() => app.quit(), 500);
+  } catch (e) {
+    console.log('[self-update] failed:', e && e.message);
+    updateInfo = { ...updateInfo, downloading: false, error: (e && e.message) || 'Update failed' };
+    sendUpdateState();
+    // Allow a FUTURE version to retry; this same version stays blocked for
+    // this run via attemptedVersions.
+    updateInProgress = false;
+  }
+}
 
 function sendUpdateState() {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('update-available', updateInfo);
-  }
-}
-
-async function checkForUpdates() {
-  try {
-    if (!app.isPackaged) {
-      console.log('[updater] skipped: not packaged');
-      return;
-    }
-    await autoUpdater.checkForUpdates();
-  } catch (e) {
-    console.log('Update check failed:', e.message);
   }
 }
 
@@ -170,12 +272,15 @@ app.whenReady().then(() => {
 
   const config = store.get('config');
   if (config && config.serverUrl && config.apiKey && config.companyId) {
-    startAgent(config, sendStatusUpdate);
+    startAgent(withAppMeta(config), sendStatusUpdate, handleAgentUpdate);
   }
-
-  setTimeout(checkForUpdates, 5000);
-  setInterval(checkForUpdates, 30 * 60 * 1000);
 });
+
+// Attach the real app version/build so heartbeats report them to the server
+// (the server piggybacks `agent_update` info on the heartbeat response).
+function withAppMeta(config) {
+  return { ...config, appVersion: app.getVersion(), appBuild: BUILD_TIMESTAMP };
+}
 
 app.on('window-all-closed', (e) => {
   e.preventDefault();
@@ -199,7 +304,7 @@ ipcMain.handle('get-config', () => {
 ipcMain.handle('save-config', (event, config) => {
   store.set('config', config);
   stopAgent();
-  startAgent(config, sendStatusUpdate);
+  startAgent(withAppMeta(config), sendStatusUpdate, handleAgentUpdate);
   return { ok: true };
 });
 
@@ -211,7 +316,7 @@ ipcMain.handle('toggle-agent', (event, enabled) => {
   if (enabled) {
     const config = store.get('config');
     if (config && config.serverUrl && config.apiKey && config.companyId) {
-      startAgent(config, sendStatusUpdate);
+      startAgent(withAppMeta(config), sendStatusUpdate, handleAgentUpdate);
       return { ok: true, running: true };
     }
     return { ok: false, error: 'Configure agent first' };
@@ -222,7 +327,8 @@ ipcMain.handle('toggle-agent', (event, enabled) => {
 });
 
 ipcMain.handle('check-update', async () => {
-  await checkForUpdates();
+  // Updates are server-driven now: every heartbeat (30s) carries the latest
+  // release info and a newer version installs itself automatically.
   return updateInfo || { available: false, currentBuild: BUILD_TIMESTAMP };
 });
 
@@ -232,13 +338,8 @@ ipcMain.handle('open-download', async () => {
 });
 
 ipcMain.handle('install-update-now', async () => {
-  if (updateInfo && updateInfo.downloaded) {
-    isQuitting = true;
-    stopAgent();
-    autoUpdater.quitAndInstall(false, true);
-    return { ok: true };
-  }
-  return { ok: false, error: 'No update downloaded yet' };
+  // Self-update installs automatically as soon as it is downloaded.
+  return { ok: false, error: 'Updates now install automatically — nothing to do.' };
 });
 
 ipcMain.handle('get-version', () => ({ build: BUILD_TIMESTAMP, version: app.getVersion() }));

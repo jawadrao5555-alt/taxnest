@@ -1,0 +1,35 @@
+directories:
+  output: dist
+  buildResources: assets
+appId: com.taxnest.pra-agent
+productName: TaxNest PRA Agent
+copyright: Copyright (c) 2026 TaxNest
+files:
+  - filter:
+      - main.js
+      - preload.js
+      - index.html
+      - src/**/*
+      - assets/**/*
+publish:
+  - provider: github
+    owner: jawadrao5555-alt
+    repo: taxnest
+    releaseType: release
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: TaxNest-Agent-Setup-${version}.${ext}
+  signAndEditExecutable: false
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: TaxNest PRA Agent
+  uninstallDisplayName: TaxNest PRA Agent
+  deleteAppDataOnUninstall: false
+electronVersion: 41.7.1

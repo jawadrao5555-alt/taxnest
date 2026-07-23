@@ -87,11 +87,14 @@ class AgentManagementController extends Controller
             : 'Agent disabled.');
     }
 
-    public function downloadAgent(\Illuminate\Http\Request $request)
+    /**
+     * Latest GitHub release info (tag + assets), cached 10 minutes.
+     * Shared by the download redirect, the /pos/agent page AND the agent
+     * heartbeat's self-update advertisement (AgentController).
+     */
+    public static function latestReleaseInfo(): array
     {
-        $type = $request->query('type', 'exe');
-
-        $assets = \Illuminate\Support\Facades\Cache::remember('taxnest_agent_latest_release', 600, function () {
+        return \Illuminate\Support\Facades\Cache::remember('taxnest_agent_latest_release', 600, function () {
             try {
                 $resp = \Illuminate\Support\Facades\Http::timeout(6)
                     ->withHeaders(['Accept' => 'application/vnd.github+json', 'User-Agent' => 'TaxNest'])
@@ -109,6 +112,13 @@ class AgentManagementController extends Controller
             } catch (\Throwable $e) {}
             return ['tag' => null, 'assets' => []];
         });
+    }
+
+    public function downloadAgent(\Illuminate\Http\Request $request)
+    {
+        $type = $request->query('type', 'exe');
+
+        $assets = self::latestReleaseInfo();
 
         $needle = $type === 'zip' ? '.zip' : '.exe';
         // Prefer the LARGEST matching asset — the real full installer, not a stale 0.2 MB stub.
@@ -131,24 +141,7 @@ class AgentManagementController extends Controller
 
     public function latestVersionInfo()
     {
-        $info = \Illuminate\Support\Facades\Cache::remember('taxnest_agent_latest_release', 600, function () {
-            try {
-                $resp = \Illuminate\Support\Facades\Http::timeout(6)
-                    ->withHeaders(['Accept' => 'application/vnd.github+json', 'User-Agent' => 'TaxNest'])
-                    ->get('https://api.github.com/repos/jawadrao5555-alt/taxnest/releases/latest');
-                if ($resp->successful()) {
-                    return [
-                        'tag' => $resp->json('tag_name'),
-                        'assets' => collect($resp->json('assets', []))->map(fn($a) => [
-                            'name' => $a['name'],
-                            'url' => $a['browser_download_url'],
-                            'size' => $a['size'] ?? 0,
-                        ])->values()->all(),
-                    ];
-                }
-            } catch (\Throwable $e) {}
-            return ['tag' => null, 'assets' => []];
-        });
+        $info = self::latestReleaseInfo();
 
         $exe = collect($info['assets'])->filter(fn($a) => str_ends_with(strtolower($a['name']), '.exe'))->sortByDesc('size')->first();
         $zip = collect($info['assets'])->filter(fn($a) => str_ends_with(strtolower($a['name']), '.zip'))->sortByDesc('size')->first();

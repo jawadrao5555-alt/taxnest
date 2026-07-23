@@ -13,6 +13,40 @@ use App\Services\FbrService;
 
 class AgentController extends Controller
 {
+    /**
+     * Self-update advertisement for v1.3.0+ agents, piggybacked on the
+     * heartbeat response. Reuses the cached GitHub latest-release info so
+     * agents never hit api.github.com directly (shared-ISP rate limits).
+     * Only tags that look like an AGENT semver (major <= 99) are advertised —
+     * date-style tags like v2026.2.0 are ignored so a mis-tagged release can
+     * never trigger a downgrade/update loop.
+     */
+    private function agentUpdateInfo(): ?array
+    {
+        try {
+            $info = AgentManagementController::latestReleaseInfo();
+            $tag = $info['tag'] ?? null;
+            if (!$tag || !preg_match('/^v?(\d{1,2})\.(\d+)\.(\d+)$/', $tag, $m)) {
+                return null;
+            }
+            $zip = collect($info['assets'] ?? [])
+                ->filter(fn($a) => str_ends_with(strtolower($a['name']), '.zip'))
+                ->sortByDesc('size')
+                ->first();
+            if (!$zip) {
+                return null;
+            }
+            return [
+                'version' => $m[1] . '.' . $m[2] . '.' . $m[3],
+                'tag' => $tag,
+                'zip_url' => $zip['url'],
+                'zip_size' => $zip['size'] ?? 0,
+            ];
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     public function heartbeat(Request $request)
     {
         $company = $request->attributes->get('agent_company');
@@ -79,6 +113,7 @@ class AgentController extends Controller
             'repromoted' => $repromoted,
             'stuck_transaction_ids' => $stuckIds,
             'server_time' => now()->toIso8601String(),
+            'agent_update' => $this->agentUpdateInfo(),
         ]);
     }
 
@@ -138,6 +173,7 @@ class AgentController extends Controller
             'repromoted' => $repromoted,
             'stuck_transaction_ids' => $stuckIds,
             'server_time' => now()->toIso8601String(),
+            'agent_update' => $this->agentUpdateInfo(),
         ]);
     }
 

@@ -8,6 +8,7 @@ let pollInterval = null;
 let heartbeatInterval = null;
 let currentConfig = null;
 let statusCallback = null;
+let updateCallback = null;
 
 const status = {
   running: false,
@@ -108,7 +109,11 @@ async function heartbeat() {
   try {
     const res = await axios.post(
       `${currentConfig.serverUrl}/heartbeat`,
-      { version: '1.0.0', company_id: currentConfig.companyId },
+      {
+        version: currentConfig.appVersion || '1.0.0',
+        build: currentConfig.appBuild || null,
+        company_id: currentConfig.companyId,
+      },
       {
         headers: { Authorization: `Bearer ${currentConfig.apiKey}` },
         timeout: 10000,
@@ -117,6 +122,12 @@ async function heartbeat() {
     status.connected = true;
     status.serverInfo = res.data.company;
     status.lastError = null;
+
+    // Self-update: the server piggybacks the latest release info on every
+    // heartbeat; main.js decides whether it is actually newer.
+    if (updateCallback && res.data.agent_update) {
+      try { updateCallback(res.data.agent_update); } catch (e) {}
+    }
 
     const healed = res.data.healed || 0;
     const repromoted = res.data.repromoted || 0;
@@ -269,13 +280,14 @@ async function reportResult(txnId, success, praInvoiceNumber, response, error, o
   }
 }
 
-function startAgent(config, onStatusChange) {
+function startAgent(config, onStatusChange, onAgentUpdate) {
   if (pollInterval || heartbeatInterval) {
     stopAgent();
   }
 
   currentConfig = config;
   statusCallback = onStatusChange;
+  updateCallback = onAgentUpdate || null;
   status.running = true;
   notify();
 

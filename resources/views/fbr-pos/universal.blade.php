@@ -730,9 +730,9 @@ window.addEventListener('popstate', function() {
                         <div class="tn-empty-icon w-28 h-28 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center mb-5">
                             <svg class="w-14 h-14 text-blue-400 dark:text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
                         </div>
-                        <p class="text-lg font-bold text-gray-700 dark:text-gray-200">No products match</p>
-                        <p class="text-sm mt-1.5 text-gray-400 dark:text-gray-500 max-w-[280px]">Try a different category or clear your search to see everything</p>
-                        <button @click="activeCategory = 'all'; searchQuery = ''; filterProducts()" class="mt-5 px-5 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm">Show All Products</button>
+                        <p class="text-lg font-bold text-gray-700 dark:text-gray-200" x-text="showProducts ? 'No products match' : 'Products grid OFF hai'"></p>
+                        <p class="text-sm mt-1.5 text-gray-400 dark:text-gray-500 max-w-[280px]" x-text="showProducts ? 'Try a different category or clear your search to see everything' : 'Products ka toggle band hai — neeche button dabate hi saray products wapas aa jayenge'"></p>
+                        <button @click="restoreProductGrid()" class="mt-5 px-5 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm">Show All Products</button>
                     </div>
                 </template>
 
@@ -2693,6 +2693,17 @@ function restaurantPos() {
             // Search still works when the grid is hidden — keep suggestions live if a query is active.
             if (this.searchQuery && this.searchQuery.trim().length > 0) { this.onSearchInput(); }
             else { this.searchSuggestions = []; this.showSearchDropdown = false; }
+        },
+
+        // Empty-state "Show All Products" rescue — ALSO turns the products grid back ON
+        // (persisted), so a cashier who accidentally hit "Products OFF" is never stuck
+        // staring at an empty grid with a button that does nothing (Frost & Brew, Jul 2026).
+        restoreProductGrid() {
+            this.showProducts = true;
+            try { localStorage.setItem('fbr_show_products', '1'); } catch (e) {}
+            this.activeCategory = 'all';
+            this.searchQuery = '';
+            this.filterProducts();
         },
 
         loadMore() {

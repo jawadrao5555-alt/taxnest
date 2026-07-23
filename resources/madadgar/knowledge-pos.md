@@ -19,7 +19,7 @@ Yeh NestPOS ka mukammal guide hai. Sirf is guide ki maloomat se jawab do.
 - Item add karne ke 3 tareeqay: (1) search box mein naam/barcode/SKU type karein, (2) product grid se click karein, (3) barcode scanner se scan karein — scan exact match foran cart mein daal deta hai (chahe koi category filter lagi ho).
 - Search mein pehle harf ko priority milti hai: jo items aap ke likhe harf se shuru hote hain wo sab se upar aate hain.
 - Search hamesha GLOBAL hai (Jul 2026 update): category dropdown sirf GRID ko filter karta hai — search box mein type karein to har category ka item mil jata hai, chahe koi bhi category selected ho. Deals aur services bhi search mein aate hain.
-- Product grid ON/OFF toggle bhi hai — grid OFF ho to search se hi kaam chalta hai.
+- Product grid ON/OFF toggle bhi hai — grid OFF ho to search se hi kaam chalta hai. Agar sale screen par saray products ghayab hon aur "Products grid OFF hai" ka message dikhe, to iska matlab kisi ne "Products" ka toggle band kar diya hai (yeh setting har PC/browser par alag save hoti hai) — "Show All Products" button dabane se ya "Products OFF" wala toggle dobara ON karne se saray products foran wapas aa jate hain.
 - Quantity badhane ke liye cart row mein qty par click kar ke type karein, ya same item dobara add karein.
 - Item hatane ke liye cart row ke delete (X) par click karein.
 - Har cart row par per-item TAX/NO TAX toggle, Discount aur Note ka option hai.

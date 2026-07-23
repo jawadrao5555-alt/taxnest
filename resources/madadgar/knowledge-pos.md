@@ -49,6 +49,7 @@ Yeh NestPOS ka mukammal guide hai. Sirf is guide ki maloomat se jawab do.
 - PRA receipt aur Local receipt ki settings ALAG ALAG hain — dono ka apna set /pos/receipt-settings par hai.
 - "Show Tax" OFF karne se customer copy par Subtotal aur Tax chhup jate hain — sirf grand TOTAL nazar aata hai; items apni asal (as-entered) price par dikhte hain. Lekin PRA ko tax hamesha POORA submit hota hai.
 - Receipt ka default style: bold + center logo. Company chahe to plain style bhi choose kar sakti hai.
+- Receipt print (Jul 2026 update): text ab pehle se zyada gehra/bold aur bara hai taake saste thermal printers par bhi saaf chape; receipt pehle se chhoti hoti hai (logo compact, faasle tight — paper ki bachat) aur upar/side margins barha diye gaye hain taake logo ya text kate nahi.
 
 ## Printer aur Hardware (Setup)
 - NestPOS kisi bhi aam thermal receipt printer (80mm ya 58mm) ke saath chalta hai — USB, network ya Bluetooth; printer Windows/browser mein install ho to NestPOS se print ho jayegi.

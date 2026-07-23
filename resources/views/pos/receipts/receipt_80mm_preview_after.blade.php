@@ -39,23 +39,23 @@
         .double-separator { border-top: 2px solid #000; margin: 2px 0; }
 
         .header { margin-bottom: 2px; }
-        .header h1 { font-size: 14px; font-weight: bold; margin-bottom: 2px; word-wrap: break-word; color: #000; }
-        .header p { font-size: 10px; line-height: 1.35; word-wrap: break-word; color: #000; font-weight: normal; }
+        .header h1 { font-size: 15px; font-weight: bold; margin-bottom: 2px; word-wrap: break-word; color: #000; }
+        .header p { font-size: 11px; line-height: 1.35; word-wrap: break-word; color: #000; font-weight: normal; }
 
         .info-table { width: 100%; border-collapse: collapse; margin: 2px 0; }
-        .info-table td { font-size: 11px; padding: 1px 0; vertical-align: top; color: #000; font-weight: normal; }
+        .info-table td { font-size: 12px; padding: 1px 0; vertical-align: top; color: #000; font-weight: normal; }
         .info-table .info-label { width: 32%; white-space: nowrap; color: #000; }
         .info-table .info-value { width: 68%; text-align: right; word-wrap: break-word; color: #000; }
 
         .invoice-numbers { border: 1.5px solid #000; padding: 4px; margin: 3px 0; }
         .inv-table { width: 100%; border-collapse: collapse; }
-        .inv-table td { font-size: 10px; padding: 1px 0; vertical-align: top; color: #000; }
+        .inv-table td { font-size: 11px; padding: 1px 0; vertical-align: top; color: #000; }
         .inv-table .inv-label { white-space: nowrap; width: 35%; color: #000; }
-        .inv-table .inv-value { text-align: right; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 9px; font-weight: bold; color: #000; }
+        .inv-table .inv-value { text-align: right; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; font-size: 10px; font-weight: bold; color: #000; }
 
         .items-table { width: 100%; margin: 3px 0; border-collapse: collapse; table-layout: fixed; }
-        .items-table th { font-size: 9px; text-transform: uppercase; border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 2px 1px; text-align: left; font-weight: normal; color: #000; }
-        .items-table td { font-size: 11px; padding: 2px 1px; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; color: #000; font-weight: normal; }
+        .items-table th { font-size: 10px; text-transform: uppercase; border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 2px 1px; text-align: left; font-weight: normal; color: #000; }
+        .items-table td { font-size: 12px; padding: 2px 1px; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; color: #000; font-weight: normal; }
         .items-table .col-item { width: 44%; text-align: left; }
         .items-table .col-qty { width: 16%; text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
         .items-table .col-rate { width: 18%; text-align: right; }
@@ -66,20 +66,20 @@
         .exempt-note { font-size: 9px; font-weight: normal; color: #000; text-align: center; margin: 3px 0 2px; padding: 2px 0; border-top: 1px dashed #000; border-bottom: 1px dashed #000; letter-spacing: 0.4px; }
 
         .totals-table { width: 100%; border-collapse: collapse; margin: 3px 0; }
-        .totals-table td { font-size: 11px; padding: 1px 0; vertical-align: top; color: #000; font-weight: normal; }
+        .totals-table td { font-size: 12px; padding: 1px 0; vertical-align: top; color: #000; font-weight: normal; }
         .totals-table .tot-label { text-align: left; color: #000; }
         .totals-table .tot-value { text-align: right; white-space: nowrap; color: #000; }
-        .totals-table .grand-total td { font-size: 15px; font-weight: bold; padding: 4px 3px; color: #000; border-top: 2.5px solid #000; border-bottom: 2.5px solid #000; letter-spacing: 0.3px; }
+        .totals-table .grand-total td { font-size: 16px; font-weight: bold; padding: 4px 3px; color: #000; border-top: 2.5px solid #000; border-bottom: 2.5px solid #000; letter-spacing: 0.3px; }
 
         .pra-badge { border: 2px solid #000; padding: 4px; margin: 3px 0; text-align: center; font-size: 10px; overflow: hidden; color: #000; font-weight: normal; }
-        .pra-badge .pra-title { font-size: 11px; font-weight: bold; margin-bottom: 2px; color: #000; }
-        .pra-badge .pra-number { font-size: 9px; font-weight: bold; letter-spacing: 0; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; max-width: 100%; display: block; color: #000; }
+        .pra-badge .pra-title { font-size: 12px; font-weight: bold; margin-bottom: 2px; color: #000; }
+        .pra-badge .pra-number { font-size: 10px; font-weight: bold; letter-spacing: 0; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; max-width: 100%; display: block; color: #000; }
         .local-badge { border: 1.5px dashed #000; padding: 4px; margin: 3px 0; text-align: center; font-size: 10px; color: #000; font-weight: normal; }
         .qr-code { text-align: center; margin: 3px 0; }
         .qr-code img { width: 84px; height: 84px; }
-        .qr-code p { font-size: 9px; margin-top: 2px; color: #000; font-weight: normal; }
+        .qr-code p { font-size: 10px; margin-top: 2px; color: #000; font-weight: normal; }
 
-        .footer { margin-top: 3px; font-size: 10px; line-height: 1.35; color: #000; font-weight: normal; }
+        .footer { margin-top: 3px; font-size: 11px; line-height: 1.35; color: #000; font-weight: normal; }
 
         @media print {
             /* PRINTABLE-WIDTH FIX v2 (owner report Jul 2026 — right edge STILL cut):
@@ -118,7 +118,7 @@
            plain weight too thin/light. Opt-in per company (Receipt Settings);
            the text stroke lays down extra ink like the KOT notes fix. */
         body, td, th, p, span, div, h1, strong { font-weight: 900 !important; }
-        body { -webkit-text-stroke: 0.5px #000; }
+        body { -webkit-text-stroke: 0.75px #000; }
     </style>
     @endif
 </head>

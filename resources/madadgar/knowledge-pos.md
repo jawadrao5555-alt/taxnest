@@ -31,7 +31,7 @@ Bill banane ka aam tareeqa, shuru se aakhir tak:
 Payment modal ki keys: 1 = Cash (foran), 2 = Card (foran), arrow keys se method highlight, Enter = highlighted method confirm, P = Save Provisional (guided flow ON ho to), Esc = band.
 
 Sale screen ki mazeed cheezein:
-- Search hamesha GLOBAL hai: category dropdown/pills sirf GRID filter karti hain — search box har category ka item dhoondta hai, deals aur services samet.
+- Search hamesha GLOBAL hai: category dropdown sirf GRID filter karta hai — search box har category ka item dhoondta hai, deals aur services samet. (Category pills ki patti hata di gayi hai — ab sirf dropdown hai, mobile par bhi.)
 - Search mein pehle harf ko priority milti hai (jo item aapke likhe harf se shuru ho wo upar).
 - Product grid ON/OFF toggle hai — grid OFF ho aur products ghayab lagein to "Show All Products" ya Products toggle dobara ON karein (yeh setting har PC/browser par alag save hoti hai).
 - SIMPLE MODE (jab Inventory Tracking OFF ho): "Manual" button nazar aata hai — naam + price likh kar ad-hoc item cart mein dalein; "Save Permanent" tick karein to product master mein bhi save ho jata hai. Search mein item na mile to naya product FORAN ban sakta hai (quick-create) — price 0 se banta hai aur cart row mein price box khud khul jata hai, wahan price likh dein. Cart row ki unit price par click kar ke bhi price edit hoti hai.
@@ -45,7 +45,7 @@ Sale screen ki mazeed cheezein:
 - Discount limit DONO types par lagti hai: percentage bhi aur Rs. amount bhi — amount discount subtotal ke limit% se zyada nahi ho sakta (default 50%). Limit se zyada discount par Manager PIN ka modal khulta hai — PIN dalne par usi bill ke liye override ho jata hai (cart clear hote hi khatam).
 - Offline mode: internet chala jaye to bill queue mein save hota hai aur net aane par khud PRA ko chala jata hai.
 - Waiter ka order aaye to header ki bell par teal badge blink karta hai — bell kholein → order par "Load to Cart" → payment karein; table khud free ho jata hai.
-- Saaf style ho to kam-istemaal buttons (Rush, Fit, Keys, Quick), guided steps ki patti aur category pills "Mazeed" button ke peechay hoti hain — Mazeed dabane se dikh jati hain. Saare features waise hi kaam karte hain.
+- Saaf style ho to kam-istemaal buttons (Rush, Fit, Keys, Quick) aur guided steps ki patti "Mazeed" button ke peechay hoti hain — Mazeed dabane se dikh jati hain. Saare features waise hi kaam karte hain.
 
 ## Keyboard Shortcuts (Sale Screen) — MUKAMMAL LIST
 - F1 = shortcuts ki madad wali screen kholo/band karo.
@@ -74,6 +74,7 @@ Sale screen ki mazeed cheezein:
 - Receipt Settings (/pos/receipt-settings) par DO tabs hain: "PRA Receipt" aur "Local Receipt" — har tab ke apne toggles: Show Address, Show NTN, Show Email, Show Phone/Mobile, Show Cashier Details, Show Tax, aur Footer message (toggle + apna text). Global options: Receipt Paper Size (80mm Standard / 58mm Compact), Bold Receipt Print toggle, Logo Style (Compact/Large).
 - "Show Tax" OFF karne se customer copy par Subtotal aur Tax chhup jate hain — sirf grand TOTAL nazar aata hai; items apni asal price par dikhte hain. Lekin PRA ko tax hamesha POORA submit hota hai.
 - Receipt ka default style: bold + center logo; company chahe to plain style choose kar sakti hai. Text gehra/bold hai taake saste printers par bhi saaf chape.
+- Restaurant orders ki receipt par order type ka numaya badge chapta hai — DINE-IN, TAKE AWAY ya DELIVERY (bold, border ke saath, bilkul upar). Retail/simple bills par koi badge nahi aata.
 - Kisi bhi purane bill ki receipt dobara: sale screen par Alt+R (Reprint) — ya /pos/transactions se bill khol kar receipt/PDF.
 - Bill ka share link: /pos/transactions se bill kholein → share link banayen — customer ko WhatsApp waghera par bhej sakte hain.
 

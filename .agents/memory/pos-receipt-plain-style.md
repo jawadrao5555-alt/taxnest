@@ -52,6 +52,11 @@ laser printers (some shops print receipts on laser, not thermal). Don't revert t
 monospace body font; DomPDF maps Arial → Helvetica core font (same Unicode limits as the
 old Courier mapping, no regression).
 
+**Order-type badge (customer request, 23 Jul 2026):** both 80mm/58mm templates print a bold
+centered bordered DINE-IN / TAKE AWAY / DELIVERY badge just above the info-table, from the
+`$transaction->order_type` snapshot (`@php match`; NULL/retail/unknown = NO badge). Keep the
+80↔58 pair in sync; never derive order type from anything but the stored snapshot.
+
 Related: iframe print focus — after the hidden print iframe's dialog closes, focus can stay
 inside the iframe and the parent document's keydown shortcuts (P reprint / Enter / Esc) go
 dead. `_printViaIframe`'s fireOnce must blur the iframe + `window.focus()` — keep that

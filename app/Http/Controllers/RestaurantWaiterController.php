@@ -83,6 +83,7 @@ class RestaurantWaiterController extends Controller
     public function tables()
     {
         $companyId = app('currentCompanyId');
+        RestaurantTable::releaseStaleReservations($companyId);
 
         $tables = RestaurantTable::where('company_id', $companyId)
             ->where('is_active', true)
@@ -138,7 +139,7 @@ class RestaurantWaiterController extends Controller
             'items.*.unit_price' => 'required|numeric|min:0|max:99999999',
             'items.*.item_id' => 'nullable|integer',
             'items.*.special_notes' => 'nullable|string|max:500',
-            'cashier_id' => 'required|integer',
+            'cashier_id' => 'nullable|integer',
             'table_id' => 'nullable|integer',
             'order_type' => 'nullable|in:dine_in,takeaway,delivery',
             'customer_name' => 'nullable|string|max:100',
@@ -146,17 +147,23 @@ class RestaurantWaiterController extends Controller
             'kitchen_notes' => 'nullable|string|max:500',
         ]);
 
-        // The chosen cashier must be a real, active billing account of THIS company.
-        $cashier = User::where('company_id', $companyId)
-            ->where('id', $validated['cashier_id'])
-            ->where('is_active', true)
-            ->where(function ($q) {
-                $q->whereIn('pos_role', ['pos_admin', 'pos_manager', 'pos_cashier'])
-                  ->orWhere('role', 'company_admin');
-            })
-            ->first();
-        if (!$cashier) {
-            return response()->json(['success' => false, 'message' => 'Selected cashier not found.'], 422);
+        // Cashier pick is OPTIONAL (customer feedback, 23 Jul 2026). No pick =
+        // unassigned order → EVERY cashier's incoming list shows it (incomingOrders
+        // already treats NULL assigned_cashier_id as "for anyone"). When a cashier
+        // IS chosen, they must be a real, active billing account of THIS company.
+        $cashier = null;
+        if (!empty($validated['cashier_id'])) {
+            $cashier = User::where('company_id', $companyId)
+                ->where('id', $validated['cashier_id'])
+                ->where('is_active', true)
+                ->where(function ($q) {
+                    $q->whereIn('pos_role', ['pos_admin', 'pos_manager', 'pos_cashier'])
+                      ->orWhere('role', 'company_admin');
+                })
+                ->first();
+            if (!$cashier) {
+                return response()->json(['success' => false, 'message' => 'Selected cashier not found.'], 422);
+            }
         }
 
         $orderType = $validated['order_type'] ?? 'dine_in';
@@ -199,7 +206,7 @@ class RestaurantWaiterController extends Controller
                 'total_amount' => $total,
                 'kitchen_notes' => $validated['kitchen_notes'] ?? null,
                 'created_by' => $user->id,
-                'assigned_cashier_id' => $cashier->id,
+                'assigned_cashier_id' => $cashier?->id,
                 'source' => 'waiter',
                 'kot_sent_at' => now(),
                 'kot_print_count' => 0,
@@ -223,7 +230,7 @@ class RestaurantWaiterController extends Controller
                 'success' => true,
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
-                'message' => 'Order sent to ' . $cashier->name . '.',
+                'message' => $cashier ? 'Order sent to ' . $cashier->name . '.' : 'Order sent to counter.',
             ]);
         });
     }

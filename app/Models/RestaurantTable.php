@@ -56,4 +56,28 @@ class RestaurantTable extends Model
         // Loose int compare — PDO may return the column as a string on some hosts.
         return (int) $this->locked_by_user_id !== (int) $userId;
     }
+
+    /**
+     * Self-heal: free RESERVED tables whose lock went stale (30min+, same
+     * threshold reserveTable uses for takeover) or that carry no lock at all.
+     * A cashier who reserves from the sale screen and walks away otherwise
+     * leaves the tile amber forever. Deliberately never touches 'occupied' —
+     * that status belongs to the held-order lifecycle. Call before any
+     * table listing/status render. Cheap no-op when nothing is stale.
+     */
+    public static function releaseStaleReservations($companyId): int
+    {
+        return static::where('company_id', $companyId)
+            ->where('status', 'reserved')
+            ->where(function ($q) {
+                $q->whereNull('locked_at')
+                    ->orWhere('locked_at', '<', now()->subMinutes(30));
+            })
+            ->update([
+                'status' => 'available',
+                'locked_by_user_id' => null,
+                'locked_at' => null,
+                'occupied_since' => null,
+            ]);
+    }
 }

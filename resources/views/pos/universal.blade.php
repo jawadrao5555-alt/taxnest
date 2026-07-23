@@ -380,7 +380,7 @@ window.addEventListener('popstate', function() {
              it is ALWAYS visible (even when the grid is hidden). NOTE (22 Jul 2026): category scopes
              the browsable GRID only — search is always GLOBAL (whole catalog), per customer request.
              Hidden automatically when the company has no categories/services/deals to pick. --}}
-        <div class="relative flex-shrink-0 hidden sm:block" x-show="catOptions().length > 0 || allServices.length > 0 || allDeals.length > 0" x-cloak>
+        <div class="relative flex-shrink-0" x-show="catOptions().length > 0 || allServices.length > 0 || allDeals.length > 0" x-cloak>
             <select x-model="activeCategory" title="Category chunein — grid usi category ke products dikhayega (search hamesha poore catalog mein chalti hai)"
                     class="appearance-none pl-3 pr-8 py-2.5 rounded-xl text-xs font-bold border-2 cursor-pointer max-w-[150px] shadow-sm transition focus:ring-2 focus:ring-purple-500 focus:border-purple-400"
                     :class="activeCategory !== 'all' ? 'border-purple-400 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300'">
@@ -434,31 +434,31 @@ window.addEventListener('popstate', function() {
                     Creating "<span x-text="searchQuery" class="font-semibold"></span>"…
                 </p>
             </div>
-            <div x-show="showSearchDropdown && searchSuggestions.length > 0" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 max-h-64 overflow-y-auto" x-ref="searchDropdown">
+            {{-- Compact search dropdown GLOBAL (customer feedback, 23 Jul 2026 — was Saaf-only):
+                 one line per product (no category sub-label), tighter rows, taller list so more
+                 results fit without scrolling. Stock dots stay (inline after the name). --}}
+            <div x-show="showSearchDropdown && searchSuggestions.length > 0" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 overflow-y-auto" style="max-height:min(60vh,480px);" x-ref="searchDropdown">
                 <template x-for="(s, i) in searchSuggestions" :key="s.id + s.type">
                     <button @click="quickAddItem(s)" @mouseenter="highlightIndex = i"
                         :data-hl="i === highlightIndex ? 'true' : 'false'"
-                        class="w-full flex items-center gap-3 px-3 py-2.5 text-left"
+                        class="w-full flex items-center gap-3 px-3 py-1.5 text-left"
                         :style="i === highlightIndex ? 'background:#7c3aed !important; border-radius:10px; margin:2px 4px; width:calc(100% - 8px); box-shadow:0 4px 12px rgba(124,58,237,0.4);' : 'margin:2px 4px; width:calc(100% - 8px);'">
                         <template x-if="s.image">
-                            <img :src="s.image" class="w-8 h-8 rounded-lg object-cover flex-shrink-0" :style="i === highlightIndex ? 'outline:2px solid white; outline-offset:1px;' : ''">
+                            <img :src="s.image" class="w-7 h-7 rounded-lg object-cover flex-shrink-0" :style="i === highlightIndex ? 'outline:2px solid white; outline-offset:1px;' : ''">
                         </template>
                         <template x-if="!s.image">
-                            <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                            <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
                                 :style="i === highlightIndex ? 'background:white; color:#7c3aed;' : 'background:linear-gradient(135deg,#f3e8ff,#ede9fe); color:#7c3aed;'">
                                 <span class="text-xs font-bold" x-text="s.name.charAt(0)"></span>
                             </div>
                         </template>
-                        <div class="flex-1 min-w-0">
-                            <span class="text-sm font-semibold block leading-snug" :style="i === highlightIndex ? 'color:white;' : 'color:#1f2937;'" x-text="s.name"></span>
-                            <div class="flex items-center gap-1.5">
-                                <span class="sugg-cat text-[10px]" :style="i === highlightIndex ? 'color:rgba(255,255,255,0.7);' : 'color:#9ca3af;'" x-text="s.type === 'service' ? 'Service' : s.category"></span>
-                                @if($company->inventory_enabled)
-                                <template x-if="s.stockStatus && s.stockStatus !== 'available'"><span class="stock-dot" :class="'stock-' + s.stockStatus"></span></template>
-                                @endif
-                            </div>
+                        <div class="flex-1 min-w-0 flex items-center gap-1.5">
+                            <span class="text-sm font-semibold truncate leading-snug" :style="i === highlightIndex ? 'color:white;' : 'color:#1f2937;'" x-text="s.name"></span>
+                            @if($company->inventory_enabled)
+                            <template x-if="s.stockStatus && s.stockStatus !== 'available'"><span class="stock-dot flex-shrink-0" :class="'stock-' + s.stockStatus"></span></template>
+                            @endif
                         </div>
-                        <span class="text-sm font-extrabold" :style="i === highlightIndex ? 'color:white;' : 'color:#9333ea;'" x-text="'Rs. ' + Number(s.price).toLocaleString()"></span>
+                        <span class="text-sm font-extrabold flex-shrink-0" :style="i === highlightIndex ? 'color:white;' : 'color:#9333ea;'" x-text="'Rs. ' + Number(s.price).toLocaleString()"></span>
                     </button>
                 </template>
             </div>
@@ -640,23 +640,19 @@ window.addEventListener('popstate', function() {
 
         <div class="flex-1 flex flex-col overflow-hidden" :class="mobileView === 'menu' ? 'flex' : 'hidden md:flex'">
 
+            {{-- Category pills strip REMOVED globally (customer feedback, 23 Jul 2026 — was
+                 Saaf-only declutter): the row ate vertical space; category filtering lives in
+                 the always-visible dropdown next to search (same activeCategory). The strip
+                 now renders ONLY for inventory-OFF companies, to host the master Products
+                 toggle + grid-hidden hint — do NOT re-add the pills. --}}
+            @if(!($inventoryEnabled ?? false))
             <div class="tn-cat-strip flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
                 <div class="flex items-center gap-2 overflow-x-auto hide-scrollbar flex-1 min-w-0">
-                    <button @click="activeCategory = 'all'; filterProducts()" x-show="showProducts" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === 'all' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">
-                        All <span class="ml-1 text-[10px] opacity-70" x-text="'(' + (allProducts.filter(p => p.show_on_sale !== false).length + allServices.length + allDeals.length) + ')'"></span>
-                    </button>
-                    @foreach($categories as $cat)
-                    <button @click="activeCategory = '{{ $cat }}'; filterProducts()" x-show="showProducts" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === '{{ $cat }}' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">{{ $cat }}</button>
-                    @endforeach
-                    <button @click="activeCategory = 'services'; filterProducts()" x-show="showProducts" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === 'services' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">Services</button>
-                    @if(!empty($dealsForJs))
-                    <button @click="activeCategory = 'deals'; filterProducts()" x-show="showProducts" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === 'deals' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">🔥 Deals <span class="ml-1 text-[10px] opacity-70" x-text="'(' + allDeals.length + ')'"></span></button>
-                    @endif
+                    <span x-show="showProducts" class="text-[11px] text-gray-400 dark:text-gray-500 px-1 whitespace-nowrap" x-text="'Items: ' + (allProducts.filter(p => p.show_on_sale !== false).length + allServices.length + allDeals.length)"></span>
                     <span x-show="!showProducts" class="text-[11px] text-gray-400 dark:text-gray-500 italic px-1 whitespace-nowrap">Grid hidden — search to add, or type to create</span>
                 </div>
                 {{-- MASTER products toggle — inventory-OFF (Simple) mode ONLY. In inventory mode the
                      catalog is mandatory (no on-the-fly manual create), so hiding it would brick billing. --}}
-                @if(!($inventoryEnabled ?? false))
                 <button type="button" @click="toggleShowProducts()" role="switch" :aria-checked="showProducts ? 'true' : 'false'"
                         class="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-bold border transition"
                         :class="showProducts ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400'"
@@ -667,8 +663,8 @@ window.addEventListener('popstate', function() {
                         <span class="inline-block h-3 w-3 transform rounded-full bg-white transition" :class="showProducts ? 'translate-x-3.5' : 'translate-x-0.5'"></span>
                     </span>
                 </button>
-                @endif
             </div>
+            @endif
 
             <div x-ref="gridContainer" tabindex="0" @keydown.arrow-right.prevent="moveGridFocus(1)" @keydown.arrow-left.prevent="moveGridFocus(-1)" @keydown.arrow-down.prevent="moveGridFocus(gridCols)" @keydown.arrow-up.prevent="moveGridFocus(-gridCols)" @keydown.enter.prevent="addGridFocusedItem()" class="flex-1 overflow-y-auto p-3 outline-none">
 
@@ -882,8 +878,11 @@ window.addEventListener('popstate', function() {
                         <span style="color:rgba(255,255,255,0.9); font-size:10px; font-weight:600;">↑↓ Navigate &nbsp; +/− Qty &nbsp; 0-9 Set Qty &nbsp; Del Remove &nbsp; Esc Exit</span>
                     </div>
                 </template>
+                {{-- Compact cart rows (customer feedback, 23 Jul 2026): tighter padding + smaller
+                     qty stepper so 6-8 items fit before scrolling (was ~4-5). Touch targets on
+                     phones still enforced by mobile.css min-height. --}}
                 <template x-for="(item, index) in cart" :key="item.cart_uid">
-                    <div class="cart-item cart-item-enter px-3 py-2.5 cursor-pointer relative"
+                    <div class="cart-item cart-item-enter px-3 py-1.5 cursor-pointer relative"
                         :class="activeCartIndex === index ? 'cart-row-active' : ''"
                         @click="selectCartRow(index)" :data-cart-index="index">
                         <div class="flex items-center gap-2.5">
@@ -919,7 +918,7 @@ window.addEventListener('popstate', function() {
                                 </template>
                             </div>
                             <div class="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-xl p-0.5">
-                                <button @click.stop="updateQty(index, -1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
+                                <button @click.stop="updateQty(index, -1)" class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M20 12H4"/></svg>
                                 </button>
                                 <input type="text" inputmode="decimal" autocomplete="off"
@@ -933,8 +932,8 @@ window.addEventListener('popstate', function() {
                                     @keydown="onQtyKeydown(index, $event)"
                                     @input.stop="onQtyInput(index, $event)"
                                     @blur="onQtyBlur(index, $event)"
-                                    class="w-16 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner px-1">
-                                <button @click.stop="updateQty(index, 1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
+                                    class="w-12 h-7 text-center text-base font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner px-1">
+                                <button @click.stop="updateQty(index, 1)" class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M12 4v16m8-8H4"/></svg>
                                 </button>
                             </div>
@@ -945,8 +944,8 @@ window.addEventListener('popstate', function() {
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                             </button>
                         </div>
-                        <div class="flex items-center gap-1.5 mt-1.5 justify-end">
-                            <button @click.stop="item.is_tax_exempt = !item.is_tax_exempt" class="text-[11px] font-extrabold px-2 py-1 rounded-md transition whitespace-nowrap ring-1" :class="item.is_tax_exempt ? 'bg-green-500 text-white ring-green-600 shadow-sm' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 ring-gray-300 dark:ring-gray-600 hover:ring-green-500 hover:text-green-600'" :title="item.is_tax_exempt ? 'Tax exempt — click or press T to apply tax' : 'Press T (when search empty) or Alt+T (anywhere) to toggle tax'" x-text="item.is_tax_exempt ? 'NO TAX (T)' : 'TAX (T)'"></button>
+                        <div class="flex items-center gap-1.5 mt-1 justify-end">
+                            <button @click.stop="item.is_tax_exempt = !item.is_tax_exempt" class="text-[10px] font-extrabold px-2 py-0.5 rounded-md transition whitespace-nowrap ring-1" :class="item.is_tax_exempt ? 'bg-green-500 text-white ring-green-600 shadow-sm' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 ring-gray-300 dark:ring-gray-600 hover:ring-green-500 hover:text-green-600'" :title="item.is_tax_exempt ? 'Tax exempt — click or press T to apply tax' : 'Press T (when search empty) or Alt+T (anywhere) to toggle tax'" x-text="item.is_tax_exempt ? 'NO TAX (T)' : 'TAX (T)'"></button>
                             <button @click.stop="item.showItemDiscount = !item.showItemDiscount" class="text-[9px] font-bold px-1.5 py-1 rounded-md transition whitespace-nowrap" :class="(item.item_discount_value || 0) > 0 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-orange-500'" x-text="(item.item_discount_value || 0) > 0 ? ((item.item_discount_type || 'percentage') === 'percentage' ? '-' + item.item_discount_value + '%' : '-Rs.' + item.item_discount_value) : 'Disc'"></button>
                         </div>
                         <div x-show="item.showItemDiscount" x-transition class="mt-1 flex items-center gap-1">

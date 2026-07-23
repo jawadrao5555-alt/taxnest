@@ -115,23 +115,25 @@
                               autocomplete="off" name="waiter_kn_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                               class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm px-3 py-2.5 focus:ring-teal-500 focus:border-teal-500"></textarea>
                     <div>
-                        <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Send to cashier</label>
+                        {{-- Cashier pick is OPTIONAL (customer feedback, 23 Jul 2026): default = counter,
+                             order shows on EVERY cashier's incoming list. Picking a specific cashier
+                             still works and sticks for the day (owner, 20 Jul 2026). --}}
+                        <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Send to</label>
                         <select x-model="cashierId" class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm px-3 py-2.5 focus:ring-teal-500 focus:border-teal-500">
-                            <option value="">— choose cashier —</option>
+                            <option value="">Counter — sab cashiers</option>
                             @foreach($cashiers as $c)
                                 <option value="{{ $c->id }}">{{ $c->name }}</option>
                             @endforeach
                         </select>
-                        {{-- Once-per-day cashier (owner, 20 Jul 2026): pick once, sticks all day on this tablet --}}
                         <p x-show="cashierId" class="mt-1 text-[11px] text-teal-600 dark:text-teal-400 font-medium">✓ Aaj ke liye yaad rahega — kal dobara select hoga</p>
-                        <p x-show="!cashierId" class="mt-1 text-[11px] text-gray-400">Aik dafa select karein — poora din yehi cashier raha ga</p>
+                        <p x-show="!cashierId" class="mt-1 text-[11px] text-gray-400">Counter par sab cashiers ko nazar aayega</p>
                     </div>
                 </div>
             </template>
 
-            <button @click="send()" :disabled="sending || !cart.length || (!appendOrderId && !cashierId)"
+            <button @click="send()" :disabled="sending || !cart.length"
                     class="w-full py-3.5 rounded-xl bg-teal-600 hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-base font-black transition"
-                    x-text="sending ? 'Sending…' : (appendOrderId ? 'ADD ITEMS TO ORDER' : 'SEND TO CASHIER')"></button>
+                    x-text="sending ? 'Sending…' : (appendOrderId ? 'ADD ITEMS TO ORDER' : 'SEND ORDER')"></button>
         </div>
     </div>
 
@@ -340,7 +342,7 @@ function waiterApp() {
                 : '/pos/waiter/orders';
             const body = this.appendOrderId ? { items } : {
                 items,
-                cashier_id: this.cashierId,
+                cashier_id: this.cashierId || null,
                 order_type: this.orderType,
                 table_id: this.orderType === 'dine_in' ? (this.selectedTable?.id || null) : null,
                 customer_name: this.customerName || null,

@@ -872,6 +872,7 @@ class PosController extends Controller
         $tables = collect();
         $selectedTable = null;
         if ($features->tables && class_exists(RestaurantTable::class)) {
+            RestaurantTable::releaseStaleReservations($companyId);
             $tables = RestaurantTable::where('company_id', $companyId)
                 ->where('is_active', true)->orderBy('sort_order')->get();
             $tableId = $request->get('table_id');

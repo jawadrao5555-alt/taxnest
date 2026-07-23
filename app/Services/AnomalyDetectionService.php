@@ -47,15 +47,18 @@ class AnomalyDetectionService
 
     public static function detectTaxSpike(int $companyId): ?AnomalyLog
     {
-        $currentMonthTax = Invoice::where('company_id', $companyId)
-            ->whereMonth('created_at', now()->month)
-            ->whereYear('created_at', now()->year)
+        // Qualified columns (fix, 23 Jul 2026): the invoice_items join made bare
+        // `company_id` / `created_at` ambiguous — nightly compliance cron failed
+        // for EVERY company on live with SQLSTATE 1052.
+        $currentMonthTax = Invoice::where('invoices.company_id', $companyId)
+            ->whereMonth('invoices.created_at', now()->month)
+            ->whereYear('invoices.created_at', now()->year)
             ->join('invoice_items', 'invoices.id', '=', 'invoice_items.invoice_id')
             ->sum('invoice_items.tax');
 
-        $previousMonthTax = Invoice::where('company_id', $companyId)
-            ->whereMonth('created_at', now()->subMonth()->month)
-            ->whereYear('created_at', now()->subMonth()->year)
+        $previousMonthTax = Invoice::where('invoices.company_id', $companyId)
+            ->whereMonth('invoices.created_at', now()->subMonth()->month)
+            ->whereYear('invoices.created_at', now()->subMonth()->year)
             ->join('invoice_items', 'invoices.id', '=', 'invoice_items.invoice_id')
             ->sum('invoice_items.tax');
 

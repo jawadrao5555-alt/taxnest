@@ -27,6 +27,7 @@ class RestaurantTableController extends Controller
     public function index()
     {
         $companyId = app('currentCompanyId');
+        RestaurantTable::releaseStaleReservations($companyId);
 
         $floors = RestaurantFloor::where('company_id', $companyId)
             ->where('is_active', true)
@@ -271,6 +272,7 @@ class RestaurantTableController extends Controller
     public function tableStatus()
     {
         $companyId = app('currentCompanyId');
+        RestaurantTable::releaseStaleReservations($companyId);
 
         $tables = RestaurantTable::where('company_id', $companyId)
             ->where('is_active', true)

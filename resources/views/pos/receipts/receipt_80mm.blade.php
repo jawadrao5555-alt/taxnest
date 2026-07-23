@@ -265,6 +265,23 @@
     </div>
     @endif
 
+    {{-- Order type (customer feedback, 23 Jul 2026): Dine-In / Take Away / Delivery
+         printed bold + centered so counter staff spot it instantly. Only when the
+         bill actually carries an order_type (restaurant flow) — retail bills skip. --}}
+    @php
+        $rcptOrderType = match ($transaction->order_type ?? null) {
+            'dine_in' => 'DINE-IN',
+            'takeaway' => 'TAKE AWAY',
+            'delivery' => 'DELIVERY',
+            default => null,
+        };
+    @endphp
+    @if($rcptOrderType)
+    <div style="text-align:center; padding:2px 0 3px;">
+        <span style="display:inline-block; border:1.5px solid #000; padding:1px 10px; font-size:11px; font-weight:bold; letter-spacing:1px;">{{ $rcptOrderType }}</span>
+    </div>
+    @endif
+
     <table class="info-table">
         <tr><td class="info-label">Date:</td><td class="info-value">{{ $transaction->created_at->format('d/m/Y h:i A') }}</td></tr>
         @if($transaction->terminal)

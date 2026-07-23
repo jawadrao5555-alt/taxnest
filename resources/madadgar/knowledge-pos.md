@@ -133,6 +133,7 @@ Yeh NestPOS ka mukammal guide hai. Sirf is guide ki maloomat se jawab do.
 ## Customize POS (/pos/customize)
 - POS Ka Style: dashboard ka style (Full ya Saaf + fancy styles). Saaf chunne par dashboard ke saath sale screen bhi saada teal look mein aa jati hai.
 - Theme colors.
+- Receipt Popup Auto-Close: bill ke baad receipt popup itne second mein khud band ho jata hai (default 10 sec). Options: Kabhi nahi / 5 / 10 / 15 / 30 sec. Popup par mouse le jao to timer ruk jata hai, kahin click ya koi key dabao to timer cancel — popup khula rehta hai. "Kabhi nahi" chuno to purana tareeqa (popup khud band nahi hota).
 - Local Billing policy (day-close par local bills save ya delete).
 - Tax Pricing mode.
 - Yeh page sirf admin/manager ke liye hai.

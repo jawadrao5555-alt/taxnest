@@ -1891,12 +1891,22 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
-    {{-- Persistent Receipt Modal — Esc + backdrop-click are intentionally NOT bound here so       --}}
-    {{-- the cashier doesn't dismiss the popup by accident while reading totals or printing.        --}}
-    {{-- Esc on this popup belongs to the browser print dialog (closes that, not our popup).        --}}
-    {{-- Popup closes ONLY via: X (top-right cross), Close button, or "New Sale" button.            --}}
-    <div x-show="showReceipt" x-cloak x-transition.opacity x-effect="if (!showReceipt) cancelPendingPrints()" class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-        <div class="receipt-modal-enter relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col" style="max-height:92vh;" x-transition.scale.90>
+    {{-- Receipt Modal — backdrop-click is intentionally NOT bound (no accidental dismiss).         --}}
+    {{-- Esc on this popup belongs to the browser print dialog first (closes that, not our popup).  --}}
+    {{-- Closes via: X, Close button, "New Sale", OR the auto-close countdown (owner, 23 Jul 2026:  --}}
+    {{-- per-company pos_receipt_autoclose_seconds, default 10s, 0 = persistent old behavior).      --}}
+    {{-- Hover pauses the countdown; any click/keypress inside cancels it.                          --}}
+    <div x-show="showReceipt" x-cloak x-transition.opacity x-effect="if (!showReceipt) { cancelPendingPrints(); cancelReceiptAutoClose(); }" class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="receipt-modal-enter relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col" style="max-height:92vh;" x-transition.scale.90
+             @mouseenter="receiptClosePaused = true" @mouseleave="receiptClosePaused = false" @click="cancelReceiptAutoClose()">
+            {{-- Auto-close countdown pill (visible only while the timer runs) --}}
+            <button type="button" x-show="receiptCloseLeft > 0" x-cloak @click.stop="cancelReceiptAutoClose()"
+                class="absolute top-3 left-3 z-10 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-900/70 hover:bg-gray-900/90 text-white text-[11px] font-bold transition"
+                title="Popup itne second mein khud band ho jayega — rokne ke liye click karein">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span x-text="receiptCloseLeft + 's'"></span>
+                <span class="opacity-75 font-semibold">· Roko</span>
+            </button>
             {{-- Top-right cross (primary close action) --}}
             <button @click="showReceipt = false" class="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/80 dark:bg-gray-800/80 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white flex items-center justify-center transition shadow-sm" title="Close popup">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -2479,8 +2489,14 @@ function restaurantPos() {
         @php $__ps = $company->printerSettings(); @endphp
         silentBillPrint: {{ ($__ps['silent_print_enabled'] && $__ps['receipt_printer']) ? 'true' : 'false' }},
         silentKotPrint: {{ ($__ps['silent_print_enabled'] && $__ps['kot_printer']) ? 'true' : 'false' }},
-        // Phase 5+ — auto-dismiss timer for the success modal so cashiers can chain sales hands-free
+        // Receipt popup auto-close (owner, 23 Jul 2026 — re-enabled after being persistent-only):
+        // popup closes itself after N seconds (companies.pos_receipt_autoclose_seconds,
+        // NULL = 10s default, 0 = never). Hover PAUSES the countdown; any click/keypress
+        // inside the popup CANCELS it — the cashier always stays in control.
         receiptAutoCloseTimer: null,
+        receiptAutoCloseSecs: {{ (int) ($company->pos_receipt_autoclose_seconds ?? 10) }},
+        receiptCloseLeft: 0,
+        receiptClosePaused: false,
         // Print-chain session tracker — bumping the epoch invalidates in-flight iframe.onload /
         // afterprint callbacks so late-firing browser events (modal closed mid-sequence) cannot
         // enqueue stray prints. Mirrors restaurant POS engine.
@@ -4067,6 +4083,8 @@ function restaurantPos() {
                 return;
             }
             if (this.showReceipt) {
+                // Any keypress while the popup is up = cashier is interacting — stop the auto-close.
+                this.cancelReceiptAutoClose();
                 // Esc closes the success popup (per cashier feedback — mouse use was needed).
                 // If a browser print dialog is on top, Esc closes that first (native) — second Esc
                 // reaches us and dismisses the popup.
@@ -5752,15 +5770,35 @@ function restaurantPos() {
             }
         },
 
-        // Persistent receipt popup — auto-dismiss disabled. Popup stays open until the cashier
-        // explicitly closes via X / Close / New Sale buttons. Functions kept as no-ops so any
-        // legacy call-sites continue to work without throwing.
+        // Receipt popup auto-close countdown (owner, 23 Jul 2026). Rules:
+        // - 0 / missing setting on old tabs = persistent popup (old behavior).
+        // - Hover pauses (receiptClosePaused), any click/keypress cancels outright.
+        // - NEVER closes while the popup print chain is still running — closing fires
+        //   cancelPendingPrints() via x-effect and would kill a queued KOT print.
         scheduleReceiptAutoClose() {
-            if (this.receiptAutoCloseTimer) { clearTimeout(this.receiptAutoCloseTimer); this.receiptAutoCloseTimer = null; }
+            this.cancelReceiptAutoClose();
+            const secs = parseInt(this.receiptAutoCloseSecs, 10) || 0;
+            if (secs <= 0) return; // 0 = never auto-close
+            this.receiptCloseLeft = secs;
+            this.receiptAutoCloseTimer = setInterval(() => {
+                if (!this.showReceipt) { this.cancelReceiptAutoClose(); return; }
+                if (this.receiptClosePaused) return; // mouse is on the popup — hold
+                if (this.receiptCloseLeft > 1) { this.receiptCloseLeft--; return; }
+                // Reached zero — if popup-print iframes/timers are still in flight,
+                // wait 2 more seconds instead of cancelling their prints.
+                if ((this.pendingPrintTimers && this.pendingPrintTimers.length) || (this.printMessageHandlers && this.printMessageHandlers.length)) {
+                    this.receiptCloseLeft = 2;
+                    return;
+                }
+                this.cancelReceiptAutoClose();
+                this.showReceipt = false;
+            }, 1000);
         },
 
         cancelReceiptAutoClose() {
-            if (this.receiptAutoCloseTimer) { clearTimeout(this.receiptAutoCloseTimer); this.receiptAutoCloseTimer = null; }
+            if (this.receiptAutoCloseTimer) { clearInterval(this.receiptAutoCloseTimer); this.receiptAutoCloseTimer = null; }
+            this.receiptCloseLeft = 0;
+            this.receiptClosePaused = false;
         },
 
         recallOrder(order) {

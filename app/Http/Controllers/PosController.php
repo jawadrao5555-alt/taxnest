@@ -87,6 +87,31 @@ class PosController extends Controller
     }
 
     /**
+     * Receipt popup auto-close timer — admin-only (owner, 23 Jul 2026).
+     * The sale-screen success popup closes itself after N seconds; any
+     * cashier interaction pauses/cancels the countdown. 0 = never
+     * (persistent popup, the old behavior); NULL = platform default (10s).
+     */
+    public function updateReceiptAutoclose(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->isPosCashier()) {
+            return response()->json(['success' => false, 'message' => 'Only POS administrators can change this setting.'], 403);
+        }
+        // Prod schema drift guard — never pretend to save into a missing column.
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_receipt_autoclose_seconds')) {
+            return response()->json(['success' => false, 'message' => 'This setting is not available yet — please try again after the pending system update.'], 503);
+        }
+        $secs = (int) $request->input('seconds', 10);
+        if (!in_array($secs, [0, 5, 10, 15, 20, 30], true)) {
+            return response()->json(['success' => false, 'message' => 'Invalid value'], 422);
+        }
+        $companyId = app('currentCompanyId');
+        Company::where('id', $companyId)->update(['pos_receipt_autoclose_seconds' => $secs]);
+        return response()->json(['success' => true, 'seconds' => $secs]);
+    }
+
+    /**
      * Tax-Inclusive Pricing (Menu-Rate-Final) mode toggle — admin-only.
      * Applies to NEW bills only: existing bills keep their own tax_inclusive
      * snapshot, so history/reports/PRA payloads never shift retroactively.

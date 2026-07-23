@@ -1,5 +1,10 @@
 uploads = []
-generated = []
+
+[[generated]]
+id = "NeSC2Hima9ZMFniQ7D9h_"
+uri = "file://attached_assets/generated_images/demo_broast_logo.png"
+type = "image"
+title = "demo broast badge logo"
 
 [[outputs]]
 id = "xrJy-_qnx_9C2ydhu3zJg"
@@ -197,4 +202,4 @@ title = "What's New notifications — aaj ke 3 updates"
 id = "FZuhG5WAmqvUfQsD6e4cc"
 uri = "file://screenshots/receipt_before_after.jpg"
 type = "image"
-title = "Receipt: Pehle vs Baad (aur zyada bold)"
+title = "Receipt: Pehle vs Baad (saaf logo + upar jagah)"

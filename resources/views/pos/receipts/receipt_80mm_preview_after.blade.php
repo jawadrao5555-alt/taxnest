@@ -92,7 +92,7 @@
                v3 (Pizza Master Jul 2026): LEFT edge clipped too ("Customer" lost its
                'C') — 1mm side padding sat inside the head's dead zone on some
                printers. Side padding raised to 2.5mm both sides (content ~67mm). */
-            body { width: auto; max-width: 72mm; padding: 3mm 3mm 1mm; margin: 0 auto; }
+            body { width: auto; max-width: 72mm; padding: 4mm 3mm 1mm; margin: 0 auto; }
             .no-print { display: none !important; }
         }
         @media screen {
@@ -210,7 +210,7 @@
         @if($printStyle['logo'] === 'center')
         {{-- display:block kills the inline-image baseline gap under the logo
              (owner report Jul 2026: "remove space under logo"). --}}
-        <div style="text-align:center; margin:0; padding:0; line-height:0;">
+        <div style="text-align:center; margin:0; padding:2mm 0 0; line-height:0;">
             <img src="{{ $logoDataUri }}" style="width:32mm; max-height:27mm; object-fit:contain; display:block; margin:0 auto;">
         </div>
         <h1>{{ $company->name }}</h1>

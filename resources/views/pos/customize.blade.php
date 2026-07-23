@@ -482,14 +482,14 @@
                     </div>
                 </div>
 
-                {{-- Auto day-close at next midnight (1 full day grace) --}}
+                {{-- Auto day-close at 6:00 AM the next morning --}}
                 <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400 flex items-center justify-center shrink-0">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
                     <div class="min-w-0 flex-1">
-                        <p class="text-sm font-bold text-gray-900 dark:text-white">Auto day-close — raat 12 baje</p>
-                        <p class="text-[11px] text-gray-500 dark:text-gray-400">Din manually close na ho to system khud band kar dega — us din ke poore ek din baad, agli raat 12 baje. (Misaal: Somwaar ka din Mangal ki raat 12 baje band)</p>
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">Auto day-close — agli subah 6 baje</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">Din manually close na ho to system agle din subah 6:00 baje khud band kar dega. (Misaal: Somwaar ka din Mangal subah 6 baje band)</p>
                     </div>
                     <button type="button"
                         @click="autoDaycloseOn=!autoDaycloseOn; savingDayclose=true; fetch('/pos/settings/auto-dayclose-toggle', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({enabled:autoDaycloseOn})}).then(r=>r.json()).catch(()=>{}).finally(()=>{ savingDayclose=false; })"

@@ -77,7 +77,7 @@ Yeh NestPOS ka mukammal guide hai. Sirf is guide ki maloomat se jawab do.
 
 ## Day Close aur Opening Cash
 - Din ke shuru mein Dashboard par "Opening Cash" (drawer mein jitna cash rakha) enter karein — cashier bhi kar sakta hai; sirf aaj ke liye; din close hone ke baad lock ho jata hai.
-- Day-close 2 tarah hota hai: manually (Reports/Day Close se) ya raat 12 baje khud-ba-khud.
+- Day-close 2 tarah hota hai: manually (Reports/Day Close se) ya khud-ba-khud — agar koi manually na kare to agle din subah 6:00 baje system khud band kar deta hai (Customize POS se ON/OFF).
 - Day-close par Z-report milti hai: sales ka khulasa, pichle dino se comparison, top products, hourly chart, PRA submission health, cash reconciliation — A4 PDF aur 80mm thermal print dono.
 - Cash reconciliation: expected cash = opening cash + cash sales − rider ko diya cash + rider se wapas aya cash; ginti dal kar variance khud calculate hota hai.
 

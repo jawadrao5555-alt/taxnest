@@ -3981,7 +3981,7 @@ class PosController extends Controller
 
     /**
      * Customize POS → Local Bills — persist "auto-archive local bills on day-close".
-     * When ON, EVERY day-close (manual or the midnight auto command) archives that day's
+     * When ON, EVERY day-close (manual or the 6 AM auto command) archives that day's
      * local/provisional bills to the Archive Portal. Rows are kept, never deleted.
      */
     public function toggleAutoPurgeLocal(Request $request)
@@ -4061,10 +4061,10 @@ class PosController extends Controller
     }
 
     /**
-     * Customize POS → Local Bills — persist "auto day-close at midnight".
+     * Customize POS → Local Bills — persist "auto day-close at 6:00 AM next morning".
      * When ON, the scheduled pos:auto-dayclose command closes any un-closed prior day
-     * at the second midnight after it (1 full day grace — yesterday stays open;
-     * see routes/console.php).
+     * at 6:00 AM the NEXT morning (owner rule 23 Jul 2026 — replaced the older
+     * "second midnight / 1-day grace" rule; see AutoCloseDayPos + routes/console.php).
      */
     public function toggleAutoDayclose(Request $request)
     {
@@ -7157,7 +7157,7 @@ class PosController extends Controller
 
     /**
      * Core day-close logic shared by the HTTP endpoint (closeDayReport) and the
-     * midnight auto-close command (pos:auto-dayclose).
+     * 6 AM next-morning auto-close command (pos:auto-dayclose).
      *
      * LOCAL-BILL WASH (owner rule Jul 2026 — REVERSES the old "never sweep
      * reporting-OFF finals" invariant): every day-close washes that day's local

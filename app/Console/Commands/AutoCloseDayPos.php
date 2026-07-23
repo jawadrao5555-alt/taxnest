@@ -15,7 +15,7 @@ class AutoCloseDayPos extends Command
 {
     protected $signature = 'pos:auto-dayclose';
 
-    protected $description = 'Auto-close prior POS trading days for companies that opted into midnight auto day-close (Customize POS → Local Bills). A day closes at the second midnight after it (1 full day grace).';
+    protected $description = 'Auto-close prior POS trading days for companies that opted into auto day-close (Customize POS → Local Bills). A day closes at 6:00 AM the NEXT morning if nobody closed it manually.';
 
     public function handle(PosController $pos): int
     {
@@ -30,22 +30,25 @@ class AutoCloseDayPos extends Command
             ->get(['id']);
 
         if ($companies->isEmpty()) {
-            $this->info('No companies with midnight auto day-close enabled.');
+            $this->info('No companies with auto day-close enabled.');
             return self::SUCCESS;
         }
 
-        // MIDNIGHT-BASED with a 1-full-day grace (owner decision Jul 2026): a trading
-        // day is auto-closed at the SECOND midnight after it — e.g. Monday's day closes
-        // at Wednesday 00:00 (Pakistan time; app tz = Asia/Karachi). This is NOT the
-        // old "last bill + 24h inactivity" rule; it is purely calendar/midnight based.
-        // So we only sweep days whose calendar date is strictly BEFORE yesterday.
-        $graceCutoff = today()->subDay()->toDateString(); // = yesterday; close days < yesterday
+        // 6 AM NEXT-MORNING rule (owner decision 23 Jul 2026 — replaces the older
+        // "second midnight / 1-day grace" rule): if nobody closed a trading day
+        // manually, it auto-closes at 6:00 AM the NEXT morning (Pakistan time;
+        // app tz = Asia/Karachi). Between 00:00–05:59 yesterday stays OPEN — a
+        // late-night shop (or its owner) can still close it manually; from 06:00
+        // onward everything before TODAY is swept. Command runs hourly, so a
+        // missed cron tick self-heals on the next hour.
+        $graceCutoff = now()->hour >= 6
+            ? today()->toDateString()            // >= 6 AM: close everything before today (incl. yesterday)
+            : today()->subDay()->toDateString(); // 00:00–05:59: yesterday keeps its grace window
         $closedTotal = 0;
 
         foreach ($companies as $company) {
             try {
-                // Prior trading days OLDER than yesterday that are not yet closed
-                // (yesterday itself is still within its grace day). Include archived
+                // Prior un-closed trading days before the cutoff. Include archived
                 // rows so a day is still detected even if some bills were archived.
                 $dates = PosTransaction::withoutGlobalScope('hide_archived')
                     ->where('company_id', $company->id)
@@ -74,7 +77,7 @@ class AutoCloseDayPos extends Command
                         $company->id,
                         $date,
                         $adminId,
-                        'Auto-closed by system (midnight, 1-day grace)'
+                        'Auto-closed by system (6:00 AM next day)'
                     );
 
                     if ($result['status'] === 'created') {

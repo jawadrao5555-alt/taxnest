@@ -1,7 +1,9 @@
 {{-- Customer search box (name/mobile + dropdown + inline quick-add) — shared partial.
-     Default ($inCart=false): rendered in the sale-screen action bar (Full styles) — markup
-     byte-identical to the original inline block. $inCart=true (SAAF only, customer request
-     22 Jul 2026): rendered at the top of the Current Order panel, full width.
+     Rendered FIRST in the sale-screen action bar for ALL styles (markup byte-identical
+     to the original inline block). Owner rule (23 Jul 2026): the guided flow starts with
+     the customer step, so this box stays at the START — a brief saaf-only move to the
+     cart panel broke the flow and was reverted; do not relocate it per-style.
+     $inCart=true renders a full-width variant (currently unused).
      Same Alpine component scope either way — $refs.customerPhoneInput, Alt+P and the guided
      customer step keep working unchanged. --}}
 @php($inCart = $inCart ?? false)

@@ -198,9 +198,3 @@ body[data-saaf] [x-ref="searchDropdown"] button {
     padding-top: 5px !important;
     padding-bottom: 5px !important;
 }
-
-/* ---------- 11. Customer box atop Current Order panel (saaf) ---------- */
-body[data-saaf] input[name="pos_customer_phone_nofill"] {
-    min-height: 44px !important;
-    font-size: 15px !important;
-}

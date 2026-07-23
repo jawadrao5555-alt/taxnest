@@ -2,7 +2,7 @@
 @php
     $isSaaf = ($company->pos_dashboard_style ?? 'default') === 'saaf';
 @endphp
-@if($isSaaf)<link rel="stylesheet" href="{{ asset('css/pos-saaf.css') }}?v=2">@endif
+@if($isSaaf)<link rel="stylesheet" href="{{ asset('css/pos-saaf.css') }}?v=3">@endif
 <style>
 *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
 @keyframes cartPop { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1); } }
@@ -366,14 +366,14 @@ window.addEventListener('popstate', function() {
          being clipped off-screen (overflow-hidden root swallows anything past the edge). --}}
     <div class="tn-action-bar flex flex-wrap items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0 shadow-sm">
 
-        {{-- Customer box: Full styles keep it here in the action bar; SAAF renders the
-             SAME partial at the top of the Current Order panel instead (customer request,
-             22 Jul 2026) — see the cart column below. --}}
-        @if(!$isSaaf)
+        {{-- Customer box: FIRST in the action bar for ALL styles — the guided flow
+             starts with the customer step, so this box must stay at the start (owner,
+             23 Jul 2026: the earlier saaf move to the cart panel broke the sequence
+             and put the category dropdown where customer used to be — REVERTED; do
+             not relocate this box per-style again). --}}
         @include('pos.partials.sale-customer-box')
 
         <div class="w-px h-6 bg-gray-200 dark:bg-gray-700 hidden sm:block flex-shrink-0"></div>
-        @endif
 
         {{-- CATEGORY DROPDOWN (optional filter) — same activeCategory as the grid pills, so the two
              stay in sync. Default "All Categories" = old behavior, byte-identical. Unlike the pills
@@ -797,14 +797,6 @@ window.addEventListener('popstate', function() {
                     <span class="text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-semibold" x-text="'T-' + selectedTable.table_number"></span>
                 </template>
             </div>
-
-            @if($isSaaf)
-            {{-- SAAF: customer box lives at the top of the Current Order panel (customer
-                 request, 22 Jul 2026) — same partial/Alpine state as the Full action bar. --}}
-            <div class="px-3 pt-2 pb-2 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
-                @include('pos.partials.sale-customer-box', ['inCart' => true])
-            </div>
-            @endif
 
             <template x-if="selectedCustomer">
                 <div class="px-3 py-2 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/20 flex items-start gap-2">

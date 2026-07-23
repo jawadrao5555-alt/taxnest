@@ -28,7 +28,7 @@ Yeh NestPOS ka mukammal guide hai. Sirf is guide ki maloomat se jawab do.
 - Customer select karna OPTIONAL hai — walk-in customer ke liye chhor dein.
 - Screen Fit: action bar mein "Fit" dropdown se poori screen ka size 80–125% adjust karein (chhoti screens par khud 90% ho jata hai).
 - Receipt popup: payment ke baad receipt ka popup khulta hai — print karein ya khud band karein; yeh khud gayab nahi hota taake receipt miss na ho.
-- Saaf style (Jul 2026): agar company ka POS style "Saaf — Simple" ho to sale screen bhi saada look mein khulti hai — teal rang, bade search box ke saath. Kam-istemaal buttons (Rush, Fit, Keys, Quick), guided-flow ki steps wali patti aur category pills ki qatar "Mazeed" button ke peechay chhupi hoti hain — Mazeed dabane se dikh jati hain (category dropdown hamesha nazar aata hai). Saaf mein customer ka box "Current Order" panel ke upar hota hai. SAARE features (shortcuts, hold, kitchen, local bills) waise hi kaam karte hain.
+- Saaf style (Jul 2026): agar company ka POS style "Saaf — Simple" ho to sale screen bhi saada look mein khulti hai — teal rang, bade search box ke saath. Kam-istemaal buttons (Rush, Fit, Keys, Quick), guided-flow ki steps wali patti aur category pills ki qatar "Mazeed" button ke peechay chhupi hoti hain — Mazeed dabane se dikh jati hain (category dropdown hamesha nazar aata hai). Customer ka box har style mein sale screen ke shuru (action bar) mein hota hai. SAARE features (shortcuts, hold, kitchen, local bills) waise hi kaam karte hain.
 - Discount limit DONO types par lagti hai (Jul 2026): percentage bhi aur Rs. amount bhi — amount discount subtotal ke limit% se zyada nahi ho sakta (default 50%). Manager PIN override se limit barh sakti hai.
 
 ## Keyboard Shortcuts (Sale Screen)

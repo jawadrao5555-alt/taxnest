@@ -46,7 +46,7 @@ Isolated POS with own auth/layouts/models; PRA integration with offline billing 
 - **Rounding**: PRA POS bill total = whole rupee on ALL write paths (backend `round()` matches frontend `Math.round()`); lines stay 2dp. (FBR POS & DI keep decimals.)
 - **PRA Connection Mode**: `companies.pra_connection_mode` 'cloud' | 'fiscal_device'. New PRA registrations hit Code 112 on cloud PostData — must use PRAL's local IMS Fiscal Device service via the Desktop Agent on the shop PC; fiscal_device mode: server never direct-submits (bills queue 'pending'), force-enables agent + auto-generates API key. → `pra-code-112-fiscal-device.md`
 - **Packages (annual-only)**: Starter 9,999 (1 team account, 500 bills/mo), Business 14,999 (5 / 2,000), Pro 24,999 (10 / 3,000, 2 branches, restaurant), Unlimited 39,999. Enforced via `PlanLimitService::canCreatePosBill()` + `canAddPosUser()`; provisionals FREE until promoted; failed/offline retries not re-charged. → `pos-package-limits.md`
-- **Roles**: `pos_manager` = full admin-equivalent (in `User::isPosAdmin()`, counts vs `user_limit`); `pos_kitchen` + `pos_waiter` limit-EXEMPT, confined. Team page role selector: Manager/Cashier.
+- **Roles**: `pos_manager` = full admin-equivalent (in `User::isPosAdmin()`, counts vs `user_limit`); `pos_kitchen` + `pos_waiter` limit-EXEMPT, confined. Team page role selector: Manager/Cashier (+ Kitchen/Waiter/Delivery Manager confined roles).
 - **Standalone POS Edition RETIRED**: all companies forced `pos_integration_mode='pra'`; null-safe `?? 'pra'` reads intentional. Do NOT re-add standalone surfaces.
 
 ### Sale screen, local billing, restaurant (memory topics = source of truth)

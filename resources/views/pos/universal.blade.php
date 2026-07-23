@@ -5317,7 +5317,9 @@ function restaurantPos() {
                 });
                 if (!res.ok) return false;
                 const d = await res.json().catch(() => null);
-                return !!(d && d.success);
+                // Return the payload (truthy) so callers can read flags like
+                // `deduped` (double-press guard) — false keeps the fallback path.
+                return (d && d.success) ? d : false;
             } catch (e) { return false; }
         },
 
@@ -5346,7 +5348,10 @@ function restaurantPos() {
             if (this.silentBillPrint) {
                 this.trySilentPrint({ type: 'bill', transaction_id: this.lastTransactionId }).then(ok => {
                     if (ok) {
-                        this.showToast('Receipt sent to printer', 'success');
+                        // deduped = this bill is ALREADY on its way to the printer
+                        // (double-press guard) — tell the cashier to wait, no 2nd copy.
+                        if (ok.deduped) this.showToast('Receipt pehle hi printer ko ja rahi hai — chand second intezar karein', 'info');
+                        else this.showToast('Receipt sent to printer', 'success');
                         if (typeof onAfterPrint === 'function') onAfterPrint();
                     } else { fallback(); }
                 });

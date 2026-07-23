@@ -320,6 +320,23 @@ class PosController extends Controller
             if (!$exists) {
                 return response()->json(['success' => false, 'reason' => 'not_found'], 404);
             }
+            // Impatient double-press guard (Malik Chicken Broast, 23 Jul 2026):
+            // laser/agent latency means the paper can take ~20s to come out, so
+            // cashiers press Print again and get a duplicate physical copy.
+            // If this SAME bill is already queued/printing (job < 2 min old —
+            // matches the agent's stale-requeue window), don't enqueue a second
+            // copy; report success with a deduped flag so the UI can explain.
+            // Once the job is done, a fresh press = legitimate reprint (allowed).
+            $inFlight = \App\Models\PosPrintJob::where('company_id', $companyId)
+                ->where('type', 'bill')
+                ->where('transaction_id', (int) $validated['transaction_id'])
+                ->whereIn('status', ['pending', 'printing'])
+                ->where('created_at', '>=', now()->subMinutes(2))
+                ->orderByDesc('id')
+                ->first();
+            if ($inFlight) {
+                return response()->json(['success' => true, 'job_id' => $inFlight->id, 'deduped' => true]);
+            }
             $job = \App\Models\PosPrintJob::create([
                 'company_id' => $companyId,
                 'type' => 'bill',

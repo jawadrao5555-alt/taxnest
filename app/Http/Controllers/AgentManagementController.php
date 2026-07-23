@@ -72,19 +72,40 @@ class AgentManagementController extends Controller
         return back()->with('success', 'Agent API key regenerated. Update your installed agent.');
     }
 
+    /**
+     * Flip the PRA SUBMISSION mode: Agent Sync ⇄ Direct Production.
+     *
+     * DECOUPLED (owner issue, 23 Jul 2026): this used to flip agent_enabled, which
+     * also killed agent auth + SILENT PRINTING. Now it flips agent_submits_pra only —
+     * switching to Direct Production keeps the agent connected so silent receipt/KOT
+     * printing continues to work.
+     */
     public function toggle(Request $request)
     {
         $user = $this->posUser();
         abort_unless($user, 403);
         $company = Company::findOrFail($user->company_id);
 
+        $toAgentSync = !$company->agentHandlesPra();
+
+        if (!$toAgentSync && ($company->pra_connection_mode ?? 'cloud') === 'fiscal_device') {
+            return back()->with('error', 'Fiscal Device mode mein Direct Production available nahi (PRA Code 112) — submission Desktop Agent ke zariye hi hoti hai. Pehle PRA Settings par Connection Mode change karein.');
+        }
+
+        if ($toAgentSync) {
+            $company->update([
+                'agent_submits_pra' => true,
+                'agent_enabled' => true,
+                'agent_api_key' => $company->agent_api_key ?: ('tnk_' . Str::random(48)),
+            ]);
+            return back()->with('success', 'Agent Sync mode enabled — desktop agent ab PRA submission karega.');
+        }
+
         $company->update([
-            'agent_enabled' => !$company->agent_enabled,
+            'agent_submits_pra' => false,
         ]);
 
-        return back()->with('success', $company->agent_enabled
-            ? 'Agent enabled.'
-            : 'Agent disabled.');
+        return back()->with('success', 'Direct Production mode enabled — server ab PRA pe directly submit karega. Agent connected rahega (silent printing chalti rahegi).');
     }
 
     /**

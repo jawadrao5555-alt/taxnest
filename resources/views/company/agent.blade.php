@@ -53,8 +53,12 @@
 
             {{-- ============================================================
                  SUBMISSION MODE — Direct Production vs Agent Sync
+                 (agentHandlesPra() — submission mode is DECOUPLED from
+                 agent_enabled; Direct mode keeps the agent connected for
+                 silent printing.)
                  ============================================================ --}}
-            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border-2 {{ $company->agent_enabled ? 'border-purple-300 dark:border-purple-700' : 'border-blue-300 dark:border-blue-700' }} p-6 mb-6">
+            @php $agentSync = $company->agentHandlesPra(); @endphp
+            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border-2 {{ $agentSync ? 'border-purple-300 dark:border-purple-700' : 'border-blue-300 dark:border-blue-700' }} p-6 mb-6">
                 <div class="flex items-center justify-between mb-4">
                     <div>
                         <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -62,15 +66,15 @@
                         </h3>
                         <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Choose how PRA invoices are sent. Switch anytime — no restart required.</p>
                     </div>
-                    <span class="px-3 py-1 rounded-full text-xs font-bold {{ $company->agent_enabled ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border border-purple-300 dark:border-purple-700' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-300 dark:border-blue-700' }}">
-                        Currently: {{ $company->agent_enabled ? '🤖 AGENT SYNC' : '⚡ DIRECT PRODUCTION' }}
+                    <span class="px-3 py-1 rounded-full text-xs font-bold {{ $agentSync ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border border-purple-300 dark:border-purple-700' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-300 dark:border-blue-700' }}">
+                        Currently: {{ $agentSync ? '🤖 AGENT SYNC' : '⚡ DIRECT PRODUCTION' }}
                     </span>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {{-- Direct Production Card --}}
-                    <div class="relative p-5 rounded-xl border-2 transition {{ !$company->agent_enabled ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 ring-2 ring-blue-200 dark:ring-blue-800' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 opacity-70' }}">
-                        @if(!$company->agent_enabled)
+                    <div class="relative p-5 rounded-xl border-2 transition {{ !$agentSync ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 ring-2 ring-blue-200 dark:ring-blue-800' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 opacity-70' }}">
+                        @if(!$agentSync)
                             <span class="absolute top-2 right-2 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-600 text-white">Active</span>
                         @endif
                         <div class="flex items-center gap-2 mb-2">
@@ -83,10 +87,11 @@
                         <ul class="text-[11px] text-gray-600 dark:text-gray-300 space-y-1 mb-3">
                             <li>✓ Tezi se setup — bus toggle ON</li>
                             <li>✓ Multi-location / mobile sales</li>
+                            <li>✓ Silent printing chalti rahegi (agent connected rahega)</li>
                             <li>⚠ Server ka IP Pakistan se whitelist hona chahiye</li>
                         </ul>
-                        @if($company->agent_enabled)
-                            <form method="POST" action="{{ route('pos.agent.toggle') }}" onsubmit="return confirm('Direct Production mode enable karen? Aage se invoices server se directly PRA jayengi (agent ko bypass karke).');">
+                        @if($agentSync)
+                            <form method="POST" action="{{ route('pos.agent.toggle') }}" onsubmit="return confirm('Direct Production mode enable karen? Aage se invoices server se directly PRA jayengi. Agent connected rahega — silent printing chalti rahegi.');">
                                 @csrf
                                 <button type="submit" class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-semibold transition">
                                     Switch to Direct Production
@@ -100,8 +105,8 @@
                     </div>
 
                     {{-- Agent Sync Card --}}
-                    <div class="relative p-5 rounded-xl border-2 transition {{ $company->agent_enabled ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 ring-2 ring-purple-200 dark:ring-purple-800' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 opacity-70' }}">
-                        @if($company->agent_enabled)
+                    <div class="relative p-5 rounded-xl border-2 transition {{ $agentSync ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 ring-2 ring-purple-200 dark:ring-purple-800' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 opacity-70' }}">
+                        @if($agentSync)
                             <span class="absolute top-2 right-2 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-purple-600 text-white">Active</span>
                         @endif
                         <div class="flex items-center gap-2 mb-2">
@@ -116,7 +121,7 @@
                             <li>✓ Server PRA se direct connect nahi karta</li>
                             <li>⚠ Agent install + chalu rehna zaroori hai</li>
                         </ul>
-                        @if(!$company->agent_enabled)
+                        @if(!$agentSync)
                             @if($company->agent_api_key)
                                 <form method="POST" action="{{ route('pos.agent.toggle') }}" onsubmit="return confirm('Agent Sync mode enable karen? Aage se invoices pending mein jayengi aur desktop agent unhe pick up karega. Agent zaroor chalu rakhen.');">
                                     @csrf

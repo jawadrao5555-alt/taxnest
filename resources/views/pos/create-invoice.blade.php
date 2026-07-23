@@ -208,7 +208,9 @@
              x-text="toast.message"></div>
 
         @php
-            $__agentEnabled = $company->agent_enabled ?? false;
+            // Submission-mode trust banner — agentHandlesPra(), not raw agent_enabled:
+            // Direct Production shops keep the agent connected for printing only.
+            $__agentEnabled = $company->agentHandlesPra();
             $__agentLastSeen = $company->agent_last_seen ?? null;
             $__agentOnline = $__agentEnabled && $__agentLastSeen && \Carbon\Carbon::parse($__agentLastSeen)->gt(now()->subMinutes(3));
         @endphp

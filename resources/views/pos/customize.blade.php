@@ -2,7 +2,7 @@
     @php
         $density = $company->pos_ui_density ? ucfirst($company->pos_ui_density) : 'Standard';
         $praOn   = (bool) (auth('pos')->user()?->praReportingEnabled($company) ?? false);
-        $agentOn = (bool) ($company->agent_enabled ?? false);
+        $agentOn = $company->agentHandlesPra(); // submission mode badge (Agent ON vs Direct)
         $invOn   = (bool) ($company->inventory_enabled ?? false);
         // Tax-Inclusive Pricing (Menu-Rate-Final) — effective rates via PosTaxRule
         // helpers ONLY (global defaults + per-company overrides), never raw table reads.

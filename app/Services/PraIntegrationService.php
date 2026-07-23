@@ -437,9 +437,11 @@ class PraIntegrationService
 
             $this->storePraResponse($praLog, $transaction, ['error' => $errorMsg], '500', false, null);
 
-            // ENTERPRISE SAFE MODE: agent-enabled companies should never go to 'offline' on TLS/transport errors —
+            // ENTERPRISE SAFE MODE: Agent-Sync companies should never go to 'offline' on TLS/transport errors —
             // the desktop agent will pick up these rows and submit them from a Pakistani IP.
-            $fallbackStatus = ($this->company->agent_enabled ?? false) ? 'pending' : 'offline';
+            // Direct Production shops (agent connected only for printing) DO fall back to 'offline'
+            // so the server-side auto-retry job rescues them.
+            $fallbackStatus = $this->company->agentHandlesPra() ? 'pending' : 'offline';
             $transaction->update(['pra_status' => $fallbackStatus]);
 
             return [

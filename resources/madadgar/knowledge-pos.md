@@ -68,6 +68,7 @@ Yeh NestPOS ka mukammal guide hai. Sirf is guide ki maloomat se jawab do.
 - Per-cashier PRA toggle: company admin har cashier ke liye PRA reporting alag se ON/OFF kar sakta hai (kuch cashiers report karein, kuch na karein).
 - PRA Connection ke 2 modes hain: (1) Cloud — server seedha PRA ko bhejta hai; (2) Fiscal Device — dukan ke PC par Desktop Sync Agent install hota hai jo bills PRA ko bhejta hai. NAYE PRA registrations ke liye Fiscal Device mode zaroori hota hai. Yeh setting support/admin set karta hai.
 - Desktop Sync Agent: Windows PC par chalta hai, server se bills utha kar PRA ko submit karta hai; silent printing (bina print dialog ke receipt/KOT print) bhi isi se hoti hai.
+- Invoice Submission Mode (/pos/agent, Cloud mode wali companies): "Agent Sync" = Desktop Agent bills PRA ko bhejta hai; "Direct Production" = server seedha bhejta hai. Jul 2026 se Direct Production par switch karne se silent printing BAND NAHI hoti — agent connected rehta hai aur receipts/KOT pehle ki tarah seedha print hote hain. Fiscal Device mode mein Direct Production available nahi (PRA ka rule).
 
 ## Provisional / Local Bills
 - Provisional (local) bill = abhi PRA ko report NAHI hua; L-series number milta hai; quota bhi nahi katta.

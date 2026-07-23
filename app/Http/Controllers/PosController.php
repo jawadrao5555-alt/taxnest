@@ -1530,9 +1530,10 @@ class PosController extends Controller
 
         $praMessage = '';
         if ($praEnabled) {
-            // ENTERPRISE SAFE MODE — Phase 1: when desktop agent is enrolled, skip server-side direct submission.
+            // ENTERPRISE SAFE MODE — Phase 1: when Agent Sync submission mode is on, skip server-side direct submission.
             // The agent (running on the company's local Pakistani PC) will pick this up via /api/agent/pending-invoices.
-            if ($company->agent_enabled) {
+            // agentHandlesPra() NOT agent_enabled — Direct Production shops may keep the agent connected for silent printing.
+            if ($company->agentHandlesPra()) {
                 $transaction->update(['pra_status' => 'pending']);
                 $praMessage = ' | 🟡 Awaiting Sync: Desktop agent will submit to PRA from your local PC.';
             } else {
@@ -1844,8 +1845,8 @@ class PosController extends Controller
 
         $praMessage = '';
         if ($goingToPra) {
-            // ENTERPRISE SAFE MODE — Phase 1: agent-enabled companies bypass server-side submission.
-            if ($company->agent_enabled) {
+            // ENTERPRISE SAFE MODE — Phase 1: Agent-Sync companies bypass server-side submission.
+            if ($company->agentHandlesPra()) {
                 $transaction->update(['pra_status' => 'pending', 'pra_response_code' => null]);
                 $praMessage = ' | 🟡 Awaiting Sync (desktop agent).';
             } else {
@@ -2127,8 +2128,8 @@ class PosController extends Controller
             }
         }
 
-        // ENTERPRISE SAFE MODE — Phase 1: agent-enabled companies just re-queue; the agent polls every 10s.
-        if ($company->agent_enabled) {
+        // ENTERPRISE SAFE MODE — Phase 1: Agent-Sync companies just re-queue; the agent polls every 10s.
+        if ($company->agentHandlesPra()) {
             $transaction->update(['pra_status' => 'pending', 'pra_response_code' => null]);
             return back()->with('success', '🟡 Re-queued for desktop agent — will sync within seconds.');
         }
@@ -2168,8 +2169,8 @@ class PosController extends Controller
             return back()->with('info', 'No failed or offline invoices to retry.');
         }
 
-        // ENTERPRISE SAFE MODE — Phase 1: agent-enabled companies just bulk re-queue; the agent will pick them up.
-        if ($company->agent_enabled) {
+        // ENTERPRISE SAFE MODE — Phase 1: Agent-Sync companies just bulk re-queue; the agent will pick them up.
+        if ($company->agentHandlesPra()) {
             $count = $pendingInvoices->count();
             DB::table('pos_transactions')
                 ->where('company_id', $companyId)
@@ -2625,8 +2626,8 @@ class PosController extends Controller
 
         $tx = PosTransaction::where('company_id', $companyId)->where('id', $id)->first();
 
-        // Agent-enabled: just leave it queued — desktop agent picks it up within 10s.
-        if ($company->agent_enabled) {
+        // Agent Sync mode: just leave it queued — desktop agent picks it up within 10s.
+        if ($company->agentHandlesPra()) {
             return response()->json([
                 'success'        => true,
                 'queued'         => true,
@@ -2752,7 +2753,7 @@ class PosController extends Controller
 
         $tx = PosTransaction::where('company_id', $companyId)->where('id', $id)->first();
 
-        if ($company->agent_enabled) {
+        if ($company->agentHandlesPra()) {
             return response()->json([
                 'success' => true,
                 'queued'  => true,
@@ -4218,13 +4219,18 @@ class PosController extends Controller
             if ($request->filled('pra_connection_mode')) {
                 $updateData['pra_connection_mode'] = $request->pra_connection_mode;
 
-                // Fiscal Device submissions only happen from the shop PC — the desktop agent is mandatory.
+                // Fiscal Device submissions only happen from the shop PC — the desktop agent is mandatory
+                // AND must be in Agent Sync submission mode (server never direct-submits, PRA Code 112).
                 if ($request->pra_connection_mode === 'fiscal_device') {
                     $updateData['agent_enabled'] = true;
+                    $updateData['agent_submits_pra'] = true;
                     if (empty($company->agent_api_key)) {
                         $updateData['agent_api_key'] = 'tnk_' . \Illuminate\Support\Str::random(48);
                     }
                 }
+                // NOTE: switching BACK to 'cloud' deliberately touches NEITHER agent flag —
+                // submission mode stays whatever the shop chose on /pos/agent, and the agent
+                // stays connected for silent printing.
             }
 
             if ($request->filled('pra_pos_id')) {

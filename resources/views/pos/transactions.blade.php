@@ -3,7 +3,9 @@
     @include('pos.partials.back-link')
     @php
         $__company = \App\Models\Company::find(app('currentCompanyId'));
-        $__agentEnabled = $__company && $__company->agent_enabled;
+        // Sync-trust banner cares about SUBMISSION mode (agentHandlesPra), not raw agent_enabled —
+        // Direct Production shops submit server-side, so no agent-sync banner for them.
+        $__agentEnabled = $__company && $__company->agentHandlesPra();
         $__agentLastSeen = $__company?->agent_last_seen;
         $__agentOnline = $__agentEnabled && $__agentLastSeen && \Carbon\Carbon::parse($__agentLastSeen)->gt(now()->subMinutes(3));
     @endphp

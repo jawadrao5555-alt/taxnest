@@ -89,6 +89,7 @@ class Company extends Model
         'agent_last_seen',
         'agent_version',
         'agent_enabled',
+        'agent_submits_pra',
         'receipt_printer_size',
         'pos_printer_settings',
         'confidential_pin',
@@ -134,6 +135,7 @@ class Company extends Model
         'fbr_pos_enabled' => 'boolean',
         'fbr_reporting_enabled' => 'boolean',
         'agent_enabled' => 'boolean',
+        'agent_submits_pra' => 'boolean',
         'agent_last_seen' => 'datetime',
         'pos_printer_settings' => 'array',
         'feature_flags' => 'array',
@@ -317,6 +319,35 @@ class Company extends Model
         return (bool) $this->agent_enabled
             && $this->agent_last_seen
             && $this->agent_last_seen->gt(now()->subMinutes(2));
+    }
+
+    /**
+     * True when PRA SUBMISSION is routed through the Desktop Sync Agent
+     * ("Agent Sync" mode). False = "Direct Production" — the server submits
+     * to PRA itself.
+     *
+     * DECOUPLED from agent_enabled on purpose (Jul 2026): agent_enabled means
+     * "the agent may connect" (auth + heartbeat + SILENT PRINTING). A shop can
+     * run Direct Production for PRA submission while still using the agent for
+     * silent receipt/KOT printing. Missing-column safe (pre-migration prod:
+     * falls back to legacy agent_enabled-only behavior).
+     *
+     * Fiscal Device mode ALWAYS routes via the agent — the cloud PostData API
+     * rejects new POS IDs with Code 112, so the server must never direct-submit.
+     */
+    public function agentHandlesPra(): bool
+    {
+        if (($this->pra_connection_mode ?? 'cloud') === 'fiscal_device') {
+            return true;
+        }
+        if (!$this->agent_enabled) {
+            return false;
+        }
+        try {
+            return (bool) ($this->agent_submits_pra ?? true);
+        } catch (\Throwable $e) {
+            return true;
+        }
     }
 
     public function getActiveFbrTokenAttribute()

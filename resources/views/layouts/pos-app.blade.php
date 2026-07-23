@@ -391,7 +391,9 @@
 
                         @if($praEnabledLayout && $companyLayout)
                             @php
-                                $agentOn = (bool) ($companyLayout->agent_enabled ?? false);
+                                // Submission mode pill — Agent Sync vs Direct (agentHandlesPra(),
+                                // NOT agent_enabled: Direct shops may keep the agent for printing).
+                                $agentOn = $companyLayout->agentHandlesPra();
                                 $agentOnline = $agentOn && $companyLayout->agent_last_seen
                                     && \Carbon\Carbon::parse($companyLayout->agent_last_seen)->gt(now()->subMinutes(2));
                             @endphp

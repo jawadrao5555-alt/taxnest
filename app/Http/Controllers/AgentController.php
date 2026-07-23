@@ -189,6 +189,20 @@ class AgentController extends Controller
         }
 
         // ===== PRA POS company (default) =====
+        // Direct Production mode: the SERVER submits to PRA — hand the agent nothing,
+        // or we'd race the server into a double submission. The agent stays connected
+        // purely for silent printing (and heartbeat/self-update).
+        if (!$company->agentHandlesPra()) {
+            return response()->json([
+                'count' => 0,
+                'invoices' => [],
+                'pra_endpoint' => null,
+                'pra_mode' => 'direct_server',
+                'pra_token' => null,
+                'pra_pos_id' => $company->pra_pos_id,
+            ]);
+        }
+
         $pending = PosTransaction::where('company_id', $company->id)
             ->whereIn('pra_status', ['offline', 'pending', 'failed'])
             ->whereNull('pra_invoice_number')

@@ -30,6 +30,14 @@ class CheckTrialExpiryJob implements ShouldQueue
             ->get();
 
         foreach ($expiredTrials as $subscription) {
+            // Admin-granted overrides (lifetime, or temporary/grace with a
+            // future override_until) ride ON the subscription row — deactivating
+            // the row would silently kill a still-valid grant. Skip those;
+            // reconcileExpiredGrants() below handles them once they lapse.
+            if ($subscription->hasActiveOverride()) {
+                continue;
+            }
+
             $subscription->update(['active' => false]);
 
             Notification::create([

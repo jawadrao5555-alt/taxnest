@@ -64,6 +64,7 @@
 - [mobile.css global overrides](mobile-css-global-overrides.md) — mobile.css beats Tailwind on phones: forced table-cell vs .hidden, touch-target blobs on toggle pills, grid collapse needs grid-cols-keep; bump ?v= on edit.
 - [pricing_plans.features = display-only](pos-plan-features-display-only.md) — no code reads the JSON; restaurant gate = restaurant_enabled column; plan cards render limits from columns + cumulative lists.
 - [Silent printer routing](silent-printer-routing.md) — KOT stamping at result-time not render; Electron listener leak = double print; no pageSize for thermal; MySQL NOW() looks offline to Laravel.
+- [Desktop Agent release distribution](agent-release-distribution.md) — building the agent ships NOTHING; customers only get GitHub Releases latest — publish zip + cache:forget after every agent build.
 - [Mockup sandbox setup quirks](mockup-sandbox-setup.md) — fresh sandbox npm install dies with "Invalid Version"; rm node_modules+lockfile then install; previews are path-based /__mockup/, no port.
 - [POS What's New updates](pos-whats-new-updates.md) — popup/bell in pos-app layout; MUST skip confined roles + pending companies (seen POST blocked = dismiss loop); after each POS deploy create an AppUpdate row.
 - [POS receipt plain style](pos-receipt-plain-style.md) — bold+center-logo now UNIVERSAL default (opt-out per company); plain style rules kept for opt-outs; hidden print iframe must give focus back or shortcuts die.

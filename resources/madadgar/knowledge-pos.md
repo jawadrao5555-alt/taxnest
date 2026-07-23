@@ -8,64 +8,70 @@ Yeh NestPOS ka mukammal guide hai. Sirf is guide ki maloomat se jawab do. Jawab 
 - POS ka user sirf /pos/login par login kar sakta hai — kisi aur panel (Digital Invoice waghera) par "Invalid credentials" aayega. Yeh security ke liye hai.
 - Har company ka data bilkul alag (isolated) hai — koi doosri dukan ka data nahi dekh sakta.
 - Nayi company register hone ke baad admin approval tak sab pages DEKH sakte hain lekin kaam (bill banana waghera) approval ke baad hi hota hai.
-- Apna profile (naam, password) badalna ho: /pos/my-profile.
+- Apna profile badalna: /pos/my-profile — Full Name, Email, Phone, Username, aur password change (Current Password + New Password + Confirm).
 
 ## Dashboard (/pos/dashboard)
 - Dashboard par KPI cards (aaj ki sales, bills, tax, net sales), hourly chart, 30 din ka trend, payment method ka breakdown aur aaj ke recent bills hote hain.
 - Cashier ko sirf apne stats nazar aate hain; admin/manager ko poori company ke.
 - Din ke shuru mein "Opening Cash" card par drawer ka cash + note enter kar ke Save karein (tafseel Day Close section mein).
-- Dashboard ka style badalna ho: /pos/customize ke "POS Ka Style" section se — "Full" (mukammal) ya "Saaf" (seedha saada, Roman Urdu) — aur kuch mazeed fancy styles bhi hain. Sirf admin/manager badal sakta hai.
+- Dashboard ka style: /pos/customize ke "POS Ka Style" section se — "Full — Poora Dashboard" (default) ya "Saaf — Simple" (seedha saada, Roman Urdu); "Mazeed styles" ke neeche 5 purane fancy designs bhi hain. Sirf admin/manager badal sakta hai.
 
 ## Sale Screen — Nayi Bill Banana (Dashboard → "Nayi Sale" ya /pos/invoice/create)
 Bill banane ka aam tareeqa, shuru se aakhir tak:
-1. (Optional) Customer: customer box mein phone/naam type karein → list se select karein. Naya customer ho to naam+phone likh kar Add kar dein. Walk-in customer ke liye yeh step CHHOR dein.
+1. (Optional) Customer: customer box mein phone/naam type karein → list se select karein. Match na mile to "Add as New" option usi dropdown mein aata hai — naam+phone likh kar foran naya customer ban jata hai. Walk-in customer ke liye yeh step CHHOR dein (khali chhor kar Enter).
 2. Items dalein — 3 tareeqay: (a) search box mein naam/barcode/SKU type karein aur Enter, (b) product grid par item click karein, (c) barcode scanner se scan karein — exact match foran cart mein chala jata hai.
 3. Quantity: cart row ke qty box par click kar ke number type karein, ya same item dobara add karein, ya cart row select kar ke + / - keys.
 4. (Optional) Item par discount (D), tax on/off (T), ya note (N) — neeche shortcuts section dekhein.
-5. Order type chunein (restaurant mode mein): Dine In / Takeaway / Delivery buttons. Dine In chunte hi TABLE PICKER khul jata hai — arrow keys se table select, Enter.
+5. Order type chunein (restaurant mode mein): Dine In / Takeaway / Delivery buttons (guided flow mein keys 1/2/3). Dine In chunte hi TABLE PICKER khul jata hai — arrow keys se table select, Enter. Delivery chunein to address picker aata hai (customer ke saved addresses + "Add New Address" inline) aur Delivery Charges ka box — yeh charges bill mein tax-free line ban kar judte hain.
 6. Bill mukammal karne ke 2 raste:
    - "PAY" button (ya F8) → payment modal → Cash (key 1) ya Card (key 2) → bill FINAL ho jata hai (PRA reporting ON ho to PRA ko report hota hai).
    - "Save Provisional" (ya F9) → bill L-series LOCAL/provisional ban jata hai — PRA ko report NAHI hota, quota nahi katta; baad mein promote kar sakte hain.
-7. Receipt popup khulta hai — Print (P), KOT (K), ya Enter se nayi sale. Popup default 10 second mein khud band hota hai (mouse le jao to timer rukta hai); yeh waqt /pos/customize se badal sakte hain.
+7. Receipt popup khulta hai — P = Print, K = KOT, Enter = nayi sale, Esc = band. Popup default 10 second mein khud band hota hai (koi bhi key dabane ya mouse le jane se timer ruk jata hai); yeh waqt /pos/customize se badlein (Never/5/10/15/30 sec).
+
+Payment modal ki keys: 1 = Cash (foran), 2 = Card (foran), arrow keys se method highlight, Enter = highlighted method confirm, P = Save Provisional (guided flow ON ho to), Esc = band.
 
 Sale screen ki mazeed cheezein:
 - Search hamesha GLOBAL hai: category dropdown/pills sirf GRID filter karti hain — search box har category ka item dhoondta hai, deals aur services samet.
 - Search mein pehle harf ko priority milti hai (jo item aapke likhe harf se shuru ho wo upar).
 - Product grid ON/OFF toggle hai — grid OFF ho aur products ghayab lagein to "Show All Products" ya Products toggle dobara ON karein (yeh setting har PC/browser par alag save hoti hai).
-- Manual entry: item inventory mein na ho to "Manual" button se naam + price khud likh kar cart mein dalein; "Save Permanent" tick karein to product master mein bhi save ho jata hai.
+- SIMPLE MODE (jab Inventory Tracking OFF ho): "Manual" button nazar aata hai — naam + price likh kar ad-hoc item cart mein dalein; "Save Permanent" tick karein to product master mein bhi save ho jata hai. Search mein item na mile to naya product FORAN ban sakta hai (quick-create) — price 0 se banta hai aur cart row mein price box khud khul jata hai, wahan price likh dein. Cart row ki unit price par click kar ke bhi price edit hoti hai.
+- Inventory Tracking ON ho to Manual/quick-create nahi hota — pehle /pos/products par product banayen.
 - Quick Type Mode (F7): "chai 2, samosa 1" jaisi line likhein — pura order khud cart mein aa jata hai. DEFAULT BAND hai; admin /pos/customize se ON kare.
-- Rush button: order ko priority mark karta hai — KOT/kitchen screen par RUSH ka nishan aata hai.
-- Hold (F5): order ko hold karein (Dine-In ke liye) — baad mein F3 se wapas kholein. Manual items aur deals hold NAHI ho sakte (sirf seedha bill).
+- Rush button: order ko priority mark karta hai — KOT/kitchen screen par laal RUSH ka nishan aata hai.
+- Hold (F5): order hold karein (Dine-In ke liye) — baad mein F3 se wapas kholein. Manual items aur deals hold NAHI ho sakte (sirf seedha bill).
+- "Send to Kitchen" (KOT) button: Dine-In order ko bina payment ke kitchen bhejta hai aur kitchen ticket print hota hai.
+- Kitchen note ka box cart ke neeche hai — poore order ke liye hidayat likhein.
 - Screen Fit: header ke "Fit" menu se poori screen 80–125% adjust karein (chhoti screens par khud 90% ho jata hai). Har PC par alag save hota hai.
-- Discount limit DONO types par lagti hai: percentage bhi aur Rs. amount bhi — amount discount subtotal ke limit% se zyada nahi ho sakta (default 50%). Manager PIN override se zyada ho sakta hai.
+- Discount limit DONO types par lagti hai: percentage bhi aur Rs. amount bhi — amount discount subtotal ke limit% se zyada nahi ho sakta (default 50%). Limit se zyada discount par Manager PIN ka modal khulta hai — PIN dalne par usi bill ke liye override ho jata hai (cart clear hote hi khatam).
 - Offline mode: internet chala jaye to bill queue mein save hota hai aur net aane par khud PRA ko chala jata hai.
+- Waiter ka order aaye to header ki bell par teal badge blink karta hai — bell kholein → order par "Load to Cart" → payment karein; table khud free ho jata hai.
 - Saaf style ho to kam-istemaal buttons (Rush, Fit, Keys, Quick), guided steps ki patti aur category pills "Mazeed" button ke peechay hoti hain — Mazeed dabane se dikh jati hain. Saare features waise hi kaam karte hain.
 
 ## Keyboard Shortcuts (Sale Screen) — MUKAMMAL LIST
 - F1 = shortcuts ki madad wali screen kholo/band karo.
 - F2 = search box par focus (search mode).
-- F3 = Held Orders ki list kholo (hold kiye hue orders wapas lene ke liye).
+- F3 = Held Orders ki list (hold kiye orders wapas lene ke liye). Modal ke andar: ↑↓ select, Enter = order wapas cart mein, P = seedha payment, D = delete, Esc = band.
 - F4 = poora cart khali karo (confirm poochta hai).
 - F5 = current order HOLD karo.
 - F6 = cart mode — cart ke aakhri item par focus (qty/edit ke liye). Ctrl+E bhi yehi karta hai.
 - F7 = Quick Type modal (agar company mein ON hai).
-- F8 = PAY — payment modal kholo. Phir 1 = Cash, 2 = Card.
+- F8 = PAY — payment modal kholo. Phir 1 = Cash, 2 = Card, Enter = confirm.
 - F9 = Save Provisional (local bill seedha save).
-- F10 = Local/Provisional bills ka modal.
-- F11 = Failed/offline PRA bills ka modal (Edit & Retry yahin se).
-- Alt+R = Reprint modal (aaj ke bills ki list, click = print).
+- F10 = Local/Provisional bills ka modal. Modal ke andar: ↑↓ select, Enter = Make Final (promote), E = Edit (bill wapas sale screen par khulta hai), D = Delete (cashier nahi kar sakta), Esc = band.
+- F11 = Failed/offline PRA bills ka modal — Edit & Retry yahin se (bill wapas cart mein aata hai, theek kar ke dobara bhejein).
+- Alt+R = Reprint modal (aaj ke bills ki list, click ya Enter = print).
 - Alt+P = customer phone box par focus.
 - Ctrl+S = search par focus.
+- Cart mode mein: ↑↓ = row select, + / - = quantity, Delete/Backspace = item hatao.
 - T = selected cart item ka TAX ON/OFF; D = discount panel; N = note box. (Search box ke andar type karte waqt yeh letters normal type hote hain — wahan Alt+T / Alt+D / Alt+N use karein, wo har jagah chalte hain.)
 - Enter = guided flow mein agla step; Escape = modal band.
-- Guided Flow (default ON): Customer → Items → Order Type (1/2/3 se chunein) → Pay — sirf Enter dabate jayen, chain khud chalti hai. /pos/customize se ON/OFF hota hai.
+- Guided Flow (default ON): Customer → Items → Order Type (1/2/3) → Pay — sirf Enter dabate jayen: khali customer box par Enter = walk-in skip; items dal kar khali search par Enter = agla step; pay modal mein Enter = Cash confirm. /pos/customize se ON/OFF hota hai.
 
 ## Payment aur Receipt
-- Payment methods: Cash aur Card (payment modal mein; keyboard 1 = Cash, 2 = Card). Har method ka apna tax rate ho sakta hai (aam default: cash 16%, card/digital 8%; company ke liye alag rate bhi ho sakta hai).
+- Payment methods: Cash aur Card (payment modal mein; keyboard 1 = Cash, 2 = Card). Har method ka apna tax rate ho sakta hai (aam default: cash 16%, card/digital 8%; company ke liye alag rate bhi ho sakta hai — /pos/features par "Cash Rate (%)" aur "Card / Digital Rate (%)" fields).
 - Bill ka grand total hamesha poore rupay mein round hota hai (line items 2 decimal tak).
 - Receipt 80mm ya 58mm thermal printer par print hoti hai — paper size /pos/receipt-settings ya PRA Settings dono jagah se badlein; print khud printer ki asal width par fit hota hai.
-- Receipt par kya kya nazar aaye (dukan ka address, NTN, email, mobile, cashier ka naam, tax, footer note) — sab /pos/receipt-settings se control hota hai.
-- PRA receipt aur Local receipt ki settings ALAG ALAG hain — dono ka apna set /pos/receipt-settings par hai.
+- Receipt Settings (/pos/receipt-settings) par DO tabs hain: "PRA Receipt" aur "Local Receipt" — har tab ke apne toggles: Show Address, Show NTN, Show Email, Show Phone/Mobile, Show Cashier Details, Show Tax, aur Footer message (toggle + apna text). Global options: Receipt Paper Size (80mm Standard / 58mm Compact), Bold Receipt Print toggle, Logo Style (Compact/Large).
 - "Show Tax" OFF karne se customer copy par Subtotal aur Tax chhup jate hain — sirf grand TOTAL nazar aata hai; items apni asal price par dikhte hain. Lekin PRA ko tax hamesha POORA submit hota hai.
 - Receipt ka default style: bold + center logo; company chahe to plain style choose kar sakti hai. Text gehra/bold hai taake saste printers par bhi saaf chape.
 - Kisi bhi purane bill ki receipt dobara: sale screen par Alt+R (Reprint) — ya /pos/transactions se bill khol kar receipt/PDF.
@@ -74,89 +80,97 @@ Sale screen ki mazeed cheezein:
 ## Printer aur Hardware (Setup)
 - NestPOS kisi bhi aam thermal receipt printer (80mm/58mm) ke saath chalta hai — USB, network ya Bluetooth; printer Windows/browser mein install ho to print ho jayegi.
 - Printer setup: (1) printer PC se connect kar ke driver install karein, (2) browser ke print dialog mein wohi printer select karein, (3) /pos/receipt-settings par paper size set karein.
-- SILENT printing (bina print dialog ke): Desktop Sync Agent install karein, phir /pos/printer-settings par jayen → Receipt Printer aur KOT Printer list se chunein → Silent Printing ON karein. Ab receipt/KOT seedha printer par jayenge.
+- SILENT printing (bina print dialog ke): Desktop Sync Agent install karein, phir /pos/printer-settings par jayen → "Enable Silent Printing" ON karein → "Bill / Receipt Printer" aur "Kitchen (KOT) Printer" dropdowns se printers chunein (list Agent se aati hai). Ab receipt/KOT seedha printer par jayenge.
 - "Printer Settings mein printers ki list khali hai": PC par PURANA agent chal raha hai — /pos/printer-settings → "Agent Setup" → "Download ZIP" se naya agent lein, extract kar ke install.bat chalayen (settings mehfooz rehti hain). 5 minute mein list aa jayegi.
 - Barcode scanner: koi bhi USB/Bluetooth scanner jo keyboard ki tarah type karta hai seedha chal jata hai — sale screen ke search box mein scan karein. Alag setup nahi chahiye.
 - Cash drawer aksar printer ke kick port se juda hota hai — receipt print par khul jata hai; yeh printer ki apni setting hai.
-- Product barcode stickers khud print karne hon: /pos/products/labels — products chunein aur stickers print karein.
+- Product barcode stickers: /pos/products/labels — sticker par naam, price, barcode aur SKU aata hai; "Columns" box se sheet ke columns (1-5) set karein aur "Print" dabayen.
 
 ## PRA Reporting (Fiscal)
 - PRA reporting ON ho to har final bill PRA ko report hota hai aur POS-YYYY-NNNNN fiscal serial milta hai; receipt par PRA fiscal number aur QR aata hai.
 - Reporting ke BAGHAIR bane bills (provisional ya reporting-OFF finals) L-series serial par rehte hain.
 - Internet na ho ya PRA down ho to bill 'offline' queue mein jata hai aur khud retry hota hai — quota dobara nahi katta.
-- PRA se reject bills F11 modal mein aate hain — wahan se Edit & Retry karein (bill theek kar ke dobara bhejein).
+- PRA se reject bills F11 modal mein aate hain — wahan se Edit & Retry karein.
 - Per-cashier PRA toggle: /pos/team par har cashier ke liye PRA reporting alag ON/OFF ho sakti hai.
-- PRA Settings (/pos/pra-settings, sirf admin): PRA POS ID, token, environment, paper size, aur Confidential PIN yahan set hote hain. "Test Connection" se connection check karein.
-- Confidential PIN: 4-6 digit PIN jo delete/void jaisi hassas actions ko lock karta hai — PRA Settings se set/remove hota hai; manager override bhi isi PIN se hota hai.
-- PRA Connection ke 2 modes: (1) Cloud — server seedha PRA ko bhejta hai; (2) Fiscal Device — dukan ke PC par Desktop Sync Agent bills PRA ko bhejta hai. NAYE PRA registrations ke liye Fiscal Device mode zaroori hai. Yeh setting support/admin set karta hai.
-- Invoice Submission Mode (/pos/agent, Cloud mode wali companies): "Agent Sync" = Desktop Agent bills PRA ko bhejta hai; "Direct Production" = server seedha bhejta hai. Direct par switch karne se silent printing BAND NAHI hoti — agent connected rehta hai. Fiscal Device mode mein Direct available nahi (PRA ka rule).
-- Desktop Sync Agent: Windows PC par chalta hai; bills PRA ko submit karta hai aur silent printing bhi isi se hoti hai. Download: /pos/agent ya /pos/printer-settings ke Agent Setup se.
+- PRA Settings (/pos/pra-settings, sirf admin) ke fields: Environment (Sandbox/Production), Connection Mode (Cloud API / PRA Fiscal Device), POS Registration ID, Production Token, PRA Proxy URL (optional), Receipt Printer Size (80mm/58mm). "Test Connection" button se connection check karein.
+- Confidential PIN: 4-6 digit PIN — PRA Settings page par "Set PIN / Change PIN" se. Yeh PIN limit se zyada discount jaisi hassas actions par manager override ke liye use hota hai. Cashier PIN set/change nahi kar sakta.
+- PRA Connection ke 2 modes: (1) Cloud API — server seedha PRA ko bhejta hai; (2) PRA Fiscal Device — dukan ke PC par Desktop Sync Agent bills PRA ko bhejta hai. NAYE PRA registrations ke liye Fiscal Device mode zaroori hai (PRA ka rule).
+- Invoice Submission Mode (/pos/agent, Cloud mode wali companies): "Agent Sync" = Desktop Agent bills PRA ko bhejta hai; "Direct Production" = server seedha bhejta hai — "Switch to..." button se badlein. Direct par switch karne se silent printing BAND NAHI hoti — agent connected rehta hai. Fiscal Device mode mein Direct available nahi.
+- Agent page (/pos/agent) par: agent ka status (Online/Offline, last seen, version, aaj submit hue bills), Company ID + API Key (masked, Show/Copy buttons, Generate/Regenerate Key), Server URL, aur "Download TaxNest Agent" (Windows).
+- Desktop Sync Agent: Windows PC par chalta hai; bills PRA ko submit karta hai aur silent printing bhi isi se hoti hai. Agent khud update ho jata hai (v1.3.0+).
 
 ## Provisional / Local Bills
 - Provisional (local) bill = abhi PRA ko report NAHI hua; L-series number; quota nahi katta.
-- Banane ka tareeqa: sale screen par "Save Provisional" button ya F9.
+- Banane ka tareeqa: sale screen par "Save Provisional" button ya F9 (ya pay modal mein P — guided flow ON ho to).
 - Dekhne ke tareeqay: sale screen par F10 modal, ya /pos/local-bills portal (export bhi ho sakta hai).
-- F10 modal ke andar har local bill par actions: Edit, Delete, aur "Make Final" (promote).
-- Promote = local bill ko PRA final banana: F10 modal mein "Make Final" → payment method chunein (1=Cash...) → naya POS fiscal serial milta hai aur monthly quota use hota hai. Promote sirf USI mahine ke andar ho sakta hai.
-- Day-close par us din ke local bills company ki standing policy ke mutabiq save ya delete hote hain — policy /pos/customize → Local Billing se (sirf admin).
+- F10 modal ke andar har local bill par actions: Enter = Make Final (promote), E = Edit, D = Delete (cashier delete nahi kar sakta).
+- Promote karne par method picker khulta hai — 3 options: Cash (1), Card (2), ya "Finalize LOCAL — don't send to PRA" (3 ya L) = bill final ho jata hai lekin PRA ko NAHI jata, L-series par hi rehta hai. Esc = cancel.
+- Cash/Card se promote = PRA final: naya POS fiscal serial milta hai aur monthly quota use hota hai. Promote sirf USI mahine ke andar ho sakta hai.
+- /pos/transactions par bhi local bill ke saamne "Submit to PRA" button hota hai (current month ke bills par).
+- Day-close par us din ke local bills company ki standing policy ke mutabiq save ya delete hote hain — policy /pos/customize → Local Billing se (sirf admin; provisional aur final dono ke liye alag "Save to record"/"Auto-delete" options + customer spend history rakhne ka toggle).
 - PRA ko report ho chuke bills kabhi delete nahi hote — sirf pure local bills wash hote hain.
 - Purane (archive kiye) local bills: /pos/archive par nazar aate hain (export bhi).
 
 ## Day Close aur Opening Cash
 - Opening Cash: din ke shuru mein Dashboard ke "Opening Cash" card par drawer ka cash amount (+ optional note) enter kar ke Save — cashier bhi kar sakta hai; sirf aaj ke liye; din close hone ke baad lock.
-- Day-close karne ka tareeqa (manual): /pos/day-close kholein → Z-report ka khulasa dekhein (total bills, gross/net sales, tax, payment breakdown) → cash reconciliation mein GINA HUA cash dalein (variance khud calculate hota hai) → rider cash ka khata dekhein → "Close Day" button dabayen.
-- Auto day-close: koi manually na kare to agle din subah 6:00 baje system khud band kar deta hai (/pos/customize se ON/OFF).
-- Z-report mein: sales khulasa, pichle din/haftay se comparison, average bill, top products, category-wise sales, hourly chart, PRA submission health (submitted/pending/offline/failed), cash reconciliation, rider summary.
-- Z-report A4 PDF aur 80mm thermal dono par print hoti hai; purani Z-reports bhi day-close page se dekhi ja sakti hain.
+- Day-close karne ka tareeqa (manual): /pos/day-close kholein → Z-report ka khulasa dekhein → cash reconciliation mein GINA HUA cash dalein (variance khud calculate hota hai) → rider khata dekhein → "Close Day" dabayen.
+- Auto day-close: koi manually na kare to agle din subah 6:00 baje system khud band kar deta hai (/pos/customize par "Auto Day-Close (24h)" toggle).
+- Z-report/day-close page mein kya kya hota hai: Total Invoices (PRA/Local/Offline ka split), Gross Sales, Total Tax, Net Revenue, payment breakdown (Cash/Card/Other), CASHIER-wise breakdown table, din ke pehle-aakhri invoice numbers, PRA submission health (submitted vs failed/offline), hourly chart, top products, discount summary, cash reconciliation, rider summary. Pichle din/haftay se comparison bhi.
+- Z-report "Download PDF" (A4) aur "Thermal Z-Report" (80mm) dono par print hoti hai; purani closes bhi day-close page par "View" se dekhein.
 - Cash reconciliation ka formula: expected cash = opening cash + cash sales − rider ko diya cash + rider se wapas aya cash.
 
 ## Products (/pos/products)
-- Naya product: /pos/products → Add — naam, price, cost price, tax rate, SKU, barcode, unit, category, image, stock, low-stock threshold.
-- Category ke hisab se extra fields bhi hain: Pharmacy (batch, expiry), Kapre (size, color), Electronics (serial/IMEI, warranty), Automotive (part number) waghera.
-- Product ON/OFF (inactive) toggle aur "sale screen par dikhao" (show on sale) toggle har product par hai — item search mein na mile to yahan check karein.
-- Excel import/export: pehle /pos/products/template se .xlsx template download karein → bhar kar /pos/products par Import karein (barcode/SKU/naam se khud match hota hai). CSV use NA karein — barcode kharab ho jate hain.
-- Barcode stickers: /pos/products/labels se print karein.
-- Services (agar dukan services bhi deti hai): /pos/services par alag list hai — yeh bhi sale screen ke search mein aati hain.
+- Naya product: "+ Add Product" → form fields: Product Name (zaroori), Category, SKU, Description, Barcode, Price PKR (zaroori), Cost Price (profit report ke liye), Tax Rate % + "Tax Exempt" toggle, "Sale screen par dikhayein" toggle, Unit (NOS/KGS/LTR/MTR/PCS/PKT/BOX), Opening Stock, Low-Stock Alert At, aur Image (No Image / Upload / Auto-fetch).
+- Category ke hisab se extra fields: Pharmacy (Batch Number, Expiry Date, Drug Type), Grocery (Weight Based, Unit Type), Kapre/Apparel (Size, Color, Season), Electronics (Serial Number, Warranty Months, IMEI), Automotive (Part Number) waghera.
+- Har product par Edit, Delete, Active/Inactive toggle, aur "sale screen par dikhao" toggle hai — item search mein na mile to yahan check karein.
+- Excel import/export: /pos/products par "Download Excel Template" (ya "Download Excel (N Products)" — poori list) → Excel mein edit karein → "Upload & Import" (barcode/SKU/naam se khud match hota hai). CSV use NA karein — barcode kharab ho jate hain.
+- Barcode stickers: /pos/products/labels.
+- Services (agar dukan services bhi deti hai): /pos/services par alag list — yeh bhi sale screen ke search mein aati hain.
 
 ## Inventory / Stock (/pos/inventory)
-- Inventory ON/OFF: /pos/features (POS Features) page se. OFF ho to nav mein grey "OFF" badge; pages POS Features par redirect hote hain.
-- Stock adjust karna: /pos/inventory/adjust — product chunein → Add / Remove / Set → reason likhein → save. Har tabdeeli ka record Movements (/pos/inventory/movements) mein rehta hai.
-- Low stock: /pos/inventory/low-stock — threshold se neeche items ki list; threshold product par set hota hai.
+- Inventory ON/OFF: /pos/features (ya /pos/customize ka Inventory Tracking toggle). OFF ho to nav mein grey "OFF" badge; pages POS Features par redirect hote hain. OFF = Simple Mode (Manual button + quick-create milta hai).
+- Stock list (/pos/inventory/stock): search + status filter (All/Low/Out); har product ka stock level bar, min level, average cost, stock value; min level inline edit hota hai.
+- Stock adjust: /pos/inventory/adjust — product chunein → type: Add (+) / Remove (−) / Set Exact (=) → quantity → (Add par purchase price) → Reason (New Purchase, Physical Count, Damaged/Expired waghera) → Notes → save.
+- Movements (/pos/inventory/movements): har tabdeeli ka log — filters: type (Sale/Purchase/Adjustment/Opening), product, date range; har row mein qty +/- aur balance-after.
+- Low stock (/pos/inventory/low-stock): Critical/Warning/Low ke counts; har row par "Restock" button seedha adjust form khol deta hai.
 - Sale par stock khud katta hai; bill delete par wapas aana ("Restock on Void") /pos/customize ki setting hai.
 - Deals ka stock deal ke andar ke items se katta hai; recipes wali dishes ka stock ingredients se katta hai.
 
 ## Deals (/pos/deals)
-- Deal banana: /pos/deals → New Deal → naam, price, description, din chunein (Mon–Sun checkboxes) → items add karein (product + quantity) → save.
+- Deal banana: "+ Add Deal" → Deal Name, Deal Price (PKR), Description (optional), Active Days (Mon–Sun checkboxes), Start Date / End Date (optional), Active toggle → "Add Item" se products + quantity dalein → save.
 - Deal ki price server enforce karta hai — cashier badal nahi sakta.
-- Deal sirf apne set kiye dino par sale screen mein aati hai.
+- Deal sirf apne set kiye dino (aur date range) mein sale screen par aati hai.
 - Deals sirf seedhi billing ke liye hain — hold/KOT par nahi ja sakti.
 
 ## Restaurant Module (Pro/Unlimited packages)
-- Chahiye: Pro ya Unlimited package (ya active trial), phir /pos/features se Restaurant ON karein.
+- Chahiye: Pro ya Unlimited package (ya active trial), phir /pos/features se restaurant features ON karein (KOT, Table Management, KDS, Kitchen Notes, Recipes).
 - Order types ke rules: Dine-In = pehle Hold/KOT, khana banne ke baad payment; Takeaway = seedha final bill; Delivery = final ya provisional dono.
-- Tables/Floors banana: /pos/restaurant/table-management → "+ Add Floor" (manzil ka naam) → "+ Add Table" (table number + seats).
-- Dine-In order: sale screen par order type "Dine In" chunein → table picker khud khulta hai → table select → items dalein → Hold/KOT bhejein → khana ban jaye to F3 se order wapas khol kar payment karein.
-- Stations/Counters (KOT routing): /pos/restaurant/kitchen-settings → "+ Add Counter" → naam (jaise "Grill") → printer chunein (Desktop Agent ki list se) → categories tick karein — un categories ke items ka KOT usi counter par jayega.
-- KDS (Kitchen Display Screen): /pos/restaurant/kds — kitchen account login karta hai; orders cards mein aate hain; "Preparing" → "Ready" buttons; Clear se hata dein. KOT ka barcode scan kar ke bhi clear ho sakta hai.
-- Kitchen account: /pos/team se Kitchen role ka login banayen — yeh sirf KDS dekhta hai, team limit mein nahi ginta.
-- Waiter: /pos/waiter portal — waiter apne login se table chunta hai, items dalta hai, cashier select kar ke "Send Order" karta hai. Cashier ko sale screen par bell icon (incoming orders) par badge nazar aata hai — order khol kar payment karein.
-- QR Menu / Public Profile: /pos/business-profile → "Enable Public Page" + "Show Menu" ON karein → menu tab mein products add karein (drag se order badlein) → QR code customer ko dikhayen; customer apne phone par menu dekhta hai. "Regenerate Link" se naya link banta hai.
-- Recipes / Ingredients: /pos/restaurant/ingredients par kachha maal banayen (naam, unit, cost, min stock; stock adjust bhi yahin) → /pos/restaurant/recipes par har dish ki recipe set karein (kaunsa ingredient kitna lagta hai). Dish bikne par ingredients ka stock khud katta hai.
+- Tables/Floors: /pos/restaurant/table-management → "+ Add Floor" (floor ka naam, jaise Ground Floor) → "+ Add Table" (Table Number jaise T1, Seats 1-50). Table delete = card par × button.
+- Dine-In order: sale screen par order type "Dine In" → table picker khud khulta hai → table select → items → "Send to Kitchen" (KOT) ya Hold → khana ban jaye to F3 se order khol kar payment. Table payment par khud free ho jata hai.
+- Kitchen Settings (/pos/restaurant/kitchen-settings) ke toggles: Kitchen Display System (KDS), Kitchen Printer, Print KOT on Hold, Dine-In Auto KOT on Table Select, Print Receipt on Pay. "Save Kitchen Settings" se save.
+- Counters/Stations (KOT routing): kitchen-settings par "+ Add Counter" → Counter Name (jaise "Grill") → Printer chunein (Desktop Agent ki list) → Product Categories tick karein — un categories ke items ka KOT usi counter par jayega.
+- KDS (/pos/restaurant/kds): kitchen account login karta hai; order cards par order number, table, RUSH tag aur timer; buttons: "Start Preparing" → "Mark Ready" → "Clear"; upar Refresh, Clear All, Camera Scan aur List/Aggregate view switcher. KOT ka barcode scan karne se order khud clear ho jata hai (scanner active rehta hai).
+- Kitchen account: /pos/team se Kitchen role ka login — sirf KDS dekhta hai, team limit mein nahi ginta.
+- Waiter (/pos/waiter): waiter apne login se — Dine In/Take Away chunein → "Choose Table" (Available sabz, Occupied laal) → items search kar ke cart mein dalein (har item par note bhi likh sakta hai) → customer naam/phone (optional) → kitchen note → cashier select → "SEND TO CASHIER". Pehle se bheje order mein "My Orders" → "Add Items" se aur items add ho sakte hain. Waiter payment/discount/delete NAHI kar sakta.
+- QR Menu / Public Profile: /pos/business-profile → "Public Page Enabled" ON + "Menu" visible ON → menu builder mein products tick karein → QR code customer ko dikhayen. Kya kya public dikhe (Phone, Mobile, Email, Address, NTN, Website, Opening Hours) — har cheez ka apna toggle. "Regenerate Link" se naya link banta hai.
+- Recipes / Ingredients: /pos/restaurant/ingredients par kachha maal (Name, Unit: kg/g/ltr/ml/pcs, Cost/Unit, Opening Stock, Min Stock) → /pos/restaurant/recipes par product chunein aur ingredient + Qty Needed rows dalein → Save Recipe. Dish bikne par ingredients ka stock khud katta hai. Ingredients ka stock adjust bhi ingredients page par hota hai.
+- Restaurant dashboard (/pos/restaurant/dashboard): live orders ka board.
 
 ## Delivery Riders
 - Riders banana: /pos/riders — naam, phone, CNIC, vehicle number. "Create Login" se rider ka email+password banayen (rider sirf /pos/rider portal dekhta hai; team limit mein NAHI ginta).
-- Rider assign karna: bill BANNE KE BAAD /pos/deliveries board par bill ke saamne "Assign Rider" dropdown se rider chunein (payment modal mein assign nahi hota).
-- Delivered mark: rider apne portal se ya cashier board se "Delivered" kare.
-- Rider cash settle karna: /pos/deliveries board par rider ke card par "Settle Cash" → jo bills settle ho rahe hain tick karein → "Settle Selected Bills". Partial settlement ho sakta hai.
+- Rider assign: bill BANNE KE BAAD /pos/deliveries board par "Assign Rider" dropdown se (payment modal mein assign nahi hota).
+- Status buttons board par: Dispatch → Delivered → (zaroorat par) Returned. Rider apne portal se bhi "Delivered ✓" kar sakta hai.
+- Rider portal (/pos/rider): rider ko apne orders, address aur "Cash to hand over" (khata) ka banner nazar aata hai.
+- Cash settle: /pos/deliveries par rider ke card par "Settle Cash" → jo bills settle ho rahe hain tick karein → note (optional) → "Confirm Settlement". Partial settlement ho sakta hai.
 - Day-close par rider ka poora khata (owed vs settled) nazar aata hai.
 - "Delivery Manager" role: sirf deliveries board + settlement tak — free, limit mein nahi ginta.
 - "Returned" mark karne se PRA wala bill cancel NAHI hota — yeh sirf andaruni record hai.
 
 ## Team / Roles (/pos/team)
-- Member add karna: /pos/team → naam, email, phone, password, role chunein → save.
+- Member add: /pos/team → naam, email, phone, password, role → save.
 - Roles: Manager = admin jaisa (settings, reports, sab); Cashier = sirf billing. Kitchen, Waiter, Rider, Delivery Manager = mehdood, FREE (limit mein nahi ginte).
 - Manager aur Cashier package ki account limit mein ginte hain (Starter 1, Business 5, Pro 10, Unlimited unlimited).
-- Cashier ON/OFF toggle bhi team page par hai (band cashier login nahi kar sakta).
+- Cashier ON/OFF toggle team page par hai (band cashier login nahi kar sakta).
 - Har cashier ke liye PRA reporting alag ON/OFF karne ka toggle bhi yahin hai.
 - Company admin team members ke passwords /pos/team par dekh sakta hai (sirf admin ko nazar aate hain).
 
@@ -166,52 +180,69 @@ Sale screen ki mazeed cheezein:
 - Pro Rs 24,999/saal: 10 accounts, 3,000 bills/mahina, 2 branches, Restaurant module.
 - Unlimited Rs 39,999/saal: sab unlimited.
 - Billing sirf saalana hai (6% discount pehle se shamil). Plans ki tafseel /pos/billing par.
-- Payment ka saboot (screenshot/slip) /pos/billing se upload karein — admin verify kar ke package activate karta hai.
+- Payment ka tareeqa: plan chunein → di gayi bank details (Bank, Title, IBAN) par raqam bhejein → payment proof form bharein: Package, Amount Paid (PKR), Reference/TID, aur proof upload (JPG/PNG/PDF) → admin verify kar ke package activate karta hai. Jaldi ho to "Send on WhatsApp" button se proof WhatsApp par bhi bhej sakte hain.
 - Sirf FINAL bills quota mein ginte hain — provisional FREE hain jab tak promote na hon; offline retry dobara nahi ginta. Quota har mahine reset hota hai.
 
 ## Tax Settings
 - Tax Pricing ke 3 modes (/pos/customize se, sirf admin):
-  1. **Standard (Tax Upar Se)**: menu price par tax alag se lagta hai.
-  2. **Menu Rate Final — Sab Same**: menu price hi grand total hai, har payment method par same.
-  3. **Menu Rate Final — Card Bachat**: menu price cash ke hisab se final; card/digital par thora sasta — receipt par "Card Discount" nazar aata hai.
-- Tax rates: default cash 16%, card/digital 8% — company ke liye alag rates support/admin set kar sakta hai.
+  1. **Standard (Tax Upar Se / Exclusive)**: menu price par tax alag se lagta hai.
+  2. **Menu Rate Final — Sab Same (Inclusive)**: menu price hi grand total hai, har payment method par same.
+  3. **Menu Rate Final — Card Bachat (Card-save)**: menu price cash ke hisab se final; card/digital par thora sasta — receipt par "Card Discount" nazar aata hai.
+- Tax rates: default cash 16%, card/digital 8% — apne rates /pos/features par "Cash Rate (%)" / "Card / Digital Rate (%)" fields se set karein (ya support se).
+- Kisi ek product ko tax-free karna ho: product edit karein → "Tax Exempt" toggle ON.
 - Mode badalne se purane bills nahi badalte — sirf naye bills par lagta hai.
 - PRA ko tax hamesha poora aur sahi submit hota hai, chahe receipt par dikhaya jaye ya nahi.
 
 ## Customers (/pos/customers)
-- Saray customers ki list, phone/naam se search, ON/OFF toggle.
-- Har customer ki poori history: /pos/customers → customer par click → us ke saray bills; history export/PDF bhi ho sakti hai.
-- Customers ka Excel import/export bhi hai (template download kar ke import karein).
-- Sale screen se bhi naya customer foran ban jata hai (phone box mein naam+phone likh kar Add).
+- Fields: Name, Phone, Email, Type (Registered/Unregistered), CNIC, NTN, City, Address. "+ Add Customer" se banayen; phone/naam se search; Active/Inactive toggle; inline Edit; Delete.
+- Har customer ki poori history: customer ke saamne "History" → us ke saray bills (export/PDF bhi).
+- Customers ka import/export bhi hai (Export/Import buttons; template download kar ke import karein).
+- Sale screen se bhi naya customer foran ban jata hai (phone box mein number likhein → "Add as New").
+
+## POS Features (/pos/features) — sirf admin/manager
+- Step 1 — Business Type: 9 presets (Restaurant, Cafe, Quick Service, Retail, Pharmacy, Salon, Grocery, Wholesale, Hybrid) — chunte hi features ki sifarish set ho jati hai.
+- Step 2 — Feature toggles: Inventory Tracking, Delivery/Takeaway, Barcode Scanning, Customer Profiles, Service Jobs, Bulk Pricing, Prescription (Pharmacy), Customer Loyalty, Multi-Branch; Restaurant walay (Pro/Unlimited): KOT, Table Management, KDS, Kitchen Notes, Recipes.
+- Cashier & Receipt preferences: density (Simple/Standard/Premium), Guided Keyboard Billing, Auto-Print KOT, Allow KOT Reprint.
+- Sales Tax Rates (PRA): Cash Rate (%) aur Card/Digital Rate (%).
+- "Reset" se features dobara default par aa jate hain.
 
 ## Customize POS (/pos/customize) — sirf admin/manager
-- POS Ka Style: Full (default) ya Saaf (seedha saada) + kuch fancy styles.
-- Theme colors (purple ke ilawa aur themes).
-- Guided Keyboard Flow ON/OFF.
+- Setup shortcuts: Modules & Features, Business Profile, Receipt Display, Printer Settings, PRA Compliance ke links.
+- POS Ka Style: Full (default) / Saaf + "Mazeed styles" (5 purane designs).
+- POS Theme: 6 rang — Purple, Blue, Emerald, Orange, Midnight, Rose.
+- Guided Keyboard Billing ON/OFF.
+- Receipt Popup Auto-Close: Never / 5 / 10 / 15 / 30 seconds.
 - Quick Type Mode ON/OFF.
-- Receipt Popup Auto-Close: Kabhi nahi / 5 / 10 / 15 / 30 sec (default 10).
-- Local Billing policy: day-close par local bills save ya delete.
-- Auto Day-Close ON/OFF (subah 6 baje).
-- Tax Pricing mode.
-- Inventory se related toggles (restock on void waghera).
+- Tax-Inclusive Pricing: Exclusive / Inclusive / Inclusive (Card-save).
+- Auto Day-Close (24h) ON/OFF.
+- Local Billing Policy: provisional aur final bills ke liye "Save to record" ya "Auto-delete" + customer spend history rakhne ka toggle.
+- Restock on Void ON/OFF.
+- Inventory Tracking ON/OFF.
+
+## Business Profile (/pos/business-profile)
+- Business Logo upload (ya remove), Business Name, Owner/Proprietor Name, NTN, Business Activity, Email, Phone (Landline), Mobile, Website, Full Address, City.
+- Yehi maloomat receipt par aati hai (receipt-settings ke toggles ke mutabiq).
+- Public QR Profile isi page par hai (dekhein Restaurant section — QR Menu).
+
+## Terminals (/pos/terminals)
+- Terminal add: Terminal Name, Terminal Code, Location → "Add Terminal". Har terminal Edit/Delete ho sakta hai. (Multi-counter dukano ke liye.)
 
 ## Reports
-- /pos/reports: date range ke sath Sales Analytics — charts, payment breakdown, top products, category performance, PDF/CSV export. Profit ka data sirf admin ko.
-- Tax Reports (/pos/tax-reports): PRA submitted bills ka record, tabs aur rate filter ke sath; CSV/PDF export. "Local Invoices" tab sirf admin ko.
-- /pos/transactions: saray bills ki list — date, payment method, cashier ke filters; bill khol kar receipt/PDF/share link; failed bills par Retry (akela ya bulk); local bills par promote/delete.
+- /pos/reports: date range presets (Today, Last 7 Days, This Month waghera) + cashier/staff filter. KPIs: Revenue, Bills, Tax, Average Bill, Discounts, Customers (pichle period se % comparison). Charts: Category Share, Daily Revenue Trend, Hourly Pattern. Category breakdown table product-level tak khulti hai. Profit Estimate/Margin sirf admin ko (cost price wale products par). PDF/CSV export.
+- Tax Reports (/pos/tax-reports): PRA aur Local tabs; filters: Tax Rate (available rates + Exempt), Period, Payment Method, Customer, custom date range; summary cards (Invoices, Sales Value, Tax, Total); "Download CSV" / "Download PDF". "Local" tab sirf admin ko.
+- /pos/transactions: saray bills — filters: search (invoice/customer), payment method, date from/to; tabs: POS (PRA) / Local; status badges: Submitted, Failed, Pending, Offline, Local. Har bill par: Receipt, Edit/Delete (sirf jab tak PRA number NA laga ho), Retry PRA (failed par), Submit to PRA (local, current month). "Sync All (N)" = saray failed ek sath retry.
 - Day Close ki purani Z-reports day-close page se.
 
 ## What's New aur Feature Suggestions
 - Naye features ki ittila: top-nav ka bell icon + one-time popup (sirf admin/manager).
-- Apni tajweez bhejein: top-nav bulb icon → /pos/suggestions (sirf admin/manager; din mein 10 tak). Status wahin nazar aata hai: pending → planned → completed (admin ke note ke sath).
+- Apni tajweez: top-nav bulb icon → /pos/suggestions (sirf admin/manager; din mein 10 tak). Status: pending → planned → completed (admin ke note ke sath).
 - Madadgar (yeh bot) se bhi masla ya feature request seedha admin team ko bhej sakte hain — bot khulasa bana kar confirm karega, "Haan" par bhej dega aur Ref number milega.
 
 ## Bill Reprint (Aaj ke Bills)
-- Sale screen par Alt+R (ya Reprint button) — aaj ke SAB bills ki list: PRA walay, Local, Sync Queue, Failed, Provisional.
-- Bill par click = receipt foran print (bilkul asal jaisi, koi COPY label nahi).
-- Search box se serial, customer naam ya raqam se dhoondein. ↑↓ se select, Enter se print.
+- Sale screen par Alt+R — aaj ke SAB bills: PRA walay, Local, Sync Queue, Failed, Provisional.
+- Bill par click ya Enter = receipt foran print (asal jaisi, koi COPY label nahi). Search se serial/naam/raqam dhoondein, ↑↓ se select.
 - Silent printing ON ho to seedha printer par, warna print window.
-- Purane dino ke bills ke liye /pos/transactions use karein.
+- Purane dino ke bills: /pos/transactions.
 
 ## PWA / Mobile / Offline
 - NestPOS ko phone/tablet/PC par app ki tarah install karein — browser ka "Add to Home Screen" / install icon.
@@ -221,17 +252,20 @@ Sale screen ki mazeed cheezein:
 ## Aam Masail (Troubleshooting)
 - "Bill PRA par nahi ja raha": internet check karein; bill 'offline' queue mein hoga aur khud retry hoga. Fiscal Device mode mein Desktop Agent ka chalta hona zaroori hai (dukan ke PC par).
 - "Login nahi ho raha": sahi panel use karein (/pos/login); Forgot Password se reset; 5 ghalat koshishon par thori der lock.
-- "Receipt par tax nahi dikh raha": /pos/receipt-settings par "Show Tax" ON karein.
+- "Receipt par tax nahi dikh raha": /pos/receipt-settings par "Show Tax" ON karein (PRA aur Local tab alag alag hain — sahi tab dekhein).
 - "Printer poora width use nahi kar raha / kat raha hai": receipt-settings mein paper size (80mm/58mm) check karein, phir printer driver.
 - "Item search mein nahi mil raha": /pos/products par check karein — product inactive to nahi, naam/barcode sahi hai? Search har category mein dhoondti hai.
 - "Sale screen par products ghayab hain": Products grid ka toggle OFF hai — "Show All Products" dabayen.
+- "Manual button nazar nahi aata": Manual sirf Simple Mode (Inventory Tracking OFF) mein hota hai. Inventory ON ho to pehle /pos/products par product banayen.
 - "Bills ki limit khatam ho gayi": package upgrade karein ya filhal provisional bills banayen (baad mein promote).
 - "Team member add nahi ho raha": package ki account limit poori ho chuki hai — upgrade karein.
 - "Restaurant features nazar nahi aa rahe": Pro ya Unlimited package chahiye, phir /pos/features se ON karein.
 - "Dashboard par Opening Cash nazar nahi aa raha": din pehle hi close ho chuka hai — kal subah enter karein.
-- "Deal ki price ghalat lag rahi hai": deal ke din check karein — deal sirf apne set kiye dino par chalti hai.
-- "KOT kitchen par nahi aa raha": /pos/restaurant/kitchen-settings par station/printer check karein aur Desktop Agent chalta ho.
+- "Deal ki price ghalat lag rahi hai": deal ke din/dates check karein — deal sirf apne set kiye dino par chalti hai.
+- "KOT kitchen par nahi aa raha": /pos/restaurant/kitchen-settings par counter/printer check karein aur Desktop Agent chalta ho.
 - "Silent print nahi ho rahi": /pos/printer-settings par Silent Printing ON ho, printer select ho, aur Desktop Agent chalta ho. Setting badalne ke baad sale screen refresh karein.
 - "Screen chhoti/bari lag rahi hai": sale screen ke "Fit" menu se size adjust karein.
 - "Hold nahi ho raha": Hold sirf Dine-In orders ke liye hai; manual items aur deals hold nahi ho sakte.
+- "Discount nahi lag raha / limit ka error": cashier ki discount limit lagi hai — manager PIN se override karein ya admin limit badhaye.
+- "Bill edit nahi ho raha": PRA number lag chuke bills edit/delete NAHI ho sakte (qanooni pabandi). Sirf local/provisional bills edit hote hain.
 - Kisi bhi aur masle ke liye WhatsApp support ya Madadgar se escalation bhej dein.

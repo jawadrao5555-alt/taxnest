@@ -491,6 +491,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/api/customer-addresses', [PosController::class, 'apiStoreCustomerAddress'])->name('pos.api.customer-addresses.store');
     Route::get('/api/failed-bills', [PosController::class, 'apiFailedBills'])->name('pos.api.failed-bills');
     Route::post('/api/failed-bills/{id}/retry', [PosController::class, 'apiRetryFailed'])->name('pos.api.failed.retry');
+    // Reprint modal (Alt+R) — read-only list of ALL of today's completed bills.
+    Route::get('/api/todays-bills', [PosController::class, 'apiTodaysBills'])->name('pos.api.todays-bills');
     Route::get('/transaction/{id}/receipt', [PosController::class, 'receipt'])->name('pos.receipt');
     Route::get('/transaction/{id}/pdf', [PosController::class, 'downloadInvoicePdf'])->name('pos.invoice.pdf');
     Route::post('/transaction/{id}/share-link', [PosController::class, 'generateShareLink'])->name('pos.invoice.share-link');

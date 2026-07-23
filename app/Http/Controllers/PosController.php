@@ -2260,6 +2260,71 @@ class PosController extends Controller
     }
 
     /**
+     * TODAY'S BILLS — read-only list for the sale-screen Reprint modal (Alt+R).
+     * Returns ALL of today's completed bills regardless of type: PRA-reported
+     * finals, reporting-OFF finals (NULL status), offline/pending queue, failed,
+     * and deliberate provisionals. Bypasses hide_archived so day-close-washed
+     * bills stay reprintable until midnight. Cashiers allowed — print-only,
+     * no mutations happen through this endpoint.
+     */
+    public function apiTodaysBills(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+
+        // Visibility MUST mirror receipt(): archived bills are listed ONLY when
+        // invoice_mode='local' (post-finalize archive) — archived PRA bills stay
+        // hidden, otherwise a listed row would 404 on the iframe print.
+        $bills = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->where(function ($q) {
+                if (\Schema::hasColumn('pos_transactions', 'is_archived')) {
+                    $q->where('is_archived', false)
+                      ->orWhereNull('is_archived')
+                      ->orWhere('invoice_mode', 'local');
+                }
+            })
+            ->whereDate('created_at', now()->toDateString())
+            ->orderBy('id', 'desc')
+            ->limit(300)
+            ->get(['id', 'invoice_number', 'pra_invoice_number', 'customer_name', 'total_amount', 'payment_method', 'order_type', 'invoice_mode', 'pra_status', 'created_at']);
+
+        $data = $bills->map(function ($b) {
+            // Badge resolution mirrors the Transactions-page tab split: the
+            // ACTUAL PRA outcome decides, not invoice_mode alone.
+            if (!empty($b->pra_invoice_number)) {
+                $badge = 'pra';           // fiscal number issued = PRA-reported
+            } elseif ($b->pra_status === 'local') {
+                $badge = 'provisional';   // deliberate provisional (completed+local+local)
+            } elseif (in_array($b->pra_status, ['offline', 'pending'], true)) {
+                $badge = 'queue';         // waiting for PRA sync
+            } elseif ($b->pra_status === 'failed') {
+                $badge = 'failed';
+            } else {
+                $badge = 'local';         // reporting-OFF final (NULL status) etc.
+            }
+            return [
+                'id'                 => $b->id,
+                'invoice_number'     => $b->invoice_number,
+                'pra_invoice_number' => $b->pra_invoice_number,
+                'customer_name'      => $b->customer_name,
+                'total_amount'       => (float) $b->total_amount,
+                'payment_method'     => $b->payment_method,
+                'order_type'         => $b->order_type,
+                'badge'              => $badge,
+                'created_time'       => $b->created_at?->format('h:i A'),
+                'created_human'      => $b->created_at?->diffForHumans(),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'count'   => $data->count(),
+            'bills'   => $data,
+        ]);
+    }
+
+    /**
      * Delete a provisional bill (only pra_status='local' allowed via this API).
      * Submitted/pending bills MUST go through the regular delete route which
      * enforces stricter checks.

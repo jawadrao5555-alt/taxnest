@@ -601,6 +601,14 @@ window.addEventListener('popstate', function() {
             <span x-show="failedBills.length > 0" class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-red-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold animate-pulse" x-text="failedBills.length"></span>
         </button>
 
+        {{-- ── REPRINT — header shortcut. Alt+R. Today's bills, click = instant print. ── --}}
+        {{-- Read-only: cashier + admin both allowed. Teal family (no-blue rule).       --}}
+        <button @click="openReprint()" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 transition" title="Aaj ke bills — click par foran reprint. Alt+R">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+            <span class="tn-key-chip text-[10px] bg-teal-400/30 px-1 rounded">Alt+R</span>
+            <span class="hidden sm:inline">Reprint</span>
+        </button>
+
         <button @click="activeHeldIndex = 0; showHeldOrders = !showHeldOrders" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             <span class="tn-key-chip text-[10px] bg-amber-400/30 px-1 rounded">F3</span>
@@ -1297,6 +1305,103 @@ window.addEventListener('popstate', function() {
             </div>
             <div x-show="localBills.length > 0" class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-[11px] text-gray-500">
                 <span>💡 Provisional bills NOT reported to PRA — edit/delete anytime, or "Make Final" to lock & submit.</span>
+            </div>
+        </div>
+    </div>
+
+    {{-- ─────────────────────────────────────────────────────────────────────── --}}
+    {{-- REPRINT MODAL — opens from header "Reprint" button (Alt+R).            --}}
+    {{-- ALL of today's completed bills (PRA / queue / failed / provisional /    --}}
+    {{-- local) — click a row = instant print of the ORIGINAL receipt.          --}}
+    {{-- Keyboard: type to search, ↑↓ navigate, Enter=Print, Esc=Close.         --}}
+    {{-- ─────────────────────────────────────────────────────────────────────── --}}
+    <div x-show="showReprint" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showReprint = false">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden" x-transition.scale.90>
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 bg-teal-50 dark:bg-teal-900/20 flex-shrink-0">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <svg class="w-5 h-5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                            Reprint — Aaj ke Bills <span class="text-xs font-medium text-teal-600 ml-1" x-text="'(' + filteredReprintBills().length + ')'"></span>
+                        </h3>
+                        <p class="text-[10px] text-gray-500 mt-0.5">Bill par click karein — foran print • ↑↓ navigate • Enter=Print • Esc=Close</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button @click="loadReprintBills()" :disabled="reprintLoading" class="text-xs text-teal-600 hover:text-teal-800 font-semibold px-2 py-1 rounded hover:bg-teal-100 disabled:opacity-50" title="Refresh list">
+                            <svg class="w-4 h-4" :class="reprintLoading ? 'animate-spin' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        </button>
+                        <button @click="showReprint = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                    </div>
+                </div>
+                <div class="mt-3 relative">
+                    <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    {{-- Element-level keydown handlers REQUIRED: handleKey's global input-field
+                         gate swallows window-level keys while this input has focus (which is the
+                         default — openReprint auto-focuses it). Do NOT rely on the window branch. --}}
+                    <input type="text" x-model="reprintSearch" @input="activeReprintIndex = 0" x-ref="reprintSearchInput"
+                           @keydown.down.prevent="activeReprintIndex = Math.min(activeReprintIndex + 1, Math.max(0, filteredReprintBills().length - 1))"
+                           @keydown.up.prevent="activeReprintIndex = Math.max(activeReprintIndex - 1, 0)"
+                           @keydown.enter.prevent="if (filteredReprintBills()[activeReprintIndex]) reprintBill(filteredReprintBills()[activeReprintIndex])"
+                           @keydown.escape.prevent="showReprint = false"
+                           autocomplete="off" name="reprint_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                           placeholder="Serial, customer ya raqam se dhoondein..."
+                           class="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 placeholder-gray-400">
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto">
+                <template x-if="reprintLoading && reprintBills.length === 0">
+                    <div class="p-12 text-center text-gray-400">
+                        <svg class="w-8 h-8 mx-auto mb-2 animate-spin text-teal-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                        <p class="text-sm">Aaj ke bills load ho rahe hain...</p>
+                    </div>
+                </template>
+                <template x-if="!reprintLoading && filteredReprintBills().length === 0">
+                    <div class="p-12 text-center text-gray-400">
+                        <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        <p class="text-sm font-medium" x-text="reprintSearch ? 'Koi bill nahi mila' : 'Aaj ka koi bill nahi'"></p>
+                        <p class="text-[11px] text-gray-400 mt-1" x-text="reprintSearch ? 'Search badal kar dobara koshish karein.' : 'Aaj jo bhi bill banega yahan nazar aayega.'"></p>
+                    </div>
+                </template>
+                <template x-for="(bill, bi) in filteredReprintBills()" :key="bill.id">
+                    <button type="button" @click="reprintBill(bill)" :disabled="reprintBusyId === bill.id"
+                            class="w-full text-left p-4 border-b border-gray-100 dark:border-gray-800 transition-all hover:bg-teal-50/60 dark:hover:bg-teal-900/10 disabled:opacity-60"
+                            :class="activeReprintIndex === bi ? 'bg-teal-50 dark:bg-teal-900/15 ring-2 ring-teal-400 ring-inset' : ''">
+                        <div class="flex items-center justify-between mb-1">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-[10px] font-mono text-gray-400 w-5" x-text="bi + 1"></span>
+                                <span class="text-sm font-bold text-gray-900 dark:text-white" x-text="bill.pra_invoice_number || bill.invoice_number"></span>
+                                <span class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide"
+                                      :class="{
+                                          'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300': bill.badge === 'pra',
+                                          'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300': bill.badge === 'provisional',
+                                          'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300': bill.badge === 'queue',
+                                          'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300': bill.badge === 'failed',
+                                          'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300': bill.badge === 'local'
+                                      }"
+                                      x-text="bill.badge === 'pra' ? 'PRA' : (bill.badge === 'provisional' ? 'Provisional' : (bill.badge === 'queue' ? 'Sync Queue' : (bill.badge === 'failed' ? 'Failed' : 'Local')))"></span>
+                            </div>
+                            <span class="text-sm font-bold text-teal-700 dark:text-teal-400" x-text="'Rs. ' + Number(bill.total_amount).toLocaleString()"></span>
+                        </div>
+                        <div class="flex items-center justify-between ml-7">
+                            <p class="text-[11px] text-gray-500">
+                                <span x-text="bill.created_time"></span>
+                                <template x-if="bill.customer_name"><span x-text="' • ' + bill.customer_name"></span></template>
+                                <template x-if="bill.payment_method"><span class="uppercase" x-text="' • ' + bill.payment_method.replace('_', ' ')"></span></template>
+                            </p>
+                            <span class="text-[10px] font-bold text-teal-600 flex items-center gap-1" x-show="reprintBusyId !== bill.id">
+                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                                Print
+                            </span>
+                            <span class="text-[10px] font-bold text-teal-600 flex items-center gap-1" x-show="reprintBusyId === bill.id">
+                                <svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                Printing...
+                            </span>
+                        </div>
+                    </button>
+                </template>
+            </div>
+            <div x-show="filteredReprintBills().length > 0" class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-[11px] text-gray-500 flex-shrink-0">
+                <span>💡 Sirf AAJ ke bills — receipt bilkul asal jaisi print hogi.</span>
             </div>
         </div>
     </div>
@@ -2435,6 +2540,17 @@ function restaurantPos() {
         showFailedBills: false,
         activeFailedIndex: 0,
         failedBillsLoading: false,
+        // ── REPRINT — TODAY'S BILLS (header shortcut, Alt+R) ─────────────────
+        // Read-only list of ALL today's completed bills (PRA/queue/failed/
+        // provisional/local). Click a row = instant print of the ORIGINAL
+        // receipt (no COPY label — owner rule 23 Jul 2026). Search filters
+        // client-side. reprintBusyId debounces double-clicks per row.
+        reprintBills: [],
+        showReprint: false,
+        activeReprintIndex: 0,
+        reprintLoading: false,
+        reprintSearch: '',
+        reprintBusyId: null,
         // ── INCOMING WAITER ORDERS (P7, F6) ───────────────────────────────
         // Orders composed on waiter tablets (source='waiter', status 'held').
         // Cashier loads one into the cart, takes payment via the MANUAL path
@@ -3938,7 +4054,7 @@ function restaurantPos() {
             //   the old empty-search shortcut ate the first letter of "Tapal"/"tea".
             // Always operates on activeCartIndex if valid, else on the LAST cart row.
             // ═══════════════════════════════════════════════════════════════
-            if ((e.key === 't' || e.key === 'T' || e.code === 'KeyT') && !e.ctrlKey && !e.metaKey && !this.showTablePicker) {
+            if ((e.key === 't' || e.key === 'T' || e.code === 'KeyT') && !e.ctrlKey && !e.metaKey && !this.showTablePicker && !this.showReprint) {
                 const tgt = e.target;
                 const isSearchInput = tgt && tgt === this.$refs.searchInput;
                 const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
@@ -3972,7 +4088,7 @@ function restaurantPos() {
             // F10 keystroke would steal focus from Pay/Held/Receipt/etc.
             if (e.key === 'F10') {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint) return;
                 this.openLocalBills();
                 return;
             }
@@ -3980,8 +4096,17 @@ function restaurantPos() {
             // Same gating as F10. Browser's native F11 = fullscreen toggle is overridden.
             if (e.key === 'F11') {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint) return;
                 this.openFailedBills();
+                return;
+            }
+            // Alt+R — Open REPRINT modal (today's bills, click = instant print).
+            // Alt-chord (not plain R) so typing names like "Rooh Afza" in the
+            // search input is never hijacked. Same modal-gating as F10/F11.
+            if (e.altKey && (e.key === 'r' || e.key === 'R' || e.code === 'KeyR')) {
+                e.preventDefault();
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint) return;
+                this.openReprint();
                 return;
             }
             // ═══════════════════════════════════════════════════════════════
@@ -3996,7 +4121,7 @@ function restaurantPos() {
                 && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills
                 && !this.showPayModal && !this.showReceipt && !this.showQuickType
                 && !this.showManualItem && !this.showCustomerPicker && !this.showShortcuts
-                && !this.showManagerPinModal && !this.showTablePicker) {
+                && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint) {
                 const tgt = e.target;
                 const isSearchInput = tgt && tgt === this.$refs.searchInput;
                 const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
@@ -4033,7 +4158,7 @@ function restaurantPos() {
                 && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills
                 && !this.showPayModal && !this.showReceipt && !this.showQuickType
                 && !this.showManualItem && !this.showCustomerPicker && !this.showShortcuts
-                && !this.showManagerPinModal && !this.showTablePicker) {
+                && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint) {
                 const tgt = e.target;
                 const isSearchInput = tgt && tgt === this.$refs.searchInput;
                 const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
@@ -4156,6 +4281,17 @@ function restaurantPos() {
             }
             if (this.showLocalBills) {
                 if (e.key === 'Escape') { e.preventDefault(); this.showLocalBills = false; }
+                return;
+            }
+            // REPRINT modal — keyboard nav. Typed characters fall through to the
+            // search input (no preventDefault on unhandled keys); ↑↓ move the
+            // highlight over the FILTERED list, Enter prints it, Esc closes.
+            if (this.showReprint) {
+                const rlist = this.filteredReprintBills();
+                if (e.key === 'ArrowDown') { e.preventDefault(); this.activeReprintIndex = Math.min(this.activeReprintIndex + 1, Math.max(0, rlist.length - 1)); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); this.activeReprintIndex = Math.max(this.activeReprintIndex - 1, 0); }
+                else if (e.key === 'Enter') { e.preventDefault(); if (rlist[this.activeReprintIndex]) this.reprintBill(rlist[this.activeReprintIndex]); }
+                else if (e.key === 'Escape') { e.preventDefault(); this.showReprint = false; }
                 return;
             }
             // FAILED BILLS modal — keyboard nav (mirror of provisional + held shortcuts)
@@ -5533,6 +5669,67 @@ function restaurantPos() {
             this.activeLocalIndex = 0;
             this.showLocalBills = true;
             this.loadLocalBills();
+        },
+        // ─── REPRINT (Alt+R) — today's bills, read-only, click = print ─────────
+        openReprint() {
+            this.activeReprintIndex = 0;
+            this.reprintSearch = '';
+            // Self-heal: _printViaIframe's onAfterPrint is skipped when the print
+            // session goes stale (cancelPendingPrints) — never let a stuck busy
+            // id dead-lock the whole reprint feature for the session.
+            this.reprintBusyId = null;
+            this.showReprint = true;
+            this.loadReprintBills();
+            this.$nextTick(() => { const el = this.$refs.reprintSearchInput; if (el) el.focus(); });
+        },
+        async loadReprintBills() {
+            this.reprintLoading = true;
+            try {
+                const res = await fetch('{{ url('/pos/api/todays-bills') }}', { headers: { 'Accept': 'application/json' } });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.success) {
+                        this.reprintBills = data.bills || [];
+                        if (this.activeReprintIndex >= this.reprintBills.length) {
+                            this.activeReprintIndex = Math.max(0, this.reprintBills.length - 1);
+                        }
+                    }
+                }
+            } catch (e) { console.warn('loadReprintBills error', e); }
+            this.reprintLoading = false;
+        },
+        filteredReprintBills() {
+            const q = (this.reprintSearch || '').toLowerCase().trim();
+            if (!q) return this.reprintBills;
+            return this.reprintBills.filter(b =>
+                (b.invoice_number || '').toLowerCase().includes(q)
+                || (b.pra_invoice_number || '').toLowerCase().includes(q)
+                || (b.customer_name || '').toLowerCase().includes(q)
+                || String(b.total_amount || '').includes(q)
+            );
+        },
+        // Print the ORIGINAL receipt of any of today's bills — no COPY label
+        // (owner rule 23 Jul 2026). Mirrors printReceipt() for an arbitrary
+        // transaction id: silent print via Desktop Agent first, hidden-iframe
+        // fallback. `deduped` = the double-press guard says this bill is
+        // ALREADY queued/printing — tell the cashier to wait, no 2nd copy.
+        reprintBill(bill) {
+            if (!bill || this.reprintBusyId) return;
+            this.reprintBusyId = bill.id;
+            const url = (this.isRestaurantMode ? '/pos/restaurant/receipt/' : '/pos/transaction/') + bill.id + (this.isRestaurantMode ? '?auto_print=1' : '/receipt?auto_print=1');
+            const done = () => { setTimeout(() => { this.reprintBusyId = null; }, 800); };
+            const fallback = () => this._printViaIframe('print-receipt-frame', url, 'width=400,height=700', done);
+            if (this.silentBillPrint) {
+                this.trySilentPrint({ type: 'bill', transaction_id: bill.id }).then(ok => {
+                    if (ok) {
+                        if (ok.deduped) this.showToast('Ye bill pehle hi printer ko ja raha hai — chand second intezar karein', 'info');
+                        else this.showToast('Receipt printer ko bhej di — ' + (bill.pra_invoice_number || bill.invoice_number), 'success');
+                        done();
+                    } else { fallback(); }
+                });
+                return;
+            }
+            fallback();
         },
         async deleteProvisional(bill) {
             if (!bill) return;

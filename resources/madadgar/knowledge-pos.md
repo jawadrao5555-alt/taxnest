@@ -150,6 +150,13 @@ Yeh NestPOS ka mukammal guide hai. Sirf is guide ki maloomat se jawab do.
 - Tajweez ka status wahin nazar aata hai: pending → planned → completed (admin ka note bhi).
 - Madadgar (yeh bot) se bhi masla ya feature request seedha admin team ko bhej sakte hain — bot khulasa bana kar confirm karega, "Haan" par bhej dega aur Ref number milega.
 
+## Bill Reprint (Aaj ke Bills)
+- Sale screen ke upar "Reprint" button (ya Alt+R) — aaj ke SAB bills ki list khul jati hai: PRA walay, Local, Sync Queue, Failed, Provisional — har type.
+- Bill par click karo to receipt foran print ho jati hai — bilkul asal jaisi (koi COPY label nahi).
+- Search box se serial number, customer ke naam ya raqam se bill dhoond sakte hain. Keyboard: ↑↓ se select, Enter se print.
+- Cashier aur admin dono use kar sakte hain. List mein sirf AAJ ke bills aate hain.
+- Agar Desktop Agent ka silent printing ON hai to print seedha printer par jati hai, warna print window khulti hai.
+
 ## PWA / Mobile / Offline
 - NestPOS ko phone/tablet/PC par app ki tarah install kar sakte hain — browser ka "Add to Home Screen" / install icon.
 - Offline mode: pages cache hote hain; internet wapas aane par offline bills khud sync ho jate hain.

@@ -31,6 +31,13 @@ Restaurant screen retired: `RestaurantPosController::pos()` early-redirects to `
 - Cashier saves "Provisional" from Pay modal (local status, no PRA submit), later promoted.
 - F10 header "Local" modal (list/edit/delete/promote via `/pos/api/provisional-bills*`); F11 "Failed" modal (retry/edit/delete via `/pos/api/failed-bills*`, race-safe atomic claim on retry).
 
+## Reprint modal (Alt+R, 23 Jul 2026)
+- Header "Reprint" button + Alt+R (Alt-chord ONLY — plain R must keep typing in search). Read-only list of ALL of TODAY's completed bills via GET `/pos/api/todays-bills` (limit 300); cashiers allowed.
+- API visibility MUST mirror `receipt()`: archived rows listed only when `invoice_mode='local'` — an archived PRA row would 404 on the iframe print. Badge from ACTUAL PRA outcome: fiscal number→PRA, local→Provisional, offline/pending→Queue, failed→Failed, NULL→Local.
+- Click = print the ORIGINAL receipt, NO COPY label (owner rule 23 Jul 2026). Path mirrors `printReceipt()` for an arbitrary id: silent agent print first (deduped flag = already queued, toast to wait), `_printViaIframe` fallback on the same restaurant/normal receipt URL split.
+- Keyboard: ↑↓/Enter/Esc live as ELEMENT-LEVEL @keydown handlers ON the search input itself — the window handleKey has a global input-field gate that swallows keys while any input has focus (and openReprint auto-focuses the search box), so a window-level modal branch alone is DEAD there (architect-caught bug). The window branch exists too for body-focus only. openReprint() resets reprintBusyId (self-heal — onAfterPrint can be skipped by stale print sessions). `showReprint` added to EVERY plain-letter (T/D/N) + F10/F11 gate list — a new modal flag must be added to all of them or cart shortcuts fire underneath.
+- FBR universal port deliberately NOT mirrored (PRA-only focus — Quick Type precedent).
+
 ## Edit-provisional-in-sale-screen (Jul 2026)
 - `?edit_bill={id}` on the sale screen loads a PROVISIONAL ONLY (local/local, NULL fiscal serial, company-scoped); anything else redirects to the classic edit page whose own guards apply. F10 modal Edit links + 'e' key use this; F11 FAILED-bill edits stay on the classic page (deliberate).
 - In edit mode: F9 becomes "Update Bill L-XXX" → PUT `/pos/transaction/{id}` JSON (updateTransaction is wantsJson-aware); Pay + Hold are toast-BLOCKED — finalizing must go through the F10 promote path (owns quota/serial/PRA rules). Bill keeps its L-serial and stays provisional on update.

@@ -34,9 +34,12 @@ the logo — don't revert to inline img); badge/box letter-spacing max 1px (2px+
 "phaila hua" waste). Serial badge sits at TOP, PAYMENT box is delivery-only — see
 pos-provisional-and-receipt-rules.md for the branch rules.
 
-**Bold + compact pass (owner, Malik Chicken Broast photo, 23 Jul 2026):** universal bold
-default is now `font-weight: 900 !important` + `-webkit-text-stroke: 0.75px` (stroke =
-browser-print only, DomPDF ignores it — fine); body fonts bumped ~+1-2px across the board
+**Bold + compact pass (owner, Malik Chicken Broast photo, 23 Jul 2026) — WEIGHT SUPERSEDED
+24 Jul 2026:** owner reversed the heaviness next day ("receipt kafi zyada bold hai"):
+bold-style block is now plain `font-weight: bold !important` (700) with NO text-stroke —
+900+stroke printed blobby/over-inked. Do NOT re-add 900 or the stroke; if a cheap-printer
+customer complains faint again, that's a per-company concern, not a universal bump.
+Rest of the 23 Jul pass still stands: body fonts bumped ~+1-2px across the board
 (80mm items/info/totals 12px, grand-total 16px; 58mm one step lower) for cheap-printer
 legibility. Compactness: separators/header-mb 2px, footer mt 3px, QR 84px/64px, center logo
 32mm/24mm (80/58) with `padding:2mm 0 0` on the wrapper. @media print body padding =

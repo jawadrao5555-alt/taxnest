@@ -111,9 +111,11 @@
     <style>
         /* BOLD PRINT STYLE (customer request Jul 2026 — Pizza Master): whole
            receipt in bold like the KOT font — cheap thermal heads print the
-           plain weight too thin/light. Opt-in per company (Receipt Settings). */
-        body, td, th, p, span, div, h1, strong { font-weight: 900 !important; }
-        body { -webkit-text-stroke: 0.75px #000; }
+           plain weight too thin/light. Opt-in per company (Receipt Settings).
+           Toned down (owner, 24 Jul 2026 "kafi zyada bold"): 900+text-stroke
+           read as blobby/over-inked on decent printers — plain bold 700, no
+           stroke. */
+        body, td, th, p, span, div, h1, strong { font-weight: bold !important; }
     </style>
     @endif
 </head>

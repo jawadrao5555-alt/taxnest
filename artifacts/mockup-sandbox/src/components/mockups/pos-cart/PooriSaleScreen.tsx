@@ -15,10 +15,20 @@ import {
   Search,
   ShoppingCart,
   Smartphone,
+  Star,
   Trash2,
   User,
   WifiOff,
 } from "lucide-react";
+
+const favorites = [
+  { name: "Chai", price: 60, c: "#0d9488" },
+  { name: "Naan", price: 30, c: "#7c5e10" },
+  { name: "Chicken Biryani", price: 350, c: "#0A4D5C" },
+  { name: "Samosa", price: 45, c: "#7c5e10" },
+  { name: "Cold Drink 1.5L", price: 180, c: "#1f2937" },
+  { name: "Doodh Patti", price: 80, c: "#0f766e" },
+];
 
 const items = [
   { name: "Chicken Biryani", qty: 2, price: 350, total: 700 },
@@ -204,8 +214,31 @@ export function PooriSaleScreen() {
       {/* ===== MAIN: grid + cart ===== */}
       <div className="flex flex-1 min-h-0">
         {/* Product grid */}
-        <div className="flex-1 p-3 overflow-hidden">
-          <div className="grid grid-cols-2 gap-1.5">
+        <div className="flex-1 p-3 overflow-hidden flex flex-col min-h-0">
+          {/* Pasandeeda — sabse zyada bikne wale khud upar */}
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Star className="w-3.5 h-3.5 text-amber-500" fill="#f59e0b" />
+            <span className="text-[11px] font-bold text-neutral-600 uppercase tracking-wide">Pasandeeda — zyada bikne wale</span>
+            <NayaTag />
+          </div>
+          <div className="grid grid-cols-2 gap-1.5 mb-3">
+            {favorites.map((p) => (
+              <button
+                key={p.name}
+                className="rounded-md bg-amber-50 border border-amber-200 pl-2 pr-2 py-1.5 text-left border-l-[3px] flex items-center gap-2"
+                style={{ borderLeftColor: p.c }}
+              >
+                <Star className="w-3 h-3 text-amber-500 shrink-0" fill="#f59e0b" />
+                <span className="text-[12px] font-medium text-neutral-800 truncate flex-1">{p.name}</span>
+                <span className="text-[12px] font-bold shrink-0" style={{ color: "#0A4D5C" }}>
+                  {p.price}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wide mb-1.5">Sab Products</div>
+          <div className="grid grid-cols-2 gap-1.5 overflow-hidden">
             {products.map((p) => (
               <button
                 key={p.name}
@@ -218,6 +251,20 @@ export function PooriSaleScreen() {
                 </span>
               </button>
             ))}
+          </div>
+
+          <div className="flex-1" />
+
+          {/* Akhri bill ki jhalak */}
+          <div className="mt-2 flex items-center gap-2 rounded-lg bg-white border border-neutral-200 px-3 py-2 shrink-0">
+            <History className="w-4 h-4 text-neutral-400 shrink-0" />
+            <span className="text-[12px] text-neutral-600">
+              <span className="font-bold text-neutral-800">Akhri bill:</span> Rs 1,125 · Cash · 15:09 · Bill #POS-2026-01847
+            </span>
+            <NayaTag />
+            <button className="ml-auto flex items-center gap-1.5 rounded-md border border-neutral-300 px-2.5 py-1 text-[11px] font-bold text-neutral-600">
+              <Printer className="w-3 h-3" /> Reprint
+            </button>
           </div>
         </div>
 

@@ -4,10 +4,12 @@ import {
   ChevronDown,
   ChevronsUpDown,
   ClipboardList,
+  Coins,
   CreditCard,
   Flame,
   History,
   Minus,
+  Percent,
   Plus,
   Printer,
   Search,
@@ -253,10 +255,15 @@ export function PooriSaleScreen() {
             ))}
           </div>
 
-          <div className="px-3 py-1.5 border-t border-neutral-100 shrink-0">
-            <div className="rounded-md border border-neutral-200 px-2.5 py-1.5 text-[11px] text-neutral-400">
+          <div className="px-3 py-1.5 border-t border-neutral-100 shrink-0 flex items-center gap-1.5">
+            <div className="flex-1 rounded-md border border-neutral-200 px-2.5 py-1.5 text-[11px] text-neutral-400">
               Order Notes… (N dabayen)
             </div>
+            <button className="relative shrink-0 flex items-center gap-1 rounded-md border border-neutral-300 px-2.5 py-1.5 text-[11px] font-bold text-neutral-600">
+              <Percent className="w-3 h-3" />
+              Discount
+              <span className="absolute -top-1.5 -right-1"><NayaTag /></span>
+            </button>
           </div>
 
           {/* Bada Total band */}
@@ -264,6 +271,9 @@ export function PooriSaleScreen() {
             <div className="text-white/80 text-[11px] leading-[18px]">
               <div>Subtotal &nbsp; Rs 970.00</div>
               <div>Tax (16%) &nbsp; Rs 155.20</div>
+              <div className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-bold text-white">
+                3 items · 7 qty <NayaTag />
+              </div>
             </div>
             <div className="text-right">
               <div className="text-white/70 text-[10px] font-semibold tracking-widest">TOTAL (CASH)</div>
@@ -295,7 +305,7 @@ export function PooriSaleScreen() {
               </button>
             </div>
 
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-4 gap-1.5">
               <button className="py-1.5 rounded-lg border border-neutral-200 text-neutral-500 text-[11px] font-semibold flex items-center justify-center gap-1.5">
                 Clear <Kbd dark>F4</Kbd>
               </button>
@@ -304,6 +314,11 @@ export function PooriSaleScreen() {
               </button>
               <button className="py-1.5 rounded-lg border border-neutral-200 text-neutral-500 text-[11px] font-semibold flex items-center justify-center gap-1.5">
                 Recall <Kbd dark>F3</Kbd>
+              </button>
+              <button className="relative py-1.5 rounded-lg border border-neutral-200 text-neutral-500 text-[11px] font-semibold flex items-center justify-center gap-1.5">
+                <Coins className="w-3.5 h-3.5" />
+                Drawer
+                <span className="absolute -top-1.5 -right-1"><NayaTag /></span>
               </button>
             </div>
 

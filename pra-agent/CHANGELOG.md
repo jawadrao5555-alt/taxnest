@@ -1,5 +1,14 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.5.0 / build 20260724-4 (2026-07-24) — BETA 3
+**New: NestPOS installs as its OWN app (Desktop icon + own taskbar identity)**
+
+- **First "Open POS" click installs NestPOS as a separate app**: a **NestPOS** icon is added to the Desktop and the Start Menu automatically (one-time; also re-creatable anytime via tray menu → "Add NestPOS Icon to Desktop"). Double-clicking that icon opens the POS screen directly — the agent stays quietly in the tray.
+- **Own taskbar identity**: the POS window now shows at the bottom (taskbar) as **NestPOS** with its own icon — grouped separately from the agent, and it can be pinned to the taskbar; the pin relaunches straight into the POS.
+- **Single-instance guard**: launching the NestPOS icon (or the agent again) while the agent is already running no longer starts a second copy — it opens/focuses the POS window in the running app (prevents double heartbeats / double prints).
+- New NestPOS icon (`nestpos.ico`, from the NestPOS PWA logo) shipped next to the app for shortcuts + window icon.
+- Exe name/path unchanged — self-update keeps the new shortcuts valid.
+
 ## v1.5.0 / build 20260724-3 (2026-07-24) — BETA 2
 **New: zero-setup agent + smarter offline sync**
 

@@ -18,7 +18,21 @@
 //   partition; everything else (WhatsApp links etc.) goes to the system browser.
 const { BrowserWindow, shell, app } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const offlineSnapshot = require('./offline-snapshot');
+
+// NestPOS icon: packaged builds ship it via extraResources (stable path next
+// to app.asar); dev falls back to the repo assets folder.
+function nestposIcon(ext) {
+  const candidates = [
+    path.join(process.resourcesPath || '', 'nestpos.' + ext),
+    path.join(__dirname, '..', 'assets', 'nestpos.' + ext),
+  ];
+  for (const p of candidates) {
+    try { if (p && fs.existsSync(p)) return p; } catch (e) {}
+  }
+  return null;
+}
 
 let posWindow = null;
 let targetUrl = null;
@@ -83,7 +97,8 @@ function openPosWindow(config, opts = {}) {
     minWidth: 900,
     minHeight: 600,
     title: 'NestPOS Desktop',
-    icon: path.join(__dirname, '..', 'assets', 'icon.png'),
+    icon: nestposIcon(process.platform === 'win32' ? 'ico' : 'png') ||
+      path.join(__dirname, '..', 'assets', 'icon.png'),
     fullscreen: kioskOn,
     kiosk: kioskOn,
     autoHideMenuBar: true,
@@ -99,6 +114,23 @@ function openPosWindow(config, opts = {}) {
 
   // Keep our own title — the web app rewrites document.title on every page.
   posWindow.on('page-title-updated', (e) => e.preventDefault());
+
+  // SEPARATE app identity on the Windows taskbar: NestPOS gets its own
+  // AppUserModelID + icon, so it groups apart from the agent, shows its own
+  // icon at the bottom, and can be pinned — pinning relaunches this same exe
+  // with --pos (straight into the POS screen).
+  try {
+    if (process.platform === 'win32') {
+      const ico = nestposIcon('ico');
+      posWindow.setAppDetails({
+        appId: 'com.taxnest.nestpos',
+        appIconPath: ico || undefined,
+        appIconIndex: 0,
+        relaunchCommand: '"' + process.execPath + '" --pos',
+        relaunchDisplayName: 'NestPOS',
+      });
+    }
+  } catch (e) {}
 
   // Tag the shell in the user agent so the server can recognize NestPOS
   // Desktop (e.g. POS login pre-ticks "Remember me" — the persist:pos

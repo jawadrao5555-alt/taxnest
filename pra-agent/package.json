@@ -36,6 +36,16 @@
       "src/**/*",
       "assets/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "assets/nestpos.ico",
+        "to": "nestpos.ico"
+      },
+      {
+        "from": "assets/nestpos-256.png",
+        "to": "nestpos.png"
+      }
+    ],
     "publish": [
       {
         "provider": "github",

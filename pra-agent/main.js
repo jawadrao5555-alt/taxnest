@@ -10,7 +10,7 @@ const { printHtml: printHtmlSilent } = require('./src/printer');
 const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk } = require('./src/pos-window');
 
 const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/taxnest/releases/latest';
-const BUILD_TIMESTAMP = '20260724-3';
+const BUILD_TIMESTAMP = '20260724-4';
 let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
 
 // ─── Zip-based SELF-UPDATE ──────────────────────────────────────────────────
@@ -227,9 +227,79 @@ function openPos() {
       },
       onLoggedIn: autoConfigureAgent,
     });
+    // First open "installs" NestPOS as its own app: Desktop + Start Menu
+    // shortcuts with the NestPOS icon (relaunch straight into the POS).
+    try {
+      if (process.platform === 'win32' && !store.get('posShortcutCreated')) {
+        createNestposShortcuts(true);
+      }
+    } catch (e) {}
     return true;
   } catch (e) {
     console.log('[pos-window] open failed:', e && e.message);
+    return false;
+  }
+}
+
+// ─── NestPOS as a SEPARATE app (Desktop icon + own taskbar identity) ────────
+// The POS window already carries its own Windows AppUserModelID
+// ('com.taxnest.nestpos', set in pos-window.js) so it groups separately on
+// the taskbar with its own icon and can be pinned. These shortcuts complete
+// the picture: a "NestPOS" icon on the Desktop + Start Menu that launches
+// this same exe with --pos, which opens the POS screen directly (agent stays
+// in the tray). Exe name/path untouched — self-update keeps shortcuts valid.
+function nestposIconPath() {
+  const candidates = [
+    path.join(process.resourcesPath || '', 'nestpos.ico'),
+    path.join(__dirname, 'assets', 'nestpos.ico'),
+  ];
+  for (const p of candidates) {
+    try { if (p && fs.existsSync(p)) return p; } catch (e) {}
+  }
+  return null;
+}
+
+function createNestposShortcuts(showNote) {
+  if (process.platform !== 'win32') return false;
+  try {
+    const shortcutOpts = {
+      target: process.execPath,
+      args: '--pos',
+      description: 'NestPOS — POS sale screen (billing, printing, PRA sync)',
+      appUserModelId: 'com.taxnest.nestpos',
+    };
+    const ico = nestposIconPath();
+    if (ico) {
+      shortcutOpts.icon = ico;
+      shortcutOpts.iconIndex = 0;
+    }
+    const targets = [
+      path.join(app.getPath('desktop'), 'NestPOS.lnk'),
+      path.join(
+        app.getPath('appData'),
+        'Microsoft', 'Windows', 'Start Menu', 'Programs', 'NestPOS.lnk'
+      ),
+    ];
+    let ok = false;
+    for (const lnk of targets) {
+      try {
+        if (shell.writeShortcutLink(lnk, 'create', shortcutOpts)) ok = true;
+      } catch (e) {
+        console.log('[nestpos-shortcut] write failed:', lnk, e && e.message);
+      }
+    }
+    if (ok) {
+      store.set('posShortcutCreated', true);
+      if (showNote && Notification.isSupported()) {
+        new Notification({
+          title: 'NestPOS installed',
+          body: 'NestPOS icon has been added to your Desktop — next time open the POS straight from there.',
+        }).show();
+      }
+    }
+    return ok;
+  } catch (e) {
+    console.log('[nestpos-shortcut] failed:', e && e.message);
     return false;
   }
 }
@@ -271,7 +341,7 @@ async function autoConfigureAgent(ses, origin) {
   }
 }
 
-function createWindow() {
+function createWindow(startHidden) {
   mainWindow = new BrowserWindow({
     width: 720,
     height: 720,
@@ -279,6 +349,7 @@ function createWindow() {
     minHeight: 600,
     title: 'TaxNest PRA Sync Agent',
     icon: path.join(__dirname, 'assets', 'icon.png'),
+    show: !startHidden,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -330,6 +401,10 @@ function buildTrayMenu() {
       click: () => openPos(),
     },
     {
+      label: 'Add NestPOS Icon to Desktop',
+      click: () => createNestposShortcuts(true),
+    },
+    {
       label: 'Kiosk Mode (POS full-screen)',
       type: 'checkbox',
       checked: posSettings.kiosk,
@@ -357,32 +432,70 @@ function buildTrayMenu() {
   tray.setContextMenu(contextMenu);
 }
 
-app.whenReady().then(() => {
-  createWindow();
-  createTray();
-
-  app.setLoginItemSettings({
-    openAtLogin: true,
-    openAsHidden: true,
+// ONE instance only — launching the NestPOS desktop icon (or the agent again)
+// while the agent is already running must NOT start a twin agent (two agents
+// = double heartbeats + double silent prints). The second launch forwards its
+// argv here and exits; we open/focus the POS window or the agent window.
+const gotInstanceLock = app.requestSingleInstanceLock();
+if (!gotInstanceLock) {
+  // Losing instance: quit immediately. ALL startup below lives inside the
+  // else-branch so a losing instance can never briefly run a twin agent
+  // (createWindow/createTray/startAgent) before quit lands.
+  app.quit();
+} else {
+  app.on('second-instance', (_event, argv) => {
+    // whenReady guard: survives the boot race (login-item auto-start + user
+    // double-clicks the NestPOS icon before this instance is ready).
+    app.whenReady().then(() => {
+      try {
+        if ((argv || []).includes('--pos')) {
+          openPos();
+          return;
+        }
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.show();
+          mainWindow.focus();
+        }
+      } catch (e) {}
+    });
   });
 
-  const config = store.get('config');
-  if (config && config.serverUrl && config.apiKey && config.companyId) {
-    startAgent(withAppMeta(config), sendStatusUpdate, handleAgentUpdate);
-  }
+  app.whenReady().then(() => {
+    // Agent windows keep the agent identity; the POS window overrides its own
+    // AppUserModelID in pos-window.js so NestPOS groups separately on the taskbar.
+    try { app.setAppUserModelId('com.taxnest.pra-agent'); } catch (e) {}
 
-  // NestPOS Desktop: optionally open the POS screen on startup (shop PCs).
-  // try/catch + additive design — a shell failure must never touch the agent.
-  try {
-    if (getPosSettings().openOnStartup) {
-      const opened = openPos();
-      // Keep the shop PC clean: POS front and center, agent window in tray.
-      if (opened && mainWindow) mainWindow.hide();
+    // Launched via the NestPOS desktop icon (--pos): go straight to the POS
+    // screen, keep the agent window hidden in the tray.
+    const posLaunch = process.argv.includes('--pos');
+
+    createWindow(posLaunch);
+    createTray();
+
+    app.setLoginItemSettings({
+      openAtLogin: true,
+      openAsHidden: true,
+    });
+
+    const config = store.get('config');
+    if (config && config.serverUrl && config.apiKey && config.companyId) {
+      startAgent(withAppMeta(config), sendStatusUpdate, handleAgentUpdate);
     }
-  } catch (e) {
-    console.log('[pos-window] startup open failed:', e && e.message);
-  }
-});
+
+    // NestPOS Desktop: open the POS screen when launched with --pos (desktop
+    // icon) or when "open on startup" is ticked (shop PCs).
+    // try/catch + additive design — a shell failure must never touch the agent.
+    try {
+      if (posLaunch || getPosSettings().openOnStartup) {
+        const opened = openPos();
+        // Keep the shop PC clean: POS front and center, agent window in tray.
+        if (opened && mainWindow) mainWindow.hide();
+      }
+    } catch (e) {
+      console.log('[pos-window] startup open failed:', e && e.message);
+    }
+  });
+}
 
 // Attach the real app version/build so heartbeats report them to the server
 // (the server piggybacks `agent_update` info on the heartbeat response).

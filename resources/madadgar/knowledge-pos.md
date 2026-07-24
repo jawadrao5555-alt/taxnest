@@ -255,7 +255,7 @@ Sale screen ki mazeed cheezein:
 - "Login nahi ho raha": sahi panel use karein (/pos/login); Forgot Password se reset; 5 ghalat koshishon par thori der lock.
 - "Receipt par tax nahi dikh raha": /pos/receipt-settings par "Show Tax" ON karein (PRA aur Local tab alag alag hain — sahi tab dekhein).
 - "Printer poora width use nahi kar raha / kat raha hai": receipt-settings mein paper size (80mm/58mm) check karein, phir printer driver.
-- "Item search mein nahi mil raha": /pos/products par check karein — product inactive to nahi, naam/barcode sahi hai? Search har category mein dhoondti hai.
+- "Item search mein nahi mil raha": search ab naam ke SHURU se chalti hai — product ka naam shuru se likhein (maslan "Chicken Roll" ke liye "chi" ya "chicken r", sirf "roll" se nahi milega). Barcode/SKU poora ya digits ke saath likhein to woh bhi mil jata hai. Phir bhi na mile to /pos/products par check karein — product inactive to nahi? Search har category mein dhoondti hai.
 - "Sale screen par products ghayab hain": Products grid ka toggle OFF hai — "Show All Products" dabayen.
 - "Manual button nazar nahi aata": Manual sirf Simple Mode (Inventory Tracking OFF) mein hota hai. Inventory ON ho to pehle /pos/products par product banayen.
 - "Bills ki limit khatam ho gayi": package upgrade karein ya filhal provisional bills banayen (baad mein promote).

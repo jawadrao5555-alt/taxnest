@@ -3223,16 +3223,22 @@ function restaurantPos() {
                     // the scan can't stop at 12 total hits, because a LATER prefix match must
                     // still outrank an EARLIER mid-word one; stop only once 12 prefix hits exist.
                     const pref = [], other = [];
+                    // STRICT PREFIX (owner, 24 Jul 2026): NAME matches only from the very
+                    // START of the name — mid-name/mid-word hits are excluded so the list
+                    // stays short ("zi" → only names starting with "Zi").
+                    // BARCODE/SKU substring matching stays (scanners type the digits, which
+                    // never match a product name) but ONLY when the query contains a digit
+                    // or symbol — letters-only typing is a NAME search, otherwise SKUs like
+                    // "CHI-001" leak unrelated products into a name search.
+                    const codeSearch = /[^a-z\s]/.test(q);
                     for (let i = 0; i < all.length && pref.length < 12; i++) {
                         const it = all[i];
                         if (!it.name || !(parseFloat(it.price) > 0)) continue;
-                        // Match by NAME, BARCODE or SKU — scanners type the barcode digits,
-                        // which never match a product name; without this, every scan "fails".
-                        if (it.name.toLowerCase().includes(q)
-                            || (it.barcode && String(it.barcode).toLowerCase().includes(q))
-                            || (it.sku && String(it.sku).toLowerCase().includes(q))) {
-                            if (it.name.toLowerCase().startsWith(q)) pref.push(it);
-                            else if (other.length < 12) other.push(it);
+                        if (it.name.toLowerCase().startsWith(q)) {
+                            pref.push(it);
+                        } else if (codeSearch && ((it.barcode && String(it.barcode).toLowerCase().includes(q))
+                            || (it.sku && String(it.sku).toLowerCase().includes(q)))) {
+                            if (other.length < 12) other.push(it);
                         }
                     }
                     const out = [...pref, ...other].slice(0, 12);
@@ -3344,13 +3350,16 @@ function restaurantPos() {
                 items = items.filter(i => i.show_on_sale !== false);
             }
             if (this.searchQuery) {
-                const q = this.searchQuery.toLowerCase();
-                // Grid search matches NAME, BARCODE or SKU (mirrors the dropdown matcher).
-                items = items.filter(i => i.name.toLowerCase().includes(q)
-                    || (i.barcode && String(i.barcode).toLowerCase().includes(q))
-                    || (i.sku && String(i.sku).toLowerCase().includes(q)));
-                // FIRST-LETTER PRIORITY (customer suggestion, 21 Jul 2026): prefix matches
-                // float to the top; stable sort keeps the original order within each group.
+                const q = this.searchQuery.trim().toLowerCase();
+                // STRICT PREFIX (owner, 24 Jul 2026): NAME matches only from the very START
+                // of the name (mirrors the dropdown matcher); BARCODE/SKU substring matching
+                // only when the query has a digit/symbol (letters-only = name search).
+                const codeSearch = /[^a-z\s]/.test(q);
+                items = items.filter(i => i.name.toLowerCase().startsWith(q)
+                    || (codeSearch && ((i.barcode && String(i.barcode).toLowerCase().includes(q))
+                        || (i.sku && String(i.sku).toLowerCase().includes(q)))));
+                // Name-prefix matches float above barcode/SKU-only matches; stable sort
+                // keeps the original order within each group.
                 items.sort((a, b) => (b.name.toLowerCase().startsWith(q) ? 1 : 0) - (a.name.toLowerCase().startsWith(q) ? 1 : 0));
             }
             this.filteredItems = items;

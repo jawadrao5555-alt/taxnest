@@ -288,6 +288,37 @@
                 </div>
             </div>
         </div>
+
+        {{-- Sales by Waiter (Table-se-Bill, Jul 2026): attribution from restaurant_orders
+             (waiter = order creator, linked txn on settle) — only shows when the range
+             actually has waiter-settled bills. --}}
+        @if($ra->waiters->isNotEmpty())
+        <div class="mt-6">
+            <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">Sales by Waiter</h4>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm table-cards">
+                    <thead>
+                        <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-700">
+                            <th class="pb-2">Waiter</th>
+                            <th class="pb-2 text-right">Orders</th>
+                            <th class="pb-2 text-right">Revenue</th>
+                            <th class="pb-2 text-right">Avg Bill</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($ra->waiters as $w)
+                        <tr class="border-b border-gray-50 dark:border-gray-800">
+                            <td class="py-2.5 font-medium text-gray-900 dark:text-white">{{ $w->name }}</td>
+                            <td class="py-2.5 text-right text-gray-700 dark:text-gray-300">{{ $w->count }}</td>
+                            <td class="py-2.5 text-right font-medium text-gray-900 dark:text-white">PKR {{ number_format($w->revenue) }}</td>
+                            <td class="py-2.5 text-right text-gray-700 dark:text-gray-300">PKR {{ number_format($w->avg) }}</td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        @endif
     </div>
 
     @if($ra->summary->bills > 0)

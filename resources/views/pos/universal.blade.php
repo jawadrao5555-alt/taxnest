@@ -378,9 +378,12 @@ window.addEventListener('popstate', function() {
 
 
         @if($features->tables)
-        <button @click="openTablePicker()" class="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold border transition flex-shrink-0" :class="selectedTable ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'">
+        {{-- Table-se-Bill (Jul 2026): teal badge = waiter orders waiting inside the
+             picker (tables + counter orders) — replaces the retired Waiter box. --}}
+        <button @click="openTablePicker()" class="relative flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold border transition flex-shrink-0" :class="selectedTable ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'">
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
             <span x-text="selectedTable ? 'T-' + selectedTable.table_number : 'Table'"></span>
+            <span x-show="incomingOrders.length > 0" x-cloak class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-teal-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold animate-pulse" x-text="incomingOrders.length"></span>
         </button>
         @endif
 
@@ -594,12 +597,9 @@ window.addEventListener('popstate', function() {
             <span x-show="localBills.length > 0" class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-purple-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="localBills.length"></span>
         </button>
 
-        {{-- ── P7 (F6): INCOMING WAITER ORDERS — teal. Badge = orders waiting for payment. ── --}}
-        <button x-show="isRestaurantMode" x-cloak @click="openIncoming()" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 transition" title="Orders sent by waiters — load to cart and take payment.">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-            <span class="hidden sm:inline">Waiter</span>
-            <span x-show="incomingOrders.length > 0" class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-teal-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold animate-pulse" x-text="incomingOrders.length"></span>
-        </button>
+        {{-- Waiter box RETIRED (Table-se-Bill, Jul 2026): waiter orders now live inside
+             the F3 table picker (purple "Order Tayyar" tables + counter orders).
+             The drawer + F6 stay as a hidden fallback (KOT reprint lives there). --}}
 
         {{-- ── FAILED BILLS — header shortcut. F11. Red theme = needs attention. ── --}}
         {{-- Click → modal with Retry / Edit / Delete actions inline. --}}
@@ -1159,10 +1159,13 @@ window.addEventListener('popstate', function() {
                         <p class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1.5" x-text="floor.name"></p>
                         <div class="grid grid-cols-3 gap-2">
                             <template x-for="t in floor.tables" :key="t.id">
-                                <button @click="selectTable(t)" :disabled="t.status === 'occupied'" class="py-3 px-2 rounded-xl text-center border-2 transition"
-                                    :class="(t.status === 'occupied' ? 'border-red-300 bg-red-50 dark:bg-red-900/20 cursor-not-allowed' : (t.status === 'reserved' ? 'border-amber-300 bg-amber-50 dark:bg-amber-900/20 hover:border-amber-400 hover:scale-105' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-purple-400 hover:scale-105')) + (tablePickerFlat()[tablePickerIndex]?.id === t.id ? ' ring-2 ring-emerald-500 ring-offset-1 dark:ring-offset-gray-900' : '')">
+                                {{-- Table-se-Bill (Jul 2026): occupied table WITH a waiting waiter
+                                     order = clickable purple "Order Tayyar" card (claim + load to
+                                     cart); occupied without an order stays disabled/red. --}}
+                                <button @click="selectTable(t)" :disabled="t.status === 'occupied' && !incomingForTable(t)" class="py-3 px-2 rounded-xl text-center border-2 transition"
+                                    :class="(incomingForTable(t) ? 'border-purple-400 bg-purple-50 dark:bg-purple-900/20 hover:border-purple-500 hover:scale-105' : (t.status === 'occupied' ? 'border-red-300 bg-red-50 dark:bg-red-900/20 cursor-not-allowed' : (t.status === 'reserved' ? 'border-amber-300 bg-amber-50 dark:bg-amber-900/20 hover:border-amber-400 hover:scale-105' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-purple-400 hover:scale-105'))) + (tablePickerFlat()[tablePickerIndex]?.id === t.id ? ' ring-2 ring-emerald-500 ring-offset-1 dark:ring-offset-gray-900' : '')">
                                     {{-- Top-view table + chairs diagram (color = status) --}}
-                                    <svg viewBox="0 0 48 48" class="w-8 h-8 mx-auto mb-1" :class="t.status === 'occupied' ? 'text-red-500' : (t.status === 'reserved' ? 'text-amber-500' : 'text-green-500 dark:text-green-400')" fill="currentColor" aria-hidden="true">
+                                    <svg viewBox="0 0 48 48" class="w-8 h-8 mx-auto mb-1" :class="incomingForTable(t) ? 'text-purple-500' : (t.status === 'occupied' ? 'text-red-500' : (t.status === 'reserved' ? 'text-amber-500' : 'text-green-500 dark:text-green-400'))" fill="currentColor" aria-hidden="true">
                                         <rect x="17" y="1.5" width="14" height="7" rx="3"/>
                                         <rect x="17" y="39.5" width="14" height="7" rx="3"/>
                                         <rect x="1.5" y="17" width="7" height="14" rx="3"/>
@@ -1170,10 +1173,39 @@ window.addEventListener('popstate', function() {
                                         <circle cx="24" cy="24" r="13"/>
                                         <circle cx="24" cy="24" r="8.5" fill="#fff" fill-opacity="0.35"/>
                                     </svg>
-                                    <p class="text-sm font-bold" :class="t.status === 'occupied' ? 'text-red-600' : 'text-gray-900 dark:text-white'" x-text="'T-' + t.table_number"></p>
-                                    <p class="text-[10px] text-gray-400" x-text="t.seats + ' seats'"></p>
-                                    <span x-show="t.status === 'occupied'" class="text-[9px] text-red-500 font-medium" x-text="'Occupied' + (elapsedSince(t.occupied_since) ? ' • ' + elapsedSince(t.occupied_since) : '')"></span>
-                                    <span x-show="t.status === 'reserved'" class="text-[9px] text-amber-600 font-medium" x-text="'Reserved' + (elapsedSince(t.locked_at) ? ' • ' + elapsedSince(t.locked_at) : '')"></span>
+                                    <p class="text-sm font-bold" :class="incomingForTable(t) ? 'text-purple-700 dark:text-purple-300' : (t.status === 'occupied' ? 'text-red-600' : 'text-gray-900 dark:text-white')" x-text="'T-' + t.table_number"></p>
+                                    <template x-if="incomingForTable(t)">
+                                        <span>
+                                            <span class="inline-block text-[9px] font-bold text-white bg-purple-600 rounded-full px-1.5 py-px animate-pulse">Order Tayyar</span>
+                                            <span class="block text-[9px] text-purple-600 dark:text-purple-300 font-medium truncate" x-text="incomingForTable(t).waiter + ' • Rs ' + Math.round(incomingForTable(t).total_amount).toLocaleString()"></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="!incomingForTable(t)">
+                                        <span>
+                                            <p class="text-[10px] text-gray-400" x-text="t.seats + ' seats'"></p>
+                                            <span x-show="t.status === 'occupied'" class="text-[9px] text-red-500 font-medium" x-text="'Occupied' + (elapsedSince(t.occupied_since) ? ' • ' + elapsedSince(t.occupied_since) : '')"></span>
+                                            <span x-show="t.status === 'reserved'" class="text-[9px] text-amber-600 font-medium" x-text="'Reserved' + (elapsedSince(t.locked_at) ? ' • ' + elapsedSince(t.locked_at) : '')"></span>
+                                        </span>
+                                    </template>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+                {{-- Table-se-Bill (Jul 2026): waiter TAKEAWAY/DELIVERY orders have no
+                     table — surface them here so they are never stranded (the old
+                     Waiter box is retired; this picker is the ONE surface). --}}
+                <template x-if="tablelessIncoming().length > 0">
+                    <div class="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                        <p class="text-[10px] font-bold uppercase tracking-wider text-purple-500 mb-1.5">Counter Orders (bina table)</p>
+                        <div class="space-y-1.5">
+                            <template x-for="o in tablelessIncoming()" :key="o.id">
+                                <button @click="claimAndLoadIncoming(o)" class="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border-2 border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20 hover:border-purple-500 transition text-left">
+                                    <span class="min-w-0">
+                                        <span class="block text-xs font-bold text-purple-700 dark:text-purple-300 truncate" x-text="o.order_number + ' • ' + (o.order_type === 'delivery' ? 'Delivery' : 'Takeaway')"></span>
+                                        <span class="block text-[10px] text-gray-500 dark:text-gray-400 truncate" x-text="o.waiter + ' • ' + o.items.length + ' items • ' + o.created_at"></span>
+                                    </span>
+                                    <span class="flex-shrink-0 text-xs font-bold text-purple-700 dark:text-purple-300" x-text="'Rs ' + Math.round(o.total_amount).toLocaleString()"></span>
                                 </button>
                             </template>
                         </div>
@@ -1458,7 +1490,10 @@ window.addEventListener('popstate', function() {
                         </div>
                         <div x-show="o.customer_name || o.customer_phone" class="mt-1 text-[11px] text-gray-500" x-text="(o.customer_name || '') + (o.customer_phone ? ' · ' + o.customer_phone : '')"></div>
                         <div class="mt-2.5 flex items-center gap-2 flex-wrap">
-                            <button @click="loadIncomingToCart(o)" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition">Load to Cart</button>
+                            {{-- Route through the atomic claim (Table-se-Bill, Jul 2026): a direct
+                                 loadIncomingToCart here would bypass single-winner claiming and two
+                                 terminals could finalize the same order twice. --}}
+                            <button @click="claimAndLoadIncoming(o)" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition">Load to Cart</button>
                             @if(($company->kot_reprint_enabled ?? true))
                             <button @click="printIncomingKot(o)" class="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs font-bold transition" title="Print the FULL kitchen ticket (reprint any time)">KOT</button>
                             @endif
@@ -2570,11 +2605,9 @@ function restaurantPos() {
         showIncoming: false,
         incomingLoading: false,
         incomingOrderId: null,
-        // Waiter easy-pickup (ZFC feedback, Jul 2026): when the cart is FREE a
-        // new waiter order auto-loads (no manual bell+Load step); busy cart gets
-        // a one-time toast nudge. Per-session dedupe so a deliberately cleared
-        // cart never re-auto-loads the same order (it stays in the bell).
-        autoLoadedIncoming: [],
+        // Table-se-Bill (Jul 2026): auto-load RETIRED — new waiter orders get a
+        // one-time toast nudge (per-session dedupe) and wait inside the F3 table
+        // picker as purple "Order Tayyar" cards until a cashier claims them.
         notifiedIncoming: [],
         // ── AUTO-SYNC ENGINE ──────────────────────────────────────────────
         // syncStatus: 'online' | 'syncing' | 'offline'
@@ -4535,6 +4568,19 @@ function restaurantPos() {
             // keeps eating keys behind the modal and the guided chain dead-ends.
             document.activeElement?.blur();
             this.loadTableStatus();
+            // Table-se-Bill (Jul 2026): waiter orders render inside THIS picker
+            // (purple "Order Tayyar" tables + tableless counter orders) — refresh
+            // the incoming list on every open so the cards are current.
+            this.loadIncoming();
+        },
+        // Held waiter order sitting on this table (visibility already enforced
+        // server-side: cashiers see own+unassigned, admins all). At most one
+        // held waiter order per table — storeOrder rejects occupied tables.
+        incomingForTable(t) {
+            return this.incomingOrders.find(o => o.table_id === t.id) || null;
+        },
+        tablelessIncoming() {
+            return this.incomingOrders.filter(o => !o.table_id);
         },
         // Flattened table list in visual order (floor by floor) — drives the
         // keyboard highlight in the picker. Recomputed live so a status refresh
@@ -4566,6 +4612,12 @@ function restaurantPos() {
             this.tablesLoading = false;
         },
         async selectTable(table) {
+            // Table-se-Bill (Jul 2026): occupied table WITH a waiting waiter order
+            // → claim it and load straight into the cart (no reserve, no auto-KOT —
+            // the table stays occupied until settlement frees it). Early return
+            // keeps the reserve/selectedTable/dine_in_auto_kot path untouched.
+            const inc = this.incomingForTable(table);
+            if (inc) { await this.claimAndLoadIncoming(inc); return; }
             if (table.status === 'occupied') { this.showToast('Table T-' + table.table_number + ' is occupied', 'warning'); return; }
             try {
                 const res = await fetch('/pos/restaurant/tables/' + table.id + '/reserve', {
@@ -4598,6 +4650,33 @@ function restaurantPos() {
             // Guided keyboard flow paused at the type step waiting for a table —
             // resume the chain into cart mode now that the table is locked in.
             if (this.guidedFlow && this.flowStep === 'cart' && !this.cartMode) this.enterCartMode('last');
+        },
+        // Table-se-Bill (Jul 2026): atomic claim then cart-load. The claim response
+        // carries a FRESH order snapshot (waiter may have appended items after our
+        // poll) — always build the cart from that, not the stale polled object.
+        async claimAndLoadIncoming(o) {
+            if (this._claimBusy) return;
+            this._claimBusy = true;
+            try {
+                const res = await fetch('/pos/api/incoming-orders/' + o.id + '/claim', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                });
+                let data = null; try { data = await res.json(); } catch (_) {}
+                if (!res.ok || !data || !data.success) {
+                    this.showToast((data && data.message) || 'Order doosre cashier ne le liya', 'warning');
+                    this.loadIncoming(); this.loadTableStatus();
+                    return;
+                }
+                this.loadIncomingToCart(data.order || o);
+                this.showTablePicker = false;
+                // Guided keyboard flow: resume the Enter-chain into cart mode so
+                // F3 → Enter on the purple card lands on the first cart row
+                // (mirrors the reserve branch's enterCartMode resume).
+                if (this.guidedFlow && !this.cartMode && this.cart.length > 0) this.enterCartMode(0);
+            } catch (e) {
+                this.showToast('Could not load order — check connection', 'error');
+            } finally { this._claimBusy = false; }
         },
         // Fire-and-forget: backend only flips status='reserved' → available, so this
         // is harmless after payment (already freed) or on occupied tables (held-order
@@ -5568,42 +5647,16 @@ function restaurantPos() {
                 this.maybeAutoLoadIncoming();
             } catch (e) { /* silent — badge just goes stale until next poll */ }
         },
-        // Waiter easy-pickup: free cart + no open overlay => oldest new waiter
-        // order lands straight in the cart; otherwise a one-time toast nudge.
-        // Auto-load only fires after a server-side ATOMIC CLAIM so two idle
-        // terminals never both load the same order (duplicate-bill guard).
-        async maybeAutoLoadIncoming() {
+        // Table-se-Bill (Jul 2026): AUTO-LOAD RETIRED — orders no longer land in
+        // the cart on their own (owner: auto-appearing carts confused cashiers).
+        // The cashier now clicks the purple "Order Tayyar" table in the F3 picker.
+        // This is just the one-time toast nudge per new order.
+        maybeAutoLoadIncoming() {
             if (!this.isRestaurantMode || !this.incomingOrders.length || document.hidden) return;
-            if (this._autoClaimBusy) return;
-            const fresh = this.incomingOrders.filter(o => !this.autoLoadedIncoming.includes(o.id));
-            if (!fresh.length) return;
-            const overlayOpen = this.showPayModal || this.showIncoming || this.showReceipt
-                || this.showHeldOrders || this.showLocalBills || this.showTablePicker;
-            if (!overlayOpen && this.cart.length === 0 && !this.incomingOrderId) {
-                const o = fresh.find(x => !x.assigned_cashier_id || x.assigned_cashier_id === this.posUserId);
-                if (o) {
-                    this._autoClaimBusy = true;
-                    try {
-                        const res = await fetch('/pos/api/incoming-orders/' + o.id + '/claim', {
-                            method: 'POST',
-                            headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                        });
-                        this.autoLoadedIncoming.push(o.id);
-                        this.notifiedIncoming.push(o.id);
-                        if (res.ok && this.cart.length === 0 && !this.incomingOrderId) {
-                            this.loadIncomingToCart(o);
-                        }
-                        // 409 = another terminal claimed it — it vanishes from
-                        // this cashier's next poll; admins still see it in the bell.
-                    } catch (e) { /* network blip — next poll retries others */ }
-                    finally { this._autoClaimBusy = false; }
-                    return;
-                }
-            }
-            fresh.forEach(o => {
+            this.incomingOrders.forEach(o => {
                 if (this.notifiedIncoming.includes(o.id)) return;
                 this.notifiedIncoming.push(o.id);
-                this.showToast('New waiter order ' + o.order_number + ' waiting — it will load when the cart is free', 'success');
+                this.showToast('Naya waiter order ' + o.order_number + (o.table ? ' (T-' + o.table + ')' : '') + ' — Table (F3) se kholein', 'success');
             });
         },
         openIncoming() {
@@ -5626,6 +5679,11 @@ function restaurantPos() {
             }));
             this.incomingOrderId = o.id;
             // Table stays attached to the RESTAURANT order — settlement frees it.
+            // Carry the waiter order's type onto the bill: pos_transactions.order_type
+            // snapshot drives the DINE-IN / TAKE AWAY / DELIVERY receipt badge, so a
+            // claimed dine-in must NOT bill as the default 'takeaway'. (Direct final
+            // pay is allowed for every type; only Hold/Provisional are type-gated.)
+            this.orderType = o.order_type || 'takeaway';
             this.selectedCustomer = (o.customer_name || o.customer_phone)
                 ? { id: null, name: o.customer_name || 'Walk-in', phone: o.customer_phone || '' }
                 : null;

@@ -328,14 +328,20 @@ class RestaurantWaiterController extends Controller
         $companyId = app('currentCompanyId');
         $user = auth('pos')->user();
 
-        $claimed = RestaurantOrder::where('company_id', $companyId)
+        $claimQuery = RestaurantOrder::where('company_id', $companyId)
             ->where('id', $id)
             ->where('source', 'waiter')
-            ->where('status', 'held')
-            ->where(function ($w) use ($user) {
+            ->where('status', 'held');
+        // Admin/manager override (Jul 2026): admins see ALL held waiter orders in
+        // the table picker — without an override, an order assigned to an
+        // off-shift cashier stays stuck for everyone else. Admin claim simply
+        // re-assigns it (single-winner UPDATE still holds per request).
+        if (!$user->isPosAdmin()) {
+            $claimQuery->where(function ($w) use ($user) {
                 $w->whereNull('assigned_cashier_id')->orWhere('assigned_cashier_id', $user->id);
-            })
-            ->update(['assigned_cashier_id' => $user->id]);
+            });
+        }
+        $claimed = $claimQuery->update(['assigned_cashier_id' => $user->id]);
 
         if (!$claimed) {
             // MySQL reports 0 affected rows when the value is unchanged (order
@@ -348,7 +354,17 @@ class RestaurantWaiterController extends Controller
             }
         }
 
-        return response()->json(['success' => true]);
+        // Return the FRESH order snapshot (table-se-bill flow, Jul 2026): the
+        // cashier's polled copy can be stale — a waiter may have appended items
+        // between the poll and the claim. Cart must build from THIS, not the
+        // stale client object. (Post-claim appends remain a known limitation —
+        // same as the old drawer flow.)
+        $order = RestaurantOrder::where('company_id', $companyId)
+            ->where('id', $id)
+            ->with(['items', 'table', 'creator', 'assignedCashier'])
+            ->first();
+
+        return response()->json(['success' => true, 'order' => $order ? $this->orderJson($order) : null]);
     }
 
     /** Link the paid PosTransaction to the waiter order, mark completed, free the table. */

@@ -7060,6 +7060,34 @@ class PosController extends Controller
             ];
         })->sortByDesc('revenue')->values();
 
+        // Sales by Waiter (Table-se-Bill, Jul 2026): waiter attribution rides on
+        // restaurant_orders (created_by = waiter, pos_transaction_id linked at
+        // settle) — pos_transactions has no waiter column. whereIn on the
+        // already-filtered $ids inherits the tab + cashier + date filters.
+        $waiters = collect();
+        if (!empty($ids)) {
+            $txnById = $transactions->keyBy('id');
+            $waiters = \App\Models\RestaurantOrder::where('company_id', $companyId)
+                ->where('source', 'waiter')
+                ->where('status', 'completed')
+                ->whereIn('pos_transaction_id', $ids)
+                ->get(['created_by', 'pos_transaction_id'])
+                ->groupBy('created_by')
+                ->map(function ($g) use ($cashierNames, $txnById) {
+                    $txns = $g->map(fn ($o) => $txnById[$o->pos_transaction_id] ?? null)->filter();
+                    $revenue = (float) $txns->sum('total_amount');
+                    return (object) [
+                        'name' => $cashierNames[$g->first()->created_by] ?? 'Unknown',
+                        'count' => $txns->count(),
+                        'revenue' => $revenue,
+                        'tax' => (float) $txns->sum('tax_amount'),
+                        'avg' => round($revenue / max(1, $txns->count()), 2),
+                    ];
+                })
+                ->filter(fn ($w) => $w->count > 0)
+                ->sortByDesc('revenue')->values();
+        }
+
         $topCustomers = $transactions
             ->filter(fn ($t) => $t->customer_id || !empty($t->customer_phone) || trim((string) $t->customer_name) !== '')
             ->groupBy(fn ($t) => $t->customer_id ?: ($t->customer_phone ?: mb_strtolower(trim((string) $t->customer_name))))
@@ -7129,6 +7157,7 @@ class PosController extends Controller
             'daily' => $daily,
             'hourly' => $hourly,
             'cashiers' => $cashiers,
+            'waiters' => $waiters,
             'top_customers' => $topCustomers,
             'payments' => $payments,
         ];

@@ -45,7 +45,7 @@ Sale screen ki mazeed cheezein:
 - Screen Fit: header ke "Fit" menu se poori screen 80–125% adjust karein (chhoti screens par khud 90% ho jata hai). Har PC par alag save hota hai.
 - Discount limit DONO types par lagti hai: percentage bhi aur Rs. amount bhi — amount discount subtotal ke limit% se zyada nahi ho sakta (default 50%). Limit se zyada discount par Manager PIN ka modal khulta hai — PIN dalne par usi bill ke liye override ho jata hai (cart clear hote hi khatam).
 - Offline mode: internet chala jaye to bill queue mein save hota hai aur net aane par khud PRA ko chala jata hai.
-- Waiter ka order aaye to header ki bell par teal badge blink karta hai. Agar cashier ka cart KHALI ho to order khud-ba-khud cart mein load ho jata hai (kuch dabana nahi parta) — bas payment karein; table khud free ho jata hai. Cart mein pehle se bill ho to toast ittila deta hai aur order bell mein intezar karta hai.
+- Waiter ka order aaye to "Table" button par teal badge lag jata hai aur toast ittila deta hai. Table (F3) kholein — jis table par waiter ka order tayyar hai woh JAMNI (purple) card "Order Tayyar" ke saath dikhta hai; us par click karte hi order cart mein aa jata hai — bas payment karein, table khud free ho jata hai. Bina table walay waiter orders (Takeaway/Delivery) isi picker mein neeche "Counter Orders" section mein hote hain. Ek order sirf ek cashier le sakta hai — doosra cashier click kare to "order doosre cashier ne le liya" ka paigham aata hai.
 - Saaf style ho to kam-istemaal buttons (Rush, Fit, Keys, Quick) aur guided steps ki patti "Mazeed" button ke peechay hoti hain — Mazeed dabane se dikh jati hain. Saare features waise hi kaam karte hain.
 
 ## Keyboard Shortcuts (Sale Screen) — MUKAMMAL LIST
@@ -230,7 +230,7 @@ Sale screen ki mazeed cheezein:
 - Terminal add: Terminal Name, Terminal Code, Location → "Add Terminal". Har terminal Edit/Delete ho sakta hai. (Multi-counter dukano ke liye.)
 
 ## Reports
-- /pos/reports: date range presets (Today, Last 7 Days, This Month waghera) + cashier/staff filter. KPIs: Revenue, Bills, Tax, Average Bill, Discounts, Customers (pichle period se % comparison). Charts: Category Share, Daily Revenue Trend, Hourly Pattern. Category breakdown table product-level tak khulti hai. Profit Estimate/Margin sirf admin ko (cost price wale products par). PDF/CSV export.
+- /pos/reports: date range presets (Today, Last 7 Days, This Month waghera) + cashier/staff filter. KPIs: Revenue, Bills, Tax, Average Bill, Discounts, Customers (pichle period se % comparison). Charts: Category Share, Daily Revenue Trend, Hourly Pattern. Category breakdown table product-level tak khulti hai. Profit Estimate/Margin sirf admin ko (cost price wale products par). "Sales by Waiter" table bhi hai — har waiter ke orders, revenue aur average bill (sirf waiter ke bheje hue, settle shuda orders ginte hain). PDF/CSV export.
 - Tax Reports (/pos/tax-reports): PRA aur Local tabs; filters: Tax Rate (available rates + Exempt), Period, Payment Method, Customer, custom date range; summary cards (Invoices, Sales Value, Tax, Total); "Download CSV" / "Download PDF". "Local" tab sirf admin ko.
 - /pos/transactions: saray bills — filters: search (invoice/customer), payment method, date from/to; tabs: POS (PRA) / Local; status badges: Submitted, Failed, Pending, Offline, Local. Har bill par: Receipt, Edit/Delete (sirf jab tak PRA number NA laga ho), Retry PRA (failed par), Submit to PRA (local, current month). "Sync All (N)" = saray failed ek sath retry.
 - Day Close ki purani Z-reports day-close page se.

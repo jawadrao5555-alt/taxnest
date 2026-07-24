@@ -173,6 +173,30 @@
     </table>
     @endif
 
+    @if($analytics->waiters->isNotEmpty())
+    <div class="section-title">Sales by Waiter</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>Waiter</th>
+                <th class="c">Orders</th>
+                <th class="r">Revenue (PKR)</th>
+                <th class="r">Avg Bill (PKR)</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($analytics->waiters as $w)
+            <tr>
+                <td>{{ $w->name }}</td>
+                <td class="c">{{ $w->count }}</td>
+                <td class="r">{{ number_format($w->revenue, 2) }}</td>
+                <td class="r">{{ number_format($w->avg, 2) }}</td>
+            </tr>
+            @endforeach
+        </tbody>
+    </table>
+    @endif
+
     @if($analytics->top_customers->isNotEmpty())
     <div class="section-title">Top Customers</div>
     <table class="data">

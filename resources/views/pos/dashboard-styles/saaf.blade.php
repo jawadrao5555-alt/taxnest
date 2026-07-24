@@ -36,19 +36,33 @@
 
 <div class="space-y-5 w-full">
 
-    {{-- Greeting + style picker --}}
+    {{-- Greeting + New Sale CTA + style picker --}}
+    @php $saafFirstName = trim(explode(' ', trim(auth('pos')->user()?->name ?? auth()->user()?->name ?? ''))[0] ?? ''); @endphp
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-            <h1 class="text-xl sm:text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">Assalam-o-Alaikum 👋</h1>
+            <h1 class="text-xl sm:text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">Assalam-o-Alaikum{{ $saafFirstName !== '' ? ', ' . $saafFirstName : '' }} 👋</h1>
             <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5">{{ now()->format('l, d M Y') }} · {{ $company->name ?? 'Business' }}</p>
         </div>
-        @include('pos.dashboard-styles._style-picker')
+        <div class="flex items-center gap-2 flex-wrap">
+            <a href="{{ route('pos.invoice.create') }}"
+               class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-bold hover:opacity-90 transition"
+               style="background:#0A4D5C;">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                Naya Bill
+            </a>
+            @include('pos.dashboard-styles._style-picker')
+        </div>
     </div>
 
     {{-- 4 clean KPI cards --}}
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
-            <p class="text-[11px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wide">Aaj ki Sales</p>
+        <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5 hover:border-teal-600 dark:hover:border-teal-500 transition">
+            <div class="flex items-center gap-2">
+                <span class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#ccfbf1;">
+                    <svg class="w-4 h-4" style="color:#0A4D5C;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/></svg>
+                </span>
+                <p class="text-[11px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wide">Aaj ki Sales</p>
+            </div>
             <p class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mt-2">Rs. {{ number_format(round($saafToday)) }}</p>
             @if($saafDeltaPct !== null)
                 @if($saafDeltaPct >= 0)
@@ -61,8 +75,13 @@
             @endif
         </div>
 
-        <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
-            <p class="text-[11px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wide">Aaj ke Bills</p>
+        <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5 hover:border-teal-600 dark:hover:border-teal-500 transition">
+            <div class="flex items-center gap-2">
+                <span class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#ccfbf1;">
+                    <svg class="w-4 h-4" style="color:#0A4D5C;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </span>
+                <p class="text-[11px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wide">Aaj ke Bills</p>
+            </div>
             <p class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mt-2">{{ number_format($saafBills) }}</p>
             @if(isset($praSyncedToday) && $praSyncedToday !== null)
                 <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{{ number_format($praSyncedToday) }} PRA synced ✓</p>
@@ -72,34 +91,59 @@
         </div>
 
         @if(empty($isCashier))
-        <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
-            <p class="text-[11px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wide">Aaj ka Profit</p>
+        <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5 hover:border-teal-600 dark:hover:border-teal-500 transition">
+            <div class="flex items-center gap-2">
+                <span class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#ccfbf1;">
+                    <svg class="w-4 h-4" style="color:#0A4D5C;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                </span>
+                <p class="text-[11px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wide">Aaj ka Profit</p>
+            </div>
             <p class="text-xl sm:text-2xl font-black mt-2" style="color:#0A4D5C;">Rs. {{ number_format(round($saafProfit)) }}</p>
             <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-1">Sirf aapko nazar aata hai</p>
         </div>
         @else
-        <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
-            <p class="text-[11px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wide">Average Bill</p>
+        <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5 hover:border-teal-600 dark:hover:border-teal-500 transition">
+            <div class="flex items-center gap-2">
+                <span class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#ccfbf1;">
+                    <svg class="w-4 h-4" style="color:#0A4D5C;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                </span>
+                <p class="text-[11px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wide">Average Bill</p>
+            </div>
             <p class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mt-2">Rs. {{ number_format(round($saafAvg)) }}</p>
             <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-1">Fi bill ausat</p>
         </div>
         @endif
 
         @if(!empty($isRestaurant))
-        <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
-            <p class="text-[11px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wide">Tables</p>
+        <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5 hover:border-teal-600 dark:hover:border-teal-500 transition">
+            <div class="flex items-center gap-2">
+                <span class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#ccfbf1;">
+                    <svg class="w-4 h-4" style="color:#0A4D5C;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M5 10v9m14-9v9M9 10v4m6-4v4M4 5h16a1 1 0 011 1v3H3V6a1 1 0 011-1z"/></svg>
+                </span>
+                <p class="text-[11px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wide">Tables</p>
+            </div>
             <p class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mt-2">{{ $occupiedTables ?? 0 }}<span class="text-sm text-gray-400">/{{ $totalTables ?? 0 }}</span></p>
             <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-1">Abhi occupied hain</p>
         </div>
         @elseif(isset($dayOpening) && $dayOpening)
-        <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
-            <p class="text-[11px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wide">Opening Cash</p>
+        <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5 hover:border-teal-600 dark:hover:border-teal-500 transition">
+            <div class="flex items-center gap-2">
+                <span class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#ccfbf1;">
+                    <svg class="w-4 h-4" style="color:#0A4D5C;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                </span>
+                <p class="text-[11px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wide">Opening Cash</p>
+            </div>
             <p class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mt-2">Rs. {{ number_format(round((float) $dayOpening->opening_cash)) }}</p>
             <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-1">Day close par hisaab milega</p>
         </div>
         @else
-        <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
-            <p class="text-[11px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wide">Opening Cash</p>
+        <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5 hover:border-teal-600 dark:hover:border-teal-500 transition">
+            <div class="flex items-center gap-2">
+                <span class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#ccfbf1;">
+                    <svg class="w-4 h-4" style="color:#0A4D5C;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                </span>
+                <p class="text-[11px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wide">Opening Cash</p>
+            </div>
             <p class="text-xl sm:text-2xl font-black text-gray-300 dark:text-gray-600 mt-2">—</p>
             <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{{ !empty($todayClosed) ? 'Aaj ka din close ho chuka hai' : 'Upar form se enter karein' }}</p>
         </div>
@@ -113,10 +157,14 @@
             @forelse($saafTopItems as $i => $item)
             <div class="flex items-center justify-between py-2.5 text-[13px] border-b border-gray-50 dark:border-gray-800 last:border-0">
                 <span class="flex items-center gap-3 min-w-0">
+                    @if($i === 0)
+                    <span class="w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0" style="background:#0A4D5C;">1</span>
+                    @else
                     <span class="w-6 h-6 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-[10px] font-bold text-gray-500 dark:text-gray-400 flex-shrink-0">{{ $i + 1 }}</span>
-                    <span class="truncate text-gray-800 dark:text-gray-200">{{ $item['name'] }}</span>
+                    @endif
+                    <span class="truncate text-gray-800 dark:text-gray-200 {{ $i === 0 ? 'font-semibold' : '' }}">{{ $item['name'] }}</span>
                 </span>
-                <span class="text-gray-400 dark:text-gray-500 font-semibold whitespace-nowrap ml-2">{{ rtrim(rtrim(number_format($item['qty'], 2), '0'), '.') }} sold</span>
+                <span class="text-[11px] font-semibold whitespace-nowrap ml-2 px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">{{ rtrim(rtrim(number_format($item['qty'], 2), '0'), '.') }} sold</span>
             </div>
             @empty
             <p class="text-xs text-gray-400 dark:text-gray-500 py-4 text-center">Abhi koi sale nahi hui — pehla bill banayein!</p>
@@ -126,20 +174,28 @@
         <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
             <p class="text-sm font-extrabold text-gray-900 dark:text-white mb-3">Roz ke Kaam</p>
             <div class="grid grid-cols-2 gap-3">
-                <a href="{{ route('pos.day-close') }}" class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center hover:border-teal-600 dark:hover:border-teal-500 transition">
-                    <div class="text-xl mb-1.5">🧾</div>
+                <a href="{{ route('pos.day-close') }}" class="group rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center hover:border-teal-600 dark:hover:border-teal-500 transition">
+                    <span class="mx-auto mb-2 w-9 h-9 rounded-lg flex items-center justify-center" style="background:#ccfbf1;">
+                        <svg class="w-5 h-5" style="color:#0A4D5C;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </span>
                     <div class="text-[12px] font-bold text-gray-700 dark:text-gray-300">Day Close</div>
                 </a>
-                <a href="{{ route('pos.reports') }}" class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center hover:border-teal-600 dark:hover:border-teal-500 transition">
-                    <div class="text-xl mb-1.5">📊</div>
+                <a href="{{ route('pos.reports') }}" class="group rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center hover:border-teal-600 dark:hover:border-teal-500 transition">
+                    <span class="mx-auto mb-2 w-9 h-9 rounded-lg flex items-center justify-center" style="background:#ccfbf1;">
+                        <svg class="w-5 h-5" style="color:#0A4D5C;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                    </span>
                     <div class="text-[12px] font-bold text-gray-700 dark:text-gray-300">Reports</div>
                 </a>
-                <a href="{{ route('pos.products') }}" class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center hover:border-teal-600 dark:hover:border-teal-500 transition">
-                    <div class="text-xl mb-1.5">🛍️</div>
+                <a href="{{ route('pos.products') }}" class="group rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center hover:border-teal-600 dark:hover:border-teal-500 transition">
+                    <span class="mx-auto mb-2 w-9 h-9 rounded-lg flex items-center justify-center" style="background:#ccfbf1;">
+                        <svg class="w-5 h-5" style="color:#0A4D5C;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    </span>
                     <div class="text-[12px] font-bold text-gray-700 dark:text-gray-300">Products</div>
                 </a>
-                <a href="{{ route('pos.customers') }}" class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center hover:border-teal-600 dark:hover:border-teal-500 transition">
-                    <div class="text-xl mb-1.5">👤</div>
+                <a href="{{ route('pos.customers') }}" class="group rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center hover:border-teal-600 dark:hover:border-teal-500 transition">
+                    <span class="mx-auto mb-2 w-9 h-9 rounded-lg flex items-center justify-center" style="background:#ccfbf1;">
+                        <svg class="w-5 h-5" style="color:#0A4D5C;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    </span>
                     <div class="text-[12px] font-bold text-gray-700 dark:text-gray-300">Customers</div>
                 </a>
             </div>

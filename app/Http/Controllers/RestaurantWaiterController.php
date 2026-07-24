@@ -316,6 +316,41 @@ class RestaurantWaiterController extends Controller
         return response()->json($orders);
     }
 
+    /**
+     * Atomic claim for the sale screen's AUTO-LOAD (waiter easy-pickup, Jul 2026).
+     * Two idle terminals polling the same unassigned order must never BOTH load
+     * it (payment runs before settlement's atomic claim → duplicate final bill).
+     * Conditional UPDATE = single-winner: sets assigned_cashier_id to the caller
+     * only while the order is still held and unassigned (or already theirs).
+     */
+    public function claimIncoming(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $user = auth('pos')->user();
+
+        $claimed = RestaurantOrder::where('company_id', $companyId)
+            ->where('id', $id)
+            ->where('source', 'waiter')
+            ->where('status', 'held')
+            ->where(function ($w) use ($user) {
+                $w->whereNull('assigned_cashier_id')->orWhere('assigned_cashier_id', $user->id);
+            })
+            ->update(['assigned_cashier_id' => $user->id]);
+
+        if (!$claimed) {
+            // MySQL reports 0 affected rows when the value is unchanged (order
+            // already assigned to this same cashier) — re-check before failing.
+            $mine = RestaurantOrder::where('company_id', $companyId)
+                ->where('id', $id)->where('source', 'waiter')->where('status', 'held')
+                ->where('assigned_cashier_id', $user->id)->exists();
+            if (!$mine) {
+                return response()->json(['success' => false, 'message' => 'Order already taken by another cashier.'], 409);
+            }
+        }
+
+        return response()->json(['success' => true]);
+    }
+
     /** Link the paid PosTransaction to the waiter order, mark completed, free the table. */
     public function completeIncoming(Request $request, $id)
     {
@@ -378,6 +413,7 @@ class RestaurantWaiterController extends Controller
             'kitchen_notes' => $o->kitchen_notes,
             'waiter' => $o->creator?->name ?? 'Unknown',
             'assigned_cashier' => $o->assignedCashier?->name,
+            'assigned_cashier_id' => $o->assigned_cashier_id,
             'subtotal' => (float) $o->subtotal,
             'total_amount' => (float) $o->total_amount,
             'unprinted_count' => $o->items->whereNull('kot_printed_at')->count(),

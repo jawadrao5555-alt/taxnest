@@ -76,3 +76,4 @@
 - [Outgoing mail / noreply SMTP](mail-noreply-smtp.md) — working cPanel SMTP block; Replit web SAPI misses mid-session secrets + ${VAR} in .env fails silently (CLI OK, web 535).
 - [Madadgar AI support bot](pos-madadgar-bot.md) — escalation row ONLY via Haan-confirm POST; routes pos.auth-only (no company.approval); artisan serve blanks env for web (secret must be literal in .env); ChatGPT Plus ≠ API credit.
 - [POS feature upgrade backlog](pos-upgrade-backlog.md) — owner-deferred upgrade list (22 Jul 2026) + split-payment tax options (PRA = ONE payModeCode per bill); build nothing until owner picks.
+- [Static asset caching on live](static-asset-caching.md) — .htaccess caches css/js 30d: every loose-asset edit MUST bump ?v=; sw.js stays no-cache; .htaccess untestable in dev.

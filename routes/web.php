@@ -655,6 +655,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     // Cashier side — incoming waiter orders on the sale screen.
     Route::get('/api/incoming-orders', [\App\Http\Controllers\RestaurantWaiterController::class, 'incomingOrders'])->name('pos.api.incoming-orders');
     Route::post('/api/incoming-orders/{id}/complete', [\App\Http\Controllers\RestaurantWaiterController::class, 'completeIncoming'])->name('pos.api.incoming-orders.complete');
+    Route::post('/api/incoming-orders/{id}/claim', [\App\Http\Controllers\RestaurantWaiterController::class, 'claimIncoming'])->name('pos.api.incoming-orders.claim');
     Route::post('/restaurant/orders/{id}/resend-kitchen', [RestaurantPosController::class, 'resendKitchen'])->name('pos.restaurant.orders.resend-kitchen');
     Route::post('/api/toggle-auto-kot', [PosController::class, 'toggleAutoKot'])->name('pos.api.toggle-auto-kot');
     Route::get('/restaurant/dashboard', [RestaurantPosController::class, 'dashboard'])->name('pos.restaurant.dashboard');

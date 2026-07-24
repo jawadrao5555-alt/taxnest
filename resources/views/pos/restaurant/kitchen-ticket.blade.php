@@ -152,10 +152,21 @@
             ->pluck('id')
             ->diff(($ticketItems ?? collect())->pluck('id'))
             ->isNotEmpty();
+        // KOT Full Mode (ZFC feedback, Jul 2026): full-order ticket that carries
+        // BOTH old and new rows — banner + per-row NEW badges only when the order
+        // actually has prior printed rows (first-ever ticket stays clean).
+        $newIds = collect($newItemIds ?? []);
+        $isFullUpdate = $newIds->isNotEmpty()
+            && ($ticketItems ?? collect())->pluck('id')->diff($newIds)->isNotEmpty();
     @endphp
     @if($isAdditionTicket)
     <div class="mt-1" style="border: 2px solid #000; padding: 4px; text-align: center;">
         <span class="bold text-lg">++ ADDED ITEMS{{ !empty($kotBatchNo) ? ' — KOT #'.$kotBatchNo : '' }} ++</span>
+    </div>
+    @elseif($isFullUpdate)
+    <div class="mt-1" style="border: 2px solid #000; padding: 4px; text-align: center;">
+        <span class="bold text-lg">++ UPDATED ORDER{{ !empty($kotBatchNo) ? ' — KOT #'.$kotBatchNo : '' }} ++</span>
+        <br><span class="bold text-sm">NEW items marked &raquo; NEW</span>
     </div>
     @endif
 
@@ -190,6 +201,9 @@
                 @foreach($items as $item)
                 <tr>
                     <td class="name">
+                        @if($isFullUpdate && $newIds->contains($item->id))
+                            <span style="border: 1.5px solid #000; padding: 0 3px; font-weight: 900; font-size: 12px;">NEW</span>
+                        @endif
                         <span class="bold">{{ $item->item_name }}</span>
                         @if($item->special_notes)
                             <br><span class="note">&raquo; NOTE: {{ $item->special_notes }}</span>

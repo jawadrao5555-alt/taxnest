@@ -44,7 +44,7 @@ Sale screen ki mazeed cheezein:
 - Screen Fit: header ke "Fit" menu se poori screen 80–125% adjust karein (chhoti screens par khud 90% ho jata hai). Har PC par alag save hota hai.
 - Discount limit DONO types par lagti hai: percentage bhi aur Rs. amount bhi — amount discount subtotal ke limit% se zyada nahi ho sakta (default 50%). Limit se zyada discount par Manager PIN ka modal khulta hai — PIN dalne par usi bill ke liye override ho jata hai (cart clear hote hi khatam).
 - Offline mode: internet chala jaye to bill queue mein save hota hai aur net aane par khud PRA ko chala jata hai.
-- Waiter ka order aaye to header ki bell par teal badge blink karta hai — bell kholein → order par "Load to Cart" → payment karein; table khud free ho jata hai.
+- Waiter ka order aaye to header ki bell par teal badge blink karta hai. Agar cashier ka cart KHALI ho to order khud-ba-khud cart mein load ho jata hai (kuch dabana nahi parta) — bas payment karein; table khud free ho jata hai. Cart mein pehle se bill ho to toast ittila deta hai aur order bell mein intezar karta hai.
 - Saaf style ho to kam-istemaal buttons (Rush, Fit, Keys, Quick) aur guided steps ki patti "Mazeed" button ke peechay hoti hain — Mazeed dabane se dikh jati hain. Saare features waise hi kaam karte hain.
 
 ## Keyboard Shortcuts (Sale Screen) — MUKAMMAL LIST
@@ -264,6 +264,7 @@ Sale screen ki mazeed cheezein:
 - "Dashboard par Opening Cash nazar nahi aa raha": din pehle hi close ho chuka hai — kal subah enter karein.
 - "Deal ki price ghalat lag rahi hai": deal ke din/dates check karein — deal sirf apne set kiye dino par chalti hai.
 - "KOT kitchen par nahi aa raha": /pos/restaurant/kitchen-settings par counter/printer check karein aur Desktop Agent chalta ho.
+- "KOT adhoora aata hai / sirf naye items print hote hain": /pos/restaurant/kitchen-settings par "Always Print Full KOT" ON karein — order update par poora order print hoga, naye items par NEW ka nishaan hoga.
 - "Silent print nahi ho rahi": /pos/printer-settings par Silent Printing ON ho, printer select ho, aur Desktop Agent chalta ho. Setting badalne ke baad sale screen refresh karein.
 - "Screen chhoti/bari lag rahi hai": sale screen ke "Fit" menu se size adjust karein.
 - "Hold nahi ho raha": Hold sirf Dine-In orders ke liye hai; manual items aur deals hold nahi ho sakte.

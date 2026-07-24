@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#6366f1">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="stylesheet" href="{{ asset('css/mobile.css') }}?v=2.6">
+    <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.6') }}">
     <title>{{ $title ?? 'Admin Panel' }} - TaxNest Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
@@ -275,6 +275,6 @@
         </div>
     </div>
     <x-whatsapp-support message="Hello, I am a TaxNest admin and need assistance." />
-<script src="{{ asset('js/wheel-scroll.js') }}?v=1" defer></script>
+<script src="{{ asset('js/wheel-scroll.js?v=1') }}" defer></script>
 </body>
 </html>

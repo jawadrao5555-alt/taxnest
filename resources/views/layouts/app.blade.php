@@ -14,7 +14,7 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
         <meta name="theme-color" content="#059669">
-        <link rel="stylesheet" href="{{ asset('css/mobile.css') }}?v=2.6">
+        <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.6') }}">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
         <meta name="apple-mobile-web-app-title" content="Tax DI">
@@ -466,6 +466,6 @@
         <x-pwa-update color="emerald" />
         <x-trial-lock-modal />
         <x-whatsapp-support />
-        <script src="{{ asset('js/wheel-scroll.js') }}?v=1" defer></script>
+        <script src="{{ asset('js/wheel-scroll.js?v=1') }}" defer></script>
     </body>
 </html>

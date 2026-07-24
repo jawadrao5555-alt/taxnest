@@ -2401,6 +2401,7 @@ function restaurantPos() {
             return Math.max(0, cashT - cardT);
         },
         posRole: '{{ $posRole }}',
+        posUserId: {{ (int) auth('pos')->id() }},
         discountLimit: {{ (float) ($discountLimit ?? 0) }},
         hasManagerPin: {{ $hasManagerPin ? 'true' : 'false' }},
         managerOverrideActive: false,
@@ -2559,6 +2560,12 @@ function restaurantPos() {
         showIncoming: false,
         incomingLoading: false,
         incomingOrderId: null,
+        // Waiter easy-pickup (ZFC feedback, Jul 2026): when the cart is FREE a
+        // new waiter order auto-loads (no manual bell+Load step); busy cart gets
+        // a one-time toast nudge. Per-session dedupe so a deliberately cleared
+        // cart never re-auto-loads the same order (it stays in the bell).
+        autoLoadedIncoming: [],
+        notifiedIncoming: [],
         // ── AUTO-SYNC ENGINE ──────────────────────────────────────────────
         // syncStatus: 'online' | 'syncing' | 'offline'
         // _syncTimer fires every 30 sec; pings count endpoint then silently
@@ -5539,7 +5546,46 @@ function restaurantPos() {
                 const res = await fetch('/pos/api/incoming-orders', { headers: { 'Accept': 'application/json' } });
                 if (!res.ok) return;
                 this.incomingOrders = await res.json();
+                this.maybeAutoLoadIncoming();
             } catch (e) { /* silent — badge just goes stale until next poll */ }
+        },
+        // Waiter easy-pickup: free cart + no open overlay => oldest new waiter
+        // order lands straight in the cart; otherwise a one-time toast nudge.
+        // Auto-load only fires after a server-side ATOMIC CLAIM so two idle
+        // terminals never both load the same order (duplicate-bill guard).
+        async maybeAutoLoadIncoming() {
+            if (!this.isRestaurantMode || !this.incomingOrders.length || document.hidden) return;
+            if (this._autoClaimBusy) return;
+            const fresh = this.incomingOrders.filter(o => !this.autoLoadedIncoming.includes(o.id));
+            if (!fresh.length) return;
+            const overlayOpen = this.showPayModal || this.showIncoming || this.showReceipt
+                || this.showHeldOrders || this.showLocalBills || this.showTablePicker;
+            if (!overlayOpen && this.cart.length === 0 && !this.incomingOrderId) {
+                const o = fresh.find(x => !x.assigned_cashier_id || x.assigned_cashier_id === this.posUserId);
+                if (o) {
+                    this._autoClaimBusy = true;
+                    try {
+                        const res = await fetch('/pos/api/incoming-orders/' + o.id + '/claim', {
+                            method: 'POST',
+                            headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                        });
+                        this.autoLoadedIncoming.push(o.id);
+                        this.notifiedIncoming.push(o.id);
+                        if (res.ok && this.cart.length === 0 && !this.incomingOrderId) {
+                            this.loadIncomingToCart(o);
+                        }
+                        // 409 = another terminal claimed it — it vanishes from
+                        // this cashier's next poll; admins still see it in the bell.
+                    } catch (e) { /* network blip — next poll retries others */ }
+                    finally { this._autoClaimBusy = false; }
+                    return;
+                }
+            }
+            fresh.forEach(o => {
+                if (this.notifiedIncoming.includes(o.id)) return;
+                this.notifiedIncoming.push(o.id);
+                this.showToast('New waiter order ' + o.order_number + ' waiting — it will load when the cart is free', 'success');
+            });
         },
         openIncoming() {
             this.showIncoming = true;

@@ -61,7 +61,7 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
         <meta name="theme-color" content="#7c3aed">
-        <link rel="stylesheet" href="{{ asset('css/mobile.css') }}?v=2.6">
+        <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.6') }}">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
         <meta name="apple-mobile-web-app-title" content="Nest Pra Pos">
@@ -93,7 +93,7 @@
                 }
             }, 1500);
         </script>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+        <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
         <script>if(document.documentElement.classList.contains('dark')){document.documentElement.style.colorScheme='dark';}</script>
         <style>
             *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
@@ -896,6 +896,6 @@
         <x-trial-lock-modal />
         {{-- Madadgar unified support bubble (AI chat + WhatsApp) — replaces the plain WhatsApp bubble on POS (owner, 22 Jul 2026) --}}
         <x-madadgar-support />
-        <script src="{{ asset('js/wheel-scroll.js') }}?v=1" defer></script>
+        <script src="{{ asset('js/wheel-scroll.js?v=1') }}" defer></script>
     </body>
 </html>

@@ -1245,6 +1245,10 @@ class RestaurantPosController extends Controller
         if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'dine_in_auto_kot')) {
             $updates['dine_in_auto_kot'] = (bool) $request->dine_in_auto_kot;
         }
+        // KOT Full Mode (ZFC feedback, Jul 2026) — hasColumn guard = prod self-heal parity.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_kot_full_mode')) {
+            $updates['pos_kot_full_mode'] = (bool) $request->pos_kot_full_mode;
+        }
         $company->update($updates);
 
         return back()->with('success', 'Kitchen settings updated successfully.');
@@ -1261,8 +1265,19 @@ class RestaurantPosController extends Controller
 
         // P7 (F6) delta-KOT: ?delta=1 renders ONLY not-yet-printed items (appended
         // rows) so the kitchen never re-fires dishes already on the pass.
+        // KOT Full Mode (ZFC feedback, Jul 2026): company opts into COMPLETE
+        // tickets — a delta request with new rows prints the WHOLE order (new
+        // rows flagged NEW); a delta request with NOTHING new keeps the empty
+        // render so the blank-print guard still skips duplicates.
         $delta = $request->query('delta') == '1';
-        $ticketItems = $delta ? $order->items->whereNull('kot_printed_at')->values() : $order->items;
+        $fullMode = (bool) ($company->pos_kot_full_mode ?? false);
+        $unprinted = $order->items->whereNull('kot_printed_at');
+        if ($delta && $fullMode && $unprinted->isNotEmpty()) {
+            $ticketItems = $order->items;
+        } else {
+            $ticketItems = $delta ? $unprinted->values() : $order->items;
+        }
+        $newItemIds = $fullMode ? $unprinted->pluck('id') : collect();
 
         // Counter/Station routing (owner, Jul 2026): optional ?station= filter
         // (numeric id, 0 = main Kitchen). Zero configured stations => legacy
@@ -1290,7 +1305,7 @@ class RestaurantPosController extends Controller
             $kotBatchNo = $nextBatch;
         }
 
-        return view('pos.restaurant.kitchen-ticket', compact('order', 'company', 'ticketItems', 'delta', 'kotBatchNo', 'grouped', 'stationLabel'));
+        return view('pos.restaurant.kitchen-ticket', compact('order', 'company', 'ticketItems', 'delta', 'kotBatchNo', 'grouped', 'stationLabel', 'newItemIds'));
     }
 
     /**

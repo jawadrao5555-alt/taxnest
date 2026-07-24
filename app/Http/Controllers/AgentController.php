@@ -603,7 +603,18 @@ class AgentController extends Controller
             }
             parse_str($job->render_query ?? '', $q);
             $delta = ($q['delta'] ?? null) == '1';
-            $ticketItems = $delta ? $order->items->whereNull('kot_printed_at')->values() : $order->items;
+            // KOT Full Mode (ZFC feedback, Jul 2026): mirror of the kitchenTicket
+            // route — delta request + new rows => print the WHOLE order (new rows
+            // flagged NEW); delta with nothing new stays empty => 204 (no blank,
+            // no duplicate). Explicit full prints unchanged.
+            $fullMode = (bool) ($company->pos_kot_full_mode ?? false);
+            $unprinted = $order->items->whereNull('kot_printed_at');
+            if ($delta && $fullMode && $unprinted->isNotEmpty()) {
+                $ticketItems = $order->items;
+            } else {
+                $ticketItems = $delta ? $unprinted->values() : $order->items;
+            }
+            $newItemIds = $fullMode ? $unprinted->pluck('id') : collect();
 
             // Counter/Station routing (Jul 2026): render_query may pin this job to
             // one station (station=ID, 0 = main Kitchen). Same shared resolver as
@@ -621,6 +632,12 @@ class AgentController extends Controller
             }
 
             $kotBatchNo = $ticketItems->max('kot_batch_no');
+            // Full-update ticket carries UNPRINTED rows that will be stamped with
+            // the NEXT batch at result time — show that number (matches the
+            // browser path, which stamps at render).
+            if ($ticketItems->whereNull('kot_printed_at')->isNotEmpty()) {
+                $kotBatchNo = ((int) $order->items->max('kot_batch_no')) + 1;
+            }
 
             // DON'T stamp kot_printed_at here — the physical print can still
             // fail after render (printer off, driver error). We record which
@@ -629,7 +646,7 @@ class AgentController extends Controller
             // SAME items (still NULL), so retries print identical content.
             $job->update(['printed_item_ids' => $ticketItems->pluck('id')->values()->all()]);
 
-            return response(view('pos.restaurant.kitchen-ticket', compact('order', 'company', 'ticketItems', 'delta', 'kotBatchNo', 'grouped', 'stationLabel'))->render())
+            return response(view('pos.restaurant.kitchen-ticket', compact('order', 'company', 'ticketItems', 'delta', 'kotBatchNo', 'grouped', 'stationLabel', 'newItemIds'))->render())
                 ->header('Content-Type', 'text/html; charset=UTF-8');
         }
 
@@ -661,12 +678,15 @@ class AgentController extends Controller
 
         // KOT actually reached paper — NOW stamp the rendered items so delta
         // tickets stay correct. Failed prints leave items NULL, so the KDS
-        // delta cycle (or a retry) naturally re-prints them.
+        // delta cycle (or a retry) naturally re-prints them. Stamp kot_batch_no
+        // in the SAME update (was missing — agent-printed rows showed batch NULL
+        // and reprint/"KOT #" headers lost their numbering).
         if ($validated['success'] && $job->type === 'kot' && !empty($job->printed_item_ids)) {
+            $nextBatch = ((int) \App\Models\RestaurantOrderItem::where('order_id', $job->restaurant_order_id)->max('kot_batch_no')) + 1;
             \App\Models\RestaurantOrderItem::whereIn('id', $job->printed_item_ids)
                 ->where('order_id', $job->restaurant_order_id)
                 ->whereNull('kot_printed_at')
-                ->update(['kot_printed_at' => now()]);
+                ->update(['kot_printed_at' => now(), 'kot_batch_no' => $nextBatch]);
         }
 
         return response()->json(['ok' => true]);

@@ -18,7 +18,7 @@ Yeh NestPOS ka mukammal guide hai. Sirf is guide ki maloomat se jawab do. Jawab 
 
 ## Sale Screen — Nayi Bill Banana (Dashboard → "Nayi Sale" ya /pos/invoice/create)
 Bill banane ka aam tareeqa, shuru se aakhir tak:
-1. (Optional) Customer: customer box mein phone/naam type karein → list se select karein. Match na mile to "Add as New" option usi dropdown mein aata hai — naam+phone likh kar foran naya customer ban jata hai. Walk-in customer ke liye yeh step CHHOR dein (khali chhor kar Enter).
+1. (Optional) Customer: customer box mein phone/naam type karein → list se select karein. Match na mile to "Add as New" option usi dropdown mein aata hai — naam+phone likh kar foran naya customer ban jata hai. Customer select hote hi uski chhoti history bhi nazar aati hai (kitne orders, kitna kharcha, aakhri order kab). Walk-in customer ke liye yeh step CHHOR dein (khali chhor kar Enter).
 2. Items dalein — 3 tareeqay: (a) search box mein naam/barcode/SKU type karein aur Enter, (b) product grid par item click karein, (c) barcode scanner se scan karein — exact match foran cart mein chala jata hai.
 3. Quantity: cart row ke qty box par click kar ke number type karein, ya same item dobara add karein, ya cart row select kar ke + / - keys.
 4. (Optional) Item par discount (D), tax on/off (T), ya note (N) — neeche shortcuts section dekhein.
@@ -26,7 +26,7 @@ Bill banane ka aam tareeqa, shuru se aakhir tak:
 6. Bill mukammal karne ke 2 raste:
    - "PAY" button (ya F8) → payment modal → Cash (key 1) ya Card (key 2) → bill FINAL ho jata hai (PRA reporting ON ho to PRA ko report hota hai).
    - "Save Provisional" (ya F9) → bill L-series LOCAL/provisional ban jata hai — PRA ko report NAHI hota, quota nahi katta; baad mein promote kar sakte hain.
-7. Receipt popup khulta hai — P = Print, K = KOT, Enter = nayi sale, Esc = band. Popup default 10 second mein khud band hota hai (koi bhi key dabane ya mouse le jane se timer ruk jata hai); yeh waqt /pos/customize se badlein (Never/5/10/15/30 sec).
+7. Receipt popup khulta hai — P = Print, K = KOT, Enter = nayi sale, Esc = band. Popup default 10 second mein khud band hota hai (koi bhi key dabane ya mouse le jane se timer ruk jata hai); yeh waqt /pos/customize se badlein (Never/5/10/15/20/30 sec).
 
 Payment modal ki keys: 1 = Cash (foran), 2 = Card (foran), arrow keys se method highlight, Enter = highlighted method confirm, P = Save Provisional (guided flow ON ho to), Esc = band.
 
@@ -42,7 +42,7 @@ Sale screen ki mazeed cheezein:
 - Hold (F5): order hold karein (Dine-In ke liye) — baad mein F3 se wapas kholein. Manual items aur deals hold NAHI ho sakte (sirf seedha bill).
 - "Send to Kitchen" (KOT) button: Dine-In order ko bina payment ke kitchen bhejta hai aur kitchen ticket print hota hai.
 - Kitchen note ka box cart ke neeche hai — poore order ke liye hidayat likhein.
-- Screen Fit: header ke "Fit" menu se poori screen 80–125% adjust karein (chhoti screens par khud 90% ho jata hai). Har PC par alag save hota hai.
+- Screen Fit: sale screen ki upar wali button qatar mein "Fit" button se poori screen 80–125% adjust karein (chhoti screens par khud 90% ho jata hai). Har PC par alag save hota hai. (Saaf style mein Fit "Mazeed" ke peechay hota hai.)
 - Discount limit DONO types par lagti hai: percentage bhi aur Rs. amount bhi — amount discount subtotal ke limit% se zyada nahi ho sakta (default 50%). Limit se zyada discount par Manager PIN ka modal khulta hai — PIN dalne par usi bill ke liye override ho jata hai (cart clear hote hi khatam).
 - Offline mode: internet chala jaye to bill queue mein save hota hai aur net aane par khud PRA ko chala jata hai.
 - Waiter ka order aaye to "Table" button par teal badge lag jata hai aur toast ittila deta hai. Table (F3) kholein — jis table par waiter ka order tayyar hai woh JAMNI (purple) card "Order Tayyar" ke saath dikhta hai; us par click karte hi order cart mein aa jata hai — bas payment karein, table khud free ho jata hai. Bina table walay waiter orders (Takeaway/Delivery) isi picker mein neeche "Counter Orders" section mein hote hain. Ek order sirf ek cashier le sakta hai — doosra cashier click kare to "order doosre cashier ne le liya" ka paigham aata hai.
@@ -61,6 +61,7 @@ Sale screen ki mazeed cheezein:
 - F10 = Local/Provisional bills ka modal. Modal ke andar: ↑↓ select, Enter = Make Final (promote), E = Edit (bill wapas sale screen par khulta hai), D = Delete (cashier nahi kar sakta), Esc = band.
 - F11 = Failed/offline PRA bills ka modal — Edit & Retry yahin se (bill wapas cart mein aata hai, theek kar ke dobara bhejein).
 - Alt+R = Reprint modal (aaj ke bills ki list, click ya Enter = print).
+- Alt+1 = CASH one-tap (pay modal Cash chuna hua khulta hai); Alt+2 = CARD one-tap — confirm phir bhi cashier hi karta hai, bill khud final nahi hota.
 - Alt+P = customer phone box par focus.
 - Ctrl+S = search par focus.
 - Cart mode mein: ↑↓ = row select, + / - = quantity, Delete/Backspace = item hatao.
@@ -149,6 +150,7 @@ Sale screen ki mazeed cheezein:
 - Order types ke rules: Dine-In = pehle Hold/KOT, khana banne ke baad payment; Takeaway = seedha final bill; Delivery = final ya provisional dono.
 - Tables/Floors: /pos/restaurant/table-management → "+ Add Floor" (floor ka naam, jaise Ground Floor) → "+ Add Table" (Table Number jaise T1, Seats 1-50). Table delete = card par × button.
 - Dine-In order: sale screen par order type "Dine In" → table picker khud khulta hai → table select → items → "Send to Kitchen" (KOT) ya Hold → khana ban jaye to F3 se order khol kar payment. Table payment par khud free ho jata hai.
+- Held order mein items badalne ke baad "↻ Re-send" button (F3 ki held list mein) se kitchen ko naya ticket jata hai — ticket par UPDATED ka nishaan hota hai.
 - Kitchen Settings (/pos/restaurant/kitchen-settings) ke toggles: Kitchen Display System (KDS), Kitchen Printer, Print KOT on Hold, Dine-In Auto KOT on Table Select, Print Receipt on Pay. "Save Kitchen Settings" se save.
 - Counters/Stations (KOT routing): kitchen-settings par "+ Add Counter" → Counter Name (jaise "Grill") → Printer chunein (Desktop Agent ki list) → Product Categories tick karein — un categories ke items ka KOT usi counter par jayega.
 - KDS (/pos/restaurant/kds): kitchen account login karta hai; order cards par order number, table, RUSH tag aur timer; buttons: "Start Preparing" → "Mark Ready" → "Clear"; upar Refresh, Clear All, Camera Scan aur List/Aggregate view switcher. KOT ka barcode scan karne se order khud clear ho jata hai (scanner active rehta hai).
@@ -213,7 +215,8 @@ Sale screen ki mazeed cheezein:
 - POS Ka Style: Full (default) / Saaf + "Mazeed styles" (5 purane designs).
 - POS Theme: 6 rang — Purple, Blue, Emerald, Orange, Midnight, Rose.
 - Guided Keyboard Billing ON/OFF.
-- Receipt Popup Auto-Close: Never / 5 / 10 / 15 / 30 seconds.
+- Receipt Popup Auto-Close: Never / 5 / 10 / 15 / 20 / 30 seconds.
+- KDS Auto-Print ON/OFF: ON ho to KDS screen wali device khud KOT print karti hai aur counter/cashier side ka KOT print BAND ho jata hai (sirf restaurant mode + KDS ON par asar). Agar KOT counter par print chahiye to yeh OFF rakhein.
 - Quick Type Mode ON/OFF.
 - Tax-Inclusive Pricing: Exclusive / Inclusive / Inclusive (Card-save).
 - Auto Day-Close (24h) ON/OFF.
@@ -242,7 +245,9 @@ Sale screen ki mazeed cheezein:
 
 ## Sale Screen ka Naya Design (Jul 2026)
 - Sale ke tools ab UPAR top bar mein hain: New Sale, Local (F10), Failed (F11), Reprint (Alt+R), Held (F3), sync status aur Switches — billing area pehle se saaf.
-- "Akhri Bills" patti: products ke neeche aaj ke bills ke chips (desktop par) — ek click par receipt dobara print.
+- Sync pill (top bar): Online (sabz) / Syncing (amber, pending bills ki ginti ke saath) / Offline (laal) — bills ki PRA sync ka live status.
+- "Switches" dropdown (top bar) mein 3 quick toggles: PRA Reporting (cashier ke liye sirf status — badalna admin ka kaam), Auto-Print, aur Auto-KOT.
+- "Akhri Bills" patti: products ke neeche aaj ke aakhri bills ke chips (desktop par) — ek click par receipt dobara print.
 - Bada TOTAL band: cart ke neeche numaya solid band mein grand total — door se parhna asaan.
 - One-tap CASH / CARD buttons (ya Alt+1 / Alt+2): payment method pehle se chuna hua Pay window khulti hai — bill khud-ba-khud final NAHI hota, confirm cashier hi karta hai.
 - Card Bachat mode mein CARD ka kam total pehle hi button par dikh jata hai.

@@ -27,21 +27,21 @@ const items = [
 ];
 
 const products = [
-  { name: "Chicken Biryani", price: 350, c: "#0A4D5C" },
-  { name: "Beef Pulao", price: 400, c: "#155e70" },
-  { name: "Chai", price: 60, c: "#0d9488" },
-  { name: "Doodh Patti", price: 80, c: "#0f766e" },
-  { name: "Samosa", price: 45, c: "#7c5e10" },
-  { name: "Pakora (250g)", price: 120, c: "#8a5a00" },
-  { name: "Zinger Burger", price: 320, c: "#6d28d9" },
-  { name: "Shawarma", price: 220, c: "#5b21b6" },
-  { name: "Fries", price: 150, c: "#374151" },
-  { name: "Cold Drink 1.5L", price: 180, c: "#1f2937" },
-  { name: "Mineral Water", price: 60, c: "#334155" },
-  { name: "Kheer", price: 130, c: "#525252" },
-  { name: "Chicken Karahi (Half)", price: 850, c: "#0A4D5C" },
-  { name: "Naan", price: 30, c: "#7c5e10" },
-  { name: "Raita", price: 50, c: "#0f766e" },
+  { name: "Chicken Biryani", price: 350 },
+  { name: "Beef Pulao", price: 400 },
+  { name: "Chai", price: 60 },
+  { name: "Doodh Patti", price: 80 },
+  { name: "Samosa", price: 45 },
+  { name: "Pakora (250g)", price: 120 },
+  { name: "Zinger Burger", price: 320 },
+  { name: "Shawarma", price: 220 },
+  { name: "Fries", price: 150 },
+  { name: "Cold Drink 1.5L", price: 180 },
+  { name: "Mineral Water", price: 60 },
+  { name: "Kheer", price: 130 },
+  { name: "Chicken Karahi (Half)", price: 850 },
+  { name: "Naan", price: 30 },
+  { name: "Raita", price: 50 },
 ];
 
 function Kbd({ children, dark = false }: { children: string; dark?: boolean }) {
@@ -66,7 +66,7 @@ function NayaTag() {
 
 function NavPill({ icon, label, kbd }: { icon: React.ReactNode; label: string; kbd: string }) {
   return (
-    <button className="flex items-center gap-1.5 rounded-md bg-white/10 border border-white/15 px-2 py-1 text-[11px] font-semibold text-white/85">
+    <button className="flex items-center gap-1.5 rounded-full bg-white/10 border border-white/15 px-2.5 py-1 text-[11px] font-semibold text-white/85">
       {icon}
       {label}
       <span className="text-[9px] font-bold rounded px-1 py-[1px] bg-black/30 text-white/80 border border-white/20">{kbd}</span>
@@ -87,11 +87,11 @@ function Toggle({ on, color }: { on: boolean; color: string }) {
 
 export function SaafSaleScreen() {
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-800 flex flex-col">
+    <div className="min-h-screen bg-[#f0fdfa] font-sans text-gray-800 flex flex-col">
       {/* ===== TOP NAV — Saaf color scheme (teal), baaqi sab Full jaisa ===== */}
       <div className="relative z-20 flex items-center gap-3 px-3 h-12 shrink-0" style={{ background: "#0A4D5C" }}>
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-md bg-white flex items-center justify-center text-xs font-extrabold" style={{ color: "#0A4D5C" }}>
+          <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center text-xs font-extrabold" style={{ color: "#0A4D5C" }}>
             N
           </div>
           <div className="leading-tight">
@@ -99,7 +99,7 @@ export function SaafSaleScreen() {
             <div className="text-white/50 text-[9px] leading-none mt-0.5">SAAF</div>
           </div>
         </div>
-        <button className="ml-2 rounded-md bg-white px-3 py-1.5 text-[12px] font-bold" style={{ color: "#0A4D5C" }}>
+        <button className="ml-2 rounded-full bg-white px-3.5 py-1.5 text-[12px] font-bold" style={{ color: "#0A4D5C" }}>
           + New Sale
         </button>
 
@@ -117,7 +117,7 @@ export function SaafSaleScreen() {
         {/* Naya switches icon + dropdown (PRA / Auto-Print / Auto-KOT) */}
         <div className="relative flex items-center gap-1.5 ml-1">
           <NayaTag />
-          <button className="flex items-center gap-1.5 rounded-md bg-white/10 border border-white/15 px-2 py-1.5">
+          <button className="flex items-center gap-1.5 rounded-full bg-white/10 border border-white/15 px-2.5 py-1.5">
             <ChevronsUpDown className="w-3.5 h-3.5 text-white/85" />
             <span className="flex items-center gap-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-neutral-300" />
@@ -126,20 +126,20 @@ export function SaafSaleScreen() {
             </span>
           </button>
           {/* dropdown khula hua dikhaya gaya hai */}
-          <div className="absolute top-10 right-0 w-64 rounded-lg bg-white border border-gray-200 shadow-lg p-2 space-y-1">
-            <div className="flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-gray-50">
+          <div className="absolute top-10 right-0 w-64 rounded-2xl bg-white border border-gray-200 shadow-lg p-2 space-y-1">
+            <div className="flex items-center justify-between rounded-xl px-2 py-1.5 hover:bg-gray-50">
               <span className="text-[11px] font-bold text-gray-600">PRA REPORTING</span>
               <span className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400">
                 OFF <Toggle on={false} color="#0d9488" />
               </span>
             </div>
-            <div className="flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-gray-50">
+            <div className="flex items-center justify-between rounded-xl px-2 py-1.5 hover:bg-gray-50">
               <span className="text-[11px] font-bold text-gray-600">AUTO-PRINT</span>
               <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">
                 ON <Toggle on color="#059669" />
               </span>
             </div>
-            <div className="flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-gray-50">
+            <div className="flex items-center justify-between rounded-xl px-2 py-1.5 hover:bg-gray-50">
               <span className="text-[11px] font-bold text-gray-600">AUTO-KOT</span>
               <span className="flex items-center gap-1.5 text-[10px] font-bold text-orange-600">
                 ON <Toggle on color="#ea580c" />
@@ -158,7 +158,7 @@ export function SaafSaleScreen() {
           </span>
           <span className="text-white/60 text-[11px] font-semibold">15:12</span>
           <Bell className="w-4 h-4 text-white/60" />
-          <div className="flex items-center gap-1.5 rounded-md bg-white/10 px-2 py-1">
+          <div className="flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1">
             <div className="w-5 h-5 rounded-full bg-white/30 flex items-center justify-center">
               <User className="w-3 h-3 text-white" />
             </div>
@@ -172,26 +172,26 @@ export function SaafSaleScreen() {
 
       {/* ===== ROW 1: Customer (pehla hi rehta hai) + Order Type ===== */}
       <div className="flex items-center gap-3 px-3 py-2 bg-white border-b border-gray-200 shrink-0">
-        <div className="flex items-center gap-2 flex-1 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2">
+        <div className="flex items-center gap-2 flex-1 rounded-full border border-gray-300 bg-gray-50 px-4 py-2">
           <User className="w-4 h-4 text-gray-400" />
           <span className="text-[13px] text-gray-400">Customer — naam ya number likhein (walk-in ke liye khali chhorein)</span>
           <span className="ml-auto"><Kbd dark>C</Kbd></span>
         </div>
         <div className="flex items-center gap-1.5">
-          <button className="rounded-lg px-3 py-2 text-[12px] font-bold border border-gray-300 text-gray-500">Dine-In</button>
-          <button className="rounded-lg px-3 py-2 text-[12px] font-bold text-white" style={{ background: "#0A4D5C" }}>
+          <button className="rounded-full px-3.5 py-2 text-[12px] font-bold border border-gray-300 text-gray-500 bg-white">Dine-In</button>
+          <button className="rounded-full px-3.5 py-2 text-[12px] font-bold text-white" style={{ background: "#0A4D5C" }}>
             Takeaway
           </button>
-          <button className="rounded-lg px-3 py-2 text-[12px] font-bold border border-gray-300 text-gray-500">Delivery</button>
+          <button className="rounded-full px-3.5 py-2 text-[12px] font-bold border border-gray-300 text-gray-500 bg-white">Delivery</button>
         </div>
       </div>
 
       {/* ===== ROW 2: Category + BADA SEARCH (steps/toggles/buttons ki lines khatam) ===== */}
       <div className="flex items-center gap-3 px-3 py-2 bg-white border-b border-gray-200 shrink-0">
-        <button className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2.5 text-[13px] font-semibold text-gray-600 shrink-0">
+        <button className="flex items-center gap-2 rounded-full border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-600 shrink-0">
           Sab Categories <ChevronDown className="w-4 h-4 text-gray-400" />
         </button>
-        <div className="flex items-center gap-2 flex-1 rounded-lg border-2 px-4 py-2.5 bg-white" style={{ borderColor: "#0A4D5C" }}>
+        <div className="flex items-center gap-2 flex-1 rounded-full border-2 px-4 py-2.5 bg-white" style={{ borderColor: "#0A4D5C" }}>
           <Search className="w-5 h-5" style={{ color: "#0A4D5C" }} />
           <span className="text-[15px] text-gray-400">Scan barcode ya product ka naam likhein…</span>
           <span className="ml-auto flex items-center gap-1.5">
@@ -203,17 +203,19 @@ export function SaafSaleScreen() {
 
       {/* ===== MAIN: grid + cart ===== */}
       <div className="flex flex-1 min-h-0">
-        {/* Product grid */}
+        {/* Product grid — Saaf cards: gol kinaray, halki shadow, teal price chip */}
         <div className="flex-1 p-3 overflow-hidden flex flex-col min-h-0">
           <div className="grid grid-cols-2 gap-1.5 overflow-hidden">
             {products.map((p) => (
               <button
                 key={p.name}
-                className="rounded-md bg-white border border-gray-200 pl-2 pr-2 py-1.5 text-left border-l-[3px] flex items-center gap-2"
-                style={{ borderLeftColor: p.c }}
+                className="rounded-xl bg-white border border-gray-200 shadow-sm pl-3 pr-1.5 py-1.5 text-left flex items-center gap-2"
               >
                 <span className="text-[12px] font-medium text-gray-800 truncate flex-1">{p.name}</span>
-                <span className="text-[12px] font-bold shrink-0" style={{ color: "#0A4D5C" }}>
+                <span
+                  className="text-[11px] font-bold shrink-0 rounded-full px-2 py-0.5"
+                  style={{ background: "#ccfbf1", color: "#0A4D5C" }}
+                >
                   {p.price}
                 </span>
               </button>
@@ -223,13 +225,13 @@ export function SaafSaleScreen() {
           <div className="flex-1" />
 
           {/* Akhri bill ki jhalak */}
-          <div className="mt-2 flex items-center gap-2 rounded-lg bg-white border border-gray-200 px-3 py-2 shrink-0">
-            <History className="w-4 h-4 text-gray-400 shrink-0" />
+          <div className="mt-2 flex items-center gap-2 rounded-2xl bg-white border border-gray-200 shadow-sm px-3 py-2 shrink-0">
+            <History className="w-4 h-4 shrink-0" style={{ color: "#0A4D5C" }} />
             <span className="text-[12px] text-gray-600">
               <span className="font-bold text-gray-800">Akhri bill:</span> Rs 1,125 · Cash · 15:09 · Bill #POS-2026-01847
             </span>
             <NayaTag />
-            <button className="ml-auto flex items-center gap-1.5 rounded-md border border-gray-300 px-2.5 py-1 text-[11px] font-bold text-gray-600">
+            <button className="ml-auto flex items-center gap-1.5 rounded-full border border-gray-300 px-3 py-1 text-[11px] font-bold text-gray-600">
               <Printer className="w-3 h-3" /> Reprint
             </button>
           </div>
@@ -253,15 +255,15 @@ export function SaafSaleScreen() {
                   <div className="text-[11px] text-gray-500">Rs {it.price.toFixed(2)}</div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button className="w-6 h-6 rounded-md border border-gray-300 flex items-center justify-center text-gray-600">
+                  <button className="w-6 h-6 rounded-full border border-gray-300 bg-gray-50 flex items-center justify-center text-gray-600">
                     <Minus className="w-3 h-3" />
                   </button>
                   <span className="w-7 text-center text-[13px] font-semibold">{it.qty}</span>
-                  <button className="w-6 h-6 rounded-md border border-gray-300 flex items-center justify-center text-gray-600">
+                  <button className="w-6 h-6 rounded-full flex items-center justify-center text-white" style={{ background: "#0d9488" }}>
                     <Plus className="w-3 h-3" />
                   </button>
                 </div>
-                <div className="w-16 text-right text-[13px] font-semibold">Rs {it.total}</div>
+                <div className="w-16 text-right text-[13px] font-semibold" style={{ color: "#0A4D5C" }}>Rs {it.total}</div>
                 <button className="text-gray-400">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -270,10 +272,10 @@ export function SaafSaleScreen() {
           </div>
 
           <div className="px-3 py-1.5 border-t border-gray-100 shrink-0 flex items-center gap-1.5">
-            <div className="flex-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-[11px] text-gray-400">
+            <div className="flex-1 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-[11px] text-gray-400">
               Order Notes… (N dabayen)
             </div>
-            <button className="relative shrink-0 flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1.5 text-[11px] font-bold text-gray-600">
+            <button className="relative shrink-0 flex items-center gap-1 rounded-full border border-gray-300 px-3 py-1.5 text-[11px] font-bold text-gray-600">
               <Percent className="w-3 h-3" />
               Discount
               <span className="absolute -top-1.5 -right-1"><NayaTag /></span>
@@ -299,19 +301,19 @@ export function SaafSaleScreen() {
           {/* One-tap payment + footer rows */}
           <div className="px-3 pt-2 pb-3 space-y-1.5 shrink-0">
             <div className="grid grid-cols-3 gap-1.5">
-              <button className="py-2 rounded-lg text-white flex flex-col items-center gap-0.5" style={{ background: "#0A4D5C" }}>
+              <button className="py-2 rounded-xl text-white flex flex-col items-center gap-0.5" style={{ background: "#0A4D5C" }}>
                 <Banknote className="w-5 h-5" />
                 <span className="text-[12px] font-bold leading-none">CASH</span>
                 <span className="text-[9px] text-white/75 leading-none">Rs 1,125</span>
                 <Kbd>Alt+1</Kbd>
               </button>
-              <button className="py-2 rounded-lg text-white flex flex-col items-center gap-0.5" style={{ background: "#0d9488" }}>
+              <button className="py-2 rounded-xl text-white flex flex-col items-center gap-0.5" style={{ background: "#0d9488" }}>
                 <CreditCard className="w-5 h-5" />
                 <span className="text-[12px] font-bold leading-none">CARD</span>
                 <span className="text-[9px] text-white/75 leading-none">Rs 1,048</span>
                 <Kbd>Alt+2</Kbd>
               </button>
-              <button className="py-2 rounded-lg text-white flex flex-col items-center gap-0.5" style={{ background: "#0f766e" }}>
+              <button className="py-2 rounded-xl text-white flex flex-col items-center gap-0.5" style={{ background: "#0f766e" }}>
                 <Smartphone className="w-5 h-5" />
                 <span className="text-[12px] font-bold leading-none">DIGITAL</span>
                 <span className="text-[9px] text-white/75 leading-none">Rs 1,048</span>
@@ -320,16 +322,16 @@ export function SaafSaleScreen() {
             </div>
 
             <div className="grid grid-cols-4 gap-1.5">
-              <button className="py-1.5 rounded-lg border border-gray-200 text-gray-500 text-[11px] font-semibold flex items-center justify-center gap-1.5">
+              <button className="py-1.5 rounded-full border border-gray-300 bg-white text-gray-500 text-[11px] font-semibold flex items-center justify-center gap-1.5">
                 Clear <Kbd dark>F4</Kbd>
               </button>
-              <button className="py-1.5 rounded-lg border border-gray-200 text-gray-500 text-[11px] font-semibold flex items-center justify-center gap-1.5">
+              <button className="py-1.5 rounded-full border border-gray-300 bg-white text-gray-500 text-[11px] font-semibold flex items-center justify-center gap-1.5">
                 Hold <Kbd dark>F5</Kbd>
               </button>
-              <button className="py-1.5 rounded-lg border border-gray-200 text-gray-500 text-[11px] font-semibold flex items-center justify-center gap-1.5">
+              <button className="py-1.5 rounded-full border border-gray-300 bg-white text-gray-500 text-[11px] font-semibold flex items-center justify-center gap-1.5">
                 Recall <Kbd dark>F3</Kbd>
               </button>
-              <button className="relative py-1.5 rounded-lg border border-gray-200 text-gray-500 text-[11px] font-semibold flex items-center justify-center gap-1.5">
+              <button className="relative py-1.5 rounded-full border border-gray-300 bg-white text-gray-500 text-[11px] font-semibold flex items-center justify-center gap-1.5">
                 <Coins className="w-3.5 h-3.5" />
                 Drawer
                 <span className="absolute -top-1.5 -right-1"><NayaTag /></span>
@@ -338,15 +340,15 @@ export function SaafSaleScreen() {
 
             {/* Send to Kitchen ab neeche — upar wali yellow line khatam */}
             <div className="grid grid-cols-3 gap-1.5 items-stretch">
-              <button className="py-2 rounded-lg border border-orange-400 bg-orange-50 text-orange-700 text-[11px] font-bold flex items-center justify-center gap-1 relative">
+              <button className="py-2 rounded-xl border border-orange-400 bg-orange-50 text-orange-700 text-[11px] font-bold flex items-center justify-center gap-1 relative">
                 <ClipboardList className="w-3.5 h-3.5" />
                 Kitchen
                 <span className="absolute -top-1.5 -right-1"><NayaTag /></span>
               </button>
-              <button className="py-2 rounded-lg border text-[11px] font-bold flex items-center justify-center gap-1.5" style={{ borderColor: "#0A4D5C", color: "#0A4D5C" }}>
+              <button className="py-2 rounded-xl border bg-white text-[11px] font-bold flex items-center justify-center gap-1.5" style={{ borderColor: "#0A4D5C", color: "#0A4D5C" }}>
                 Provisional <Kbd dark>F9</Kbd>
               </button>
-              <button className="py-2 rounded-lg text-white text-[12px] font-extrabold flex items-center justify-center gap-1.5" style={{ background: "#0d9488" }}>
+              <button className="py-2 rounded-xl text-white text-[12px] font-extrabold flex items-center justify-center gap-1.5" style={{ background: "#0d9488" }}>
                 PAY <Kbd>F8</Kbd>
               </button>
             </div>

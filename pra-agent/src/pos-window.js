@@ -16,7 +16,7 @@
 //   the POS window (and the tray menu mirrors it).
 // - window.open: same-origin popups open as child windows in the same
 //   partition; everything else (WhatsApp links etc.) goes to the system browser.
-const { BrowserWindow, shell } = require('electron');
+const { BrowserWindow, shell, app } = require('electron');
 const path = require('path');
 const offlineSnapshot = require('./offline-snapshot');
 
@@ -99,6 +99,39 @@ function openPosWindow(config, opts = {}) {
 
   // Keep our own title — the web app rewrites document.title on every page.
   posWindow.on('page-title-updated', (e) => e.preventDefault());
+
+  // Tag the shell in the user agent so the server can recognize NestPOS
+  // Desktop (e.g. POS login pre-ticks "Remember me" — the persist:pos
+  // partition keeps the session across restarts, so remember SHOULD be on).
+  try {
+    const ua = posWindow.webContents.getUserAgent() || '';
+    if (!ua.includes('NestPOSDesktop')) {
+      posWindow.webContents.setUserAgent(ua + ' NestPOSDesktop/' + app.getVersion());
+    }
+  } catch (e) {}
+
+  // Agent AUTO-CONFIG (v1.5.0): once the cashier is logged in (any authed
+  // /pos/ page loaded), let main.js pull the company's agent credentials
+  // with the session cookie — zero manual agent setup on shop PCs.
+  // onLoggedIn returns a promise resolving true on success; until then we
+  // keep retrying on subsequent page loads (e.g. first load was the login
+  // page, or the config fetch raced a network drop).
+  const onLoggedIn = typeof opts.onLoggedIn === 'function' ? opts.onLoggedIn : null;
+  let autoCfgDone = false;
+  let autoCfgInFlight = false;
+  posWindow.webContents.on('did-finish-load', () => {
+    try {
+      if (!onLoggedIn || autoCfgDone || autoCfgInFlight) return;
+      const cur = posWindow.webContents.getURL() || '';
+      if (!cur.startsWith(origin + '/pos/')) return;
+      if (cur.startsWith(origin + '/pos/login')) return;
+      autoCfgInFlight = true;
+      Promise.resolve(onLoggedIn(posWindow.webContents.session, origin))
+        .then((ok) => { autoCfgDone = !!ok; })
+        .catch(() => {})
+        .finally(() => { autoCfgInFlight = false; });
+    } catch (e) { autoCfgInFlight = false; }
+  });
 
   // Offline Mode (Beta): register the passthrough-first https interception on
   // the persist:pos partition BEFORE the first load, and snapshot the sale

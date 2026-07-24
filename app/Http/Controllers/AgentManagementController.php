@@ -45,6 +45,53 @@ class AgentManagementController extends Controller
         return view('company.agent', compact('company', 'stats', 'isOnline', 'release'));
     }
 
+    /**
+     * NestPOS Desktop auto-config (Jul 2026): the Electron shell calls this
+     * right after a successful POS login and feeds the company's agent
+     * credentials into itself — zero manual setup for silent printing.
+     *
+     * SAFETY: this endpoint must NEVER change how PRA submission is routed.
+     * - Fresh key: agent_enabled=true + agent_submits_pra=false (printing-only;
+     *   fiscal_device companies route via agent regardless — agentHandlesPra()).
+     * - Existing key but agent disabled: re-enable, and if agent_submits_pra is
+     *   NULL pin it to false first (NULL + enabled would flip PRA routing to
+     *   the agent via the legacy `?? true` fallback in agentHandlesPra()).
+     * - Existing enabled key: returned as-is, nothing written.
+     */
+    public function desktopConfig(Request $request)
+    {
+        $user = $this->posUser();
+        abort_unless($user, 403);
+        $company = Company::findOrFail($user->company_id);
+
+        $hasSubmitsCol = \Schema::hasColumn('companies', 'agent_submits_pra');
+
+        if (empty($company->agent_api_key)) {
+            $update = [
+                'agent_api_key' => 'tnk_' . Str::random(48),
+                'agent_enabled' => true,
+            ];
+            if ($hasSubmitsCol) {
+                $update['agent_submits_pra'] = false;
+            }
+            $company->update($update);
+        } elseif (!$company->agent_enabled) {
+            $update = ['agent_enabled' => true];
+            if ($hasSubmitsCol && $company->agent_submits_pra === null) {
+                $update['agent_submits_pra'] = false;
+            }
+            $company->update($update);
+        }
+
+        return response()->json([
+            'success' => true,
+            'server_url' => url('/api/agent'),
+            'api_key' => $company->agent_api_key,
+            'company_id' => $company->id,
+            'company_name' => $company->name,
+        ]);
+    }
+
     public function generateKey(Request $request)
     {
         $user = $this->posUser();

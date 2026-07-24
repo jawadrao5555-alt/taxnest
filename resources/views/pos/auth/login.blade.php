@@ -73,7 +73,7 @@
 
                             <div class="flex items-center justify-between">
                                 <label class="flex items-center">
-                                    <input id="remember_me" type="checkbox" name="remember" class="rounded border-purple-300/30 bg-white/5 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 w-4 h-4">
+                                    <input id="remember_me" type="checkbox" name="remember" @if(str_contains(request()->userAgent() ?? '', 'NestPOSDesktop')) checked @endif class="rounded border-purple-300/30 bg-white/5 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 w-4 h-4">
                                     <span class="ml-2 text-sm text-purple-200/50">Remember me</span>
                                 </label>
                                 <a href="{{ route('password.request') }}" class="text-sm text-purple-300/70 hover:text-purple-200 transition">Forgot Password?</a>

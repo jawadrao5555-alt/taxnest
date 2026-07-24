@@ -447,6 +447,9 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/agent/regenerate-key', [\App\Http\Controllers\AgentManagementController::class, 'regenerateKey'])->name('pos.agent.regenerate');
     Route::post('/agent/toggle', [\App\Http\Controllers\AgentManagementController::class, 'toggle'])->name('pos.agent.toggle');
     Route::get('/agent/download', [\App\Http\Controllers\AgentManagementController::class, 'downloadAgent'])->name('pos.agent.download');
+    // NestPOS Desktop shell auto-config: shell fetches agent credentials with the
+    // logged-in POS session cookie right after login (zero manual agent setup).
+    Route::get('/desktop/agent-config', [\App\Http\Controllers\AgentManagementController::class, 'desktopConfig'])->name('pos.desktop.agent-config');
 
     Route::get('/dashboard', [PosController::class, 'dashboard'])->name('pos.dashboard');
     Route::post('/notifications/{id}/dismiss', [PosController::class, 'dismissNotification'])->name('pos.notifications.dismiss');

@@ -10,7 +10,7 @@ const { printHtml: printHtmlSilent } = require('./src/printer');
 const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk } = require('./src/pos-window');
 
 const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/taxnest/releases/latest';
-const BUILD_TIMESTAMP = '20260724-2';
+const BUILD_TIMESTAMP = '20260724-3';
 let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
 
 // ─── Zip-based SELF-UPDATE ──────────────────────────────────────────────────
@@ -207,26 +207,66 @@ function setPosSettings(next) {
   });
 }
 
+// Zero-config default (v1.5.0): the POS window can open BEFORE the agent is
+// configured — it just loads the live POS on the default server. After login,
+// autoConfigureAgent() below feeds the agent credentials automatically.
+const DEFAULT_SERVER_URL = 'https://taxnest.com.pk/api/agent';
+
 function openPos() {
   try {
     const config = store.get('config');
-    if (!config || !config.serverUrl) {
-      // Not configured yet — show the agent settings window instead.
-      if (mainWindow) mainWindow.show();
-      return false;
-    }
+    const posConfig =
+      config && config.serverUrl ? config : { serverUrl: DEFAULT_SERVER_URL };
     const s = getPosSettings();
-    openPosWindow(config, {
+    openPosWindow(posConfig, {
       kiosk: s.kiosk,
       isOfflineEnabled: () => getPosSettings().offlineMode,
       onKioskToggle: (kioskNow) => {
         setPosSettings({ ...getPosSettings(), kiosk: kioskNow });
         buildTrayMenu();
       },
+      onLoggedIn: autoConfigureAgent,
     });
     return true;
   } catch (e) {
     console.log('[pos-window] open failed:', e && e.message);
+    return false;
+  }
+}
+
+// Agent AUTO-CONFIG (v1.5.0): pull the company's agent credentials from the
+// server using the POS window's logged-in session cookie. Zero manual setup —
+// silent printing + PRA sync start working right after the first POS login.
+// Never overwrites an existing complete config.
+async function autoConfigureAgent(ses, origin) {
+  try {
+    const existing = store.get('config');
+    if (existing && existing.serverUrl && existing.apiKey && existing.companyId) {
+      return true; // already configured — nothing to do, stop retrying
+    }
+    const res = await ses.fetch(origin + '/pos/desktop/agent-config', {
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    if (!data || !data.success || !data.api_key || !data.company_id) return false;
+    const config = {
+      serverUrl: data.server_url || origin + '/api/agent',
+      apiKey: data.api_key,
+      companyId: data.company_id,
+    };
+    store.set('config', config);
+    stopAgent();
+    startAgent(withAppMeta(config), sendStatusUpdate, handleAgentUpdate);
+    console.log('[auto-config] agent configured from POS login (company ' + data.company_id + ')');
+    try {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('config-autofilled', { companyId: data.company_id });
+      }
+    } catch (e) {}
+    return true;
+  } catch (e) {
+    console.log('[auto-config] failed:', e && e.message);
     return false;
   }
 }

@@ -1162,6 +1162,12 @@ class PosController extends Controller
             // present only on bills queued in IndexedDB while the device was
             // offline, replayed by the sale screen's sync engine.
             'offline_uuid' => 'nullable|string|max:64',
+            // Offline Desktop Mode Phase 2 (Jul 2026): when the bill was queued
+            // offline, the client sends the ORIGINAL sale moment + the cashier
+            // who rang it up, so a next-morning sync doesn't stamp every bill
+            // with the sync time / whoever pressed "Sync".
+            'offline_queued_at' => 'nullable|date',
+            'offline_queued_by' => 'nullable|integer',
         ]);
 
         // OFFLINE-FIRST replay guard: if an earlier sync attempt already stored
@@ -1359,6 +1365,40 @@ class PosController extends Controller
             'delivery_status' => $riderId ? 'assigned' : null,
         ] : [];
 
+        // Offline Desktop Mode Phase 2 (Jul 2026): honor the ORIGINAL sale moment
+        // and cashier for offline-queued bills. Only trusted when the request also
+        // carries an offline_uuid (i.e. it really came through the offline queue).
+        // Timestamp is clamped to [now-3d, now] — a wrong PC clock or a stale
+        // queue can never back-date beyond the wash window or post-date a bill.
+        // Attribution only sticks when the claimed user belongs to THIS company.
+        $offlineQueuedAt = null;
+        $offlineQueuedBy = null;
+        if ($offlineUuidColumnExists) {
+            if ($request->filled('offline_queued_at')) {
+                try {
+                    $qa = \Carbon\Carbon::parse($request->input('offline_queued_at'));
+                    $min = now()->subDays(3);
+                    if ($qa->lt($min)) {
+                        $qa = $min;
+                    }
+                    if ($qa->gt(now())) {
+                        $qa = now();
+                    }
+                    $offlineQueuedAt = $qa;
+                } catch (\Throwable $e) {
+                    $offlineQueuedAt = null;
+                }
+            }
+            if ($request->filled('offline_queued_by')) {
+                $qbId = (int) $request->input('offline_queued_by');
+                if ($qbId > 0 && $qbId !== (int) auth('pos')->id()) {
+                    $offlineQueuedBy = \App\Models\User::where('id', $qbId)
+                        ->where('company_id', $companyId)
+                        ->value('id');
+                }
+            }
+        }
+
         DB::beginTransaction();
         try {
             $draftId = $request->input('draft_id');
@@ -1448,9 +1488,19 @@ class PosController extends Controller
                     'submission_hash' => $submissionHash,
                     // Offline-first idempotency key (NULL for normal online bills).
                     'offline_uuid' => $offlineUuidColumnExists ? $offlineUuid : null,
-                    'created_by' => auth('pos')->id(),
+                    // Offline sync: credit the cashier who RANG UP the bill, not
+                    // whoever's session replayed the queue next morning.
+                    'created_by' => $offlineQueuedBy ?: auth('pos')->id(),
                     'notes' => $request->input('kitchen_notes'),
                 ] + $riderFields + $taxInclusiveFields);
+            }
+
+            // Offline sync: stamp the bill with the ORIGINAL (clamped) sale moment.
+            // created_at is NOT mass-assignable — set + save explicitly. Applies to
+            // both the fresh-create and the resumed-draft finalize paths.
+            if ($offlineQueuedAt) {
+                $transaction->created_at = $offlineQueuedAt;
+                $transaction->save();
             }
 
             foreach ($companyItems as $ri) {

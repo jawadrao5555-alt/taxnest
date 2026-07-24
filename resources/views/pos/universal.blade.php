@@ -2976,6 +2976,11 @@ function restaurantPos() {
             // reopen the lost-response duplicate window. Fallback only if absent.
             const uuid = payload.offline_uuid || this._newOfflineUuid();
             payload.offline_uuid = uuid;
+            // Phase 2: ride the ORIGINAL sale moment + cashier on the payload so a
+            // next-morning sync books the bill under the right date & user (server
+            // clamps the timestamp and company-checks the user — spoof-safe).
+            payload.offline_queued_at = new Date().toISOString();
+            payload.offline_queued_by = {{ (int) auth('pos')->id() }};
             const rec = {
                 uuid,
                 company_id: this._offlineCompanyId,
@@ -3035,8 +3040,13 @@ function restaurantPos() {
             }
             this.offlineSyncing = true;
             this.syncStatus = 'syncing';
-            let ok = 0, failed = 0, authStop = false;
+            let ok = 0, failed = 0, authStop = false, poisoned = 0;
             for (const b of bills.sort((a, z) => a.queued_at - z.queued_at)) {
+                // Poison-bill cap: after 50 REJECTED attempts (server said no — not
+                // network drops, those `break` before counting) stop retrying so one
+                // bad bill can't block/spam the queue forever. It stays on-device
+                // (badge + count) for support to inspect.
+                if ((b.tries || 0) >= 50) { poisoned++; continue; }
                 try {
                     const res = await fetch('{{ route("pos.invoice.store") }}', {
                         method: 'POST',
@@ -3077,6 +3087,7 @@ function restaurantPos() {
             }
             if (authStop) this.showToast('Session expired — please refresh & login. Offline bills are safe on this device.', 'error');
             else if (failed > 0 && manual) this.showToast(failed + ' bill(s) could not sync — see pending badge', 'error');
+            else if (poisoned > 0 && manual) this.showToast(poisoned + ' bill(s) blocked after 50 failed tries — support se raabta karein', 'error');
         },
         // Client-rendered interim receipt for an OFFLINE bill (no server template
         // reachable). Grand TOTAL only — never prints subtotal/tax lines, which

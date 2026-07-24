@@ -1,5 +1,14 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.5.0 / build 20260724-3 (2026-07-24) — BETA 2
+**New: zero-setup agent + smarter offline sync**
+
+- **Agent auto-config**: the POS window now opens even on a fresh, unconfigured install (default server) — and right after the cashier logs in, the agent automatically fetches this company's Server URL + API key from the server and configures itself. Silent printing + sync start working with ZERO manual setup. Existing configured agents are never overwritten.
+- **Remember me pre-ticked**: the POS login page detects NestPOS Desktop (user-agent tag) and pre-ticks "Remember me" so the login survives restarts by default.
+- **Offline bills keep their real date & cashier**: bills queued offline now carry the original sale time and the cashier who rang them up; the server books them under that time (clamped to the last 3 days) and credits the right cashier after sync.
+- **Poison-bill cap**: an offline bill rejected by the server 50 times stops auto-retrying (stays safely on the device for support) so it can never block or spam the queue.
+- **Product images offline**: the snapshot now also saves product images (from the embedded catalog), so the sale screen shows pictures while offline (size caps still apply).
+
 ## v1.5.0 / build 20260724-2 (2026-07-24) — BETA
 **New: Offline Mode (Beta) — billing without internet (NestPOS Desktop)**
 

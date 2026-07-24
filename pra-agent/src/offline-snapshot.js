@@ -143,6 +143,27 @@ function extractAssetPaths(html, origin) {
   return Array.from(found);
 }
 
+// Product images: the sale screen embeds the product list as JSON, so image
+// URLs appear as escaped strings (https:\/\/...\/storage\/products\/x.png) —
+// never in href/src attributes. Unescape a copy and scan for /storage/ image
+// paths so offline mode shows product pictures too (caps still apply).
+function extractEmbeddedImagePaths(html, origin) {
+  const found = new Set();
+  const un = String(html || '').replace(/\\\//g, '/');
+  const re = /(?:https?:\/\/[^"'\s\\]+?)?\/storage\/[^"'\s?#\\]+?\.(?:png|jpe?g|webp|gif|svg)/gi;
+  let m;
+  while ((m = re.exec(un)) !== null) {
+    const raw = m[0];
+    try {
+      const u = /^https?:/i.test(raw) ? new URL(raw) : new URL(origin + raw);
+      if (u.origin !== origin) continue;
+      if (!ASSET_EXT.has(extOf(u.pathname))) continue;
+      found.add(u.pathname);
+    } catch (e) {}
+  }
+  return Array.from(found);
+}
+
 function extractCssUrls(cssText, origin, cssPathname) {
   const found = new Set();
   const re = /url\(\s*['"]?([^'")]+)['"]?\s*\)/gi;
@@ -190,7 +211,12 @@ async function captureSnapshot(ses, origin, pageUrl) {
       (html.includes('restaurantPos(') || html.includes('Current Order') || html.includes('pos/invoice'));
     if (!looksLikeSaleScreen) { log('capture skipped: not the sale screen (login redirect?)'); return false; }
 
-    const wanted = extractAssetPaths(html, origin).slice(0, MAX_ASSETS);
+    // Page assets FIRST (css/js keep the screen usable), product images after —
+    // if the caps bite, pictures are the right thing to lose.
+    const wanted = extractAssetPaths(html, origin)
+      .concat(extractEmbeddedImagePaths(html, origin))
+      .filter((p, i, arr) => arr.indexOf(p) === i)
+      .slice(0, MAX_ASSETS);
     const dir = snapshotDir();
     const aDir = assetsDir();
     await fsp.mkdir(aDir, { recursive: true });
@@ -364,6 +390,7 @@ module.exports = {
   snapshotInfo,
   // exported for tests
   extractAssetPaths,
+  extractEmbeddedImagePaths,
   extractCssUrls,
   injectOfflineBanner,
   serveOffline,

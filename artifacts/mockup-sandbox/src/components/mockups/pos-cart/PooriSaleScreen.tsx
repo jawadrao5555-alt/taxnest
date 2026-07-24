@@ -37,6 +37,9 @@ const products = [
   { name: "Cold Drink 1.5L", price: 180, c: "#1f2937" },
   { name: "Mineral Water", price: 60, c: "#334155" },
   { name: "Kheer", price: 130, c: "#525252" },
+  { name: "Chicken Karahi (Half)", price: 850, c: "#0A4D5C" },
+  { name: "Naan", price: 30, c: "#7c5e10" },
+  { name: "Raita", price: 50, c: "#0f766e" },
 ];
 
 function Kbd({ children, dark = false }: { children: string; dark?: boolean }) {
@@ -200,14 +203,15 @@ export function PooriSaleScreen() {
       <div className="flex flex-1 min-h-0">
         {/* Product grid */}
         <div className="flex-1 p-3 overflow-hidden">
-          <div className="grid grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-5 gap-2">
             {products.map((p) => (
-              <button key={p.name} className="rounded-lg bg-white border border-neutral-200 p-2.5 text-left">
-                <div className="w-full h-14 rounded-md mb-2 flex items-center justify-center text-white text-lg font-extrabold" style={{ background: p.c }}>
-                  {p.name.charAt(0)}
-                </div>
-                <div className="text-[12px] font-semibold text-neutral-800 truncate">{p.name}</div>
-                <div className="text-[12px] font-bold" style={{ color: "#0A4D5C" }}>
+              <button
+                key={p.name}
+                className="rounded-lg bg-white border border-neutral-200 px-2.5 py-2 text-left border-l-4"
+                style={{ borderLeftColor: p.c }}
+              >
+                <div className="text-[12px] font-semibold text-neutral-800 leading-tight line-clamp-2 min-h-[30px]">{p.name}</div>
+                <div className="text-[12px] font-bold mt-0.5" style={{ color: "#0A4D5C" }}>
                   Rs {p.price}
                 </div>
               </button>

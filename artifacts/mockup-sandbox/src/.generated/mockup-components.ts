@@ -9,6 +9,7 @@ export const modules: ModuleMap = {
   "./components/mockups/sale-screen-features/DesignBList.tsx": () => import("../components/mockups/sale-screen-features/DesignBList.tsx"),
   "./components/mockups/sale-screen-features/SaleScreenFull.tsx": () => import("../components/mockups/sale-screen-features/SaleScreenFull.tsx"),
   "./components/mockups/sale-screen-features/SaleScreenSaada.tsx": () => import("../components/mockups/sale-screen-features/SaleScreenSaada.tsx"),
+  "./components/mockups/waiter-table-flow/SaleScreenPlacement.tsx": () => import("../components/mockups/waiter-table-flow/SaleScreenPlacement.tsx"),
   "./components/mockups/waiter-table-flow/TablePicker.tsx": () => import("../components/mockups/waiter-table-flow/TablePicker.tsx"),
   "./components/mockups/waiter-table-flow/WaiterSalesReport.tsx": () => import("../components/mockups/waiter-table-flow/WaiterSalesReport.tsx")
 };

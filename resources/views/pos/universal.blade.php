@@ -678,13 +678,13 @@ window.addEventListener('popstate', function() {
             <div x-ref="gridContainer" tabindex="0" @keydown.arrow-right.prevent="moveGridFocus(1)" @keydown.arrow-left.prevent="moveGridFocus(-1)" @keydown.arrow-down.prevent="moveGridFocus(gridCols)" @keydown.arrow-up.prevent="moveGridFocus(-gridCols)" @keydown.enter.prevent="addGridFocusedItem()" class="flex-1 overflow-y-auto p-3 outline-none">
 
                 <template x-if="loading">
-                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
                         <template x-for="i in 12"><div class="rounded-2xl overflow-hidden"><div class="skeleton aspect-square"></div><div class="p-2.5 space-y-2"><div class="skeleton h-3 rounded w-3/4"></div><div class="skeleton h-4 rounded w-1/2"></div></div></div></template>
                     </div>
                 </template>
 
                 <template x-if="!loading">
-                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
                         <template x-for="(item, idx) in displayItems" :key="item.id + '-' + item.type">
                             <div :id="'grid-item-' + idx" class="prod-card bg-white dark:bg-gray-900 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-800 shadow-sm fade-in" :class="[gridFocusMode && gridFocusIndex === idx ? 'ring-2 ring-purple-500 shadow-purple-200 dark:shadow-purple-900' : '', item.stockStatus === 'out' && blockOutOfStock ? 'stock-out' : (item.stockStatus === 'out' && !blockOutOfStock ? 'stock-out allow-add' : '')]" @click="handleProductClick(item)">
                                 {{-- IMAGE CARD: only render the big image area when a real uploaded image exists. --}}
@@ -710,7 +710,7 @@ window.addEventListener('popstate', function() {
                                 </template>
                                 {{-- TEXT-ONLY ROW: when no image, render a compact name+price list row — no placeholder, no letter badge. --}}
                                 <template x-if="!item.image">
-                                    <div class="relative flex items-center justify-end gap-1 px-3 pt-2.5 min-h-[26px]">
+                                    <div class="relative flex items-center justify-end gap-1 px-2.5 pt-1.5 min-h-0">
                                         @if($company->inventory_enabled)
                                         <template x-if="item.stockStatus === 'low'"><span class="stock-dot stock-low" title="Low stock"></span></template>
                                         <template x-if="item.stockStatus === 'out'"><span class="px-1.5 py-0.5 bg-red-500/90 text-white text-[8px] font-bold rounded-md">OUT</span></template>
@@ -719,12 +719,12 @@ window.addEventListener('popstate', function() {
                                         <template x-if="item.is_tax_exempt"><span class="px-1.5 py-0.5 bg-green-500/90 text-white text-[8px] font-bold rounded-md">NO TAX</span></template>
                                     </div>
                                 </template>
-                                <div class="px-3 py-2.5">
+                                <div class="px-2.5 py-2">
                                     <p class="font-bold text-gray-900 dark:text-white truncate leading-tight" :class="item.image ? 'text-xs' : 'text-sm'" x-text="item.name"></p>
                                     <template x-if="item.type === 'deal' && item.components">
                                         <p class="text-[10px] text-gray-500 dark:text-gray-400 truncate mt-0.5" x-text="item.components" :title="item.components"></p>
                                     </template>
-                                    <div class="flex items-center justify-between mt-1.5 gap-2">
+                                    <div class="flex items-center justify-between mt-1 gap-2">
                                         <span class="price-badge text-sm font-extrabold text-purple-600 dark:text-purple-400" x-text="'Rs. ' + Number(item.price).toLocaleString()"></span>
                                         <div class="flex items-center gap-2">
                                             <template x-if="getCartQty(item) > 0">
@@ -732,8 +732,8 @@ window.addEventListener('popstate', function() {
                                             </template>
                                             {{-- Inline + button for the no-image text row (image cards already have the floating quick-add). --}}
                                             <template x-if="!item.image">
-                                                <button @click.stop="handleProductClick(item)" class="w-8 h-8 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center shadow-sm transition-all">
-                                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                                                <button @click.stop="handleProductClick(item)" class="w-7 h-7 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center shadow-sm transition-all">
+                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
                                                 </button>
                                             </template>
                                         </div>
@@ -788,8 +788,8 @@ window.addEventListener('popstate', function() {
             </button>
         </div>
 
-        {{-- Cart column widened (owner, 24 Jul 2026: "cart asani se nazar aaye") 300/340/380 → 320/380/420 --}}
-        <div class="w-full md:w-[320px] lg:w-[380px] xl:w-[420px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl" :class="mobileView === 'cart' ? 'flex' : 'hidden md:flex'">
+        {{-- Cart column widened again (owner, 24 Jul 2026: buttons one-line + compact tiles) 320/380/420 → 340/400/460 --}}
+        <div class="w-full md:w-[340px] lg:w-[400px] xl:w-[460px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl" :class="mobileView === 'cart' ? 'flex' : 'hidden md:flex'">
             <div class="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
                 <button @click="mobileView = 'menu'" class="md:hidden p-1.5 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
@@ -1062,21 +1062,24 @@ window.addEventListener('popstate', function() {
                             <span x-show="heldOrders.length > 0" class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center held-badge-pulse shadow-sm" x-text="heldOrders.length"></span>
                         </button>
                     </div>
-                    <!-- ─── SAVE PROVISIONAL — separate from Pay (no modal, no payment) ─── -->
-                    <button @click="saveProvisionalDirect()" :disabled="cart.length === 0 || submitting || (!editingBillId && !canProvisional())" :title="(!editingBillId && !canProvisional()) ? 'Provisional bills are for Delivery orders only' : ''" class="w-full py-2.5 mb-2 rounded-xl text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-30 shadow-sm transition flex items-center justify-center gap-2">
-                        <svg x-show="!submitting" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
-                        <svg x-show="submitting" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                        <span x-text="editingBillId ? ('Update Bill ' + editingBillNumber) : 'Save Provisional'"></span>
-                        <kbd class="text-[9px] bg-amber-700/40 px-1.5 py-0.5 rounded font-mono">F9</kbd>
-                    </button>
-                    <button @click="showPayModal = true" :disabled="cart.length === 0 || submitting" class="pay-btn-premium btn-ripple w-full py-4 rounded-2xl text-base font-extrabold text-white disabled:opacity-30">
-                        <span class="flex items-center justify-center gap-2">
-                            <svg x-show="submitting" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                            <svg x-show="!submitting" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                            PAY Rs. <span x-text="Number(roundedTotal).toLocaleString()"></span>
-                            <kbd x-show="!submitting" class="text-[9px] bg-green-500/30 px-1.5 rounded font-mono">F8</kbd>
-                        </span>
-                    </button>
+                    <!-- ─── SAVE PROVISIONAL + PAY — ONE line (owner, 24 Jul 2026): frees a full
+                         button-row of cart height; Provisional 2/5, PAY 3/5 (stays dominant). ─── -->
+                    <div class="grid grid-cols-5 gap-2">
+                        <button @click="saveProvisionalDirect()" :disabled="cart.length === 0 || submitting || (!editingBillId && !canProvisional())" :title="(!editingBillId && !canProvisional()) ? 'Provisional bills are for Delivery orders only' : ''" class="col-span-2 min-w-0 py-3 rounded-xl text-xs font-bold text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-30 shadow-sm transition flex items-center justify-center gap-1">
+                            <svg x-show="!submitting" class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                            <svg x-show="submitting" class="w-3.5 h-3.5 flex-shrink-0 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                            <span class="truncate" x-text="editingBillId ? ('Update Bill ' + editingBillNumber) : 'Provisional'"></span>
+                            <kbd class="text-[9px] bg-amber-700/40 px-1.5 py-0.5 rounded font-mono flex-shrink-0">F9</kbd>
+                        </button>
+                        <button @click="showPayModal = true" :disabled="cart.length === 0 || submitting" class="pay-btn-premium btn-ripple col-span-3 min-w-0 py-3 rounded-xl text-sm font-extrabold text-white disabled:opacity-30">
+                            <span class="flex items-center justify-center gap-1.5">
+                                <svg x-show="submitting" class="w-4 h-4 flex-shrink-0 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                <svg x-show="!submitting" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                                PAY Rs. <span x-text="Number(roundedTotal).toLocaleString()"></span>
+                                <kbd x-show="!submitting" class="text-[9px] bg-green-500/30 px-1.5 rounded font-mono flex-shrink-0">F8</kbd>
+                            </span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

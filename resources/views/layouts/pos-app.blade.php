@@ -300,11 +300,16 @@
                         <div class="h-5 w-px bg-white/10 hidden md:block"></div>
 
                         <nav class="hidden md:flex items-center gap-1">
+                            {{-- Sale-screen redesign (Jul 2026): on the sale screen itself the static
+                                 "New Sale" link is replaced by the teleported action button (newSale())
+                                 that lands in #tn-nav-sale-tools below — see universal.blade.php. --}}
+                            @unless(request()->routeIs('pos.invoice.create'))
                             <a href="{{ route('pos.invoice.create') }}"
-                               class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.invoice.create') ? 'active text-white' : 'text-white' }}">
+                               class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-white">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
                                 New Sale
                             </a>
+                            @endunless
                             @if(($companyLayout->pos_dashboard_style ?? 'default') === 'saaf')
                             {{-- Saaf dashboard (Jul 2026): simplified always-visible nav — 5 core links; everything else stays in the profile menu. --}}
                             <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}"
@@ -326,6 +331,12 @@
                             <x-branch-switcher color="purple" />
                         </div>
                     </div>
+
+                    {{-- Sale-screen tools anchor (Jul 2026 redesign): universal.blade.php teleports
+                         its utility pills (Local/Failed/Reprint/Held), + New Sale and the switches
+                         dropdown here via x-teleport, so they keep restaurantPos() Alpine scope.
+                         Empty and harmless on every other POS page. --}}
+                    <div id="tn-nav-sale-tools" class="hidden md:flex items-center gap-1.5 min-w-0 flex-1 justify-center px-2"></div>
 
                     <div class="flex items-center gap-2" x-data="{ online: navigator.onLine, isFs: false, clock: '{{ now()->format('H:i') }}' }"
                          x-init="

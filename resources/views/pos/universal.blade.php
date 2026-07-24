@@ -1,8 +1,13 @@
 <x-pos-layout>
+{{-- DIVERGENCE NOTE (24 Jul 2026): sale-screen redesign applied HERE only —
+     nav sale-tools teleport, compact grid rows, Akhri Bills strip, notes+discount
+     one-row, bada total band, one-tap CASH/CARD (Alt+1/2). The FBR universal port
+     (fbr-pos/universal.blade.php) is intentionally FROZEN on the pre-redesign
+     layout until the owner approves porting — diff against it accordingly. --}}
 @php
     $isSaaf = ($company->pos_dashboard_style ?? 'default') === 'saaf';
 @endphp
-@if($isSaaf)<link rel="stylesheet" href="{{ asset('css/pos-saaf.css') }}?v=3">@endif
+@if($isSaaf)<link rel="stylesheet" href="{{ asset('css/pos-saaf.css') }}?v=4">@endif
 <style>
 *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
 @keyframes cartPop { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1); } }
@@ -226,10 +231,146 @@ window.addEventListener('popstate', function() {
      terminals, big TVs). Auto mode picks the zoom from viewport size; manual % is
      per-device via localStorage 'tn_screen_fit'. Empty string = normal 100% layout. --}}
 <div x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="tn-sale-root flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950" :style="fitStyleStr">
-    {{-- PRA Reporting + Auto-Print toggles strip (visible to admin + cashier).
+
+    {{-- ═══════════ NAV SALE TOOLS (Jul 2026 redesign, owner-approved mockup) ═══════════
+         Desktop (md+): the utility pills (Local/Failed/Reprint/Held + sync), the "+ New Sale"
+         action and a "Switches" dropdown (PRA / Auto-Print / Auto-KOT) live INSIDE the black
+         top-nav — teleported into #tn-nav-sale-tools (pos-app.blade.php) via x-teleport so
+         they KEEP this restaurantPos() Alpine scope. The old in-page buttons + toggles strip
+         below stay as the MOBILE fallback (md:hidden) — same state, same handlers. --}}
+    <template x-teleport="#tn-nav-sale-tools">
+        <div class="flex items-center gap-1.5 min-w-0" x-data="{ switchesOpen: false, autoPrintLoading: false, autoKotLoading: false }">
+
+            {{-- + New Sale — replaces the static nav link on this page (action = clear & restart) --}}
+            <button @click="newSale()" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-purple-600 hover:bg-purple-700 shadow-sm transition flex-shrink-0" title="Nayi sale shuru karein (cart clear)">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                <span class="hidden lg:inline">New Sale</span>
+            </button>
+
+            {{-- Local (provisional) bills — F10 --}}
+            <button @click="openLocalBills()" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition flex-shrink-0" title="Provisional bills (local — not submitted to PRA). Press F10.">
+                <span class="tn-key-chip text-[9px] bg-purple-400/30 px-1 rounded">F10</span>
+                <span class="hidden lg:inline">Local</span>
+                <span x-show="localBills.length > 0" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-purple-600 text-white text-[9px] rounded-full flex items-center justify-center font-bold" x-text="localBills.length"></span>
+            </button>
+
+            {{-- Failed PRA bills — F11 --}}
+            <button @click="openFailedBills()" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 transition flex-shrink-0" title="Failed PRA submissions — needs retry. Press F11.">
+                <span class="tn-key-chip text-[9px] bg-red-400/30 px-1 rounded">F11</span>
+                <span class="hidden lg:inline">Failed</span>
+                <span x-show="failedBills.length > 0" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-600 text-white text-[9px] rounded-full flex items-center justify-center font-bold animate-pulse" x-text="failedBills.length"></span>
+            </button>
+
+            {{-- Reprint today's bills — Alt+R (teal family, no-blue rule) --}}
+            <button @click="openReprint()" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 transition flex-shrink-0" title="Aaj ke bills — click par foran reprint. Alt+R">
+                <span class="tn-key-chip text-[9px] bg-teal-400/30 px-1 rounded">Alt+R</span>
+                <span class="hidden lg:inline">Reprint</span>
+            </button>
+
+            {{-- Held orders — F3 --}}
+            <button @click="activeHeldIndex = 0; showHeldOrders = !showHeldOrders" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition flex-shrink-0" title="Held orders / tables. Press F3.">
+                <span class="tn-key-chip text-[9px] bg-amber-400/30 px-1 rounded">F3</span>
+                <span class="hidden lg:inline">Held</span>
+                <span x-show="heldOrders.length > 0" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold" x-text="heldOrders.length"></span>
+            </button>
+
+            {{-- 🟢/🟡/🔴 Auto-Sync status pill — same logic as the mobile copy --}}
+            <button type="button" @click="syncOfflineBills(true)" class="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-bold border transition flex-shrink-0"
+                 :class="syncStatus === 'online' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : (syncStatus === 'syncing' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800')"
+                 :title="offlineNeedsLogin ? 'Session expired — refresh & login to sync bills saved on this device' : (syncStatus === 'online' ? ('Auto-Sync Online' + ((failedBills.length + offlineQueueCount) ? ' · ' + (failedBills.length + offlineQueueCount) + ' pending — click to sync now' : '')) : (syncStatus === 'syncing' ? 'Syncing pending bills…' : 'Offline — bills are saved on this device and auto-sync when internet returns'))">
+                <span class="w-2 h-2 rounded-full"
+                      :class="syncStatus === 'online' ? 'bg-emerald-500' : (syncStatus === 'syncing' ? 'bg-amber-500 animate-pulse' : 'bg-red-500 animate-pulse')"></span>
+                <span class="hidden xl:inline" x-text="syncStatus === 'online' ? 'Online' : (syncStatus === 'syncing' ? 'Syncing' : 'Offline')"></span>
+                <span x-show="(failedBills.length + offlineQueueCount) > 0" class="px-1.5 rounded-full text-[9px] font-black"
+                      :class="syncStatus === 'online' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'"
+                      x-text="failedBills.length + offlineQueueCount"></span>
+            </button>
+
+            {{-- Switches dropdown — PRA Reporting / Auto-Print / Auto-KOT (same handlers
+                 as the mobile toggles strip; cashiers see the read-only PRA badge). --}}
+            <div class="relative flex-shrink-0">
+                <button type="button" @click="switchesOpen = !switchesOpen" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/15 transition" title="PRA Reporting / Auto-Print / Auto-KOT switches">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    <span class="hidden lg:inline">Switches</span>
+                    <svg class="w-3 h-3 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div x-show="switchesOpen" x-cloak @click.outside="switchesOpen = false" x-transition
+                     class="absolute right-0 top-full mt-2 bg-white dark:bg-gray-900 rounded-xl shadow-2xl shadow-black/20 border border-gray-200/80 dark:border-gray-700/80 p-3 z-[100] w-64 space-y-3">
+
+                    @if(($company->pos_integration_mode ?? 'pra') !== 'standalone')
+                    @if(auth('pos')->user()?->isPosCashier())
+                    @php $praAssignedOnNav = (bool) (auth('pos')->user()?->praReportingEnabled($company)); @endphp
+                    <div class="flex items-center justify-between gap-2" title="Aap ka PRA Reporting status admin ne set kiya hai — change karwane ke liye admin se rabta karein.">
+                        <span class="text-[10px] uppercase tracking-wider font-extrabold text-purple-700 dark:text-purple-300">PRA Reporting</span>
+                        @if($praAssignedOnNav)
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-[10px] font-black uppercase tracking-wide">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Online
+                        </span>
+                        @else
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-[10px] font-black uppercase tracking-wide">
+                            <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span> Offline
+                        </span>
+                        @endif
+                    </div>
+                    @else
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-[10px] uppercase tracking-wider font-extrabold text-purple-700 dark:text-purple-300">PRA Reporting</span>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button"
+                                @click="praLoading = true; fetch('{{ route('pos.api.toggle-pra') }}', { method:'POST', headers:{ 'X-CSRF-TOKEN':'{{ csrf_token() }}', 'Content-Type':'application/json', 'Accept':'application/json' } }).then(r => r.json()).then(d => { praEnabled = !!d.enabled; praLoading = false; window.tnNotify && window.tnNotify('PRA Reporting', praEnabled ? 'Enabled' : 'Disabled'); }).catch(() => { praLoading = false; alert('Toggle failed'); })"
+                                :disabled="praLoading"
+                                :class="praEnabled ? 'bg-purple-600' : 'bg-gray-400 dark:bg-gray-600'"
+                                class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out shadow-inner">
+                                <span :class="praEnabled ? 'translate-x-5' : 'translate-x-0.5'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5"></span>
+                            </button>
+                            <span x-text="praEnabled ? 'ON' : 'OFF'" :class="praEnabled ? 'text-purple-700 dark:text-purple-300' : 'text-gray-500 dark:text-gray-400'" class="text-[10px] font-black w-7"></span>
+                            <span x-show="praLoading" class="text-[10px] text-purple-500 animate-pulse">…</span>
+                        </div>
+                    </div>
+                    @endif
+                    @endif
+
+                    <div class="flex items-center justify-between gap-2" title="When ON, the receipt print dialog opens automatically right after a successful payment.">
+                        <span class="text-[10px] uppercase tracking-wider font-extrabold text-emerald-700 dark:text-emerald-300">🖨️ Auto-Print</span>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button"
+                                @click="autoPrintLoading = true; fetch('{{ route('pos.api.toggle-auto-print') }}', { method:'POST', headers:{ 'X-CSRF-TOKEN':'{{ csrf_token() }}', 'Content-Type':'application/json', 'Accept':'application/json' } }).then(r => r.json()).then(d => { autoPrintEnabled = !!d.enabled; kitchenSettings.print_on_pay = autoPrintEnabled; autoPrintLoading = false; window.tnNotify && window.tnNotify('Auto-Print Receipt', autoPrintEnabled ? 'Enabled' : 'Disabled'); }).catch(() => { autoPrintLoading = false; alert('Toggle failed'); })"
+                                :disabled="autoPrintLoading"
+                                :class="autoPrintEnabled ? 'bg-emerald-600' : 'bg-gray-400 dark:bg-gray-600'"
+                                class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out shadow-inner">
+                                <span :class="autoPrintEnabled ? 'translate-x-5' : 'translate-x-0.5'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5"></span>
+                            </button>
+                            <span x-text="autoPrintEnabled ? 'ON' : 'OFF'" :class="autoPrintEnabled ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-500 dark:text-gray-400'" class="text-[10px] font-black w-7"></span>
+                            <span x-show="autoPrintLoading" class="text-[10px] text-emerald-500 animate-pulse">…</span>
+                        </div>
+                    </div>
+
+                    @if($features->kot ?? false)
+                    <div class="flex items-center justify-between gap-2" title="When ON, the kitchen ticket auto-prints right after payment of a held order — counter prints receipt, kitchen prints KOT.">
+                        <span class="text-[10px] uppercase tracking-wider font-extrabold text-orange-700 dark:text-orange-300">🍳 Auto-KOT</span>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button"
+                                @click="autoKotLoading = true; fetch('{{ route('pos.api.toggle-auto-kot') }}', { method:'POST', headers:{ 'X-CSRF-TOKEN':'{{ csrf_token() }}', 'Content-Type':'application/json', 'Accept':'application/json' } }).then(r => r.json()).then(d => { if (d.success) { autoKotEnabled = !!d.enabled; window.tnNotify && window.tnNotify('Auto-KOT', autoKotEnabled ? 'Enabled' : 'Disabled'); } else { alert(d.message || 'Toggle failed'); } autoKotLoading = false; }).catch(() => { autoKotLoading = false; alert('Toggle failed'); })"
+                                :disabled="autoKotLoading"
+                                :class="autoKotEnabled ? 'bg-orange-600' : 'bg-gray-400 dark:bg-gray-600'"
+                                class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out shadow-inner">
+                                <span :class="autoKotEnabled ? 'translate-x-5' : 'translate-x-0.5'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5"></span>
+                            </button>
+                            <span x-text="autoKotEnabled ? 'ON' : 'OFF'" :class="autoKotEnabled ? 'text-orange-700 dark:text-orange-300' : 'text-gray-500 dark:text-gray-400'" class="text-[10px] font-black w-7"></span>
+                            <span x-show="autoKotLoading" class="text-[10px] text-orange-500 animate-pulse">…</span>
+                        </div>
+                    </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </template>
+
+    {{-- PRA Reporting + Auto-Print toggles strip — MOBILE FALLBACK ONLY (md:hidden) since the
+         Jul 2026 redesign moved these switches into the top-nav dropdown on desktop.
          autoPrintEnabled lives on the parent restaurantPos() scope (mirrors kitchenSettings.print_on_pay)
          so toggling immediately updates the receipt-iframe URL on the very next sale, no refresh needed. --}}
-    <div class="tn-toggles-strip flex items-center justify-end gap-4 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/10 border-b border-purple-100 dark:border-purple-900/30 flex-shrink-0"
+    <div class="tn-toggles-strip flex md:hidden items-center justify-end gap-4 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/10 border-b border-purple-100 dark:border-purple-900/30 flex-shrink-0"
          x-data="{
             autoPrintLoading: false,
             autoKotLoading: false
@@ -475,7 +616,8 @@ window.addEventListener('popstate', function() {
             </button>
         </template>
 
-        <button @click="newSale()" class="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 hover:bg-green-100 transition">
+        {{-- New Sale — MOBILE ONLY since Jul 2026 redesign (desktop copy teleported into the top-nav) --}}
+        <button @click="newSale()" class="flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 hover:bg-green-100 transition">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
             <span class="hidden sm:inline">New</span>
         </button>
@@ -579,7 +721,7 @@ window.addEventListener('popstate', function() {
         {{-- ── PROVISIONAL BILLS (Local) — header shortcut. Same pattern as Held. ── --}}
         {{-- 🟢/🟡/🔴 Auto-Sync status pill — live network + pending-bill indicator. --}}
         {{-- Offline-first (Jul 2026): badge now ALSO counts device-queued offline bills; click = sync now. --}}
-        <button type="button" @click="syncOfflineBills(true)" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition"
+        <button type="button" @click="syncOfflineBills(true)" class="flex md:hidden items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition"
              :class="syncStatus === 'online' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : (syncStatus === 'syncing' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800')"
              :title="offlineNeedsLogin ? 'Session expired — refresh & login to sync bills saved on this device' : (syncStatus === 'online' ? ('Auto-Sync Online' + ((failedBills.length + offlineQueueCount) ? ' · ' + (failedBills.length + offlineQueueCount) + ' pending — click to sync now' : '')) : (syncStatus === 'syncing' ? 'Syncing pending bills…' : 'Offline — bills are saved on this device and auto-sync when internet returns'))">
             <span class="w-2 h-2 rounded-full"
@@ -590,7 +732,7 @@ window.addEventListener('popstate', function() {
                   x-text="failedBills.length + offlineQueueCount"></span>
         </button>
         {{-- Click → modal with Edit / Delete / Make Final actions inline. F10 shortcut. --}}
-        <button @click="openLocalBills()" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition" title="Provisional bills (local — not submitted to PRA). Press F10.">
+        <button @click="openLocalBills()" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition" title="Provisional bills (local — not submitted to PRA). Press F10.">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
             <span class="tn-key-chip text-[10px] bg-purple-400/30 px-1 rounded">F10</span>
             <span class="hidden sm:inline">Local</span>
@@ -603,7 +745,7 @@ window.addEventListener('popstate', function() {
 
         {{-- ── FAILED BILLS — header shortcut. F11. Red theme = needs attention. ── --}}
         {{-- Click → modal with Retry / Edit / Delete actions inline. --}}
-        <button @click="openFailedBills()" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 transition" title="Failed PRA submissions — needs retry. Press F11.">
+        <button @click="openFailedBills()" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 transition" title="Failed PRA submissions — needs retry. Press F11.">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
             <span class="tn-key-chip text-[10px] bg-red-400/30 px-1 rounded">F11</span>
             <span class="hidden sm:inline">Failed</span>
@@ -612,37 +754,22 @@ window.addEventListener('popstate', function() {
 
         {{-- ── REPRINT — header shortcut. Alt+R. Today's bills, click = instant print. ── --}}
         {{-- Read-only: cashier + admin both allowed. Teal family (no-blue rule).       --}}
-        <button @click="openReprint()" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 transition" title="Aaj ke bills — click par foran reprint. Alt+R">
+        <button @click="openReprint()" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 transition" title="Aaj ke bills — click par foran reprint. Alt+R">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
             <span class="tn-key-chip text-[10px] bg-teal-400/30 px-1 rounded">Alt+R</span>
             <span class="hidden sm:inline">Reprint</span>
         </button>
 
-        <button @click="activeHeldIndex = 0; showHeldOrders = !showHeldOrders" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition">
+        <button @click="activeHeldIndex = 0; showHeldOrders = !showHeldOrders" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             <span class="tn-key-chip text-[10px] bg-amber-400/30 px-1 rounded">F3</span>
             <span class="hidden sm:inline">Held</span>
             <span x-show="heldOrders.length > 0" class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="heldOrders.length"></span>
         </button>
 
-        <div class="hidden md:flex items-center gap-1.5">
-            <button @click="holdOrder()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems() || !canHold()" :title="!canHold() ? 'Hold is for Dine-In orders only' : ((hasManualItems() || hasDealItems()) ? 'Manual items & deals billing-only — pay first or remove from cart to hold' : 'Hold this order')" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
-                <svg x-show="submitting" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                <span x-show="!submitting" class="text-[10px] bg-amber-400/30 px-1 rounded">F5</span> <span x-text="submitting ? 'Holding...' : 'Hold'"></span>
-            </button>
-
-            {{-- Phase 5 — Send to Kitchen (visible only when feature.kot is on) --}}
-            @if($features->kot ?? false)
-            <button @click="sendToKitchen()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems() || !canHold()" :title="!canHold() ? 'Send to Kitchen is for Dine-In orders only' : ((hasManualItems() || hasDealItems()) ? 'Manual items & deals billing-only — pay first or remove from cart' : 'Saves the order and prints the kitchen ticket without taking payment.')" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
-                <span class="text-base leading-none">🍳</span>
-                <span x-text="submitting ? 'Sending...' : 'Send to Kitchen'"></span>
-            </button>
-            @endif
-
-            <button @click="showPayModal = true" :disabled="cart.length === 0 || submitting" class="flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold bg-green-600 hover:bg-green-700 text-white disabled:opacity-40 shadow-sm transition">
-                <span x-show="!submitting" class="text-[10px] bg-green-500/30 px-1 rounded">F8</span> Pay
-            </button>
-        </div>
+        {{-- Hold / Send-to-Kitchen / Pay group REMOVED from the action bar (Jul 2026 redesign):
+             Hold + Pay already live in the cart footer; Send to Kitchen moved there too
+             (next to Provisional + PAY) so ALL bill actions sit in ONE place. --}}
     </div>
 
     <div class="flex flex-1 overflow-hidden">
@@ -678,67 +805,46 @@ window.addEventListener('popstate', function() {
             <div x-ref="gridContainer" tabindex="0" @keydown.arrow-right.prevent="moveGridFocus(1)" @keydown.arrow-left.prevent="moveGridFocus(-1)" @keydown.arrow-down.prevent="moveGridFocus(gridCols)" @keydown.arrow-up.prevent="moveGridFocus(-gridCols)" @keydown.enter.prevent="addGridFocusedItem()" class="flex-1 overflow-y-auto p-3 outline-none">
 
                 <template x-if="loading">
-                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-                        <template x-for="i in 12"><div class="rounded-2xl overflow-hidden"><div class="skeleton aspect-square"></div><div class="p-2.5 space-y-2"><div class="skeleton h-3 rounded w-3/4"></div><div class="skeleton h-4 rounded w-1/2"></div></div></div></template>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                        <template x-for="i in 12"><div class="rounded-xl overflow-hidden flex items-center gap-2 px-2.5 py-2.5 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800"><div class="skeleton w-8 h-8 rounded-lg flex-shrink-0"></div><div class="flex-1 space-y-1.5"><div class="skeleton h-3 rounded w-3/4"></div><div class="skeleton h-2.5 rounded w-1/3"></div></div></div></template>
                     </div>
                 </template>
 
+                {{-- ═══ COMPACT PRODUCT LIST (Jul 2026 redesign, owner-approved mockup) ═══
+                     Big image cards replaced by dense 2-column text rows: tiny thumb (only when a
+                     real image exists), name + badges, price, cart-qty badge, + button. Same
+                     handleProductClick / gridFocus / stock-out semantics — calcGridCols reads the
+                     rendered grid so arrow-key navigation adapts automatically. Class names
+                     .prod-card / .price-badge / .cart-qty-badge / .quick-add / .stock-out kept
+                     (CSS + tests rely on them). --}}
                 <template x-if="!loading">
-                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                         <template x-for="(item, idx) in displayItems" :key="item.id + '-' + item.type">
-                            <div :id="'grid-item-' + idx" class="prod-card bg-white dark:bg-gray-900 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-800 shadow-sm fade-in" :class="[gridFocusMode && gridFocusIndex === idx ? 'ring-2 ring-purple-500 shadow-purple-200 dark:shadow-purple-900' : '', item.stockStatus === 'out' && blockOutOfStock ? 'stock-out' : (item.stockStatus === 'out' && !blockOutOfStock ? 'stock-out allow-add' : '')]" @click="handleProductClick(item)">
-                                {{-- IMAGE CARD: only render the big image area when a real uploaded image exists. --}}
+                            <div :id="'grid-item-' + idx" class="prod-card flex items-center gap-2.5 px-2.5 py-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm fade-in cursor-pointer hover:border-purple-300 dark:hover:border-purple-700 transition" :class="[gridFocusMode && gridFocusIndex === idx ? 'ring-2 ring-purple-500' : '', item.stockStatus === 'out' && blockOutOfStock ? 'stock-out' : (item.stockStatus === 'out' && !blockOutOfStock ? 'stock-out allow-add' : '')]" @click="handleProductClick(item)">
                                 <template x-if="item.image">
-                                    <div class="relative aspect-[4/3] bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-900 flex items-center justify-center overflow-hidden">
-                                        <img :src="item.image" :alt="item.name" class="w-full h-full object-cover" loading="lazy" onerror="this.style.display='none';">
-                                        @if($company->inventory_enabled)
-                                        <div class="absolute top-1.5 left-1.5 flex flex-col gap-1">
-                                            <template x-if="item.stockStatus === 'low'"><span class="stock-dot stock-low" title="Low stock"></span></template>
-                                            <template x-if="item.stockStatus === 'out'"><span class="px-1.5 py-0.5 bg-red-500/90 text-white text-[8px] font-bold rounded-md">OUT</span></template>
-                                        </div>
-                                        @endif
-                                        <div class="absolute top-1.5 right-1.5 flex flex-col gap-1">
-                                            @if($company->inventory_enabled)
-                                            <template x-if="item.hasRecipe"><span class="px-1.5 py-0.5 bg-orange-500/90 text-white text-[8px] font-bold rounded-md flex items-center gap-0.5"><span class="text-[9px]">&#x1F373;</span> Recipe</span></template>
-                                            @endif
-                                            <template x-if="item.is_tax_exempt"><span class="px-1.5 py-0.5 bg-green-500/90 text-white text-[8px] font-bold rounded-md">NO TAX</span></template>
-                                        </div>
-                                        <button @click.stop="handleProductClick(item)" class="quick-add absolute bottom-2 right-2 w-9 h-9 rounded-full bg-purple-600 hover:bg-purple-700 text-white shadow-sm flex items-center justify-center transition-all">
-                                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-                                        </button>
-                                    </div>
+                                    <img :src="item.image" :alt="item.name" class="w-9 h-9 rounded-lg object-cover flex-shrink-0" loading="lazy" onerror="this.style.display='none';">
                                 </template>
-                                {{-- TEXT-ONLY ROW: when no image, render a compact name+price list row — no placeholder, no letter badge. --}}
-                                <template x-if="!item.image">
-                                    <div class="relative flex items-center justify-end gap-1 px-2.5 pt-1.5 min-h-0">
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-1.5 min-w-0">
+                                        <p class="text-sm font-bold text-gray-900 dark:text-white truncate leading-tight" x-text="item.name"></p>
                                         @if($company->inventory_enabled)
-                                        <template x-if="item.stockStatus === 'low'"><span class="stock-dot stock-low" title="Low stock"></span></template>
-                                        <template x-if="item.stockStatus === 'out'"><span class="px-1.5 py-0.5 bg-red-500/90 text-white text-[8px] font-bold rounded-md">OUT</span></template>
-                                        <template x-if="item.hasRecipe"><span class="px-1.5 py-0.5 bg-orange-500/90 text-white text-[8px] font-bold rounded-md flex items-center gap-0.5"><span class="text-[9px]">&#x1F373;</span> Recipe</span></template>
+                                        <template x-if="item.stockStatus === 'low'"><span class="stock-dot stock-low flex-shrink-0" title="Low stock"></span></template>
+                                        <template x-if="item.stockStatus === 'out'"><span class="px-1.5 py-0.5 bg-red-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">OUT</span></template>
+                                        <template x-if="item.hasRecipe"><span class="text-[10px] flex-shrink-0" title="Recipe">&#x1F373;</span></template>
                                         @endif
-                                        <template x-if="item.is_tax_exempt"><span class="px-1.5 py-0.5 bg-green-500/90 text-white text-[8px] font-bold rounded-md">NO TAX</span></template>
+                                        <template x-if="item.is_tax_exempt"><span class="px-1.5 py-0.5 bg-green-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">NO TAX</span></template>
                                     </div>
-                                </template>
-                                <div class="px-2.5 py-2">
-                                    <p class="font-bold text-gray-900 dark:text-white truncate leading-tight" :class="item.image ? 'text-xs' : 'text-sm'" x-text="item.name"></p>
                                     <template x-if="item.type === 'deal' && item.components">
                                         <p class="text-[10px] text-gray-500 dark:text-gray-400 truncate mt-0.5" x-text="item.components" :title="item.components"></p>
                                     </template>
-                                    <div class="flex items-center justify-between mt-1 gap-2">
-                                        <span class="price-badge text-sm font-extrabold text-purple-600 dark:text-purple-400" x-text="'Rs. ' + Number(item.price).toLocaleString()"></span>
-                                        <div class="flex items-center gap-2">
-                                            <template x-if="getCartQty(item) > 0">
-                                                <span class="cart-qty-badge text-[10px] bg-gradient-to-br from-purple-500 to-purple-700 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold shadow-sm" x-text="getCartQty(item)"></span>
-                                            </template>
-                                            {{-- Inline + button for the no-image text row (image cards already have the floating quick-add). --}}
-                                            <template x-if="!item.image">
-                                                <button @click.stop="handleProductClick(item)" class="w-7 h-7 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center shadow-sm transition-all">
-                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-                                                </button>
-                                            </template>
-                                        </div>
-                                    </div>
                                 </div>
+                                <span class="price-badge text-sm font-extrabold text-purple-600 dark:text-purple-400 flex-shrink-0" x-text="'Rs. ' + Number(item.price).toLocaleString()"></span>
+                                <template x-if="getCartQty(item) > 0">
+                                    <span class="cart-qty-badge text-[10px] bg-gradient-to-br from-purple-500 to-purple-700 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold shadow-sm flex-shrink-0" x-text="getCartQty(item)"></span>
+                                </template>
+                                <button @click.stop="handleProductClick(item)" class="quick-add w-7 h-7 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center shadow-sm transition-all flex-shrink-0">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                                </button>
                             </div>
                         </template>
                     </div>
@@ -762,6 +868,24 @@ window.addEventListener('popstate', function() {
                         </button>
                     </div>
                 </template>
+            </div>
+
+            {{-- ═══ AKHRI BILLS strip (Jul 2026 redesign) — today's last bills as one-click
+                 reprint chips. Reuses reprintBills/reprintBill() (Alt+R modal data); list is
+                 loaded on init + refreshed after every successful sale. Desktop only. --}}
+            <div x-show="reprintBills.length > 0" x-cloak class="hidden md:flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex-shrink-0 overflow-hidden">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 dark:text-gray-500 flex-shrink-0">Akhri Bills</span>
+                <div class="flex items-center gap-1.5 overflow-x-auto hide-scrollbar min-w-0 flex-1">
+                    <template x-for="bill in reprintBills.slice(0, 8)" :key="'strip-' + bill.id">
+                        <button type="button" @click="reprintBill(bill)" :disabled="reprintBusyId === bill.id"
+                            class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-purple-50 hover:border-purple-200 hover:text-purple-700 dark:hover:bg-purple-900/20 transition flex-shrink-0 disabled:opacity-50"
+                            :title="'Reprint ' + (bill.pra_invoice_number || bill.invoice_number)">
+                            <span x-text="bill.pra_invoice_number || bill.invoice_number"></span>
+                            <span class="font-extrabold text-purple-600 dark:text-purple-400" x-text="'Rs.' + Number(bill.total_amount).toLocaleString()"></span>
+                        </button>
+                    </template>
+                </div>
+                <button type="button" @click="openReprint()" class="text-[10px] font-bold text-purple-600 dark:text-purple-400 hover:text-purple-800 flex-shrink-0 px-1.5" title="Saray aaj ke bills (Alt+R)">Sab &rarr;</button>
             </div>
 
             <div class="md:hidden flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
@@ -984,24 +1108,26 @@ window.addEventListener('popstate', function() {
             </div>
 
             <div class="border-t border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-sm">
-                <div class="px-3 py-1.5">
+                {{-- Jul 2026 redesign (mockup parity): Order Notes + Discount trigger share ONE
+                     row — frees a full row of cart height. Discount panel opens below as before. --}}
+                <div class="px-3 py-1.5 flex items-center gap-1.5">
                     <textarea x-model="kitchenNotes" x-ref="orderNotesInput" rows="1"
                         autocomplete="off" name="pos_order_notes_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                         @keydown.enter.prevent.stop="$event.target.blur()"
                         @keydown.escape.prevent.stop="$event.target.blur()"
-                        placeholder="Order Notes... (press N to focus, ⏎/Esc to exit)"
-                        class="w-full text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-purple-500 focus:border-purple-500 resize-none placeholder-gray-400"></textarea>
+                        placeholder="Order Notes... (N)"
+                        class="flex-1 min-w-0 text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-purple-500 focus:border-purple-500 resize-none placeholder-gray-400"></textarea>
+                    <button @click="showDiscount = !showDiscount" class="shrink-0 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="discountAmount > 0 ? 'bg-orange-100 dark:bg-orange-900/20 text-orange-600 border-orange-200 dark:border-orange-800' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:bg-gray-200'">
+                        <span x-text="discountAmount > 0 ? '-Rs. ' + Number(discountAmount).toLocaleString() : '% Discount'"></span>
+                    </button>
                 </div>
-                <div class="px-3 py-1.5">
-                    <div class="flex items-center gap-1.5">
-                        <button @click="showDiscount = !showDiscount" class="text-[10px] font-semibold px-2 py-0.5 rounded-lg transition" :class="discountAmount > 0 ? 'bg-orange-100 dark:bg-orange-900/20 text-orange-600' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200'">
-                            <span x-text="discountAmount > 0 ? 'Discount: -Rs. ' + Number(discountAmount).toLocaleString() : '+ Discount'"></span>
-                        </button>
-                        <span class="text-[8px] text-gray-400" x-text="'Limit: ' + effectiveDiscountLimit + '%'"></span>
-                        <button x-show="!managerOverrideActive && hasManagerPin && posRole !== 'pos_admin'" @click="requestManagerOverride()" class="text-[8px] font-bold text-blue-600 hover:text-blue-800 px-1">Override</button>
-                        <span x-show="managerOverrideActive" class="text-[8px] font-bold text-green-600 px-1">Unlocked</span>
-                    </div>
-                    <div x-show="showDiscount" x-transition class="mt-1.5 p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl space-y-1.5">
+                <div class="px-3 pb-1.5" x-show="showDiscount" x-transition>
+                    <div class="p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl space-y-1.5">
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-[8px] text-gray-400" x-text="'Limit: ' + effectiveDiscountLimit + '%'"></span>
+                            <button x-show="!managerOverrideActive && hasManagerPin && posRole !== 'pos_admin'" @click="requestManagerOverride()" class="text-[8px] font-bold text-blue-600 hover:text-blue-800 px-1">Override</button>
+                            <span x-show="managerOverrideActive" class="text-[8px] font-bold text-green-600 px-1">Unlocked</span>
+                        </div>
                         <div class="flex gap-1">
                             <button @click="discountType = 'percentage'" class="flex-1 text-[10px] font-bold py-1 rounded-lg transition" :class="discountType === 'percentage' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-500'">%</button>
                             <button @click="discountType = 'amount'" class="flex-1 text-[10px] font-bold py-1 rounded-lg transition" :class="discountType === 'amount' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-500'">Rs.</button>
@@ -1022,34 +1148,59 @@ window.addEventListener('popstate', function() {
                         </div>
                     </div>
                 </div>
-                <div class="px-3 py-2 space-y-1">
-                    <div class="flex justify-between text-xs text-gray-500"><span>Subtotal</span><span x-text="'Rs. ' + Number(subtotal).toLocaleString()"></span></div>
-                    <div x-show="itemDiscountsTotal > 0" class="flex justify-between text-xs text-orange-500">
-                        <span>Item Discounts</span>
-                        <span x-text="'-Rs. ' + Number(itemDiscountsTotal).toLocaleString()"></span>
+                {{-- Jul 2026 redesign: BADA TOTAL BAND (mockup parity) — solid brand band
+                     (bg-purple-900 → theme engine remaps per theme), big white total,
+                     items·qty pill + method-aware "Card pe" hint. All original rows kept. --}}
+                <div class="px-3 py-2 bg-purple-900">
+                    <div class="flex items-end justify-between gap-2">
+                        <div class="min-w-0 space-y-0.5 text-[11px] leading-tight text-white/75">
+                            <div class="flex gap-2"><span>Subtotal</span><span x-text="'Rs. ' + Number(subtotal).toLocaleString()"></span></div>
+                            <div x-show="itemDiscountsTotal > 0" class="flex gap-2 text-orange-300">
+                                <span>Item Disc.</span>
+                                <span x-text="'-Rs. ' + Number(itemDiscountsTotal).toLocaleString()"></span>
+                            </div>
+                            <div x-show="discountAmount > 0" class="flex gap-2 text-orange-300">
+                                <span x-text="discountType === 'percentage' ? 'Discount (' + discountValue + '%)' : 'Discount'"></span>
+                                <span x-text="'-Rs. ' + Number(discountAmount).toLocaleString()"></span>
+                            </div>
+                            <div x-show="exemptAmount > 0" class="flex gap-2 text-green-300"><span>Tax-Exempt</span><span x-text="'-Rs. ' + Number(exemptAmount).toLocaleString()"></span></div>
+                            <div class="flex gap-2"><span x-text="taxInclusive ? ('Tax (' + taxRate + '% incl.)') : ('Tax (' + taxRate + '%)')"></span><span x-text="'Rs. ' + Number(taxAmount).toLocaleString()"></span></div>
+                            <div x-show="Math.abs(roundOff) > 0.001" class="flex gap-2 text-white/60">
+                                <span>Round Off</span>
+                                <span x-text="(roundOff >= 0 ? '+ Rs. ' : '− Rs. ') + Math.abs(roundOff).toFixed(2)"></span>
+                            </div>
+                            <div class="pt-0.5">
+                                <span class="inline-flex items-center rounded-full bg-white/15 px-2 py-0.5 text-[9px] font-bold text-white" x-text="cart.length + ' items · ' + Number(cartQtyCount.toFixed(2)).toLocaleString() + ' qty'"></span>
+                            </div>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <div class="text-[9px] font-bold tracking-widest text-white/60 uppercase" x-text="cartMethodHint ? 'Total (Cash)' : 'Total'"></div>
+                            <div class="total-animate total-line text-3xl font-black text-white leading-none" x-text="'Rs. ' + Number(roundedTotal).toLocaleString()" :class="cartAnimating ? 'cart-pop' : ''"></div>
+                            <div x-show="cartMethodHint" x-cloak class="text-[9px] text-white/60 mt-0.5" x-text="cartMethodHint"></div>
+                        </div>
                     </div>
-                    <div x-show="discountAmount > 0" class="flex justify-between text-xs text-orange-600 dark:text-orange-400">
-                        <span x-text="discountType === 'percentage' ? 'Order Discount (' + discountValue + '%)' : 'Order Discount'"></span>
-                        <span x-text="'-Rs. ' + Number(discountAmount).toLocaleString()"></span>
-                    </div>
-                    <div x-show="exemptAmount > 0" class="flex justify-between text-xs text-green-600 dark:text-green-400"><span>Tax-Exempt</span><span x-text="'-Rs. ' + Number(exemptAmount).toLocaleString()"></span></div>
-                    <div class="flex justify-between text-xs text-gray-500"><span x-text="taxInclusive ? ('Tax (' + taxRate + '% incl.)') : ('Tax (' + taxRate + '%)')"></span><span x-text="'Rs. ' + Number(taxAmount).toLocaleString()"></span></div>
-                    <div x-show="Math.abs(roundOff) > 0.001" class="flex justify-between text-xs text-blue-500 dark:text-blue-400">
-                        <span>Round Off</span>
-                        <span x-text="(roundOff >= 0 ? '+ Rs. ' : '− Rs. ') + Math.abs(roundOff).toFixed(2)"></span>
-                    </div>
-                    <div class="flex items-baseline justify-between pt-2 mt-1 border-t tn-hairline">
-                        <span class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Total</span>
-                        <span class="total-animate total-line text-2xl font-black text-gray-900 dark:text-white" x-text="'Rs. ' + Number(roundedTotal).toLocaleString()" :class="cartAnimating ? 'cart-pop' : ''" :style="roundedTotal > 0 ? 'color: #059669' : ''"></span>
-                    </div>
-                    <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] text-gray-400 pt-0.5">
+                    <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] text-white/50 pt-1">
                         <span>Est. Cost</span><span x-text="'Rs. ' + r2(getCartCost()).toLocaleString()"></span>
                     </div>
-                    <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] font-semibold" :class="(totalAmount - getCartCost()) >= 0 ? 'text-green-600' : 'text-red-500'">
+                    <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] font-semibold" :class="(totalAmount - getCartCost()) >= 0 ? 'text-green-300' : 'text-red-300'">
                         <span>Est. Profit</span><span x-text="'Rs. ' + r2(totalAmount - getCartCost()).toLocaleString()"></span>
                     </div>
                 </div>
-                <div class="px-3 pb-3 space-y-2 mobile-sticky-pay">
+                <div class="px-3 pb-3 pt-2 space-y-2 mobile-sticky-pay">
+                    {{-- Jul 2026 redesign: ONE-TAP method buttons — preselect the method and
+                         open the SAME Pay modal (NEVER instant-finalize; Enter confirms).
+                         payPreselect is consumed by the modal's x-effect (which otherwise
+                         resets payMethodIndex to 0 on every open). --}}
+                    <div class="grid grid-cols-2 gap-2">
+                        <button @click="payPreselect = 0; showPayModal = true" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
+                            <span class="flex items-center gap-1.5 text-xs font-extrabold leading-none"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>CASH</span>
+                            <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(cartTotalForMethod('cash')).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+1</kbd></span>
+                        </button>
+                        <button @click="payPreselect = 1; showPayModal = true" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-gray-700 hover:bg-gray-800 dark:bg-gray-600 dark:hover:bg-gray-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
+                            <span class="flex items-center gap-1.5 text-xs font-extrabold leading-none"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>CARD</span>
+                            <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(cartTotalForMethod('card')).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+2</kbd></span>
+                        </button>
+                    </div>
                     <div class="grid grid-cols-3 gap-2">
                         <button @click="if(cart.length && confirm('Clear entire cart?')) { clearCart(); }" :disabled="cart.length === 0" class="py-2 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-30 transition flex items-center justify-center gap-0.5">Clear <kbd class="text-[8px] bg-red-200/50 dark:bg-red-800/30 px-1 rounded font-mono">F4</kbd></button>
                         <button @click="holdOrder()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems() || !canHold()" :title="!canHold() ? 'Hold is for Dine-In orders only' : ((hasManualItems() || hasDealItems()) ? 'Manual items & deals billing-only — pay first or remove' : '')" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center gap-1">
@@ -1063,7 +1214,15 @@ window.addEventListener('popstate', function() {
                         </button>
                     </div>
                     <!-- ─── SAVE PROVISIONAL + PAY — ONE line (owner, 24 Jul 2026): frees a full
-                         button-row of cart height; Provisional 2/5, PAY 3/5 (stays dominant). ─── -->
+                         button-row of cart height; Provisional 2/5, PAY 3/5 (stays dominant).
+                         Jul 2026 redesign: Send to Kitchen (KOT companies) joins this row —
+                         it was removed from the action bar so all bill actions live here. ─── -->
+                    @if($features->kot ?? false)
+                    <button @click="sendToKitchen()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems() || !canHold()" :title="!canHold() ? 'Send to Kitchen is for Dine-In orders only' : ((hasManualItems() || hasDealItems()) ? 'Manual items & deals billing-only — pay first or remove from cart' : 'Saves the order and prints the kitchen ticket without taking payment.')" class="w-full py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-30 disabled:cursor-not-allowed shadow-sm transition flex items-center justify-center gap-1.5">
+                        <span class="text-sm leading-none">🍳</span>
+                        <span x-text="submitting ? 'Sending...' : 'Send to Kitchen'"></span>
+                    </button>
+                    @endif
                     <div class="grid grid-cols-5 gap-2">
                         <button @click="saveProvisionalDirect()" :disabled="cart.length === 0 || submitting || (!editingBillId && !canProvisional())" :title="(!editingBillId && !canProvisional()) ? 'Provisional bills are for Delivery orders only' : ''" class="col-span-2 min-w-0 py-3 rounded-xl text-xs font-bold text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-30 shadow-sm transition flex items-center justify-center gap-1">
                             <svg x-show="!submitting" class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
@@ -1094,7 +1253,7 @@ window.addEventListener('popstate', function() {
          (ESC / click-away / Cancel). Without this a cancelled held-order payment left the
          stale id behind and the NEXT normal cart sale silently routed to payHeldOrderDirect
          for that old held order (processPayment checks payingHeldOrderId first). --}}
-    <div x-show="showPayModal" x-cloak x-transition.opacity x-effect="if (showPayModal) { submitting = false; saveAsProvisional = false; payMethodIndex = 0; } else if (!submitting) { payingHeldOrderId = null; }" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false">
+    <div x-show="showPayModal" x-cloak x-transition.opacity x-effect="if (showPayModal) { submitting = false; saveAsProvisional = false; payMethodIndex = (payPreselect === 1 ? 1 : 0); payPreselect = null; } else if (!submitting) { payingHeldOrderId = null; }" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
             <div class="p-5 text-center border-b border-gray-100 dark:border-gray-800">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">Payment</h3>
@@ -2530,6 +2689,10 @@ function restaurantPos() {
         // 1 = Card). Arrow keys move it, Enter confirms the highlighted one, and
         // number keys 1/2 jump + fire directly. Reset to 0 each time the modal opens.
         payMethodIndex: 0,
+        // One-tap CASH/CARD buttons (Jul 2026 redesign): the pay-modal x-effect
+        // resets payMethodIndex to 0 on every open, so a preselect must ride in
+        // via this flag — consumed (and nulled) by the x-effect itself.
+        payPreselect: null,
         // PROVISIONAL BILL FLOW — when true, the Pay modal saves the bill with
         // pra_status='local' (no PRA submission). Bill stays editable/deletable
         // and can be promoted to final later via the "Submit to PRA — Make Final"
@@ -2753,6 +2916,32 @@ function restaurantPos() {
         get roundedTotal() { return Math.round(this.totalAmount); },
         get roundOff() { return this.r2(this.roundedTotal - this.totalAmount); },
         get exemptAmount() { return this.cart.filter(i => i.is_tax_exempt).reduce((s, i) => s + this.getItemTotal(i), 0); },
+        // ─── Jul 2026 redesign: method-aware CART totals (estimate only — the
+        // backend recomputes tax per method on submit; PRA gets tax in full).
+        // Mirrors heldOrderEstimate()/payModalTotal math for the LIVE cart.
+        get cartQtyCount() { return this.cart.reduce((s, i) => s + this._safeQty(i.quantity), 0); },
+        cartTotalForMethod(method) {
+            const rate = method === 'card'
+                ? (this.taxRules['debit_card'] || this.taxRules['card'] || 8)
+                : (this.taxRules['cash'] ?? this.taxRate);
+            if (this.taxInclusive) {
+                if (this.cardSaveMode() && Math.abs(this.taxMenuRate - rate) >= 0.005) return this.cardSaveTotalForRate(rate);
+                // Plain inclusive: menu total is method-independent.
+                return Math.round(Math.max(0, this.r2(this.effectiveSubtotal - this.discountAmount)));
+            }
+            const tax = this.r2(this.taxableSubtotal * rate / 100);
+            return Math.round(Math.max(0, this.r2(this.effectiveSubtotal - this.discountAmount + tax)));
+        },
+        // "Card/Digital pe: Rs X" hint under the big total — only when the card
+        // rate actually differs from cash (exclusive or card-save modes).
+        get cartMethodHint() {
+            if (!this.cart.length) return '';
+            const cashRate = this.taxRules['cash'] ?? this.taxRate;
+            const cardRate = this.taxRules['debit_card'] || this.taxRules['card'] || cashRate;
+            if (Math.abs(cashRate - cardRate) < 0.005) return '';
+            if (this.taxInclusive && !this.cardSaveMode()) return ''; // menu-rate-final: sab same
+            return 'Card pe: Rs. ' + Number(this.cartTotalForMethod('card')).toLocaleString() + (this.taxInclusive ? '' : ' (tax ' + cardRate + '%)');
+        },
         recalcDiscount() {
             if (!this.discountValue || this.discountValue <= 0) { this.discountAmount = 0; return; }
             if (this.discountType === 'percentage') {
@@ -2848,6 +3037,7 @@ function restaurantPos() {
             // Failures are silent — badge just won't show until next refresh.
             setTimeout(() => this.loadLocalBills(), 1200);
             setTimeout(() => this.loadFailedBills(), 1500);
+            setTimeout(() => this.loadReprintBills(), 1800); // Akhri Bills strip (Jul 2026 redesign)
             // P7: incoming waiter orders — badge poll every 20s (restaurant mode only).
             if (this.isRestaurantMode) {
                 setTimeout(() => this.loadIncoming(), 1800);
@@ -4181,6 +4371,18 @@ function restaurantPos() {
                 this.openReprint();
                 return;
             }
+            // Alt+1 / Alt+2 — ONE-TAP PAY (Jul 2026 redesign): open the Pay modal
+            // with CASH / CARD preselected. NEVER instant-finalizes — the cashier
+            // still confirms with Enter (or a click) inside the modal. Alt-chord
+            // so plain digits keep doing qty-typing / modal row-jumps.
+            if (e.altKey && (e.code === 'Digit1' || e.code === 'Digit2' || e.key === '1' || e.key === '2')) {
+                e.preventDefault();
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint) return;
+                if (this.cart.length === 0 || this.submitting) return;
+                this.payPreselect = (e.code === 'Digit2' || e.key === '2') ? 1 : 0;
+                this.showPayModal = true;
+                return;
+            }
             // ═══════════════════════════════════════════════════════════════
             // D / Alt+D — UNIVERSAL DISCOUNT TOGGLE
             // Toggles `item.showItemDiscount` on the active cart row (or last row).
@@ -5416,6 +5618,7 @@ function restaurantPos() {
                 if (provisional) { this.loadLocalBills(); }
                 // Refresh failed badge — successful sales might leave a previous fail intact.
                 this.loadFailedBills();
+                this.loadReprintBills(); // Akhri Bills strip stays current
                 // This sale reached the server → we're online. Drain any bills
                 // still queued from an earlier outage.
                 if (this.offlineQueueCount > 0) this.syncOfflineBills();
@@ -5469,14 +5672,11 @@ function restaurantPos() {
         },
         get payModalTotal() {
             if (this.payingHeldOrderId) return this.heldOrderEstimate(this.payMethodIndex === 1 ? 'card' : 'cash');
-            // Card-save: the modal total is method-aware (cash = menu, card = cheaper).
-            if (this.cardSaveMode()) {
-                const rate = this.payMethodIndex === 1
-                    ? (this.taxRules['debit_card'] || this.taxRules['card'] || 8)
-                    : (this.taxRules['cash'] || this.taxMenuRate);
-                return this.cardSaveTotalForRate(rate);
-            }
-            return this.roundedTotal;
+            // Method-aware for the live cart in EVERY tax mode (Jul 2026 redesign):
+            // exclusive = card's own (lower) rate, card-save = cheaper card total,
+            // plain inclusive = method-independent menu total. Matches the amounts
+            // shown on the one-tap CASH/CARD buttons AND what the backend charges.
+            return this.cartTotalForMethod(this.payMethodIndex === 1 ? 'card' : 'cash');
         },
 
         startNewAfterPayment() {
@@ -6094,6 +6294,7 @@ function restaurantPos() {
                     if (provisional) { this.loadLocalBills(); }
                     // Refresh failed badge so cashier sees pending/failed state in real time.
                     this.loadFailedBills();
+                    this.loadReprintBills(); // Akhri Bills strip stays current
                     return true;
                 } else { if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; } this.showToast(data.message || 'Payment failed', 'error'); return false; }
             } catch (e) {

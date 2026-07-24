@@ -6,6 +6,10 @@
     // inputs is pinned OFF here. The markup they gate stays in the file
     // (compiles fine, never renders) so future diffs against the PRA source
     // remain reviewable. DO NOT delete these pins — undefined vars = 500.
+    // DIVERGENCE NOTE (24 Jul 2026): the PRA source received a sale-screen
+    // redesign (nav sale-tools teleport, compact grid, Akhri Bills strip,
+    // bada total band, one-tap CASH/CARD). This port is intentionally FROZEN
+    // pre-redesign until the owner approves porting it.
     $features = (object) [
         'tables' => false, 'delivery' => false, 'kot' => false,
         'kitchen' => false, 'recipes' => false, 'inventory' => false,

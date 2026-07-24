@@ -240,8 +240,18 @@ Sale screen ki mazeed cheezein:
 - Apni tajweez: top-nav bulb icon → /pos/suggestions (sirf admin/manager; din mein 10 tak). Status: pending → planned → completed (admin ke note ke sath).
 - Madadgar (yeh bot) se bhi masla ya feature request seedha admin team ko bhej sakte hain — bot khulasa bana kar confirm karega, "Haan" par bhej dega aur Ref number milega.
 
+## Sale Screen ka Naya Design (Jul 2026)
+- Sale ke tools ab UPAR top bar mein hain: New Sale, Local (F10), Failed (F11), Reprint (Alt+R), Held (F3), sync status aur Switches — billing area pehle se saaf.
+- "Akhri Bills" patti: products ke neeche aaj ke bills ke chips (desktop par) — ek click par receipt dobara print.
+- Bada TOTAL band: cart ke neeche numaya solid band mein grand total — door se parhna asaan.
+- One-tap CASH / CARD buttons (ya Alt+1 / Alt+2): payment method pehle se chuna hua Pay window khulti hai — bill khud-ba-khud final NAHI hota, confirm cashier hi karta hai.
+- Card Bachat mode mein CARD ka kam total pehle hi button par dikh jata hai.
+- Customer box aur search ab 2 qataron mein: customer box bara, search poori chorai.
+- Purane sab shortcuts (F-keys, T/D/N, guided flow) waise hi chalte hain.
+
 ## Bill Reprint (Aaj ke Bills)
 - Sale screen par Alt+R — aaj ke SAB bills: PRA walay, Local, Sync Queue, Failed, Provisional.
+- Naya: products ke neeche "Akhri Bills" patti se bhi ek click par reprint (desktop).
 - Bill par click ya Enter = receipt foran print (asal jaisi, koi COPY label nahi). Search se serial/naam/raqam dhoondein, ↑↓ se select.
 - Silent printing ON ho to seedha printer par, warna print window.
 - Purane dino ke bills: /pos/transactions.

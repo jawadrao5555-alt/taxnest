@@ -52,7 +52,7 @@ Restaurant screen retired: `RestaurantPosController::pos()` early-redirects to `
 
 ## PWA update hold (Jul 2026)
 `window.tnPwaUpdateHold` registered in `_startAutoSync` init: returns true while cart non-empty, pay modal open, submitting, or receipt popup open — pwa-update toast defers auto-reload (retries every 30s; manual Refresh bypasses). Mirrored in FBR universal.
-## Sale-screen redesign (24 Jul 2026, owner-approved mockups — dev only until owner OKs deploy)
+## Sale-screen redesign (24 Jul 2026, owner-approved — DEPLOYED LIVE 24 Jul 2026 + What's New row published)
 - **Nav sale-tools teleport**: New Sale / Local F10 / Failed F11 / Reprint Alt+R / Held F3 / sync pill / Switches dropdown live in the TOP NAV via `<template x-teleport="#tn-nav-sale-tools">` (anchor in pos-app.blade.php, OUTSIDE the saaf @if — shared by Full + Saaf navs, empty on other pages). Teleported nodes keep restaurantPos() scope. Old in-page buttons remain as the MOBILE fallback — handler changes must hit BOTH copies.
 - **Akhri Bills strip** (under grid, desktop only): today's bills as one-click reprint chips; reuses `reprintBills`/`reprintBill()`; loaded on init (+1.8s) and refreshed via `loadReprintBills()` in BOTH final-sale paths (processPaymentManual + payHeldOrderDirect). Any NEW final-sale path must call it too.
 - **Bada total band**: solid `bg-purple-900` (in pos-app theme remap set; saaf CSS §11 maps it to #0A4D5C). All old total rows kept inside it.

@@ -31,6 +31,7 @@ Bill banane ka aam tareeqa, shuru se aakhir tak:
 Payment modal ki keys: 1 = Cash (foran), 2 = Card (foran), arrow keys se method highlight, Enter = highlighted method confirm, P = Save Provisional (guided flow ON ho to), Esc = band.
 
 Sale screen ki mazeed cheezein:
+- Layout (Jul 2026): upar wali patti ab DO qataron (2 rows) mein hai — pehli qatar mein bara CUSTOMER box (aur Table/order-type buttons), doosri qatar mein category dropdown + poori chaurai wala SEARCH box aur bill ke buttons (Pay/Hold waghera). Dono boxes ab pehle se kaafi baray hain, cart panel bhi chaura hai.
 - Search hamesha GLOBAL hai: category dropdown sirf GRID filter karta hai — search box har category ka item dhoondta hai, deals aur services samet. (Category pills ki patti hata di gayi hai — ab sirf dropdown hai, mobile par bhi.)
 - Search mein pehle harf ko priority milti hai (jo item aapke likhe harf se shuru ho wo upar).
 - Product grid ON/OFF toggle hai — grid OFF ho aur products ghayab lagein to "Show All Products" ya Products toggle dobara ON karein (yeh setting har PC/browser par alag save hoti hai).

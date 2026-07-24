@@ -92,10 +92,11 @@
     .tn-flow-strip svg { display: none; }
     .tn-flow-strip span[x-text] { padding: 2px 7px; font-size: 10px; white-space: nowrap; }
 
-    /* Action bar: inputs on row 1, buttons wrap below (nothing clipped anymore) */
+    /* Action bar (2 rows since Jul 2026): customer full-width on row 1, search full-width
+       on row 2; buttons wrap below their row (nothing clipped anymore) */
     .tn-action-bar { flex-wrap: wrap; row-gap: 6px; }
-    .tn-action-bar > div:first-child { min-width: 0 !important; max-width: none !important; flex: 1 1 44%; }
-    .tn-action-bar > .flex-1.relative { flex: 1 1 48%; }
+    .tn-action-row1 > div:first-child { min-width: 0 !important; max-width: none !important; flex: 1 1 100%; }
+    .tn-action-row2 > .flex-1.relative { flex: 1 1 100%; }
     /* F-key chips are meaningless on touch — hide them, show the text labels instead */
     .tn-key-chip { display: none !important; }
     .tn-action-bar > button > span.hidden:not(.font-mono) { display: inline; }
@@ -363,8 +364,10 @@ window.addEventListener('popstate', function() {
     @endif
 
     {{-- flex-wrap: on narrow displays the action buttons wrap to a second row instead of
-         being clipped off-screen (overflow-hidden root swallows anything past the edge). --}}
-    <div class="tn-action-bar flex flex-wrap items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0 shadow-sm">
+         being clipped off-screen (overflow-hidden root swallows anything past the edge).
+         ROW 1 (owner, 24 Jul 2026): customer box WIDE + order-context widgets + utility
+         buttons; category + full-width search moved to their own ROW 2 below. --}}
+    <div class="tn-action-bar tn-action-row1 flex flex-wrap items-center gap-2 px-3 pt-2 pb-1.5 bg-white dark:bg-gray-900 flex-shrink-0">
 
         {{-- Customer box: FIRST in the action bar for ALL styles — the guided flow
              starts with the customer step, so this box must stay at the start (owner,
@@ -373,96 +376,6 @@ window.addEventListener('popstate', function() {
              not relocate this box per-style again). --}}
         @include('pos.partials.sale-customer-box')
 
-        <div class="w-px h-6 bg-gray-200 dark:bg-gray-700 hidden sm:block flex-shrink-0"></div>
-
-        {{-- CATEGORY DROPDOWN (optional filter) — same activeCategory as the grid pills, so the two
-             stay in sync. Default "All Categories" = old behavior, byte-identical. Unlike the pills
-             it is ALWAYS visible (even when the grid is hidden). NOTE (22 Jul 2026): category scopes
-             the browsable GRID only — search is always GLOBAL (whole catalog), per customer request.
-             Hidden automatically when the company has no categories/services/deals to pick. --}}
-        <div class="relative flex-shrink-0" x-show="catOptions().length > 0 || allServices.length > 0 || allDeals.length > 0" x-cloak>
-            <select x-model="activeCategory" title="Category chunein — grid usi category ke products dikhayega (search hamesha poore catalog mein chalti hai)"
-                    class="appearance-none pl-3 pr-8 py-2.5 rounded-xl text-xs font-bold border-2 cursor-pointer max-w-[150px] shadow-sm transition focus:ring-2 focus:ring-purple-500 focus:border-purple-400"
-                    :class="activeCategory !== 'all' ? 'border-purple-400 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300'">
-                <option value="all">All Categories</option>
-                <template x-for="c in catOptions()" :key="c"><option :value="c" x-text="c"></option></template>
-                <template x-if="allServices.length > 0"><option value="services">Services</option></template>
-                <template x-if="allDeals.length > 0"><option value="deals">🔥 Deals</option></template>
-            </select>
-            <svg class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-        </div>
-
-        <div class="flex-1 relative" style="min-width:170px;">
-            <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input type="search" x-ref="searchInput" x-model="searchQuery" @input="onSearchInput()" @keydown.arrow-down.prevent="moveHighlight(1)" @keydown.arrow-up.prevent="moveHighlight(-1)" @keydown.enter.prevent.stop="addHighlightedItem($event)" @keydown.tab="if(flowStep === 'type'){ $event.preventDefault(); } else if(!searchQuery && cart.length > 0){ $event.preventDefault(); enterCartMode('last'); }" @focus="if(searchQuery) showSearchDropdown = true" @click.away="showSearchDropdown = false" placeholder="{{ $isSaaf ? 'Cheez ka naam likhein ya barcode scan karein — Enter se add' : 'Search products... (type to filter, Enter to add, Tab → cart)' }}" class="search-glow w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-400 transition shadow-sm" autocomplete="one-time-code" name="pos_product_search_nofill" data-lpignore="true" data-form-type="other" role="combobox">
-            <kbd x-show="!searchQuery" class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 font-mono">Ctrl+S</kbd>
-            <button x-show="searchQuery" @click="searchQuery = ''; showSearchDropdown = false; filterProducts(); $refs.searchInput.focus()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-            {{-- Smart Product Creation — empty-state.
-                 SIMPLE MODE (inventory OFF): inline "+ Create '<name>' (Enter)" creates product on the fly.
-                 INVENTORY MODE (inventory ON): "Open Products" button — never auto-creates. --}}
-            <div x-show="searchQuery.trim().length > 0 && searchSuggestions.length === 0 && !quickCreating" x-transition
-                 class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
-                <template x-if="!isInventoryEnabled()">
-                    <button type="button" @click="quickCreateProduct()"
-                        class="w-full flex items-center gap-3 px-3 py-3 text-left hover:bg-purple-50 dark:hover:bg-purple-900/20 transition group">
-                        <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-purple-500 to-purple-700 text-white flex-shrink-0 shadow">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-sm font-bold text-gray-900 dark:text-white">Create "<span x-text="searchQuery"></span>"</p>
-                            <p class="text-[10px] text-gray-400">Adds to cart instantly · set price after</p>
-                        </div>
-                        <span class="text-[9px] font-mono bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 px-1.5 py-0.5 rounded border border-purple-200 dark:border-purple-800">⏎</span>
-                    </button>
-                </template>
-                <template x-if="isInventoryEnabled()">
-                    <div class="px-3 py-3">
-                        <p class="text-sm font-semibold text-gray-700 dark:text-gray-200">Product not found</p>
-                        <p class="text-[10px] text-gray-400 mb-2">Inventory mode requires you to add products from Product Management.</p>
-                        <a href="{{ route('pos.products') }}" class="inline-flex items-center gap-1.5 text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300">
-                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                            Open Products
-                        </a>
-                    </div>
-                </template>
-            </div>
-            <div x-show="quickCreating" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-purple-200 rounded-xl shadow-2xl z-50 px-3 py-3">
-                <p class="text-xs text-gray-500 flex items-center gap-2">
-                    <svg class="w-4 h-4 animate-spin text-purple-600" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
-                    Creating "<span x-text="searchQuery" class="font-semibold"></span>"…
-                </p>
-            </div>
-            {{-- Compact search dropdown GLOBAL (customer feedback, 23 Jul 2026 — was Saaf-only):
-                 one line per product (no category sub-label), tighter rows, taller list so more
-                 results fit without scrolling. Stock dots stay (inline after the name). --}}
-            <div x-show="showSearchDropdown && searchSuggestions.length > 0" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 overflow-y-auto" style="max-height:min(60vh,480px);" x-ref="searchDropdown">
-                <template x-for="(s, i) in searchSuggestions" :key="s.id + s.type">
-                    <button @click="quickAddItem(s)" @mouseenter="highlightIndex = i"
-                        :data-hl="i === highlightIndex ? 'true' : 'false'"
-                        class="w-full flex items-center gap-3 px-3 py-1.5 text-left"
-                        :style="i === highlightIndex ? 'background:#7c3aed !important; border-radius:10px; margin:2px 4px; width:calc(100% - 8px); box-shadow:0 4px 12px rgba(124,58,237,0.4);' : 'margin:2px 4px; width:calc(100% - 8px);'">
-                        <template x-if="s.image">
-                            <img :src="s.image" class="w-7 h-7 rounded-lg object-cover flex-shrink-0" :style="i === highlightIndex ? 'outline:2px solid white; outline-offset:1px;' : ''">
-                        </template>
-                        <template x-if="!s.image">
-                            <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                                :style="i === highlightIndex ? 'background:white; color:#7c3aed;' : 'background:linear-gradient(135deg,#f3e8ff,#ede9fe); color:#7c3aed;'">
-                                <span class="text-xs font-bold" x-text="s.name.charAt(0)"></span>
-                            </div>
-                        </template>
-                        <div class="flex-1 min-w-0 flex items-center gap-1.5">
-                            <span class="text-sm font-semibold truncate leading-snug" :style="i === highlightIndex ? 'color:white;' : 'color:#1f2937;'" x-text="s.name"></span>
-                            @if($company->inventory_enabled)
-                            <template x-if="s.stockStatus && s.stockStatus !== 'available'"><span class="stock-dot flex-shrink-0" :class="'stock-' + s.stockStatus"></span></template>
-                            @endif
-                        </div>
-                        <span class="text-sm font-extrabold flex-shrink-0" :style="i === highlightIndex ? 'color:white;' : 'color:#9333ea;'" x-text="'Rs. ' + Number(s.price).toLocaleString()"></span>
-                    </button>
-                </template>
-            </div>
-        </div>
 
         @if($features->tables)
         <button @click="openTablePicker()" class="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold border transition flex-shrink-0" :class="selectedTable ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'">
@@ -563,6 +476,102 @@ window.addEventListener('popstate', function() {
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
             <span class="hidden sm:inline">New</span>
         </button>
+
+    </div>
+
+    {{-- ── ACTION BAR ROW 2 (owner, 24 Jul 2026): category + a FULL-WIDTH product search
+         get their own row so the search box is big and readable on every screen; the
+         customer box sits alone (wide) on row 1. Bill-action buttons stay next to search. --}}
+    <div class="tn-action-bar tn-action-row2 flex flex-wrap items-center gap-2 px-3 pt-1.5 pb-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0 shadow-sm">
+
+        {{-- CATEGORY DROPDOWN (optional filter) — same activeCategory as the grid pills, so the two
+             stay in sync. Default "All Categories" = old behavior, byte-identical. Unlike the pills
+             it is ALWAYS visible (even when the grid is hidden). NOTE (22 Jul 2026): category scopes
+             the browsable GRID only — search is always GLOBAL (whole catalog), per customer request.
+             Hidden automatically when the company has no categories/services/deals to pick. --}}
+        <div class="relative flex-shrink-0" x-show="catOptions().length > 0 || allServices.length > 0 || allDeals.length > 0" x-cloak>
+            <select x-model="activeCategory" title="Category chunein — grid usi category ke products dikhayega (search hamesha poore catalog mein chalti hai)"
+                    class="appearance-none pl-3 pr-8 py-2.5 rounded-xl text-xs font-bold border-2 cursor-pointer max-w-[150px] shadow-sm transition focus:ring-2 focus:ring-purple-500 focus:border-purple-400"
+                    :class="activeCategory !== 'all' ? 'border-purple-400 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300'">
+                <option value="all">All Categories</option>
+                <template x-for="c in catOptions()" :key="c"><option :value="c" x-text="c"></option></template>
+                <template x-if="allServices.length > 0"><option value="services">Services</option></template>
+                <template x-if="allDeals.length > 0"><option value="deals">🔥 Deals</option></template>
+            </select>
+            <svg class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+        </div>
+
+        <div class="flex-1 relative" style="min-width:170px;">
+            <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <input type="search" x-ref="searchInput" x-model="searchQuery" @input="onSearchInput()" @keydown.arrow-down.prevent="moveHighlight(1)" @keydown.arrow-up.prevent="moveHighlight(-1)" @keydown.enter.prevent.stop="addHighlightedItem($event)" @keydown.tab="if(flowStep === 'type'){ $event.preventDefault(); } else if(!searchQuery && cart.length > 0){ $event.preventDefault(); enterCartMode('last'); }" @focus="if(searchQuery) showSearchDropdown = true" @click.away="showSearchDropdown = false" placeholder="{{ $isSaaf ? 'Cheez ka naam likhein ya barcode scan karein — Enter se add' : 'Search products... (type to filter, Enter to add, Tab → cart)' }}" class="search-glow w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-400 transition shadow-sm" autocomplete="one-time-code" name="pos_product_search_nofill" data-lpignore="true" data-form-type="other" role="combobox">
+            <kbd x-show="!searchQuery" class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 font-mono">Ctrl+S</kbd>
+            <button x-show="searchQuery" @click="searchQuery = ''; showSearchDropdown = false; filterProducts(); $refs.searchInput.focus()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+            {{-- Smart Product Creation — empty-state.
+                 SIMPLE MODE (inventory OFF): inline "+ Create '<name>' (Enter)" creates product on the fly.
+                 INVENTORY MODE (inventory ON): "Open Products" button — never auto-creates. --}}
+            <div x-show="searchQuery.trim().length > 0 && searchSuggestions.length === 0 && !quickCreating" x-transition
+                 class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                <template x-if="!isInventoryEnabled()">
+                    <button type="button" @click="quickCreateProduct()"
+                        class="w-full flex items-center gap-3 px-3 py-3 text-left hover:bg-purple-50 dark:hover:bg-purple-900/20 transition group">
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-purple-500 to-purple-700 text-white flex-shrink-0 shadow">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-bold text-gray-900 dark:text-white">Create "<span x-text="searchQuery"></span>"</p>
+                            <p class="text-[10px] text-gray-400">Adds to cart instantly · set price after</p>
+                        </div>
+                        <span class="text-[9px] font-mono bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 px-1.5 py-0.5 rounded border border-purple-200 dark:border-purple-800">⏎</span>
+                    </button>
+                </template>
+                <template x-if="isInventoryEnabled()">
+                    <div class="px-3 py-3">
+                        <p class="text-sm font-semibold text-gray-700 dark:text-gray-200">Product not found</p>
+                        <p class="text-[10px] text-gray-400 mb-2">Inventory mode requires you to add products from Product Management.</p>
+                        <a href="{{ route('pos.products') }}" class="inline-flex items-center gap-1.5 text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                            Open Products
+                        </a>
+                    </div>
+                </template>
+            </div>
+            <div x-show="quickCreating" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-purple-200 rounded-xl shadow-2xl z-50 px-3 py-3">
+                <p class="text-xs text-gray-500 flex items-center gap-2">
+                    <svg class="w-4 h-4 animate-spin text-purple-600" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                    Creating "<span x-text="searchQuery" class="font-semibold"></span>"…
+                </p>
+            </div>
+            {{-- Compact search dropdown GLOBAL (customer feedback, 23 Jul 2026 — was Saaf-only):
+                 one line per product (no category sub-label), tighter rows, taller list so more
+                 results fit without scrolling. Stock dots stay (inline after the name). --}}
+            <div x-show="showSearchDropdown && searchSuggestions.length > 0" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 overflow-y-auto" style="max-height:min(60vh,480px);" x-ref="searchDropdown">
+                <template x-for="(s, i) in searchSuggestions" :key="s.id + s.type">
+                    <button @click="quickAddItem(s)" @mouseenter="highlightIndex = i"
+                        :data-hl="i === highlightIndex ? 'true' : 'false'"
+                        class="w-full flex items-center gap-3 px-3 py-1.5 text-left"
+                        :style="i === highlightIndex ? 'background:#7c3aed !important; border-radius:10px; margin:2px 4px; width:calc(100% - 8px); box-shadow:0 4px 12px rgba(124,58,237,0.4);' : 'margin:2px 4px; width:calc(100% - 8px);'">
+                        <template x-if="s.image">
+                            <img :src="s.image" class="w-7 h-7 rounded-lg object-cover flex-shrink-0" :style="i === highlightIndex ? 'outline:2px solid white; outline-offset:1px;' : ''">
+                        </template>
+                        <template x-if="!s.image">
+                            <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                                :style="i === highlightIndex ? 'background:white; color:#7c3aed;' : 'background:linear-gradient(135deg,#f3e8ff,#ede9fe); color:#7c3aed;'">
+                                <span class="text-xs font-bold" x-text="s.name.charAt(0)"></span>
+                            </div>
+                        </template>
+                        <div class="flex-1 min-w-0 flex items-center gap-1.5">
+                            <span class="text-sm font-semibold truncate leading-snug" :style="i === highlightIndex ? 'color:white;' : 'color:#1f2937;'" x-text="s.name"></span>
+                            @if($company->inventory_enabled)
+                            <template x-if="s.stockStatus && s.stockStatus !== 'available'"><span class="stock-dot flex-shrink-0" :class="'stock-' + s.stockStatus"></span></template>
+                            @endif
+                        </div>
+                        <span class="text-sm font-extrabold flex-shrink-0" :style="i === highlightIndex ? 'color:white;' : 'color:#9333ea;'" x-text="'Rs. ' + Number(s.price).toLocaleString()"></span>
+                    </button>
+                </template>
+            </div>
+        </div>
 
         {{-- ── PROVISIONAL BILLS (Local) — header shortcut. Same pattern as Held. ── --}}
         {{-- 🟢/🟡/🔴 Auto-Sync status pill — live network + pending-bill indicator. --}}
@@ -779,7 +788,8 @@ window.addEventListener('popstate', function() {
             </button>
         </div>
 
-        <div class="w-full md:w-[300px] lg:w-[340px] xl:w-[380px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl" :class="mobileView === 'cart' ? 'flex' : 'hidden md:flex'">
+        {{-- Cart column widened (owner, 24 Jul 2026: "cart asani se nazar aaye") 300/340/380 → 320/380/420 --}}
+        <div class="w-full md:w-[320px] lg:w-[380px] xl:w-[420px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl" :class="mobileView === 'cart' ? 'flex' : 'hidden md:flex'">
             <div class="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
                 <button @click="mobileView = 'menu'" class="md:hidden p-1.5 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>

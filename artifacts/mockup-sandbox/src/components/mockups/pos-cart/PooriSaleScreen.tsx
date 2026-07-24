@@ -203,17 +203,17 @@ export function PooriSaleScreen() {
       <div className="flex flex-1 min-h-0">
         {/* Product grid */}
         <div className="flex-1 p-3 overflow-hidden">
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-3 gap-1.5">
             {products.map((p) => (
               <button
                 key={p.name}
-                className="rounded-lg bg-white border border-neutral-200 px-2.5 py-2 text-left border-l-4"
+                className="rounded-md bg-white border border-neutral-200 pl-2 pr-2 py-1.5 text-left border-l-[3px] flex items-center gap-2"
                 style={{ borderLeftColor: p.c }}
               >
-                <div className="text-[12px] font-semibold text-neutral-800 leading-tight line-clamp-2 min-h-[30px]">{p.name}</div>
-                <div className="text-[12px] font-bold mt-0.5" style={{ color: "#0A4D5C" }}>
-                  Rs {p.price}
-                </div>
+                <span className="text-[12px] font-medium text-neutral-800 truncate flex-1">{p.name}</span>
+                <span className="text-[12px] font-bold shrink-0" style={{ color: "#0A4D5C" }}>
+                  {p.price}
+                </span>
               </button>
             ))}
           </div>

@@ -65,7 +65,7 @@
 - [pricing_plans.features = display-only](pos-plan-features-display-only.md) — no code reads the JSON; restaurant gate = restaurant_enabled column; plan cards render limits from columns + cumulative lists.
 - [Silent printer routing](silent-printer-routing.md) — KOT stamping at result-time not render; Electron listener leak = double print; no pageSize for thermal; MySQL NOW() looks offline to Laravel.
 - [Desktop Agent release distribution](agent-release-distribution.md) — GitHub Releases latest = only channel; agents ≥v1.3.0 self-update via heartbeat agent_update (zip swap); tag must be agent-semver major≤99.
-- [NestPOS Desktop shell](pos-desktop-shell.md) — opt-in POS window inside the agent (v1.4.0+); exe name frozen; printHtml mutex needed BEFORE web-side bridge hook; Ctrl+Alt+K kiosk.
+- [NestPOS Desktop shell](pos-desktop-shell.md) — opt-in POS window inside the agent (v1.4.0+); exe frozen; v1.5.0 Offline Mode: passthrough-first https interception + disk snapshot, capture MUST bypass own handler; beta zips = real file, never symlink/GitHub.
 - [Mockup sandbox setup quirks](mockup-sandbox-setup.md) — fresh sandbox npm install dies with "Invalid Version"; rm node_modules+lockfile then install; previews are path-based /__mockup/, no port.
 - [POS What's New updates](pos-whats-new-updates.md) — popup/bell in pos-app layout; MUST skip confined roles + pending companies (seen POST blocked = dismiss loop); after each POS deploy create an AppUpdate row.
 - [POS receipt plain style](pos-receipt-plain-style.md) — bold+center-logo now UNIVERSAL default (opt-out per company); plain style rules kept for opt-outs; hidden print iframe must give focus back or shortcuts die.

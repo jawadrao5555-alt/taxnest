@@ -18,6 +18,7 @@
 //   partition; everything else (WhatsApp links etc.) goes to the system browser.
 const { BrowserWindow, shell } = require('electron');
 const path = require('path');
+const offlineSnapshot = require('./offline-snapshot');
 
 let posWindow = null;
 let targetUrl = null;
@@ -73,6 +74,8 @@ function openPosWindow(config, opts = {}) {
   targetUrl = origin + '/pos/invoice/create';
   onKioskToggleCb = typeof opts.onKioskToggle === 'function' ? opts.onKioskToggle : null;
   let kioskOn = !!opts.kiosk;
+  const isOfflineEnabled =
+    typeof opts.isOfflineEnabled === 'function' ? opts.isOfflineEnabled : () => false;
 
   posWindow = new BrowserWindow({
     width: 1366,
@@ -96,6 +99,28 @@ function openPosWindow(config, opts = {}) {
 
   // Keep our own title — the web app rewrites document.title on every page.
   posWindow.on('page-title-updated', (e) => e.preventDefault());
+
+  // Offline Mode (Beta): register the passthrough-first https interception on
+  // the persist:pos partition BEFORE the first load, and snapshot the sale
+  // screen after each successful online load. Registration only happens when
+  // the setting is ON at window-open time (OFF = zero behavior change);
+  // isOfflineEnabled() is also re-checked before ever serving a snapshot.
+  try {
+    if (isOfflineEnabled()) {
+      offlineSnapshot.registerOfflineInterception(
+        posWindow.webContents.session, origin, isOfflineEnabled
+      );
+    }
+    posWindow.webContents.on('did-finish-load', () => {
+      try {
+        if (!isOfflineEnabled()) return;
+        const cur = posWindow.webContents.getURL() || '';
+        if (cur.startsWith(origin + '/pos/invoice/create')) {
+          offlineSnapshot.scheduleCapture(posWindow.webContents.session, origin, cur);
+        }
+      } catch (e) {}
+    });
+  } catch (e) {}
 
   // Ctrl+Alt+K toggles kiosk from inside the POS window (staff escape hatch).
   posWindow.webContents.on('before-input-event', (event, input) => {

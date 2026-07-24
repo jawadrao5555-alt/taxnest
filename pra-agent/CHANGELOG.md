@@ -1,5 +1,16 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.5.0 / build 20260724-2 (2026-07-24) — BETA
+**New: Offline Mode (Beta) — billing without internet (NestPOS Desktop)**
+
+- New **Offline Mode (Beta)** toggle on the NestPOS Desktop card (default OFF). When ON:
+  - Every successful online sale-screen load saves a local snapshot of the screen (with the logged-in cashier's full product catalog, prices and settings) plus its static assets to this PC.
+  - If the internet goes away — even across a PC restart — the POS screen still opens from the snapshot and billing keeps working; bills are stored in the existing in-page offline queue and sync automatically (duplicate-proof) as soon as the internet returns.
+  - An amber "Offline mode" pill shows on the screen with the snapshot's last-update time and a retry button; the window auto-reloads when connectivity returns.
+- Implementation: passthrough-first HTTPS interception on the POS window's session (network first, snapshot ONLY on network failure, same-origin always) — with the toggle OFF, behavior is completely unchanged.
+- Limits: first login needs internet; PRA fiscal numbers attach after sync (offline receipts show the local number); prices/settings changed while offline appear after reconnection; restaurant kitchen/waiter multi-device flows are not offline yet.
+- Sync agent + silent printing untouched.
+
 ## v1.4.0 / build 20260724-1 (2026-07-24)
 **New: NestPOS Desktop — full POS screen inside the agent ("Rasta B")**
 

@@ -10,7 +10,7 @@ const { printHtml: printHtmlSilent } = require('./src/printer');
 const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk } = require('./src/pos-window');
 
 const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/taxnest/releases/latest';
-const BUILD_TIMESTAMP = '20260724-1';
+const BUILD_TIMESTAMP = '20260724-2';
 let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
 
 // ─── Zip-based SELF-UPDATE ──────────────────────────────────────────────────
@@ -196,11 +196,15 @@ let isQuitting = false;
 // ─── NestPOS Desktop (POS screen shell) settings ────────────────────────────
 function getPosSettings() {
   const s = store.get('posSettings') || {};
-  return { openOnStartup: !!s.openOnStartup, kiosk: !!s.kiosk };
+  return { openOnStartup: !!s.openOnStartup, kiosk: !!s.kiosk, offlineMode: !!s.offlineMode };
 }
 
 function setPosSettings(next) {
-  store.set('posSettings', { openOnStartup: !!next.openOnStartup, kiosk: !!next.kiosk });
+  store.set('posSettings', {
+    openOnStartup: !!next.openOnStartup,
+    kiosk: !!next.kiosk,
+    offlineMode: !!next.offlineMode,
+  });
 }
 
 function openPos() {
@@ -214,6 +218,7 @@ function openPos() {
     const s = getPosSettings();
     openPosWindow(config, {
       kiosk: s.kiosk,
+      isOfflineEnabled: () => getPosSettings().offlineMode,
       onKioskToggle: (kioskNow) => {
         setPosSettings({ ...getPosSettings(), kiosk: kioskNow });
         buildTrayMenu();

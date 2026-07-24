@@ -213,10 +213,17 @@
       <input type="checkbox" id="posStartup" style="width:auto; margin:0;">
       Open POS screen automatically when this PC starts
     </label>
-    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; color:#fff;">
+    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom:8px; font-size:13px; color:#fff;">
       <input type="checkbox" id="posKiosk" style="width:auto; margin:0;">
       Kiosk mode — full-screen POS (press <b>Ctrl+Alt+K</b> inside POS to exit)
     </label>
+    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; color:#fff;">
+      <input type="checkbox" id="posOffline" style="width:auto; margin:0;">
+      Offline Mode (Beta) — billing keeps working without internet; bills sync automatically when it returns
+    </label>
+    <p style="font-size:11px; color:#c4b5fd; margin:6px 0 0 24px; line-height:1.5;">
+      Changing this takes effect the next time the POS screen is opened. First login always needs internet.
+    </p>
     <div id="posSaved" style="display:none; margin-top:8px; font-size:12px; color:#10b981;">✓ Saved</div>
   </div>
 
@@ -434,17 +441,20 @@
     const s = await window.agentAPI.getPosSettings();
     $('posStartup').checked = !!s.openOnStartup;
     $('posKiosk').checked = !!s.kiosk;
+    $('posOffline').checked = !!s.offlineMode;
   }
   async function savePosSettings() {
     await window.agentAPI.savePosSettings({
       openOnStartup: $('posStartup').checked,
       kiosk: $('posKiosk').checked,
+      offlineMode: $('posOffline').checked,
     });
     $('posSaved').style.display = 'block';
     setTimeout(() => { $('posSaved').style.display = 'none'; }, 2000);
   }
   $('posStartup').addEventListener('change', savePosSettings);
   $('posKiosk').addEventListener('change', savePosSettings);
+  $('posOffline').addEventListener('change', savePosSettings);
   $('openPosBtn').addEventListener('click', () => window.agentAPI.openPosWindow());
   loadPosSettings();
 

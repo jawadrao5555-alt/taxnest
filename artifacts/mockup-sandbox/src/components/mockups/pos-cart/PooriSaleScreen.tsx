@@ -203,7 +203,7 @@ export function PooriSaleScreen() {
       <div className="flex flex-1 min-h-0">
         {/* Product grid */}
         <div className="flex-1 p-3 overflow-hidden">
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-2 gap-1.5">
             {products.map((p) => (
               <button
                 key={p.name}
@@ -220,7 +220,7 @@ export function PooriSaleScreen() {
         </div>
 
         {/* Cart column */}
-        <div className="w-[400px] shrink-0 bg-white border-l border-neutral-200 flex flex-col">
+        <div className="w-[460px] shrink-0 bg-white border-l border-neutral-200 flex flex-col">
           {/* Header — yellow duplicate line KHATAM, sirf ye header */}
           <div className="px-4 py-2.5 flex items-center justify-between shrink-0" style={{ background: "#0A4D5C" }}>
             <div className="flex items-center gap-2 text-white font-semibold text-sm">

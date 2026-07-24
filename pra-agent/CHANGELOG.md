@@ -1,5 +1,13 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.5.0 / build 20260725-1 (2026-07-25) — BETA 4
+**New: agent follows the POS login (auto company switch)**
+
+- **The agent now follows whoever logs into the POS window**: when a DIFFERENT company logs in, the agent automatically fetches that company's Server URL + API key and reconfigures itself — no manual copy-paste, ever. Logging back in as the previous company switches it back the same way.
+- Same company logging in again = no change (zero writes). If the company's API key was regenerated on the server, the agent now self-heals to the new key on the next login.
+- **Windows notification on switch**: when the agent moves to a different company, a desktop notification announces it ("Agent ab ... ke liye chal raha hai") so staff on fiscal-device shops notice that PRA sync + printing ownership changed.
+- Implementation: seeing the POS login page re-arms the auto-config check (race-safe via a generation counter); the config fetch is a read-only GET with the session cookie (server pins PRA routing exactly as before).
+
 ## v1.5.0 / build 20260724-4 (2026-07-24) — BETA 3
 **New: NestPOS installs as its OWN app (Desktop icon + own taskbar identity)**
 

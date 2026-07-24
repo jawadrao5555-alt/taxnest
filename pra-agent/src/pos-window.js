@@ -148,18 +148,27 @@ function openPosWindow(config, opts = {}) {
   // onLoggedIn returns a promise resolving true on success; until then we
   // keep retrying on subsequent page loads (e.g. first load was the login
   // page, or the config fetch raced a network drop).
+  // v1.5.0 beta4: seeing the LOGIN page again re-arms the check — so after a
+  // logout + login as ANOTHER company, main.js re-fetches and the agent swaps
+  // to the new company's credentials automatically (owner rule: the agent
+  // follows whoever is logged into the POS window).
   const onLoggedIn = typeof opts.onLoggedIn === 'function' ? opts.onLoggedIn : null;
   let autoCfgDone = false;
   let autoCfgInFlight = false;
+  let autoCfgGen = 0; // bumped on every login-page sighting — a stale fetch can't clobber a newer re-arm
   posWindow.webContents.on('did-finish-load', () => {
     try {
-      if (!onLoggedIn || autoCfgDone || autoCfgInFlight) return;
+      if (!onLoggedIn) return;
       const cur = posWindow.webContents.getURL() || '';
+      // Login-page re-arm runs BEFORE the inFlight gate so a logout that races
+      // an in-flight config fetch still re-arms the check for the next login.
+      if (cur.startsWith(origin + '/pos/login')) { autoCfgDone = false; autoCfgGen++; return; }
+      if (autoCfgDone || autoCfgInFlight) return;
       if (!cur.startsWith(origin + '/pos/')) return;
-      if (cur.startsWith(origin + '/pos/login')) return;
+      const gen = autoCfgGen;
       autoCfgInFlight = true;
       Promise.resolve(onLoggedIn(posWindow.webContents.session, origin))
-        .then((ok) => { autoCfgDone = !!ok; })
+        .then((ok) => { if (gen === autoCfgGen) autoCfgDone = !!ok; })
         .catch(() => {})
         .finally(() => { autoCfgInFlight = false; });
     } catch (e) { autoCfgInFlight = false; }

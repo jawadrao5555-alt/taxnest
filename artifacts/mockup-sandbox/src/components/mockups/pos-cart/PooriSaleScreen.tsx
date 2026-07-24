@@ -27,10 +27,10 @@ const items = [
 ];
 
 const products = [
-  { name: "Chicken Biryani", price: 350, c: "#0A4D5C" },
-  { name: "Beef Pulao", price: 400, c: "#155e70" },
-  { name: "Chai", price: 60, c: "#0d9488" },
-  { name: "Doodh Patti", price: 80, c: "#0f766e" },
+  { name: "Chicken Biryani", price: 350, c: "#4c1d95" },
+  { name: "Beef Pulao", price: 400, c: "#5b21b6" },
+  { name: "Chai", price: 60, c: "#7c3aed" },
+  { name: "Doodh Patti", price: 80, c: "#8b5cf6" },
   { name: "Samosa", price: 45, c: "#7c5e10" },
   { name: "Pakora (250g)", price: 120, c: "#8a5a00" },
   { name: "Zinger Burger", price: 320, c: "#6d28d9" },
@@ -39,9 +39,9 @@ const products = [
   { name: "Cold Drink 1.5L", price: 180, c: "#1f2937" },
   { name: "Mineral Water", price: 60, c: "#334155" },
   { name: "Kheer", price: 130, c: "#525252" },
-  { name: "Chicken Karahi (Half)", price: 850, c: "#0A4D5C" },
+  { name: "Chicken Karahi (Half)", price: 850, c: "#4c1d95" },
   { name: "Naan", price: 30, c: "#7c5e10" },
-  { name: "Raita", price: 50, c: "#0f766e" },
+  { name: "Raita", price: 50, c: "#8b5cf6" },
 ];
 
 function Kbd({ children, dark = false }: { children: string; dark?: boolean }) {
@@ -91,7 +91,7 @@ export function PooriSaleScreen() {
       {/* ===== TOP BLACK NAV — ab utility buttons + toggles yahan ===== */}
       <div className="relative z-20 flex items-center gap-3 px-3 h-12 shrink-0" style={{ background: "#101418" }}>
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-md flex items-center justify-center text-white text-xs font-extrabold" style={{ background: "#0d9488" }}>
+          <div className="w-7 h-7 rounded-md flex items-center justify-center text-white text-xs font-extrabold" style={{ background: "#7c3aed" }}>
             N
           </div>
           <div className="leading-tight">
@@ -99,7 +99,7 @@ export function PooriSaleScreen() {
             <div className="text-white/50 text-[9px] leading-none mt-0.5">ENTERPRISE</div>
           </div>
         </div>
-        <button className="ml-2 rounded-md px-3 py-1.5 text-[12px] font-bold text-white" style={{ background: "#0d9488" }}>
+        <button className="ml-2 rounded-md px-3 py-1.5 text-[12px] font-bold text-white" style={{ background: "#7c3aed" }}>
           + New Sale
         </button>
 
@@ -130,7 +130,7 @@ export function PooriSaleScreen() {
             <div className="flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-neutral-50">
               <span className="text-[11px] font-bold text-neutral-600">PRA REPORTING</span>
               <span className="flex items-center gap-1.5 text-[10px] font-bold text-neutral-400">
-                OFF <Toggle on={false} color="#0d9488" />
+                OFF <Toggle on={false} color="#7c3aed" />
               </span>
             </div>
             <div className="flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-neutral-50">
@@ -179,7 +179,7 @@ export function PooriSaleScreen() {
         </div>
         <div className="flex items-center gap-1.5">
           <button className="rounded-lg px-3 py-2 text-[12px] font-bold border border-neutral-300 text-neutral-500">Dine-In</button>
-          <button className="rounded-lg px-3 py-2 text-[12px] font-bold text-white" style={{ background: "#0A4D5C" }}>
+          <button className="rounded-lg px-3 py-2 text-[12px] font-bold text-white" style={{ background: "#6d28d9" }}>
             Takeaway
           </button>
           <button className="rounded-lg px-3 py-2 text-[12px] font-bold border border-neutral-300 text-neutral-500">Delivery</button>
@@ -191,8 +191,8 @@ export function PooriSaleScreen() {
         <button className="flex items-center gap-2 rounded-lg border border-neutral-300 px-3 py-2.5 text-[13px] font-semibold text-neutral-600 shrink-0">
           Sab Categories <ChevronDown className="w-4 h-4 text-neutral-400" />
         </button>
-        <div className="flex items-center gap-2 flex-1 rounded-lg border-2 px-4 py-2.5 bg-white" style={{ borderColor: "#0d9488" }}>
-          <Search className="w-5 h-5" style={{ color: "#0d9488" }} />
+        <div className="flex items-center gap-2 flex-1 rounded-lg border-2 px-4 py-2.5 bg-white" style={{ borderColor: "#7c3aed" }}>
+          <Search className="w-5 h-5" style={{ color: "#7c3aed" }} />
           <span className="text-[15px] text-neutral-400">Scan barcode ya product ka naam likhein…</span>
           <span className="ml-auto flex items-center gap-1.5">
             <NayaTag />
@@ -213,7 +213,7 @@ export function PooriSaleScreen() {
                 style={{ borderLeftColor: p.c }}
               >
                 <span className="text-[12px] font-medium text-neutral-800 truncate flex-1">{p.name}</span>
-                <span className="text-[12px] font-bold shrink-0" style={{ color: "#0A4D5C" }}>
+                <span className="text-[12px] font-bold shrink-0" style={{ color: "#6d28d9" }}>
                   {p.price}
                 </span>
               </button>
@@ -238,7 +238,7 @@ export function PooriSaleScreen() {
         {/* Cart column */}
         <div className="w-[460px] shrink-0 bg-white border-l border-neutral-200 flex flex-col">
           {/* Header — yellow duplicate line KHATAM, sirf ye header */}
-          <div className="px-4 py-2.5 flex items-center justify-between shrink-0" style={{ background: "#0A4D5C" }}>
+          <div className="px-4 py-2.5 flex items-center justify-between shrink-0" style={{ background: "#2e1065" }}>
             <div className="flex items-center gap-2 text-white font-semibold text-sm">
               <ShoppingCart className="w-4 h-4" /> Current Order
             </div>
@@ -281,7 +281,7 @@ export function PooriSaleScreen() {
           </div>
 
           {/* Bada Total band */}
-          <div className="px-4 py-2.5 flex items-end justify-between shrink-0" style={{ background: "#0A4D5C" }}>
+          <div className="px-4 py-2.5 flex items-end justify-between shrink-0" style={{ background: "#2e1065" }}>
             <div className="text-white/80 text-[11px] leading-[18px]">
               <div>Subtotal &nbsp; Rs 970.00</div>
               <div>Tax (16%) &nbsp; Rs 155.20</div>
@@ -299,7 +299,7 @@ export function PooriSaleScreen() {
           {/* One-tap payment + footer rows */}
           <div className="px-3 pt-2 pb-3 space-y-1.5 shrink-0">
             <div className="grid grid-cols-3 gap-1.5">
-              <button className="py-2 rounded-lg text-white flex flex-col items-center gap-0.5" style={{ background: "#0d9488" }}>
+              <button className="py-2 rounded-lg text-white flex flex-col items-center gap-0.5" style={{ background: "#7c3aed" }}>
                 <Banknote className="w-5 h-5" />
                 <span className="text-[12px] font-bold leading-none">CASH</span>
                 <span className="text-[9px] text-white/75 leading-none">Rs 1,125</span>
@@ -346,7 +346,7 @@ export function PooriSaleScreen() {
               <button className="py-2 rounded-lg border border-amber-400 bg-amber-50 text-amber-700 text-[11px] font-bold flex items-center justify-center gap-1.5">
                 Provisional <Kbd dark>F9</Kbd>
               </button>
-              <button className="py-2 rounded-lg text-white text-[12px] font-extrabold flex items-center justify-center gap-1.5" style={{ background: "#0A4D5C" }}>
+              <button className="py-2 rounded-lg text-white text-[12px] font-extrabold flex items-center justify-center gap-1.5" style={{ background: "#6d28d9" }}>
                 PAY <Kbd>F8</Kbd>
               </button>
             </div>

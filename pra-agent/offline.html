@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+<meta charset="UTF-8">
+<title>NestPOS Desktop — Internet Nahi</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #06333d 0%, #0A4D5C 100%);
+    color: #fff;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .box {
+    max-width: 480px;
+    width: 100%;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    padding: 36px 28px;
+  }
+  .icon { font-size: 52px; margin-bottom: 14px; }
+  h1 { font-size: 22px; margin-bottom: 10px; }
+  p { font-size: 14px; color: #b6dbe4; line-height: 1.7; margin-bottom: 8px; }
+  .count { font-weight: 700; color: #fff; }
+  .btn {
+    margin-top: 18px;
+    padding: 12px 26px;
+    border: none;
+    border-radius: 10px;
+    background: #0d7a91;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .btn:hover { background: #0f8fa9; }
+  .err { margin-top: 14px; font-size: 11px; color: #7fb6c2; word-break: break-all; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="icon">📡</div>
+    <h1>Internet nahi mil raha</h1>
+    <p>NestPOS server se raabta nahi ho pa raha. Internet check karein — connection wapas aate hi POS khud khul jayega.</p>
+    <p><span class="count" id="count">15</span> second mein dobara koshish hogi&hellip;</p>
+    <button class="btn" id="retryBtn">Abhi Dobara Koshish Karein</button>
+    <div class="err" id="errLine"></div>
+  </div>
+<script>
+  var params = new URLSearchParams(location.search);
+  var target = params.get('target') || '';
+  var err = params.get('err') || '';
+  if (err) document.getElementById('errLine').textContent = err;
+
+  function retry() {
+    if (target && /^https:\/\//i.test(target)) {
+      location.replace(target);
+    }
+  }
+  document.getElementById('retryBtn').addEventListener('click', retry);
+
+  var left = 15;
+  var el = document.getElementById('count');
+  setInterval(function () {
+    left -= 1;
+    if (left <= 0) { retry(); left = 15; }
+    el.textContent = left;
+  }, 1000);
+</script>
+</body>
+</html>

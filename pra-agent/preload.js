@@ -17,4 +17,7 @@ contextBridge.exposeInMainWorld('agentAPI', {
   installFbrIms: () => ipcRenderer.invoke('install-fbr-ims'),
   onImsProgress: (callback) =>
     ipcRenderer.on('ims-progress', (event, p) => callback(p)),
+  getPosSettings: () => ipcRenderer.invoke('get-pos-settings'),
+  savePosSettings: (s) => ipcRenderer.invoke('save-pos-settings', s),
+  openPosWindow: () => ipcRenderer.invoke('open-pos-window'),
 });

@@ -1,5 +1,21 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.4.0 / build 20260724-1 (2026-07-24)
+**New: NestPOS Desktop — full POS screen inside the agent ("Rasta B")**
+
+- New **Open POS Screen** button (agent window + tray menu): opens the live TaxNest POS sale screen in its own desktop window — billing, printing and PRA sync on one PC, no browser needed. Login persists across restarts (persistent session; tick "Remember me" on the login page).
+- **Kiosk mode** (optional, off by default): full-screen POS for shop counters. Toggle from the agent window, the tray menu, or **Ctrl+Alt+K** inside the POS window.
+- **Open on startup** (optional): the POS screen opens automatically when the shop PC boots; the agent settings window stays in the tray.
+- Offline fallback page (Roman Urdu) with auto-retry every 15s when the server is unreachable on load; once the sale screen is open, the existing in-page offline bill queue keeps billing through outages.
+- Same-origin popups open in-app (same session); external links (e.g. WhatsApp) open in the system browser.
+- New `window.nestposDesktop` bridge in the POS window (desktop detection + silent `printHtml` hook) — groundwork for dialog-free receipt printing from the web app in a future server-side deploy.
+- The sync agent + silent printer routing are completely untouched — the POS shell is additive and opt-in; existing shops upgrade in place via self-update with zero behavior change until they use the new buttons.
+
+## v1.3.0 / build 20260723-2 (2026-07-23)
+**New: zip-based self-update**
+
+- Agents update themselves automatically from GitHub Releases via the server heartbeat (`agent_update`) — download, verify size, extract, robocopy swap, relaunch. One attempt per version per run.
+
 ## v1.2.0 / build 20260717-1 (2026-07-17)
 **New: FBR IMS one-stop setup (Fiscal Device mode)**
 

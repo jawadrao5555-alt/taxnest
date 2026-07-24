@@ -211,4 +211,6 @@ function stopPrinting() {
   printStatus.printingEnabled = false;
 }
 
-module.exports = { startPrinting, stopPrinting, getPrintStatus };
+// printHtml is also used by the NestPOS Desktop POS window bridge
+// (pos-print-html IPC) for in-app silent receipt printing.
+module.exports = { startPrinting, stopPrinting, getPrintStatus, printHtml };

@@ -6,9 +6,11 @@ const { spawn } = require('child_process');
 const axios = require('axios');
 const Store = require('electron-store');
 const { startAgent, stopAgent, getStatus } = require('./src/agent');
+const { printHtml: printHtmlSilent } = require('./src/printer');
+const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk } = require('./src/pos-window');
 
 const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/taxnest/releases/latest';
-const BUILD_TIMESTAMP = '20260723-2';
+const BUILD_TIMESTAMP = '20260724-1';
 let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
 
 // ─── Zip-based SELF-UPDATE ──────────────────────────────────────────────────
@@ -191,6 +193,39 @@ let mainWindow = null;
 let tray = null;
 let isQuitting = false;
 
+// ─── NestPOS Desktop (POS screen shell) settings ────────────────────────────
+function getPosSettings() {
+  const s = store.get('posSettings') || {};
+  return { openOnStartup: !!s.openOnStartup, kiosk: !!s.kiosk };
+}
+
+function setPosSettings(next) {
+  store.set('posSettings', { openOnStartup: !!next.openOnStartup, kiosk: !!next.kiosk });
+}
+
+function openPos() {
+  try {
+    const config = store.get('config');
+    if (!config || !config.serverUrl) {
+      // Not configured yet — show the agent settings window instead.
+      if (mainWindow) mainWindow.show();
+      return false;
+    }
+    const s = getPosSettings();
+    openPosWindow(config, {
+      kiosk: s.kiosk,
+      onKioskToggle: (kioskNow) => {
+        setPosSettings({ ...getPosSettings(), kiosk: kioskNow });
+        buildTrayMenu();
+      },
+    });
+    return true;
+  } catch (e) {
+    console.log('[pos-window] open failed:', e && e.message);
+    return false;
+  }
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 720,
@@ -235,15 +270,32 @@ function createTray() {
   }
 
   tray = new Tray(icon);
-  tray.setToolTip('TaxNest PRA Sync Agent');
+  tray.setToolTip('NestPOS Desktop — TaxNest PRA Sync Agent');
 
+  buildTrayMenu();
+  tray.on('click', () => mainWindow && mainWindow.show());
+}
+
+function buildTrayMenu() {
+  if (!tray) return;
+  const posSettings = getPosSettings();
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Show Window',
-      click: () => mainWindow && mainWindow.show(),
+      label: '🖥️ Open POS Screen',
+      click: () => openPos(),
     },
     {
-      label: 'Status',
+      label: 'Kiosk Mode (POS full-screen)',
+      type: 'checkbox',
+      checked: posSettings.kiosk,
+      click: (item) => {
+        setPosSettings({ ...getPosSettings(), kiosk: item.checked });
+        applyKiosk(item.checked);
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Agent Settings / Status',
       click: () => mainWindow && mainWindow.show(),
     },
     { type: 'separator' },
@@ -258,7 +310,6 @@ function createTray() {
   ]);
 
   tray.setContextMenu(contextMenu);
-  tray.on('click', () => mainWindow && mainWindow.show());
 }
 
 app.whenReady().then(() => {
@@ -273,6 +324,18 @@ app.whenReady().then(() => {
   const config = store.get('config');
   if (config && config.serverUrl && config.apiKey && config.companyId) {
     startAgent(withAppMeta(config), sendStatusUpdate, handleAgentUpdate);
+  }
+
+  // NestPOS Desktop: optionally open the POS screen on startup (shop PCs).
+  // try/catch + additive design — a shell failure must never touch the agent.
+  try {
+    if (getPosSettings().openOnStartup) {
+      const opened = openPos();
+      // Keep the shop PC clean: POS front and center, agent window in tray.
+      if (opened && mainWindow) mainWindow.hide();
+    }
+  } catch (e) {
+    console.log('[pos-window] startup open failed:', e && e.message);
   }
 });
 
@@ -343,6 +406,36 @@ ipcMain.handle('install-update-now', async () => {
 });
 
 ipcMain.handle('get-version', () => ({ build: BUILD_TIMESTAMP, version: app.getVersion() }));
+
+// ─── NestPOS Desktop (POS screen shell) IPC ─────────────────────────────────
+ipcMain.handle('get-pos-settings', () => getPosSettings());
+
+ipcMain.handle('save-pos-settings', (event, s) => {
+  setPosSettings(s || {});
+  applyKiosk(!!(s && s.kiosk));
+  buildTrayMenu();
+  return { ok: true };
+});
+
+ipcMain.handle('open-pos-window', () => ({ ok: openPos() }));
+
+// Silent-print bridge for the POS window (window.nestposDesktop.printHtml).
+// Accepts calls ONLY from the POS window itself — a stray/child page can
+// never feed paper to the shop printer.
+ipcMain.handle('pos-print-html', async (event, html, deviceName) => {
+  const pw = getPosWindowRef();
+  if (!pw || event.sender !== pw.webContents) {
+    return { success: false, error: 'unauthorized' };
+  }
+  if (!html || typeof html !== 'string') {
+    return { success: false, error: 'empty html' };
+  }
+  try {
+    return await printHtmlSilent(html, deviceName || undefined);
+  } catch (e) {
+    return { success: false, error: (e && e.message) || 'print failed' };
+  }
+});
 
 // ─── FBR IMS Fiscal Service helper ──────────────────────────────────────────
 // FBRIMS is FBR's OWN software (runs as a separate service on localhost:8524).

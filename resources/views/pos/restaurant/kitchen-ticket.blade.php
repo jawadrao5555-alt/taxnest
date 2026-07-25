@@ -8,8 +8,11 @@
         @page { size: 80mm auto; margin: 0; }
         @media print {
             /* PRINTABLE-WIDTH FIX v2 (Jul 2026): 80mm paper prints only ~72mm — cap at
-               the safe printable width and center so full-80mm drivers don't clip. */
-            body { width: auto; max-width: 72mm; margin: 0 auto; }
+               the safe printable width so full-80mm drivers don't clip.
+               v5 (ZFC Pizza Point Jul 2026): margin auto → 0 — on misconfigured A4-default
+               queues centering pushes the body off the printable window; left-align keeps
+               it readable, correct drivers print identically. */
+            body { width: auto; max-width: 72mm; margin: 0; }
             .no-print { display: none !important; }
             .station-section { page-break-after: auto; }
         }

@@ -93,8 +93,14 @@
                'C') — 1mm side padding sat inside the head's dead zone on some
                printers. Side padding raised.
                v4 (Malik Chicken Broast Jul 2026): sides now 3mm (content ~66mm); 4mm TOP
-               padding is deliberate breathing room so low-starting heads don't cut the logo. */
-            body { width: auto; max-width: 72mm; padding: 4mm 3mm 1mm; margin: 0 auto; }
+               padding is deliberate breathing room so low-starting heads don't cut the logo.
+               v5 (ZFC Pizza Point Jul 2026): margin auto → 0. When the Windows queue's
+               default paper is A4 (misconfigured driver), auto-centering parks the body
+               at ~65mm from the left — the 72mm print head then shows only the first
+               1-2 letters of each line at the paper's right edge ("blank" receipts).
+               LEFT-align instead: correct-size drivers print identically (3mm padding
+               still clears the head's dead zone), misconfigured A4 queues stay readable. */
+            body { width: auto; max-width: 72mm; padding: 4mm 3mm 1mm; margin: 0; }
             .no-print { display: none !important; }
         }
         @media screen {

@@ -89,8 +89,11 @@
                v3 (Pizza Master Jul 2026): LEFT edge clipped too — side padding
                raised so the first column clears the dead zone.
                v4 (Malik Chicken Broast Jul 2026): sides now 2.5mm; 4mm TOP padding is
-               deliberate breathing room so low-starting heads don't cut the logo. */
-            body { width: auto; max-width: 48mm; padding: 4mm 2.5mm 1mm; margin: 0 auto; }
+               deliberate breathing room so low-starting heads don't cut the logo.
+               v5 (ZFC Pizza Point Jul 2026): margin auto → 0 — on misconfigured A4-default
+               queues centering pushes the body off the printable window; left-align keeps
+               it readable, correct drivers print identically. */
+            body { width: auto; max-width: 48mm; padding: 4mm 2.5mm 1mm; margin: 0; }
             .no-print { display: none !important; }
         }
         @media screen {

@@ -1,4 +1,12 @@
 const { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shell, dialog } = require('electron');
+
+// Silent printing from a hidden window renders BLANK pages on some Windows
+// GPUs/drivers when hardware acceleration is on (live failure: ZFC Pizza
+// Point, Jul 2026 — jobs report success, paper comes out empty on every
+// queue, while manual visible-window prints work fine). CPU rasterization
+// is more than enough for receipt-sized pages. MUST run before app ready.
+app.disableHardwareAcceleration();
+
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -10,7 +18,7 @@ const { printHtml: printHtmlSilent } = require('./src/printer');
 const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk } = require('./src/pos-window');
 
 const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/taxnest/releases/latest';
-const BUILD_TIMESTAMP = '20260725-1';
+const BUILD_TIMESTAMP = '20260725-2';
 let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
 
 // ─── Zip-based SELF-UPDATE ──────────────────────────────────────────────────

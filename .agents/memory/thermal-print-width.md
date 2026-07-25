@@ -3,6 +3,9 @@ name: Thermal receipt printable width
 description: Why browser-printed thermal receipts clip on the right edge and the width rule every receipt template must follow.
 ---
 
+# The ordering rule (v6, Jul 2026 — KOT blank-slip regression)
+The `@media print` fix block must be the LAST rule set in the template's stylesheet. A media query adds ZERO specificity — a later base `body { width:80mm; margin:0 auto; }` rule silently overrides an earlier print-block fix, making it dead CSS. kitchen-ticket.blade.php had the v5 fix at the TOP of its `<style>` for weeks; prints were still the "right-edge strip on A4 queue" symptom while every grep said the fix was deployed. **When auditing thermal templates, check the print block's POSITION, not just its presence.** Receipts were never hit only because their print block happened to sit after the base styles.
+
 # The rule
 In `@media print`, NEVER force `body { width: <physical paper width> }` on thermal receipt templates. Use `width: auto; max-width: <paper>mm;` (+ tiny padding) so the body fills whatever printable width the printer driver reports.
 

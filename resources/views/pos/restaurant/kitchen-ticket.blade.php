@@ -6,16 +6,6 @@
     <title>Kitchen Ticket - {{ $order->order_number }}</title>
     <style>
         @page { size: 80mm auto; margin: 0; }
-        @media print {
-            /* PRINTABLE-WIDTH FIX v2 (Jul 2026): 80mm paper prints only ~72mm — cap at
-               the safe printable width so full-80mm drivers don't clip.
-               v5 (ZFC Pizza Point Jul 2026): margin auto → 0 — on misconfigured A4-default
-               queues centering pushes the body off the printable window; left-align keeps
-               it readable, correct drivers print identically. */
-            body { width: auto; max-width: 72mm; margin: 0; }
-            .no-print { display: none !important; }
-            .station-section { page-break-after: auto; }
-        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Courier New', 'Lucida Console', monospace;
@@ -99,6 +89,24 @@
         .kot-barcode-box { text-align: center; margin: 8px 0 4px; }
         .kot-barcode-box svg { max-width: 95%; height: 50px; }
         .kot-barcode-hint { font-size: 9px; color: #000; font-weight: bold; letter-spacing: 1px; margin-top: 2px; }
+        /* PRINTABLE-WIDTH FIX v6 (ZFC Pizza Point Jul 2026) — this block MUST stay
+           LAST in the stylesheet. It used to sit at the TOP, before the base
+           `body { width:80mm; margin:0 auto; }` rule — equal specificity means the
+           LATER rule wins, so the base rule silently overrode this fix during print:
+           on A4-default Windows queues the 80mm body auto-centered ~65mm from the
+           left and the 72mm print head produced a blank slip with only the first
+           1-2 letters of each line at the right edge (receipts were fine — their
+           print block already came after the base styles).
+           v5 history: margin auto → 0 so misconfigured A4 queues stay readable;
+           72mm cap = safe printable width of 80mm paper; padding matches receipts
+           (4mm top clears low-starting heads, 3mm sides clear the dead zone). */
+        @media print {
+            /* `html body` = higher specificity than the base `body` rule, so this
+               fix survives even if someone later re-orders the stylesheet. */
+            html body { width: auto; max-width: 72mm; margin: 0; padding: 4mm 3mm 1mm; }
+            .no-print { display: none !important; }
+            .station-section { page-break-after: auto; }
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 </head>

@@ -78,5 +78,8 @@
 - [Madadgar AI support bot](pos-madadgar-bot.md) — escalation row ONLY via Haan-confirm POST; routes pos.auth-only (no company.approval); artisan serve blanks env for web (secret must be literal in .env); ChatGPT Plus ≠ API credit.
 - [POS feature upgrade backlog](pos-upgrade-backlog.md) — owner-deferred upgrade list (22 Jul 2026) + split-payment tax options (PRA = ONE payModeCode per bill); build nothing until owner picks.
 - [Static asset caching on live](static-asset-caching.md) — .htaccess caches css/js 30d: every loose-asset edit MUST bump ?v=; sw.js stays no-cache; .htaccess untestable in dev.
+- [POS dashboard styles & Saaf](pos-dashboard-styles.md) — 7 styles, Saaf sale-screen skin, global compaction/search/discount rules, style picker ONLY at customize#style, new-style checklist.
+- [Auth guards & login rules](auth-guards-login.md) — per-panel guard isolation, no cross-login, admin auto-detect, CNIC/NTN identifiers, login-page styling.
+- [POS Feature Suggestion box](pos-feature-suggestions.md) — 10/user/day cap, Zyada Demand grouping, owner's "3 customer rule", admin/manager-only visibility.
 - [Per-user POS grid prefs](pos-user-grid-prefs.md) — user pref OVERRIDES admin show_on_sale BOTH directions (owner rejected admin-wins); grid-only via isItemVisible, search never filtered.
 - [Site performance conventions](site-perf-conventions.md) — ONE font CDN (bunny only, no Google Fonts), Chart.js self-hosted /vendor, landing stats cached 10min; extra HTTPS domains cost 300-500ms from PK.

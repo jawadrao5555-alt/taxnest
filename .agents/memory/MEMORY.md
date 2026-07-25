@@ -34,6 +34,7 @@
 - [PRA Code 112 & Fiscal Device mode](pra-code-112-fiscal-device.md) — new POS IDs can't use cloud PostData; local IMS service localhost:8524 GetInvoiceNumberByModel, single OBJECT payload, agent on same PC.
 - [Alpine expression pitfalls](alpine-expression-pitfalls.md) — leading /* */ comment kills Alpine's if-detection (handler silently dead); x-model needs a plain path, never a ternary; :class evals even when x-show false.
 - [SW skip-list for sale screens](sw-skiplist-sale-screens.md) — every new authenticated sale/edit screen must go into sw.js skipPatterns + CACHE_VERSION bump; runtime cache survives logout (offline-only exposure).
+- [PRA sale screen offline-first boot](pos-sale-screen-offline-boot.md) — /pos/invoice/create served cache-first (SALE_CACHE) + boot fingerprint self-refresh; purge on login/logout; new baked data MUST join the fingerprint.
 - [Dynamic sale campaigns](dynamic-sale-campaigns.md) — admin sales via sale_campaigns + PricingPlan sale_* accessors; base price never hiked, auto-expires by date (no cron); ALL surfaces + charge paths read sale_price; compare_at column dead.
 - [FBR universal sale screen port](fbr-universal-sale-screen.md) — port of PRA universal with shim pins (never delete); held sales = Phase2 JSON carts, recall needs conditional-delete claim; live paths must be /fbr-pos/.
 - [Eloquent missing attribute = silent null](eloquent-missing-attribute-null.md) — $product->price (real col: default_price) silently zeroed fixed-price POS bills to Rs 1; fresh-shop e2e journeys catch what seasoned test companies can't.

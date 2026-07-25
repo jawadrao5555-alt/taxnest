@@ -2696,6 +2696,11 @@ $jsEnc = function ($value, $fallback = '[]') {
 };
 @endphp
 <script>
+// OFFLINE-FIRST BOOT (Jul 2026): server-side fingerprint of everything baked
+// into this page (user, company, screen file, catalog, settings). The SW may
+// serve this page from SALE_CACHE — bootFpCheck() compares this against
+// /pos/api/boot-check ~1.5s after boot and reloads once if stale.
+window.tnBootFp = {!! $jsEnc($bootFp ?? null, 'null') !!};
 function restaurantPos() {
     return {
         allProducts: {!! $jsEnc($productsJson) !!},
@@ -3204,10 +3209,57 @@ function restaurantPos() {
         },
         fitLabel() { return this.screenFit === 'auto' ? 'Fit' : Math.round(this.screenFit * 100) + '%'; },
 
+        // OFFLINE-FIRST BOOT (Jul 2026): the SW serves this page cache-first, so a
+        // cached copy verifies its baked fingerprint against the server shortly
+        // after boot. Mismatch → drop SALE_CACHE + ONE-SHOT reload (never yanks a
+        // sale in progress — except on user/company switch, which is a security
+        // reload). Offline / network fail → silently keep the cached screen
+        // (the existing offline queue handles bill submits).
+        bootFpCheck() {
+            try {
+                const cur = window.tnBootFp;
+                if (!cur) return;
+                fetch('{{ route('pos.api.boot-check') }}', { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+                    .then(r => {
+                        if (r.redirected || r.status === 401 || r.status === 419) { window.location.replace('{{ route('pos.login') }}'); return null; }
+                        if (!r.ok) return null;
+                        const ct = r.headers.get('content-type') || '';
+                        if (!ct.includes('json')) { window.location.replace('{{ route('pos.login') }}'); return null; }
+                        return r.json();
+                    })
+                    .then(d => {
+                        if (!d || !d.ok || !d.fp) return;
+                        const fresh = d.fp;
+                        const same = ['u', 'c', 's', 'cat', 'set'].every(k => String(cur[k]) === String(fresh[k]));
+                        if (same) return;
+                        const userChanged = String(cur.u) !== String(fresh.u) || String(cur.c) !== String(fresh.c);
+                        // Never yank an in-progress sale for a content update.
+                        const busy = (this.cart && this.cart.length > 0) || this.editingBillId || this.showPayModal || this.showReceipt || this.submitting;
+                        if (!userChanged && busy) return;
+                        // One-shot guard: never reload twice for the same server fingerprint
+                        // (protects against a reload loop if the cache update races us).
+                        const sig = [fresh.u, fresh.c, fresh.s, fresh.cat, fresh.set].join(':');
+                        try {
+                            if (!userChanged && sessionStorage.getItem('tnBootFpReloaded') === sig) return;
+                            sessionStorage.setItem('tnBootFpReloaded', sig);
+                        } catch (e) {}
+                        const doReload = () => window.location.reload();
+                        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+                            // Drop the stale cached copy first so the reload fetches fresh.
+                            try { navigator.serviceWorker.controller.postMessage({ type: 'TN_DROP_SALE_CACHE' }); } catch (e) {}
+                            setTimeout(doReload, 400);
+                        } else {
+                            doReload();
+                        }
+                    })
+                    .catch(() => {}); // offline → cached screen keeps working as-is
+            } catch (e) {}
+        },
         init() {
             if (this._inited) return;
             this._inited = true;
             this.initFit();
+            setTimeout(() => this.bootFpCheck(), 1500);
             // Honor the saved "hide products" preference ONLY in inventory-OFF mode.
             // Inventory mode must always show the catalog (no manual on-the-fly create).
             try { if (!this.isInventoryEnabled() && localStorage.getItem('pos_show_products') === '0') this.showProducts = false; } catch (e) {}

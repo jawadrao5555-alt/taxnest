@@ -1072,17 +1072,79 @@ class PosController extends Controller
         // — mapForUser is hasTable + try/catch guarded internally).
         $userGridPrefs = \App\Models\PosUserItemPref::mapForUser(auth('pos')->id());
 
+        // OFFLINE-FIRST BOOT (Jul 2026): fingerprint baked into the page so a
+        // SW-cached copy of this screen can detect staleness via /pos/api/boot-check.
+        $bootFp = $this->posBootFingerprint($company, $user);
+
         return response(view('pos.universal', compact(
             'company', 'features', 'products', 'services', 'categories',
             'recipeLookup', 'tables', 'selectedTable', 'heldOrders',
             'customers', 'taxRate', 'taxRules', 'stockStatus', 'blockOutOfStock',
             'posRole', 'discountLimit', 'hasManagerPin', 'ingredientCosts',
             'lowStockAlerts', 'inventoryEnabled', 'dealsForJs',
-            'editBillForJs', 'userGridPrefs'
+            'editBillForJs', 'userGridPrefs', 'bootFp'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         ->header('Pragma', 'no-cache')
         ->header('Expires', '0');
+    }
+
+    /**
+     * OFFLINE-FIRST SALE SCREEN (Jul 2026): the service worker serves
+     * /pos/invoice/create cache-first (SALE_CACHE in public/sw.js). This
+     * fingerprint — baked into the rendered page AND served by bootCheck() —
+     * lets a cached copy detect that it is stale (new deploy, catalog change,
+     * settings change, user/company switch) and reload itself once.
+     * Keys are deliberately short: u=user, c=company, s=screen file mtime,
+     * cat=catalog revision, set=settings revision.
+     */
+    private function posBootFingerprint(Company $company, $user): array
+    {
+        $companyId = $company->id;
+        $agg = function ($query) {
+            $row = $query->selectRaw('COUNT(*) AS cnt, MAX(updated_at) AS mx')->first();
+            return ($row->cnt ?? 0) . ':' . (string) ($row->mx ?? '');
+        };
+        $catalogRev = md5(implode('|', [
+            $agg(PosProduct::where('company_id', $companyId)),
+            $agg(PosService::where('company_id', $companyId)),
+            $agg(PosDeal::where('company_id', $companyId)),
+            // Deals carry weekday/date windows — a day change must refresh the screen.
+            now()->toDateString(),
+        ]));
+
+        $settingsRev = md5(json_encode([
+            optional($company->updated_at)->timestamp,
+            optional($user->updated_at)->timestamp,
+            (bool) $user->praReportingEnabled($company),
+            PosTaxRule::effectiveRules($company),
+            $user->pos_role ?? 'pos_cashier',
+            \App\Models\PosUserItemPref::mapForUser($user->id),
+        ]));
+
+        $screenPath = resource_path('views/pos/universal.blade.php');
+        return [
+            'u' => (int) $user->id,
+            'c' => (int) $companyId,
+            's' => is_file($screenPath) ? (string) @filemtime($screenPath) : '0',
+            'cat' => $catalogRev,
+            'set' => $settingsRev,
+        ];
+    }
+
+    /**
+     * GET /pos/api/boot-check — tiny freshness probe for the SW-cached sale
+     * screen. Never cached ('/api/' is in the SW skip list; no-store headers).
+     */
+    public function bootCheck()
+    {
+        $user = auth('pos')->user();
+        $company = Company::find(app('currentCompanyId'));
+        if (!$user || !$company) {
+            return response()->json(['ok' => false], 401);
+        }
+        return response()->json(['ok' => true, 'fp' => $this->posBootFingerprint($company, $user)])
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 
     /**

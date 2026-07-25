@@ -275,6 +275,7 @@ Sale screen ki mazeed cheezein:
 ## PWA / Mobile / Offline
 - NestPOS ko phone/tablet/PC par app ki tarah install karein — browser ka "Add to Home Screen" / install icon.
 - Offline mode: pages cache hote hain; net wapas aane par offline bills khud sync ho jate hain.
+- Sale screen (Jul 2026 se): pehli dafa load hone ke baad computer par mehfooz ho jati hai — agli har dafa TURANT khulti hai, slow internet ya net band hone par bhi. Products/rates/settings badlein to screen khud taaza ho jati hai; logout ya user change par purani copy khud saaf ho jati hai. Agar screen purani lage to sirf refresh karein (F5) ya logout/login karein.
 - App khud update hota hai — update par chhota toast aata hai aur app refresh hota hai (bill banate waqt kabhi beech mein refresh nahi hota).
 
 ## Aam Masail (Troubleshooting)

@@ -1,8 +1,14 @@
 // TaxNest Suite Service Worker — Tax DI / Nest Pra Pos / Nest FBR Pos
 // Strategy: Stale-while-revalidate for static assets, network-first for HTML, offline fallback.
-const CACHE_VERSION = 'taxnest-v47';
+const CACHE_VERSION = 'taxnest-v48';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
+// OFFLINE-FIRST SALE SCREEN (Jul 2026): dedicated cache for /pos/invoice/create
+// served CACHE-FIRST (instant boot on shop internet) with background revalidate.
+// The page carries a baked fingerprint (window.tnBootFp) and self-reloads via
+// /pos/api/boot-check when stale. Purged on ANY logout AND any /login POST
+// (per-user data is baked into the HTML — audit rule, July 2026).
+const SALE_CACHE = `${CACHE_VERSION}-sale`;
 const OFFLINE_PAGE = '/offline-splash';
 
 const STATIC_ASSETS = [
@@ -49,11 +55,45 @@ self.addEventListener('fetch', e => {
     // GET or POST) purges all cached authenticated pages so the next user on a shared
     // terminal can never see the previous session's pages, even offline.
     if (url.pathname.includes('/logout')) {
-        e.waitUntil(caches.delete(RUNTIME_CACHE));
+        e.waitUntil(Promise.all([caches.delete(RUNTIME_CACHE), caches.delete(SALE_CACHE)]));
+        return;
+    }
+
+    // User-switch hygiene: a LOGIN submit means a (possibly different) user is
+    // starting a session — drop the cached sale screen, it bakes per-user data
+    // (PRA toggle, role gates, discount limit, grid prefs).
+    if (req.method === 'POST' && url.pathname.includes('/login')) {
+        e.waitUntil(caches.delete(SALE_CACHE));
         return;
     }
 
     if (req.method !== 'GET') return;
+
+    // OFFLINE-FIRST SALE SCREEN: exact match only — query-string variants
+    // (?table_id, ?edit_bill, ?updated) stay network-only via skipPatterns.
+    // Cache-first + background revalidate; never cache redirects (login/pending)
+    // or non-HTML. Offline with no cache → offline splash.
+    if (req.mode === 'navigate' && url.pathname === '/pos/invoice/create' && url.search === '') {
+        e.respondWith((async () => {
+            const c = await caches.open(SALE_CACHE);
+            const cached = await c.match(req);
+            const network = fetch(req).then(res => {
+                const ct = res.headers.get('content-type') || '';
+                if (res.ok && !res.redirected && ct.includes('text/html')) {
+                    c.put(req, res.clone());
+                }
+                return res;
+            });
+            if (cached) {
+                network.catch(() => {}); // background revalidate — cache updated for next boot
+                return cached;
+            }
+            try { return await network; } catch (err) {
+                return (await caches.match(OFFLINE_PAGE)) || Response.error();
+            }
+        })());
+        return;
+    }
 
     // Never cache: auth, API, admin, agent, FBR submit, payment posting, livewire, debugbar
     const skipPatterns = ['/api/', '/login', '/logout', '/register', '/admin/', '/agent/', '/livewire/', '/_debugbar/', '/setup-', '/sanctum/', '/broadcasting/', '/pos/invoice/create', '/pos/v2/invoice/create', '/pos/create-invoice', '/fbr-pos/create', '/edit-failed', '/pos/restaurant/kds', '/pos/waiter'];
@@ -148,4 +188,7 @@ self.addEventListener('notificationclick', e => {
 // Notify clients when a new SW version is ready
 self.addEventListener('message', e => {
     if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
+    // Sale screen detected it is stale (boot fingerprint mismatch) — drop the
+    // cached copy so its imminent reload fetches fresh from the network.
+    if (e.data && e.data.type === 'TN_DROP_SALE_CACHE') e.waitUntil(caches.delete(SALE_CACHE));
 });

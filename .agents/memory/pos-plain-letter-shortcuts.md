@@ -5,6 +5,8 @@ description: Global plain-letter shortcuts (T/D/N) on POS sale screens must neve
 
 # POS plain-letter shortcut routing (T / D / N)
 
+**Actions as of 26 Jul 2026 (PRA screen):** T = per-item tax toggle (only remaining per-item control — a green NO TAX chip under the row is its ONLY visible state). D = BILL-level discount panel (per-item discount UI removed; focuses `$refs.billDiscountInput`). N = dead key (order-notes textarea removed; handler no-ops via `if (el)` guard). FBR port still has the OLD per-item behaviors — it is FROZEN, do not sync.
+
 **Rule:** A document-level plain-letter shortcut may fire ONLY when focus is on
 body/non-input elements (or a qty input for T/N). The search input is a typing
 surface at ALL times — including when empty. `Alt+key` is the "works anywhere"

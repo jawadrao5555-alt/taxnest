@@ -1242,55 +1242,24 @@ window.addEventListener('popstate', function() {
                             <div class="text-right min-w-[60px]">
                                 <p class="text-sm font-extrabold text-gray-900 dark:text-white" x-text="'Rs.' + getItemTotal(item).toLocaleString()"></p>
                             </div>
-                            {{-- Compact cart rows v2 (customer feedback, 26 Jul 2026): TAX + Disc moved
-                                 UP into the main row as icon buttons beside delete — kills the whole
-                                 second row per item so more items fit before the cart scrolls.
-                                 Keyboard T / Alt+T toggle unchanged (toggleItemTax). Green = NO TAX
-                                 (same colour semantics as the old pill). --}}
-                            <button @click.stop="item.is_tax_exempt = !item.is_tax_exempt"
-                                class="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-lg transition ring-1 active:scale-90"
-                                :class="item.is_tax_exempt ? 'bg-green-500 text-white ring-green-600 shadow-sm' : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-300 ring-gray-300 dark:ring-gray-600 hover:ring-green-500 hover:text-green-600'"
-                                :title="item.is_tax_exempt ? 'NO TAX — click ya T se tax wapis lagayen' : 'Tax ON — T (search khali ho) ya Alt+T se tax hataayen'">
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" d="M19 5L5 19"/>
-                                    <circle cx="6.5" cy="6.5" r="2.2"/>
-                                    <circle cx="17.5" cy="17.5" r="2.2"/>
-                                    <path x-show="item.is_tax_exempt" stroke-linecap="round" d="M4 4l16 16"/>
-                                </svg>
-                            </button>
-                            <button @click.stop="item.showItemDiscount = !item.showItemDiscount"
-                                style="min-width:28px"
-                                class="h-7 px-1 flex-shrink-0 flex items-center justify-center rounded-lg transition active:scale-90 text-[9px] font-bold whitespace-nowrap"
-                                :class="(item.item_discount_value || 0) > 0 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-orange-500'"
-                                title="Item discount">
-                                <span x-show="(item.item_discount_value || 0) > 0" x-text="(item.item_discount_type || 'percentage') === 'percentage' ? '-' + item.item_discount_value + '%' : '-Rs.' + item.item_discount_value"></span>
-                                <svg x-show="!((item.item_discount_value || 0) > 0)" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 10V5a2 2 0 012-2z"/></svg>
-                            </button>
+                            {{-- Cart rows v3 (owner + ZFC feedback, 26 Jul 2026): per-item TAX + Disc
+                                 icon buttons AND the per-item note input REMOVED — bill-level Discount
+                                 (footer) + bill-level note are the only surfaces. Data fields
+                                 (is_tax_exempt / item_discount_* / special_notes) stay in the cart
+                                 model + every payload so recalled/edited bills keep their values.
+                                 Keyboard T / Alt+T tax toggle kept (NO TAX badge shows state). --}}
                             <button @click.stop="removeFromCart(index)" class="p-1.5 flex-shrink-0 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition active:scale-90">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                             </button>
                         </div>
-                        <div x-show="item.showItemDiscount" x-transition class="mt-1 flex items-center gap-1">
-                            <button @click.stop="item.item_discount_type = 'percentage'" class="text-[9px] font-bold px-1.5 py-0.5 rounded transition" :class="(item.item_discount_type || 'percentage') === 'percentage' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400'">%</button>
-                            <button @click.stop="item.item_discount_type = 'amount'" class="text-[9px] font-bold px-1.5 py-0.5 rounded transition" :class="item.item_discount_type === 'amount' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400'">Rs</button>
-                            <input type="number" x-model.lazy.number="item.item_discount_value" :data-discount-input="index"
-                                @click.stop
-                                @keydown.enter.prevent.stop="$event.target.blur()"
-                                @keydown.escape.prevent.stop="$event.target.blur()"
-                                min="0" step="any" placeholder="0" class="dense-input w-14 text-[10px] bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 text-gray-900 dark:text-white focus:ring-purple-500">
-                            <button @click.stop="item.item_discount_value = 0; item.showItemDiscount = false" class="text-[9px] text-red-400 hover:text-red-600 px-1">X</button>
+                        {{-- Read-only chips for values carried in from recalled/edited bills or the
+                             T/Alt+T tax shortcut (no per-item editors any more, but the cashier must
+                             still SEE the state — NO TAX chip is the only exempt indicator now). --}}
+                        <div x-show="item.is_tax_exempt || (item.item_discount_value || 0) > 0 || (item.special_notes || '').length > 0" class="mt-0.5 flex items-center gap-1 flex-wrap">
+                            <span x-show="item.is_tax_exempt" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-green-500 text-white">NO TAX</span>
+                            <span x-show="(item.item_discount_value || 0) > 0" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-600" x-text="(item.item_discount_type || 'percentage') === 'percentage' ? '-' + item.item_discount_value + '%' : '-Rs.' + item.item_discount_value"></span>
+                            <span x-show="(item.special_notes || '').length > 0" class="text-[9px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300 truncate max-w-[180px]" x-text="item.special_notes"></span>
                         </div>
-                        @if($features->kitchen_notes)
-                        {{-- Per-item kitchen note (e.g. "no onions") — parity with restaurant screen, gated by kitchen_notes feature --}}
-                        <div class="mt-1" @click.stop>
-                            <input type="text" x-model="item.special_notes"
-                                autocomplete="off" name="pos_item_note_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
-                                @keydown.enter.prevent.stop="$event.target.blur()"
-                                @keydown.escape.prevent.stop="$event.target.blur()"
-                                placeholder="Item note (e.g. no onions, extra spicy)..."
-                                class="dense-input w-full text-[10px] bg-amber-50/60 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-md px-2 py-1 text-gray-600 dark:text-gray-300 focus:ring-amber-400 placeholder-gray-300">
-                        </div>
-                        @endif
                     </div>
                 </template>
             </div>
@@ -1317,7 +1286,7 @@ window.addEventListener('popstate', function() {
                             <button @click="discountType = 'amount'" class="flex-1 text-[10px] font-bold py-1 rounded-lg transition" :class="discountType === 'amount' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-500'">Rs.</button>
                         </div>
                         <div class="flex items-center gap-1.5">
-                            <input type="number" x-model.number="discountValue" @input="if(!checkDiscountLimit(discountValue, discountType)) { discountValue = discountType === 'percentage' ? effectiveDiscountLimit : maxAmountDiscount; showToast('Discount capped at ' + effectiveDiscountLimit + '%' + (discountType === 'amount' ? ' of bill (Rs. ' + maxAmountDiscount.toLocaleString() + ')' : ''), 'error'); } recalcDiscount()" min="0" :max="discountType === 'percentage' ? effectiveDiscountLimit : maxAmountDiscount" step="any" :placeholder="discountType === 'percentage' ? 'Max ' + effectiveDiscountLimit + '%' : 'Direct amount Rs.'" class="flex-1 text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-gray-900 dark:text-white focus:ring-purple-500">
+                            <input type="number" x-ref="billDiscountInput" x-model.number="discountValue" @input="if(!checkDiscountLimit(discountValue, discountType)) { discountValue = discountType === 'percentage' ? effectiveDiscountLimit : maxAmountDiscount; showToast('Discount capped at ' + effectiveDiscountLimit + '%' + (discountType === 'amount' ? ' of bill (Rs. ' + maxAmountDiscount.toLocaleString() + ')' : ''), 'error'); } recalcDiscount()" min="0" :max="discountType === 'percentage' ? effectiveDiscountLimit : maxAmountDiscount" step="any" :placeholder="discountType === 'percentage' ? 'Max ' + effectiveDiscountLimit + '%' : 'Direct amount Rs.'" class="flex-1 text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-gray-900 dark:text-white focus:ring-purple-500">
                             <button @click="discountValue = 0; recalcDiscount(); showDiscount = false" class="text-[10px] text-red-500 hover:text-red-700 px-1.5">Clear</button>
                         </div>
                         <div x-show="discountType === 'percentage'" class="flex gap-1 flex-wrap">
@@ -1470,6 +1439,16 @@ window.addEventListener('popstate', function() {
                     <span class="block text-[10px] font-semibold mt-0.5 text-blue-600/60" x-text="(taxInclusive ? 'Incl. tax ' : 'Tax: ') + (taxRules['debit_card'] || taxRules['card'] || 8) + '%' + (modalCardSaving > 0 ? ' • Save Rs. ' + Number(modalCardSaving).toLocaleString() : '')"></span>
                     <kbd x-show="!submitting" class="block mt-0.5 text-[9px] font-mono text-blue-500/60">Press 2</kbd>
                 </button>
+            </div>
+            {{-- Bill note (owner, 26 Jul 2026): per-item note inputs removed from cart rows —
+                 THIS is now the single note surface, at final-bill time. Bound to kitchenNotes
+                 which already rides every payload (sale/hold/update/offline). data-pay-note
+                 keyboard guard in the modal handler stops 1/2/Enter shortcuts while typing. --}}
+            <div class="px-4 pb-2" @click.stop>
+                <input type="text" x-model="kitchenNotes" data-pay-note
+                    autocomplete="off" name="pos_bill_note_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                    placeholder="Bill note (optional — e.g. kam mirch, alag pack)..."
+                    class="w-full text-xs bg-amber-50/60 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-lg px-2.5 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-amber-400 placeholder-gray-400">
             </div>
             <div class="px-4 pb-0.5">
                 <p class="text-center text-[10px] text-gray-400 dark:text-gray-500 font-medium">Use <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&larr;</kbd> <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&rarr;</kbd> to choose &middot; <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">Enter</kbd> to confirm</p>
@@ -4566,11 +4545,11 @@ function restaurantPos() {
             }
             // ═══════════════════════════════════════════════════════════════
             // D / Alt+D — UNIVERSAL DISCOUNT TOGGLE
-            // Toggles `item.showItemDiscount` on the active cart row (or last row).
-            // Same smart routing as T: works in body / empty search; Alt+D anywhere.
-            // After toggling ON, focuses the discount input via $nextTick.
-            // SKIPPED when any list-modal is open — those modals own the D key
-            // for their delete-row action (held/local/failed).
+            // Cart rows v3 (owner, 26 Jul 2026): per-item discount UI removed —
+            // D now toggles the BILL-level discount panel (showDiscount) and
+            // focuses its input. Same smart routing as T: body / empty search;
+            // Alt+D anywhere. SKIPPED when any list-modal is open — those
+            // modals own the D key for their delete-row action.
             // ═══════════════════════════════════════════════════════════════
             if ((e.key === 'd' || e.key === 'D' || e.code === 'KeyD') && !e.ctrlKey && !e.metaKey
                 && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills
@@ -4590,13 +4569,11 @@ function restaurantPos() {
                     e.preventDefault();
                     e.stopPropagation();
                     if (this.cart.length === 0) { this.showToast('Cart is empty', 'warning'); return; }
-                    const idx = (this.activeCartIndex >= 0 && this.activeCartIndex < this.cart.length) ? this.activeCartIndex : this.cart.length - 1;
-                    const item = this.cart[idx];
-                    item.showItemDiscount = !item.showItemDiscount;
-                    this.showToast(item.showItemDiscount ? `Discount panel opened — ${item.item_name || 'item'}` : `Discount closed`, item.showItemDiscount ? 'info' : 'warning');
-                    if (item.showItemDiscount) {
+                    this.showDiscount = !this.showDiscount;
+                    this.showToast(this.showDiscount ? 'Bill discount panel opened' : 'Discount closed', this.showDiscount ? 'info' : 'warning');
+                    if (this.showDiscount) {
                         this.$nextTick(() => {
-                            const el = document.querySelector(`[data-discount-input="${idx}"]`);
+                            const el = this.$refs.billDiscountInput;
                             if (el) { el.focus(); el.select && el.select(); }
                         });
                     }
@@ -4649,6 +4626,13 @@ function restaurantPos() {
             // swallowed by the qty-input block below.
             // ═══════════════════════════════════════════════════════════════
             if (this.showPayModal) {
+                // Bill-note input guard: while typing in the pay modal's note field,
+                // ALL modal shortcuts (1/2/arrows/Enter) must type, not fire payments.
+                // Enter/Escape blur the field so shortcuts resume after.
+                if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-pay-note')) {
+                    if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); e.target.blur(); }
+                    return;
+                }
                 // Arrow keys move the payment-method highlight (Cash <-> Card); Enter confirms it.
                 if (e.key === 'ArrowLeft' || e.key === 'ArrowUp')   { e.preventDefault(); e.stopPropagation(); this.payMethodIndex = 0; return; }
                 if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); e.stopPropagation(); this.payMethodIndex = 1; return; }

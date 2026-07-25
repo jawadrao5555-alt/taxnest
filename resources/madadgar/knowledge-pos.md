@@ -41,7 +41,7 @@ Sale screen ki mazeed cheezein:
 - Rush button: order ko priority mark karta hai — KOT/kitchen screen par laal RUSH ka nishan aata hai.
 - Hold (F5): order hold karein (Dine-In ke liye) — baad mein F3 se wapas kholein. Manual items aur deals hold NAHI ho sakte (sirf seedha bill).
 - "Send to Kitchen" (KOT) button: Dine-In order ko bina payment ke kitchen bhejta hai aur kitchen ticket print hota hai.
-- Kitchen note ka box cart ke neeche hai — poore order ke liye hidayat likhein.
+- Bill note ka box payment window mein hai (Cash/Card chunne se pehle) — poore order ke liye hidayat likhein (misal: kam mirch, alag pack).
 - Screen Fit: sale screen ki upar wali button qatar mein "Fit" button se poori screen 80–125% adjust karein (chhoti screens par khud 90% ho jata hai). Har PC par alag save hota hai. (Saaf style mein Fit "Mazeed" ke peechay hota hai.)
 - Discount limit DONO types par lagti hai: percentage bhi aur Rs. amount bhi — amount discount subtotal ke limit% se zyada nahi ho sakta (default 50%). Limit se zyada discount par Manager PIN ka modal khulta hai — PIN dalne par usi bill ke liye override ho jata hai (cart clear hote hi khatam).
 - Offline mode: internet chala jaye to bill queue mein save hota hai aur net aane par khud PRA ko chala jata hai.
@@ -65,7 +65,7 @@ Sale screen ki mazeed cheezein:
 - Alt+P = customer phone box par focus.
 - Ctrl+S = search par focus.
 - Cart mode mein: ↑↓ = row select, + / - = quantity, Delete/Backspace = item hatao.
-- T = selected cart item ka TAX ON/OFF; D = discount panel. (Search box ke andar type karte waqt yeh letters normal type hote hain — wahan Alt+T / Alt+D use karein, wo har jagah chalte hain.) Order Notes ka box (N) hata diya gaya hai (26 Jul 2026) — restaurant mode mein per-item note ab bhi har item ke neeche likha ja sakta hai.
+- T = selected cart item ka TAX ON/OFF (NO TAX ka sabz chip item ke neeche dikhta hai); D = bill discount panel kholta hai. (Search box ke andar type karte waqt yeh letters normal type hote hain — wahan Alt+T / Alt+D use karein, wo har jagah chalte hain.) Per-item note ka box hata diya gaya hai (26 Jul 2026) — bill note ab payment window mein hai.
 - Enter = guided flow mein agla step; Escape = modal band.
 - Guided Flow (default ON): Customer → Items → Order Type (1/2/3) → Pay — sirf Enter dabate jayen: khali customer box par Enter = walk-in skip; items dal kar khali search par Enter = agla step; pay modal mein Enter = Cash confirm. /pos/customize se ON/OFF hota hai.
 
@@ -253,8 +253,8 @@ Sale screen ki mazeed cheezein:
 - One-tap CASH / CARD buttons (ya Alt+1 / Alt+2): payment method pehle se chuna hua Pay window khulti hai — bill khud-ba-khud final NAHI hota, confirm cashier hi karta hai.
 - Card Bachat mode mein CARD ka kam total pehle hi button par dikh jata hai.
 - Customer box aur search ab 2 qataron mein: customer box bara, search poori chorai.
-- Compact cart rows (26 Jul 2026): har item ab sirf EK qatar leta hai — TAX aur Discount ke buttons ab chhote icons ban kar delete (bin) icon ke sath usi qatar mein aa gaye hain (% icon = tax on/off, sabz = NO TAX; tag icon = item discount, discount lagi ho to raqam dikhti hai). Is se cart mein pehle se kahin zyada items bina scroll ke dikhte hain.
-- Order Notes ka box (cart ke neeche wala) hata diya gaya hai (26 Jul 2026) — cart aur chhota ho gaya. Order-level % Discount ka button wahin hai. Restaurant mode mein per-item notes pehle ki tarah har item ke neeche likhe ja sakte hain.
+- Saaf cart rows (26 Jul 2026): har item ki qatar mein ab sirf quantity, total aur delete (bin) ka button hai — per-item TAX/Discount buttons aur per-item note ka box hata diya gaya hai. Discount ab sirf bill-level hai (cart ke neeche % Discount button ya D key) aur note payment window mein. Agar kisi purane/recalled bill mein item discount, note ya NO TAX laga ho to wo chhote chips ki shakal mein item ke neeche dikh jata hai (sirf dekhne ke liye).
+- Bill note payment window mein hai (26 Jul 2026): Cash/Card chunne se pehle chhota sa "Bill note" ka box — kitchen/order hidayat wahan likhein. Note likhte waqt 1/2/Enter shortcuts nahi chalte; Enter dabane par box se bahar aa jate hain, phir shortcuts wapas chal parte hain.
 - Purane sab shortcuts (F-keys, T/D, guided flow) waise hi chalte hain.
 
 ## Apni Grid Khud Tarteeb Dein (Jul 2026)

@@ -109,14 +109,21 @@ Route::get('/health', function () {
 });
 
 Route::get('/', function () {
-    $stats = ['total_invoices' => 0, 'total_companies' => 0];
+    // Perf (Jul 2026): these 4 COUNTs over big tables cost ~250ms on EVERY
+    // landing hit — cache 10 min (marketing stats don't need to be live).
     try {
-        $stats['total_invoices'] = \App\Models\Invoice::where('status', 'locked')->count()
-            + \App\Models\PosTransaction::where('pra_status', 'success')->count()
-            + \App\Models\FbrPosTransaction::where('fbr_status', 'success')->count();
-        $stats['total_companies'] = \App\Models\Company::where('status', 'approved')->count();
+        $stats = \Illuminate\Support\Facades\Cache::remember('landing_stats', 600, function () {
+            return [
+                'total_invoices' => \App\Models\Invoice::where('status', 'locked')->count()
+                    + \App\Models\PosTransaction::where('pra_status', 'success')->count()
+                    + \App\Models\FbrPosTransaction::where('fbr_status', 'success')->count(),
+                'total_companies' => \App\Models\Company::where('status', 'approved')->count(),
+            ];
+        });
     } catch (\Throwable $e) {
+        // DB down: show zeros for THIS request only — never cache zeros for 10 min.
         \Log::warning('Landing stats unavailable: ' . $e->getMessage());
+        $stats = ['total_invoices' => 0, 'total_companies' => 0];
     }
 
     return view('landing', [

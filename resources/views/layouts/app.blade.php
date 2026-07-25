@@ -25,11 +25,10 @@
 
         <title>{{ config('app.name', 'TaxNest') }}</title>
 
+        {{-- ONE font CDN only (perf, Jul 2026): Inter moved onto the same bunny.net
+             request as Figtree — Google Fonts (2 extra domains) removed. --}}
         <link rel="preconnect" href="https://fonts.bunny.net">
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700&display=swap" rel="stylesheet" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700|inter:300,400,500,600,700,800,900&display=swap" rel="stylesheet" />
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         <script>
@@ -47,7 +46,7 @@
                 }
             }, 2000);
         </script>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+        <script src="/vendor/chart.umd.min.js?v=4.4.0"></script>
         <script>if(document.documentElement.classList.contains('dark')){document.documentElement.style.colorScheme='dark';}</script>
         <style>
             :root {

@@ -72,11 +72,11 @@
         <link rel="icon" type="image/png" sizes="192x192" href="/icons/nest-pra/icon-192.png">
         <link rel="icon" type="image/png" sizes="512x512" href="/icons/nest-pra/icon-512.png">
         <title>NestPOS — {{ config('app.name', 'TaxNest') }}</title>
+        {{-- ONE font CDN only (perf, Jul 2026): Google Fonts duplicate removed — it
+             loaded the SAME Inter family from 2 extra domains (2 extra DNS+TLS
+             round-trips per fresh visit, render-blocking). Do not re-add. --}}
         <link rel="preconnect" href="https://fonts.bunny.net">
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800,900&display=swap" rel="stylesheet" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+        <link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700,800,900&display=swap" rel="stylesheet" />
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         <script>
             setTimeout(function(){
@@ -93,7 +93,9 @@
                 }
             }, 1500);
         </script>
-        <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+        {{-- Self-hosted Chart.js (perf, Jul 2026): third-party CDN cost an extra
+             DNS+TLS connection on every fresh load; .htaccess caches /vendor 30d. --}}
+        <script defer src="/vendor/chart.umd.min.js?v=4.4.0"></script>
         <script>if(document.documentElement.classList.contains('dark')){document.documentElement.style.colorScheme='dark';}</script>
         <style>
             *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }

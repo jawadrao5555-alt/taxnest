@@ -219,7 +219,7 @@
                 </div>
             </div>
 
-            <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+            {{-- Chart.js already loaded once in the admin-app layout head. --}}
             <script>
                 document.addEventListener('DOMContentLoaded', function() {
                     const ctx = document.getElementById('monthlyRevenueChart');

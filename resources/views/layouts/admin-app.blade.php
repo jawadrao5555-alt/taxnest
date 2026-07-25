@@ -11,7 +11,7 @@
     <title>{{ $title ?? 'Admin Panel' }} - TaxNest Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/vendor/chart.umd.min.js?v=4.4.0"></script>
     <script>
         var adminThemes = {
             indigo:  { accent: '#6366f1', accentHover: '#4f46e5', accentBg: 'rgba(99,102,241,0.15)', accentText: '#818cf8', sidebar: '#111827', sidebarBorder: '#1f2937', body: '#030712', label: 'Indigo' },
@@ -35,9 +35,9 @@
         }
         applyAdminTheme(getAdminTheme());
     </script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    {{-- ONE font CDN only (perf, Jul 2026): same bunny.net Inter as the other panels. --}}
+    <link rel="preconnect" href="https://fonts.bunny.net">
+    <link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700,800,900&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
         html, body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }

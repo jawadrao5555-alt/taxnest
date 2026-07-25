@@ -78,3 +78,4 @@
 - [Madadgar AI support bot](pos-madadgar-bot.md) — escalation row ONLY via Haan-confirm POST; routes pos.auth-only (no company.approval); artisan serve blanks env for web (secret must be literal in .env); ChatGPT Plus ≠ API credit.
 - [POS feature upgrade backlog](pos-upgrade-backlog.md) — owner-deferred upgrade list (22 Jul 2026) + split-payment tax options (PRA = ONE payModeCode per bill); build nothing until owner picks.
 - [Static asset caching on live](static-asset-caching.md) — .htaccess caches css/js 30d: every loose-asset edit MUST bump ?v=; sw.js stays no-cache; .htaccess untestable in dev.
+- [Site performance conventions](site-perf-conventions.md) — ONE font CDN (bunny only, no Google Fonts), Chart.js self-hosted /vendor, landing stats cached 10min; extra HTTPS domains cost 300-500ms from PK.

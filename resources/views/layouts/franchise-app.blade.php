@@ -11,7 +11,7 @@
     <title>{{ $title ?? 'Franchise Panel' }} - TaxNest</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/vendor/chart.umd.min.js?v=4.4.0"></script>
     <style>
         /* 🎯 GLOBAL FADED-TEXT CONTRAST BOOST — kills the "ghost text" look in dark mode
            caused by Tailwind's text-gray-400/500 being too low-contrast on dark surfaces.

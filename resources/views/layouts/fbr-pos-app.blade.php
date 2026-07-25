@@ -27,11 +27,9 @@
         <link rel="icon" type="image/png" sizes="192x192" href="/icons/nest-fbr/icon-192.png">
         <link rel="icon" type="image/png" sizes="512x512" href="/icons/nest-fbr/icon-512.png">
         <title>FBR POS — {{ config('app.name', 'TaxNest') }}</title>
+        {{-- ONE font CDN only (perf, Jul 2026): Google Fonts duplicate removed — mirrors pos-app. --}}
         <link rel="preconnect" href="https://fonts.bunny.net">
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800,900&display=swap" rel="stylesheet" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+        <link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700,800,900&display=swap" rel="stylesheet" />
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         {{-- Alpine CDN fallback — only fires if Vite bundle failed (5s grace) --}}
         <script>
@@ -49,7 +47,7 @@
                 }
             }, 5000);
         </script>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+        <script src="/vendor/chart.umd.min.js?v=4.4.0" defer></script>
         <script>if(document.documentElement.classList.contains('dark')){document.documentElement.style.colorScheme='dark';}</script>
         <style>
             *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }

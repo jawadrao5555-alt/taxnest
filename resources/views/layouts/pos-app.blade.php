@@ -275,6 +275,12 @@
             .cmd-icon { width: 28px; height: 28px; border-radius: 8px; background: hsla(var(--accent-h), var(--accent-s), 92%, 1); color: hsla(var(--accent-h), var(--accent-s), 35%, 1); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
             .dark .cmd-icon { background: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.2); color: hsla(var(--accent-h), var(--accent-s), 75%, 1); }
             .cmd-kbd { font-family: 'SF Mono', Menlo, monospace; font-size: 10px; background: rgba(148,163,184,0.18); padding: 2px 6px; border-radius: 4px; color: inherit; }
+            /* Sale-screen nav tools strip: hide the scrollbar (it scrolls when narrow);
+               align-self stretch = full 48px nav height so button count-badges (-top-1)
+               don't get clipped by the overflow container. (Inline CSS, not Tailwind
+               self-stretch — that utility isn't in the current Vite build.) */
+            #tn-nav-sale-tools { scrollbar-width: none; -ms-overflow-style: none; align-self: stretch; }
+            #tn-nav-sale-tools::-webkit-scrollbar { display: none; }
         </style>
         {{-- PWA service worker (NestPOS scope) --}}
         <script>
@@ -293,7 +299,7 @@
             <header class="topnav-bar flex-shrink-0 relative z-50">
                 <div class="flex items-center justify-between px-3 sm:px-5 h-12">
 
-                    <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-3 flex-shrink-0">
                         <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}" class="flex items-center gap-2 group">
                             <div class="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center group-hover:bg-white/25 transition">
                                 <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
@@ -343,9 +349,12 @@
                          its utility pills (Local/Failed/Reprint/Held), + New Sale and the switches
                          dropdown here via x-teleport, so they keep restaurantPos() Alpine scope.
                          Empty and harmless on every other POS page. --}}
-                    <div id="tn-nav-sale-tools" class="hidden md:flex items-center gap-1.5 min-w-0 flex-1 justify-center px-2"></div>
+                    {{-- overflow-x-auto (scrollbar hidden) + mx-auto on the teleported child replace
+                         justify-center: centered when it fits, scrollable when narrow — pills must
+                         NEVER spill over the right-side user group (ZFC overlap bug, 26 Jul 2026). --}}
+                    <div id="tn-nav-sale-tools" class="hidden md:flex items-center gap-1.5 min-w-0 flex-1 px-2 overflow-x-auto"></div>
 
-                    <div class="flex items-center gap-2" x-data="{ online: navigator.onLine, isFs: false, clock: '{{ now()->format('H:i') }}' }"
+                    <div class="flex items-center gap-2 flex-shrink-0" x-data="{ online: navigator.onLine, isFs: false, clock: '{{ now()->format('H:i') }}' }"
                          x-init="
                             window.addEventListener('online', () => online = true);
                             window.addEventListener('offline', () => online = false);

@@ -15,3 +15,10 @@ The real admin-panel sidebar is hardcoded inside `resources/views/layouts/admin-
 **Why:** The Feature Suggestions + POS What's New admin links were first added to navigation.blade.php and the owner reported "admin panel mein show hi nahi ho raha" — the admin layout never includes that file.
 
 **How to apply:** Any new admin-panel sidebar link goes in admin-app.blade.php's `<nav>`; verify by logging in as admin on dev and grepping the rendered /admin/dashboard HTML for the label.
+
+## Sale-screen nav tools strip = overflow-x-auto, never justify-center
+`#tn-nav-sale-tools` (pos-app.blade.php) receives the sale screen's teleported pills, all `flex-shrink-0`. It must stay `overflow-x-auto` (scrollbar hidden via inline CSS + `align-self: stretch` so -top-1 badges don't clip) with `mx-auto` on the teleported child (safe-center) — NOT `justify-center`.
+
+**Why:** With justify-center + non-shrinking pills, on 1280px shop screens the strip spilled OVER the right-side user group — nav text visually merging on top of each other (live customer report, Jul 2026).
+
+**How to apply:** Any new pill added to the teleported strip keeps `flex-shrink-0`; dropdowns inside the strip must NOT rely on a `relative` wrapper (overflow clips absolute panels) — use `position: fixed` anchored to the trigger's getBoundingClientRect() on open, like the Switches panel. Left brand group + right user group keep `flex-shrink-0`.

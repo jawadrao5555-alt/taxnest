@@ -356,7 +356,9 @@ window.addEventListener('popstate', function() {
          they KEEP this restaurantPos() Alpine scope. The old in-page buttons + toggles strip
          below stay as the MOBILE fallback (md:hidden) — same state, same handlers. --}}
     <template x-teleport="#tn-nav-sale-tools">
-        <div class="flex items-center gap-1.5 min-w-0" x-data="{ switchesOpen: false, autoPrintLoading: false, autoKotLoading: false }">
+        {{-- mx-auto: centered while it fits; parent #tn-nav-sale-tools is overflow-x-auto so on
+             narrow screens the strip scrolls instead of spilling over the user menu (ZFC bug). --}}
+        <div class="flex items-center gap-1.5 mx-auto flex-shrink-0" x-data="{ switchesOpen: false, autoPrintLoading: false, autoKotLoading: false, swTop: 0, swRight: 0 }">
 
             {{-- + New Sale — replaces the static nav link on this page (action = clear & restart) --}}
             <button @click="newSale()" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-purple-600 hover:bg-purple-700 shadow-sm transition flex-shrink-0" title="Nayi sale shuru karein (cart clear)">
@@ -404,15 +406,22 @@ window.addEventListener('popstate', function() {
             </button>
 
             {{-- Switches dropdown — PRA Reporting / Auto-Print / Auto-KOT (same handlers
-                 as the mobile toggles strip; cashiers see the read-only PRA badge). --}}
-            <div class="relative flex-shrink-0">
-                <button type="button" @click="switchesOpen = !switchesOpen" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/15 transition" title="PRA Reporting / Auto-Print / Auto-KOT switches">
+                 as the mobile toggles strip; cashiers see the read-only PRA badge).
+                 NOTE: wrapper is intentionally NOT `relative` — the panel is position:fixed
+                 (anchored to the button rect on open) so it escapes the overflow-x-auto
+                 clipping of #tn-nav-sale-tools and stays attached to its trigger. --}}
+            <div class="flex-shrink-0">
+                <button type="button" x-ref="swBtn" @click="switchesOpen = !switchesOpen; if (switchesOpen) { var r = $refs.swBtn.getBoundingClientRect(); swTop = r.bottom + 8; swRight = Math.max(8, window.innerWidth - r.right); }" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/15 transition" title="PRA Reporting / Auto-Print / Auto-KOT switches">
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                     <span class="hidden lg:inline">Switches</span>
                     <svg class="w-3 h-3 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                 </button>
+                {{-- Panel is position:fixed anchored to the button rect (computed on open) —
+                     it must escape the overflow-x-auto clip of #tn-nav-sale-tools AND stay
+                     visually attached to its trigger on wide screens (strip is centered). --}}
                 <div x-show="switchesOpen" x-cloak @click.outside="switchesOpen = false" x-transition
-                     class="absolute right-0 top-full mt-2 bg-white dark:bg-gray-900 rounded-xl shadow-2xl shadow-black/20 border border-gray-200/80 dark:border-gray-700/80 p-3 z-[100] w-64 space-y-3">
+                     :style="'top:' + swTop + 'px; right:' + swRight + 'px;'"
+                     class="fixed bg-white dark:bg-gray-900 rounded-xl shadow-2xl shadow-black/20 border border-gray-200/80 dark:border-gray-700/80 p-3 z-[100] w-64 space-y-3">
 
                     @if(($company->pos_integration_mode ?? 'pra') !== 'standalone')
                     @if(auth('pos')->user()?->isPosCashier())

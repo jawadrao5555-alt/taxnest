@@ -140,6 +140,9 @@ class PosAuth
         if (($user->pos_role ?? null) === 'pos_waiter') {
             $path = ltrim($request->path(), '/');
             $allowed = str_starts_with($path, 'pos/waiter')
+                // Per-user grid visibility prefs (owner, 25 Jul 2026) — waiters
+                // may hide/show items on their OWN tablet grid.
+                || str_starts_with($path, 'pos/grid-prefs')
                 || $path === 'pos/logout'
                 || $path === 'pos/login';
             if (!$allowed) {

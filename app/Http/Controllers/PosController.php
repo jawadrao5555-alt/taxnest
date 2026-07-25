@@ -993,13 +993,18 @@ class PosController extends Controller
             }
         }
 
+        // Per-USER grid visibility overrides (owner, 25 Jul 2026): map of
+        // "type:id" => 0/1. Empty array until the table exists (prod drift safe
+        // — mapForUser is hasTable + try/catch guarded internally).
+        $userGridPrefs = \App\Models\PosUserItemPref::mapForUser(auth('pos')->id());
+
         return response(view('pos.universal', compact(
             'company', 'features', 'products', 'services', 'categories',
             'recipeLookup', 'tables', 'selectedTable', 'heldOrders',
             'customers', 'taxRate', 'taxRules', 'stockStatus', 'blockOutOfStock',
             'posRole', 'discountLimit', 'hasManagerPin', 'ingredientCosts',
             'lowStockAlerts', 'inventoryEnabled', 'dealsForJs',
-            'editBillForJs'
+            'editBillForJs', 'userGridPrefs'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         ->header('Pragma', 'no-cache')

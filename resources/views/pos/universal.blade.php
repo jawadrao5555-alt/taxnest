@@ -794,14 +794,38 @@ window.addEventListener('popstate', function() {
             {{-- Category pills strip REMOVED globally (customer feedback, 23 Jul 2026 — was
                  Saaf-only declutter): the row ate vertical space; category filtering lives in
                  the always-visible dropdown next to search (same activeCategory). The strip
-                 now renders ONLY for inventory-OFF companies, to host the master Products
-                 toggle + grid-hidden hint — do NOT re-add the pills. --}}
-            @if(!($inventoryEnabled ?? false))
+                 now renders for ALL companies (25 Jul 2026 — hosts the per-user grid edit
+                 chip); the master Products toggle stays inventory-OFF only. Do NOT re-add
+                 the pills. --}}
             <div class="tn-cat-strip flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
                 <div class="flex items-center gap-2 overflow-x-auto hide-scrollbar flex-1 min-w-0">
-                    <span x-show="showProducts" class="text-[11px] text-gray-400 dark:text-gray-500 px-1 whitespace-nowrap" x-text="'Items: ' + (allProducts.filter(p => p.show_on_sale !== false).length + allServices.length + allDeals.length)"></span>
-                    <span x-show="!showProducts" class="text-[11px] text-gray-400 dark:text-gray-500 italic px-1 whitespace-nowrap">Grid hidden — search to add, or type to create</span>
+                    <template x-if="!gridEditMode">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span x-show="showProducts" class="text-[11px] text-gray-400 dark:text-gray-500 px-1 whitespace-nowrap" x-text="'Items: ' + (allProducts.filter(p => isItemVisible(p)).length + allServices.filter(s => isItemVisible(s)).length + allDeals.filter(d => isItemVisible(d)).length)"></span>
+                            <span x-show="!showProducts" class="text-[11px] text-gray-400 dark:text-gray-500 italic px-1 whitespace-nowrap">Grid hidden — search to add, or type to create</span>
+                        </div>
+                    </template>
+                    {{-- Edit-mode banner (Roman Urdu — customer-facing) --}}
+                    <template x-if="gridEditMode">
+                        <span class="text-[11px] font-semibold text-purple-700 dark:text-purple-300 px-1 whitespace-nowrap">Item par tap karein — chhupane / dikhane ke liye</span>
+                    </template>
                 </div>
+                {{-- "Sab Wapas Dikhao" — resets ALL of this user's grid prefs (edit mode only) --}}
+                <button type="button" x-show="gridEditMode && hiddenPrefCount > 0" x-cloak @click="resetGridPrefs()" :disabled="gridPrefBusy"
+                        class="flex-shrink-0 px-2.5 py-1.5 rounded-full text-[11px] font-bold border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 transition disabled:opacity-50">
+                    Sab Wapas Dikhao
+                </button>
+                {{-- PER-USER grid edit chip (owner, 25 Jul 2026): ALL roles — each user
+                     hides/shows items on their OWN grid only. Search never affected. --}}
+                <button type="button" @click="gridEditMode = !gridEditMode; filterProducts()"
+                        class="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-bold border transition"
+                        :class="gridEditMode ? 'bg-purple-600 border-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'"
+                        :title="gridEditMode ? 'Tarteeb mukammal — wapas billing par' : 'Apni grid khud tarteeb dein — items chhupayein ya dikhayein (sirf aap ki screen par asar)'">
+                    <svg x-show="!gridEditMode" class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                    <svg x-show="gridEditMode" x-cloak class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    <span x-text="gridEditMode ? 'Ho Gaya' : 'Grid Tarteeb'" class="whitespace-nowrap"></span>
+                </button>
+                @if(!($inventoryEnabled ?? false))
                 {{-- MASTER products toggle — inventory-OFF (Simple) mode ONLY. In inventory mode the
                      catalog is mandatory (no on-the-fly manual create), so hiding it would brick billing. --}}
                 <button type="button" @click="toggleShowProducts()" role="switch" :aria-checked="showProducts ? 'true' : 'false'"
@@ -814,8 +838,8 @@ window.addEventListener('popstate', function() {
                         <span class="inline-block h-3 w-3 transform rounded-full bg-white transition" :class="showProducts ? 'translate-x-3.5' : 'translate-x-0.5'"></span>
                     </span>
                 </button>
+                @endif
             </div>
-            @endif
 
             <div x-ref="gridContainer" tabindex="0" @keydown.arrow-right.prevent="moveGridFocus(1)" @keydown.arrow-left.prevent="moveGridFocus(-1)" @keydown.arrow-down.prevent="moveGridFocus(gridCols)" @keydown.arrow-up.prevent="moveGridFocus(-gridCols)" @keydown.enter.prevent="addGridFocusedItem()" class="flex-1 overflow-y-auto p-3 outline-none">
 
@@ -835,7 +859,9 @@ window.addEventListener('popstate', function() {
                 <template x-if="!loading">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                         <template x-for="(item, idx) in displayItems" :key="item.id + '-' + item.type">
-                            <div :id="'grid-item-' + idx" class="prod-card flex items-center gap-2.5 px-2.5 py-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm fade-in cursor-pointer hover:border-purple-300 dark:hover:border-purple-700 transition" :class="[gridFocusMode && gridFocusIndex === idx ? 'ring-2 ring-purple-500' : '', item.stockStatus === 'out' && blockOutOfStock ? 'stock-out' : (item.stockStatus === 'out' && !blockOutOfStock ? 'stock-out allow-add' : '')]" @click="handleProductClick(item)">
+                            {{-- GRID EDIT MODE (per-user, 25 Jul 2026): tile click toggles THIS user's
+                                 visibility pref instead of adding to cart; hidden tiles render dimmed. --}}
+                            <div :id="'grid-item-' + idx" class="prod-card flex items-center gap-2.5 px-2.5 py-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm fade-in cursor-pointer hover:border-purple-300 dark:hover:border-purple-700 transition" :class="[gridFocusMode && gridFocusIndex === idx ? 'ring-2 ring-purple-500' : '', gridEditMode ? '' : (item.stockStatus === 'out' && blockOutOfStock ? 'stock-out' : (item.stockStatus === 'out' && !blockOutOfStock ? 'stock-out allow-add' : '')), gridEditMode && !isItemVisible(item) ? 'opacity-40' : '']" @click="gridEditMode ? toggleItemVisibility(item) : handleProductClick(item)">
                                 <template x-if="item.image">
                                     <img :src="item.image" :alt="item.name" class="w-9 h-9 rounded-lg object-cover flex-shrink-0" loading="lazy" onerror="this.style.display='none';">
                                 </template>
@@ -857,8 +883,11 @@ window.addEventListener('popstate', function() {
                                 <template x-if="getCartQty(item) > 0">
                                     <span class="cart-qty-badge text-[10px] bg-gradient-to-br from-purple-500 to-purple-700 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold shadow-sm flex-shrink-0" x-text="getCartQty(item)"></span>
                                 </template>
-                                <button @click.stop="handleProductClick(item)" class="quick-add w-7 h-7 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center shadow-sm transition-all flex-shrink-0">
-                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                                <button @click.stop="gridEditMode ? toggleItemVisibility(item) : handleProductClick(item)" class="quick-add w-7 h-7 rounded-full text-white flex items-center justify-center shadow-sm transition-all flex-shrink-0" :class="gridEditMode ? (isItemVisible(item) ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-gray-400 hover:bg-gray-500') : 'bg-purple-600 hover:bg-purple-700'">
+                                    <svg x-show="!gridEditMode" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                                    {{-- Edit mode: open eye = visible, slashed eye = hidden (this user only) --}}
+                                    <svg x-show="gridEditMode && isItemVisible(item)" x-cloak class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                    <svg x-show="gridEditMode && !isItemVisible(item)" x-cloak class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
                                 </button>
                             </div>
                         </template>
@@ -2567,6 +2596,59 @@ function restaurantPos() {
     return {
         allProducts: {!! $jsEnc($productsJson) !!},
         allServices: {!! $jsEnc($servicesJson) !!},
+        // PER-USER grid visibility (owner, 25 Jul 2026): {"product:12":0,"deal:3":1}.
+        // User pref OVERRIDES the admin show_on_sale default in BOTH directions —
+        // for THIS user's grid only. Search is NEVER filtered by these prefs.
+        userGridPrefs: {!! $jsEnc((object) ($userGridPrefs ?? []), '{}') !!},
+        gridEditMode: false,
+        gridPrefBusy: false,
+        // Effective grid visibility: explicit user pref wins; else admin default
+        // (products honor show_on_sale, services/deals default visible).
+        isItemVisible(i) {
+            const key = (i._type || i.type || 'product') + ':' + i.id;
+            if (this.userGridPrefs[key] !== undefined) return this.userGridPrefs[key] == 1;
+            return !((i._type || i.type) === 'product' && i.show_on_sale === false);
+        },
+        async toggleItemVisibility(i) {
+            const type = i._type || i.type || 'product';
+            const key = type + ':' + i.id;
+            const newVisible = !this.isItemVisible(i);
+            const prev = this.userGridPrefs[key];
+            this.userGridPrefs[key] = newVisible ? 1 : 0; // optimistic
+            try {
+                const res = await fetch('/pos/grid-prefs/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: JSON.stringify({ item_type: type, item_id: i.id, visible: newVisible })
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                this.filterProducts();
+            } catch (e) {
+                if (prev === undefined) delete this.userGridPrefs[key]; else this.userGridPrefs[key] = prev;
+                this.showToast('Save nahi hua — dobara try karein', 'error');
+            }
+        },
+        async resetGridPrefs() {
+            if (this.gridPrefBusy) return;
+            this.gridPrefBusy = true;
+            try {
+                const res = await fetch('/pos/grid-prefs/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                this.userGridPrefs = {};
+                this.filterProducts();
+                this.showToast('Sab items wapas dikh rahe hain', 'success');
+            } catch (e) {
+                this.showToast('Reset nahi hua — dobara try karein', 'error');
+            } finally {
+                this.gridPrefBusy = false;
+            }
+        },
+        get hiddenPrefCount() {
+            return Object.values(this.userGridPrefs).filter(v => v == 0).length;
+        },
         // Deals (Jul 2026): server-filtered to TODAY's live deals only (weekday +
         // date-range checked in universalCreateInvoice) — never cached client-side,
         // so an off-day deal can never linger past midnight via localStorage.
@@ -3430,7 +3512,8 @@ function restaurantPos() {
         addGridFocusedItem() {
             if (!this.gridFocusMode || this.displayItems.length === 0) return;
             const item = this.displayItems[this.gridFocusIndex];
-            if (item) this.handleProductClick(item);
+            // GRID EDIT mode (per-user prefs): Enter toggles visibility, mirrors tile click.
+            if (item) this.gridEditMode ? this.toggleItemVisibility(item) : this.handleProductClick(item);
         },
 
         handleProductClick(item) {
@@ -3609,7 +3692,10 @@ function restaurantPos() {
                 if (this.activeCategory === 'services') { items = this.allServices.filter(s => parseFloat(s.price) > 0 && s.name && s.name.trim().length > 0); }
                 else if (this.activeCategory === 'deals') { items = this.allDeals.filter(d => parseFloat(d.price) > 0 && d.name && d.name.trim().length > 0); }
                 else if (this.activeCategory !== 'all') { items = this.allProducts.filter(p => p.category === this.activeCategory && parseFloat(p.price) > 0 && p.name && p.name.trim().length > 0); }
-                items = items.filter(i => i.show_on_sale !== false);
+                // Effective visibility = per-USER pref ?? admin show_on_sale default
+                // (isItemVisible). In GRID EDIT mode, ALL items render (hidden ones
+                // greyed) so the user can un-hide them.
+                if (!this.gridEditMode) items = items.filter(i => this.isItemVisible(i));
             }
             if (this.searchQuery) {
                 const q = this.searchQuery.trim().toLowerCase();
@@ -3899,8 +3985,9 @@ function restaurantPos() {
             const pool = this.quickTypePool().filter(p => {
                 if (p.is_active === false) return false;
                 if (!(parseFloat(p.price) > 0)) return false;
-                // "Hidden from sale screen" products only surface on explicit search — never via the random picker.
-                if ((p._type || p.type) === 'product' && p.show_on_sale === false) return false;
+                // Grid-hidden items (admin default OR per-user pref) only surface on
+                // explicit search — never via the random picker.
+                if (!this.isItemVisible(p)) return false;
                 if (inv && p.stockStatus === 'out' && this.blockOutOfStock) return false;
                 return true;
             });

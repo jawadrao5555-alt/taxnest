@@ -254,6 +254,14 @@ Sale screen ki mazeed cheezein:
 - Customer box aur search ab 2 qataron mein: customer box bara, search poori chorai.
 - Purane sab shortcuts (F-keys, T/D/N, guided flow) waise hi chalte hain.
 
+## Apni Grid Khud Tarteeb Dein (Jul 2026)
+- Har POS user (cashier, waiter, manager — sab) apni SALE SCREEN ki grid se items chhupa ya dikha sakta hai — sirf apni screen par, doosron par koi asar nahi.
+- Kaise: products ke upar wali patti mein "Grid Tarteeb" (aankh wala) button dabayein → edit mode on. Ab kisi bhi item par tap karein = chhup jayega (dhundla ho jayega); dobara tap = wapas aa jayega. "Ho Gaya" se edit mode band.
+- "Sab Wapas Dikhao" button = aap ki saari chhupi hui items ek saath wapas.
+- Admin ne jo item "sale par na dikhao" kiya ho, user chahe to edit mode mein use apni grid par wapas la sakta hai — ye har user ka apna ikhtiyar hai.
+- SEARCH par koi asar nahi: chhupa hua item bhi type karke dhoondein to mil jata hai aur bill mein add ho jata hai.
+- Waiter tablet par bhi yehi feature hai ("Grid Tarteeb" button search ke neeche).
+
 ## Bill Reprint (Aaj ke Bills)
 - Sale screen par Alt+R — aaj ke SAB bills: PRA walay, Local, Sync Queue, Failed, Provisional.
 - Naya: products ke neeche "Akhri Bills" patti se bhi ek click par reprint (desktop).

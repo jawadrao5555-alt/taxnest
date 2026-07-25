@@ -43,11 +43,28 @@
                     <button @click="activeCategory = c; filterProducts()" :class="activeCategory === c ? 'bg-teal-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'" class="px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition" x-text="c"></button>
                 </template>
             </div>
+            {{-- PER-USER grid visibility (owner, 25 Jul 2026): waiter tarteeb apni
+                 tablet ke liye — edit mode mein tile tap = chhupao/dikhao. --}}
+            <div class="flex items-center gap-2 mb-2">
+                <button type="button" @click="gridEditMode = !gridEditMode; filterProducts()"
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition"
+                        :class="gridEditMode ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'">
+                    <svg x-show="!gridEditMode" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                    <svg x-show="gridEditMode" x-cloak class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    <span x-text="gridEditMode ? 'Ho Gaya' : 'Grid Tarteeb'"></span>
+                </button>
+                <button type="button" x-show="gridEditMode && hiddenPrefCount > 0" x-cloak @click="resetGridPrefs()" :disabled="gridPrefBusy"
+                        class="px-3 py-1.5 rounded-full text-xs font-bold border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 transition disabled:opacity-50">
+                    Sab Wapas Dikhao
+                </button>
+                <span x-show="gridEditMode" x-cloak class="text-[11px] font-semibold text-teal-700 dark:text-teal-300">Item par tap karein — chhupane / dikhane ke liye</span>
+            </div>
             <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2.5 max-h-[60vh] overflow-y-auto pr-1">
                 <template x-for="p in filtered" :key="p.id">
-                    <button @click="addToCart(p)" class="rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-teal-500 dark:hover:border-teal-500 p-3 text-left transition active:scale-95">
+                    <button @click="gridEditMode ? toggleItemVisibility(p) : addToCart(p)" class="rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-teal-500 dark:hover:border-teal-500 p-3 text-left transition active:scale-95" :class="gridEditMode && !isItemVisible(p) ? 'opacity-40' : ''">
                         <span class="block text-sm font-bold text-gray-800 dark:text-gray-100 leading-snug" x-text="p.name"></span>
                         <span class="block mt-1 text-xs font-black text-teal-700 dark:text-teal-400" x-text="'Rs ' + p.price.toLocaleString()"></span>
+                        <span x-show="gridEditMode" x-cloak class="block mt-1 text-[10px] font-bold" :class="isItemVisible(p) ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'" x-text="isItemVisible(p) ? 'Dikh raha hai' : 'Chhupa hua'"></span>
                     </button>
                 </template>
                 <div x-show="filtered.length === 0" class="col-span-full text-center py-8 text-sm text-gray-400">No items match.</div>
@@ -205,6 +222,11 @@
 function waiterApp() {
     return {
         products: {!! $jsEnc($products) !!},
+        // PER-USER grid visibility (owner, 25 Jul 2026): {"product:12":0}. Pref
+        // overrides admin show_on_sale BOTH directions — this waiter's grid only.
+        userGridPrefs: {!! $jsEnc((object) ($userGridPrefs ?? [])) !!},
+        gridEditMode: false,
+        gridPrefBusy: false,
         cashTaxRate: {{ (float) ($cashTaxRate ?? 16) }},
         filtered: [],
         categories: [],
@@ -262,10 +284,63 @@ function waiterApp() {
 
         filterProducts() {
             const q = this.search.trim().toLowerCase();
-            this.filtered = this.products.filter(p =>
+            // Effective visibility = user pref ?? admin show_on_sale (pref-less
+            // behavior identical to the old server-side filter). Edit mode shows
+            // ALL items (hidden dimmed) so the waiter can un-hide them.
+            const pool = this.products.filter(p => this.gridEditMode || this.isItemVisible(p));
+            // Category pills track EFFECTIVE visibility (no empty pill for a
+            // category whose items are all hidden — matches pre-feature output).
+            this.categories = [...new Set(pool.map(p => p.category))].sort();
+            if (this.activeCategory !== 'all' && !this.categories.includes(this.activeCategory)) this.activeCategory = 'all';
+            this.filtered = pool.filter(p =>
                 (this.activeCategory === 'all' || p.category === this.activeCategory) &&
                 (!q || p.name.toLowerCase().includes(q) || (p.barcode && p.barcode.toLowerCase() === q))
             );
+        },
+
+        isItemVisible(p) {
+            const key = 'product:' + p.id;
+            if (this.userGridPrefs[key] !== undefined) return this.userGridPrefs[key] == 1;
+            return p.show_on_sale !== false;
+        },
+        async toggleItemVisibility(p) {
+            const key = 'product:' + p.id;
+            const newVisible = !this.isItemVisible(p);
+            const prev = this.userGridPrefs[key];
+            this.userGridPrefs[key] = newVisible ? 1 : 0; // optimistic
+            try {
+                const res = await fetch('/pos/grid-prefs/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: JSON.stringify({ item_type: 'product', item_id: p.id, visible: newVisible })
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                this.filterProducts();
+            } catch (e) {
+                if (prev === undefined) delete this.userGridPrefs[key]; else this.userGridPrefs[key] = prev;
+                this.showToast('Save nahi hua — dobara try karein', 'error');
+            }
+        },
+        async resetGridPrefs() {
+            if (this.gridPrefBusy) return;
+            this.gridPrefBusy = true;
+            try {
+                const res = await fetch('/pos/grid-prefs/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                this.userGridPrefs = {};
+                this.filterProducts();
+                this.showToast('Sab items wapas dikh rahe hain', 'success');
+            } catch (e) {
+                this.showToast('Reset nahi hua — dobara try karein', 'error');
+            } finally {
+                this.gridPrefBusy = false;
+            }
+        },
+        get hiddenPrefCount() {
+            return Object.values(this.userGridPrefs).filter(v => v == 0).length;
         },
 
         addToCart(p) {

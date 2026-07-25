@@ -448,6 +448,14 @@ Route::middleware(['pos.auth'])->prefix('pos/madadgar')->group(function () {
     Route::post('/escalate', [\App\Http\Controllers\MadadgarController::class, 'escalate'])->name('pos.madadgar.escalate')->middleware('throttle:10,1');
 });
 
+// Per-user sale-grid visibility (owner, 25 Jul 2026) — pos.auth ONLY, NO
+// company.approval (personal display pref; same precedent as Madadgar).
+// ALL POS roles allowed, including cashiers and waiters (owner explicit).
+Route::middleware(['pos.auth'])->prefix('pos/grid-prefs')->group(function () {
+    Route::post('/toggle', [\App\Http\Controllers\PosGridPrefController::class, 'toggle'])->name('pos.grid-prefs.toggle')->middleware('throttle:60,1');
+    Route::post('/reset', [\App\Http\Controllers\PosGridPrefController::class, 'reset'])->name('pos.grid-prefs.reset')->middleware('throttle:10,1');
+});
+
 Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(function () {
     Route::get('/agent', [\App\Http\Controllers\AgentManagementController::class, 'show'])->name('pos.agent');
     Route::post('/agent/generate-key', [\App\Http\Controllers\AgentManagementController::class, 'generateKey'])->name('pos.agent.generate');

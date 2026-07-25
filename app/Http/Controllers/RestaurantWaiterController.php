@@ -46,6 +46,10 @@ class RestaurantWaiterController extends Controller
             abort(403, 'Restaurant features are not enabled for this company.');
         }
 
+        // Per-USER grid prefs (owner, 25 Jul 2026): ALL active products go to the
+        // client (the old hard ->filter(show_on_sale) moved into the view's
+        // isItemVisible) so a waiter can un-hide admin-hidden items on THEIR grid.
+        // Pref-less output stays identical: default = show_on_sale.
         $products = PosProduct::where('company_id', $companyId)
             ->where('is_active', true)
             ->orderBy('name')
@@ -59,8 +63,9 @@ class RestaurantWaiterController extends Controller
                 'show_on_sale' => (bool) ($p->show_on_sale ?? true),
                 'is_tax_exempt' => (bool) ($p->is_tax_exempt ?? false),
             ])
-            ->filter(fn($p) => $p['show_on_sale'])
             ->values();
+
+        $userGridPrefs = \App\Models\PosUserItemPref::mapForUser($user->id);
 
         $cashiers = User::where('company_id', $companyId)
             ->where('is_active', true)
@@ -76,7 +81,7 @@ class RestaurantWaiterController extends Controller
         // tax is computed by the cashier's settle path (storeInvoice), never here.
         $cashTaxRate = \App\Models\PosTaxRule::getRateForMethod('cash', $company);
 
-        return view('pos.waiter', compact('company', 'products', 'cashiers', 'cashTaxRate'));
+        return view('pos.waiter', compact('company', 'products', 'cashiers', 'cashTaxRate', 'userGridPrefs'));
     }
 
     /** Live floors + tables — waiter-scoped twin of the sale screen's table-status API. */

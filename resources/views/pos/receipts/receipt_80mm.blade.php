@@ -112,6 +112,19 @@
         .no-print { display: none !important; }
     </style>
     @endif
+    @if(!empty($pdfMode) && ($pdfPaper ?? 'thermal') === 'a4')
+    <style>
+        /* A4 PDF PAPER MODE (customer video Jul 2026): the downloaded 80mm-wide PDF
+           printed on a regular (non-thermal) printer came out shifted to the paper's
+           right edge and clipped — desktop PDF viewers CENTER a small page on the
+           driver's A4 canvas, and narrow tray paper only catches the left part.
+           Opt-in per company (Receipt Settings → PDF Download Paper): the PDF page
+           becomes real A4 and the receipt strip sits at the TOP-LEFT, so any office
+           printer prints it straight. Must come AFTER the pdfMode block above so
+           these !important rules win the cascade. */
+        body { width: 72mm !important; max-width: 72mm !important; margin: 8mm 0 0 8mm !important; }
+    </style>
+    @endif
     @php $printStyle = $company->posReceiptStyle(); @endphp
     @if($printStyle['bold'])
     <style>

@@ -154,6 +154,19 @@
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Match your thermal printer's paper roll. The print automatically fits your printer's actual printable width — no fine-tuning needed.</p>
         </div>
 
+        {{-- PDF Download Paper (customer video Jul 2026): downloaded PDFs printed on
+             regular office printers came out shifted to the right edge and clipped —
+             PDF viewers center the narrow thermal page on the driver's A4 canvas. --}}
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-6">
+            @php $pdfPaperPref = ($company->invoice_display_prefs['pos_style']['pdf_paper'] ?? 'thermal') === 'a4' ? 'a4' : 'thermal'; @endphp
+            <label class="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">📄 PDF Download Paper <span class="text-xs font-normal text-gray-500 dark:text-gray-400">(downloaded &amp; shared PDF bills)</span></label>
+            <select name="rp_pdf_paper" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-purple-500 focus:ring-purple-500">
+                <option value="thermal" {{ $pdfPaperPref === 'thermal' ? 'selected' : '' }}>Thermal Roll — PDF page matches your receipt roll (default)</option>
+                <option value="a4" {{ $pdfPaperPref === 'a4' ? 'selected' : '' }}>A4 — for regular (non-thermal) office printers</option>
+            </select>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">If downloaded bills print shifted to one side or cut off on a regular printer, switch to A4 — the bill prints at the top-left of a full A4 page. Thermal roll printing from the receipt screen is not affected.</p>
+        </div>
+
         {{-- Print Style (customer feedback Jul 2026 — Pizza Master): GLOBAL like
              paper size — it's the printer/brand look, not a bill-type setting.
              Applies to both PRA and Local receipts. --}}

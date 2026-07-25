@@ -106,6 +106,14 @@
         .no-print { display: none !important; }
     </style>
     @endif
+    @if(!empty($pdfMode) && ($pdfPaper ?? 'thermal') === 'a4')
+    <style>
+        /* A4 PDF PAPER MODE (see receipt_80mm): receipt strip top-left on a real A4
+           page so downloaded PDFs print straight on regular office printers.
+           Must come AFTER the pdfMode block so these !important rules win. */
+        body { width: 54mm !important; max-width: 54mm !important; margin: 8mm 0 0 8mm !important; }
+    </style>
+    @endif
     @php $printStyle = $company->posReceiptStyle(); @endphp
     @if($printStyle['bold'])
     <style>

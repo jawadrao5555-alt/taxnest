@@ -204,6 +204,7 @@ class PosController extends Controller
                 'lp_footer_text' => 'nullable|string|max:150',
                 'rp_printer_size' => 'nullable|in:80mm,58mm',
                 'rp_logo_style' => 'nullable|in:side,center',
+                'rp_pdf_paper' => 'nullable|in:thermal,a4',
             ]);
             $prefs = $company->invoice_display_prefs ?? [];
             // PRA (fiscal) receipt set — legacy 'pos' key, backward compatible.
@@ -233,6 +234,10 @@ class PosController extends Controller
             $prefs['pos_style'] = [
                 'bold' => $request->has('rp_style_bold'),
                 'logo' => $request->input('rp_logo_style', 'side') === 'center' ? 'center' : 'side',
+                // PDF Download Paper (customer video Jul 2026): 'thermal' = exact
+                // roll-width PDF page (default); 'a4' = real A4 page, receipt strip
+                // top-left — fixes right-shifted/clipped prints on office printers.
+                'pdf_paper' => $request->input('rp_pdf_paper') === 'a4' ? 'a4' : 'thermal',
             ];
             $company->update([
                 'invoice_display_prefs' => $prefs,
@@ -3097,10 +3102,20 @@ class PosController extends Controller
         $receiptView = $printerSize === '58mm' ? 'pos.receipts.receipt_58mm' : 'pos.receipts.receipt_80mm';
         $paperWidthPt = $printerSize === '58mm' ? 164.41 : 226.77;
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($receiptView, ['transaction' => $transaction, 'company' => $company, 'pdfMode' => true])
+        // PDF Download Paper (customer video Jul 2026): shops printing the downloaded
+        // PDF on a regular office printer got a right-shifted, clipped print — PDF
+        // viewers CENTER the narrow thermal page on the driver's A4 canvas. Opt-in
+        // 'a4' mode makes the PDF a real A4 page with the receipt strip top-left.
+        $pdfPaper = ($company->invoice_display_prefs['pos_style']['pdf_paper'] ?? 'thermal') === 'a4' ? 'a4' : 'thermal';
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($receiptView, ['transaction' => $transaction, 'company' => $company, 'pdfMode' => true, 'pdfPaper' => $pdfPaper])
             ->setOption('isRemoteEnabled', true)
             ->setOption('isHtml5ParserEnabled', true);
-        $pdf->setPaper([0, 0, $paperWidthPt, $this->estimateReceiptHeightPt($transaction, $company, $printerSize)], 'portrait');
+        if ($pdfPaper === 'a4') {
+            $pdf->setPaper('a4', 'portrait'); // auto-paginates if a receipt outgrows one page
+        } else {
+            $pdf->setPaper([0, 0, $paperWidthPt, $this->estimateReceiptHeightPt($transaction, $company, $printerSize)], 'portrait');
+        }
 
         return $pdf->download("Invoice-{$transaction->invoice_number}.pdf");
     }
@@ -3148,10 +3163,18 @@ class PosController extends Controller
         $receiptView = $printerSize === '58mm' ? 'pos.receipts.receipt_58mm' : 'pos.receipts.receipt_80mm';
         $paperWidthPt = $printerSize === '58mm' ? 164.41 : 226.77;
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($receiptView, ['transaction' => $transaction, 'company' => $company, 'pdfMode' => true])
+        // Same PDF Download Paper handling as downloadInvoicePdf — share-link
+        // recipients print on regular printers even more often than cashiers.
+        $pdfPaper = ($company->invoice_display_prefs['pos_style']['pdf_paper'] ?? 'thermal') === 'a4' ? 'a4' : 'thermal';
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($receiptView, ['transaction' => $transaction, 'company' => $company, 'pdfMode' => true, 'pdfPaper' => $pdfPaper])
             ->setOption('isRemoteEnabled', true)
             ->setOption('isHtml5ParserEnabled', true);
-        $pdf->setPaper([0, 0, $paperWidthPt, $this->estimateReceiptHeightPt($transaction, $company, $printerSize)], 'portrait');
+        if ($pdfPaper === 'a4') {
+            $pdf->setPaper('a4', 'portrait');
+        } else {
+            $pdf->setPaper([0, 0, $paperWidthPt, $this->estimateReceiptHeightPt($transaction, $company, $printerSize)], 'portrait');
+        }
 
         return $pdf->stream("Invoice-{$transaction->invoice_number}.pdf");
     }

@@ -290,6 +290,9 @@ Sale screen ki mazeed cheezein:
 - "KOT kitchen par nahi aa raha": /pos/restaurant/kitchen-settings par counter/printer check karein aur Desktop Agent chalta ho.
 - "KOT adhoora aata hai / sirf naye items print hote hain": /pos/restaurant/kitchen-settings par "Always Print Full KOT" ON karein — order update par poora order print hoga, naye items par NEW ka nishaan hoga.
 - "Silent print nahi ho rahi": /pos/printer-settings par Silent Printing ON ho, printer select ho, aur Desktop Agent chalta ho. Setting badalne ke baad sale screen refresh karein.
+- "Bill atak atak ke / adhoora print hota hai, dobara theek nikalta hai": yeh browser printing ka masla hai. Behtareen hal: Direct Printing ON karein — Desktop Agent chalta ho to sale screen par ek purple card khud aayega ("Direct Printing dastiyab hai") jis se admin aik click mein ON kar sakta hai, ya /pos/printer-settings se manually. Iske baad bill seedha printer par jayega, popup ke bagair. Saath mein Windows printer driver mein "Start printing after last page is spooled" set karna bhi madad karta hai.
+- "Sale screen der tak khali/white rehti hai": ab loading screen ("NestPOS load ho raha hai") foran nazar aati hai — slow internet par thora intezar karein, screen khud aa jayegi. Baar baar ho to dukan ka internet check karein.
+- "Kitchen wali parchi (KOT) par QR nahi hota": yeh design hai — KOT sirf kitchen ke liye hoti hai, QR sirf customer ke final bill par aata hai (payment ke baad).
 - "Screen chhoti/bari lag rahi hai": sale screen ke "Fit" menu se size adjust karein.
 - "Hold nahi ho raha": Hold sirf Dine-In orders ke liye hai; manual items aur deals hold nahi ho sakte.
 - "Discount nahi lag raha / limit ka error": cashier ki discount limit lagi hai — manager PIN se override karein ya admin limit badhaye.

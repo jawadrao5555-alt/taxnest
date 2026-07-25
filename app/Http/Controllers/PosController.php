@@ -284,6 +284,9 @@ class PosController extends Controller
             $settings['kot_printer'] = ($kot !== '' && in_array($kot, $known, true)) ? $kot : null;
             $settings['silent_print_enabled'] = $request->boolean('silent_print_enabled')
                 && ($settings['receipt_printer'] || $settings['kot_printer']);
+            // Manual save = deliberate choice — the sale-screen one-click prompt
+            // must never nag this shop again (even if they chose to stay OFF).
+            $settings['prompt_dismissed_at'] = $settings['prompt_dismissed_at'] ?? now()->toIso8601String();
 
             $company->update(['pos_printer_settings' => $settings]);
 
@@ -299,6 +302,72 @@ class PosController extends Controller
             ->get();
 
         return view('pos.printer-settings', compact('company', 'settings', 'agentOnline', 'recentFailed'));
+    }
+
+    /**
+     * One-click silent-print prompt (sale-screen banner, admins/managers only).
+     * POST {action: enable|dismiss}. Enable recomputes the smart printer pick
+     * SERVER-side (never trusts the client), validates it against the agent's
+     * reported printers, and turns on silent BILL printing only — KOT routing
+     * stays a manual choice on Printer Settings (a wrong KOT device would send
+     * kitchen tickets to the counter). Dismiss stamps prompt_dismissed_at so
+     * the shop is never nagged again.
+     */
+    public function apiPrinterPrompt(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->isPosCashier()) { abort(403); }
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        if (!$company) { abort(404); }
+
+        $validated = $request->validate(['action' => 'required|in:enable,dismiss']);
+        $settings = $company->printerSettings();
+
+        if ($validated['action'] === 'dismiss') {
+            $settings['prompt_dismissed_at'] = now()->toIso8601String();
+            $company->update(['pos_printer_settings' => $settings]);
+            return response()->json(['success' => true]);
+        }
+
+        $pick = self::smartPrinterPick($settings['available_printers']);
+        if (!$pick) {
+            return response()->json(['success' => false, 'reason' => 'no_confident_pick'], 409);
+        }
+        $settings['receipt_printer'] = $pick;
+        $settings['silent_print_enabled'] = true;
+        $settings['prompt_dismissed_at'] = now()->toIso8601String();
+        $company->update(['pos_printer_settings' => $settings]);
+
+        return response()->json(['success' => true, 'printer' => $pick]);
+    }
+
+    /**
+     * Smart receipt-printer pick from the agent's reported printers:
+     * (a) first name/displayName that LOOKS thermal (pos/thermal/receipt/80/58/
+     * rp-/xp-/tm- patterns) and is not a virtual device; (b) else the Windows
+     * default printer unless it is clearly virtual (PDF/XPS/OneNote/Fax);
+     * (c) else null = no confident pick — the banner then links to Printer
+     * Settings instead of one-click enabling. NEVER auto-pick blind: a wrong
+     * device means receipts silently go nowhere (worse than popup printing).
+     */
+    public static function smartPrinterPick(array $printers): ?string
+    {
+        $thermal = '/pos|thermal|receipt|\b80\b|\b58\b|rp-|xp-|tm-/i';
+        $virtual = '/pdf|xps|onenote|fax|journal/i';
+        foreach ($printers as $p) {
+            $hay = ($p['name'] ?? '') . ' ' . ($p['displayName'] ?? '');
+            if (preg_match($thermal, $hay) && !preg_match($virtual, $hay)) {
+                return $p['name'];
+            }
+        }
+        foreach ($printers as $p) {
+            $hay = ($p['name'] ?? '') . ' ' . ($p['displayName'] ?? '');
+            if (!empty($p['isDefault']) && !preg_match($virtual, $hay)) {
+                return $p['name'];
+            }
+        }
+        return null;
     }
 
     /**

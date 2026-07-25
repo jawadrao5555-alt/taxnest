@@ -309,6 +309,12 @@ class Company extends Model
             'kot_printer' => $s['kot_printer'] ?? null,
             'available_printers' => is_array($s['available_printers'] ?? null) ? $s['available_printers'] : [],
             'printers_reported_at' => $s['printers_reported_at'] ?? null,
+            // One-click silent-print prompt (Jul 2026): timestamp when an admin
+            // dismissed the sale-screen banner OR manually saved printer settings
+            // (deliberate choice either way — never nag again). MUST stay in this
+            // normalized shape: the printer-settings POST rebuilds $settings from
+            // it and would silently drop the key otherwise.
+            'prompt_dismissed_at' => $s['prompt_dismissed_at'] ?? null,
         ];
     }
 

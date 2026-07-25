@@ -168,7 +168,19 @@
                 // wait so the chain still advances.
                 setTimeout(signalParent, 20000);
             }
-            setTimeout(function() { window.print(); }, 500);
+            // First-print stutter fix (customer report, 25 Jul 2026): fire print
+            // only once fonts/rendering are settled — cheap Windows thermal drivers
+            // truncate jobs rasterized while the page is still busy. 2.5s failsafe
+            // guarantees print ALWAYS fires (hidden iframes may throttle promises).
+            var tnPrinted = false;
+            var tnFirePrint = function() {
+                if (tnPrinted) return;
+                tnPrinted = true;
+                window.print();
+            };
+            var tnFontsReady = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
+            tnFontsReady.then(function() { setTimeout(tnFirePrint, 500); });
+            setTimeout(tnFirePrint, 2500);
         });
     </script>
 

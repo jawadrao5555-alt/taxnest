@@ -151,7 +151,16 @@
                 window.addEventListener('afterprint', signalParent, { once: true });
                 setTimeout(signalParent, 20000);
             }
-            setTimeout(function() { window.print(); }, 500);
+            // First-print stutter fix (25 Jul 2026) — see receipt_80mm for rationale.
+            var tnPrinted = false;
+            var tnFirePrint = function() {
+                if (tnPrinted) return;
+                tnPrinted = true;
+                window.print();
+            };
+            var tnFontsReady = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
+            tnFontsReady.then(function() { setTimeout(tnFirePrint, 500); });
+            setTimeout(tnFirePrint, 2500);
         });
     </script>
 

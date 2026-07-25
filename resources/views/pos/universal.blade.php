@@ -33,6 +33,67 @@
         setTimeout(kill, 12000);
     })();
 </script>
+{{-- One-click Silent Printing prompt (owner mandate, 25 Jul 2026 — "sab ke liye
+     solve karo"): shops with a connected Desktop Agent almost never find
+     /pos/printer-settings, so first prints stutter via browser printing forever.
+     Floating card (fixed — never disturbs the Screen-Fit layout), ADMIN/MANAGER
+     ONLY + not pending; server re-validates everything (smartPrinterPick) so
+     this block is presentational. Dismiss / manual settings save = never again. --}}
+@php
+    $__pp = $company->printerSettings();
+    $__ppUser = auth('pos')->user();
+    $__ppShow = $__ppUser && !$__ppUser->isPosCashier()
+        && !$company->isPending()
+        && $company->agent_enabled
+        && !$__pp['silent_print_enabled']
+        && empty($__pp['prompt_dismissed_at'])
+        && !empty($__pp['available_printers'])
+        && !empty($__pp['printers_reported_at'])
+        && \Carbon\Carbon::parse($__pp['printers_reported_at'])->gt(now()->subDays(7));
+    $__ppPick = $__ppShow ? \App\Http\Controllers\PosController::smartPrinterPick($__pp['available_printers']) : null;
+@endphp
+@if($__ppShow)
+<div id="tn-silent-prompt" class="fixed bottom-4 left-4 z-40 max-w-sm rounded-xl bg-purple-800 text-white px-4 py-3 shadow-sm">
+    <div class="flex items-start gap-3">
+        <svg class="w-6 h-6 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+        <div class="flex-1">
+            <div class="font-bold text-sm">Direct Printing dastiyab hai!</div>
+            <p class="text-xs text-purple-100 mt-0.5">Bill seedha printer par jayega — na popup, na atak atak, pehli baar mein poora print.@if($__ppPick) Printer: <b>{{ $__ppPick }}</b>@endif</p>
+            <div class="flex items-center gap-2 mt-2">
+                @if($__ppPick)
+                <button type="button" onclick="tnSilentPromptAct('enable', this)" class="bg-white text-purple-800 font-bold text-xs px-3 py-1.5 rounded-lg">Haan, ON kar dein</button>
+                @else
+                <a href="{{ route('pos.printer-settings') }}" class="bg-white text-purple-800 font-bold text-xs px-3 py-1.5 rounded-lg">Printer chunein</a>
+                @endif
+                <button type="button" onclick="tnSilentPromptAct('dismiss', this)" class="text-purple-200 hover:text-white text-xs underline">Nahi, aise hi theek hai</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    function tnSilentPromptAct(action, btn) {
+        btn.disabled = true;
+        fetch('{{ route('pos.api.printer-prompt') }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': (document.querySelector('meta[name=csrf-token]') || {}).content || ''
+            },
+            body: JSON.stringify({ action: action })
+        }).then(function (r) { return r.json(); }).then(function (d) {
+            var el = document.getElementById('tn-silent-prompt');
+            if (action === 'enable' && d && d.success) {
+                if (el) el.innerHTML = '<div class="font-bold text-sm text-center">Direct printing ON ho gayi \u2014 screen refresh ho rahi hai\u2026</div>';
+                setTimeout(function () { location.reload(); }, 1200);
+            } else if (el) { el.remove(); }
+        }).catch(function () {
+            var el = document.getElementById('tn-silent-prompt');
+            if (el) el.remove();
+        });
+    }
+</script>
+@endif
 <style>
 *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
 @keyframes cartPop { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1); } }

@@ -76,7 +76,12 @@
              loaded the SAME Inter family from 2 extra domains (2 extra DNS+TLS
              round-trips per fresh visit, render-blocking). Do not re-add. --}}
         <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700,800,900&display=swap" rel="stylesheet" />
+        {{-- Non-render-blocking font load (customer blank-screen report, 25 Jul 2026):
+             media="print" defers CSS apply until onload flips it to all — first paint
+             no longer waits on the fonts.bunny.net round-trip (slow PK connections).
+             Inter has display=swap so text renders in the system font meanwhile. --}}
+        <link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700,800,900&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+        <noscript><link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700,800,900&display=swap" rel="stylesheet" /></noscript>
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         <script>
             setTimeout(function(){

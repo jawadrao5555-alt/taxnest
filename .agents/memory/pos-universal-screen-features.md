@@ -7,6 +7,10 @@ description: Full feature rules for pos/universal.blade.php — Screen Fit, sear
 
 Restaurant screen retired: `RestaurantPosController::pos()` early-redirects to `pos.invoice.create` (carries table_id). Mirrored in the FBR universal port — keep diffable (see `fbr-universal-sale-screen.md`).
 
+## Boot splash (slow-connection blank-screen fix, Jul 2026)
+- Inline-styled `#tn-boot-splash` overlay near top of universal.blade.php — page streamed ~700KB and looked BLANK WHITE on slow shop internet until Alpine painted the grid. Removed on `alpine:initialized` + window-load+800ms + 12s failsafe (can never stick). Do NOT remove, and do NOT move product JSON out of the page to "fix" load time — offline billing + localStorage product cache depend on inline data.
+- Companion: bunny.net Inter stylesheet in pos-app layout is non-render-blocking (`media="print"` onload swap + noscript). Receipts/KOTs print from standalone templates, unaffected.
+
 ## Screen & search features
 - **Screen Fit**: root binds `:style="fitStyleStr"` — CSS zoom + px-height compensation (auto by viewport; manual 80–125% via action-bar "Fit" dropdown; localStorage `tn_screen_fit`).
 - Barcode/SKU exact-match search with fast-path add; scans stay GLOBAL (never category-narrowed).

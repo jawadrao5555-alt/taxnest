@@ -8,6 +8,31 @@
     $isSaaf = ($company->pos_dashboard_style ?? 'default') === 'saaf';
 @endphp
 @if($isSaaf)<link rel="stylesheet" href="{{ asset('css/pos-saaf.css') }}?v=4">@endif
+{{-- Boot splash (customer report, 25 Jul 2026): on slow shop connections this ~700KB
+     page looked BLANK WHITE after a hard refresh until Alpine parsed and the grid
+     painted. Inline-styled overlay shows the moment its bytes stream in; removed on
+     alpine:initialized (grid about to paint) with window-load + 12s failsafes so it
+     can never stick. Do NOT move product JSON out of the page (offline billing +
+     the localStorage product cache depend on inline data). --}}
+<div id="tn-boot-splash" style="position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#f9fafb;">
+    <style>
+        @keyframes tnBootSpin { to { transform: rotate(360deg); } }
+        #tn-boot-splash .tn-boot-spinner { width:44px;height:44px;border:4px solid #e5e7eb;border-top-color:#7c3aed;border-radius:50%;animation:tnBootSpin .8s linear infinite; }
+        .dark #tn-boot-splash { background:#111827 !important; }
+        .dark #tn-boot-splash .tn-boot-title { color:#e5e7eb !important; }
+    </style>
+    <div class="tn-boot-spinner"></div>
+    <div class="tn-boot-title" style="font-weight:800;color:#374151;font-size:15px;">NestPOS load ho raha hai&hellip;</div>
+    <div style="color:#9ca3af;font-size:12px;">Internet slow ho to thora sa waqt lag sakta hai</div>
+</div>
+<script>
+    (function () {
+        var kill = function () { var el = document.getElementById('tn-boot-splash'); if (el) el.remove(); };
+        document.addEventListener('alpine:initialized', kill);
+        window.addEventListener('load', function () { setTimeout(kill, 800); });
+        setTimeout(kill, 12000);
+    })();
+</script>
 <style>
 *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
 @keyframes cartPop { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1); } }

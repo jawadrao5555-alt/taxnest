@@ -74,7 +74,17 @@
 .price-badge { background: linear-gradient(135deg, rgba(124,58,237,0.08), rgba(124,58,237,0.15)); border: 1px solid rgba(124,58,237,0.15); border-radius: 8px; padding: 2px 8px; }
 .dark .price-badge { background: linear-gradient(135deg, rgba(167,139,250,0.1), rgba(167,139,250,0.2)); border-color: rgba(167,139,250,0.2); }
 @media (max-width: 767px) {
-    .mobile-sticky-pay { position: sticky; bottom: 0; z-index: 20; background: inherit; padding-bottom: env(safe-area-inset-bottom, 0); }
+    /* ── Mobile cart fix (owner iPhone screenshot, 25 Jul 2026) ──
+       The sale screen has a FIXED app height, so the tall cart footer (Notes +
+       Total band + pay buttons) gets clipped on phones and the sticky pay block
+       used to hover OVER Order Notes with a see-through background (background:
+       inherit resolved to the parent's translucent bg-gray-50/80). Fix: let the
+       whole cart column scroll on mobile and dock the pay block with a SOLID
+       background + top hairline so content scrolls cleanly underneath it. */
+    .tn-cart-col { overflow-y: auto; }
+    .tn-cart-col [x-ref="cartList"] { flex: none; overflow: visible; }
+    .mobile-sticky-pay { position: sticky; bottom: 0; z-index: 20; background: #f9fafb; border-top: 1px solid rgba(148,163,184,.28); box-shadow: 0 -10px 24px rgba(0,0,0,.10); padding-bottom: env(safe-area-inset-bottom, 0); }
+    .dark .mobile-sticky-pay { background: #111827; }
     .mobile-collapse-header { cursor: pointer; user-select: none; }
     .mobile-collapse-header::after { content: '▾'; float: right; transition: transform 0.2s; font-size: 10px; color: #9ca3af; }
     .mobile-collapse-header.collapsed::after { transform: rotate(-90deg); }
@@ -102,6 +112,11 @@
     .tn-action-bar { flex-wrap: wrap; row-gap: 6px; }
     .tn-action-row1 > div:first-child { min-width: 0 !important; max-width: none !important; flex: 1 1 100%; }
     .tn-action-row2 > .flex-1.relative { flex: 1 1 100%; }
+    /* Tidy wrap (25 Jul 2026): stretch the action-bar buttons evenly so wrapped
+       rows form a clean grid instead of ragged left-hugging pills. */
+    .tn-action-row1 > button, .tn-action-row2 > button { flex: 1 1 auto; justify-content: center; }
+    .tn-action-row1 > div.overflow-hidden { flex: 1 1 auto; display: flex; }
+    .tn-action-row1 > div.overflow-hidden > button { flex: 1 1 auto; }
     /* F-key chips are meaningless on touch — hide them, show the text labels instead */
     .tn-key-chip { display: none !important; }
     .tn-action-bar > button > span.hidden:not(.font-mono) { display: inline; }
@@ -721,7 +736,7 @@ window.addEventListener('popstate', function() {
         {{-- ── PROVISIONAL BILLS (Local) — header shortcut. Same pattern as Held. ── --}}
         {{-- 🟢/🟡/🔴 Auto-Sync status pill — live network + pending-bill indicator. --}}
         {{-- Offline-first (Jul 2026): badge now ALSO counts device-queued offline bills; click = sync now. --}}
-        <button type="button" @click="syncOfflineBills(true)" class="flex md:hidden items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition"
+        <button type="button" x-cloak @click="syncOfflineBills(true)" class="flex md:hidden items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition"
              :class="syncStatus === 'online' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : (syncStatus === 'syncing' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800')"
              :title="offlineNeedsLogin ? 'Session expired — refresh & login to sync bills saved on this device' : (syncStatus === 'online' ? ('Auto-Sync Online' + ((failedBills.length + offlineQueueCount) ? ' · ' + (failedBills.length + offlineQueueCount) + ' pending — click to sync now' : '')) : (syncStatus === 'syncing' ? 'Syncing pending bills…' : 'Offline — bills are saved on this device and auto-sync when internet returns'))">
             <span class="w-2 h-2 rounded-full"
@@ -913,7 +928,7 @@ window.addEventListener('popstate', function() {
         </div>
 
         {{-- Cart column widened again (owner, 24 Jul 2026: buttons one-line + compact tiles) 320/380/420 → 340/400/460 --}}
-        <div class="w-full md:w-[340px] lg:w-[400px] xl:w-[460px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl" :class="mobileView === 'cart' ? 'flex' : 'hidden md:flex'">
+        <div class="tn-cart-col w-full md:w-[340px] lg:w-[400px] xl:w-[460px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl" :class="mobileView === 'cart' ? 'flex' : 'hidden md:flex'">
             <div class="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
                 <button @click="mobileView = 'menu'" class="md:hidden p-1.5 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>

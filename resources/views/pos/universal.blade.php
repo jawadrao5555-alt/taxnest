@@ -159,6 +159,22 @@
 .toast-exit { animation: toastSlideOut 0.3s ease forwards; }
 .price-badge { background: linear-gradient(135deg, rgba(124,58,237,0.08), rgba(124,58,237,0.15)); border: 1px solid rgba(124,58,237,0.15); border-radius: 8px; padding: 2px 8px; }
 .dark .price-badge { background: linear-gradient(135deg, rgba(167,139,250,0.1), rgba(167,139,250,0.2)); border-color: rgba(167,139,250,0.2); }
+/* ── Cart column full height (ZFC customer feedback, 25 Jul 2026) ──
+   The two action-bar rows used to span the FULL width, so the band above the
+   cart column sat empty. The bars now live INSIDE the left (products) column
+   and the cart column rises to the very top. Custom classes (not Tailwind
+   utilities) so no rebuild-dependency for the responsive flip. */
+.tn-body-row { display: flex; flex-direction: column; flex: 1 1 0%; min-height: 0; overflow: hidden; }
+.tn-left-col { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+@media (min-width: 768px) {
+    .tn-body-row { flex-direction: row; }
+    .tn-left-col { flex: 1 1 0%; }
+}
+@media (max-width: 767px) {
+    /* Mobile: bars stack ABOVE the cart exactly like before — cart fills the rest */
+    .tn-body-row > .tn-cart-col { flex: 1 1 0%; min-height: 0; }
+}
+
 @media (max-width: 767px) {
     /* ── Mobile cart fix (owner iPhone screenshot, 25 Jul 2026) ──
        The sale screen has a FIXED app height, so the tall cart footer (Notes +
@@ -605,6 +621,13 @@ window.addEventListener('popstate', function() {
     </div>
     @endif
 
+    {{-- ── BODY ROW (ZFC feedback, 25 Jul 2026): action-bar rows 1+2 moved INSIDE the
+         left (products) column so the cart column spans the FULL height — the band
+         above the cart used to sit empty. Mobile stacking order unchanged (bars on
+         top, cart below via .tn-body-row column direction under 768px). --}}
+    <div class="tn-body-row">
+    <div class="tn-left-col" :class="mobileView === 'menu' ? 'flex-1' : ''">
+
     {{-- flex-wrap: on narrow displays the action buttons wrap to a second row instead of
          being clipped off-screen (overflow-hidden root swallows anything past the edge).
          ROW 1 (owner, 24 Jul 2026): customer box WIDE + order-context widgets + utility
@@ -867,8 +890,8 @@ window.addEventListener('popstate', function() {
              (next to Provisional + PAY) so ALL bill actions sit in ONE place. --}}
     </div>
 
-    <div class="flex flex-1 overflow-hidden">
-
+    {{-- Old full-width flex-row opener removed (25 Jul 2026): .tn-body-row above is the
+         row container now; this inner div is the PRODUCTS area (grid) only. --}}
         <div class="flex-1 flex flex-col overflow-hidden" :class="mobileView === 'menu' ? 'flex' : 'hidden md:flex'">
 
             {{-- Category pills strip REMOVED globally (customer feedback, 23 Jul 2026 — was
@@ -1026,6 +1049,9 @@ window.addEventListener('popstate', function() {
                  Cart edit stays reachable via the cart header Edit button, F6,
                  Ctrl+E, Tab-from-search and arrow keys. FBR port untouched (frozen). --}}
         </div>
+
+    {{-- closes .tn-left-col (action bars + products area) --}}
+    </div>
 
         {{-- Cart column widened again (owner, 24 Jul 2026: buttons one-line + compact tiles) 320/380/420 → 340/400/460 --}}
         <div class="tn-cart-col w-full md:w-[340px] lg:w-[400px] xl:w-[460px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl" :class="mobileView === 'cart' ? 'flex' : 'hidden md:flex'">

@@ -21,7 +21,7 @@ Bill banane ka aam tareeqa, shuru se aakhir tak:
 1. (Optional) Customer: customer box mein phone/naam type karein → list se select karein. Match na mile to "Add as New" option usi dropdown mein aata hai — naam+phone likh kar foran naya customer ban jata hai. Customer select hote hi uski chhoti history bhi nazar aati hai (kitne orders, kitna kharcha, aakhri order kab). Walk-in customer ke liye yeh step CHHOR dein (khali chhor kar Enter).
 2. Items dalein — 3 tareeqay: (a) search box mein naam/barcode/SKU type karein aur Enter, (b) product grid par item click karein, (c) barcode scanner se scan karein — exact match foran cart mein chala jata hai.
 3. Quantity: cart row ke qty box par click kar ke number type karein, ya same item dobara add karein, ya cart row select kar ke + / - keys.
-4. (Optional) Item par discount (D), tax on/off (T), ya note (N) — neeche shortcuts section dekhein.
+4. (Optional) Item par discount ya tax on/off: har cart item ki qatar mein delete (bin) icon ke sath do chhote icons hote hain — % icon = us item ka TAX ON/OFF (sabz ho jaye to NO TAX), tag icon = us item ka discount. Keyboard se bhi: T = tax, D = discount (neeche shortcuts section dekhein).
 5. Order type chunein (restaurant mode mein): Dine In / Takeaway / Delivery buttons (guided flow mein keys 1/2/3). Dine In chunte hi TABLE PICKER khul jata hai — arrow keys se table select, Enter. Delivery chunein to address picker aata hai (customer ke saved addresses + "Add New Address" inline) aur cart (Current Order) ke upar "Delivery Charges" ki patti — wahan raqam likhein, yeh charges bill mein tax-free line ban kar judte hain.
 6. Bill mukammal karne ke 2 raste:
    - "PAY" button (ya F8) → payment modal → Cash (key 1) ya Card (key 2) → bill FINAL ho jata hai (PRA reporting ON ho to PRA ko report hota hai).
@@ -65,7 +65,7 @@ Sale screen ki mazeed cheezein:
 - Alt+P = customer phone box par focus.
 - Ctrl+S = search par focus.
 - Cart mode mein: ↑↓ = row select, + / - = quantity, Delete/Backspace = item hatao.
-- T = selected cart item ka TAX ON/OFF; D = discount panel; N = note box. (Search box ke andar type karte waqt yeh letters normal type hote hain — wahan Alt+T / Alt+D / Alt+N use karein, wo har jagah chalte hain.)
+- T = selected cart item ka TAX ON/OFF; D = discount panel. (Search box ke andar type karte waqt yeh letters normal type hote hain — wahan Alt+T / Alt+D use karein, wo har jagah chalte hain.) Order Notes ka box (N) hata diya gaya hai (26 Jul 2026) — restaurant mode mein per-item note ab bhi har item ke neeche likha ja sakta hai.
 - Enter = guided flow mein agla step; Escape = modal band.
 - Guided Flow (default ON): Customer → Items → Order Type (1/2/3) → Pay — sirf Enter dabate jayen: khali customer box par Enter = walk-in skip; items dal kar khali search par Enter = agla step; pay modal mein Enter = Cash confirm. /pos/customize se ON/OFF hota hai.
 
@@ -253,7 +253,9 @@ Sale screen ki mazeed cheezein:
 - One-tap CASH / CARD buttons (ya Alt+1 / Alt+2): payment method pehle se chuna hua Pay window khulti hai — bill khud-ba-khud final NAHI hota, confirm cashier hi karta hai.
 - Card Bachat mode mein CARD ka kam total pehle hi button par dikh jata hai.
 - Customer box aur search ab 2 qataron mein: customer box bara, search poori chorai.
-- Purane sab shortcuts (F-keys, T/D/N, guided flow) waise hi chalte hain.
+- Compact cart rows (26 Jul 2026): har item ab sirf EK qatar leta hai — TAX aur Discount ke buttons ab chhote icons ban kar delete (bin) icon ke sath usi qatar mein aa gaye hain (% icon = tax on/off, sabz = NO TAX; tag icon = item discount, discount lagi ho to raqam dikhti hai). Is se cart mein pehle se kahin zyada items bina scroll ke dikhte hain.
+- Order Notes ka box (cart ke neeche wala) hata diya gaya hai (26 Jul 2026) — cart aur chhota ho gaya. Order-level % Discount ka button wahin hai. Restaurant mode mein per-item notes pehle ki tarah har item ke neeche likhe ja sakte hain.
+- Purane sab shortcuts (F-keys, T/D, guided flow) waise hi chalte hain.
 
 ## Apni Grid Khud Tarteeb Dein (Jul 2026)
 - Har POS user (cashier, waiter, manager — sab) apni SALE SCREEN ki grid se items chhupa ya dikha sakta hai — sirf apni screen par, doosron par koi asar nahi.

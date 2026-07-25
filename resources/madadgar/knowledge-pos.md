@@ -22,7 +22,7 @@ Bill banane ka aam tareeqa, shuru se aakhir tak:
 2. Items dalein — 3 tareeqay: (a) search box mein naam/barcode/SKU type karein aur Enter, (b) product grid par item click karein, (c) barcode scanner se scan karein — exact match foran cart mein chala jata hai.
 3. Quantity: cart row ke qty box par click kar ke number type karein, ya same item dobara add karein, ya cart row select kar ke + / - keys.
 4. (Optional) Item par discount (D), tax on/off (T), ya note (N) — neeche shortcuts section dekhein.
-5. Order type chunein (restaurant mode mein): Dine In / Takeaway / Delivery buttons (guided flow mein keys 1/2/3). Dine In chunte hi TABLE PICKER khul jata hai — arrow keys se table select, Enter. Delivery chunein to address picker aata hai (customer ke saved addresses + "Add New Address" inline) aur Delivery Charges ka box — yeh charges bill mein tax-free line ban kar judte hain.
+5. Order type chunein (restaurant mode mein): Dine In / Takeaway / Delivery buttons (guided flow mein keys 1/2/3). Dine In chunte hi TABLE PICKER khul jata hai — arrow keys se table select, Enter. Delivery chunein to address picker aata hai (customer ke saved addresses + "Add New Address" inline) aur cart (Current Order) ke upar "Delivery Charges" ki patti — wahan raqam likhein, yeh charges bill mein tax-free line ban kar judte hain.
 6. Bill mukammal karne ke 2 raste:
    - "PAY" button (ya F8) → payment modal → Cash (key 1) ya Card (key 2) → bill FINAL ho jata hai (PRA reporting ON ho to PRA ko report hota hai).
    - "Save Provisional" (ya F9) → bill L-series LOCAL/provisional ban jata hai — PRA ko report NAHI hota, quota nahi katta; baad mein promote kar sakte hain.

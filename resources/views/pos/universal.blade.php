@@ -646,16 +646,10 @@ window.addEventListener('popstate', function() {
             <span class="tn-key-chip px-1.5 py-1.5 text-[8px] font-mono text-gray-400 bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">F2</span>
         </div>
 
-        {{-- Item #3 (owner, Jul 2026): delivery charges — visible only when order type is
-             Delivery. Applies as a TAX-EXEMPT manual cart line ("Delivery Charges") so it
-             rides every existing bill path (processPaymentManual) with NO schema change;
-             switching away from Delivery removes the line automatically. --}}
-        <div x-show="orderType === 'delivery'" x-cloak class="flex items-center gap-1 flex-shrink-0 rounded-lg border border-gray-200 dark:border-gray-700 px-2 py-1">
-            <span class="text-[10px] font-bold text-gray-500 dark:text-gray-400 whitespace-nowrap">Delivery Rs</span>
-            <input type="number" min="0" step="1" x-model="deliveryChargeInput" @change="setDeliveryCharge()" @keydown.enter.prevent="setDeliveryCharge()" placeholder="0"
-                   autocomplete="off" name="pos_delivery_charge_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
-                   class="w-16 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-1.5 py-1 focus:ring-purple-500 focus:border-purple-500">
-        </div>
+        {{-- Item #3 (owner, Jul 2026): delivery charges input MOVED to the cart panel's
+             Delivery section (customer feedback, 25 Jul 2026) — see "Delivery Charges"
+             strip under the Current Order header. Mechanism unchanged: TAX-EXEMPT manual
+             cart line via setDeliveryCharge(). --}}
         @endif
 
         <div class="w-px h-6 bg-gray-200 dark:bg-gray-700 hidden sm:block flex-shrink-0"></div>
@@ -1065,6 +1059,24 @@ window.addEventListener('popstate', function() {
                     <span class="text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-semibold" x-text="'T-' + selectedTable.table_number"></span>
                 </template>
             </div>
+
+            {{-- Item #3 relocation (customer feedback, 25 Jul 2026): Delivery charges input
+                 lives HERE in the cart's Delivery section (was: top action bar) — visible
+                 whenever order type = Delivery, with or without a selected customer.
+                 Mechanism unchanged: setDeliveryCharge() adds/updates the TAX-EXEMPT manual
+                 "Delivery Charges" cart line; switching order type removes it. --}}
+            @if($features->delivery ?? false)
+            <template x-if="orderType === 'delivery'">
+                <div class="px-3 py-2 bg-purple-50 dark:bg-purple-900/10 border-b border-purple-100 dark:border-purple-900/20 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-purple-600 dark:text-purple-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0zM13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+                    <span class="text-xs font-bold text-purple-700 dark:text-purple-300 flex-1">Delivery Charges</span>
+                    <span class="text-[10px] font-bold text-gray-500 dark:text-gray-400">Rs</span>
+                    <input type="number" min="0" step="1" x-model="deliveryChargeInput" @change="setDeliveryCharge()" @keydown.enter.prevent="setDeliveryCharge()" placeholder="0"
+                           autocomplete="off" name="pos_delivery_charge_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                           class="w-20 rounded-md border-purple-200 dark:border-purple-800 dark:bg-gray-800 dark:text-white text-xs px-1.5 py-1 focus:ring-purple-500 focus:border-purple-500">
+                </div>
+            </template>
+            @endif
 
             <template x-if="selectedCustomer">
                 <div class="px-3 py-2 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/20 flex items-start gap-2">

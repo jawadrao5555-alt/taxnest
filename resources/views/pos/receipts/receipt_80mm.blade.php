@@ -173,22 +173,12 @@
     </script>
 
     @php
-        // BULLETPROOF LOGO LOADING — embeds logo as base64 data URI when file exists
-        // on disk. Works in browser print, PDF render, and share flows without
-        // depending on `php artisan storage:link` being run on the server.
-        $logoDataUri = null;
-        $logoMissing = false;
-        if ($company->logo_path) {
-            $logoFile = public_path('storage/' . $company->logo_path);
-            if (!file_exists($logoFile)) { $logoFile = storage_path('app/public/' . $company->logo_path); }
-            if (file_exists($logoFile)) {
-                $ext = strtolower(pathinfo($logoFile, PATHINFO_EXTENSION));
-                $mime = $ext === 'jpg' ? 'jpeg' : $ext;
-                $logoDataUri = 'data:image/' . $mime . ';base64,' . base64_encode(file_get_contents($logoFile));
-            } else {
-                $logoMissing = true;
-            }
-        }
+        // BULLETPROOF LOGO LOADING — Company::receiptLogoDataUri() embeds the logo
+        // as a base64 data URI, downscaling multi-MB uploads to a cached small PNG.
+        // NEVER embed the raw file here: huge base64 payloads break the Desktop
+        // Agent's data-URL silent print (ERR_INVALID_URL) and bloat every receipt.
+        $logoDataUri = $company->receiptLogoDataUri();
+        $logoMissing = (bool) ($company->logo_path && !$logoDataUri);
         $addressLine = trim(($company->address ?? '') . (($company->city) ? ', ' . $company->city : ''));
         $phoneLine = trim(implode(' / ', array_filter([$company->phone ?? null, $company->mobile ?? null])));
         // Owner (Jul 2026): PRA and Local bills each have their OWN display set —

@@ -4,11 +4,18 @@
 //
 // Flow: report installed printers (on start + every 5 min) → poll /print-jobs
 // (server-side claim, safe across restarts) → fetch rendered receipt/KOT HTML
-// → load into a hidden window via data: URL (scripts stay dormant — templates
-// only auto-print when ?auto_print=1 is in location.search, which a data URL
-// never has) → webContents.print({ silent, deviceName }) → report result.
+// → write to a temp file and load into a hidden window (scripts stay dormant —
+// templates only auto-print when ?auto_print=1 is in location.search, which a
+// file:// URL never has) → webContents.print({ silent, deviceName }) → result.
+//
+// NEVER load receipt HTML via a base64 data: URL — Chromium rejects URLs over
+// ~2 MB with ERR_INVALID_URL (-300), and receipts with embedded logos hit that
+// (live failure: Pizza Master, Jul 2026). Temp file + loadFile has no size cap.
 const { BrowserWindow } = require('electron');
 const axios = require('axios');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
 let printersInterval = null;
 let jobsInterval = null;
@@ -76,12 +83,15 @@ function printHtml(html, deviceName) {
   return new Promise((resolve) => {
     let settled = false;
     let win;
+    let tmpFile = null;
     const done = (success, error) => {
       if (settled) return;
       settled = true;
       // CRITICAL: drop any pending load listener — a stale listener firing on
       // the NEXT job's load would print the same content twice.
       try { if (win && !win.isDestroyed()) win.webContents.removeAllListeners('did-finish-load'); } catch (e) {}
+      // Best-effort temp file cleanup — content is already rasterized by now.
+      try { if (tmpFile) fs.unlinkSync(tmpFile); } catch (e) {}
       resolve({ success, error: error || null });
     };
 
@@ -119,8 +129,17 @@ function printHtml(html, deviceName) {
       }, 500);
     });
 
-    const dataUrl = 'data:text/html;charset=utf-8;base64,' + Buffer.from(html, 'utf8').toString('base64');
-    win.loadURL(dataUrl).catch((e) => {
+    // Temp file + loadFile — a data: URL over ~2 MB fails with ERR_INVALID_URL
+    // (big embedded logos). file:// carries no query string, so the templates'
+    // ?auto_print=1 guard keeps their own scripts dormant, same as before.
+    try {
+      tmpFile = path.join(os.tmpdir(), `taxnest-print-${Date.now()}-${Math.random().toString(36).slice(2)}.html`);
+      fs.writeFileSync(tmpFile, html, 'utf8');
+    } catch (e) {
+      clearTimeout(timer);
+      return done(false, `tmpfile: ${e.message}`);
+    }
+    win.loadFile(tmpFile).catch((e) => {
       clearTimeout(timer);
       done(false, `load: ${e.message}`);
     });

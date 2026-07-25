@@ -156,19 +156,11 @@
     </script>
 
     @php
-        $logoDataUri = null;
-        $logoMissing = false;
-        if ($company->logo_path) {
-            $logoFile = public_path('storage/' . $company->logo_path);
-            if (!file_exists($logoFile)) { $logoFile = storage_path('app/public/' . $company->logo_path); }
-            if (file_exists($logoFile)) {
-                $ext = strtolower(pathinfo($logoFile, PATHINFO_EXTENSION));
-                $mime = $ext === 'jpg' ? 'jpeg' : $ext;
-                $logoDataUri = 'data:image/' . $mime . ';base64,' . base64_encode(file_get_contents($logoFile));
-            } else {
-                $logoMissing = true;
-            }
-        }
+        // Logo via Company::receiptLogoDataUri() — downscales multi-MB uploads to a
+        // cached small PNG. NEVER embed the raw file: huge base64 payloads break the
+        // Desktop Agent's data-URL silent print (ERR_INVALID_URL) — mirrors receipt_80mm.
+        $logoDataUri = $company->receiptLogoDataUri();
+        $logoMissing = (bool) ($company->logo_path && !$logoDataUri);
         $addressLine = trim(($company->address ?? '') . (($company->city) ? ', ' . $company->city : ''));
         $phoneLine = trim(implode(' / ', array_filter([$company->phone ?? null, $company->mobile ?? null])));
         // Owner (Jul 2026): PRA and Local bills each have their OWN display set —

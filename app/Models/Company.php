@@ -489,4 +489,84 @@ class Company extends Model
     {
         return $this->standard_tax_rate ?? 18.0;
     }
+
+    /**
+     * Base64 data-URI of the company logo, SAFE for thermal receipts.
+     *
+     * Large uploaded logos (multi-MB photos) must NEVER be embedded as-is:
+     * the Desktop Agent prints receipts by loading the whole HTML as a
+     * base64 data: URL, and Chromium rejects URLs over ~2 MB with
+     * ERR_INVALID_URL — the shop sees "sent to printer" but nothing prints.
+     * Big embeds also bloat every receipt popup/PDF over shop internet.
+     *
+     * Strategy: files up to 120 KB embed unchanged; bigger files are
+     * downscaled once to a cached 384px-wide PNG (thermal printers are
+     * ~576 dots wide, receipts show the logo at ≤32mm, so 384px is plenty)
+     * and the cached copy is embedded. If the image can't be processed,
+     * return null — a receipt without a logo beats a receipt that never
+     * prints.
+     */
+    public function receiptLogoDataUri(): ?string
+    {
+        if (!$this->logo_path) {
+            return null;
+        }
+        $file = public_path('storage/' . $this->logo_path);
+        if (!is_file($file)) {
+            $file = storage_path('app/public/' . $this->logo_path);
+        }
+        if (!is_file($file)) {
+            return null;
+        }
+
+        $size = @filesize($file);
+        if ($size !== false && $size <= 120 * 1024) {
+            $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+            $mime = $ext === 'jpg' ? 'jpeg' : ($ext ?: 'png');
+            return 'data:image/' . $mime . ';base64,' . base64_encode((string) file_get_contents($file));
+        }
+
+        // Cached downscaled copy — keyed on path + mtime so a re-uploaded
+        // logo regenerates automatically.
+        $cacheDir = storage_path('app/public/receipt-logos');
+        $cacheFile = $cacheDir . '/' . $this->id . '-' . substr(md5($this->logo_path . '|' . (@filemtime($file) ?: 0)), 0, 10) . '.png';
+
+        if (!is_file($cacheFile)) {
+            if (!function_exists('imagecreatefromstring')) {
+                return null; // no GD on this host — skip logo rather than break printing
+            }
+            try {
+                $src = @imagecreatefromstring((string) file_get_contents($file));
+                if (!$src) {
+                    return null;
+                }
+                $w = imagesx($src);
+                $h = imagesy($src);
+                if ($w < 1 || $h < 1) {
+                    imagedestroy($src);
+                    return null;
+                }
+                $tw = min(384, $w);
+                $th = max(1, (int) round($h * $tw / $w));
+                $dst = imagecreatetruecolor($tw, $th);
+                imagealphablending($dst, false);
+                imagesavealpha($dst, true);
+                imagefill($dst, 0, 0, imagecolorallocatealpha($dst, 0, 0, 0, 127));
+                imagecopyresampled($dst, $src, 0, 0, 0, 0, $tw, $th, $w, $h);
+                if (!is_dir($cacheDir)) {
+                    @mkdir($cacheDir, 0755, true);
+                }
+                imagepng($dst, $cacheFile, 8);
+                imagedestroy($src);
+                imagedestroy($dst);
+            } catch (\Throwable $e) {
+                return null;
+            }
+        }
+
+        if (!is_file($cacheFile)) {
+            return null;
+        }
+        return 'data:image/png;base64,' . base64_encode((string) file_get_contents($cacheFile));
+    }
 }

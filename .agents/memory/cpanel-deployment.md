@@ -13,6 +13,7 @@ description: Exact paths/commands to deploy TaxNest to the owner's shared cPanel
 - LIVE Laravel app root: `/home/taxnestc/public_html` — this IS the git repo (remote = GitHub `jawadrao5555-alt/taxnest`, branch `main`). Document root serves from `public_html/public/` (there is NO `public_html/index.php`; the real entry is `public_html/public/index.php`).
 - **Decoy/duplicate copies — NOT live, never pull or edit there:** `/home/taxnestc/public_html/taxnest`, `/home/taxnestc/repositories/taxnest`, `/home/taxnestc/.trash/taxnest`. All three are stale clones of the same GitHub repo; touching them does nothing to the live site and only causes confusion.
 - PHP 8.4 binary: `/usr/local/bin/ea-php84`. Plain `php` may be the wrong version on this host — prefer the full binary path in cron and when in doubt.
+- **GD extension is WEB-only on this host**: `imagecreatefromstring` exists under PHP-FPM (web hits) but NOT in the ea-php84 CLI — any image-processing feature must run/verify via a web request (temp probe in public/), never a CLI script.
 - `.env` is gitignored, so it (and the prod DB credentials inside it) survives every `git pull`. Never commit/overwrite it.
 
 # Partial tar-deploy = live 500 for EVERYONE (19 Jul 2026 incident)

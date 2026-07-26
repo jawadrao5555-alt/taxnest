@@ -106,6 +106,14 @@
                thin first glyphs vanish ("ITEM" → "TEM"). Sides raised to 4mm: full-width
                drivers clear the dead zone, 72mm-reporting drivers lose only 2mm content. */
             body { width: auto; max-width: 72mm; padding: 4mm 4mm 1mm; margin: 0; }
+            /* v6 companion (Pizza Master Jul 2026): boxed elements draw their
+               VERTICAL border lines at the extreme content edges — even with 4mm
+               body padding those 1.5-2px lines sit exactly on the dead-zone
+               boundary and are the first thing a misaligned head eats (video
+               showed the SALE RECEIPT / TOTAL / PAYMENT boxes missing their left
+               border). Inset every full-width bordered box 1mm per side so the
+               corners always print; text tables keep the full content width. */
+            .invoice-numbers, .pra-badge, .local-badge, .edge-box { margin-left: 1mm; margin-right: 1mm; }
             .no-print { display: none !important; }
         }
         @media screen {
@@ -460,7 +468,7 @@
             : (in_array($rcptPayRaw, ['card', 'debit_card', 'credit_card'], true) ? 'CARD'
             : ($rcptPayRaw === 'qr_payment' ? 'ONLINE / QR' : strtoupper(str_replace('_', ' ', $rcptPayRaw))));
     @endphp
-    <div style="border: 2px solid #000; text-align: center; font-weight: bold; font-size: 14px; letter-spacing: 1px; padding: 3px 2px; margin: 3px 0; color: #000;">PAYMENT: {{ $rcptPayLabel }}</div>
+    <div class="edge-box" style="border: 2px solid #000; text-align: center; font-weight: bold; font-size: 14px; letter-spacing: 1px; padding: 3px 2px; margin: 3px 0; color: #000;">PAYMENT: {{ $rcptPayLabel }}</div>
     @endif
 
     <div class="separator"></div>

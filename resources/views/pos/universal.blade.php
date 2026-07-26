@@ -386,12 +386,16 @@ window.addEventListener('popstate', function() {
                 <span class="hidden lg:inline">Reprint</span>
             </button>
 
-            {{-- Held orders — F3 --}}
-            <button @click="activeHeldIndex = 0; showHeldOrders = !showHeldOrders" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition flex-shrink-0" title="Held orders / tables. Press F3.">
-                <span class="tn-key-chip text-[9px] bg-amber-400/30 px-1 rounded">F3</span>
+            {{-- Held orders — F3 RETIRED (owner, 26 Jul 2026). Table companies:
+                 held orders ab TABLE board ke andar hain (tiles + "bina table"
+                 chips) — yeh button sirf NON-table companies ke liye bacha hai. --}}
+            @unless($features->tables ?? false)
+            <button @click="activeHeldIndex = 0; showHeldOrders = !showHeldOrders" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition flex-shrink-0" title="Held orders">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <span class="hidden lg:inline">Held</span>
                 <span x-show="heldOrders.length > 0" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold" x-text="heldOrders.length"></span>
             </button>
+            @endunless
 
             {{-- 🟢/🟡/🔴 Auto-Sync status pill — same logic as the mobile copy --}}
             <button type="button" @click="syncOfflineBills(true)" class="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-bold border transition flex-shrink-0"
@@ -867,7 +871,7 @@ window.addEventListener('popstate', function() {
         </button>
 
         {{-- Waiter box RETIRED (Table-se-Bill, Jul 2026): waiter orders now live inside
-             the F3 table picker (purple "Order Tayyar" tables + counter orders).
+             the Select-Table picker (purple "Order Tayyar" tables + counter orders).
              The drawer + F6 stay as a hidden fallback (KOT reprint lives there). --}}
 
         {{-- ── FAILED BILLS — header shortcut. F11. Red theme = needs attention. ── --}}
@@ -887,12 +891,14 @@ window.addEventListener('popstate', function() {
             <span class="hidden sm:inline">Reprint</span>
         </button>
 
-        <button @click="activeHeldIndex = 0; showHeldOrders = !showHeldOrders" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition">
+        {{-- Held pill — table companies: TABLE board hi single surface hai (F3 retired) --}}
+        @unless($features->tables ?? false)
+        <button @click="activeHeldIndex = 0; showHeldOrders = !showHeldOrders" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition" title="Held orders">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            <span class="tn-key-chip text-[10px] bg-amber-400/30 px-1 rounded">F3</span>
             <span class="hidden sm:inline">Held</span>
             <span x-show="heldOrders.length > 0" class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="heldOrders.length"></span>
         </button>
+        @endunless
 
         {{-- Hold / Send-to-Kitchen / Pay group REMOVED from the action bar (Jul 2026 redesign):
              Hold + Pay already live in the cart footer; Send to Kitchen moved there too
@@ -1355,17 +1361,19 @@ window.addEventListener('popstate', function() {
                             <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(cartTotalForMethod('card')).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+2</kbd></span>
                         </button>
                     </div>
-                    <div class="grid grid-cols-3 gap-2">
+                    <div class="grid gap-2 {{ ($features->tables ?? false) ? 'grid-cols-2' : 'grid-cols-3' }}">
                         <button @click="if(cart.length && confirm('Clear entire cart?')) { clearCart(); }" :disabled="cart.length === 0" class="py-2 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-30 transition flex items-center justify-center gap-0.5">Clear <kbd class="text-[8px] bg-red-200/50 dark:bg-red-800/30 px-1 rounded font-mono">F4</kbd></button>
                         <button @click="holdOrder()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems() || !canHold()" :title="!canHold() ? 'Hold is for Dine-In orders only' : ((hasManualItems() || hasDealItems()) ? 'Manual items & deals billing-only — pay first or remove' : '')" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center gap-1">
                             <svg x-show="submitting" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                             <span x-text="submitting ? 'Holding...' : 'Hold'"></span>
                             <kbd x-show="!submitting" class="text-[8px] bg-amber-200/50 dark:bg-amber-800/30 px-1 rounded ml-0.5 font-mono">F5</kbd>
                         </button>
+                        @unless($features->tables ?? false)
                         <button @click="showHeldOrders = !showHeldOrders" class="relative py-2 text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition flex items-center justify-center gap-0.5">
-                            Recall <kbd class="text-[8px] bg-purple-200/50 dark:bg-purple-800/30 px-1 rounded font-mono">F3</kbd>
+                            Recall
                             <span x-show="heldOrders.length > 0" class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center held-badge-pulse shadow-sm" x-text="heldOrders.length"></span>
                         </button>
+                        @endunless
                     </div>
                     <!-- ─── SAVE PROVISIONAL + PAY — ONE line (owner, 24 Jul 2026): frees a full
                          button-row of cart height; Provisional 2/5, PAY 3/5 (stays dominant).
@@ -1405,7 +1413,7 @@ window.addEventListener('popstate', function() {
                  Tile click opens an ACTION MENU (never a direct action) — View/
                  Edit, Final-with-confirm, KOT resend, Free table — which kills
                  the "anjaane mein bill final" accidents. Same table-status feed
-                 as the F3 picker (single source, no duplicate system). --}}
+                 as the Select-Table picker (single source, no duplicate system). --}}
             <div class="border-t-2 border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 flex-shrink-0">
                 <button type="button" @click="tableBoardOpen = true" class="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-900 transition" title="Table board kholein — har table ka live haal (Alt+B)">
                     <svg class="w-3.5 h-3.5 text-teal-700 dark:text-teal-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M5 10v9m14-9v9M4 5h16a1 1 0 011 1v3H3V6a1 1 0 011-1z"/></svg>
@@ -1414,6 +1422,7 @@ window.addEventListener('popstate', function() {
                     <span x-show="boardCounts().reserved > 0" class="min-w-[16px] px-1 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-[9px] rounded-full font-black" x-text="boardCounts().reserved"></span>
                     <span x-show="boardCounts().waiter > 0" class="min-w-[16px] px-1 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-[9px] rounded-full font-black animate-pulse" x-text="boardCounts().waiter"></span>
                     <span x-show="tablelessIncoming().length > 0" class="min-w-[16px] px-1 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-[9px] rounded-full font-black" x-text="'C' + tablelessIncoming().length"></span>
+                    <span x-show="heldNoTable().length > 0" class="min-w-[16px] px-1 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-[9px] rounded-full font-black" title="Held orders (bina table)" x-text="'H' + heldNoTable().length"></span>
                     <span class="flex-1"></span>
                     {{-- Chalti hui raqam — sab khule orders (tables + counter) ka live sum --}}
                     <span x-show="boardOpenTotal() > 0" class="text-[9px] font-bold text-gray-500 dark:text-gray-400 whitespace-nowrap" title="In tables/counter orders pe itni raqam abhi chal rahi hai" x-text="'Rs ' + boardOpenTotal().toLocaleString() + ' chalu'"></span>
@@ -1435,6 +1444,7 @@ window.addEventListener('popstate', function() {
                         <span x-show="boardCounts().reserved > 0" class="min-w-[18px] px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-[10px] rounded-full font-black text-center" x-text="boardCounts().reserved"></span>
                         <span x-show="boardCounts().waiter > 0" class="min-w-[18px] px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-[10px] rounded-full font-black text-center animate-pulse" x-text="boardCounts().waiter"></span>
                         <span x-show="tablelessIncoming().length > 0" class="min-w-[18px] px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-[10px] rounded-full font-black text-center" x-text="'C' + tablelessIncoming().length"></span>
+                        <span x-show="heldNoTable().length > 0" class="min-w-[18px] px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-[10px] rounded-full font-black text-center" title="Held orders (bina table)" x-text="'H' + heldNoTable().length"></span>
                         <span class="flex-1"></span>
                         <span x-show="boardOpenTotal() > 0" class="text-[11px] font-bold text-gray-500 dark:text-gray-400 whitespace-nowrap" title="In tables/counter orders pe itni raqam abhi chal rahi hai" x-text="'Rs ' + boardOpenTotal().toLocaleString() + ' chalu'"></span>
                         <button @click="tableBoardOpen = false" class="text-gray-400 hover:text-gray-600 flex-shrink-0"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
@@ -1460,7 +1470,7 @@ window.addEventListener('popstate', function() {
                             </div>
                         </template>
                         {{-- Counter Orders (bina table — waiter takeaway/delivery) on the
-                             board too, warna cashier ko F3 kholna parta tha sirf inke liye.
+                             board too, warna cashier ko alag window kholni parti thi sirf inke liye.
                              Click = wahi ATOMIC claim → cart-load path (single winner). --}}
                         <template x-if="tablelessIncoming().length > 0">
                             <div class="mt-2.5">
@@ -1473,6 +1483,26 @@ window.addEventListener('popstate', function() {
                                                 <span class="text-[10px] font-bold whitespace-nowrap" x-text="'Rs ' + Math.round(o.total_amount || 0).toLocaleString()"></span>
                                             </span>
                                             <span class="block text-[10px] truncate font-medium opacity-90" x-text="(o.waiter ? o.waiter + ' • ' : '') + o.order_number"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                        {{-- Held Orders (bina table) — F3 window RETIRED (owner 26 Jul 2026):
+                             jo held orders kisi table pe NAHIN hain woh yahan amber chips
+                             mein dikhte hain. Click = tiles jaisa ACTION MENU (kabhi direct
+                             action nahi). Table waale held orders tiles pe occupied hain. --}}
+                        <template x-if="heldNoTable().length > 0">
+                            <div class="mt-2.5">
+                                <p class="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase px-1">Held Orders (bina table)</p>
+                                <div class="grid grid-cols-3 gap-2 mt-1.5">
+                                    <template x-for="o in heldNoTable()" :key="'bh' + o.id">
+                                        <button type="button" @click="tableBoardOpen = false; heldMenu = o" class="rounded-lg border-2 px-2 py-1.5 text-left transition hover:scale-[1.02] border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200">
+                                            <span class="flex items-center justify-between gap-1">
+                                                <span class="text-[11px] font-black truncate" x-text="o.order_number"></span>
+                                                <span class="text-[10px] font-bold whitespace-nowrap" x-text="'Rs ' + Math.round(o.total_amount || 0).toLocaleString()"></span>
+                                            </span>
+                                            <span class="block text-[10px] truncate font-medium opacity-90" x-text="(o.customer_name ? o.customer_name + ' • ' : '') + ((o.items || []).length) + ' items'"></span>
                                         </button>
                                     </template>
                                 </div>
@@ -1557,7 +1587,7 @@ window.addEventListener('popstate', function() {
                 </div>
                 <button @click="showTablePicker = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
             </div>
-            {{-- F3 Dine-In (Jul 2026): LIVE floors + tables, refreshed on every open via
+            {{-- Select-Table picker (Dine-In, Jul 2026): LIVE floors + tables, refreshed on every open via
                  /pos/restaurant/api/table-status. Green=free, amber=reserved, red=occupied.
                  Selecting a table RESERVES it server-side (race-safe) before it sticks. --}}
             <div class="p-4 max-h-[50vh] overflow-y-auto">
@@ -1695,8 +1725,42 @@ window.addEventListener('popstate', function() {
             </div>
         </template>
     </div>
+
+    {{-- ═══ HELD ORDER ACTION MENU (bina-table board chip click, Jul 2026) ═══
+         Wahi menu-pattern jaise table tiles: kabhi direct action nahi. Recall /
+         PAY (pay-modal) / KOT / Delete — sab yahin; alag F3 window RETIRED. --}}
+    <div x-show="heldMenu" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="heldMenu = null" @keydown.escape.window="if (heldMenu) heldMenu = null">
+        <template x-if="heldMenu">
+            <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden" x-transition.scale.90>
+                <div class="p-4 border-b border-gray-100 dark:border-gray-800 flex items-start gap-3">
+                    <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-amber-100 dark:bg-amber-900/30 text-amber-600">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-base font-black text-gray-900 dark:text-white" x-text="heldMenu.order_number"></p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400 truncate" x-text="(heldMenu.customer_name ? heldMenu.customer_name + ' • ' : '') + ((heldMenu.items || []).length) + ' items • Rs ' + Math.round(heldMenu.total_amount || 0).toLocaleString()"></p>
+                    </div>
+                    <button @click="heldMenu = null" class="text-gray-400 hover:text-gray-600 flex-shrink-0"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                </div>
+                <div class="p-3 space-y-2">
+                    <button @click="heldMenuRecall()" class="w-full py-2.5 rounded-xl text-sm font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition">Bill Kholo / Edit karo</button>
+                    <button @click="heldMenuPay()" class="w-full py-2.5 rounded-xl text-sm font-extrabold text-white bg-green-600 hover:bg-green-700 transition" x-text="'PAY karo — Rs ' + Math.round(heldMenu.total_amount || 0).toLocaleString()"></button>
+                    @if($features->kot ?? false)
+                    <div class="grid grid-cols-2 gap-2">
+                        <a :href="'/pos/restaurant/orders/' + heldMenu.id + '/kitchen-ticket'" target="_blank" class="py-2 rounded-xl text-xs font-bold text-center text-orange-600 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 transition">KOT Dekho</a>
+                        <button @click="heldMenuResend()" class="py-2 rounded-xl text-xs font-bold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-300 dark:border-orange-700 hover:bg-orange-100 transition">↻ KOT Dobara Bhejo</button>
+                    </div>
+                    @endif
+                    <button @click="heldMenuDelete()" class="w-full py-2 rounded-xl text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 transition">Order Delete karo</button>
+                </div>
+            </div>
+        </template>
+    </div>
     @endif
 
+    {{-- HELD ORDERS window — sirf NON-table companies (owner 26 Jul 2026: table
+         companies ke held orders TABLE board mein merge; alag window RETIRED). --}}
+    @unless($features->tables ?? false)
     <div x-show="showHeldOrders" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showHeldOrders = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden" x-transition.scale.90>
             <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
@@ -1739,6 +1803,7 @@ window.addEventListener('popstate', function() {
             </div>
         </div>
     </div>
+    @endunless
 
     {{-- ─────────────────────────────────────────────────────────────────────── --}}
     {{-- PROVISIONAL BILLS MODAL — opens from header "Local" button (F10).      --}}
@@ -2208,10 +2273,6 @@ window.addEventListener('popstate', function() {
                             <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
                                 <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Order Type Cycle</span>
                                 <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">F2</kbd>
-                            </div>
-                            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
-                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Held Orders</span>
-                                <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">F3</kbd>
                             </div>
                             <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
                                 <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Clear Cart</span>
@@ -3024,7 +3085,7 @@ function restaurantPos() {
         heldOrders: {!! $jsEnc($heldOrders) !!},
         showTablePicker: false,
         tablePickerIndex: 0,
-        // F3 Dine-In — live floors/tables for the picker modal (fetched on open).
+        // Dine-In Select-Table picker — live floors/tables (fetched on open).
         tableFloors: [],
         tablesLoading: false,
         // Occupied-timer tick — bumped every 30s so elapsed labels re-render live.
@@ -3058,6 +3119,7 @@ function restaurantPos() {
         boardMenuTable: null,   // tile clicked → action menu modal
         boardConfirm: null,     // { table } → Final CASH/CARD confirm modal
         boardBusy: false,
+        heldMenu: null,         // held (bina-table) chip → action menu modal
         // ── PRA REPORTING TOGGLE (root scope so modals/buttons can read it) ───
         // Mirrors the logged-in user's OWN reporting switch (per-cashier toggle,
         // owner rule Jul 2026). Used by Provisional/Failed bill
@@ -3123,7 +3185,7 @@ function restaurantPos() {
         incomingLoading: false,
         incomingOrderId: null,
         // Table-se-Bill (Jul 2026): auto-load RETIRED — new waiter orders get a
-        // one-time toast nudge (per-session dedupe) and wait inside the F3 table
+        // one-time toast nudge (per-session dedupe) and wait inside the Select-Table
         // picker as purple "Order Tayyar" cards until a cashier claims them.
         notifiedIncoming: [],
         // ── AUTO-SYNC ENGINE ──────────────────────────────────────────────
@@ -3448,7 +3510,7 @@ function restaurantPos() {
                 // Occupied-timer tick (table picker + held-orders elapsed labels).
                 setInterval(() => { this.nowTick = Date.now(); }, 30000);
                 // Table Board (Jul 2026): tiles live below the cart, so the status
-                // feed must poll even with the F3 picker closed. Paused while the
+                // feed must poll even with the table picker closed. Paused while the
                 // tab is hidden or a payment is mid-flight.
                 if (this.tableBoardEnabled) {
                     setTimeout(() => this.loadTableStatus(), 2200);
@@ -4646,7 +4708,10 @@ function restaurantPos() {
             // ═══════════════════════════════════════════════════════════════
             if (e.key === 'F1') { e.preventDefault(); this.showShortcuts = !this.showShortcuts; return; }
             if (e.key === 'F2') { e.preventDefault(); this.cartMode = false; this.activeCartIndex = -1; this.enterSearchMode(); return; }
-            if (e.key === 'F3') { e.preventDefault(); this.activeHeldIndex = 0; this.showHeldOrders = true; return; }
+            // F3 RETIRED (owner, 26 Jul 2026): held orders TABLE board mein merge
+            // ho gaye — koi shortcut window nahi kholta. Key swallow hoti hai
+            // (browser find na khule) aur table-companies ko board ka hint milta hai.
+            if (e.key === 'F3') { e.preventDefault(); if (this.tableBoardEnabled) { this.showToast('Held orders ab TABLE board mein hain — TABLE button ya Alt+B', 'info'); } return; }
             if (e.key === 'F4') { e.preventDefault(); if (this.cart.length && confirm('Clear entire cart?')) { this.clearCart(); } return; }
             if (e.key === 'F5') { e.preventDefault(); this.holdOrder(); return; }
             if (e.key === 'F6') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode('last'); this.mobileView = 'cart'; } return; }
@@ -4671,7 +4736,7 @@ function restaurantPos() {
             //   the old empty-search shortcut ate the first letter of "Tapal"/"tea".
             // Always operates on activeCartIndex if valid, else on the LAST cart row.
             // ═══════════════════════════════════════════════════════════════
-            if ((e.key === 't' || e.key === 'T' || e.code === 'KeyT') && !e.ctrlKey && !e.metaKey && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm) {
+            if ((e.key === 't' || e.key === 'T' || e.code === 'KeyT') && !e.ctrlKey && !e.metaKey && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.heldMenu) {
                 const tgt = e.target;
                 const isSearchInput = tgt && tgt === this.$refs.searchInput;
                 const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
@@ -4705,7 +4770,7 @@ function restaurantPos() {
             // F10 keystroke would steal focus from Pay/Held/Receipt/etc.
             if (e.key === 'F10') {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.heldMenu) return;
                 this.openLocalBills();
                 return;
             }
@@ -4713,7 +4778,7 @@ function restaurantPos() {
             // Same gating as F10. Browser's native F11 = fullscreen toggle is overridden.
             if (e.key === 'F11') {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.heldMenu) return;
                 this.openFailedBills();
                 return;
             }
@@ -4724,7 +4789,7 @@ function restaurantPos() {
                 e.preventDefault();
                 if (this.tableBoardOpen) {
                     this.tableBoardOpen = false;
-                } else if (!(this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm)) {
+                } else if (!(this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.heldMenu)) {
                     this.tableBoardOpen = true;
                 }
                 return;
@@ -4734,7 +4799,7 @@ function restaurantPos() {
             // search input is never hijacked. Same modal-gating as F10/F11.
             if (e.altKey && (e.key === 'r' || e.key === 'R' || e.code === 'KeyR')) {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.heldMenu) return;
                 this.openReprint();
                 return;
             }
@@ -4744,7 +4809,7 @@ function restaurantPos() {
             // keeps the modal. Alt-chord so plain digits keep qty-typing.
             if (e.altKey && (e.code === 'Digit1' || e.code === 'Digit2' || e.key === '1' || e.key === '2')) {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.heldMenu) return;
                 if (this.cart.length === 0 || this.submitting) return;
                 const oneTapCard = (e.code === 'Digit2' || e.key === '2');
                 this.payingHeldOrderId = null;
@@ -4765,7 +4830,7 @@ function restaurantPos() {
                 && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills
                 && !this.showPayModal && !this.showReceipt && !this.showQuickType
                 && !this.showManualItem && !this.showCustomerPicker && !this.showShortcuts
-                && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm) {
+                && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.heldMenu) {
                 const tgt = e.target;
                 const isSearchInput = tgt && tgt === this.$refs.searchInput;
                 const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
@@ -4800,7 +4865,7 @@ function restaurantPos() {
                 && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills
                 && !this.showPayModal && !this.showReceipt && !this.showQuickType
                 && !this.showManualItem && !this.showCustomerPicker && !this.showShortcuts
-                && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm) {
+                && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.heldMenu) {
                 const tgt = e.target;
                 const isSearchInput = tgt && tgt === this.$refs.searchInput;
                 const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
@@ -4968,6 +5033,9 @@ function restaurantPos() {
             // (Smart Upsell Enter/Esc priority block removed — 25 Jul 2026.)
 
             if (e.key === 'Escape') {
+                // heldMenu ka apna @keydown.escape.window hai — fallback chain
+                // yahan na chale warna search/category bhi saath clear ho jate.
+                if (this.heldMenu) { return; }
                 if (this.showShortcuts) { this.showShortcuts = false; return; }
                 if (this.showNewCustomerModal) { this.showNewCustomerModal = false; return; }
                 if (this.showLowStockPopup) { this.showLowStockPopup = false; return; }
@@ -5052,7 +5120,7 @@ function restaurantPos() {
             if (!confirm('Void current order? All items will be removed.')) return;
             this.clearCart(); this.showToast('Order voided', 'success');
         },
-        // ── F3 Dine-In table picker (Jul 2026) ────────────────────────────────
+        // ── Dine-In Select-Table picker (Jul 2026) ────────────────────────────────
         // Dine In pill → picker opens (if no table yet). Selecting a table
         // RESERVES it server-side (race-safe; 409 if another cashier got it).
         // Reservation auto-frees on: bill stored (backend, final+provisional),
@@ -5261,7 +5329,7 @@ function restaurantPos() {
                 this.showTablePicker = false;
                 if (this.tableBoardEnabled) this.loadTableStatus(); // Table Board: tile turns "mine"
                 // Guided keyboard flow: resume the Enter-chain into cart mode so
-                // F3 → Enter on the purple card lands on the first cart row
+                // Table picker → Enter on the purple card lands on the first cart row
                 // (mirrors the reserve branch's enterCartMode resume).
                 if (this.guidedFlow && !this.cartMode && this.cart.length > 0) this.enterCartMode(0);
             } catch (e) {
@@ -5303,7 +5371,10 @@ function restaurantPos() {
                 .reduce((s, t) => s + (t.order ? (parseFloat(t.order.total_amount) || 0) : 0), 0);
             const counter = this.tablelessIncoming()
                 .reduce((s, o) => s + (parseFloat(o.total_amount) || 0), 0);
-            return Math.round(tables + counter);
+            // Bina-table held orders bhi khuli raqam hain (board ki amber chips).
+            const held = this.heldNoTable()
+                .reduce((s, o) => s + (parseFloat(o.total_amount) || 0), 0);
+            return Math.round(tables + counter + held);
         },
         // Minutes elapsed since ts (reads nowTick → refreshes on the 30s tick).
         boardMinsSince(ts) {
@@ -5441,6 +5512,16 @@ function restaurantPos() {
             this.resendKitchen({ id: t.order.id });
             this.boardMenuTable = null;
         },
+        // ── Held-order ACTION MENU (bina-table amber chips on the Table Board).
+        // Sab actions EXISTING pipelines reuse karte hain (recallOrder /
+        // payHeldOrder / resendKitchen / deleteHeldOrder) — menu sirf hub hai.
+        // Waiter-source orders EXCLUDED — woh purple "C" counter chips hain
+        // (atomic-claim path); yahan bhi dikhte to double-count + claim bypass hota.
+        heldNoTable() { return this.heldOrders.filter(o => !o.table && o.source !== 'waiter'); },
+        heldMenuRecall() { const o = this.heldMenu; this.heldMenu = null; if (o) this.recallOrder(o); },
+        heldMenuPay()    { const o = this.heldMenu; this.heldMenu = null; if (o) this.payHeldOrder(o.id); },
+        heldMenuResend() { const o = this.heldMenu; this.heldMenu = null; if (o) this.resendKitchen(o); },
+        heldMenuDelete() { const o = this.heldMenu; this.heldMenu = null; if (o) this.deleteHeldOrder(o.id); },
         // Free table: reserved-only → release; cashier order → confirm + cancel
         // (same endpoint as Held-modal delete). Waiter orders never reach here
         // (button hidden) — cancel belongs to the waiter/admin side.
@@ -6106,7 +6187,7 @@ function restaurantPos() {
                     // Item #1: delivery-address snapshot — only rides on Delivery orders.
                     delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || null) : null,
                     kitchen_notes: this.kitchenNotes,
-                    // F3 Dine-In — backend auto-frees this reserved table once the
+                    // Dine-In picker — backend auto-frees this reserved table once the
                     // bill is stored (reserved → available; occupied untouched).
                     table_id: this.selectedTable?.id || null,
                     // PROVISIONAL BILL FLOW — when true, storeInvoice forces
@@ -6444,14 +6525,14 @@ function restaurantPos() {
         },
         // Table-se-Bill (Jul 2026): AUTO-LOAD RETIRED — orders no longer land in
         // the cart on their own (owner: auto-appearing carts confused cashiers).
-        // The cashier now clicks the purple "Order Tayyar" table in the F3 picker.
+        // The cashier now clicks the purple "Order Tayyar" table in the table picker / TABLE board.
         // This is just the one-time toast nudge per new order.
         maybeAutoLoadIncoming() {
             if (!this.isRestaurantMode || !this.incomingOrders.length || document.hidden) return;
             this.incomingOrders.forEach(o => {
                 if (this.notifiedIncoming.includes(o.id)) return;
                 this.notifiedIncoming.push(o.id);
-                this.showToast('Naya waiter order ' + o.order_number + (o.table ? ' (T-' + o.table + ')' : '') + ' — Table (F3) se kholein', 'success');
+                this.showToast('Naya waiter order ' + o.order_number + (o.table ? ' (T-' + o.table + ')' : '') + ' — TABLE board (Alt+B) se kholein', 'success');
             });
         },
         openIncoming() {

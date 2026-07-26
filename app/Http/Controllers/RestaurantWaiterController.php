@@ -427,7 +427,7 @@ class RestaurantWaiterController extends Controller
             'id' => $o->id,
             'order_number' => $o->order_number,
             'order_type' => $o->order_type,
-            'table_id' => $o->table_id,
+            'table_id' => $o->table_id !== null ? (int) $o->table_id : null,
             'table' => $o->table ? $o->table->table_number : null,
             'customer_name' => $o->customer_name,
             'customer_phone' => $o->customer_phone,

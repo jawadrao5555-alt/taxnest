@@ -18,6 +18,11 @@ class RestaurantOrder extends Model
     ];
 
     protected $casts = [
+        // int casts: live cPanel PDO returns uncast int columns as STRINGS
+        // (dev = ints) — JS strict === on ids breaks only on live.
+        'table_id' => 'integer',
+        'assigned_cashier_id' => 'integer',
+        'created_by' => 'integer',
         'subtotal' => 'decimal:2',
         'discount_amount' => 'decimal:2',
         'tax_amount' => 'decimal:2',

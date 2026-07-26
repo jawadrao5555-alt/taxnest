@@ -5160,7 +5160,9 @@ function restaurantPos() {
         // server-side: cashiers see own+unassigned, admins all). At most one
         // held waiter order per table — storeOrder rejects occupied tables.
         incomingForTable(t) {
-            return this.incomingOrders.find(o => o.table_id === t.id) || null;
+            // Number() dono taraf: live MySQL PDO table_id ko STRING deta hai
+            // ("56"), dev int — strict === live par purple tile ko marta tha.
+            return this.incomingOrders.find(o => o.table_id != null && Number(o.table_id) === Number(t.id)) || null;
         },
         tablelessIncoming() {
             return this.incomingOrders.filter(o => !o.table_id);

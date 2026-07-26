@@ -221,3 +221,21 @@ id = "0U2W8TR4jaVuIFShtXbfA"
 uri = "file://screenshots/whats-new-popup.png"
 type = "image"
 title = "What's New popup — nayi wording"
+
+[[outputs]]
+id = "kW-eI51MXCmuqo5puEy0e"
+uri = "file://screenshots/table-board-howto.png"
+type = "image"
+title = "Table Board — istemal ka tareeqa (notification image)"
+
+[[outputs]]
+id = "HKFR22uiU2235ajJOl2_6"
+uri = "file://screenshots/L2b-live-board-closeup.png"
+type = "image"
+title = "Live par Table Board — sab rang sahi"
+
+[[outputs]]
+id = "4ZNhHheS3ckDyTU4xQLQq"
+uri = "file://screenshots/L3-live-tile-menu.png"
+type = "image"
+title = "Live par table action menu"

@@ -307,14 +307,17 @@
 
             {{-- Setup Instructions --}}
             <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-700 p-6">
-                <h3 class="text-lg font-semibold text-blue-900 dark:text-blue-200 mb-3">📖 Setup Instructions</h3>
+                <h3 class="text-lg font-semibold text-blue-900 dark:text-blue-200 mb-3">📖 Install Karne Ka Tareeqa</h3>
                 <ol class="list-decimal list-inside space-y-2 text-sm text-blue-900 dark:text-blue-200">
-                    <li>Download the TaxNest Agent installer for your operating system above</li>
-                    <li>Install the agent on your Pakistan-based PC (must have internet access)</li>
-                    <li>Launch the agent and enter your <strong>Company ID</strong>, <strong>API Key</strong>, and <strong>Server URL</strong> shown above</li>
-                    <li>Click "Connect" — the agent will now auto-sync your invoices to PRA</li>
-                    <li>Keep the PC online during business hours (agent runs in system tray)</li>
+                    <li>Upar se Windows <strong>.zip</strong> download karein (Pakistan wale PC par, internet zaroori)</li>
+                    <li>Zip file par right-click karke <strong>"Extract All"</strong> karein — Downloads ya Desktop par (kisi purane agent folder ke upar nahi)</li>
+                    <li>Extract hue folder mein <strong>install.bat</strong> par double-click karein — installer purana agent khud band karke nayi files laga dega, shortcuts bana dega</li>
+                    <li>Agent khud start ho kar system tray mein chala jayega. Pehli dafa <strong>Company ID</strong>, <strong>API Key</strong> aur <strong>Server URL</strong> (upar diye gaye) enter karein — ya NestPOS Desktop window mein sirf login karein, settings khud lag jayengi</li>
+                    <li>PC business hours mein online rakhein — bas! Aage se <strong>naye versions khud-ba-khud update</strong> ho jayenge, dobara download/install ki zaroorat <strong>nahi</strong></li>
                 </ol>
+                <div class="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg text-xs text-amber-800 dark:text-amber-300">
+                    ⚠️ <strong>Zaroori:</strong> Zip ko kabhi chalte hue agent ke folder par seedha extract na karein — Windows "File In Use / open in Electron" ka error dega. Hamesha naye folder mein extract karke <strong>install.bat</strong> chalayen; wo purana agent khud band kar deta hai.
+                </div>
                 <div class="mt-4 p-3 bg-white dark:bg-gray-900 rounded-lg text-xs text-gray-700 dark:text-gray-300">
                     <strong>How it works:</strong> Your PC will check for pending invoices every 30 seconds, submit them to PRA using your local Pakistani IP, and report results back to TaxNest. No relay, no proxy, no PC dependency on TaxNest's servers.
                 </div>

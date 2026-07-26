@@ -287,6 +287,7 @@ Sale screen ki mazeed cheezein:
 
 ## Aam Masail (Troubleshooting)
 - "Bill PRA par nahi ja raha": internet check karein; bill 'offline' queue mein hoga aur khud retry hoga. Fiscal Device mode mein Desktop Agent ka chalta hona zaroori hai (dukan ke PC par).
+- "Agent install karte hue 'File In Use / open in Electron' ka error": aap zip ko chalte hue agent ke folder par seedha extract kar rahe hain. Hal: (1) error window Cancel karein, (2) system tray mein TaxNest icon par right-click karke Quit karein (NestPOS window bhi band), (3) zip ko Downloads par NAYE folder mein extract karein, (4) us folder mein install.bat par double-click karein — wo purana agent khud band karke install kar dega. Yaad rahe: aik dafa install ke baad naye versions KHUD update hote hain — dobara download/install ki zaroorat nahi.
 - "Login nahi ho raha": sahi panel use karein (/pos/login); Forgot Password se reset; 5 ghalat koshishon par thori der lock.
 - "Receipt par tax nahi dikh raha": /pos/receipt-settings par "Show Tax" ON karein (PRA aur Local tab alag alag hain — sahi tab dekhein).
 - "Printer poora width use nahi kar raha / kat raha hai": receipt-settings mein paper size (80mm/58mm) check karein, phir printer driver.

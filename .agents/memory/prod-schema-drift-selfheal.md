@@ -26,3 +26,6 @@ The owner's production (cPanel MySQL) schema drifts from dev: an add-column migr
 - Drift is not only MISSING columns — a column can exist on prod with the WRONG DEFAULT (pos_products.show_on_sale ended up DEFAULT 0 on cPanel MySQL; migration defines default(true), dev correct). Every create path relying on the DB default (CSV import, quick-create, auto-create) then writes the wrong value → whole shop's sale grid empty.
 - **How to apply:** never trust DB defaults on prod — set business-critical booleans EXPLICITLY in every ::create(); fix via idempotent migration that re-asserts the default (guarded ALTER) + a one-time heuristic backfill (e.g. flip only companies where >=90% of >5 active products are affected, so deliberate per-item settings survive).
 - Diagnosis pattern: newest form-created rows correct, older/imported rows wrong = default drift, not user action.
+
+## CLI probes masquerading as drift
+- "Unknown column" errors on prod are NOT always drift: check the stack trace FIRST for `/tmp/*.php` or "Command line code" frames — someone's manual probe script with guessed column names produces the exact same QueryException in laravel.log. Real drift = stack goes through app controllers/HTTP kernel. (Jul 2026: chased a phantom pos_print_jobs.printer_name "drift" that was a /tmp/p.php probe; schemas were identical.)

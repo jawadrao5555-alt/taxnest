@@ -1404,13 +1404,15 @@ window.addEventListener('popstate', function() {
                  "anjaane mein bill final" accidents. Same table-status feed as
                  the F3 picker (single source, no duplicate system). --}}
             <div class="border-t-2 border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 flex-shrink-0">
-                <button type="button" @click="tableBoardOpen = !tableBoardOpen; try { localStorage.setItem('tn_table_board_open', tableBoardOpen ? '1' : '0'); } catch(_) {}" class="w-full flex items-center gap-2 px-3 py-1.5" title="Tables board — har table ka live haal">
+                <button type="button" @click="tableBoardOpen = !tableBoardOpen; try { localStorage.setItem('tn_table_board_open', tableBoardOpen ? '1' : '0'); } catch(_) {}" class="w-full flex items-center gap-2 px-3 py-1.5" title="Tables board — har table ka live haal (Alt+B)">
                     <svg class="w-3.5 h-3.5 text-teal-700 dark:text-teal-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M5 10v9m14-9v9M4 5h16a1 1 0 011 1v3H3V6a1 1 0 011-1z"/></svg>
                     <span class="text-[11px] font-black text-gray-700 dark:text-gray-300 tracking-wide">TABLES</span>
                     <span x-show="boardCounts().occupied > 0" class="min-w-[16px] px-1 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-[9px] rounded-full font-black" x-text="boardCounts().occupied"></span>
                     <span x-show="boardCounts().reserved > 0" class="min-w-[16px] px-1 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-[9px] rounded-full font-black" x-text="boardCounts().reserved"></span>
                     <span x-show="boardCounts().waiter > 0" class="min-w-[16px] px-1 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-[9px] rounded-full font-black animate-pulse" x-text="boardCounts().waiter"></span>
                     <span class="flex-1"></span>
+                    {{-- Chalti hui raqam — sab khule orders (tables + counter) ka live sum --}}
+                    <span x-show="boardOpenTotal() > 0" class="text-[9px] font-bold text-gray-500 dark:text-gray-400 whitespace-nowrap" title="In tables/counter orders pe itni raqam abhi chal rahi hai" x-text="'Rs ' + boardOpenTotal().toLocaleString() + ' chalu'"></span>
                     <svg class="w-3.5 h-3.5 text-gray-400 transition-transform" :class="tableBoardOpen ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                 </button>
                 <div x-show="tableBoardOpen" x-cloak class="px-2 pb-2 max-h-44 overflow-y-auto">
@@ -1425,9 +1427,28 @@ window.addEventListener('popstate', function() {
                                     <button type="button" @click="openBoardMenu(t)" class="rounded-lg border-2 px-1.5 py-1 text-left transition hover:scale-[1.02]" :class="boardTileClass(t)">
                                         <span class="flex items-center justify-between gap-1">
                                             <span class="text-[11px] font-black" x-text="'T-' + t.table_number"></span>
-                                            <span class="text-[9px] font-bold whitespace-nowrap" x-text="boardTileTime(t)"></span>
+                                            <span class="text-[9px] font-bold whitespace-nowrap" :class="boardTileUrgent(t) ? 'animate-pulse' : ''" x-text="(boardTileUrgent(t) ? '⚠ ' : '') + boardTileTime(t)"></span>
                                         </span>
                                         <span class="block text-[9px] truncate font-medium opacity-90" x-text="boardTileSub(t)"></span>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                    {{-- Counter Orders (bina table — waiter takeaway/delivery) on the
+                         board too, warna cashier ko F3 kholna parta tha sirf inke liye.
+                         Click = wahi ATOMIC claim → cart-load path (single winner). --}}
+                    <template x-if="tablelessIncoming().length > 0">
+                        <div class="mt-1.5">
+                            <p class="text-[9px] font-bold text-purple-500 uppercase px-1">Counter Orders (bina table)</p>
+                            <div class="grid grid-cols-3 gap-1.5 mt-1">
+                                <template x-for="o in tablelessIncoming()" :key="'bc' + o.id">
+                                    <button type="button" @click="claimAndLoadIncoming(o)" class="rounded-lg border-2 px-1.5 py-1 text-left transition hover:scale-[1.02] border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20 text-purple-800 dark:text-purple-200">
+                                        <span class="flex items-center justify-between gap-1">
+                                            <span class="text-[10px] font-black truncate" x-text="o.order_type === 'delivery' ? 'Delivery' : 'Takeaway'"></span>
+                                            <span class="text-[9px] font-bold whitespace-nowrap" x-text="'Rs ' + Math.round(o.total_amount || 0).toLocaleString()"></span>
+                                        </span>
+                                        <span class="block text-[9px] truncate font-medium opacity-90" x-text="(o.waiter ? o.waiter + ' • ' : '') + o.order_number"></span>
                                     </button>
                                 </template>
                             </div>
@@ -2182,6 +2203,10 @@ window.addEventListener('popstate', function() {
                             <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
                                 <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Customer Select</span>
                                 <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">Alt+P</kbd>
+                            </div>
+                            <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
+                                <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Tables Board</span>
+                                <kbd style="background:#e9d5ff; color:#7c3aed; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700;">Alt+B</kbd>
                             </div>
                             <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:#f9fafb; border-radius:8px;" class="dark:bg-gray-800">
                                 <span style="font-size:12px; font-weight:600; color:#374151;" class="dark:text-gray-300">Pay / Checkout</span>
@@ -4654,6 +4679,15 @@ function restaurantPos() {
                 this.openFailedBills();
                 return;
             }
+            // Alt+B — Toggle the TABLES board strip (customer ask: ek haath
+            // keyboard pe ho to board bhi bina mouse khule/band ho). No modal
+            // gating needed — it's a strip toggle, not an overlay.
+            if (e.altKey && (e.key === 'b' || e.key === 'B' || e.code === 'KeyB') && this.tableBoardEnabled) {
+                e.preventDefault();
+                this.tableBoardOpen = !this.tableBoardOpen;
+                try { localStorage.setItem('tn_table_board_open', this.tableBoardOpen ? '1' : '0'); } catch(_) {}
+                return;
+            }
             // Alt+R — Open REPRINT modal (today's bills, click = instant print).
             // Alt-chord (not plain R) so typing names like "Rooh Afza" in the
             // search input is never hijacked. Same modal-gating as F10/F11.
@@ -5211,16 +5245,47 @@ function restaurantPos() {
             return {
                 occupied: all.filter(t => t.status === 'occupied' && !this.boardIsWaiter(t)).length,
                 reserved: all.filter(t => !t.order && t.status === 'reserved').length,
-                waiter: all.filter(t => this.boardIsWaiter(t)).length,
+                // Purple badge = SAB waiting waiter orders (table + counter/bina-table)
+                waiter: all.filter(t => this.boardIsWaiter(t)).length + this.tablelessIncoming().length,
             };
+        },
+        // Live sum of every OPEN order (table tiles + counter orders) — header
+        // "Rs X chalu" glance: kitni raqam abhi tables/counter pe khuli hai.
+        boardOpenTotal() {
+            const tables = this.tableFloors.flatMap(f => f.tables)
+                .reduce((s, t) => s + (t.order ? (parseFloat(t.order.total_amount) || 0) : 0), 0);
+            const counter = this.tablelessIncoming()
+                .reduce((s, o) => s + (parseFloat(o.total_amount) || 0), 0);
+            return Math.round(tables + counter);
+        },
+        // Minutes elapsed since ts (reads nowTick → refreshes on the 30s tick).
+        boardMinsSince(ts) {
+            if (!ts) return 0;
+            const ms = this.nowTick - new Date(ts).getTime();
+            return (isNaN(ms) || ms < 0) ? 0 : Math.floor(ms / 60000);
+        },
+        // Urgency (customer angle: "table bhool gaye / khana thanda ho gaya"):
+        // waiter order 10+ min unclaimed, occupied 30+ min, reserved 15+ min.
+        boardTileUrgent(t) {
+            if (this.boardIsWaiter(t)) return this.boardMinsSince(t.occupied_since) >= 10;
+            if (t.order || t.status === 'occupied') return this.boardMinsSince(t.occupied_since) >= 30;
+            if (t.status === 'reserved') return this.boardMinsSince(t.locked_at) >= 15;
+            return false;
         },
         boardIsWaiter(t) {
             return !!(t && t.order && t.order.source === 'waiter' && this.incomingForTable(t));
         },
         boardTileClass(t) {
-            if (this.boardIsWaiter(t)) return 'border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20 text-purple-800 dark:text-purple-200';
-            if (t.status === 'occupied' || t.order) return 'border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300';
-            if (t.status === 'reserved') return 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300';
+            const urgent = this.boardTileUrgent(t); // solid stronger tint — no glow (design rule)
+            if (this.boardIsWaiter(t)) return urgent
+                ? 'border-purple-500 dark:border-purple-500 bg-purple-100 dark:bg-purple-900/40 text-purple-900 dark:text-purple-100'
+                : 'border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20 text-purple-800 dark:text-purple-200';
+            if (t.status === 'occupied' || t.order) return urgent
+                ? 'border-red-500 dark:border-red-500 bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200'
+                : 'border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300';
+            if (t.status === 'reserved') return urgent
+                ? 'border-amber-500 dark:border-amber-500 bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200'
+                : 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300';
             return 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300';
         },
         boardTileTime(t) {

@@ -43,6 +43,21 @@
                         @if($company->agent_version)
                             <p class="text-xs text-indigo-200 mt-1">Version: {{ $company->agent_version }}</p>
                         @endif
+                        @if(!is_null($company->agent_offline_mode))
+                            <p class="text-xs text-indigo-200 mt-1">
+                                Offline Mode:
+                                @if($company->agent_offline_mode)
+                                    <span class="font-semibold text-emerald-300">ON</span>
+                                    @if($company->agent_snapshot_at)
+                                        · Snapshot: {{ $company->agent_snapshot_at->diffForHumans() }}
+                                    @else
+                                        · Snapshot: not captured yet
+                                    @endif
+                                @else
+                                    <span class="font-semibold">OFF</span>
+                                @endif
+                            </p>
+                        @endif
                     </div>
                     <div class="text-right">
                         <div class="text-3xl font-bold">{{ $stats['submitted_today'] }}</div>

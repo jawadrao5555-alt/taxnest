@@ -3408,6 +3408,10 @@ function restaurantPos() {
             // clamps the timestamp and company-checks the user — spoof-safe).
             payload.offline_queued_at = new Date().toISOString();
             payload.offline_queued_by = {{ (int) auth('pos')->id() }};
+            // Multi-branch fidelity: snapshot the branch this screen was rendered
+            // for, so a bill queued on branch A and synced later (possibly after a
+            // different login) still books under branch A. Server company-checks it.
+            payload.offline_branch_id = {{ (int) (app()->bound('currentBranchId') ? (app('currentBranchId') ?? 0) : 0) }};
             const rec = {
                 uuid,
                 company_id: this._offlineCompanyId,

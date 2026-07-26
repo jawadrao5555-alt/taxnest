@@ -13,7 +13,8 @@ const os = require('os');
 const { spawn } = require('child_process');
 const axios = require('axios');
 const Store = require('electron-store');
-const { startAgent, stopAgent, getStatus } = require('./src/agent');
+const { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider } = require('./src/agent');
+const offlineSnapshot = require('./src/offline-snapshot');
 const { printHtml: printHtmlSilent } = require('./src/printer');
 const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk } = require('./src/pos-window');
 
@@ -501,6 +502,21 @@ if (!gotInstanceLock) {
     // Agent windows keep the agent identity; the POS window overrides its own
     // AppUserModelID in pos-window.js so NestPOS groups separately on the taskbar.
     try { app.setAppUserModelId('com.taxnest.pra-agent'); } catch (e) {}
+
+    // Offline Mode telemetry: every heartbeat reports whether NestPOS Desktop
+    // Offline Mode is ON and when the sale-screen snapshot was last captured,
+    // so admins can spot stale snapshots remotely. Read lazily each beat (the
+    // toggle can change at runtime); any failure = fields simply omitted.
+    setHeartbeatExtraProvider(() => {
+      const out = { offline_mode: getPosSettings().offlineMode ? 1 : 0 };
+      try {
+        const info = offlineSnapshot.snapshotInfo();
+        out.snapshot_saved_at = info && info.savedAt ? info.savedAt : null;
+      } catch (e) {
+        out.snapshot_saved_at = null;
+      }
+      return out;
+    });
 
     // Launched via the NestPOS desktop icon (--pos): go straight to the POS
     // screen, keep the agent window hidden in the tray.

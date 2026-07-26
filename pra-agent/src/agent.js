@@ -9,6 +9,14 @@ let heartbeatInterval = null;
 let currentConfig = null;
 let statusCallback = null;
 let updateCallback = null;
+// Optional provider of extra heartbeat fields (set by main.js — e.g. NestPOS
+// Desktop Offline Mode telemetry). Must return a plain object; failures are
+// swallowed so telemetry can never break the heartbeat.
+let heartbeatExtraProvider = null;
+
+function setHeartbeatExtraProvider(fn) {
+  heartbeatExtraProvider = typeof fn === 'function' ? fn : null;
+}
 
 const status = {
   running: false,
@@ -107,12 +115,17 @@ function log(...args) {
 async function heartbeat() {
   if (!currentConfig) return;
   try {
+    let extra = {};
+    if (heartbeatExtraProvider) {
+      try { extra = heartbeatExtraProvider() || {}; } catch (e) { extra = {}; }
+    }
     const res = await axios.post(
       `${currentConfig.serverUrl}/heartbeat`,
       {
         version: currentConfig.appVersion || '1.0.0',
         build: currentConfig.appBuild || null,
         company_id: currentConfig.companyId,
+        ...extra,
       },
       {
         headers: { Authorization: `Bearer ${currentConfig.apiKey}` },
@@ -321,4 +334,4 @@ function stopAgent() {
   log('Agent stopped');
 }
 
-module.exports = { startAgent, stopAgent, getStatus };
+module.exports = { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider };

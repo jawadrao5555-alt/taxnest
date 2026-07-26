@@ -1309,6 +1309,9 @@ class PosController extends Controller
             // with the sync time / whoever pressed "Sync".
             'offline_queued_at' => 'nullable|date',
             'offline_queued_by' => 'nullable|integer',
+            // Branch the bill was rung up on (multi-branch shops): snapshot from
+            // the offline queue so a later sync books it under the right branch.
+            'offline_branch_id' => 'nullable|integer',
         ]);
 
         // OFFLINE-FIRST replay guard: if an earlier sync attempt already stored
@@ -1539,6 +1542,19 @@ class PosController extends Controller
                 }
             }
         }
+        // Multi-branch fidelity (Jul 2026): a bill queued offline on branch A
+        // must book under branch A even if the sync happens under a different
+        // login/branch context. Only accepted when the branch belongs to THIS
+        // company; otherwise falls back to the current session's branch.
+        $offlineBranchId = null;
+        if ($offlineUuidColumnExists && $request->filled('offline_branch_id')) {
+            $obId = (int) $request->input('offline_branch_id');
+            if ($obId > 0) {
+                $offlineBranchId = \App\Models\Branch::where('company_id', $companyId)
+                    ->where('id', $obId)
+                    ->value('id');
+            }
+        }
 
         DB::beginTransaction();
         try {
@@ -1606,7 +1622,7 @@ class PosController extends Controller
 
                 $transaction = PosTransaction::create([
                     'company_id' => $companyId,
-                    'branch_id' => app()->bound('currentBranchId') ? app('currentBranchId') : null,
+                    'branch_id' => $offlineBranchId ?: (app()->bound('currentBranchId') ? app('currentBranchId') : null),
                     'terminal_id' => $request->terminal_id,
                     'invoice_number' => $invoiceNumber,
                     'invoice_mode' => $invoiceMode,

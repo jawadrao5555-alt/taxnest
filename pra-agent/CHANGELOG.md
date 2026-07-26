@@ -1,5 +1,12 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.5.3 (2026-07-26)
+**Offline Mode telemetry — admins can monitor it remotely**
+
+- **Heartbeat now reports Offline Mode status**: every 30s beat tells the server whether NestPOS Desktop Offline Mode is ON and when the sale-screen snapshot was last captured. The /pos/agent page and the SaaS admin panel show it — a shop running on a stale snapshot is now visible without visiting the PC.
+- Purely additive telemetry: old servers ignore the extra fields, and a telemetry failure can never break the heartbeat itself.
+- Internal hardening: POS window force-close flag now resets in the `closed` handler (future-proofing, no behavior change).
+
 ## v1.5.2 (2026-07-26)
 **New: NestPOS window stays loaded — instant open, no repeated loading**
 

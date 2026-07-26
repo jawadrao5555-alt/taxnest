@@ -51,10 +51,37 @@ class AgentController extends Controller
     {
         $company = $request->attributes->get('agent_company');
 
-        $company->update([
+        $update = [
             'agent_last_seen' => now(),
             'agent_version' => $request->input('version', $company->agent_version),
-        ]);
+        ];
+
+        // NestPOS Desktop Offline Mode telemetry (Jul 2026): agents v1.5.3+
+        // report the toggle + snapshot freshness. Column-guarded so a deploy
+        // window where code lands before the migration can never 500 a beat.
+        static $telemetryCols = null;
+        if ($telemetryCols === null) {
+            $telemetryCols = \Illuminate\Support\Facades\Schema::hasColumn('companies', 'agent_offline_mode')
+                && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'agent_snapshot_at');
+        }
+        if ($telemetryCols && $request->has('offline_mode')) {
+            $update['agent_offline_mode'] = (bool) $request->input('offline_mode');
+            $snapAt = null;
+            if ($request->filled('snapshot_saved_at')) {
+                try {
+                    $snapAt = \Carbon\Carbon::parse($request->input('snapshot_saved_at'));
+                    // A wrong PC clock must never post-date the snapshot.
+                    if ($snapAt->gt(now())) {
+                        $snapAt = now();
+                    }
+                } catch (\Throwable $e) {
+                    $snapAt = null;
+                }
+            }
+            $update['agent_snapshot_at'] = $snapAt;
+        }
+
+        $company->update($update);
 
         // ===== FBR POS Fiscal Device company =====
         if ($company->agentServesFbr()) {

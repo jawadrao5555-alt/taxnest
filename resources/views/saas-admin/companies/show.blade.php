@@ -93,6 +93,23 @@
                 <div class="flex justify-between"><span class="text-gray-400">Inventory</span>
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs {{ $company->inventory_enabled ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">{{ $company->inventory_enabled ? 'Enabled' : 'Disabled' }}</span>
                 </div>
+                @php $praAgentOnline = $company->agent_last_seen && $company->agent_last_seen->gt(now()->subMinutes(2)); @endphp
+                <div class="flex justify-between"><span class="text-gray-400">Desktop Agent</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs {{ $praAgentOnline ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">
+                        {{ $praAgentOnline ? 'Online' : ($company->agent_last_seen ? 'Offline' : 'Never connected') }}{{ $company->agent_version ? ' · v' . $company->agent_version : '' }}
+                    </span>
+                </div>
+                @if(!is_null($company->agent_offline_mode))
+                <div class="flex justify-between"><span class="text-gray-400">Offline Mode</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs {{ $company->agent_offline_mode ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">
+                        @if($company->agent_offline_mode)
+                            ON · Snapshot {{ $company->agent_snapshot_at ? $company->agent_snapshot_at->diffForHumans() : 'not captured' }}
+                        @else
+                            OFF
+                        @endif
+                    </span>
+                </div>
+                @endif
                 @endif
             </div>
         </div>

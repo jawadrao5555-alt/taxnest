@@ -239,3 +239,9 @@ id = "4ZNhHheS3ckDyTU4xQLQq"
 uri = "file://screenshots/L3-live-tile-menu.png"
 type = "image"
 title = "Live par table action menu"
+
+[[outputs]]
+id = "hNKMtPv5uJb-SJRU2krTB"
+uri = "file://docs/nestpos-book.md"
+type = "text"
+title = "NestPOS Book — Mukammal User Guide (Roman Urdu)"

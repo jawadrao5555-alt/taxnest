@@ -203,3 +203,21 @@ id = "FZuhG5WAmqvUfQsD6e4cc"
 uri = "file://screenshots/receipt_before_after.jpg"
 type = "image"
 title = "Receipt: Pehle vs Baad (saaf logo + upar jagah)"
+
+[[outputs]]
+id = "pzwkbJCM1tOZhGZMVrAkM"
+uri = "file://screenshots/table-button-bar.png"
+type = "image"
+title = "Sale screen — cart poori height, neeche slim TABLE button"
+
+[[outputs]]
+id = "zlb5ogjoTcFANBvbCSSDz"
+uri = "file://screenshots/table-board-modal.png"
+type = "image"
+title = "TABLE button par click — board popup mein khulta hai"
+
+[[outputs]]
+id = "0U2W8TR4jaVuIFShtXbfA"
+uri = "file://screenshots/whats-new-popup.png"
+type = "image"
+title = "What's New popup — nayi wording"

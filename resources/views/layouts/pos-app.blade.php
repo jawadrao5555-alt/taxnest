@@ -36,7 +36,13 @@
         // Pending companies: approval middleware blocks POSTs too — skip them as well.
         $wnAllowed = $posUserLayout && $posUserLayout->isPosAdmin();
         $wnPending = ($companyLayout->status ?? null) === 'pending';
-        if ($wnAllowed && !$wnPending
+        // View-only impersonation (admin "View as Company"): ReadOnlyImpersonation
+        // blocks ALL POSTs incl. /pos/whats-new/seen — the popup would re-appear on
+        // EVERY page (dismiss loop) and its full-screen z-130 overlay sits on top of
+        // everything. Same convention as pending companies: skip it entirely.
+        $wnImp = session('impersonation');
+        $wnReadonlyImp = is_array($wnImp) && !empty($wnImp['readonly']);
+        if ($wnAllowed && !$wnPending && !$wnReadonlyImp
             && \Illuminate\Support\Facades\Schema::hasTable('app_updates')
             && \App\Models\SystemSetting::get('pos_whats_new_enabled', '1') === '1') {
             $whatsNewList = \App\Models\AppUpdate::where('audience', 'pos')->where('is_published', true)

@@ -354,27 +354,13 @@
                          NEVER spill over the right-side user group (ZFC overlap bug, 26 Jul 2026). --}}
                     <div id="tn-nav-sale-tools" class="hidden md:flex items-center gap-1.5 min-w-0 flex-1 px-2 overflow-x-auto"></div>
 
-                    <div class="flex items-center gap-2 flex-shrink-0" x-data="{ online: navigator.onLine, isFs: false, clock: '{{ now()->format('H:i') }}' }"
+                    <div class="flex items-center gap-2 flex-shrink-0" x-data="{ isFs: false }"
                          x-init="
-                            window.addEventListener('online', () => online = true);
-                            window.addEventListener('offline', () => online = false);
                             document.addEventListener('fullscreenchange', () => isFs = !!document.fullscreenElement);
                             isFs = !!document.fullscreenElement;
-                            setInterval(() => { const d = new Date(); clock = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }, 30000);
                          ">
-                        <div class="hidden lg:flex items-center gap-3 mr-2 px-2 py-1 rounded-lg" style="background: rgba(255,255,255,0.06)">
-                            <div class="flex items-center gap-1.5" :title="online ? 'Network Online' : 'Network Offline — working locally'">
-                                <span class="w-1.5 h-1.5 rounded-full status-dot-live" :class="online ? 'bg-emerald-400' : 'bg-red-400'" :style="online ? 'box-shadow:0 0 6px rgba(16,185,129,0.6)' : 'box-shadow:0 0 6px rgba(239,68,68,0.6)'"></span>
-                                <span class="text-[9px] font-bold uppercase tracking-wider" :class="online ? 'text-emerald-300' : 'text-red-300'" x-text="online ? 'Net' : 'Off'"></span>
-                            </div>
-                            <div class="w-px h-3 bg-white/15"></div>
-                            <div class="flex items-center gap-1.5" title="PRA reporting status">
-                                <span class="w-1.5 h-1.5 rounded-full {{ $praEnabledLayout ? 'bg-green-400 status-dot-live' : 'bg-amber-400' }}" style="box-shadow: 0 0 6px {{ $praEnabledLayout ? 'rgba(16,185,129,0.5)' : 'rgba(245,158,11,0.5)' }}"></span>
-                                <span class="text-[9px] {{ $praEnabledLayout ? 'text-green-300' : 'text-amber-300' }} font-bold uppercase tracking-wider">PRA</span>
-                            </div>
-                            <div class="w-px h-3 bg-white/15"></div>
-                            <span class="text-[10px] font-mono font-semibold" style="color: var(--meta-color)" x-text="clock"></span>
-                        </div>
+                        {{-- Net/PRA/clock status cluster REMOVED (owner, 26 Jul 2026) — sale screen
+                             already has its own Auto-Sync Online/Offline pill; do not re-add. --}}
 
                         <button @click="$dispatch('open-cmd-palette')" class="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-white hover:bg-white/15 transition group" title="Quick Command (Ctrl+K)">
                             <svg class="w-3.5 h-3.5 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>

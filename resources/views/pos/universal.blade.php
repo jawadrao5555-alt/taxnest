@@ -3239,6 +3239,11 @@ function restaurantPos() {
             this._inited = true;
             this.initFit();
             setTimeout(() => this.bootFpCheck(), 1500);
+            // NestPOS Desktop keep-alive (Jul 2026): the desktop shell hides the
+            // window on close and calls this hook when it is shown again — so a
+            // long-lived screen picks up deploys/product changes with ONE reload.
+            // bootFpCheck() has its own busy-guard (never yanks a sale in progress).
+            try { window.tnDesktopResumeCheck = () => { try { this.bootFpCheck(); } catch (e) {} }; } catch (e) {}
             // Honor the saved "hide products" preference ONLY in inventory-OFF mode.
             // Inventory mode must always show the catalog (no manual on-the-fly create).
             try { if (!this.isInventoryEnabled() && localStorage.getItem('pos_show_products') === '0') this.showProducts = false; } catch (e) {}

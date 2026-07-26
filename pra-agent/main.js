@@ -234,6 +234,9 @@ function openPos() {
         buildTrayMenu();
       },
       onLoggedIn: autoConfigureAgent,
+      // Keep-alive (v1.5.2): POS window hides on close and must only REALLY
+      // close when the whole app is quitting (tray Quit / self-update).
+      isQuitting: () => isQuitting,
     });
     // First open "installs" NestPOS as its own app: Desktop + Start Menu
     // shortcuts with the NestPOS icon (relaunch straight into the POS).

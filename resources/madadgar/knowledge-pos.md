@@ -103,6 +103,7 @@ Sale screen ki mazeed cheezein:
 - Invoice Submission Mode (/pos/agent, Cloud mode wali companies): "Agent Sync" = Desktop Agent bills PRA ko bhejta hai; "Direct Production" = server seedha bhejta hai — "Switch to..." button se badlein. Direct par switch karne se silent printing BAND NAHI hoti — agent connected rehta hai. Fiscal Device mode mein Direct available nahi.
 - Agent page (/pos/agent) par: agent ka status (Online/Offline, last seen, version, aaj submit hue bills), Company ID + API Key (masked, Show/Copy buttons, Generate/Regenerate Key), Server URL, aur "Download TaxNest Agent" (Windows).
 - Desktop Sync Agent: Windows PC par chalta hai; bills PRA ko submit karta hai aur silent printing bhi isi se hoti hai. Agent khud update ho jata hai (v1.3.0+).
+- NestPOS Desktop window (agent v1.5.2+): X se band karne par window poori tarah band NAHI hoti — background mein tayyar rehti hai. Dobara "Open POS" ya Desktop ka NestPOS icon = screen FORAN khulti hai, koi loading nahi. Jab TaxNest ki update aati hai to screen khud aik dafa refresh ho kar naya data le leti hai (bill banate waqt kabhi refresh nahi hoti). Poori tarah band karna ho to tray icon par right-click → Quit Agent.
 
 ## Provisional / Local Bills
 - Provisional (local) bill = abhi PRA ko report NAHI hua; L-series number; quota nahi katta.

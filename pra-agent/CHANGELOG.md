@@ -1,5 +1,18 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.5.2 (2026-07-26)
+**New: NestPOS window stays loaded — instant open, no repeated loading**
+
+- **Closing the POS window now HIDES it instead of killing it**: the sale screen stays fully loaded in the background (login, screen, data sab qaim). The next "Open POS" / NestPOS icon click brings it back INSTANTLY — no reload, no waiting, works like a real offline desktop app.
+- **Auto-refresh on updates**: every time the window comes back on screen it silently verifies freshness with the server — if we deployed an update (new features, product/price changes) while it was hidden, the screen reloads ONCE and picks everything up. It NEVER refreshes in the middle of a sale (existing busy-guard).
+- Background timers are no longer throttled while hidden — incoming waiter orders + the offline bill queue keep syncing at full speed.
+- A one-time notification explains that NestPOS is still ready in the background. Quitting the agent from the tray still closes everything for real.
+
+## v1.5.1 (2026-07-25)
+**Fix: blank silent prints on some Windows PCs**
+
+- Hardware acceleration is now OFF for the hidden print window — on PCs where the GPU/driver produced BLANK receipts/KOTs from silent printing, prints now render correctly.
+
 ## v1.5.0 / build 20260725-1 (2026-07-25) — BETA 4
 **New: agent follows the POS login (auto company switch)**
 

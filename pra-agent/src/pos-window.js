@@ -16,7 +16,7 @@
 //   the POS window (and the tray menu mirrors it).
 // - window.open: same-origin popups open as child windows in the same
 //   partition; everything else (WhatsApp links etc.) goes to the system browser.
-const { BrowserWindow, shell, app } = require('electron');
+const { BrowserWindow, shell, app, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const offlineSnapshot = require('./offline-snapshot');
@@ -37,6 +37,26 @@ function nestposIcon(ext) {
 let posWindow = null;
 let targetUrl = null;
 let onKioskToggleCb = null;
+let forceClose = false;          // set only by closePosWindow() / app quit
+let hideNoticeShown = false;     // one tray notification per run
+let lastResumeCheck = 0;         // throttle for the on-show freshness check
+
+// Keep-alive resume check (v1.5.2): the POS window now HIDES on close instead
+// of being destroyed, so "Open POS" is instant (no reload). Every time it
+// comes back on screen we ask the page to re-verify its boot fingerprint —
+// if we deployed an update while the window was hidden, the sale screen
+// reloads ONCE (its own busy-guard never yanks a sale in progress). The hook
+// is a no-op on login/offline pages where it doesn't exist.
+function runResumeCheck(win) {
+  try {
+    const now = Date.now();
+    if (now - lastResumeCheck < 60 * 1000) return;
+    lastResumeCheck = now;
+    win.webContents
+      .executeJavaScript('window.tnDesktopResumeCheck && window.tnDesktopResumeCheck(); true', true)
+      .catch(() => {});
+  } catch (e) {}
+}
 
 function deriveOrigin(config) {
   try {
@@ -77,8 +97,12 @@ function loadOfflinePage(win, failedUrl, errorDescription) {
 function openPosWindow(config, opts = {}) {
   const existing = getPosWindowRef();
   if (existing) {
+    // Keep-alive path (v1.5.2): the window survived its last "close" as a
+    // hidden window — showing it is INSTANT (no page reload). Freshness is
+    // handled by the resume check below.
     existing.show();
     existing.focus();
+    runResumeCheck(existing);
     return existing;
   }
 
@@ -109,6 +133,10 @@ function openPosWindow(config, opts = {}) {
       nodeIntegration: false,
       sandbox: true,
       preload: path.join(__dirname, 'pos-preload.js'),
+      // Keep-alive (v1.5.2): the window keeps living hidden after "close",
+      // so timers must NOT be throttled in the background — the sale screen's
+      // incoming-orders poll + offline bill queue keep running at full speed.
+      backgroundThrottling: false,
     },
   });
 
@@ -239,9 +267,36 @@ function openPosWindow(config, opts = {}) {
     return { action: 'deny' };
   });
 
+  // Keep-alive (v1.5.2): "close" HIDES the window instead of destroying it —
+  // the sale screen stays fully loaded (login, screen, data sab qaim), so the
+  // next "Open POS" is instant like a real desktop app. A real close happens
+  // only on app quit / self-update (forceClose or opts.isQuitting()).
+  const isQuittingFn = typeof opts.isQuitting === 'function' ? opts.isQuitting : () => false;
+  posWindow.on('close', (e) => {
+    if (forceClose || isQuittingFn()) return; // let it really close
+    e.preventDefault();
+    try { posWindow.hide(); } catch (err) {}
+    if (!hideNoticeShown) {
+      hideNoticeShown = true;
+      try {
+        if (Notification.isSupported()) {
+          new Notification({
+            title: 'NestPOS',
+            body: 'NestPOS background mein tayyar hai — dobara kholne par foran khulega (loading nahi hogi).',
+          }).show();
+        }
+      } catch (err) {}
+    }
+  });
+
+  // Whenever the window comes back on screen, re-verify freshness (throttled).
+  posWindow.on('show', () => runResumeCheck(posWindow));
+  posWindow.on('restore', () => runResumeCheck(posWindow));
+
   posWindow.on('closed', () => {
     posWindow = null;
     onKioskToggleCb = null;
+    forceClose = false; // reset here (not synchronously) — safe even if a future beforeunload defers 'close'
   });
 
   posWindow.loadURL(targetUrl).catch(() => loadOfflinePage(posWindow, targetUrl, 'load failed'));
@@ -251,7 +306,10 @@ function openPosWindow(config, opts = {}) {
 
 function closePosWindow() {
   const win = getPosWindowRef();
-  if (win) { try { win.close(); } catch (e) {} }
+  if (win) {
+    forceClose = true;
+    try { win.close(); } catch (e) { forceClose = false; }
+  }
 }
 
 module.exports = { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, closePosWindow };

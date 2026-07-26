@@ -150,6 +150,26 @@ class PosAuth
             }
         }
 
+        // ═══ Staff Hazri heartbeat (owner batch, 26 Jul 2026) ═══
+        // Throttled "last seen" stamp on the user's latest OPEN session row —
+        // max ONE UPDATE per user per 5 minutes (cache flag), kabhi request
+        // block nahi karta. Browser band / bijli gayi = logout_at NULL rehta
+        // hai aur report last_activity_at ko hi aakhri waqt dikhati hai.
+        try {
+            $beatKey = 'pos_hazri_beat_' . $user->id;
+            if (!cache()->has($beatKey)) {
+                cache()->put($beatKey, 1, 300);
+                \Illuminate\Support\Facades\DB::table('pos_user_sessions')
+                    ->where('user_id', $user->id)
+                    ->whereNull('logout_at')
+                    ->orderByDesc('id')
+                    ->limit(1)
+                    ->update(['last_activity_at' => now(), 'updated_at' => now()]);
+            }
+        } catch (\Throwable $e) {
+            // Table not migrated yet — ignore.
+        }
+
         // Resolve & bind active branch (returns null if no branches exist yet).
         // NOTE: use bind() not instance() — instance(name, null) is treated as "not bound" by Laravel.
         $branchId = app(\App\Services\BranchContextService::class)->getActiveBranchId();

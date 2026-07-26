@@ -55,7 +55,8 @@ Isolated POS (own auth/layouts/models); PRA integration with offline billing + a
 - **Opening Cash**: day-start drawer entry, today-only, locks once day closed; both close paths auto-fill `opening_float`. → `pos-opening-cash.md`
 - **Day-close** (manual + 6AM auto): Z-report analytics, cash recon, A4 PDF + 80mm thermal; washes that day's local bills per standing policy (non-NULL pra_status / fiscal number NEVER touched; deleted finals still consume quota); Local Bills Portal + promote rules. → `pos-local-bills-dayclose.md`
 - **Delivery Riders**: rider logins + khata + settlement board + day-close recon; assignment BOARD-ONLY post-payment. → `pos-delivery-riders.md`
-- **Restaurant module**: Pro/Unlimited gating via `PosFeatureService` (`restaurant_enabled` COLUMN, never plan IDs); tables/KOT stations/KDS/waiters/deals/QR menu; order-type flow rules; KOT Full Mode. → `pos-restaurant-module.md`, `silent-printer-routing.md`, `pos-deals-feature.md`
+- **Restaurant module**: Pro/Unlimited gating via `PosFeatureService` (`restaurant_enabled` COLUMN, never plan IDs); tables/KOT stations/KDS/waiters/deals/QR menu; order-type flow rules; KOT Full Mode; Table Shift (empty-target-only, timer carries, no KOT reprint). → `pos-restaurant-module.md`, `silent-printer-routing.md`, `pos-deals-feature.md`
+- **Staff Hazri** (26 Jul 2026): `pos_user_sessions` attendance — admin/manager-only /pos/reports/hazri + day-close Z-report section; login listener MUST stay pos-guard-gated. → `pos-staff-hazri.md`
 
 ## FBR POS
 - Isolated FBR-integrated POS (`fbrpos` guard): FBR IMS submission, provisional + payment-confirm flow, PIN system, Edit & Retry. → `fbr-pos-ims-fiscalization.md`

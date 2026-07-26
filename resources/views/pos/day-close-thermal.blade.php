@@ -159,6 +159,21 @@
     <div class="hr"></div>
     @endif
 
+    {{-- Staff Attendance / Hazri (owner batch, 26 Jul 2026). * = no logout
+         pressed — last activity time shown instead. --}}
+    @if(!empty($hazri))
+    <div class="sec">Staff Hazri</div>
+    <table>
+        @foreach($hazri as $h)
+        <tr>
+            <td>{{ \Illuminate\Support\Str::limit($h->name, 14) }}</td>
+            <td class="r">{{ $h->first_in ? \Carbon\Carbon::parse($h->first_in)->format('h:iA') : '-' }} &rarr; {{ $h->last_out ? \Carbon\Carbon::parse($h->last_out)->format('h:iA') : ($h->last_seen ? \Carbon\Carbon::parse($h->last_seen)->format('h:iA') . '*' : '-') }} &middot; {{ $h->bill_count }} bills</td>
+        </tr>
+        @endforeach
+    </table>
+    <div class="hr"></div>
+    @endif
+
     <div class="sec">Stats</div>
     <table>
         <tr><td>Average Bill</td><td class="r">{{ number_format($analytics->avg_bill, 2) }}</td></tr>

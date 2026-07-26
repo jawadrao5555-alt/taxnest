@@ -320,6 +320,48 @@
     </table>
     @endif
 
+    {{-- ═══ Staff Attendance / Hazri (owner batch, 26 Jul 2026) ═══
+         From pos_user_sessions: first login, last logout (or last-seen when
+         Logout was never pressed), bills + first/last sale per staff member. --}}
+    @if(!empty($hazri))
+    <div class="section-title">Staff Attendance (Hazri)</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>Staff</th>
+                <th class="c">First In</th>
+                <th class="c">Last Out</th>
+                <th class="c">Logins</th>
+                <th class="c">Bills</th>
+                <th class="c">First Sale</th>
+                <th class="c">Last Sale</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($hazri as $h)
+            <tr>
+                <td>{{ $h->name }}</td>
+                <td class="c">{{ $h->first_in ? \Carbon\Carbon::parse($h->first_in)->format('h:i A') : '-' }}</td>
+                <td class="c">
+                    @if($h->last_out)
+                        {{ \Carbon\Carbon::parse($h->last_out)->format('h:i A') }}
+                    @elseif($h->last_seen)
+                        {{ \Carbon\Carbon::parse($h->last_seen)->format('h:i A') }}*
+                    @else
+                        -
+                    @endif
+                </td>
+                <td class="c">{{ $h->session_count }}</td>
+                <td class="c">{{ $h->bill_count }}</td>
+                <td class="c">{{ $h->first_sale ? \Carbon\Carbon::parse($h->first_sale)->format('h:i A') : '-' }}</td>
+                <td class="c">{{ $h->last_sale ? \Carbon\Carbon::parse($h->last_sale)->format('h:i A') : '-' }}</td>
+            </tr>
+            @endforeach
+        </tbody>
+    </table>
+    <div style="font-size:8px; color:#6b7280; margin-top:2px;">* = no logout pressed - last activity time shown.</div>
+    @endif
+
     {{-- ═══ Comprehensive Z-Report analytics (owner request Jul 2026) ═══ --}}
     @if($analytics->categories->isNotEmpty())
     <div class="section-title">Category-wise Sales</div>

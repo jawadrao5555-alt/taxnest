@@ -655,15 +655,11 @@ window.addEventListener('popstate', function() {
         @include('pos.partials.sale-customer-box')
 
 
-        @if($features->tables)
-        {{-- Table-se-Bill (Jul 2026): teal badge = waiter orders waiting inside the
-             picker (tables + counter orders) — replaces the retired Waiter box. --}}
-        <button @click="openTablePicker()" class="relative flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold border transition flex-shrink-0" :class="selectedTable ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'">
-            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-            <span x-text="selectedTable ? 'T-' + selectedTable.table_number : 'Table'"></span>
-            <span x-show="incomingOrders.length > 0" x-cloak class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-teal-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold animate-pulse" x-text="incomingOrders.length"></span>
-        </button>
-        @endif
+        {{-- Top "Table" button REMOVED (owner, 26 Jul 2026) — sirf frontend se.
+             Picker ab Dine In pill se khulta hai (selected table pill par dikhta
+             hai, waiter-order teal badge bhi wahin shift ho gaya); TABLE board
+             neeche cart ke saath maujood hai. openTablePicker/selectedTable ka
+             poora backend flow UNTOUCHED. --}}
 
         {{-- Order-type switcher (Dine In / Takeaway / Delivery): RESTAURANT-category
              companies only (owner rule, Jul 2026). A plain retail/general store has no
@@ -673,7 +669,15 @@ window.addEventListener('popstate', function() {
         @if(($features->tables ?? false) || ($features->kot ?? false) || ($features->kitchen ?? false) || ($features->delivery ?? false))
         <div class="flex items-center rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex-shrink-0" title="Press F2 to cycle">
             @if($features->tables)
-            <button @click="setOrderType('dine_in')" class="px-2 py-1.5 text-[10px] font-bold transition-all" :class="orderType === 'dine_in' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">Dine In</button>
+            {{-- Dine In pill (owner, 26 Jul 2026): selected table isi pill mein
+                 dikhta hai ("Dine In · T-3"); dobara click = picker (table change).
+                 Teal count chip = waiter orders waiting in the picker (Table-se-Bill
+                 badge — top Table button ke saath yahan shift hua; INLINE chip,
+                 absolute nahi — parent div overflow-hidden badge kaat deta). --}}
+            <button @click="setOrderType('dine_in')" class="flex items-center gap-1 px-2 py-1.5 text-[10px] font-bold transition-all" :class="orderType === 'dine_in' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">
+                <span x-text="selectedTable ? 'Dine In · T-' + selectedTable.table_number : 'Dine In'"></span>
+                <span x-show="incomingOrders.length > 0" x-cloak class="min-w-[16px] h-[16px] px-1 bg-teal-600 text-white text-[9px] rounded-full inline-flex items-center justify-center font-bold animate-pulse" x-text="incomingOrders.length"></span>
+            </button>
             @endif
             <button @click="setOrderType('takeaway')" class="px-2 py-1.5 text-[10px] font-bold transition-all border-x border-gray-200 dark:border-gray-700" :class="orderType === 'takeaway' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">Takeaway</button>
             @if($features->delivery)
@@ -1435,7 +1439,7 @@ window.addEventListener('popstate', function() {
                  (both z-50) stack ABOVE it. Tile/chip click closes the modal
                  first (cart or menu becomes the focus). ESC yahan tabhi chalta
                  hai jab menu/confirm khule na hon (unka apna ESC pehle hai). --}}
-            <div x-show="tableBoardOpen" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center p-4" @click.self="tableBoardOpen = false" @keydown.escape.window="if (tableBoardOpen && !boardMenuTable && !boardConfirm && !showPayModal) tableBoardOpen = false">
+            <div x-show="tableBoardOpen" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center p-4" @click.self="tableBoardOpen = false" @keydown.escape.window="if (tableBoardOpen && !boardMenuTable && !boardConfirm && !boardShift && !showPayModal) tableBoardOpen = false">
                 <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden" x-transition.scale.90>
                     <div class="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center gap-2">
                         <svg class="w-4 h-4 text-teal-700 dark:text-teal-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M5 10v9m14-9v9M4 5h16a1 1 0 011 1v3H3V6a1 1 0 011-1z"/></svg>
@@ -1604,9 +1608,12 @@ window.addEventListener('popstate', function() {
                             <template x-for="t in floor.tables" :key="t.id">
                                 {{-- Table-se-Bill (Jul 2026): occupied table WITH a waiting waiter
                                      order = clickable purple "Order Tayyar" card (claim + load to
-                                     cart); occupied without an order stays disabled/red. --}}
-                                <button @click="selectTable(t)" :disabled="t.status === 'occupied' && !incomingForTable(t)" class="py-3 px-2 rounded-xl text-center border-2 transition"
-                                    :class="(incomingForTable(t) ? 'border-purple-400 bg-purple-50 dark:bg-purple-900/20 hover:border-purple-500 hover:scale-105' : (t.status === 'occupied' ? 'border-red-300 bg-red-50 dark:bg-red-900/20 cursor-not-allowed' : (t.status === 'reserved' ? 'border-amber-300 bg-amber-50 dark:bg-amber-900/20 hover:border-amber-400 hover:scale-105' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-purple-400 hover:scale-105'))) + (tablePickerFlat()[tablePickerIndex]?.id === t.id ? ' ring-2 ring-emerald-500 ring-offset-1 dark:ring-offset-gray-900' : '')">
+                                     cart). 26 Jul 2026 (owner item 5): occupied WITHOUT waiter order
+                                     ab bhi clickable — board ACTION MENU khulta hai (view/final/shift)
+                                     — magar sirf jab cart KHALI ho; bhara cart = disabled (view-only
+                                     rule: naya order galti se purane bill par na chadhe). --}}
+                                <button @click="selectTable(t)" :disabled="t.status === 'occupied' && !incomingForTable(t) && cart.length > 0" class="py-3 px-2 rounded-xl text-center border-2 transition"
+                                    :class="(incomingForTable(t) ? 'border-purple-400 bg-purple-50 dark:bg-purple-900/20 hover:border-purple-500 hover:scale-105' : (t.status === 'occupied' ? (cart.length > 0 ? 'border-red-300 bg-red-50 dark:bg-red-900/20 cursor-not-allowed' : 'border-red-300 bg-red-50 dark:bg-red-900/20 hover:border-red-500 hover:scale-105') : (t.status === 'reserved' ? 'border-amber-300 bg-amber-50 dark:bg-amber-900/20 hover:border-amber-400 hover:scale-105' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-purple-400 hover:scale-105'))) + (tablePickerFlat()[tablePickerIndex]?.id === t.id ? ' ring-2 ring-emerald-500 ring-offset-1 dark:ring-offset-gray-900' : '')">
                                     {{-- Top-view table + chairs diagram (color = status) --}}
                                     <svg viewBox="0 0 48 48" class="w-8 h-8 mx-auto mb-1" :class="incomingForTable(t) ? 'text-purple-500' : (t.status === 'occupied' ? 'text-red-500' : (t.status === 'reserved' ? 'text-amber-500' : 'text-green-500 dark:text-green-400'))" fill="currentColor" aria-hidden="true">
                                         <rect x="17" y="1.5" width="14" height="7" rx="3"/>
@@ -1663,7 +1670,7 @@ window.addEventListener('popstate', function() {
          for a table: View/Edit (recall to cart), Final (confirm modal), KOT
          resend, Free/Cancel. Waiter orders go through the ATOMIC claim first
          (invariant) and are never Free-able from here. --}}
-    <div x-show="boardMenuTable" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="boardMenuTable = null" @keydown.escape.window="if (boardConfirm) { boardConfirm = null; } else if (boardMenuTable) { boardMenuTable = null; }">
+    <div x-show="boardMenuTable" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="boardMenuTable = null" @keydown.escape.window="if (boardShift) { boardShift = null; } else if (boardConfirm) { boardConfirm = null; } else if (boardMenuTable) { boardMenuTable = null; }">
         <template x-if="boardMenuTable">
             <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden" x-transition.scale.90>
                 <div class="p-4 border-b border-gray-100 dark:border-gray-800 flex items-start gap-3">
@@ -1687,6 +1694,9 @@ window.addEventListener('popstate', function() {
                             @if(($features->kot ?? false) || ($features->kitchen ?? false))
                             <button x-show="boardMenuTable.order.kot_sent_at" @click="boardResendKot()" :disabled="boardBusy" class="w-full py-2 rounded-xl text-xs font-bold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 disabled:opacity-40 transition">↻ KOT Dobara Bhejo</button>
                             @endif
+                            {{-- Table Shift (owner batch, 26 Jul 2026): har role, sirf
+                                 KHALI table par, timer continue, KOT reprint NAHI. --}}
+                            <button @click="boardAskShift()" :disabled="boardBusy" class="w-full py-2 rounded-xl text-xs font-bold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 disabled:opacity-40 transition">&#8644; Table Badlein (Shift)</button>
                             <button x-show="!(boardMenuTable.order && boardMenuTable.order.source === 'waiter')" @click="boardFree()" :disabled="boardBusy" class="w-full py-2 rounded-xl text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-40 transition">Order Cancel + Table Khali</button>
                             <p x-show="boardMenuTable.order && boardMenuTable.order.source === 'waiter'" class="text-[10px] text-purple-500 dark:text-purple-400 text-center">Waiter ka order — cancel sirf waiter/admin side se</p>
                         </div>
@@ -1721,6 +1731,48 @@ window.addEventListener('popstate', function() {
                 </div>
                 <div class="px-4 pb-4">
                     <button @click="boardConfirm = null" :disabled="boardBusy" class="w-full py-2 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition" x-text="boardBusy ? 'Bill ban raha hai…' : 'Cancel — wapas jao'"></button>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    {{-- ═══ TABLE SHIFT MODAL (owner batch, 26 Jul 2026) ═══
+         Board menu "Table Badlein" → sirf KHALI (green) tables ki grid. Shift
+         server-side race-safe hai (lockForUpdate); timer purana chalta rahta
+         hai; KOT dobara print NAHI hota. Har POS role ke liye available. --}}
+    <div x-show="boardShift" x-cloak x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="if (!boardBusy) boardShift = null">
+        <template x-if="boardShift">
+            <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md max-h-[70vh] overflow-hidden flex flex-col" x-transition.scale.90>
+                <div class="p-4 border-b border-gray-100 dark:border-gray-800 flex items-start gap-3">
+                    <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-base font-black text-gray-900 dark:text-white" x-text="'T-' + boardShift.table.table_number + ' ka order shift karein'"></p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">Naya table chunein — sirf KHALI tables. Timer chalta rahega, KOT dobara nahi chalega.</p>
+                    </div>
+                    <button @click="boardShift = null" :disabled="boardBusy" class="text-gray-400 hover:text-gray-600 flex-shrink-0"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                </div>
+                <div class="p-4 overflow-y-auto">
+                    <template x-if="boardShiftFree().length === 0">
+                        <p class="text-center text-sm text-gray-400 py-6">Koi khali table nahi — pehle koi table free karein</p>
+                    </template>
+                    <template x-for="floor in tableFloors" :key="'sh' + floor.name">
+                        <div class="mb-3" x-show="floor.tables.some(t => t.status === 'available' && !t.order)">
+                            <p class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1.5" x-text="floor.name"></p>
+                            <div class="grid grid-cols-3 gap-2">
+                                <template x-for="t in floor.tables.filter(t => t.status === 'available' && !t.order)" :key="'shift' + t.id">
+                                    <button @click="doShiftTable(t)" :disabled="boardBusy" class="py-3 px-2 rounded-xl text-center border-2 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 hover:border-teal-500 hover:scale-105 disabled:opacity-40 transition">
+                                        <p class="text-sm font-bold text-gray-900 dark:text-white" x-text="'T-' + t.table_number"></p>
+                                        <p class="text-[10px] text-gray-400" x-text="(t.seats ? t.seats + ' seats' : 'Khali')"></p>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                <div class="px-4 pb-4">
+                    <button @click="boardShift = null" :disabled="boardBusy" class="w-full py-2 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition" x-text="boardBusy ? 'Shift ho raha hai…' : 'Cancel — wapas jao'"></button>
                 </div>
             </div>
         </template>
@@ -3118,6 +3170,7 @@ function restaurantPos() {
         tableBoardOpen: false, // board ab MODAL hai (owner 26 Jul 2026) — load par band, Alt+B / TABLE button se khulta hai
         boardMenuTable: null,   // tile clicked → action menu modal
         boardConfirm: null,     // { table } → Final CASH/CARD confirm modal
+        boardShift: null,       // { table, order } → Table Shift modal (26 Jul 2026)
         boardBusy: false,
         heldMenu: null,         // held (bina-table) chip → action menu modal
         // ── PRA REPORTING TOGGLE (root scope so modals/buttons can read it) ───
@@ -4697,7 +4750,7 @@ function restaurantPos() {
             // ke peechay LEAK na karein. Agar menu/confirm/pay upar khula ho
             // (z-50) to unke apne handlers chalte hain — yeh block skip.
             // ═══════════════════════════════════════════════════════════════
-            if (this.tableBoardOpen && !this.boardMenuTable && !this.boardConfirm && !this.showPayModal) {
+            if (this.tableBoardOpen && !this.boardMenuTable && !this.boardConfirm && !this.boardShift && !this.showPayModal) {
                 if (e.altKey && (e.key === 'b' || e.key === 'B' || e.code === 'KeyB')) { e.preventDefault(); this.tableBoardOpen = false; return; }
                 if (e.key === 'Escape') { e.preventDefault(); this.tableBoardOpen = false; return; }
                 if (/^F\d+$/.test(e.key) || ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'e'))) { e.preventDefault(); }
@@ -4739,7 +4792,7 @@ function restaurantPos() {
             //   the old empty-search shortcut ate the first letter of "Tapal"/"tea".
             // Always operates on activeCartIndex if valid, else on the LAST cart row.
             // ═══════════════════════════════════════════════════════════════
-            if ((e.key === 't' || e.key === 'T' || e.code === 'KeyT') && !e.ctrlKey && !e.metaKey && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.heldMenu) {
+            if ((e.key === 't' || e.key === 'T' || e.code === 'KeyT') && !e.ctrlKey && !e.metaKey && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.boardShift && !this.heldMenu) {
                 const tgt = e.target;
                 const isSearchInput = tgt && tgt === this.$refs.searchInput;
                 const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
@@ -4773,7 +4826,7 @@ function restaurantPos() {
             // F10 keystroke would steal focus from Pay/Held/Receipt/etc.
             if (e.key === 'F10') {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.heldMenu) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardShift || this.heldMenu) return;
                 this.openLocalBills();
                 return;
             }
@@ -4781,7 +4834,7 @@ function restaurantPos() {
             // Same gating as F10. Browser's native F11 = fullscreen toggle is overridden.
             if (e.key === 'F11') {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.heldMenu) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardShift || this.heldMenu) return;
                 this.openFailedBills();
                 return;
             }
@@ -4792,7 +4845,7 @@ function restaurantPos() {
                 e.preventDefault();
                 if (this.tableBoardOpen) {
                     this.tableBoardOpen = false;
-                } else if (!(this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.heldMenu)) {
+                } else if (!(this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardShift || this.heldMenu)) {
                     this.tableBoardOpen = true;
                 }
                 return;
@@ -4802,7 +4855,7 @@ function restaurantPos() {
             // search input is never hijacked. Same modal-gating as F10/F11.
             if (e.altKey && (e.key === 'r' || e.key === 'R' || e.code === 'KeyR')) {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.heldMenu) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardShift || this.heldMenu) return;
                 this.openReprint();
                 return;
             }
@@ -4812,7 +4865,7 @@ function restaurantPos() {
             // keeps the modal. Alt-chord so plain digits keep qty-typing.
             if (e.altKey && (e.code === 'Digit1' || e.code === 'Digit2' || e.key === '1' || e.key === '2')) {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.heldMenu) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardShift || this.heldMenu) return;
                 if (this.cart.length === 0 || this.submitting) return;
                 const oneTapCard = (e.code === 'Digit2' || e.key === '2');
                 this.payingHeldOrderId = null;
@@ -4833,7 +4886,7 @@ function restaurantPos() {
                 && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills
                 && !this.showPayModal && !this.showReceipt && !this.showQuickType
                 && !this.showManualItem && !this.showCustomerPicker && !this.showShortcuts
-                && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.heldMenu) {
+                && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.boardShift && !this.heldMenu) {
                 const tgt = e.target;
                 const isSearchInput = tgt && tgt === this.$refs.searchInput;
                 const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
@@ -4868,7 +4921,7 @@ function restaurantPos() {
                 && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills
                 && !this.showPayModal && !this.showReceipt && !this.showQuickType
                 && !this.showManualItem && !this.showCustomerPicker && !this.showShortcuts
-                && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.heldMenu) {
+                && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.boardShift && !this.heldMenu) {
                 const tgt = e.target;
                 const isSearchInput = tgt && tgt === this.$refs.searchInput;
                 const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
@@ -5133,8 +5186,11 @@ function restaurantPos() {
             // leaving the type removes it so it can never bill on dine-in/takeaway.
             if (type !== 'delivery') this.removeDeliveryCharge();
             if (type === 'dine_in') {
+                // 26 Jul 2026: table selected ho tab BHI picker khole — pill par
+                // dobara click = table change ka raasta (top Table button retire).
+                const reopen = this.orderType === 'dine_in' && this.selectedTable;
                 this.orderType = 'dine_in';
-                if (!this.selectedTable) this.openTablePicker();
+                if (!this.selectedTable || reopen) this.openTablePicker();
                 return;
             }
             if (this.selectedTable) { this.releaseTable(this.selectedTable.id); this.selectedTable = null; }
@@ -5278,7 +5334,13 @@ function restaurantPos() {
             // keeps the reserve/selectedTable/dine_in_auto_kot path untouched.
             const inc = this.incomingForTable(table);
             if (inc) { await this.claimAndLoadIncoming(inc); return; }
-            if (table.status === 'occupied') { this.showToast('Table T-' + table.table_number + ' is occupied', 'warning'); return; }
+            if (table.status === 'occupied') {
+                // 26 Jul 2026 (owner item 5): khali cart + occupied tile = board
+                // ACTION MENU (view/final/KOT/shift) yahin picker se. Bhara cart
+                // par sirf warning (view-only rule — cart kabhi discard na ho).
+                if (this.cart.length === 0) { this.showTablePicker = false; this.openBoardMenu(table); return; }
+                this.showToast('Table T-' + table.table_number + ' is occupied', 'warning'); return;
+            }
             try {
                 const res = await fetch('/pos/restaurant/tables/' + table.id + '/reserve', {
                     method: 'POST',
@@ -5514,6 +5576,52 @@ function restaurantPos() {
             if (!t || !t.order) return;
             this.resendKitchen({ id: t.order.id });
             this.boardMenuTable = null;
+        },
+        // ── Table Shift (owner batch, 26 Jul 2026) ─────────────────────────
+        // Menu band → shift modal (sirf khali tables). Server race-safe hai;
+        // timer continue (occupied_since carry) aur KOT dobara NAHI chalta.
+        boardAskShift() {
+            const t = this.boardMenuTable;
+            if (!t || !t.order) return;
+            this.boardMenuTable = null;
+            this.boardShift = { table: t, order: t.order };
+            this.loadTableStatus(); // fresh statuses — stale "khali" tile na dikhe
+        },
+        boardShiftFree() {
+            return this.tableFloors.flatMap(f => f.tables).filter(x => x.status === 'available' && !x.order);
+        },
+        async doShiftTable(target) {
+            if (this.boardBusy || !this.boardShift || !target) return;
+            const ord = this.boardShift.order;
+            const fromT = this.boardShift.table;
+            this.boardBusy = true;
+            try {
+                const res = await fetch('/pos/restaurant/orders/' + ord.id + '/shift-table', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ table_id: target.id }),
+                });
+                const data = await res.json().catch(() => null);
+                if (data && data.success) {
+                    this.showToast(data.message || ('Order T-' + target.table_number + ' par shift ho gaya'), 'success');
+                    this.boardShift = null;
+                    // Agar yehi order cart mein khula hai (edit) to selectedTable ko naye
+                    // table par le aao — warna Hold dobara PURANE table par parkega.
+                    if (this.selectedTable && Number(this.selectedTable.id) === Number(fromT.id)) {
+                        this.selectedTable = { id: target.id, table_number: target.table_number, seats: target.seats };
+                    }
+                    // heldOrders snapshot mein bhi naya table likho (Recall list sahi dikhe).
+                    const held = this.heldOrders.find(o => Number(o.id) === Number(ord.id));
+                    if (held) held.table = { id: target.id, table_number: target.table_number };
+                } else {
+                    this.showToast((data && data.message) || 'Shift nahi hua', 'error');
+                }
+            } catch (e) {
+                this.showToast('Shift nahi hua — connection check karein', 'error');
+            } finally {
+                this.boardBusy = false;
+                this.loadTableStatus();
+            }
         },
         // ── Held-order ACTION MENU (bina-table amber chips on the Table Board).
         // Sab actions EXISTING pipelines reuse karte hain (recallOrder /

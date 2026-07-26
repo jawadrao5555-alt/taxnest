@@ -5,10 +5,19 @@
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
             {{ ($tab ?? 'pra') === 'local' ? 'Local Reports' : 'POS Reports' }}
         </h1>
-        <a href="{{ route('pos.reports.csv', array_filter(['tab' => $tab, 'cashier' => $selectedCashier, 'from' => request('from'), 'to' => request('to')])) }}" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-            Download CSV
-        </a>
+        <div class="flex items-center gap-2 flex-wrap">
+            @if(auth('pos')->user()?->isPosAdmin())
+            {{-- Staff Hazri (owner batch, 26 Jul 2026) — ADMIN/MANAGER-ONLY --}}
+            <a href="{{ route('pos.reports.hazri') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 transition">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Staff Hazri
+            </a>
+            @endif
+            <a href="{{ route('pos.reports.csv', array_filter(['tab' => $tab, 'cashier' => $selectedCashier, 'from' => request('from'), 'to' => request('to')])) }}" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                Download CSV
+            </a>
+        </div>
     </div>
 
     @include('pos.partials.mode-tabs', ['baseUrl' => route('pos.reports')])

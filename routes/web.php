@@ -517,6 +517,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/reports', [PosController::class, 'reports'])->name('pos.reports');
     Route::get('/tax-reports', [PosController::class, 'taxReports'])->name('pos.tax-reports');
     Route::get('/reports/csv', [PosController::class, 'exportReportCsv'])->name('pos.reports.csv');
+    // Staff Hazri (owner batch, 26 Jul 2026) — ADMIN/MANAGER-ONLY (403 in controller).
+    Route::get('/reports/hazri', [PosController::class, 'hazriReport'])->name('pos.reports.hazri');
     Route::get('/tax-reports/csv', [PosController::class, 'exportTaxReportCsv'])->name('pos.tax-reports.csv');
     Route::get('/tax-reports/pdf', [PosController::class, 'exportTaxReportPdf'])->name('pos.tax-reports.pdf');
     Route::get('/reports/analytics-pdf', [PosController::class, 'reportsAnalyticsPdf'])->name('pos.reports.analytics-pdf');
@@ -651,6 +653,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/restaurant/orders/hold', [RestaurantPosController::class, 'holdOrder'])->name('pos.restaurant.orders.hold');
     Route::post('/restaurant/orders/{id}/pay', [RestaurantPosController::class, 'payOrder'])->name('pos.restaurant.orders.pay');
     Route::post('/restaurant/orders/{id}/delete', [RestaurantPosController::class, 'deleteOrder'])->name('pos.restaurant.orders.delete');
+    Route::post('/restaurant/orders/{id}/shift-table', [RestaurantPosController::class, 'shiftTable'])->name('pos.restaurant.orders.shift-table');
     Route::get('/restaurant/orders/by-table/{tableId}', [RestaurantPosController::class, 'getOrdersByTable'])->name('pos.restaurant.orders.by-table');
     Route::get('/restaurant/tables', [RestaurantTableController::class, 'index'])->name('pos.restaurant.tables');
     Route::post('/restaurant/tables/{id}/lock', [RestaurantTableController::class, 'lockTable'])->name('pos.restaurant.tables.lock');
@@ -674,6 +677,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/waiter/api/orders', [\App\Http\Controllers\RestaurantWaiterController::class, 'myOrders'])->name('pos.waiter.orders');
     Route::post('/waiter/orders', [\App\Http\Controllers\RestaurantWaiterController::class, 'storeOrder'])->name('pos.waiter.orders.store');
     Route::post('/waiter/orders/{id}/items', [\App\Http\Controllers\RestaurantWaiterController::class, 'appendItems'])->name('pos.waiter.orders.append');
+    Route::post('/waiter/orders/{id}/shift-table', [\App\Http\Controllers\RestaurantWaiterController::class, 'shiftTable'])->name('pos.waiter.orders.shift-table');
     // Cashier side — incoming waiter orders on the sale screen.
     Route::get('/api/incoming-orders', [\App\Http\Controllers\RestaurantWaiterController::class, 'incomingOrders'])->name('pos.api.incoming-orders');
     Route::post('/api/incoming-orders/{id}/complete', [\App\Http\Controllers\RestaurantWaiterController::class, 'completeIncoming'])->name('pos.api.incoming-orders.complete');

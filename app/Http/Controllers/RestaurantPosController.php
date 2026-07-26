@@ -553,6 +553,117 @@ class RestaurantPosController extends Controller
         }
     }
 
+    // ── Table Shift (owner batch, 26 Jul 2026) ─────────────────────────────
+    // Move a HELD order to another AVAILABLE table. Har POS role kar sakta hai
+    // (owner: "har ID se ho"). Rules: target khali ho, timer (occupied_since)
+    // chalta rahe, KOT dobara NAHI — kot_* columns untouched. Race-safe:
+    // lockForUpdate on order + BOTH tables, 409 if anything changed under us.
+    public function shiftTable(Request $request, $orderId)
+    {
+        $companyId = app('currentCompanyId');
+        if (!is_numeric($orderId) || $orderId < 1) {
+            return response()->json(['success' => false, 'message' => 'Invalid order ID'], 400);
+        }
+        $request->validate(['table_id' => 'required|integer|min:1']);
+        $targetTableId = (int) $request->input('table_id');
+
+        DB::beginTransaction();
+        try {
+            $order = RestaurantOrder::where('company_id', $companyId)
+                ->lockForUpdate()->find($orderId);
+            if (!$order) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Order nahi mila'], 404);
+            }
+            if ($order->status !== 'held') {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Order ab held nahi — shift possible nahi'], 409);
+            }
+            if ((int) $order->table_id === $targetTableId) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Order isi table par hai'], 422);
+            }
+
+            $target = RestaurantTable::where('company_id', $companyId)
+                ->where('is_active', true)
+                ->lockForUpdate()->find($targetTableId);
+            if (!$target) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Table nahi mila'], 404);
+            }
+            // Sirf KHALI table par shift (owner rule). Reserved/occupied = block.
+            // Defense-in-depth: koi active order us table par parked na ho.
+            $targetBusy = RestaurantOrder::where('company_id', $companyId)
+                ->where('table_id', $target->id)
+                ->whereIn('status', ['held', 'preparing', 'ready'])
+                ->exists();
+            if ($target->status !== 'available' || $targetBusy) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'T-' . $target->table_number . ' khali nahi hai'], 409);
+            }
+
+            $oldTableId = $order->table_id;
+            $oldTable = $oldTableId
+                ? RestaurantTable::where('company_id', $companyId)->lockForUpdate()->find($oldTableId)
+                : null;
+
+            // Timer continue: purane table ka occupied_since carry karo
+            // (fallback order creation time — bina-table held order shift case).
+            $since = ($oldTable && $oldTable->occupied_since) ? $oldTable->occupied_since : $order->created_at;
+
+            RestaurantTable::where('company_id', $companyId)->where('id', $target->id)->update([
+                'status' => 'occupied',
+                'locked_by_user_id' => null,
+                'locked_at' => null,
+                'occupied_since' => $since,
+            ]);
+
+            $order->table_id = $target->id;
+            $order->save();
+
+            // Purana table free — magar sirf tab jab koi AUR active order us par na ho.
+            if ($oldTableId) {
+                $stillActive = RestaurantOrder::where('company_id', $companyId)
+                    ->where('table_id', $oldTableId)
+                    ->whereIn('status', ['held', 'preparing', 'ready'])
+                    ->exists();
+                if (!$stillActive) {
+                    RestaurantTable::where('company_id', $companyId)->where('id', $oldTableId)
+                        ->update(['status' => 'available', 'locked_by_user_id' => null, 'locked_at' => null, 'occupied_since' => null]);
+                }
+            }
+
+            try {
+                if (class_exists(AuditLogService::class)) {
+                    AuditLogService::log(
+                        'order_table_shifted',
+                        'restaurant_order',
+                        $order->id,
+                        ['table_id' => $oldTableId, 'table_number' => $oldTable?->table_number],
+                        ['table_id' => $target->id, 'table_number' => $target->table_number, 'order_number' => $order->order_number],
+                        $companyId,
+                        Auth::guard('pos')->id()
+                    );
+                }
+            } catch (\Exception $auditEx) {
+            }
+
+            DB::commit();
+            return response()->json([
+                'success' => true,
+                'message' => 'Order T-' . $target->table_number . ' par shift ho gaya',
+                'table' => ['id' => $target->id, 'table_number' => $target->table_number],
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $ve) {
+            DB::rollBack();
+            throw $ve;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Table shift failed: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Shift nahi hua — dobara koshish karein'], 500);
+        }
+    }
+
     public function payOrder(Request $request, $orderId)
     {
         $companyId = app('currentCompanyId');

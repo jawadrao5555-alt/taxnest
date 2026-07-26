@@ -204,11 +204,40 @@
                         <div class="mt-1.5 text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
                             <template x-for="(it, ix) in o.items" :key="ix"><span><span x-text="it.quantity + '× ' + it.name"></span><span x-show="ix < o.items.length - 1"> · </span></span></template>
                         </div>
-                        <div class="mt-2.5">
+                        <div class="mt-2.5 flex items-center gap-2">
                             <button @click="startAppend(o)" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition">Add Items</button>
+                            {{-- Table Shift (owner batch, 26 Jul 2026): sirf dine-in
+                                 orders (table wale); khali table par hi jayega. --}}
+                            <button x-show="o.table_id" @click="startShift(o)" class="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-teal-300 dark:border-teal-700 text-teal-700 dark:text-teal-300 hover:bg-teal-50 text-xs font-bold transition">&#8644; Table Badlein</button>
                         </div>
                     </div>
                 </template>
+            </div>
+        </div>
+    </div>
+
+    {{-- ── Table Shift modal (owner batch, 26 Jul 2026) ───────────────────────
+         Waiter apna held dine-in order KHALI table par shift kare. Timer
+         continue, KOT dobara nahi. Race-safe server-side. --}}
+    <div x-show="shiftFor" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/60" @click="if (!shiftBusy) shiftFor = null"></div>
+        <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-xl max-h-[80vh] flex flex-col overflow-hidden">
+            <div class="px-5 py-4 bg-teal-600 flex items-center justify-between">
+                <h3 class="text-white font-bold" x-text="shiftFor ? (shiftFor.order_number + ' — naya table chunein') : ''"></h3>
+                <button @click="shiftFor = null" :disabled="shiftBusy" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/25 text-white font-black">×</button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4">
+                <p class="text-[11px] text-gray-500 dark:text-gray-400 mb-3">Sirf KHALI tables — timer chalta rahega, KOT dobara nahi chalega.</p>
+                <div x-show="shiftTablesLoading" class="text-center py-8 text-sm text-gray-400">Loading…</div>
+                <div x-show="!shiftTablesLoading && shiftFreeTables().length === 0" class="text-center py-8 text-sm text-gray-400">Koi khali table nahi.</div>
+                <div class="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    <template x-for="t in shiftFreeTables()" :key="'shift' + t.id">
+                        <button @click="doShift(t)" :disabled="shiftBusy" class="rounded-xl border-2 p-3 text-center transition bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:border-emerald-500 disabled:opacity-40">
+                            <span class="block text-base font-black" x-text="'T-' + t.table_number"></span>
+                            <span class="block text-[10px] font-bold mt-0.5" x-text="t.floor + ' · ' + t.seats + ' seats'"></span>
+                        </button>
+                    </template>
+                </div>
             </div>
         </div>
     </div>
@@ -248,6 +277,9 @@ function waiterApp() {
         myOrdersLoading: false,
         appendOrderId: null,
         appendOrderNumber: '',
+        shiftFor: null,          // Table Shift (26 Jul 2026): order being shifted
+        shiftBusy: false,
+        shiftTablesLoading: false,
         toast: '',
         toastType: 'success',
         _toastTimer: null,
@@ -403,6 +435,43 @@ function waiterApp() {
             this.appendOrderId = null;
             this.appendOrderNumber = '';
             this.cart = [];
+        },
+
+        // ── Table Shift (owner batch, 26 Jul 2026) ──────────────────────────
+        async startShift(o) {
+            this.shiftFor = o;
+            this.showMyOrders = false;
+            this.shiftTablesLoading = true;
+            try {
+                const res = await fetch('/pos/waiter/api/tables', { headers: { 'Accept': 'application/json' } });
+                if (res.ok) this.tables = await res.json();
+            } catch (e) { /* silent — grid shows "koi khali table nahi" */ }
+            this.shiftTablesLoading = false;
+        },
+        shiftFreeTables() {
+            return this.tables.filter(t => t.status === 'available' && !(t.active_orders > 0) && !(this.shiftFor && Number(t.id) === Number(this.shiftFor.table_id)));
+        },
+        async doShift(t) {
+            if (this.shiftBusy || !this.shiftFor) return;
+            this.shiftBusy = true;
+            try {
+                const res = await fetch('/pos/waiter/orders/' + this.shiftFor.id + '/shift-table', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ table_id: t.id }),
+                });
+                const data = await res.json().catch(() => null);
+                if (data && data.success) {
+                    this.showToast(data.message || ('Order T-' + t.table_number + ' par shift ho gaya'), 'success');
+                    this.shiftFor = null;
+                    this.loadMyOrders();
+                } else {
+                    this.showToast((data && data.message) || 'Shift nahi hua', 'error');
+                }
+            } catch (e) {
+                this.showToast('Network error — try again.', 'error');
+            }
+            this.shiftBusy = false;
         },
 
         async send() {

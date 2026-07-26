@@ -269,6 +269,21 @@ class PosAuthController extends Controller
 
     public function logout(Request $request)
     {
+        // Staff Hazri (owner batch, 26 Jul 2026): logout par is user ki SAB
+        // khuli session rows band karo (multi-tab/stale rows bhi) — report
+        // mein "Logout" waqt sahi dikhe. Failure kabhi logout na roke.
+        try {
+            $u = Auth::guard('pos')->user();
+            if ($u) {
+                \Illuminate\Support\Facades\DB::table('pos_user_sessions')
+                    ->where('user_id', $u->id)
+                    ->whereNull('logout_at')
+                    ->update(['logout_at' => now(), 'last_activity_at' => now(), 'updated_at' => now()]);
+            }
+        } catch (\Throwable $e) {
+            // Table not migrated yet — ignore.
+        }
+
         Auth::guard('pos')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();

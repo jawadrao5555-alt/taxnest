@@ -298,6 +298,29 @@ class RestaurantWaiterController extends Controller
         });
     }
 
+    /**
+     * Table Shift (owner batch, 26 Jul 2026): waiter apna HELD order kisi
+     * KHALI table par shift kare. Ownership yahan verify hoti hai, phir
+     * poori race-safe logic RestaurantPosController::shiftTable ki hai
+     * (lockForUpdate, timer carry, KOT reprint NAHI) — ek hi source of truth.
+     */
+    public function shiftTable(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $user = auth('pos')->user();
+
+        $owns = RestaurantOrder::where('company_id', $companyId)
+            ->where('source', 'waiter')
+            ->where('created_by', $user->id)
+            ->where('id', $id)
+            ->exists();
+        if (!$owns) {
+            return response()->json(['success' => false, 'message' => 'Order nahi mila'], 404);
+        }
+
+        return app(RestaurantPosController::class)->shiftTable($request, $id);
+    }
+
     /** Cashier side — waiter orders waiting for payment (mine or unassigned; admins see all). */
     public function incomingOrders()
     {

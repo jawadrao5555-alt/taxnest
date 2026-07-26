@@ -7875,8 +7875,9 @@ class PosController extends Controller
         });
 
         $analytics = $this->buildDayCloseAnalytics($companyId, $report->report_date->toDateString(), $transactions, $company);
+        $hazri = $this->buildHazriRows($companyId, $report->report_date->toDateString());
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.day-close-pdf', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics'));
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.day-close-pdf', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri'));
         $pdf->setPaper('a4', 'portrait');
 
         return $pdf->download("Day-Close-{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf");
@@ -7912,7 +7913,117 @@ class PosController extends Controller
         });
 
         $analytics = $this->buildDayCloseAnalytics($companyId, $report->report_date->toDateString(), $transactions, $company);
+        $hazri = $this->buildHazriRows($companyId, $report->report_date->toDateString());
 
-        return view('pos.day-close-thermal', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics'));
+        return view('pos.day-close-thermal', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri'));
+    }
+
+    /**
+     * ═══ Staff Hazri (owner batch, 26 Jul 2026) ═══
+     * Attendance report page — ADMIN/MANAGER-ONLY (cashiers & confined roles
+     * kabhi staff ki hazri na dekhein). Data = pos_user_sessions (login/logout/
+     * last-seen) + us business day ke bills (min/max sale time per user).
+     */
+    public function hazriReport(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $user = auth('pos')->user();
+        if (!$user->isPosAdmin()) {
+            abort(403);
+        }
+        $company = Company::find($companyId);
+
+        $date = $request->get('date');
+        try {
+            $date = $date ? \Carbon\Carbon::parse($date)->toDateString() : \App\Services\PosBusinessDay::current($companyId);
+        } catch (\Throwable $e) {
+            $date = \App\Services\PosBusinessDay::current($companyId);
+        }
+
+        $rows = $this->buildHazriRows($companyId, $date);
+        // loadMissing = explicit load (lazy access is FATAL under preventLazyLoading).
+        $opening = \App\Models\PosDayOpening::forDate($companyId, $date)?->loadMissing('enteredBy');
+
+        return view('pos.reports-hazri', compact('company', 'date', 'rows', 'opening'));
+    }
+
+    /**
+     * Hazri rows for one BUSINESS day (6 AM → next 6 AM window, wahi rule jo
+     * PosBusinessDay/auto-dayclose ka hai). Ek row per staff member:
+     * pehla login, aakhri logout (ya last-seen jab logout kabhi dabaya hi
+     * nahi), session count, bills + pehli/aakhri sale. Table na ho (prod
+     * migrate pending) to khali array — report/day-close kabhi na toote.
+     */
+    private function buildHazriRows(int $companyId, string $date): array
+    {
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('pos_user_sessions')) {
+                return [];
+            }
+            $start = \Carbon\Carbon::parse($date, config('app.timezone'))->setTime(6, 0);
+            $end = $start->copy()->addDay();
+
+            $sessions = \App\Models\PosUserSession::where('company_id', $companyId)
+                ->where('login_at', '>=', $start)
+                ->where('login_at', '<', $end)
+                ->orderBy('login_at')
+                ->get()
+                ->groupBy('user_id');
+
+            // Bills of the SAME business day (historical truth — archived
+            // rows included, matches the day-close data set).
+            $bills = PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->where('business_date', $date)
+                ->selectRaw('created_by, COUNT(*) as bill_count, MIN(created_at) as first_sale, MAX(created_at) as last_sale, SUM(total_amount) as revenue')
+                ->groupBy('created_by')
+                ->get()
+                ->keyBy('created_by');
+
+            $userIds = $sessions->keys()->merge($bills->keys())->unique()->filter()->values();
+            if ($userIds->isEmpty()) {
+                return [];
+            }
+            $users = User::where('company_id', $companyId)->whereIn('id', $userIds)->get()->keyBy('id');
+
+            $rows = [];
+            foreach ($userIds as $uid) {
+                $u = $users->get($uid);
+                if (!$u) {
+                    continue; // deleted/foreign user — skip silently
+                }
+                $s = $sessions->get($uid, collect());
+                $b = $bills->get($uid);
+                $openSession = $s->firstWhere('logout_at', null);
+                $lastSeen = $s->map(fn ($x) => $x->last_activity_at ?? $x->logout_at ?? $x->login_at)->filter()->max();
+                $rows[] = (object) [
+                    'user_id' => $uid,
+                    'name' => $u->name,
+                    'pos_role' => $u->pos_role ?: ($u->role === 'company_admin' ? 'pos_admin' : null),
+                    'first_in' => $s->min('login_at'),
+                    'last_out' => $openSession ? null : $s->map(fn ($x) => $x->logout_at)->filter()->max(),
+                    'last_seen' => $lastSeen,
+                    'still_open' => (bool) $openSession,
+                    'session_count' => $s->count(),
+                    'bill_count' => $b ? (int) $b->bill_count : 0,
+                    'revenue' => $b ? (float) $b->revenue : 0.0,
+                    'first_sale' => $b?->first_sale,
+                    'last_sale' => $b?->last_sale,
+                ];
+            }
+
+            // Pehle jo pehle aaya (first_in), bina-login (sirf bills) sab se aakhir.
+            usort($rows, function ($a, $b) {
+                if ($a->first_in && $b->first_in) return $a->first_in <=> $b->first_in;
+                if ($a->first_in) return -1;
+                if ($b->first_in) return 1;
+                return strcmp($a->name, $b->name);
+            });
+
+            return $rows;
+        } catch (\Throwable $e) {
+            \Log::warning('hazri rows failed: ' . $e->getMessage());
+            return [];
+        }
     }
 }

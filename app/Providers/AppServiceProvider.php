@@ -103,6 +103,30 @@ class AppServiceProvider extends ServiceProvider
                 // Column not migrated yet or DB hiccup — never block a login.
                 Log::warning('last_login stamp failed: ' . $e->getMessage());
             }
+
+            // Staff Hazri (owner batch, 26 Jul 2026): every REAL pos-guard login
+            // writes one attendance row. Impersonation (admin session active)
+            // is excluded — SaaS admin ka "View as" kabhi hazri na banaye.
+            // Direct DB insert: no model events; failure NEVER blocks a login.
+            try {
+                if (($event->guard ?? null) === 'pos'
+                    && $event->user instanceof \App\Models\User
+                    && $event->user->company_id
+                    && !\Illuminate\Support\Facades\Auth::guard('admin')->check()) {
+                    DB::table('pos_user_sessions')->insert([
+                        'company_id' => $event->user->company_id,
+                        'user_id' => $event->user->id,
+                        'login_at' => now(),
+                        'last_activity_at' => now(),
+                        'ip' => request()->ip(),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                // Table not migrated yet — never block a login.
+                Log::warning('hazri login row failed: ' . $e->getMessage());
+            }
         });
 
         if (app()->environment('production')) {

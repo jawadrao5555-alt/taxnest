@@ -62,7 +62,7 @@ Sale screen ki mazeed cheezein:
 - F10 = Local/Provisional bills ka modal. Modal ke andar: ↑↓ select, Enter = Make Final (promote), E = Edit (bill wapas sale screen par khulta hai), D = Delete (cashier nahi kar sakta), Esc = band.
 - F11 = Failed/offline PRA bills ka modal — Edit & Retry yahin se (bill wapas cart mein aata hai, theek kar ke dobara bhejein).
 - Alt+R = Reprint modal (aaj ke bills ki list, click ya Enter = print).
-- Alt+1 = CASH one-tap (pay modal Cash chuna hua khulta hai); Alt+2 = CARD one-tap — confirm phir bhi cashier hi karta hai, bill khud final nahi hota.
+- Alt+1 = CASH one-tap, Alt+2 = CARD one-tap — bill SEEDHA final ho jata hai (koi dobara popup nahi); tax apki tax setting se khud lagta hai (Cash/Card ka apna apna rate). Method chunna ho ya bill note likhni ho to bara PAY (F8) button dabayen — us par Pay window khulti hai.
 - Alt+P = customer phone box par focus.
 - Ctrl+S = search par focus.
 - Cart mode mein: ↑↓ = row select, + / - = quantity, Delete/Backspace = item hatao.
@@ -256,7 +256,7 @@ Sale screen ki mazeed cheezein:
 - "Switches" dropdown (top bar) mein 3 quick toggles: PRA Reporting (cashier ke liye sirf status — badalna admin ka kaam), Auto-Print, aur Auto-KOT.
 - "Akhri Bills" patti: products ke neeche aaj ke aakhri bills ke chips (desktop par) — ek click par receipt dobara print.
 - Bada TOTAL band: cart ke neeche numaya solid band mein grand total — door se parhna asaan.
-- One-tap CASH / CARD buttons (ya Alt+1 / Alt+2): payment method pehle se chuna hua Pay window khulti hai — bill khud-ba-khud final NAHI hota, confirm cashier hi karta hai.
+- One-tap CASH / CARD buttons (ya Alt+1 / Alt+2, 26 Jul 2026 se): ek dabane par bill SEEDHA final ho jata hai — koi dobara popup nahi. Tax apki tax setting se khud lagta hai (Cash aur Card ka apna apna rate, button par total pehle hi sahi dikhta hai). Method baad mein chunna ho ya bill note likhni ho to bara PAY (F8) button — us par Pay window khulti hai.
 - Card Bachat mode mein CARD ka kam total pehle hi button par dikh jata hai.
 - Customer box aur search ab 2 qataron mein: customer box bara, search poori chorai.
 - Saaf cart rows (26 Jul 2026): har item ki qatar mein ab sirf quantity, total aur delete (bin) ka button hai — per-item TAX/Discount buttons aur per-item note ka box hata diya gaya hai. Discount ab sirf bill-level hai (cart ke neeche % Discount button ya D key) aur note payment window mein. Agar kisi purane/recalled bill mein item discount, note ya NO TAX laga ho to wo chhote chips ki shakal mein item ke neeche dikh jata hai (sirf dekhne ke liye).

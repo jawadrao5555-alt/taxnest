@@ -1340,16 +1340,17 @@ window.addEventListener('popstate', function() {
                     </div>
                 </div>
                 <div class="px-3 pb-3 pt-2 space-y-2 mobile-sticky-pay">
-                    {{-- Jul 2026 redesign: ONE-TAP method buttons — preselect the method and
-                         open the SAME Pay modal (NEVER instant-finalize; Enter confirms).
-                         payPreselect is consumed by the modal's x-effect (which otherwise
-                         resets payMethodIndex to 0 on every open). --}}
+                    {{-- ONE-TAP method buttons (owner, 26 Jul 2026): CASH/CARD finalize the
+                         bill DIRECTLY with that method — tax rate auto-follows the company's
+                         tax module (taxRules/pricing mode), no second 8%/16% choice popup.
+                         The PAY (F8) button below keeps the Pay modal (method choice + note).
+                         Failures surface via showToast (modal-independent). --}}
                     <div class="grid grid-cols-2 gap-2">
-                        <button @click="payPreselect = 0; showPayModal = true" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
+                        <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 0; processPayment('cash')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
                             <span class="flex items-center gap-1.5 text-xs font-extrabold leading-none"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>CASH</span>
                             <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(cartTotalForMethod('cash')).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+1</kbd></span>
                         </button>
-                        <button @click="payPreselect = 1; showPayModal = true" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-gray-700 hover:bg-gray-800 dark:bg-gray-600 dark:hover:bg-gray-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
+                        <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 1; processPayment('card')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-gray-700 hover:bg-gray-800 dark:bg-gray-600 dark:hover:bg-gray-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
                             <span class="flex items-center gap-1.5 text-xs font-extrabold leading-none"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>CARD</span>
                             <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(cartTotalForMethod('card')).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+2</kbd></span>
                         </button>
@@ -4737,16 +4738,19 @@ function restaurantPos() {
                 this.openReprint();
                 return;
             }
-            // Alt+1 / Alt+2 — ONE-TAP PAY (Jul 2026 redesign): open the Pay modal
-            // with CASH / CARD preselected. NEVER instant-finalizes — the cashier
-            // still confirms with Enter (or a click) inside the modal. Alt-chord
-            // so plain digits keep doing qty-typing / modal row-jumps.
+            // Alt+1 / Alt+2 — ONE-TAP PAY (owner, 26 Jul 2026): finalize DIRECTLY
+            // as CASH / CARD — tax auto-follows the company tax module, no second
+            // 8%/16% popup (same as the on-screen CASH/CARD buttons). PAY (F8)
+            // keeps the modal. Alt-chord so plain digits keep qty-typing.
             if (e.altKey && (e.code === 'Digit1' || e.code === 'Digit2' || e.key === '1' || e.key === '2')) {
                 e.preventDefault();
                 if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm) return;
                 if (this.cart.length === 0 || this.submitting) return;
-                this.payPreselect = (e.code === 'Digit2' || e.key === '2') ? 1 : 0;
-                this.showPayModal = true;
+                const oneTapCard = (e.code === 'Digit2' || e.key === '2');
+                this.payingHeldOrderId = null;
+                this.saveAsProvisional = false;
+                this.payMethodIndex = oneTapCard ? 1 : 0;
+                this.processPayment(oneTapCard ? 'card' : 'cash');
                 return;
             }
             // ═══════════════════════════════════════════════════════════════
@@ -6012,7 +6016,10 @@ function restaurantPos() {
             }
 
             const now = Date.now();
-            if (now - this.lastPayTime < 3000) return;
+            // Debounce toast (architect, 26 Jul 2026): one-tap CASH/CARD made this
+            // 3s guard easily reachable in fast shops — a SILENT return looked like
+            // a dead button. Tell the cashier instead of ignoring the tap.
+            if (now - this.lastPayTime < 3000) { this.showToast('Thora ruk kar dobara dabayen — pichla bill abhi save hua hai', 'error'); return; }
             this.lastPayTime = now;
             this.submitting = true; this.stockError = '';
             try {
@@ -6067,7 +6074,8 @@ function restaurantPos() {
         // modal rendering.
         async processPaymentManual(method, provisional = false) {
             const now = Date.now();
-            if (now - this.lastPayTime < 3000) return;
+            // Same debounce toast as processPayment — one-tap must never look dead.
+            if (now - this.lastPayTime < 3000) { this.showToast('Thora ruk kar dobara dabayen — pichla bill abhi save hua hai', 'error'); return; }
             this.lastPayTime = now;
             this.submitting = true; this.stockError = '';
             const savedTotal = this.totalAmount;

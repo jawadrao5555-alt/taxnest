@@ -15,6 +15,7 @@ class PosTransaction extends Model
         'cash_received', 'change_due',
         'status', 'locked_by_terminal_id', 'lock_time',
         'pra_invoice_number', 'pra_response_code', 'pra_status', 'submission_hash', 'pra_qr_code', 'created_by',
+        'business_date',
         'offline_uuid',
         'share_token', 'share_token_created_at',
         'receipt_printed_at', 'reprint_count',
@@ -37,6 +38,27 @@ class PosTransaction extends Model
                 $q->where(function ($w) {
                     $w->where('is_archived', false)->orWhereNull('is_archived');
                 });
+            }
+        });
+
+        // Business-day stamp (owner rule 26 Jul 2026): set ONCE at creation, on
+        // EVERY create path (sale, draft, restaurant settle, offline sync).
+        // 00:00–05:59 bills belong to the previous day's business while that
+        // day is still un-closed (PosBusinessDay). Seeded/synced rows with an
+        // explicit created_at are bucketed by that timestamp, not by "now".
+        static::creating(function (self $t) {
+            try {
+                if ($t->business_date === null
+                    && $t->company_id
+                    && \Schema::hasColumn('pos_transactions', 'business_date')) {
+                    $at = $t->created_at
+                        ? \Illuminate\Support\Carbon::parse($t->created_at)
+                        : now();
+                    $t->business_date = \App\Services\PosBusinessDay::forMoment((int) $t->company_id, $at);
+                }
+            } catch (\Throwable $e) {
+                // Stamping must never block a sale — the migration backfill
+                // repairs any missing stamps.
             }
         });
     }

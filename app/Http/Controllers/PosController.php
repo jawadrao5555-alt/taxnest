@@ -552,7 +552,11 @@ class PosController extends Controller
             return redirect()->route('pos.features', ['welcome' => 1]);
         }
 
-        $today = now()->startOfDay();
+        // Business day (owner rule 26 Jul 2026): dashboard "today" = the OPEN
+        // trading day — after midnight (before 6 AM) with yesterday un-closed,
+        // "aaj" is still yesterday's business day. All day-bucket KPIs read
+        // business_date; created_at stays for timestamps/PRA truth.
+        $bizToday = \App\Services\PosBusinessDay::current($companyId);
 
         // Local (non-PRA) bills are excluded from ALL dashboard KPIs — they are
         // visible only in the isolated Local Bills Portal (pos_role='local_viewer').
@@ -565,14 +569,14 @@ class PosController extends Controller
 
         $todayStats = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
-            ->where('created_at', '>=', $today)
+            ->where('business_date', $bizToday)
             ->where($excludeLocal)
             ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue, COALESCE(AVG(total_amount),0) as avg_ticket')
             ->first();
 
         $monthStats = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
-            ->where('created_at', '>=', now()->startOfMonth())
+            ->where('business_date', '>=', now()->startOfMonth()->toDateString())
             ->where($excludeLocal)
             ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue')
             ->first();
@@ -582,9 +586,9 @@ class PosController extends Controller
         $period = in_array($request->query('period'), ['today', 'week', 'month'], true)
             ? $request->query('period') : 'today';
         $periodStart = match ($period) {
-            'week'  => now()->startOfWeek(),
-            'month' => now()->startOfMonth(),
-            default => now()->startOfDay(),
+            'week'  => now()->startOfWeek()->toDateString(),
+            'month' => now()->startOfMonth()->toDateString(),
+            default => $bizToday,
         };
 
         // Cost / profit aggregation: JOIN items → products to read cost_price.
@@ -597,7 +601,7 @@ class PosController extends Controller
             })
             ->where('t.company_id', $companyId)
             ->where('t.status', 'completed')
-            ->where('t.created_at', '>=', $periodStart)
+            ->where('t.business_date', '>=', $periodStart)
             ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
             ->where($excludeLocalRaw)
             ->selectRaw('
@@ -607,7 +611,7 @@ class PosController extends Controller
 
         $periodOrders = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
-            ->where('created_at', '>=', $periodStart)
+            ->where('business_date', '>=', $periodStart)
             ->where($excludeLocal)
             ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue')
             ->first();
@@ -631,7 +635,7 @@ class PosController extends Controller
             ->join('pos_transaction_items as i', 'i.transaction_id', '=', 't.id')
             ->where('t.company_id', $companyId)
             ->where('t.status', 'completed')
-            ->where('t.created_at', '>=', $periodStart)
+            ->where('t.business_date', '>=', $periodStart)
             ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
             ->where($excludeLocalRaw)
             ->where('i.item_type', 'product')
@@ -647,7 +651,7 @@ class PosController extends Controller
             ->join('pos_products as p', 'p.id', '=', 'i.item_id')
             ->where('t.company_id', $companyId)
             ->where('t.status', 'completed')
-            ->where('t.created_at', '>=', $periodStart)
+            ->where('t.business_date', '>=', $periodStart)
             ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
             ->where($excludeLocalRaw)
             ->where('i.item_type', 'product')
@@ -691,7 +695,7 @@ class PosController extends Controller
 
         $paymentBreakdown = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
-            ->where('created_at', '>=', $today)
+            ->where('business_date', $bizToday)
             ->where($excludeLocal)
             ->selectRaw("payment_method, COUNT(*) as count, COALESCE(SUM(total_amount),0) as total")
             ->groupBy('payment_method')
@@ -723,13 +727,12 @@ class PosController extends Controller
         if ($dashboardStyle === 'saaf') {
             $yesterdayRevenue = (float) PosTransaction::where('company_id', $companyId)
                 ->where('status', 'completed')
-                ->where('created_at', '>=', $today->copy()->subDay())
-                ->where('created_at', '<', $today)
+                ->where('business_date', \Carbon\Carbon::parse($bizToday)->subDay()->toDateString())
                 ->where($excludeLocal)
                 ->sum('total_amount');
             $praSyncedToday = PosTransaction::where('company_id', $companyId)
                 ->where('status', 'completed')
-                ->where('created_at', '>=', $today)
+                ->where('business_date', $bizToday)
                 ->where($excludeLocal)
                 ->where('pra_status', 'submitted')
                 ->count();
@@ -2493,7 +2496,7 @@ class PosController extends Controller
                       ->orWhere('invoice_mode', 'local');
                 }
             })
-            ->whereDate('created_at', now()->toDateString())
+            ->where('business_date', \App\Services\PosBusinessDay::current($companyId))
             ->orderBy('id', 'desc')
             ->limit(300)
             ->get(['id', 'invoice_number', 'pra_invoice_number', 'customer_name', 'total_amount', 'payment_method', 'order_type', 'invoice_mode', 'pra_status', 'created_at']);
@@ -3347,25 +3350,28 @@ class PosController extends Controller
             $this->applyReportFilters($q, $tab, $cashierFilter);
         };
 
+        // Sales reports group by BUSINESS day (owner rule 26 Jul 2026): an
+        // after-midnight bill counts toward the previous day's business.
+        // Tax reports (buildTaxReportQuery) stay on created_at — PRA legal truth.
         $dailySales = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
-            ->where('created_at', '>=', now()->subDays(30))
+            ->where('business_date', '>=', now()->subDays(30)->toDateString())
             ->tap($modeFilter)
-            ->selectRaw("DATE(created_at) as date, COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue")
-            ->groupByRaw('DATE(created_at)')
+            ->selectRaw("business_date as date, COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue")
+            ->groupBy('business_date')
             ->orderBy('date', 'desc')
             ->get();
 
         $paymentSummary = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
-            ->where('created_at', '>=', now()->startOfMonth())
+            ->where('business_date', '>=', now()->startOfMonth()->toDateString())
             ->tap($modeFilter)
             ->selectRaw("payment_method, COUNT(*) as count, COALESCE(SUM(total_amount),0) as total, COALESCE(SUM(tax_amount),0) as tax")
             ->groupBy('payment_method')
             ->get();
 
         $topItems = PosTransactionItem::whereHas('transaction', function ($q) use ($companyId, $tab, $cashierFilter) {
-            $q->where('company_id', $companyId)->where('status', 'completed')->where('created_at', '>=', now()->startOfMonth());
+            $q->where('company_id', $companyId)->where('status', 'completed')->where('business_date', '>=', now()->startOfMonth()->toDateString());
             $this->applyReportFilters($q, $tab, $cashierFilter);
         })
             ->selectRaw("item_name, SUM(quantity) as total_qty, SUM(subtotal) as total_revenue")
@@ -3376,10 +3382,10 @@ class PosController extends Controller
 
         $monthlyTrend = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
-            ->where('created_at', '>=', now()->subMonths(6)->startOfMonth())
+            ->where('business_date', '>=', now()->subMonths(6)->startOfMonth()->toDateString())
             ->tap($modeFilter)
-            ->selectRaw(\App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM') . " as month, COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue")
-            ->groupByRaw(\App\Helpers\DbCompat::dateFormat('created_at', 'YYYY-MM'))
+            ->selectRaw(\App\Helpers\DbCompat::dateFormat('business_date', 'YYYY-MM') . " as month, COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue")
+            ->groupByRaw(\App\Helpers\DbCompat::dateFormat('business_date', 'YYYY-MM'))
             ->orderBy('month')
             ->get();
 
@@ -3466,8 +3472,8 @@ class PosController extends Controller
         $transactions = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
             ->when($hasRange,
-                fn ($q) => $q->whereBetween('created_at', [$rangeFrom, $rangeTo]),
-                fn ($q) => $q->where('created_at', '>=', now()->subDays(30)))
+                fn ($q) => $q->whereBetween('business_date', [$rangeFrom->toDateString(), $rangeTo->toDateString()]),
+                fn ($q) => $q->where('business_date', '>=', now()->subDays(30)->toDateString()))
             ->tap(fn ($q) => $this->applyReportFilters($q, $tab))
             ->when($cashierFilter && $cashierFilter !== 'all', fn($q) => $q->where('created_by', $cashierFilter))
             ->with('creator')
@@ -6838,7 +6844,9 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
-        $date = $request->get('date', today()->format('Y-m-d'));
+        // Default = the OPEN trading day (business day): after midnight, before
+        // 6 AM, with yesterday still un-closed, the page must land on yesterday.
+        $date = $request->get('date', \App\Services\PosBusinessDay::current($companyId));
 
         $existingReport = PosDayCloseReport::where('company_id', $companyId)
             ->where('report_date', $date)
@@ -6847,7 +6855,7 @@ class PosController extends Controller
         // Local (non-PRA) bills are excluded from the day-close view & figures —
         // visible only in the isolated Local Bills Portal (pos_role='local_viewer').
         $transactions = PosTransaction::where('company_id', $companyId)
-            ->whereDate('created_at', $date)
+            ->where('business_date', $date)
             ->where(function ($q) {
                 $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
             })
@@ -6894,32 +6902,34 @@ class PosController extends Controller
         // (un-archived + no fiscal number; hide_archived global scope already
         // filters archived rows).
         $pendingBase = fn () => PosTransaction::where('company_id', $companyId)
-            ->whereDate('created_at', '<=', $date)
+            ->where('business_date', '<=', $date)
             ->whereNull('pra_invoice_number');
         $pendingProv = $pendingBase()
             ->where('invoice_mode', 'local')
             ->where('pra_status', 'local')
-            // Draft guard mirrors the wash: earlier-day draft carts survive the
-            // backlog sweep, so keep them out of the preview too.
+            // Draft guard mirrors the wash and stays on CALENDAR created_at:
+            // an after-midnight draft (cashier mid-sale at 00:30) must survive
+            // yesterday's 01:30 close — its business_date equals the close date,
+            // but its calendar date does not.
             ->where(function ($q) use ($date) {
                 $q->whereDate('created_at', $date)
                     ->orWhere('status', '!=', 'draft');
             })
-            ->get(['id', 'created_at', 'total_amount']);
+            ->get(['id', 'created_at', 'business_date', 'total_amount']);
         $pendingFinal = $pendingBase()
             ->where('status', 'completed')
             ->where(function ($q) {
                 $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
             })
             ->whereNull('pra_status')
-            ->get(['id', 'created_at', 'total_amount']);
+            ->get(['id', 'created_at', 'business_date', 'total_amount']);
         $localWash = (object) [
             'prov_count' => $pendingProv->count(),
             'prov_amount' => (float) $pendingProv->sum('total_amount'),
-            'prov_backlog' => $pendingProv->filter(fn ($t) => $t->created_at && $t->created_at->toDateString() < $date)->count(),
+            'prov_backlog' => $pendingProv->filter(fn ($t) => $t->business_date && $t->business_date < $date)->count(),
             'final_count' => $pendingFinal->count(),
             'final_amount' => (float) $pendingFinal->sum('total_amount'),
-            'final_backlog' => $pendingFinal->filter(fn ($t) => $t->created_at && $t->created_at->toDateString() < $date)->count(),
+            'final_backlog' => $pendingFinal->filter(fn ($t) => $t->business_date && $t->business_date < $date)->count(),
         ];
 
         $analytics = $this->buildDayCloseAnalytics($companyId, $date, $transactions, $company);
@@ -6940,7 +6950,8 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $user = \Illuminate\Support\Facades\Auth::guard('pos')->user();
-        $date = $request->input('date', today()->format('Y-m-d'));
+        // Default = the OPEN trading day (business day) — same rule as the page.
+        $date = $request->input('date', \App\Services\PosBusinessDay::current($companyId));
 
         // Local-bill wash at day-close now follows the STANDING company policy set by
         // an admin in Customize POS → Local Billing (save=archive | delete, per bill
@@ -7115,7 +7126,7 @@ class PosController extends Controller
         $compareFor = function (string $cmpDate) use ($companyId) {
             $row = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
-                ->whereDate('created_at', $cmpDate)
+                ->where('business_date', $cmpDate)
                 ->where(function ($q) {
                     $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
                 })
@@ -7176,8 +7187,8 @@ class PosController extends Controller
         $transactions = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
             ->tap(fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter))
-            ->whereBetween('created_at', [$from, $to])
-            ->get(['id', 'created_at', 'created_by', 'customer_id', 'customer_name', 'customer_phone', 'subtotal', 'total_amount', 'tax_amount', 'discount_amount', 'payment_method']);
+            ->whereBetween('business_date', [$from->toDateString(), $to->toDateString()])
+            ->get(['id', 'created_at', 'business_date', 'created_by', 'customer_id', 'customer_name', 'customer_phone', 'subtotal', 'total_amount', 'tax_amount', 'discount_amount', 'payment_method']);
 
         $ids = $transactions->pluck('id')->all();
         $items = empty($ids) ? collect() : \App\Models\PosTransactionItem::whereIn('transaction_id', $ids)
@@ -7253,7 +7264,7 @@ class PosController extends Controller
             $cursor->addDay();
         }
         foreach ($transactions as $t) {
-            $d = $t->created_at?->toDateString();
+            $d = $t->business_date ?: $t->created_at?->toDateString();
             if ($d !== null && isset($daily[$d])) {
                 $daily[$d]->count++;
                 $daily[$d]->revenue += (float) $t->total_amount;
@@ -7339,7 +7350,7 @@ class PosController extends Controller
         $prevRow = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
             ->tap(fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter))
-            ->whereBetween('created_at', [$prevFrom, $prevTo])
+            ->whereBetween('business_date', [$prevFrom->toDateString(), $prevTo->toDateString()])
             ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as revenue, COALESCE(SUM(tax_amount),0) as tax')
             ->first();
         $pct = function (float $prev, float $cur): ?float {
@@ -7457,17 +7468,20 @@ class PosController extends Controller
 
             $dayBills = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
-                ->whereDate('created_at', $date)
+                ->where('business_date', $date)
                 ->whereNotNull('rider_id')
                 ->get();
 
+            // rider_settled_at stays on the REAL calendar date (settlement
+            // timestamps carry no business date) — known v1 limitation: a 1 AM
+            // settlement counts toward the calendar day, not the open trading day.
             $cashIn = (float) PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->whereNotNull('rider_id')
                 ->where('payment_method', 'cash')
                 ->whereNotNull('rider_settlement_id')
                 ->whereDate('rider_settled_at', $date)
-                ->whereDate('created_at', '<', $date)
+                ->where('business_date', '<', $date)
                 ->where(function ($q) {
                     $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
                 })
@@ -7521,7 +7535,7 @@ class PosController extends Controller
         // visible only in the isolated Local Bills Portal. The purge/archive query
         // below still targets them so day-close archiving keeps working.
         $transactions = PosTransaction::where('company_id', $companyId)
-            ->whereDate('created_at', $date)
+            ->where('business_date', $date)
             ->where(function ($q) {
                 $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
             })
@@ -7535,14 +7549,15 @@ class PosController extends Controller
         // below: both kinds, un-archived, no fiscal number.
         $hasLocalBills = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
-            ->whereDate('created_at', '<=', $date)
+            ->where('business_date', '<=', $date)
             ->whereNull('pra_invoice_number')
             ->where('is_archived', false)
             ->where(function ($q) use ($date) {
                 $q->where(function ($qq) use ($date) {
                     $qq->where('invoice_mode', 'local')->where('pra_status', 'local')
-                        // Draft guard mirrors the wash: backlog counts only
-                        // non-draft provisionals; close-date drafts still wash.
+                        // Draft guard mirrors the wash (CALENDAR created_at —
+                        // see wash note): backlog counts only non-draft
+                        // provisionals; close-date drafts still wash.
                         ->where(function ($d) use ($date) {
                             $d->whereDate('created_at', $date)
                                 ->orWhere('status', '!=', 'draft');
@@ -7662,7 +7677,7 @@ class PosController extends Controller
             $baseQuery = function () use ($companyId, $date) {
                 return PosTransaction::withoutGlobalScope('hide_archived')
                     ->where('company_id', $companyId)
-                    ->whereDate('created_at', '<=', $date)
+                    ->where('business_date', '<=', $date)
                     ->whereNull('pra_invoice_number')
                     ->where('is_archived', false);
             };
@@ -7673,10 +7688,15 @@ class PosController extends Controller
                     'query' => $baseQuery()
                         ->where('invoice_mode', 'local')
                         ->where('pra_status', 'local')
-                        // DRAFT GUARD: the close DATE keeps its pre-existing full
-                        // wash (incl. that day's abandoned draft carts), but the
-                        // BACKLOG sweep takes only non-draft provisionals — a saved
-                        // draft cart from an earlier day stays resumable.
+                        // DRAFT GUARD (stays on CALENDAR created_at, NOT
+                        // business_date): an after-midnight draft (cashier
+                        // mid-sale at 00:30) carries yesterday's business_date —
+                        // switching this equality would wash the live cart during
+                        // yesterday's 01:30 close. The close DATE keeps its
+                        // pre-existing full wash (incl. that day's abandoned
+                        // draft carts); the BACKLOG sweep takes only non-draft
+                        // provisionals — a saved draft cart from an earlier day
+                        // stays resumable.
                         ->where(function ($q) use ($date) {
                             $q->whereDate('created_at', $date)
                                 ->orWhere('status', '!=', 'draft');
@@ -7709,7 +7729,7 @@ class PosController extends Controller
                     'action' => $set['action'],
                     'count' => $rows->count(),
                     'amount' => round((float) $rows->sum('total_amount'), 2),
-                    'backlog' => $rows->filter(fn ($t) => $t->created_at && $t->created_at->toDateString() < $date)->count(),
+                    'backlog' => $rows->filter(fn ($t) => $t->business_date && $t->business_date < $date)->count(),
                 ];
                 if ($rows->isEmpty()) {
                     continue;
@@ -7774,8 +7794,13 @@ class PosController extends Controller
                     $deletedCount += $kindDeleted;
                     // Quota add-back counts ONLY report-month bills (see note above):
                     // backlog from earlier months is deleted but not re-counted.
+                    // Filter by BUSINESS date: an after-midnight final (created
+                    // Aug 1 00:30, business_date Jul 31) deleted during Jul 31's
+                    // close must still be credited to July's quota — created_at
+                    // bounds would let it escape quota entirely.
                     $deletedByKind[$billKind] += $rows
-                        ->filter(fn ($t) => $t->created_at && $t->created_at->between($monthStart, $monthEnd))
+                        ->filter(fn ($t) => ($d = $t->business_date ?: $t->created_at?->toDateString())
+                            && $d >= $monthStart->toDateString() && $d <= $monthEnd->toDateString())
                         ->count();
                 } else {
                     $archivedCount += PosTransaction::withoutGlobalScope('hide_archived')
@@ -7833,7 +7858,7 @@ class PosController extends Controller
         // Local (non-PRA) bills excluded — visible only in the Local Bills Portal.
         $transactions = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
-            ->whereDate('created_at', $report->report_date)
+            ->where('business_date', $report->report_date->toDateString())
             ->where(function ($q) {
                 $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
             })
@@ -7870,7 +7895,7 @@ class PosController extends Controller
 
         $transactions = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
-            ->whereDate('created_at', $report->report_date)
+            ->where('business_date', $report->report_date->toDateString())
             ->where(function ($q) {
                 $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
             })

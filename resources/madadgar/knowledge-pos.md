@@ -11,6 +11,7 @@ Yeh NestPOS ka mukammal guide hai. Sirf is guide ki maloomat se jawab do. Jawab 
 - Apna profile badalna: /pos/my-profile — Full Name, Email, Phone, Username, aur password change (Current Password + New Password + Confirm).
 
 ## Dashboard (/pos/dashboard)
+- "Aaj" ke figures Business Day ke hisaab se hain: raat 12 ke baad (subah 6 tak, jab tak din close na ho) ki sales pichle din mein ginti hain — dukan raat der tak khuli ho to raat ki sales usi din ke totals mein rehti hain.
 - Dashboard par KPI cards (aaj ki sales, bills, tax, net sales), hourly chart, 30 din ka trend, payment method ka breakdown aur aaj ke recent bills hote hain.
 - Cashier ko sirf apne stats nazar aate hain; admin/manager ko poori company ke.
 - Din ke shuru mein "Opening Cash" card par drawer ka cash + note enter kar ke Save karein (tafseel Day Close section mein).
@@ -124,6 +125,7 @@ Sale screen ki mazeed cheezein:
 - Z-report/day-close page mein kya kya hota hai: Total Invoices (PRA/Local/Offline ka split), Gross Sales, Total Tax, Net Revenue, payment breakdown (Cash/Card/Other), CASHIER-wise breakdown table, din ke pehle-aakhri invoice numbers, PRA submission health (submitted vs failed/offline), hourly chart, top products, discount summary, cash reconciliation, rider summary. Pichle din/haftay se comparison bhi.
 - Z-report "Download PDF" (A4) aur "Thermal Z-Report" (80mm) dono par print hoti hai; purani closes bhi day-close page par "View" se dekhein.
 - Cash reconciliation ka formula: expected cash = opening cash + cash sales − rider ko diya cash + rider se wapas aya cash.
+- **Business Day (Jul 2026 se): raat 12 baje ke BAAD ke bills bhi PICHLE din mein ginte hain** — jab tak din close na ho (subah 6 baje tak). Maslan raat 1 baje ki sale 25 tareekh ke Z-report/day-close, dashboard "Aaj" aur sales reports mein 25 ko hi ginegi, chahay calendar par 26 shuru ho chuki ho. Din close karne ke baad (ya subah 6 baje ke baad) nayi sale agle din mein jati hai. PRA/tax ko asal waqt hi report hota hai — qanooni record par koi farq nahi.
 
 ## Products (/pos/products)
 - Naya product: "+ Add Product" → form fields: Product Name (zaroori), Category, SKU, Description, Barcode, Price PKR (zaroori), Cost Price (profit report ke liye), Tax Rate % + "Tax Exempt" toggle, "Sale screen par dikhayein" toggle, Unit (NOS/KGS/LTR/MTR/PCS/PKT/BOX), Opening Stock, Low-Stock Alert At, aur Image (No Image / Upload / Auto-fetch).

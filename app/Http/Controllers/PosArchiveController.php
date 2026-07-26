@@ -33,11 +33,14 @@ class PosArchiveController extends Controller
                   ->orWhere('customer_phone', 'like', "%{$q}%");
             });
         }
+        // Business-day filters (owner rule 26 Jul 2026): the archive is where
+        // day-close-washed bills land, so its date filters must match the
+        // Z-report's business-day buckets or counts would disagree.
         if ($from = $request->input('from')) {
-            $query->whereDate('created_at', '>=', $from);
+            $query->where('business_date', '>=', $from);
         }
         if ($to = $request->input('to')) {
-            $query->whereDate('created_at', '<=', $to);
+            $query->where('business_date', '<=', $to);
         }
         if ($cashier = $request->input('cashier')) {
             $query->where('created_by', $cashier);
@@ -92,10 +95,10 @@ class PosArchiveController extends Controller
             ->where(function ($m) { $m->where('invoice_mode', 'pra')->orWhereNull('invoice_mode'); });
 
         if ($from = $request->input('from')) {
-            $query->whereDate('created_at', '>=', $from);
+            $query->where('business_date', '>=', $from);
         }
         if ($to = $request->input('to')) {
-            $query->whereDate('created_at', '<=', $to);
+            $query->where('business_date', '<=', $to);
         }
 
         $bills = $query->with('creator')->orderBy('archived_at', 'desc')->get();

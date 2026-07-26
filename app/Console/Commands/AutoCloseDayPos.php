@@ -50,10 +50,19 @@ class AutoCloseDayPos extends Command
             try {
                 // Prior un-closed trading days before the cutoff. Include archived
                 // rows so a day is still detected even if some bills were archived.
+                // Days are keyed by BUSINESS date (owner rule 26 Jul 2026): an
+                // after-midnight bill belongs to the previous trading day, so the
+                // auto-close must sweep by business_date or those bills would
+                // re-open an already-closed day. Falls back to DATE(created_at)
+                // until the migration lands on PROD.
+                $hasBizDate = Schema::hasColumn('pos_transactions', 'business_date');
                 $dates = PosTransaction::withoutGlobalScope('hide_archived')
                     ->where('company_id', $company->id)
-                    ->whereDate('created_at', '<', $graceCutoff)
-                    ->selectRaw('DATE(created_at) as d')
+                    ->when($hasBizDate,
+                        fn ($q) => $q->where('business_date', '<', $graceCutoff)
+                            ->selectRaw('business_date as d'),
+                        fn ($q) => $q->whereDate('created_at', '<', $graceCutoff)
+                            ->selectRaw('DATE(created_at) as d'))
                     ->groupBy('d')
                     ->pluck('d');
 

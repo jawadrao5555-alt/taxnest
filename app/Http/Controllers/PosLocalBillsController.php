@@ -37,21 +37,25 @@ class PosLocalBillsController extends Controller
                   ->orWhere('customer_phone', 'like', "%{$q}%");
             });
         }
+        // Date filters + "Aaj" stats follow the BUSINESS day (owner rule 26 Jul
+        // 2026): after-midnight bills (before 6 AM, day un-closed) belong to the
+        // previous trading day.
         if ($from = $request->input('from')) {
-            $query->whereDate('created_at', '>=', $from);
+            $query->where('business_date', '>=', $from);
         }
         if ($to = $request->input('to')) {
-            $query->whereDate('created_at', '<=', $to);
+            $query->where('business_date', '<=', $to);
         }
         if ($cashier = $request->input('cashier')) {
             $query->where('created_by', $cashier);
         }
 
+        $bizToday = \App\Services\PosBusinessDay::current($companyId);
         $stats = [
             'total' => (clone $query)->count(),
             'sum' => (clone $query)->sum('total_amount'),
-            'today' => $this->baseQuery($companyId)->whereDate('created_at', today())->count(),
-            'today_sum' => $this->baseQuery($companyId)->whereDate('created_at', today())->sum('total_amount'),
+            'today' => $this->baseQuery($companyId)->where('business_date', $bizToday)->count(),
+            'today_sum' => $this->baseQuery($companyId)->where('business_date', $bizToday)->sum('total_amount'),
         ];
 
         $bills = $query->with(['creator', 'items'])
@@ -84,10 +88,10 @@ class PosLocalBillsController extends Controller
         $query = $this->baseQuery($companyId);
 
         if ($from = $request->input('from')) {
-            $query->whereDate('created_at', '>=', $from);
+            $query->where('business_date', '>=', $from);
         }
         if ($to = $request->input('to')) {
-            $query->whereDate('created_at', '<=', $to);
+            $query->where('business_date', '<=', $to);
         }
 
         $bills = $query->with('creator')->orderBy('created_at', 'desc')->get();

@@ -3278,9 +3278,12 @@ function restaurantPos() {
         discountAmount: 0,
 
         get filteredCustomers() {
+            // PERF: cap rendered rows — big shops carry 10k+ customers and an uncapped
+            // x-for renders them ALL into the DOM at boot (20MB DOM, 15s splash on weak
+            // POS PCs). Search still scans the FULL list; only the visible rows are capped.
             const q = this.customerSearch.toLowerCase();
-            if (!q) return this.allCustomers;
-            return this.allCustomers.filter(c => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q)));
+            if (!q) return this.allCustomers.slice(0, 50);
+            return this.allCustomers.filter(c => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q))).slice(0, 50);
         },
 
         r2(v) { return Math.round((v + Number.EPSILON) * 100) / 100; },

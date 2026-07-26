@@ -90,19 +90,32 @@
         <noscript><link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700,800,900&display=swap" rel="stylesheet" /></noscript>
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         <script>
-            setTimeout(function(){
-                if(!window.Alpine && !window.__alpineStarted && !window.__alpineFallbackLoading){
-                    window.__alpineFallbackLoading=true;
-                    var c=document.createElement('script');
-                    c.src='https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.14.8/dist/cdn.min.js';
-                    document.head.appendChild(c);
-                    c.onload=function(){
-                        var s=document.createElement('script');
-                        s.src='https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js';
-                        document.head.appendChild(s);
-                    };
+            // Alpine CDN fallback (only if the Vite bundle failed). MUST arm AFTER
+            // DOMContentLoaded: module scripts always run before DCL, so post-DCL
+            // "no Alpine" is definitive. The old blind 1.5s timer fired MID-PARSE on
+            // slow POS PCs (big sale-screen HTML still streaming) — CDN Alpine then
+            // started before restaurantPos() was even defined → whole screen error
+            // flood + stuck splash + a SECOND Alpine boot when the bundle arrived.
+            (function(){
+                function tnAlpineFallback(){
+                    setTimeout(function(){
+                        if(!window.Alpine && !window.__alpineStarted && !window.__alpineFallbackLoading){
+                            window.__alpineFallbackLoading=true;
+                            window.__alpineStarted=true; // block a late bundle from double-starting
+                            var c=document.createElement('script');
+                            c.src='https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.14.8/dist/cdn.min.js';
+                            document.head.appendChild(c);
+                            c.onload=function(){
+                                var s=document.createElement('script');
+                                s.src='https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js';
+                                document.head.appendChild(s);
+                            };
+                        }
+                    }, 500);
                 }
-            }, 1500);
+                if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', tnAlpineFallback); }
+                else { tnAlpineFallback(); }
+            })();
         </script>
         {{-- Self-hosted Chart.js (perf, Jul 2026): third-party CDN cost an extra
              DNS+TLS connection on every fresh load; .htaccess caches /vendor 30d. --}}

@@ -1394,6 +1394,48 @@ window.addEventListener('popstate', function() {
                     </div>
                 </div>
             </div>
+
+            @if($features->tables ?? false)
+            {{-- ═══ TABLE BOARD (customer request ×3, owner-approved Jul 2026) ═══
+                 Always-visible tables strip below the cart: live status color,
+                 elapsed time, staff name + running amount per table. Click on a
+                 tile opens an ACTION MENU (never a direct action) — View/Edit,
+                 Final-with-confirm, KOT resend, Free table — which kills the
+                 "anjaane mein bill final" accidents. Same table-status feed as
+                 the F3 picker (single source, no duplicate system). --}}
+            <div class="border-t-2 border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 flex-shrink-0">
+                <button type="button" @click="tableBoardOpen = !tableBoardOpen; try { localStorage.setItem('tn_table_board_open', tableBoardOpen ? '1' : '0'); } catch(_) {}" class="w-full flex items-center gap-2 px-3 py-1.5" title="Tables board — har table ka live haal">
+                    <svg class="w-3.5 h-3.5 text-teal-700 dark:text-teal-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M5 10v9m14-9v9M4 5h16a1 1 0 011 1v3H3V6a1 1 0 011-1z"/></svg>
+                    <span class="text-[11px] font-black text-gray-700 dark:text-gray-300 tracking-wide">TABLES</span>
+                    <span x-show="boardCounts().occupied > 0" class="min-w-[16px] px-1 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-[9px] rounded-full font-black" x-text="boardCounts().occupied"></span>
+                    <span x-show="boardCounts().reserved > 0" class="min-w-[16px] px-1 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-[9px] rounded-full font-black" x-text="boardCounts().reserved"></span>
+                    <span x-show="boardCounts().waiter > 0" class="min-w-[16px] px-1 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-[9px] rounded-full font-black animate-pulse" x-text="boardCounts().waiter"></span>
+                    <span class="flex-1"></span>
+                    <svg class="w-3.5 h-3.5 text-gray-400 transition-transform" :class="tableBoardOpen ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div x-show="tableBoardOpen" x-cloak class="px-2 pb-2 max-h-44 overflow-y-auto">
+                    <template x-if="tableFloors.length === 0">
+                        <p class="text-[10px] text-gray-400 text-center py-2" x-text="tablesLoading ? 'Tables load ho rahe hain…' : 'Koi table set nahi'"></p>
+                    </template>
+                    <template x-for="floor in tableFloors" :key="'bf' + floor.name">
+                        <div>
+                            <p x-show="tableFloors.length > 1" class="text-[9px] font-bold text-gray-400 uppercase mt-1 px-1" x-text="floor.name"></p>
+                            <div class="grid grid-cols-3 gap-1.5 mt-1">
+                                <template x-for="t in floor.tables" :key="'bt' + t.id">
+                                    <button type="button" @click="openBoardMenu(t)" class="rounded-lg border-2 px-1.5 py-1 text-left transition hover:scale-[1.02]" :class="boardTileClass(t)">
+                                        <span class="flex items-center justify-between gap-1">
+                                            <span class="text-[11px] font-black" x-text="'T-' + t.table_number"></span>
+                                            <span class="text-[9px] font-bold whitespace-nowrap" x-text="boardTileTime(t)"></span>
+                                        </span>
+                                        <span class="block text-[9px] truncate font-medium opacity-90" x-text="boardTileSub(t)"></span>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+            @endif
         </div>
     </div>
 
@@ -1538,6 +1580,74 @@ window.addEventListener('popstate', function() {
                 </template>
             </div>
         </div>
+    </div>
+
+    {{-- ═══ TABLE BOARD ACTION MENU (Jul 2026) ═══
+         Tile click NEVER acts directly — this menu is the single control hub
+         for a table: View/Edit (recall to cart), Final (confirm modal), KOT
+         resend, Free/Cancel. Waiter orders go through the ATOMIC claim first
+         (invariant) and are never Free-able from here. --}}
+    <div x-show="boardMenuTable" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="boardMenuTable = null" @keydown.escape.window="if (boardConfirm) { boardConfirm = null; } else if (boardMenuTable) { boardMenuTable = null; }">
+        <template x-if="boardMenuTable">
+            <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden" x-transition.scale.90>
+                <div class="p-4 border-b border-gray-100 dark:border-gray-800 flex items-start gap-3">
+                    <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" :class="boardIsWaiter(boardMenuTable) ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600' : (boardMenuTable.status === 'occupied' ? 'bg-red-100 dark:bg-red-900/30 text-red-600' : (boardMenuTable.status === 'reserved' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600' : 'bg-green-100 dark:bg-green-900/30 text-green-600'))">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M5 10v9m14-9v9M4 5h16a1 1 0 011 1v3H3V6a1 1 0 011-1z"/></svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-base font-black text-gray-900 dark:text-white" x-text="'T-' + boardMenuTable.table_number"></p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400 truncate" x-text="boardMenuSummary()"></p>
+                    </div>
+                    <button @click="boardMenuTable = null" class="text-gray-400 hover:text-gray-600 flex-shrink-0"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                </div>
+                <div class="p-3 space-y-2">
+                    <template x-if="!boardMenuTable.order && boardMenuTable.status === 'available'">
+                        <button @click="boardReserve()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-40 transition">Naya Order — Table Reserve karo</button>
+                    </template>
+                    <template x-if="boardMenuTable.order">
+                        <div class="space-y-2">
+                            <button @click="boardViewEdit()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 disabled:opacity-40 transition" x-text="boardBusy ? 'Load ho raha hai…' : 'Bill Kholo / Edit karo'"></button>
+                            <button @click="boardAskFinal()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-extrabold text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 transition" x-text="'FINAL karo — Rs ' + Math.round(boardMenuTable.order.total_amount).toLocaleString()"></button>
+                            @if(($features->kot ?? false) || ($features->kitchen ?? false))
+                            <button x-show="boardMenuTable.order.kot_sent_at" @click="boardResendKot()" :disabled="boardBusy" class="w-full py-2 rounded-xl text-xs font-bold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 disabled:opacity-40 transition">↻ KOT Dobara Bhejo</button>
+                            @endif
+                            <button x-show="!(boardMenuTable.order && boardMenuTable.order.source === 'waiter')" @click="boardFree()" :disabled="boardBusy" class="w-full py-2 rounded-xl text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-40 transition">Order Cancel + Table Khali</button>
+                            <p x-show="boardMenuTable.order && boardMenuTable.order.source === 'waiter'" class="text-[10px] text-purple-500 dark:text-purple-400 text-center">Waiter ka order — cancel sirf waiter/admin side se</p>
+                        </div>
+                    </template>
+                    <template x-if="!boardMenuTable.order && boardMenuTable.status === 'reserved'">
+                        <button @click="boardFree()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 hover:bg-amber-100 disabled:opacity-40 transition">Reserve Khatam — Table Khali karo</button>
+                    </template>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    {{-- ═══ TABLE BOARD FINAL CONFIRM (Jul 2026) ═══
+         The anti-"anjaane mein final" step: table + amount shown big, then an
+         explicit CASH/CARD choice. Menu closes before this opens (no overlap). --}}
+    <div x-show="boardConfirm" x-cloak x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="boardConfirm = null">
+        <template x-if="boardConfirm">
+            <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
+                <div class="p-5 text-center border-b border-gray-100 dark:border-gray-800">
+                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wide">Bill Final hoga</p>
+                    <p class="text-2xl font-black text-gray-900 dark:text-white mt-1" x-text="'T-' + boardConfirm.table.table_number"></p>
+                    <p class="text-lg font-extrabold text-green-600 mt-0.5" x-text="'Rs ' + Math.round(boardConfirm.table.order.total_amount).toLocaleString()"></p>
+                    <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1">Pakka final karna hai? Payment ka tareeqa chunein:</p>
+                </div>
+                <div class="p-4 grid grid-cols-2 gap-3">
+                    <button @click="boardFinalPay('cash')" :disabled="boardBusy" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:bg-green-100 hover:border-green-400">
+                        <p class="text-sm font-black text-green-700 dark:text-green-300">CASH</p>
+                    </button>
+                    <button @click="boardFinalPay('card')" :disabled="boardBusy" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 hover:border-blue-400">
+                        <p class="text-sm font-black text-blue-700 dark:text-blue-300">CARD</p>
+                    </button>
+                </div>
+                <div class="px-4 pb-4">
+                    <button @click="boardConfirm = null" :disabled="boardBusy" class="w-full py-2 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition" x-text="boardBusy ? 'Bill ban raha hai…' : 'Cancel — wapas jao'"></button>
+                </div>
+            </div>
+        </template>
     </div>
     @endif
 
@@ -2892,6 +3002,12 @@ function restaurantPos() {
         promoteMethodIndex: 0,
         promoteSubmitting: false,
         showHeldOrders: false,
+        // ─── Table Board (Jul 2026): always-visible tables strip below cart ───
+        tableBoardEnabled: {{ ($features->tables ?? false) ? 'true' : 'false' }},
+        tableBoardOpen: (() => { try { return localStorage.getItem('tn_table_board_open') !== '0'; } catch(_) { return true; } })(),
+        boardMenuTable: null,   // tile clicked → action menu modal
+        boardConfirm: null,     // { table } → Final CASH/CARD confirm modal
+        boardBusy: false,
         // ── PRA REPORTING TOGGLE (root scope so modals/buttons can read it) ───
         // Mirrors the logged-in user's OWN reporting switch (per-cashier toggle,
         // owner rule Jul 2026). Used by Provisional/Failed bill
@@ -3281,6 +3397,13 @@ function restaurantPos() {
                 setInterval(() => { if (!document.hidden && !this.showPayModal) this.loadIncoming(); }, 20000);
                 // Occupied-timer tick (table picker + held-orders elapsed labels).
                 setInterval(() => { this.nowTick = Date.now(); }, 30000);
+                // Table Board (Jul 2026): tiles live below the cart, so the status
+                // feed must poll even with the F3 picker closed. Paused while the
+                // tab is hidden or a payment is mid-flight.
+                if (this.tableBoardEnabled) {
+                    setTimeout(() => this.loadTableStatus(), 2200);
+                    setInterval(() => { if (!document.hidden && !this.showPayModal && !this.boardBusy) this.loadTableStatus(); }, 25000);
+                }
             }
             // 🔄 Auto-Sync — kicks in after 4 sec, then every 30 sec.
             // Live-updates online/offline pill + silently retries pending bills.
@@ -4485,7 +4608,7 @@ function restaurantPos() {
             //   the old empty-search shortcut ate the first letter of "Tapal"/"tea".
             // Always operates on activeCartIndex if valid, else on the LAST cart row.
             // ═══════════════════════════════════════════════════════════════
-            if ((e.key === 't' || e.key === 'T' || e.code === 'KeyT') && !e.ctrlKey && !e.metaKey && !this.showTablePicker && !this.showReprint) {
+            if ((e.key === 't' || e.key === 'T' || e.code === 'KeyT') && !e.ctrlKey && !e.metaKey && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm) {
                 const tgt = e.target;
                 const isSearchInput = tgt && tgt === this.$refs.searchInput;
                 const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
@@ -4519,7 +4642,7 @@ function restaurantPos() {
             // F10 keystroke would steal focus from Pay/Held/Receipt/etc.
             if (e.key === 'F10') {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm) return;
                 this.openLocalBills();
                 return;
             }
@@ -4527,7 +4650,7 @@ function restaurantPos() {
             // Same gating as F10. Browser's native F11 = fullscreen toggle is overridden.
             if (e.key === 'F11') {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm) return;
                 this.openFailedBills();
                 return;
             }
@@ -4536,7 +4659,7 @@ function restaurantPos() {
             // search input is never hijacked. Same modal-gating as F10/F11.
             if (e.altKey && (e.key === 'r' || e.key === 'R' || e.code === 'KeyR')) {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm) return;
                 this.openReprint();
                 return;
             }
@@ -4546,7 +4669,7 @@ function restaurantPos() {
             // so plain digits keep doing qty-typing / modal row-jumps.
             if (e.altKey && (e.code === 'Digit1' || e.code === 'Digit2' || e.key === '1' || e.key === '2')) {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm) return;
                 if (this.cart.length === 0 || this.submitting) return;
                 this.payPreselect = (e.code === 'Digit2' || e.key === '2') ? 1 : 0;
                 this.showPayModal = true;
@@ -4564,7 +4687,7 @@ function restaurantPos() {
                 && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills
                 && !this.showPayModal && !this.showReceipt && !this.showQuickType
                 && !this.showManualItem && !this.showCustomerPicker && !this.showShortcuts
-                && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint) {
+                && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm) {
                 const tgt = e.target;
                 const isSearchInput = tgt && tgt === this.$refs.searchInput;
                 const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
@@ -4599,7 +4722,7 @@ function restaurantPos() {
                 && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills
                 && !this.showPayModal && !this.showReceipt && !this.showQuickType
                 && !this.showManualItem && !this.showCustomerPicker && !this.showShortcuts
-                && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint) {
+                && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm) {
                 const tgt = e.target;
                 const isSearchInput = tgt && tgt === this.$refs.searchInput;
                 const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
@@ -5056,6 +5179,7 @@ function restaurantPos() {
                 }
                 this.loadIncomingToCart(data.order || o);
                 this.showTablePicker = false;
+                if (this.tableBoardEnabled) this.loadTableStatus(); // Table Board: tile turns "mine"
                 // Guided keyboard flow: resume the Enter-chain into cart mode so
                 // F3 → Enter on the purple card lands on the first cart row
                 // (mirrors the reserve branch's enterCartMode resume).
@@ -5075,6 +5199,175 @@ function restaurantPos() {
                     headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 });
             } catch (e) {}
+        },
+
+        // ═══ TABLE BOARD (customer request ×3, owner-approved Jul 2026) ═══════
+        // Always-visible tiles below the cart. Rules: tile click ONLY opens the
+        // action menu; Final always passes the confirm modal; waiter orders are
+        // ALWAYS claimed atomically before any load/pay (single-winner invariant);
+        // purple = waiter order still visible in MY incoming list (own+unassigned).
+        boardCounts() {
+            const all = this.tableFloors.flatMap(f => f.tables);
+            return {
+                occupied: all.filter(t => t.status === 'occupied' && !this.boardIsWaiter(t)).length,
+                reserved: all.filter(t => !t.order && t.status === 'reserved').length,
+                waiter: all.filter(t => this.boardIsWaiter(t)).length,
+            };
+        },
+        boardIsWaiter(t) {
+            return !!(t && t.order && t.order.source === 'waiter' && this.incomingForTable(t));
+        },
+        boardTileClass(t) {
+            if (this.boardIsWaiter(t)) return 'border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20 text-purple-800 dark:text-purple-200';
+            if (t.status === 'occupied' || t.order) return 'border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300';
+            if (t.status === 'reserved') return 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300';
+            return 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300';
+        },
+        boardTileTime(t) {
+            if (t.order || t.status === 'occupied') return this.elapsedSince(t.occupied_since);
+            if (t.status === 'reserved') return this.elapsedSince(t.locked_at);
+            return '';
+        },
+        boardTileSub(t) {
+            if (t.order) {
+                const who = t.order.staff_name ? String(t.order.staff_name).split(' ')[0] : '';
+                return (who ? who + ' • ' : '') + 'Rs ' + Math.round(t.order.total_amount || 0).toLocaleString();
+            }
+            if (t.status === 'reserved') return 'Reserved';
+            return 'Free' + (t.seats ? ' • ' + t.seats + ' seats' : '');
+        },
+        boardMenuSummary() {
+            const t = this.boardMenuTable;
+            if (!t) return '';
+            if (t.order) {
+                const bits = [];
+                if (this.boardIsWaiter(t)) bits.push('Waiter order');
+                else if (t.order.staff_name) bits.push(String(t.order.staff_name).split(' ')[0]);
+                if (t.order.order_number) bits.push('#' + t.order.order_number);
+                const el = this.boardTileTime(t);
+                if (el) bits.push(el);
+                return bits.join(' • ');
+            }
+            if (t.status === 'reserved') return 'Reserved' + (this.elapsedSince(t.locked_at) ? ' • ' + this.elapsedSince(t.locked_at) : '');
+            return (t.floor ? t.floor + ' • ' : '') + 'Free table';
+        },
+        openBoardMenu(t) {
+            if (this.boardBusy) return;
+            this.boardMenuTable = t;
+        },
+        // View/Edit → load the table's order into the cart. Waiter orders go via
+        // the ATOMIC claim (existing path). Foreign cashier-held orders are NOT
+        // in this.heldOrders — fetch fresh WITH items from by-table, then reuse
+        // the standard recallOrder pipeline.
+        async boardViewEdit() {
+            const t = this.boardMenuTable;
+            if (!t || !t.order || this.boardBusy) return;
+            this.boardBusy = true;
+            try {
+                if (t.order.source === 'waiter') {
+                    await this.claimAndLoadIncoming({ id: t.order.id });
+                    this.boardMenuTable = null;
+                    return;
+                }
+                const res = await fetch('/pos/restaurant/orders/by-table/' + t.id, { headers: { 'Accept': 'application/json' } });
+                const orders = res.ok ? await res.json() : [];
+                const list = Array.isArray(orders) ? orders : [];
+                const ord = list.find(o => o.id === t.order.id) || list[0];
+                if (!ord) {
+                    this.showToast('Order nahi mila — board refresh ho raha hai', 'warning');
+                    this.loadTableStatus();
+                    this.boardMenuTable = null;
+                    return;
+                }
+                ord.table = ord.table || { id: t.id, table_number: t.table_number, occupied_since: t.occupied_since };
+                this.recallOrder(ord);
+                this.boardMenuTable = null;
+            } catch (e) {
+                this.showToast('Order load nahi hua — connection check karein', 'error');
+            } finally { this.boardBusy = false; }
+        },
+        // FINAL — step 1: close menu, open the explicit confirm (anti "anjaane
+        // mein final"). Both modals are z-50; they never overlap.
+        boardAskFinal() {
+            const t = this.boardMenuTable;
+            if (!t || !t.order) return;
+            this.boardMenuTable = null;
+            this.boardConfirm = { table: t };
+        },
+        // FINAL — step 2 (CASH/CARD chosen): waiter orders claim FIRST, then the
+        // shared payHeldOrderDirect pipeline with the tile's own order_type so a
+        // dine_in never re-triggers the auto-KOT chain from a foreign terminal.
+        async boardFinalPay(method) {
+            if (this.boardBusy || !this.boardConfirm) return;
+            const t = this.boardConfirm.table;
+            this.boardBusy = true;
+            try {
+                let orderId = t.order.id;
+                if (t.order.source === 'waiter') {
+                    const res = await fetch('/pos/api/incoming-orders/' + orderId + '/claim', {
+                        method: 'POST',
+                        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    });
+                    let data = null; try { data = await res.json(); } catch (_) {}
+                    if (!res.ok || !data || !data.success) {
+                        this.showToast((data && data.message) || 'Order doosre cashier ne le liya', 'warning');
+                        this.boardConfirm = null;
+                        this.loadIncoming(); this.loadTableStatus();
+                        return;
+                    }
+                    orderId = (data.order && data.order.id) || orderId;
+                }
+                await this.payHeldOrderDirect(orderId, method, null, false, t.order.order_type || 'dine_in');
+                this.boardConfirm = null;
+                this.loadTableStatus();
+                if (this.isRestaurantMode) this.loadIncoming();
+            } finally { this.boardBusy = false; }
+        },
+        boardResendKot() {
+            const t = this.boardMenuTable;
+            if (!t || !t.order) return;
+            this.resendKitchen({ id: t.order.id });
+            this.boardMenuTable = null;
+        },
+        // Free table: reserved-only → release; cashier order → confirm + cancel
+        // (same endpoint as Held-modal delete). Waiter orders never reach here
+        // (button hidden) — cancel belongs to the waiter/admin side.
+        async boardFree() {
+            const t = this.boardMenuTable;
+            if (!t || this.boardBusy) return;
+            if (t.order) {
+                if (t.order.source === 'waiter') return;
+                if (!confirm('T-' + t.table_number + ' ka order CANCEL hoga aur table khali ho jayega.\nPakka?')) return;
+                this.boardBusy = true;
+                try {
+                    const res = await fetch('/pos/restaurant/orders/' + t.order.id + '/delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    });
+                    const data = res.ok ? await res.json().catch(() => null) : null;
+                    if (data && data.success) {
+                        this.heldOrders = this.heldOrders.filter(o => o.id !== t.order.id);
+                        this.showToast('Order cancel — T-' + t.table_number + ' khali', 'success');
+                    } else {
+                        this.showToast((data && data.message) || 'Cancel nahi hua', 'error');
+                    }
+                } catch (e) {
+                    this.showToast('Cancel nahi hua — connection check karein', 'error');
+                } finally { this.boardBusy = false; }
+            } else if (t.status === 'reserved') {
+                this.releaseTable(t.id);
+                this.showToast('T-' + t.table_number + ' reserve khatam', 'success');
+            }
+            this.boardMenuTable = null;
+            setTimeout(() => this.loadTableStatus(), 400);
+        },
+        // Free tile → reserve + start a new dine-in (existing selectTable path,
+        // including the dine_in_auto_kot chain and guided-flow resume).
+        async boardReserve() {
+            const t = this.boardMenuTable;
+            if (!t) return;
+            this.boardMenuTable = null;
+            await this.selectTable(t);
         },
 
         // ── Global mouse-wheel forwarding ──────────────────────────────────────
@@ -5406,6 +5699,7 @@ function restaurantPos() {
                 } else { this.showToast(data.message || 'Failed', 'error'); }
             } catch (e) { this.showToast('Network error', 'error'); }
             this.submitting = false;
+            if (result && this.tableBoardEnabled) this.loadTableStatus(); // Table Board: held table goes red
             return result;
         },
 
@@ -5789,6 +6083,7 @@ function restaurantPos() {
                 // Refresh failed badge — successful sales might leave a previous fail intact.
                 this.loadFailedBills();
                 this.loadReprintBills(); // Akhri Bills strip stays current
+                if (this.tableBoardEnabled) this.loadTableStatus(); // Table Board: settled table frees up
                 // This sale reached the server → we're online. Drain any bills
                 // still queued from an earlier outage.
                 if (this.offlineQueueCount > 0) this.syncOfflineBills();
@@ -6413,17 +6708,22 @@ function restaurantPos() {
                     // Enter keystroke would land on a phantom selection.
                     if (this.heldOrders.length === 0) { this.showHeldOrders = false; this.activeHeldIndex = 0; }
                     this.showToast('Order deleted', 'success');
+                    if (this.tableBoardEnabled) this.loadTableStatus(); // Table Board: table freed
                 } else { this.showToast(data.message || 'Failed', 'error'); }
             } catch (e) { console.error('Delete held order error:', e); this.showToast('Error deleting order', 'error'); }
         },
 
-        async payHeldOrderDirect(orderId, method, savedTotal, provisional = false) {
+        async payHeldOrderDirect(orderId, method, savedTotal, provisional = false, orderTypeOverride = null) {
             // Order type captured NOW (owner, Jul 2026): held-modal pays read it from
             // the heldOrders entry (removed from the list on success below); billing
             // pass-through orders are never in heldOrders → falls back to the current
             // order-type widget. Drives the dine-in no-KOT-at-final rule in the chain.
+            // Table Board pays pass an explicit orderTypeOverride (the tile's own
+            // order_type) — foreign-terminal orders are NOT in this.heldOrders, and
+            // falling back to the widget could mislabel a dine_in as takeaway and
+            // wrongly re-trigger the auto-KOT chain.
             const heldOrd = this.heldOrders.find(o => o.id === orderId);
-            const payOrderType = (heldOrd && heldOrd.order_type) || this.orderType || null;
+            const payOrderType = orderTypeOverride || (heldOrd && heldOrd.order_type) || this.orderType || null;
             try {
                 // PROVISIONAL BILL FLOW — when true, RestaurantPosController::payOrder
                 // forces pra_status='local' and skips PRA submission. Bill remains
@@ -6465,8 +6765,9 @@ function restaurantPos() {
                     // Refresh failed badge so cashier sees pending/failed state in real time.
                     this.loadFailedBills();
                     this.loadReprintBills(); // Akhri Bills strip stays current
+                    if (this.tableBoardEnabled) this.loadTableStatus(); // Table Board: paid table frees up
                     return true;
-                } else { if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; } this.showToast(data.message || 'Payment failed', 'error'); return false; }
+                } else { if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; } this.showToast(data.message || 'Payment failed', 'error'); if (res.status === 409 && this.tableBoardEnabled) this.loadTableStatus(); return false; }
             } catch (e) {
                 console.error('[payHeldOrderDirect] FAIL', e);
                 this.showToast('Payment error: ' + (e?.message || e?.name || 'unknown') + ' — F12 console', 'error');

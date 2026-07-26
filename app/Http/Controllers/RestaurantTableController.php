@@ -276,9 +276,13 @@ class RestaurantTableController extends Controller
 
         $tables = RestaurantTable::where('company_id', $companyId)
             ->where('is_active', true)
-            ->with(['floor', 'activeOrders'])
+            ->with(['floor', 'activeOrders.creator'])
             ->get()
             ->map(function ($t) {
+                // Table Board (Jul 2026): the sale-screen board needs the active
+                // held order's summary (who placed it + amount) right on the tile.
+                // Oldest active order = the one the table is "running" on.
+                $active = $t->activeOrders->sortBy('id')->first();
                 return [
                     'id' => $t->id,
                     'table_number' => $t->table_number,
@@ -289,6 +293,16 @@ class RestaurantTableController extends Controller
                     'locked_by' => $t->locked_by_user_id,
                     'locked_at' => $t->locked_at,
                     'occupied_since' => $t->occupied_since,
+                    'order' => $active ? [
+                        'id' => $active->id,
+                        'order_number' => $active->order_number,
+                        'total_amount' => (float) $active->total_amount,
+                        'staff_name' => $active->creator?->name,
+                        'source' => $active->source,
+                        'order_type' => $active->order_type,
+                        'kot_sent_at' => $active->kot_sent_at,
+                        'status' => $active->status,
+                    ] : null,
                 ];
             });
 

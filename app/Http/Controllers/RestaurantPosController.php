@@ -668,6 +668,36 @@ class RestaurantPosController extends Controller
 
         DB::beginTransaction();
         try {
+            // ── Single-winner guard (Table Board, Jul 2026) ──────────────────
+            // Cross-terminal pays are first-class now (sale-screen Table Board):
+            // re-fetch the order under a ROW LOCK and re-check status INSIDE the
+            // txn — without this, two terminals settling the same held order both
+            // pass the pre-txn status check and create DUPLICATE final bills (and
+            // duplicate PRA submissions). Loser gets 409 + a refresh hint.
+            $freshOrder = RestaurantOrder::where('company_id', $companyId)
+                ->with('items')
+                ->lockForUpdate()
+                ->find($orderId);
+            if (!$freshOrder || in_array($freshOrder->status, ['completed', 'cancelled'], true)) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This order was already settled or cancelled on another terminal — refresh the table board.',
+                ], 409);
+            }
+            // Drift guard: header amounts were computed from the PRE-lock read. If a
+            // waiter appended/edited lines in between, those amounts are stale — bail
+            // out instead of writing a bill whose header doesn't match its lines.
+            $freshSubtotal = round((float) $freshOrder->items->sum('subtotal'), 2);
+            if ($freshSubtotal !== round((float) $subtotal, 2) || $freshOrder->items->count() !== $order->items->count()) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Order was just updated (new items) — refresh and try again.',
+                ], 409);
+            }
+            $order = $freshOrder;
+
             $stockErrors = $this->validateStockForOrder($companyId, $order, true);
             if (!empty($stockErrors)) {
                 DB::rollBack();

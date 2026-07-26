@@ -99,8 +99,13 @@
                at ~65mm from the left — the 72mm print head then shows only the first
                1-2 letters of each line at the paper's right edge ("blank" receipts).
                LEFT-align instead: correct-size drivers print identically (3mm padding
-               still clears the head's dead zone), misconfigured A4 queues stay readable. */
-            body { width: auto; max-width: 72mm; padding: 4mm 3mm 1mm; margin: 0; }
+               still clears the head's dead zone), misconfigured A4 queues stay readable.
+               v6 (Pizza Master Jul 2026): v5's left-align regressed the LEFT edge on
+               drivers whose page size is the FULL 80mm roll ("Roll Paper 80 x 297mm"):
+               body sits at paper x=0, so 3mm side padding < the head's ~4mm dead zone —
+               thin first glyphs vanish ("ITEM" → "TEM"). Sides raised to 4mm: full-width
+               drivers clear the dead zone, 72mm-reporting drivers lose only 2mm content. */
+            body { width: auto; max-width: 72mm; padding: 4mm 4mm 1mm; margin: 0; }
             .no-print { display: none !important; }
         }
         @media screen {

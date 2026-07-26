@@ -9,6 +9,9 @@ The `@media print` fix block must be the LAST rule set in the template's stylesh
 # The rule
 In `@media print`, NEVER force `body { width: <physical paper width> }` on thermal receipt templates. Use `width: auto; max-width: <paper>mm;` (+ tiny padding) so the body fills whatever printable width the printer driver reports.
 
+# The side-padding rule (v7 padding bump, Jul 2026 — Pizza Master left-cut regression; template comment says "v6")
+v5's `margin: 0` left-align sits the body at paper x=0 on drivers whose page size is the FULL roll width ("Roll Paper 80 x 297mm") — side padding must then cover the head's dead zone ALONE. 3mm sides < ~4mm dead zone cut thin first glyphs ("ITEM" → "TEM") on the 80mm receipt; sides raised to 4mm (80mm template). 58mm template still has 2.5mm sides (dead zone ~5mm on full-58mm drivers) — raise the same way if a 58mm shop reports a left cut.
+
 # The margin rule (v5, Jul 2026)
 In `@media print`, body margin must be `margin: 0` — NEVER `margin: 0 auto`. **Why:** shops leave the printer queue's default paper size at A4; `auto` centering then parks the ~72mm body in the MIDDLE of an A4-wide page, so an 80mm head prints only the rightmost ~7mm strip (first 1-2 letters of each line at the paper's right edge) plus a long blank feed — looks like "blank paper" from silent print. `margin: 0` left-aligns, so the bill stays readable even on misconfigured queues; correctly configured 72mm queues are pixel-identical (no free space to center in). **Watch:** on drivers reporting full 80/58mm width, left padding is 3mm/2.5mm — if a printer's left dead zone exceeds that, raise padding to ~4mm (never force width). Advise shops to set the queue paper to 80mm receipt to kill the blank feed.
 

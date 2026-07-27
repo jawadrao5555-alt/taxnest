@@ -1390,6 +1390,16 @@ class RestaurantPosController extends Controller
         if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_kot_full_mode')) {
             $updates['pos_kot_full_mode'] = (bool) $request->pos_kot_full_mode;
         }
+        // KOT Print Style (customer feedback 27 Jul 2026): paper-saving toggles +
+        // print position. hasColumn guards = prod self-heal parity.
+        foreach (['kot_compact', 'kot_show_customer', 'kot_show_orderby', 'kot_show_barcode', 'kot_show_footer', 'kot_align_center'] as $kotFlag) {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', $kotFlag)) {
+                $updates[$kotFlag] = (bool) $request->input($kotFlag);
+            }
+        }
+        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_left_margin_mm')) {
+            $updates['kot_left_margin_mm'] = max(0, min(30, (int) $request->input('kot_left_margin_mm', 0)));
+        }
         $company->update($updates);
 
         return back()->with('success', 'Kitchen settings updated successfully.');

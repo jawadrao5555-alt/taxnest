@@ -82,6 +82,90 @@
             </div>
         </div>
 
+        {{-- KOT Print Style (customer feedback 27 Jul 2026, Pizza Master): paper-saving
+             toggles + print position. Defaults keep the ticket exactly as before. --}}
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+            <div class="p-5 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-sm font-bold text-gray-900 dark:text-white">KOT Print Style — Paper Saving</h3>
+                <p class="text-xs text-gray-500 mt-0.5">Shorten the kitchen ticket by hiding parts you don't need, and adjust where it prints on the paper</p>
+            </div>
+            <div class="divide-y divide-gray-200 dark:divide-gray-700">
+                <div class="p-5 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Compact KOT</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">Smaller fonts and tighter spacing — a noticeably shorter ticket</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="hidden" name="kot_compact" value="0">
+                        <input type="checkbox" name="kot_compact" value="1" {{ ($company->kot_compact ?? false) ? 'checked' : '' }} class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-purple-600"></div>
+                    </label>
+                </div>
+                <div class="p-5 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Show Customer Name</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">Print the customer's name on the kitchen ticket</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="hidden" name="kot_show_customer" value="0">
+                        <input type="checkbox" name="kot_show_customer" value="1" {{ ($company->kot_show_customer ?? true) ? 'checked' : '' }} class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-purple-600"></div>
+                    </label>
+                </div>
+                <div class="p-5 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Show "Order by" &amp; Item Count</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">The footer lines with the staff name and total item count</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="hidden" name="kot_show_orderby" value="0">
+                        <input type="checkbox" name="kot_show_orderby" value="1" {{ ($company->kot_show_orderby ?? true) ? 'checked' : '' }} class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-purple-600"></div>
+                    </label>
+                </div>
+                <div class="p-5 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Show Barcode</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">Needed for KDS scan-to-clear — turn off only if the kitchen never scans tickets</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="hidden" name="kot_show_barcode" value="0">
+                        <input type="checkbox" name="kot_show_barcode" value="1" {{ ($company->kot_show_barcode ?? true) ? 'checked' : '' }} class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-purple-600"></div>
+                    </label>
+                </div>
+                <div class="p-5 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Show Business Name at Bottom</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">Print your business name at the end of the ticket</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="hidden" name="kot_show_footer" value="0">
+                        <input type="checkbox" name="kot_show_footer" value="1" {{ ($company->kot_show_footer ?? true) ? 'checked' : '' }} class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-purple-600"></div>
+                    </label>
+                </div>
+                <div class="p-5">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-900 dark:text-white mb-1">Print Position</label>
+                            <select name="kot_align_center" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm">
+                                <option value="0" {{ !($company->kot_align_center ?? false) ? 'selected' : '' }}>Left edge (default — safest)</option>
+                                <option value="1" {{ ($company->kot_align_center ?? false) ? 'selected' : '' }}>Center of paper</option>
+                            </select>
+                            <p class="text-[11px] text-amber-600 dark:text-amber-400 mt-1">Use Center ONLY if the printer's paper size is set to 80mm roll. On an A4/Letter queue, Center pushes the print off the paper and the slip comes out blank.</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-900 dark:text-white mb-1">Left Margin (mm)</label>
+                            <input type="number" name="kot_left_margin_mm" min="0" max="30" step="1" value="{{ (int) ($company->kot_left_margin_mm ?? 0) }}"
+                                   class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm">
+                            <p class="text-[11px] text-gray-400 mt-1">Shifts the print to the right (0–30mm). Used only with "Left edge" position. Start with 3–5mm if the print sits too far left.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 p-5">
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">Order Flow</h3>
             <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">

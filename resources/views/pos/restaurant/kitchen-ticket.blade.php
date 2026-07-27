@@ -4,6 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kitchen Ticket - {{ $order->order_number }}</title>
+    @php
+        // KOT PRINT STYLE (customer feedback 27 Jul 2026, Pizza Master video):
+        // paper-saving toggles + print position, read from the COMPANY row so
+        // BOTH render paths (kitchen-ticket route + Agent print-job content)
+        // honor them. Null-coalesced defaults = prod schema-drift safe.
+        $kotCompact      = (bool) ($company->kot_compact ?? false);
+        $kotShowCustomer = (bool) ($company->kot_show_customer ?? true);
+        $kotShowOrderby  = (bool) ($company->kot_show_orderby ?? true);
+        $kotShowBarcode  = (bool) ($company->kot_show_barcode ?? true);
+        $kotShowFooter   = (bool) ($company->kot_show_footer ?? true);
+        $kotAlignCenter  = (bool) ($company->kot_align_center ?? false);
+        $kotMarginMm     = max(0, min(30, (int) ($company->kot_left_margin_mm ?? 0)));
+    @endphp
     <style>
         @page { size: 80mm auto; margin: 0; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -89,8 +102,33 @@
         .kot-barcode-box { text-align: center; margin: 8px 0 4px; }
         .kot-barcode-box svg { max-width: 95%; height: 50px; }
         .kot-barcode-hint { font-size: 9px; color: #000; font-weight: bold; letter-spacing: 1px; margin-top: 2px; }
+        @if($kotCompact)
+        /* COMPACT KOT (paper-saving, Jul 2026) — screen-side shrink rules. These
+           sit AFTER the base rules (same specificity, later wins) and BEFORE the
+           v6 print fix. Print-side padding override lives after the v6 block. */
+        body { font-size: 12px; line-height: 1.3; padding: 2mm 3mm; }
+        .separator { margin: 3px 0; }
+        .separator-light { margin: 2px 0; }
+        .separator-station { margin: 4px 0 2px; }
+        .text-xl { font-size: 16px; }
+        .text-lg { font-size: 14px; }
+        .mt-1 { margin-top: 2px; }
+        .mt-2 { margin-top: 4px; }
+        .items-table { margin: 2px 0; }
+        .items-table td { padding: 3px 2px; font-size: 13px; }
+        .items-table .qty { font-size: 15px; }
+        .items-table .note { font-size: 13px; }
+        .order-type-badge { padding: 1px 6px; font-size: 12px; }
+        .station-header { font-size: 13px; padding: 3px 6px; letter-spacing: 1px; }
+        .station-section { margin-bottom: 4px; }
+        .station-item-count { margin-bottom: 2px; }
+        .kitchen-notes { padding: 4px 6px; margin-top: 4px; font-size: 14px; }
+        .kot-barcode-box { margin: 4px 0 2px; }
+        .kot-barcode-box svg { height: 36px; }
+        @endif
         /* PRINTABLE-WIDTH FIX v6 (ZFC Pizza Point Jul 2026) — this block MUST stay
-           LAST in the stylesheet. It used to sit at the TOP, before the base
+           LAST among the STATIC rules (only the company-driven opt-in overrides
+           below it may follow). It used to sit at the TOP, before the base
            `body { width:80mm; margin:0 auto; }` rule — equal specificity means the
            LATER rule wins, so the base rule silently overrode this fix during print:
            on A4-default Windows queues the 80mm body auto-centered ~65mm from the
@@ -107,8 +145,29 @@
             .no-print { display: none !important; }
             .station-section { page-break-after: auto; }
         }
+        /* COMPANY KOT PRINT OPTIONS (Jul 2026) — OPT-IN per-company overrides of
+           the v6 fix. Default (all OFF) keeps margin:0 + 4mm top padding exactly
+           as v6 shipped. Center/margin are deliberate shop choices: center on a
+           misconfigured A4 Windows queue can re-create the v6 blank-slip failure,
+           which is why it is opt-in and warned about on the settings page. */
+        @if($kotCompact)
+        @media print {
+            html body { padding: 2mm 3mm 1mm; }
+        }
+        @endif
+        @if($kotAlignCenter)
+        @media print {
+            html body { margin-left: auto; margin-right: auto; }
+        }
+        @elseif($kotMarginMm > 0)
+        @media print {
+            html body { margin-left: {{ $kotMarginMm }}mm; }
+        }
+        @endif
     </style>
+    @if($kotShowBarcode)
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    @endif
 </head>
 <body>
     <div class="text-center">
@@ -143,7 +202,7 @@
         @endif
     </div>
 
-    @if($order->customer_name)
+    @if($kotShowCustomer && $order->customer_name)
     <div class="mt-1">
         <span class="bold text-sm">Customer: {{ $order->customer_name }}</span>
     </div>
@@ -237,6 +296,9 @@
     </div>
     @endif
 
+    {{-- KOT Print Style (Jul 2026): footer blocks individually toggleable per
+         company — paper saving. Each hidden block also drops its separator. --}}
+    @if($kotShowOrderby)
     <div class="separator"></div>
 
     <div class="text-center text-sm">
@@ -252,13 +314,21 @@
         <p>Order by: {{ $order->creator->name ?? 'Staff' }}</p>
         <p class="mt-1">{{ $kotRows->count() }} item(s) &mdash; Total Qty: {{ $kotQty == intval($kotQty) ? intval($kotQty) : number_format($kotQty, 2) }}</p>
     </div>
+    @endif
 
+    @if($kotShowBarcode)
     <div class="separator"></div>
     <div class="kot-barcode-box">
         <svg id="kotBarcode"></svg>
         <div class="kot-barcode-hint">SCAN BARCODE TO CLEAR</div>
     </div>
+    @endif
+    @if($kotShowFooter)
+    @if(!$kotShowOrderby && !$kotShowBarcode)
+    <div class="separator"></div>
+    @endif
     <p class="text-center bold text-sm">{{ $company->name ?? 'Restaurant' }}</p>
+    @endif
 
     <div class="no-print print-btn-row">
         <button class="print-btn" onclick="printAll()">Print Full KOT</button>
@@ -295,12 +365,15 @@
         }
 
         function renderBarcode() {
+            // KOT Print Style (Jul 2026): barcode can be hidden per company —
+            // skip cleanly when the svg is not on the page.
+            if (!document.getElementById('kotBarcode')) return;
             try {
                 if (typeof JsBarcode === 'function') {
                     JsBarcode('#kotBarcode', 'KOT-{{ $order->id }}', {
                         format: 'CODE128',
                         width: 2,
-                        height: 50,
+                        height: {{ $kotCompact ? 36 : 50 }},
                         displayValue: true,
                         fontSize: 12,
                         margin: 0,

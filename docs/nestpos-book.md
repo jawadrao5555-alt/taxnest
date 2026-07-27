@@ -425,6 +425,12 @@ Bina table walay held orders board popup mein **"Held Orders (bina table)"** ke 
 ### Kitchen Settings (/pos/restaurant/kitchen-settings)
 Toggles: **Kitchen Display System (KDS)**, Kitchen Printer, Print KOT on Hold, Dine-In Auto KOT on Table Select, Print Receipt on Pay, **Always Print Full KOT** (order update par poora order print, naye items par NEW ka nishaan).
 
+### KOT Print Style — Paper Saving (27 Jul 2026, naya)
+Kitchen Settings par hi ek naya section — KOT ki parchi chhoti karne aur print ki position set karne ke liye:
+- **Compact KOT**: chhote fonts, tang spacing — parchi kaafi chhoti ho jati hai.
+- **Show Customer Name / "Order by" & Item Count / Barcode / Business Name**: jo cheez kitchen ko nahi chahiye OFF kar dein — parchi aur chhoti. (Barcode OFF karne se KDS ka scan-to-clear band ho jata hai — sirf tab OFF karein jab kitchen ticket scan nahi karti.)
+- **Print Position**: default "Left edge" (sab se mehfooz). Print side par aata ho to **Left Margin (mm)** mein 3–5 dalein — print utna right sarak jayega. "Center of paper" SIRF tab chunein jab Windows printer ki paper size 80mm roll set ho — A4/Letter queue par Center se parchi khali nikalti hai.
+
 ### Counters / Stations (KOT routing)
 "+ Add Counter" → Counter Name (jaise "Grill") → Printer chunein → Product Categories tick karein — un categories ke items ka KOT usi counter par jayega.
 

@@ -245,3 +245,21 @@ id = "hNKMtPv5uJb-SJRU2krTB"
 uri = "file://docs/nestpos-book.md"
 type = "text"
 title = "NestPOS Book — Mukammal User Guide (Roman Urdu)"
+
+[[outputs]]
+id = "w1HUMUJtUYW7MJwSYJwlH"
+uri = "file://screenshots/variant-a-classic.png"
+type = "image"
+title = "Variant A — Classic Split (cart left, payment right)"
+
+[[outputs]]
+id = "W8t4grbi8NmJxH_7IIbRA"
+uri = "file://screenshots/variant-b-billstyle.png"
+type = "image"
+title = "Variant B — Bill Style (receipt-jaisa cart + bara total band)"
+
+[[outputs]]
+id = "rQ-lq9vNCF4zyca9B-6vM"
+uri = "file://screenshots/variant-c-customerpanel.png"
+type = "image"
+title = "Variant C — Customer Panel (customer info + payment grid)"

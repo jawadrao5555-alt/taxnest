@@ -16,11 +16,22 @@
             <p class="text-sm text-gray-500 dark:text-gray-400">Compose the order, then send it to a cashier for payment.</p>
         </div>
         <div class="flex items-center gap-2">
+            {{-- ZFC (29 Jul 2026): manual refresh — waiter phones keep this tab
+                 open for days; this pulls the LATEST code with a cache-buster. --}}
+            <button @click="hardRefresh()" title="Refresh app" class="px-3 py-2 rounded-xl text-sm font-bold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-teal-500 transition">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            </button>
             <button @click="openMyOrders()" class="relative px-4 py-2 rounded-xl text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white transition">
                 My Orders
                 <span x-show="myOrders.length > 0" x-cloak class="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 bg-amber-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="myOrders.length"></span>
             </button>
         </div>
+    </div>
+
+    {{-- ── New-version banner (auto-update check, ZFC 29 Jul 2026) ────────── --}}
+    <div x-show="updateAvailable" x-cloak class="mb-3 rounded-xl bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 px-4 py-2.5 flex items-center justify-between gap-2 flex-wrap">
+        <span class="text-sm font-bold text-blue-800 dark:text-blue-300">Nayi update aa gayi hai — Refresh karein.</span>
+        <button @click="hardRefresh()" class="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold">REFRESH</button>
     </div>
 
     {{-- ── Append-mode banner ─────────────────────────────────────────────── --}}
@@ -287,6 +298,10 @@ function waiterApp() {
         toast: '',
         toastType: 'success',
         _toastTimer: null,
+        // Auto-update (ZFC, 29 Jul 2026): page ki code-version; server se poll
+        // kar ke naya deploy pakarte hain.
+        appVersion: @json($appVersion ?? 'unknown'),
+        updateAvailable: false,
 
         init() {
             this.categories = [...new Set(this.products.map(p => p.category))].sort();
@@ -294,6 +309,32 @@ function waiterApp() {
             this.initDayCashier();
             this.loadMyOrders();
             setInterval(() => { if (!document.hidden) this.loadMyOrders(); }, 30000);
+            // Version check: every 2 min + whenever the phone comes back to the tab.
+            setInterval(() => this.checkVersion(), 120000);
+            document.addEventListener('visibilitychange', () => { if (!document.hidden) this.checkVersion(); });
+            this.checkVersion();
+        },
+
+        async checkVersion() {
+            if (this.updateAvailable || document.hidden) return;
+            try {
+                const res = await fetch('{{ route("pos.waiter.version") }}?_=' + Date.now(), { cache: 'no-store' });
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data.v && this.appVersion !== 'unknown' && data.v !== this.appVersion) {
+                    // Cart mein items hain => sirf banner (order zaya na ho);
+                    // khali app => khud hi refresh.
+                    if (this.cart.length === 0 && !this.sending) { this.hardRefresh(); }
+                    else { this.updateAvailable = true; }
+                }
+            } catch (e) { /* offline / network blip — agli dafa sahi */ }
+        },
+
+        hardRefresh() {
+            // Cache-buster query — SW skip-list + fresh URL = guaranteed new code.
+            const u = new URL(window.location.href);
+            u.searchParams.set('_r', Date.now());
+            window.location.replace(u.toString());
         },
 
         // Once-per-day cashier (owner, 20 Jul 2026): the waiter picks a cashier

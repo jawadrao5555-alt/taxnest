@@ -85,10 +85,33 @@ class RestaurantWaiterController extends Controller
         // final price — waiter sees ONE "Total", no before-tax / incl-tax split.
         $taxInclusive = (bool) ($company->pos_tax_inclusive ?? false);
 
-        return view('pos.waiter', compact('company', 'products', 'cashiers', 'cashTaxRate', 'userGridPrefs', 'taxInclusive'));
+        // ZFC (29 Jul 2026): waiter tablets stay open for days and never see new
+        // deploys. Page embeds this code-version; the app polls /waiter/api/version
+        // and self-refreshes (or shows a banner if a cart is in progress).
+        $appVersion = self::codeVersion();
+
+        return view('pos.waiter', compact('company', 'products', 'cashiers', 'cashTaxRate', 'userGridPrefs', 'taxInclusive', 'appVersion'));
     }
 
     /** Live floors + tables — waiter-scoped twin of the sale screen's table-status API. */
+    /**
+     * Code-version fingerprint for the waiter app (ZFC, 29 Jul 2026): waiter
+     * phones keep the tab open for days and never pick up new deploys. Cheap:
+     * mtime+size of the waiter blade (changes on every deploy that touches it).
+     */
+    public static function codeVersion(): string
+    {
+        $f = resource_path('views/pos/waiter.blade.php');
+        return is_file($f) ? md5(filemtime($f) . ':' . filesize($f)) : 'unknown';
+    }
+
+    /** Polled by the open waiter app to detect a new deploy. */
+    public function version()
+    {
+        return response()->json(['v' => self::codeVersion()])
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate');
+    }
+
     public function tables()
     {
         $companyId = app('currentCompanyId');

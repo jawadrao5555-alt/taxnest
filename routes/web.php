@@ -676,6 +676,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     // Waiter composes an order (customer/table/items) and SENDs it to a cashier.
     // pos_waiter role is confined to these routes by PosAuth.
     Route::get('/waiter', [\App\Http\Controllers\RestaurantWaiterController::class, 'index'])->name('pos.waiter');
+    Route::get('/waiter/api/version', [\App\Http\Controllers\RestaurantWaiterController::class, 'version'])->name('pos.waiter.version');
     Route::get('/waiter/api/tables', [\App\Http\Controllers\RestaurantWaiterController::class, 'tables'])->name('pos.waiter.tables');
     Route::get('/waiter/api/orders', [\App\Http\Controllers\RestaurantWaiterController::class, 'myOrders'])->name('pos.waiter.orders');
     Route::post('/waiter/orders', [\App\Http\Controllers\RestaurantWaiterController::class, 'storeOrder'])->name('pos.waiter.orders.store');

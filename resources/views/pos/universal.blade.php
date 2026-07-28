@@ -1279,10 +1279,24 @@ window.addEventListener('popstate', function() {
                      model + N-shortcut guard stay intact (handler no-ops when the ref is absent);
                      per-item notes (kitchen_notes feature) unaffected. Only the order-level
                      Discount trigger remains, right-aligned on a slim row. --}}
-                <div class="px-3 py-1 flex items-center justify-end">
+                <div class="px-3 py-1 flex items-center justify-end gap-1.5">
+                    {{-- Bill Note toggle (owner, 28 Jul 2026): Dine-In sends the KOT at Hold time —
+                         the Pay-modal note comes too late for the kitchen. This opens a one-line
+                         input bound to the SAME kitchenNotes model as the Pay-modal field (one
+                         note, two surfaces). Collapsed by default: zero cart-height cost. --}}
+                    <button @click="showCartNote = !showCartNote; if (showCartNote) $nextTick(() => $refs.cartNoteInput?.focus())" class="shrink-0 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="(kitchenNotes || '').length > 0 ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:bg-gray-200'">
+                        <span x-text="(kitchenNotes || '').length > 0 ? '✎ Note ✓' : '✎ Note'"></span>
+                    </button>
                     <button @click="showDiscount = !showDiscount" class="shrink-0 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="discountAmount > 0 ? 'bg-orange-100 dark:bg-orange-900/20 text-orange-600 border-orange-200 dark:border-orange-800' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:bg-gray-200'">
                         <span x-text="discountAmount > 0 ? '-Rs. ' + Number(discountAmount).toLocaleString() : '% Discount'"></span>
                     </button>
+                </div>
+                <div class="px-3 pb-1.5" x-show="showCartNote" x-transition x-cloak>
+                    <input type="text" x-model="kitchenNotes" x-ref="cartNoteInput" data-pay-note
+                        autocomplete="off" name="pos_cart_note_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                        placeholder="Bill note (optional — e.g. kam mirch, alag pack)..."
+                        @keydown.enter.prevent="showCartNote = false"
+                        class="w-full text-xs bg-amber-50/60 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-lg px-2.5 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-amber-400 placeholder-gray-400">
                 </div>
                 <div class="px-3 pb-1.5" x-show="showDiscount" x-transition>
                     <div class="p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl space-y-1.5">
@@ -3348,6 +3362,9 @@ function restaurantPos() {
         lastHoldTime: 0,
         lastPayTime: 0,
         showDiscount: false,
+        // Cart-level Bill Note toggle (owner, 28 Jul 2026) — same kitchenNotes model
+        // as the Pay-modal note; collapsed by default so cart height is untouched.
+        showCartNote: false,
         discountType: 'percentage',
         discountValue: 0,
         discountAmount: 0,
@@ -5202,7 +5219,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.incomingOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.fixCartIndex(); this.clearCartStorage(); },
+        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.kitchenNotes = ''; this.showCartNote = false; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.incomingOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm('Current order has ' + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast('New sale started', 'success');

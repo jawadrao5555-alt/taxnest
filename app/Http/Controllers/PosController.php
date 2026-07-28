@@ -2561,7 +2561,19 @@ class PosController extends Controller
             ->limit(300)
             ->get(['id', 'invoice_number', 'pra_invoice_number', 'customer_name', 'total_amount', 'payment_method', 'order_type', 'invoice_mode', 'pra_status', 'created_at']);
 
-        $data = $bills->map(function ($b) {
+        // Table name per bill (dine-in): batch lookup via restaurant_orders →
+        // restaurant_tables so the Reprint list can show "Dine-in • Table 5".
+        // One IN query — no N+1 on the 300-bill list.
+        $tableByTx = [];
+        if ($bills->isNotEmpty() && \Schema::hasTable('restaurant_orders')) {
+            $tableByTx = \DB::table('restaurant_orders')
+                ->join('restaurant_tables', 'restaurant_tables.id', '=', 'restaurant_orders.table_id')
+                ->whereIn('restaurant_orders.pos_transaction_id', $bills->pluck('id'))
+                ->pluck('restaurant_tables.table_number', 'restaurant_orders.pos_transaction_id')
+                ->all();
+        }
+
+        $data = $bills->map(function ($b) use ($tableByTx) {
             // Badge resolution mirrors the Transactions-page tab split: the
             // ACTUAL PRA outcome decides, not invoice_mode alone.
             if (!empty($b->pra_invoice_number)) {
@@ -2583,6 +2595,7 @@ class PosController extends Controller
                 'total_amount'       => (float) $b->total_amount,
                 'payment_method'     => $b->payment_method,
                 'order_type'         => $b->order_type,
+                'table_number'       => $tableByTx[$b->id] ?? null,
                 'badge'              => $badge,
                 'created_time'       => $b->created_at?->format('h:i A'),
                 'created_human'      => $b->created_at?->diffForHumans(),

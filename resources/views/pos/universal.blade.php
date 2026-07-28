@@ -2083,7 +2083,7 @@ window.addEventListener('popstate', function() {
                            @keydown.down.prevent="activeReprintIndex = Math.min(activeReprintIndex + 1, Math.max(0, filteredReprintBills().length - 1))"
                            @keydown.up.prevent="activeReprintIndex = Math.max(activeReprintIndex - 1, 0)"
                            @keydown.enter.prevent="if (filteredReprintBills()[activeReprintIndex]) reprintBill(filteredReprintBills()[activeReprintIndex])"
-                           @keydown.escape.prevent="showReprint = false"
+                           @keydown.escape.prevent="if (reprintPreviewBill) { reprintPreviewBill = null } else { showReprint = false }"
                            autocomplete="off" name="reprint_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                            placeholder="Serial, customer ya raqam se dhoondein..."
                            class="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500 placeholder-gray-400">
@@ -2120,6 +2120,16 @@ window.addEventListener('popstate', function() {
                                           'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300': bill.badge === 'local'
                                       }"
                                       x-text="bill.badge === 'pra' ? 'PRA' : (bill.badge === 'provisional' ? 'Provisional' : (bill.badge === 'queue' ? 'Sync Queue' : (bill.badge === 'failed' ? 'Failed' : 'Local')))"></span>
+                                {{-- Order-type badge (ZFC, 30 Jul 2026): Dine-in/Takeaway/Delivery + table --}}
+                                <template x-if="bill.order_type">
+                                    <span class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide"
+                                          :class="{
+                                              'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300': bill.order_type === 'dine_in',
+                                              'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300': bill.order_type === 'takeaway',
+                                              'bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300': bill.order_type === 'delivery'
+                                          }"
+                                          x-text="orderTypeLabel(bill)"></span>
+                                </template>
                             </div>
                             <span class="text-sm font-bold text-teal-700 dark:text-teal-400" x-text="'Rs. ' + Number(bill.total_amount).toLocaleString()"></span>
                         </div>
@@ -2129,6 +2139,14 @@ window.addEventListener('popstate', function() {
                                 <template x-if="bill.customer_name"><span x-text="' • ' + bill.customer_name"></span></template>
                                 <template x-if="bill.payment_method"><span class="uppercase" x-text="' • ' + bill.payment_method.replace('_', ' ')"></span></template>
                             </p>
+                            {{-- Preview eye (ZFC, 30 Jul 2026): dekh kar print — row click = foran
+                                 print barqarar. span (not button) — row itself is a <button>. --}}
+                            <span role="button" tabindex="0" @click.stop="openReprintPreview(bill)" @keydown.enter.stop.prevent="openReprintPreview(bill)"
+                                  class="text-[10px] font-bold text-gray-500 hover:text-teal-700 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-teal-100 dark:hover:bg-teal-900/30 mr-1"
+                                  title="Bill preview — pehle dekhein, phir print karein">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                Preview
+                            </span>
                             <span class="text-[10px] font-bold text-teal-600 flex items-center gap-1" x-show="reprintBusyId !== bill.id">
                                 <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                                 Print
@@ -2143,6 +2161,38 @@ window.addEventListener('popstate', function() {
             </div>
             <div x-show="filteredReprintBills().length > 0" class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-[11px] text-gray-500 flex-shrink-0">
                 <span>💡 Sirf AAJ ke bills — receipt bilkul asal jaisi print hogi.</span>
+            </div>
+        </div>
+    </div>
+
+    {{-- ─────────────────────────────────────────────────────────────────────── --}}
+    {{-- REPRINT PREVIEW (ZFC, 30 Jul 2026) — eye button on a reprint row.       --}}
+    {{-- Shows the REAL receipt HTML in an iframe (no auto_print), with a Print   --}}
+    {{-- button that reuses reprintBill(). Sits ABOVE the reprint modal (z-50)    --}}
+    {{-- via inline z-index — NO arbitrary Tailwind class (Vite build trap).      --}}
+    {{-- ─────────────────────────────────────────────────────────────────────── --}}
+    <div x-show="reprintPreviewBill" x-cloak x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" style="z-index:60" @click.self="reprintPreviewBill = null" @keydown.escape.window="reprintPreviewBill = null">
+        <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden">
+            <div class="px-4 py-3 bg-teal-600 flex items-center justify-between flex-shrink-0">
+                <div class="min-w-0">
+                    <h3 class="text-white font-bold text-sm truncate" x-text="reprintPreviewBill ? ('Bill Preview — ' + (reprintPreviewBill.pra_invoice_number || reprintPreviewBill.invoice_number)) : ''"></h3>
+                    <p class="text-teal-100 text-[11px]" x-text="reprintPreviewBill ? [orderTypeLabel(reprintPreviewBill), reprintPreviewBill.customer_name, 'Rs. ' + Number(reprintPreviewBill.total_amount).toLocaleString()].filter(Boolean).join(' • ') : ''"></p>
+                </div>
+                <button @click="reprintPreviewBill = null" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/25 text-white flex items-center justify-center transition flex-shrink-0" title="Close">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="flex-1 overflow-hidden bg-gray-100 dark:bg-gray-800">
+                <template x-if="reprintPreviewBill">
+                    <iframe :src="receiptViewUrl(reprintPreviewBill)" class="w-full h-full bg-white" style="min-height:55vh;border:0"></iframe>
+                </template>
+            </div>
+            <div class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-end gap-2 flex-shrink-0">
+                <button @click="reprintPreviewBill = null" class="px-4 py-2 text-xs font-bold text-gray-600 dark:text-gray-300 rounded-xl border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition">Band Karein</button>
+                <button @click="reprintBill(reprintPreviewBill); reprintPreviewBill = null" class="px-5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl transition flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                    Print Karein
+                </button>
             </div>
         </div>
     </div>
@@ -3334,6 +3384,7 @@ function restaurantPos() {
         reprintLoading: false,
         reprintSearch: '',
         reprintBusyId: null,
+        reprintPreviewBill: null,   // Preview modal (ZFC 30 Jul 2026): bill being previewed
         // ── INCOMING WAITER ORDERS (P7, F6) ───────────────────────────────
         // Orders composed on waiter tablets (source='waiter', status 'held').
         // Cashier loads one into the cart, takes payment via the MANUAL path
@@ -5207,6 +5258,12 @@ function restaurantPos() {
             // search input (no preventDefault on unhandled keys); ↑↓ move the
             // highlight over the FILTERED list, Enter prints it, Esc closes.
             if (this.showReprint) {
+                // Preview open (ZFC 30 Jul 2026): Esc = sirf preview band; Enter = print.
+                if (this.reprintPreviewBill) {
+                    if (e.key === 'Escape') { e.preventDefault(); this.reprintPreviewBill = null; }
+                    else if (e.key === 'Enter') { e.preventDefault(); const b = this.reprintPreviewBill; this.reprintPreviewBill = null; this.reprintBill(b); }
+                    return;
+                }
                 const rlist = this.filteredReprintBills();
                 if (e.key === 'ArrowDown') { e.preventDefault(); this.activeReprintIndex = Math.min(this.activeReprintIndex + 1, Math.max(0, rlist.length - 1)); }
                 else if (e.key === 'ArrowUp') { e.preventDefault(); this.activeReprintIndex = Math.max(this.activeReprintIndex - 1, 0); }
@@ -7050,6 +7107,24 @@ function restaurantPos() {
         // transaction id: silent print via Desktop Agent first, hidden-iframe
         // fallback. `deduped` = the double-press guard says this bill is
         // ALREADY queued/printing — tell the cashier to wait, no 2nd copy.
+        // Order-type label for reprint rows/preview (ZFC 30 Jul 2026):
+        // Dine-in + table number when we have it.
+        orderTypeLabel(bill) {
+            if (!bill || !bill.order_type) return '';
+            if (bill.order_type === 'dine_in') return 'Dine-in' + (bill.table_number ? ' • ' + bill.table_number : '');
+            if (bill.order_type === 'takeaway') return 'Takeaway';
+            if (bill.order_type === 'delivery') return 'Delivery';
+            return String(bill.order_type).replace('_', ' ');
+        },
+        // Receipt VIEW url (no auto_print) — same route family reprintBill() prints.
+        receiptViewUrl(bill) {
+            if (!bill) return 'about:blank';
+            return this.isRestaurantMode ? ('/pos/restaurant/receipt/' + bill.id) : ('/pos/transaction/' + bill.id + '/receipt');
+        },
+        openReprintPreview(bill) {
+            if (!bill) return;
+            this.reprintPreviewBill = bill;
+        },
         reprintBill(bill) {
             if (!bill || this.reprintBusyId) return;
             this.reprintBusyId = bill.id;

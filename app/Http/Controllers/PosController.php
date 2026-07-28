@@ -475,6 +475,11 @@ class PosController extends Controller
             return response()->json(['success' => true, 'job_id' => $job->id]);
         }
 
+        // KOT needs ONE of the two ids — clean 422 instead of an undefined-key 500.
+        if (!$request->filled('restaurant_order_id') && !$request->filled('transaction_id')) {
+            return response()->json(['success' => false, 'reason' => 'missing_id'], 422);
+        }
+
         // ── KOT from a TRANSACTION (order-less delivery bills, ZFC 28 Jul 2026) ──
         if (!$request->filled('restaurant_order_id') && $request->filled('transaction_id')) {
             if (!$settings['kot_printer']) {

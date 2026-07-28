@@ -13,9 +13,12 @@
             /* Thermal rule: never force body width = physical paper width
                (80mm prints ~72mm) — auto + max-width cap. */
             width: auto;
-            max-width: 80mm;
-            margin: 0 auto;
-            padding: 3mm;
+            max-width: 72mm;
+            /* margin 0 (NOT auto) even on screen — ZFC's misconfigured A4 queue
+               centered the body and printed only a right-edge strip; mirror
+               receipt_80mm v5/v6: left-align + 4mm side padding. */
+            margin: 0;
+            padding: 4mm 4mm 1mm;
             background: #fff;
             color: #000;
             line-height: 1.5;

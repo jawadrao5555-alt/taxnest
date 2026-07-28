@@ -60,6 +60,7 @@
 - [Live POS test company](live-pos-test-company.md) — STANDING live QA company id 35 (retained); all other live POS companies are REAL customers; "Pro restaurant drift" was a FALSE alarm; pos/* CSRF-exempt.
 - [POS restaurant module invariants](pos-restaurant-module.md) — gating column rule, Table Shift (empty-target-only, timer carries, no KOT reprint), station-KOT single resolver, KDS kitchen_status isolation, waiter settle path, deal snapshot stock, QR menu.
 - [POS Staff Hazri](pos-staff-hazri.md) — pos_user_sessions; login listener MUST stay pos-guard-gated + skip impersonation; 5-min heartbeat throttle; 6AM window; admin-only report + day-close section.
+- [POS wide-cart (Variant A) layout](pos-widecart-layout.md) — showProducts=false desktop flip: cart wide LEFT + 400px payment RIGHT via .tn-widecart + display:contents wrappers; new cart children must join a wrapper.
 - [POS universal screen features](pos-universal-screen-features.md) — Screen Fit, manual-cart type mapping, receipt popup, F10/F11 modals, PWA update hold; detail moved out of replit.md.
 - [Offline-first POS billing dedupe](offline-first-pos-billing.md) — offline_uuid rides on EVERY submit attempt incl. online (lost-response dupes); replay guard before quota; timestamp/poison-queue gaps open.
 - [POS Screen Fit zoom](pos-screen-fit-zoom.md) — sale screens scale via CSS zoom + px-height compensation (vh unreliable in zoomed subtree); CSS.supports guard mandatory; auto shrinks 1280–1366w shops to 90%.

@@ -175,6 +175,33 @@
     .tn-body-row > .tn-cart-col { flex: 1 1 0%; min-height: 0; }
 }
 
+/* ── WIDE-CART layout (owner-approved "Variant A" mockup, 28 Jul 2026) ──
+   Products-hidden mode (showProducts=false) par DESKTOP layout flip: top bars
+   full-width rehte hain, neeche cart poori width LEFT me phailta hai aur payment/
+   totals ka block RIGHT column ban jata hai (product grid area collapse).
+   .tn-cart-main / .tn-cart-side wrappers are display:contents by DEFAULT, so the
+   normal (grid-ON) layout and mobile are bit-for-bit unchanged. Mobile (<768px)
+   kabhi widecart nahi hota. Custom classes — no Tailwind rebuild dependency. */
+.tn-cart-main, .tn-cart-side { display: contents; }
+/* Legacy fallback (no display:contents): wrappers become plain flex columns that
+   reproduce the original stacking — cart list pane flexes, footer pane sizes to
+   content — so old WebViews keep a working (normal) cart layout. */
+@supports not (display: contents) {
+    .tn-cart-main { display: flex; flex-direction: column; flex: 1 1 0%; min-height: 0; }
+    .tn-cart-side { display: flex; flex-direction: column; flex-shrink: 0; }
+}
+@media (min-width: 768px) {
+    .tn-widecart { flex-direction: column; }
+    .tn-widecart .tn-left-col { flex: 0 0 auto; }
+    /* Products area shrinks to just the category strip + Akhri Bills (toggle wapas ON karne ka raasta wahin hai) */
+    .tn-widecart .tn-left-col > div.flex-1 { flex: 0 0 auto; }
+    .tn-widecart [x-ref="gridContainer"] { display: none; }
+    .tn-widecart .tn-cart-col { width: 100% !important; flex: 1 1 0%; min-height: 0; flex-direction: row; border-left: 0; border-top: 1px solid rgba(148,163,184,.28); }
+    .tn-widecart .tn-cart-main { display: flex; flex-direction: column; flex: 1 1 0%; min-width: 0; min-height: 0; }
+    .tn-widecart .tn-cart-side { display: flex; flex-direction: column; flex: 0 0 400px; width: 400px; min-height: 0; overflow-y: auto; border-left: 1px solid rgba(148,163,184,.28); }
+    .tn-widecart .tn-cart-side > div:first-child { border-top: 0; }
+}
+
 @media (max-width: 767px) {
     /* ── Mobile cart fix (owner iPhone screenshot, 25 Jul 2026) ──
        The sale screen has a FIXED app height, so the tall cart footer (Notes +
@@ -638,7 +665,7 @@ window.addEventListener('popstate', function() {
          left (products) column so the cart column spans the FULL height — the band
          above the cart used to sit empty. Mobile stacking order unchanged (bars on
          top, cart below via .tn-body-row column direction under 768px). --}}
-    <div class="tn-body-row">
+    <div class="tn-body-row" :class="!showProducts ? 'tn-widecart' : ''">
     <div class="tn-left-col" :class="mobileView === 'menu' ? 'flex-1' : ''">
 
     {{-- flex-wrap: on narrow displays the action buttons wrap to a second row instead of
@@ -1074,6 +1101,10 @@ window.addEventListener('popstate', function() {
 
         {{-- Cart column widened again (owner, 24 Jul 2026: buttons one-line + compact tiles) 320/380/420 → 340/400/460 --}}
         <div class="tn-cart-col w-full md:w-[340px] lg:w-[400px] xl:w-[460px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl" :class="mobileView === 'cart' ? 'flex' : 'hidden md:flex'">
+            {{-- WIDE-CART wrapper (Variant A, 28 Jul 2026): display:contents by default —
+                 zero layout change. In .tn-widecart desktop mode this becomes the LEFT
+                 (wide) pane: header + banners + cart list. --}}
+            <div class="tn-cart-main">
             <div class="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
                 <button @click="mobileView = 'menu'" class="md:hidden p-1.5 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
@@ -1273,7 +1304,12 @@ window.addEventListener('popstate', function() {
                     </div>
                 </template>
             </div>
+            {{-- closes .tn-cart-main --}}
+            </div>
 
+            {{-- WIDE-CART wrapper: RIGHT payment column in widecart mode (totals band +
+                 pay buttons + TABLE strip); display:contents otherwise. --}}
+            <div class="tn-cart-side">
             <div class="border-t border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-sm">
                 {{-- Order Notes textarea REMOVED (owner, 26 Jul 2026 — cart height). kitchenNotes
                      model + N-shortcut guard stay intact (handler no-ops when the ref is absent);
@@ -1530,6 +1566,8 @@ window.addEventListener('popstate', function() {
                 </div>
             </div>
             @endif
+            {{-- closes .tn-cart-side --}}
+            </div>
         </div>
     </div>
 

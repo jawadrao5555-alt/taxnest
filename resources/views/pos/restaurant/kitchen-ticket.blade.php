@@ -171,11 +171,14 @@
 </head>
 <body>
     <div class="text-center">
-        @if(($order->kot_print_count ?? 0) > 1)
+        @if(($order->kot_print_count ?? 0) > 1 && empty($delta))
             {{-- Phase 5 — re-send marker so kitchen knows items changed.
                  Jul 2026 (Pizza Master feedback): the old white-on-black
                  "UPDATED" badge printed as an EMPTY black box on thermal
-                 printers and wasted 2 lines — merged into ONE bold line. --}}
+                 printers and wasted 2 lines — merged into ONE bold line.
+                 Jul 28 2026 (ZFC feedback): delta tickets carry ONLY new items,
+                 so they must print CLEAN — no reprint/updated wording at all.
+                 Banner kept for manual full re-sends (non-delta) only. --}}
             <p class="text-sm bold" style="color:#000; font-weight:900;">*** REPRINT #{{ $order->kot_print_count }} &mdash; IGNORE PRIOR TICKET ***</p>
         @endif
         @if($order->priority ?? false)
@@ -212,37 +215,10 @@
 
     <div class="separator"></div>
 
-    @php
-        // "ADDED ITEMS" banner (ZFC feedback Jul 2026): delta=1 is sent on EVERY
-        // universal-screen KOT — including the very FIRST send — so keying the
-        // banner on $delta alone stamped "ADDED ITEMS" on brand-new orders and
-        // confused the kitchen. Real test: does the order have items ALREADY
-        // printed in an earlier batch that are NOT on this ticket? Only then is
-        // this ticket an addition.
-        $isAdditionTicket = !empty($delta) && $order->items
-            ->whereNotNull('kot_printed_at')
-            ->pluck('id')
-            ->diff(($ticketItems ?? collect())->pluck('id'))
-            ->isNotEmpty();
-        // KOT Full Mode (ZFC feedback, Jul 2026): full-order ticket that carries
-        // BOTH old and new rows — banner + per-row NEW badges only when the order
-        // actually has prior printed rows (first-ever ticket stays clean).
-        $newIds = collect($newItemIds ?? []);
-        $isFullUpdate = $newIds->isNotEmpty()
-            && ($ticketItems ?? collect())->pluck('id')->diff($newIds)->isNotEmpty();
-    @endphp
-    {{-- Jul 2026 (Pizza Master feedback): boxed banners ate ~4 lines each —
-         slimmed to single bold centered lines so a reprint/delta ticket is
-         nearly as short as a first-print KOT. --}}
-    @if($isAdditionTicket)
-    <div class="mt-1 text-center">
-        <span class="bold text-lg">++ ADDED ITEMS{{ !empty($kotBatchNo) ? ' — KOT #'.$kotBatchNo : '' }} ++</span>
-    </div>
-    @elseif($isFullUpdate)
-    <div class="mt-1 text-center">
-        <span class="bold text-lg">++ UPDATED ORDER{{ !empty($kotBatchNo) ? ' — KOT #'.$kotBatchNo : '' }} ++ <span class="text-sm">(&raquo; NEW)</span></span>
-    </div>
-    @endif
+    {{-- Jul 28 2026 (ZFC feedback via owner): "ADDED ITEMS" / "UPDATED ORDER"
+         banners REMOVED entirely — an updated order's ticket prints only the
+         NEW items, plainly, with no update wording. The per-batch "KOT #N" in
+         the header is enough for the kitchen to sequence tickets. --}}
 
     @php
         // Counter/Station routing (Jul 2026): grouping is resolved in the
@@ -275,9 +251,6 @@
                 @foreach($items as $item)
                 <tr>
                     <td class="name">
-                        @if($isFullUpdate && $newIds->contains($item->id))
-                            <span style="border: 1.5px solid #000; padding: 0 3px; font-weight: 900; font-size: 12px;">NEW</span>
-                        @endif
                         <span class="bold">{{ $item->item_name }}</span>
                         @if($item->special_notes)
                             <br><span class="note">&raquo; NOTE: {{ $item->special_notes }}</span>

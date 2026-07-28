@@ -172,9 +172,11 @@
 <body>
     <div class="text-center">
         @if(($order->kot_print_count ?? 0) > 1)
-            {{-- Phase 5 — re-send marker so kitchen knows items changed --}}
-            <p class="priority-badge" style="background:#000; border-color:#000; color:#fff;">*** UPDATED ***</p>
-            <p class="text-sm bold mt-1" style="color:#000; font-weight:900;">REPRINT #{{ $order->kot_print_count }} &mdash; IGNORE PRIOR TICKET</p>
+            {{-- Phase 5 — re-send marker so kitchen knows items changed.
+                 Jul 2026 (Pizza Master feedback): the old white-on-black
+                 "UPDATED" badge printed as an EMPTY black box on thermal
+                 printers and wasted 2 lines — merged into ONE bold line. --}}
+            <p class="text-sm bold" style="color:#000; font-weight:900;">*** REPRINT #{{ $order->kot_print_count }} &mdash; IGNORE PRIOR TICKET ***</p>
         @endif
         @if($order->priority ?? false)
             <p class="priority-badge mt-1">!!! RUSH !!!</p>
@@ -229,14 +231,16 @@
         $isFullUpdate = $newIds->isNotEmpty()
             && ($ticketItems ?? collect())->pluck('id')->diff($newIds)->isNotEmpty();
     @endphp
+    {{-- Jul 2026 (Pizza Master feedback): boxed banners ate ~4 lines each —
+         slimmed to single bold centered lines so a reprint/delta ticket is
+         nearly as short as a first-print KOT. --}}
     @if($isAdditionTicket)
-    <div class="mt-1" style="border: 2px solid #000; padding: 4px; text-align: center;">
+    <div class="mt-1 text-center">
         <span class="bold text-lg">++ ADDED ITEMS{{ !empty($kotBatchNo) ? ' — KOT #'.$kotBatchNo : '' }} ++</span>
     </div>
     @elseif($isFullUpdate)
-    <div class="mt-1" style="border: 2px solid #000; padding: 4px; text-align: center;">
-        <span class="bold text-lg">++ UPDATED ORDER{{ !empty($kotBatchNo) ? ' — KOT #'.$kotBatchNo : '' }} ++</span>
-        <br><span class="bold text-sm">NEW items marked &raquo; NEW</span>
+    <div class="mt-1 text-center">
+        <span class="bold text-lg">++ UPDATED ORDER{{ !empty($kotBatchNo) ? ' — KOT #'.$kotBatchNo : '' }} ++ <span class="text-sm">(&raquo; NEW)</span></span>
     </div>
     @endif
 

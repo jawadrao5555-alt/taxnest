@@ -19,3 +19,9 @@ description: SALE_CACHE cache-first serving of /pos/invoice/create, boot fingerp
 **Also accepted staleness:** customers list + heldOrders baked copy can be one boot-cycle old — new waiter orders arrive via the existing 20s `/pos/api/incoming-orders` poll, so nothing operational is missed.
 
 **How to apply:** if the sale screen ever bakes NEW user/company-variant or price-relevant data, add it to `posBootFingerprint()` (PosController) or it will be served stale from cache. If it ever bakes branch-scoped data, add branch id to the fingerprint. Never cache query-string variants or add other authenticated screens to SALE_CACHE without these same rails.
+
+
+## Loop-proof reload (28 Jul 2026, ZFC "loading bar bar")
+- Old flow (postMessage TN_DROP_SALE_CACHE + 400ms reload) was a RACE: slow/failed network → reload landed on the same stale copy → loop.
+- New contract in bootFpCheck: fetch fresh HTML (cache:'reload') FIRST, page itself `caches.put()`s it into the live `*-sale` cache (name discovered via caches.keys().find(endsWith('-sale')) — never hardcode the version), THEN reload. Network fail → NO reload, cached screen keeps working. sessionStorage one-shot guard set only after fresh copy secured.
+- posBootFingerprint: now()->toDateString() joins `cat` ONLY when company has deals (dealsAgg not '0:...') — deal-less shops no longer force-reload every morning.

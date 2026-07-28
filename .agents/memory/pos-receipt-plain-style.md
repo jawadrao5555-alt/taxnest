@@ -64,3 +64,9 @@ Related: iframe print focus — after the hidden print iframe's dialog closes, f
 inside the iframe and the parent document's keydown shortcuts (P reprint / Enter / Esc) go
 dead. `_printViaIframe`'s fireOnce must blur the iframe + `window.focus()` — keep that
 recovery in any new hidden-iframe print path.
+
+
+## 28 Jul 2026: per-set name/developed-by toggles
+- show_business_name + show_developed_by now in defaultDisplayPrefs (default TRUE) for BOTH pos (PRA) and pos_local sets; gated in receipt_80mm/58mm headers + footer and proof-bill (proof follows the LOCAL set via $company->posReceiptPrefs('local')).
+- Any new receipt template MUST gate the business-name h1 and the Developed-by line on these prefs.
+- Proof bill is ENGLISH ONLY (owner rule: printed receipts/bills = English, no Roman Urdu).

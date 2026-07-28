@@ -16,3 +16,5 @@ Owner regularly sends `.m4a` voice notes (Urdu/Punjabi) as attached assets; they
 Scribe v1 auto-detects language (returns `language_code` urd/hin with ~0.98 prob for the owner's notes) and handles code-switched Urdu/English well.
 
 **Why:** three failure modes cost a round each — object body (pydantic string_type error), JSON content type (422 model_id missing), and 403 from preserved 600 perms. This recipe is the one that works end-to-end.
+
+**UPDATE (28 Jul 2026):** the ElevenLabs proxy callback now REJECTS string bodies (schema requires Record) and its multipart encoding 400s even with model_id alone — STT via the proxy is currently broken. Working fallback: the project's own `.env` has `OPENAI_API_KEY` (strip surrounding quotes!) — `curl https://api.openai.com/v1/audio/transcriptions -F model=gpt-4o-mini-transcribe -F file=@x.m4a -F response_format=text` from the shell transcribes Urdu voice notes locally, no public URL staging needed.

@@ -20,3 +20,7 @@ In `@media print`, body margin must be `margin: 0` — NEVER `margin: 0 auto`. *
 **Why:** owner's live shop (Jul 2026) reported right-edge clipping on a real 80mm thermal bill — "Cash"→"Cas", time/amounts cut. 80mm paper has only ~72mm printable width (58mm → ~48mm) because of printer hardware margins; a forced 80mm-wide body pushes the right ~8mm into the non-printable strip. `max-width` cap keeps A4/letter test-prints from stretching.
 
 **How to apply:** every browser-printed thermal template (PRA 80mm/58mm receipts, restaurant receipt, kitchen ticket, FBR receipt) carries this fix with a "PRINTABLE-WIDTH FIX" comment. Any NEW receipt/ticket template must copy the pattern. Special case: FBR receipt's `$paperSize === 'a4'` branch deliberately re-fixes `width: 80mm` (centered on the big page — no clipping risk there). This is the browser-print sibling of the DomPDF issue (DomPDF uses media "screen", separate `$pdfMode` override already handles it).
+
+## margin:0 in @media print (28 Jul 2026, ZFC proof bill)
+- `margin: 0 auto` in the PRINT block centers the capped body on the driver's wider canvas — the thermal head prints only the left slice, so the bill comes out as a thin right-edge strip.
+- Every thermal template's @media print body must be `width:auto; max-width:72mm; margin:0` (mirror receipt_80mm). Screen-side `margin:0 auto` is fine.

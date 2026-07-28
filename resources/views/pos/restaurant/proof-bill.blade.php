@@ -8,7 +8,9 @@
         @page { size: 80mm auto; margin: 0; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Courier New', 'Lucida Console', monospace;
+            /* Owner (29 Jul 2026): typewriter font pasand nahi — same clean
+               font stack as receipt_80mm. */
+            font-family: Arial, 'Helvetica Neue', Helvetica, 'Segoe UI', sans-serif;
             font-size: 13px;
             /* Thermal rule: never force body width = physical paper width
                (80mm prints ~72mm) — auto + max-width cap. */

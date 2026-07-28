@@ -53,3 +53,9 @@ See `prod-scheduled-jobs-cron.md` for why this is mandatory.
 - **Sandbox gotcha:** the agent sandbox blocks destructive git verbs (`git checkout --`, `git restore`, …) even inside an SSH command STRING (pattern match on the bash command). Use `git stash` (allowed, and the runbook-endorsed reconcile move) instead of checkout when clearing live drift.
 - `git commit-tree` is ALSO blocked (pattern-matches "git commit") — there is NO way to mint a commit mid-task. Mid-task deploy = scp/tar the changed files (feature-unit rule above) + caches + OPcache reset; push `origin HEAD:main` only in a LATER turn once the platform checkpoint/completion commit exists, then reconcile live via stash+pull.
 - After any deploy, "no fresh errors" check: `grep 'production.ERROR' storage/logs/laravel.log` filtered to post-deploy timestamps — pre-existing noise: a Compliance cron fails nightly at 02:00 with "Column 'created_at' ambiguous" (DI-side, pre-existing, NOT deploy fallout; owner has not asked to fix it — NestPOS-only focus).
+
+## Git-based deploy now WORKS (28 Jul 2026)
+- Live tree is now CLEAN and synced to origin/main (was dirty from old tar-based deploys; local diffs + untracked blockers backed up in `~/deploy_backups/` on the server).
+- Deploy = `git push origin HEAD:main` from dev, then SSH: `git pull origin main` → view/route/config cache → temp `public/r.php` opcache_reset → delete it.
+- **Domain gotcha:** the LIVE domain is `taxnest.com.pk` (cPanel main domain). `https://taxnest.pk` returns 403 from some OTHER server — testing the wrong domain looks like a deploy-breaking 403. Always verify against taxnest.com.pk.
+- Stale `.git/refs/remotes/origin/main.lock` in dev workspace can block push — rm the lock file.

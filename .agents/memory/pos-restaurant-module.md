@@ -59,3 +59,8 @@ Move an open (status 'held') order to another table: POST /pos/restaurant/orders
 - **Defaults MUST render the old ticket byte-identical** — every rule is opt-in via body classes/inline style. Compact CSS sits BEFORE the v6 static print fix; opt-in overrides (compact print padding, center = margin auto, else margin-left {mm}) come AFTER v6 so they win the cascade. Keep the v6 "LAST among STATIC rules" comment honest.
 - Center alignment is OPT-IN with an explicit UI warning: v6 history — auto-centering blanks slips on Windows queues misconfigured to A4/Letter (print lands off-paper). Default stays left; the safe fix for "print sits to a side" is Left Margin (mm). Do NOT make center the default.
 - Barcode OFF removes the JsBarcode CDN + svg entirely (renderBarcode guards the missing element) — this intentionally kills KDS scan-to-clear for that company; KB/book warn the shopkeeper.
+
+## Proof Bill (28 Jul 2026)
+- `GET /pos/restaurant/orders/{id}/proof-bill` renders a thermal pre-bill marked "PROOF BILL — NOT PAID": NO PosTransaction, no serial, no PRA call; order stays open. It must NEVER finalize or mutate the order.
+- Board action popup lazy-fetches items via orders/by-table on open (`boardMenuItems`); keep the table-status polling endpoint light — never bake items into it.
+- Dine-in holdOrder success reopens the table picker (owner flow: KOT → back to tables chart); non-dine-in keeps phone-input focus.

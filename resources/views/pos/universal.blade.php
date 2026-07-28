@@ -3565,6 +3565,20 @@ function restaurantPos() {
             this.$watch('kitchenNotes', () => { this.saveCart(); });
             setTimeout(() => this.cacheProductData(), 800);
             document.addEventListener('keydown', (e) => this.handleKey(e));
+            // Owner (28 Jul 2026): "New Sale pe click karo to 'NestPOS load ho raha
+            // hai' kyun aata hai?" — mobile-menu / stray nav links to the plain sale
+            // URL were doing a FULL page reload (boot splash) even though we're
+            // already ON the sale screen. Intercept exact-match links only (never
+            // ?edit_bill= / ?table_id= reloads — those NEED a fresh page).
+            document.addEventListener('click', (e) => {
+                const a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+                if (!a) return;
+                const plain = '{{ route('pos.invoice.create') }}';
+                if (a.href === plain || a.href === plain + '/') {
+                    e.preventDefault();
+                    this.newSale();
+                }
+            });
             this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
             // EDIT MODE (Jul 2026): ?edit_bill= → load the provisional bill into the
             // cart. Also show the "updated" toast after a successful edit-reload.

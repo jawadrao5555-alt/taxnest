@@ -263,3 +263,9 @@ id = "rQ-lq9vNCF4zyca9B-6vM"
 uri = "file://screenshots/variant-c-customerpanel.png"
 type = "image"
 title = "Variant C — Customer Panel (customer info + payment grid)"
+
+[[outputs]]
+id = "q2EdO_OzlyM_taYHw-G4F"
+uri = "file://screenshots/variant-a-plus-total-band.png"
+type = "image"
+title = "Variant A + Bada Total Band (C/B style)"

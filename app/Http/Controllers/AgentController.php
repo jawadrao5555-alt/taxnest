@@ -621,7 +621,27 @@ class AgentController extends Controller
                 ->header('Content-Type', 'text/html; charset=UTF-8');
         }
 
+        // Proof bill (ZFC 28 Jul 2026): pre-bill via silent path — no OS dialog.
+        if ($job->type === 'proof') {
+            $order = \App\Models\RestaurantOrder::where('company_id', $company->id)
+                ->with(['items', 'table', 'creator'])
+                ->find($job->restaurant_order_id);
+            if (!$order) {
+                return response()->json(['error' => 'Order not found'], 404);
+            }
+            return response(view('pos.restaurant.proof-bill', ['order' => $order, 'company' => $company])->render())
+                ->header('Content-Type', 'text/html; charset=UTF-8');
+        }
+
         if ($job->type === 'kot') {
+            // Order-less delivery bills: KOT rendered from the transaction itself.
+            if (!$job->restaurant_order_id && $job->transaction_id) {
+                $html = \App\Http\Controllers\RestaurantPosController::renderTransactionKot($company->id, (int) $job->transaction_id);
+                if ($html === null) {
+                    return response('', 204); // nothing to print — agent marks done
+                }
+                return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
+            }
             $order = \App\Models\RestaurantOrder::where('company_id', $company->id)
                 ->with(['items', 'table', 'creator'])
                 ->find($job->restaurant_order_id);

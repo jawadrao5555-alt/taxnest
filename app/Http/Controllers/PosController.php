@@ -215,6 +215,8 @@ class PosController extends Controller
                 'show_mobile' => $request->has('rp_show_mobile'),
                 'show_cashier' => $request->has('rp_show_cashier'),
                 'show_footer' => $request->has('rp_show_footer'),
+                'show_business_name' => $request->has('rp_show_business_name'),
+                'show_developed_by' => $request->has('rp_show_developed_by'),
                 'footer_text' => trim((string) $request->input('rp_footer_text', '')) ?: null,
             ];
             // Local (L-series) receipt set — owner request Jul 2026: PRA and Local
@@ -226,6 +228,8 @@ class PosController extends Controller
                 'show_mobile' => $request->has('lp_show_mobile'),
                 'show_cashier' => $request->has('lp_show_cashier'),
                 'show_footer' => $request->has('lp_show_footer'),
+                'show_business_name' => $request->has('lp_show_business_name'),
+                'show_developed_by' => $request->has('lp_show_developed_by'),
                 'show_tax' => $request->has('lp_show_tax'),
                 'footer_text' => trim((string) $request->input('lp_footer_text', '')) ?: null,
             ];
@@ -390,9 +394,10 @@ class PosController extends Controller
         if (!$company) { abort(404); }
 
         $validated = $request->validate([
-            'type' => 'required|in:bill,kot',
+            'type' => 'required|in:bill,kot,proof',
             'transaction_id' => 'required_if:type,bill|nullable|integer',
-            'restaurant_order_id' => 'required_if:type,kot|nullable|integer',
+            // kot: restaurant_order_id OR transaction_id (order-less delivery bills)
+            'restaurant_order_id' => 'required_if:type,proof|nullable|integer',
             'delta' => 'nullable|boolean',
             // Counter/Station routing: a station-pinned KDS device enqueues ONLY
             // its own counter's ticket (0 = main Kitchen bucket).
@@ -440,6 +445,52 @@ class PosController extends Controller
                 'company_id' => $companyId,
                 'type' => 'bill',
                 'target_printer' => $settings['receipt_printer'],
+                'transaction_id' => (int) $validated['transaction_id'],
+                'status' => 'pending',
+                'created_by' => $user->id,
+            ]);
+            return response()->json(['success' => true, 'job_id' => $job->id]);
+        }
+
+        // ── PROOF BILL (ZFC 28 Jul 2026): pre-bill on the RECEIPT printer —
+        // silent path so the desktop app never pops the Windows print dialog. ──
+        if ($validated['type'] === 'proof') {
+            if (!$settings['receipt_printer']) {
+                return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
+            }
+            $exists = \App\Models\RestaurantOrder::where('company_id', $companyId)
+                ->where('id', (int) $validated['restaurant_order_id'])
+                ->exists();
+            if (!$exists) {
+                return response()->json(['success' => false, 'reason' => 'not_found'], 404);
+            }
+            $job = \App\Models\PosPrintJob::create([
+                'company_id' => $companyId,
+                'type' => 'proof',
+                'target_printer' => $settings['receipt_printer'],
+                'restaurant_order_id' => (int) $validated['restaurant_order_id'],
+                'status' => 'pending',
+                'created_by' => $user->id,
+            ]);
+            return response()->json(['success' => true, 'job_id' => $job->id]);
+        }
+
+        // ── KOT from a TRANSACTION (order-less delivery bills, ZFC 28 Jul 2026) ──
+        if (!$request->filled('restaurant_order_id') && $request->filled('transaction_id')) {
+            if (!$settings['kot_printer']) {
+                return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
+            }
+            $exists = PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->where('id', (int) $validated['transaction_id'])
+                ->exists();
+            if (!$exists) {
+                return response()->json(['success' => false, 'reason' => 'not_found'], 404);
+            }
+            $job = \App\Models\PosPrintJob::create([
+                'company_id' => $companyId,
+                'type' => 'kot',
+                'target_printer' => $settings['kot_printer'],
                 'transaction_id' => (int) $validated['transaction_id'],
                 'status' => 'pending',
                 'created_by' => $user->id,
@@ -1108,12 +1159,16 @@ class PosController extends Controller
             $row = $query->selectRaw('COUNT(*) AS cnt, MAX(updated_at) AS mx')->first();
             return ($row->cnt ?? 0) . ':' . (string) ($row->mx ?? '');
         };
+        $dealsAgg = $agg(PosDeal::where('company_id', $companyId));
         $catalogRev = md5(implode('|', [
             $agg(PosProduct::where('company_id', $companyId)),
             $agg(PosService::where('company_id', $companyId)),
-            $agg(PosDeal::where('company_id', $companyId)),
-            // Deals carry weekday/date windows — a day change must refresh the screen.
-            now()->toDateString(),
+            $dealsAgg,
+            // Deals carry weekday/date windows — a day change must refresh the
+            // screen, but ONLY for companies that actually have deals (ZFC,
+            // 28 Jul 2026: the date-flip forced EVERY shop into a morning reload
+            // — needless splash/reload churn for deal-less companies).
+            str_starts_with($dealsAgg, '0:') ? '' : now()->toDateString(),
         ]));
 
         $settingsRev = md5(json_encode([
@@ -6942,7 +6997,18 @@ class PosController extends Controller
         // reconciliation's opening float for this date.
         $dayOpening = \App\Models\PosDayOpening::forDate($companyId, $date);
 
-        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'analytics', 'riderFigures', 'dayOpening'));
+        // Day-close warning (ZFC 28 Jul 2026): open held orders / occupied tables
+        // must be surfaced BEFORE closing — otherwise they dangle into tomorrow.
+        $openOrders = \App\Models\RestaurantOrder::where('company_id', $companyId)
+            ->whereIn('status', ['held', 'preparing', 'ready'])
+            ->count();
+        $occupiedTables = \App\Models\RestaurantOrder::where('company_id', $companyId)
+            ->whereIn('status', ['held', 'preparing', 'ready'])
+            ->whereNotNull('table_id')
+            ->distinct('table_id')
+            ->count('table_id');
+
+        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables'));
     }
 
     public function closeDayReport(Request $request)

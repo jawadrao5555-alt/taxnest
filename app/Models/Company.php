@@ -193,6 +193,10 @@ class Company extends Model
             'show_mobile' => true,
             'show_cashier' => true,
             'show_footer' => true,
+            // ZFC 28 Jul 2026: business name + "Developed by" line are now
+            // per-receipt-type toggles (owner wanted them OFF on local bills).
+            'show_business_name' => true,
+            'show_developed_by' => true,
             'footer_text' => null,
         ];
     }
@@ -206,7 +210,7 @@ class Company extends Model
 
         $merged = array_merge($defaults, is_array($prefs) ? $prefs : []);
 
-        foreach (['show_address', 'show_ntn', 'show_email', 'show_mobile', 'show_cashier', 'show_footer'] as $k) {
+        foreach (['show_address', 'show_ntn', 'show_email', 'show_mobile', 'show_cashier', 'show_footer', 'show_business_name', 'show_developed_by'] as $k) {
             $merged[$k] = filter_var($merged[$k], FILTER_VALIDATE_BOOLEAN);
         }
 
@@ -237,7 +241,7 @@ class Company extends Model
         }
 
         $merged = array_merge(self::defaultDisplayPrefs(), $local);
-        foreach (['show_address', 'show_ntn', 'show_email', 'show_mobile', 'show_cashier', 'show_footer'] as $k) {
+        foreach (['show_address', 'show_ntn', 'show_email', 'show_mobile', 'show_cashier', 'show_footer', 'show_business_name', 'show_developed_by'] as $k) {
             $merged[$k] = filter_var($merged[$k], FILTER_VALIDATE_BOOLEAN);
         }
         $merged['show_tax'] = filter_var($local['show_tax'] ?? $pra['show_tax'], FILTER_VALIDATE_BOOLEAN);

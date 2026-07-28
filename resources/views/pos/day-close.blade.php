@@ -522,7 +522,19 @@
                     </p>
                 </div>
             </div>
-            <button type="submit" onclick="return confirm('Are you sure you want to close this day? This action cannot be undone.')"
+            @if(($openOrders ?? 0) > 0)
+            {{-- ZFC 28 Jul 2026: warn BEFORE closing when held orders / occupied
+                 tables are still open — they dangle into tomorrow otherwise. --}}
+            <div class="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-400 dark:border-amber-700">
+                <div class="text-sm">
+                    <span class="font-bold text-amber-800 dark:text-amber-300">⚠️ {{ $openOrders }} open order{{ $openOrders > 1 ? 's' : '' }} abhi settle nahi {{ $openOrders > 1 ? 'hue' : 'hua' }}{{ ($occupiedTables ?? 0) > 0 ? ' — ' . $occupiedTables . ' table' . ($occupiedTables > 1 ? 's' : '') . ' occupied' : '' }}</span>
+                    <p class="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                        Day close karne se pehle held orders settle ya cancel kar lein — warna yeh orders (aur occupied tables) agle din ke TABLE board par latakte rahenge aur aaj ki sales mein count nahi honge.
+                    </p>
+                </div>
+            </div>
+            @endif
+            <button type="submit" onclick="return confirm('{{ ($openOrders ?? 0) > 0 ? $openOrders . ' order(s) abhi OPEN hain! Phir bhi day close karna hai?\n\n' : '' }}Are you sure you want to close this day? This action cannot be undone.')"
                 class="px-6 py-2.5 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition text-sm flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                 Close Day & Generate Z-Report

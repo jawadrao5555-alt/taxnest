@@ -209,6 +209,12 @@
     /* NOTE: body-prefixed + .bg-purple-900 repeated for specificity — pos-app ka
        theme engine `body:not([data-theme=purple]) .bg-purple-900 {...!important}`
        (0,2,1) warna is rule ko beat kar deta hai (red/blue/etc themes par). */
+    /* Owner (ZFC 28 Jul 2026): normal-mode totals band must be DARK BLACK — the
+       theme engine's bg-purple-900 remap washed it to a light accent shade on
+       non-purple themes ("light black"). :not(.tn-widecart) keeps the C-style
+       white totals card untouched; extra class hops out-rank the theme's
+       body:not([data-theme=purple]) .bg-purple-900 override. */
+    body .tn-body-row:not(.tn-widecart) .tn-cart-col .tn-total-band.bg-purple-900 { background: #0b0f14 !important; }
     body .tn-widecart .tn-total-band.bg-purple-900 { background: #fff !important; border-top: 1px solid #e5e7eb; padding: 12px 16px; }
     .tn-widecart .tn-total-band > .flex { flex-direction: column; align-items: stretch; gap: 8px; }
     .tn-widecart .tn-total-band > .flex > .min-w-0 { width: 100%; }
@@ -3603,16 +3609,43 @@ function restaurantPos() {
                         const sig = [fresh.u, fresh.c, fresh.s, fresh.cat, fresh.set].join(':');
                         try {
                             if (!userChanged && sessionStorage.getItem('tnBootFpReloaded') === sig) return;
-                            sessionStorage.setItem('tnBootFpReloaded', sig);
                         } catch (e) {}
-                        const doReload = () => window.location.reload();
-                        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-                            // Drop the stale cached copy first so the reload fetches fresh.
-                            try { navigator.serviceWorker.controller.postMessage({ type: 'TN_DROP_SALE_CACHE' }); } catch (e) {}
-                            setTimeout(doReload, 400);
-                        } else {
-                            doReload();
-                        }
+                        // LOOP-PROOF RELOAD (ZFC 28 Jul 2026 — "loading bar bar aata
+                        // hai"): the old flow dropped the SW cache via postMessage and
+                        // reloaded 400ms later — a race. If the fresh network fetch was
+                        // slow/failed, the reload landed back on the SAME stale copy
+                        // (or a blank splash) and the cycle repeated. New contract:
+                        // fetch a FRESH copy over the network FIRST, put it into the
+                        // sale cache OURSELVES, and reload only once the new page is
+                        // secured. Network down/flaky → keep the current working screen.
+                        (async () => {
+                            if (!userChanged) {
+                                try {
+                                    const resp = await fetch(window.location.pathname, { cache: 'reload', credentials: 'same-origin' });
+                                    const ct = (resp && resp.headers.get('content-type')) || '';
+                                    if (!resp || !resp.ok || resp.redirected || !ct.includes('text/html')) return;
+                                    if (window.caches) {
+                                        try {
+                                            // Never hardcode the versioned cache name — find the
+                                            // live '-sale' cache (sw.js bumps CACHE_VERSION often).
+                                            const names = await caches.keys();
+                                            const saleName = names.find(n => n.endsWith('-sale'));
+                                            if (saleName) {
+                                                const c = await caches.open(saleName);
+                                                await c.put(new Request(window.location.pathname), resp.clone());
+                                            }
+                                        } catch (e) {}
+                                    }
+                                } catch (e) { return; } // offline — cached screen keeps working
+                            } else {
+                                // Different user/company baked in — the cached copy is
+                                // WRONG for this session; drop it and force network.
+                                try { navigator.serviceWorker?.controller?.postMessage({ type: 'TN_DROP_SALE_CACHE' }); } catch (e) {}
+                                await new Promise(r => setTimeout(r, 300));
+                            }
+                            try { sessionStorage.setItem('tnBootFpReloaded', sig); } catch (e) {}
+                            window.location.reload();
+                        })();
                     })
                     .catch(() => {}); // offline → cached screen keeps working as-is
             } catch (e) {}
@@ -5639,7 +5672,17 @@ function restaurantPos() {
             const t = this.boardMenuTable;
             if (!t || !t.order) return;
             const url = '/pos/restaurant/orders/' + t.order.id + '/proof-bill?auto_print=1';
-            this._printViaIframe('print-receipt-frame', url, 'width=400,height=700');
+            const fallback = () => this._printViaIframe('print-receipt-frame', url, 'width=400,height=700');
+            // Silent-first (ZFC 28 Jul 2026): the iframe path pops the Windows
+            // print dialog inside the desktop app — route through the agent
+            // queue like receipts; iframe stays as the fallback.
+            if (this.silentBillPrint) {
+                this.trySilentPrint({ type: 'proof', restaurant_order_id: t.order.id }).then(ok => {
+                    if (ok) this.showToast('Proof bill sent to printer', 'success'); else fallback();
+                });
+                return;
+            }
+            fallback();
         },
         // View/Edit → load the table's order into the cart. Waiter orders go via
         // the ATOMIC claim (existing path). Foreign cashier-held orders are NOT
@@ -6519,8 +6562,11 @@ function restaurantPos() {
                 this.scheduleReceiptAutoClose();
                 this.$nextTick(() => { setTimeout(() => this.triggerConfetti(), 300); });
                 // Auto-print receipt for manual-cart bills too (parity with held-order pay).
-                // Manual carts don't have a restaurant order so KOT is a no-op — receipt only.
-                this.runAutoPrintChain(null);
+                // DELIVERY bills saved here (provisional rider khata + manual-cart finals)
+                // have NO restaurant order — KOT prints from the TRANSACTION (ZFC 28 Jul 2026).
+                const txnKotId = (this.isRestaurantMode && this.orderType === 'delivery' && !this.incomingOrderId)
+                    ? (data.transaction_id || null) : null;
+                this.runAutoPrintChain(null, this.orderType, txnKotId);
                 // P7: settle the linked waiter order (atomic server-side claim) —
                 // frees the table and clears it from every cashier's Incoming list.
                 // FINAL bills only: a provisional is editable/deletable, so it must
@@ -6769,6 +6815,25 @@ function restaurantPos() {
             fallback();
         },
 
+        // KOT for ORDER-LESS bills (ZFC 28 Jul 2026): delivery provisionals /
+        // manual-cart finals have no restaurant order — the kitchen ticket is
+        // rendered from the TRANSACTION. Silent-first, iframe fallback.
+        printTxnKitchenTicket(txnId, onAfterPrint) {
+            if (!txnId) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
+            const url = '/pos/transactions/' + txnId + '/kitchen-ticket?auto_print=1';
+            const fallback = () => this._printViaIframe('print-kot-frame', url, 'width=350,height=600', onAfterPrint);
+            if (this.silentKotPrint) {
+                this.trySilentPrint({ type: 'kot', transaction_id: txnId }).then(ok => {
+                    if (ok) {
+                        this.showToast('KOT sent to printer', 'success');
+                        if (typeof onAfterPrint === 'function') onAfterPrint();
+                    } else { fallback(); }
+                });
+                return;
+            }
+            fallback();
+        },
+
         // ── P7 (F6): INCOMING WAITER ORDERS ───────────────────────────
         async loadIncoming() {
             if (!this.isRestaurantMode) return;
@@ -6863,7 +6928,7 @@ function restaurantPos() {
         //
         // ✅ FIX (May-07): Tightened gap between receipt-finish → KOT-start (300ms → 80ms)
         // and initial chain start (400ms → 150ms) to feel snappier on thermal printers.
-        runAutoPrintChain(orderId, orderType = null) {
+        runAutoPrintChain(orderId, orderType = null, txnKotId = null) {
             // MASTER GATE — auto-print OFF means NOTHING fires automatically.
             if (!this.autoPrintEnabled) return;
             const hasReceipt = !!this.lastTransactionId;
@@ -6873,7 +6938,9 @@ function restaurantPos() {
             // ticket at hold — by final the food is already served, the receipt
             // carries the items. Takeaway/Delivery counter sales keep Auto-KOT
             // (kitchen cooks AFTER payment there).
-            const wantsKot = !!this.autoKotEnabled && !!orderId && orderType !== 'dine_in' && !this.kdsHandlesKot();
+            // txnKotId (ZFC 28 Jul 2026): order-less delivery bills (provisional
+            // rider khata / manual-cart finals) KOT from the TRANSACTION instead.
+            const wantsKot = !!this.autoKotEnabled && (!!orderId || !!txnKotId) && orderType !== 'dine_in' && !this.kdsHandlesKot();
             const wantsReceipt = hasReceipt;
             // KOT delta = ALWAYS in the auto chain (owner, Jul 2026): the kitchen
             // already has every line that printed at hold / waiter-send / recall —
@@ -6883,18 +6950,30 @@ function restaurantPos() {
             // the cashier settles a waiter/held bill).
             const kotDelta = true;
             if (!wantsReceipt && !wantsKot) return;
+            const fireKot = (cb) => orderId
+                ? this.printKitchenTicket(orderId, cb, kotDelta)
+                : this.printTxnKitchenTicket(txnKotId, cb);
             this.$nextTick(() => {
                 if (wantsReceipt && wantsKot) {
+                    // FAST PATH (ZFC 28 Jul 2026 — "KOT 15-20 sec late"): when BOTH
+                    // prints go through the silent agent queue there is no print
+                    // dialog to serialize around — enqueue receipt and KOT jobs
+                    // IMMEDIATELY (agent prints them in order anyway) instead of
+                    // waiting for the receipt roundtrip before creating the KOT job.
+                    if (this.silentBillPrint && this.silentKotPrint) {
+                        this.queuePrintTimer(() => { this.printReceipt(); fireKot(); }, 150);
+                        return;
+                    }
                     this.queuePrintTimer(() => {
                         this.printReceipt(() => {
-                            this.queuePrintTimer(() => this.printKitchenTicket(orderId, undefined, kotDelta), 80);
+                            this.queuePrintTimer(() => fireKot(), 80);
                         });
                     }, 150);
                 } else if (wantsReceipt) {
                     this.queuePrintTimer(() => this.printReceipt(), 150);
                 } else if (wantsKot) {
                     // Pathological case: no transaction (so no receipt possible) but KOT requested.
-                    this.queuePrintTimer(() => this.printKitchenTicket(orderId, undefined, kotDelta), 150);
+                    this.queuePrintTimer(() => fireKot(), 150);
                 }
             });
         },

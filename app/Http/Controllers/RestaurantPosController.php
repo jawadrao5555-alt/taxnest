@@ -1478,6 +1478,75 @@ class RestaurantPosController extends Controller
     }
 
     /**
+     * Delivery KOT from a TRANSACTION (ZFC, 28 Jul 2026): delivery bills saved
+     * straight from the cart (provisional rider-khata bills + manual-cart
+     * finals) have NO restaurant order, so the order-based KOT never fires and
+     * the kitchen gets nothing. Render the SAME kitchen ticket from the
+     * transaction's items via an unsaved RestaurantOrder shim. Shared by the
+     * HTTP route and the Agent print-job content endpoint.
+     */
+    public static function renderTransactionKot(int $companyId, int $transactionId): ?string
+    {
+        $transaction = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->with(['items', 'creator'])
+            ->find($transactionId);
+        if (!$transaction || $transaction->items->isEmpty()) {
+            return null;
+        }
+        $company = Company::find($companyId);
+
+        $order = new RestaurantOrder([
+            'order_number' => $transaction->invoice_number ?: ('TXN-' . $transaction->id),
+            'order_type' => $transaction->order_type ?: 'delivery',
+            'customer_name' => $transaction->customer_name ?? null,
+        ]);
+        $order->created_at = $transaction->created_at;
+        $order->kot_print_count = 1; // never a "REPRINT" banner
+        $order->priority = false;
+        $order->kitchen_notes = null;
+        $order->setRelation('table', null);
+        $order->setRelation('creator', $transaction->creator);
+
+        $ticketItems = $transaction->items->map(function ($it) {
+            $row = new \App\Models\RestaurantOrderItem([
+                'item_type' => $it->item_type,
+                'item_id' => $it->item_id,
+                'item_name' => $it->item_name,
+                'quantity' => $it->quantity,
+                'unit_price' => $it->unit_price,
+                'special_notes' => $it->special_notes,
+            ]);
+            $row->id = $it->id; // stable keys for the blade loops
+            return $row;
+        })->values();
+
+        // Same station grouping resolver as order KOTs (no station filter —
+        // one full ticket; multi-station splitting stays an order-KOT feature).
+        $prep = \App\Models\PosStation::prepareTicket($companyId, $ticketItems, null);
+
+        return view('pos.restaurant.kitchen-ticket', [
+            'order' => $order,
+            'company' => $company,
+            'ticketItems' => $prep['items'],
+            'grouped' => $prep['grouped'],
+            'stationLabel' => $prep['stationLabel'],
+            'delta' => false,
+            'kotBatchNo' => null,
+            'newItemIds' => collect(),
+        ])->render();
+    }
+
+    /** GET /pos/transactions/{id}/kitchen-ticket — iframe/popup KOT for order-less bills. */
+    public function transactionKitchenTicket(Request $request, $transactionId)
+    {
+        $html = self::renderTransactionKot((int) app('currentCompanyId'), (int) $transactionId);
+        abort_if($html === null, 404);
+
+        return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
+    }
+
+    /**
      * Phase 5 — Re-send an existing held order to the kitchen.
      * Increments kot_print_count and refreshes kot_sent_at so the next
      * printed ticket is marked "UPDATED". Does NOT touch items, totals,

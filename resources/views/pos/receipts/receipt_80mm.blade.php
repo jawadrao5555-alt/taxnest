@@ -250,12 +250,12 @@
         <div style="text-align:center; margin:0; padding:2mm 0 0; line-height:0;">
             <img src="{{ $logoDataUri }}" style="width:32mm; max-height:27mm; object-fit:contain; display:block; margin:0 auto;">
         </div>
-        <h1>{{ $company->name }}</h1>
+        @if($rp['show_business_name'] ?? true)<h1>{{ $company->name }}</h1>@endif
         @else
         <table style="width:100%; border-collapse:collapse; margin-bottom:2px;">
             <tr>
                 <td style="text-align:left; vertical-align:middle; width:64%; padding:0;">
-                    <h1 style="text-align:left; margin:0;">{{ $company->name }}</h1>
+                    @if($rp['show_business_name'] ?? true)<h1 style="text-align:left; margin:0;">{{ $company->name }}</h1>@endif
                 </td>
                 <td style="text-align:right; vertical-align:middle; width:36%; padding:0;">
                     <img src="{{ $logoDataUri }}" style="max-width:80px; max-height:42px; object-fit:contain;">
@@ -264,7 +264,7 @@
         </table>
         @endif
         @else
-        <h1>{{ $company->name }}</h1>
+        @if($rp['show_business_name'] ?? true)<h1>{{ $company->name }}</h1>@endif
         @endif
         @if($company->business_activity)<p>{{ $company->business_activity }}</p>@endif
         @if(!empty($addressLine) && $rp['show_address'])<p>{{ $addressLine }}</p>@endif
@@ -534,7 +534,7 @@
 
     <div class="footer text-center">
         @if($rp['show_footer'])<p>{{ $rp['footer_text'] ?? 'Thank you for your purchase!' }}</p>@endif
-        <p>Developed by: taxnest.com.pk</p>
+        @if($rp['show_developed_by'] ?? true)<p>Developed by: taxnest.com.pk</p>@endif
         <p>{{ now()->format('d/m/Y h:i:s A') }}</p>
     </div>
 </body>

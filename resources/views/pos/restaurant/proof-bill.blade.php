@@ -41,43 +41,53 @@
     </style>
 </head>
 <body>
+    {{-- ZFC redesign (28 Jul 2026): old-software style — big bold Bill/Table No,
+         Qty/Price/Amount columns, ENGLISH only (printed bills carry no Roman Urdu).
+         Business-name toggle follows the LOCAL receipt set. --}}
+    @php $pp = $company->posReceiptPrefs('local'); @endphp
+    @if($pp['show_business_name'] ?? true)
     <div class="text-center bold text-lg">{{ $company->business_name ?? $company->name }}</div>
+    @endif
     <div class="proof-line">*** PROOF BILL ***</div>
-    <div class="text-center text-sm bold">YEH PAKKI RECEIPT NAHI HAI — NOT PAID</div>
     <div class="separator"></div>
-    <div class="flex text-sm">
-        <span>Order: <span class="bold">{{ $order->order_number }}</span></span>
-        <span>{{ $order->created_at->format('d M Y g:i A') }}</span>
+    <div class="text-center bold" style="font-size:18px; letter-spacing:1px;">
+        BILL NO: {{ $order->order_number }}
     </div>
-    <div class="flex text-sm">
-        <span>
-            @if($order->table)Table: <span class="bold">T-{{ $order->table->table_number }}</span>@else{{ ucfirst(str_replace('_',' ',$order->order_type)) }}@endif
-        </span>
-        @if($order->creator)<span>By: {{ \Illuminate\Support\Str::of($order->creator->name)->before(' ') }}</span>@endif
+    <div class="text-center bold" style="font-size:20px; margin-top:2px;">
+        @if($order->table)TABLE NO: T-{{ $order->table->table_number }}@else{{ strtoupper(str_replace('_',' ',$order->order_type)) }}@endif
+    </div>
+    <div class="flex text-sm mt-1">
+        <span>{{ $order->created_at->format('d-M-Y') }}</span>
+        <span>{{ $order->created_at->format('g:i A') }}</span>
     </div>
     <table class="items-table">
-        <tr class="head"><td class="qty">Qty</td><td>Item</td><td class="amt">Amount</td></tr>
+        <tr class="head"><td>Item</td><td class="qty" style="text-align:center;">Qty</td><td class="amt">Price</td><td class="amt">Amount</td></tr>
         @foreach($order->items as $item)
         <tr>
-            <td class="qty">{{ rtrim(rtrim(number_format((float)$item->quantity, 2), '0'), '.') }}</td>
             <td>{{ $item->item_name }}</td>
+            <td class="qty" style="text-align:center;">{{ rtrim(rtrim(number_format((float)$item->quantity, 2), '0'), '.') }}</td>
+            <td class="amt">{{ number_format((float)$item->unit_price, 0) }}</td>
             <td class="amt">{{ number_format((float)($item->subtotal ?? ((float)$item->quantity * (float)$item->unit_price)), 0) }}</td>
         </tr>
         @endforeach
     </table>
     <table class="totals" style="width:100%">
-        <tr><td>Subtotal</td><td style="text-align:right">Rs {{ number_format((float)$order->subtotal, 0) }}</td></tr>
+        <tr><td>Total</td><td style="text-align:right">Rs {{ number_format((float)$order->subtotal, 0) }}</td></tr>
         @if((float)$order->discount_amount > 0)
         <tr><td>Discount</td><td style="text-align:right">- Rs {{ number_format((float)$order->discount_amount, 0) }}</td></tr>
         @endif
         @if((float)$order->tax_amount > 0)
         <tr><td>Tax</td><td style="text-align:right">Rs {{ number_format((float)$order->tax_amount, 0) }}</td></tr>
         @endif
-        <tr class="grand"><td>TOTAL</td><td style="text-align:right">Rs {{ number_format((float)$order->total_amount, 0) }}</td></tr>
+        <tr class="grand"><td>GRAND TOTAL</td><td style="text-align:right">Rs {{ number_format((float)$order->total_amount, 0) }}</td></tr>
     </table>
     <div class="separator"></div>
-    <div class="proof-line">*** PROOF BILL — NOT PAID ***</div>
-    <div class="text-center text-sm">Final bill counter se milega. Shukriya!</div>
+    <div class="flex text-sm">
+        @if($order->creator)<span>User: <span class="bold">{{ \Illuminate\Support\Str::of($order->creator->name)->before(' ') }}</span></span>@endif
+        <span>{{ strtoupper(str_replace('_',' ',$order->order_type)) }}</span>
+    </div>
+    <div class="proof-line">*** NOT PAID ***</div>
+    <div class="text-center text-sm bold">Thank You For Visiting Us</div>
 
     <script>
         // Same auto-print contract as the KOT ticket: iframe → postMessage the

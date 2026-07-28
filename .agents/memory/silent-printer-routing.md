@@ -31,3 +31,9 @@ description: POS silent printing via Desktop Agent print-job queue — invariant
 - Print-job type 'proof' (proof bill on RECEIPT printer) — agent prints any type generically, so 'proof' works on OLD agents too (server renders proof-bill view; auto_print script no-ops without query param). boardProofBill = silent-first.
 - KOT can now ride on transaction_id (no restaurant_order_id): order-less delivery bills (provisional rider khata / manual-cart finals) KOT via RestaurantPosController::renderTransactionKot (unsaved RestaurantOrder shim). Route /pos/transactions/{id}/kitchen-ticket; AgentController kot branch checks restaurant_order_id first, falls back to transaction_id.
 - Agent v1.5.4: print-job poll 5s→2s. Client fast path: when BOTH silentBillPrint+silentKotPrint, receipt & KOT jobs enqueue in PARALLEL (no dialog to serialize around).
+
+## Waiter-punched orders (29 Jul 2026)
+- Waiter storeOrder/appendItems now enqueue KOT via `App\Services\KotPrintService::enqueueForOrder` (best-effort, inside the same DB::transaction — jobs commit atomically with the order). Before this fix waiter orders only stamped kot_sent_at with NO print job (kitchen never printed).
+- KotPrintService mirrors PosController::apiCreatePrintJob's KOT branch (no-station single job + station split, delta support) — if that branch changes, keep the service in sync. Station-PINNED KDS path stays only in the controller.
+- Cashier settling a waiter-loaded order does NOT re-enqueue KOT (incomingOrderId path passes no KOT order id) — no double print.
+- Toast types in universal.blade.php: success=green, info=blue (new), else red. Info banners must use 'info', not 'error'.

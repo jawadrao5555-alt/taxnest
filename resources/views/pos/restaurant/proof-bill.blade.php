@@ -37,7 +37,11 @@
         .totals .grand td { font-weight: bold; font-size: 16px; border-top: 2px solid #000; padding-top: 4px; }
         /* Slim single-line marker — no reversed block, no boxed banner (thermal rules). */
         .proof-line { text-align: center; font-weight: 900; font-size: 15px; letter-spacing: 1px; margin: 4px 0; }
-        @media print { body { width: auto; max-width: 80mm; } }
+        /* PRINT: margin MUST be 0 (not auto) — auto centers the 80mm body on the
+           driver's wider canvas and the thermal head prints only the left slice,
+           so the bill came out as a thin right-edge strip (ZFC photo 28 Jul 2026).
+           Mirror receipt_80mm's print block: width auto + 72mm cap + margin 0. */
+        @media print { body { width: auto; max-width: 72mm; margin: 0; padding: 4mm 4mm 1mm; } }
     </style>
 </head>
 <body>

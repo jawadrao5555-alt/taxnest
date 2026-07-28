@@ -2565,10 +2565,14 @@ class PosController extends Controller
         // restaurant_tables so the Reprint list can show "Dine-in • Table 5".
         // One IN query — no N+1 on the 300-bill list.
         $tableByTx = [];
-        if ($bills->isNotEmpty() && \Schema::hasTable('restaurant_orders')) {
+        if ($bills->isNotEmpty() && \Schema::hasTable('restaurant_orders') && \Schema::hasTable('restaurant_tables')) {
+            // orderBy id: if duplicate orders ever point at one transaction
+            // (data drift), pluck keeps the LAST row = the newest order.
             $tableByTx = \DB::table('restaurant_orders')
                 ->join('restaurant_tables', 'restaurant_tables.id', '=', 'restaurant_orders.table_id')
+                ->where('restaurant_orders.company_id', $companyId)
                 ->whereIn('restaurant_orders.pos_transaction_id', $bills->pluck('id'))
+                ->orderBy('restaurant_orders.id')
                 ->pluck('restaurant_tables.table_number', 'restaurant_orders.pos_transaction_id')
                 ->all();
         }

@@ -2080,9 +2080,9 @@ window.addEventListener('popstate', function() {
                          gate swallows window-level keys while this input has focus (which is the
                          default — openReprint auto-focuses it). Do NOT rely on the window branch. --}}
                     <input type="text" x-model="reprintSearch" @input="activeReprintIndex = 0" x-ref="reprintSearchInput"
-                           @keydown.down.prevent="activeReprintIndex = Math.min(activeReprintIndex + 1, Math.max(0, filteredReprintBills().length - 1))"
-                           @keydown.up.prevent="activeReprintIndex = Math.max(activeReprintIndex - 1, 0)"
-                           @keydown.enter.prevent="if (filteredReprintBills()[activeReprintIndex]) reprintBill(filteredReprintBills()[activeReprintIndex])"
+                           @keydown.down.prevent="if (!reprintPreviewBill) activeReprintIndex = Math.min(activeReprintIndex + 1, Math.max(0, filteredReprintBills().length - 1))"
+                           @keydown.up.prevent="if (!reprintPreviewBill) activeReprintIndex = Math.max(activeReprintIndex - 1, 0)"
+                           @keydown.enter.prevent="if (reprintPreviewBill) { const b = reprintPreviewBill; reprintPreviewBill = null; reprintBill(b); } else if (filteredReprintBills()[activeReprintIndex]) { reprintBill(filteredReprintBills()[activeReprintIndex]) }"
                            @keydown.escape.prevent="if (reprintPreviewBill) { reprintPreviewBill = null } else { showReprint = false }"
                            autocomplete="off" name="reprint_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                            placeholder="Serial, customer ya raqam se dhoondein..."
@@ -2141,7 +2141,9 @@ window.addEventListener('popstate', function() {
                             </p>
                             {{-- Preview eye (ZFC, 30 Jul 2026): dekh kar print — row click = foran
                                  print barqarar. span (not button) — row itself is a <button>. --}}
-                            <span role="button" tabindex="0" @click.stop="openReprintPreview(bill)" @keydown.enter.stop.prevent="openReprintPreview(bill)"
+                            {{-- pointer-only (review 30 Jul 2026): NOT focusable — row <button>
+                                 owns keyboard; a nested focusable control = invalid nesting. --}}
+                            <span @click.stop="openReprintPreview(bill)"
                                   class="text-[10px] font-bold text-gray-500 hover:text-teal-700 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-teal-100 dark:hover:bg-teal-900/30 mr-1"
                                   title="Bill preview — pehle dekhein, phir print karein">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>

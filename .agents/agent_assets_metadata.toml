@@ -269,3 +269,9 @@ id = "q2EdO_OzlyM_taYHw-G4F"
 uri = "file://screenshots/variant-a-plus-total-band.png"
 type = "image"
 title = "Variant A + Bada Total Band (C/B style)"
+
+[[outputs]]
+id = "7kN-iJpL2vUlj7iWPNRPk"
+uri = "file://screenshots/variant-a-plus-c-band.png"
+type = "image"
+title = "Variant A + C wala Total Style"

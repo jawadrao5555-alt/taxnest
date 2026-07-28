@@ -200,6 +200,28 @@
     .tn-widecart .tn-cart-main { display: flex; flex-direction: column; flex: 1 1 0%; min-width: 0; min-height: 0; }
     .tn-widecart .tn-cart-side { display: flex; flex-direction: column; flex: 0 0 400px; width: 400px; min-height: 0; overflow-y: auto; border-left: 1px solid rgba(148,163,184,.28); }
     .tn-widecart .tn-cart-side > div:first-child { border-top: 0; }
+
+    /* ── C-style totals card in widecart (owner pick, 28 Jul 2026) ──
+       Variant C ka "Payment" look: white card, halki dark-gray rows label-left /
+       value-right, neeche border ke baad Grand Total theme-accent color me bada.
+       Sirf DESKTOP widecart me — normal grid-ON band aur mobile band (purple)
+       bilkul unchanged. Theme-safe: accent color pos-app ke --accent-* vars se. */
+    /* NOTE: body-prefixed + .bg-purple-900 repeated for specificity — pos-app ka
+       theme engine `body:not([data-theme=purple]) .bg-purple-900 {...!important}`
+       (0,2,1) warna is rule ko beat kar deta hai (red/blue/etc themes par). */
+    body .tn-widecart .tn-total-band.bg-purple-900 { background: #fff !important; border-top: 1px solid #e5e7eb; padding: 12px 16px; }
+    .tn-widecart .tn-total-band > .flex { flex-direction: column; align-items: stretch; gap: 8px; }
+    .tn-widecart .tn-total-band > .flex > .min-w-0 { width: 100%; }
+    .tn-widecart .tn-total-band > .flex > .min-w-0 > .flex { justify-content: space-between; font-size: 13px; line-height: 1.5; }
+    .tn-widecart .tn-total-band > .flex > .text-right { border-top: 1px solid #e5e7eb; padding-top: 8px; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+    .tn-widecart .tn-total-band .text-white\/75 { color: #4b5563 !important; }
+    .tn-widecart .tn-total-band .text-white\/60 { color: #374151 !important; }
+    .tn-widecart .tn-total-band .text-white\/50 { color: #6b7280 !important; }
+    .tn-widecart .tn-total-band .text-orange-300 { color: #dc2626 !important; }
+    .tn-widecart .tn-total-band .text-green-300 { color: #059669 !important; }
+    .tn-widecart .tn-total-band .text-red-300 { color: #dc2626 !important; }
+    .tn-widecart .tn-total-band .bg-white\/15 { background: #f3f4f6 !important; color: #4b5563 !important; }
+    .tn-widecart .tn-total-band .total-line { color: hsl(var(--accent-h, 263), var(--accent-s, 70%), var(--accent-l, 50%)) !important; }
 }
 
 @media (max-width: 767px) {
@@ -1364,7 +1386,7 @@ window.addEventListener('popstate', function() {
                 {{-- Jul 2026 redesign: BADA TOTAL BAND (mockup parity) — solid brand band
                      (bg-purple-900 → theme engine remaps per theme), big white total,
                      items·qty pill + method-aware "Card pe" hint. All original rows kept. --}}
-                <div class="px-3 py-2 bg-purple-900">
+                <div class="tn-total-band px-3 py-2 bg-purple-900">
                     <div class="flex items-end justify-between gap-2">
                         <div class="min-w-0 space-y-0.5 text-[11px] leading-tight text-white/75">
                             <div class="flex gap-2"><span>Subtotal</span><span x-text="'Rs. ' + Number(subtotal).toLocaleString()"></span></div>

@@ -47,7 +47,10 @@
                     $sinceTs = $table->status === 'occupied' ? $table->occupied_since : ($table->status === 'reserved' ? $table->locked_at : null);
                 @endphp
                 @if($sinceTs)
-                <div class="text-[10px] {{ $table->status === 'occupied' ? 'text-red-500 dark:text-red-400' : 'text-amber-500 dark:text-amber-400' }}">
+                {{-- Pizza Master feedback (Jul 2026): timer ab LIVE tick karta hai
+                     (data-since + JS interval), refresh ka intezar nahi. --}}
+                <div class="text-[10px] font-semibold tabular-nums {{ $table->status === 'occupied' ? 'text-red-500 dark:text-red-400' : 'text-amber-500 dark:text-amber-400' }}"
+                     data-since="{{ $sinceTs->toIso8601String() }}">
                     {{ $sinceTs->diffForHumans(null, true) }}
                 </div>
                 @endif
@@ -80,5 +83,25 @@ function tableView() {
         },
     };
 }
+
+// Live ticking occupied/reserved timers (Pizza Master feedback, Jul 2026).
+// Elapsed labels recompute from data-since every 30s — no page refresh needed.
+(function () {
+    function fmt(ms) {
+        if (isNaN(ms) || ms < 0) ms = 0;
+        var mins = Math.floor(ms / 60000);
+        var h = Math.floor(mins / 60), m = mins % 60;
+        return h > 0 ? (h + 'h ' + m + 'm') : (m + 'm');
+    }
+    function tick() {
+        var now = Date.now();
+        document.querySelectorAll('[data-since]').forEach(function (el) {
+            var t = new Date(el.getAttribute('data-since')).getTime();
+            el.textContent = fmt(now - t);
+        });
+    }
+    tick();
+    setInterval(tick, 30000);
+})();
 </script>
 </x-pos-layout>

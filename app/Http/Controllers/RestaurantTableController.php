@@ -276,7 +276,13 @@ class RestaurantTableController extends Controller
 
         $tables = RestaurantTable::where('company_id', $companyId)
             ->where('is_active', true)
-            ->with(['floor', 'activeOrders.creator'])
+            // Perf (Pizza Master feedback, Jul 2026): picker felt slow on live —
+            // constrain eager-load columns so the polling endpoint stays light.
+            ->with([
+                'floor:id,name',
+                'activeOrders' => fn ($q) => $q->select('id', 'table_id', 'order_number', 'total_amount', 'created_by', 'source', 'order_type', 'kot_sent_at', 'status'),
+                'activeOrders.creator:id,name',
+            ])
             ->get()
             ->map(function ($t) {
                 // Table Board (Jul 2026): the sale-screen board needs the active

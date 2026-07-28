@@ -387,9 +387,9 @@ Restaurant module ke liye **Pro ya Unlimited package** chahiye (ya active trial)
 **/pos/restaurant/table-management** → "+ Add Floor" (naam, jaise Ground Floor) → "+ Add Table" (Table Number jaise T1, Seats 1–50). Table delete = card par × button.
 
 ### Dine-In ka poora flow
-1. Sale screen par order type **"Dine In"** → table picker khud khulta hai → table select.
+1. Sale screen par order type **"Dine In"** → table picker khud khulta hai → table select. (28 Jul 2026: picker ab BARA chart hai — saari tables zyada columns mein ek nazar mein.)
 2. Table chunte hi order-type pill **"Dine In · T-3"** ban jati hai (teal nishaan) — table badalna ho to pill par dobara click (picker khul jata hai).
-3. Items dalein → **"Send to Kitchen" (KOT)** ya **Hold**.
+3. Items dalein → **"Send to Kitchen" (KOT)** ya **Hold**. (28 Jul 2026: KOT bhejte hi screen khud TABLE chart par wapas aa jati hai — agla order seedha agli table se.)
 4. Khana ban jaye to **TABLE board (Alt+B)** se table par click → "View / Edit" ya "FINAL karo" se payment.
 5. Payment par table **khud free** ho jata hai.
 
@@ -405,7 +405,9 @@ Button par click (ya **Alt+B**) = TABLE BOARD popup:
 - Data har ~25 second mein khud taaza hota hai
 
 **Table par click karne se chhota MENU khulta hai** (seedha koi action nahi hota):
+- Menu ke oopar hi **order ke items ki list** dikhti hai (28 Jul 2026, naya) — qty × item + raqam, bill kholne ki zaroorat nahi
 - **View / Edit** — order cart mein kholein
+- **Proof Bill Print (bina final)** (28 Jul 2026, naya) — customer ko dikhane ke liye kachi parchi; parchi par saaf "PROOF BILL — NOT PAID" likha hota hai, order khula rehta hai, koi invoice/serial nahi banta
 - **FINAL karo** — pehle CASH ya CARD ki tasdeeq poochta hai (ghalti se final hone ka masla khatam)
 - **KOT Dobara Bhejo** — updated ticket kitchen ko (UPDATED ka nishaan ke sath)
 - **⇄ Table Badlein (Shift)** — neeche dekhein

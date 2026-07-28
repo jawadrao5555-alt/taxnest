@@ -668,6 +668,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/restaurant/kds/clear-all', [RestaurantKdsController::class, 'clearAll'])->name('pos.restaurant.kds.clear-all');
     Route::get('/restaurant/api/live-orders', [RestaurantKdsController::class, 'liveOrders'])->name('pos.restaurant.live-orders');
     Route::get('/restaurant/orders/{id}/kitchen-ticket', [RestaurantPosController::class, 'kitchenTicket'])->name('pos.restaurant.kitchen-ticket');
+    Route::get('/restaurant/orders/{id}/proof-bill', [RestaurantPosController::class, 'proofBill'])->name('pos.restaurant.proof-bill');
 
     // ── P7 (F6): Waiter Tablets ──────────────────────────────────────────────
     // Waiter composes an order (customer/table/items) and SENDs it to a cashier.

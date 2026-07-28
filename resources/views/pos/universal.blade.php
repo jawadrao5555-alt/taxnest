@@ -1583,7 +1583,9 @@ window.addEventListener('popstate', function() {
 
     @if($features->tables)
     <div x-show="showTablePicker" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showTablePicker = false">
-        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md max-h-[70vh] overflow-hidden" x-transition.scale.90>
+        {{-- Pizza Master feedback (Jul 2026): bara "chart" layout — saari tables ek
+             nazar mein (max-w-md → max-w-3xl, 3 → up-to-6 columns). --}}
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden" x-transition.scale.90>
             <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                 <div>
                     <h3 class="text-lg font-bold text-gray-900 dark:text-white">Select Table</h3>
@@ -1594,7 +1596,7 @@ window.addEventListener('popstate', function() {
             {{-- Select-Table picker (Dine-In, Jul 2026): LIVE floors + tables, refreshed on every open via
                  /pos/restaurant/api/table-status. Green=free, amber=reserved, red=occupied.
                  Selecting a table RESERVES it server-side (race-safe) before it sticks. --}}
-            <div class="p-4 max-h-[50vh] overflow-y-auto">
+            <div class="p-4 max-h-[65vh] overflow-y-auto">
                 <template x-if="tablesLoading && tableFloors.length === 0">
                     <p class="text-center text-sm text-gray-400 py-6">Loading tables…</p>
                 </template>
@@ -1604,7 +1606,7 @@ window.addEventListener('popstate', function() {
                 <template x-for="floor in tableFloors" :key="floor.name">
                     <div class="mb-3">
                         <p class="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1.5" x-text="floor.name"></p>
-                        <div class="grid grid-cols-3 gap-2">
+                        <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
                             <template x-for="t in floor.tables" :key="t.id">
                                 {{-- Table-se-Bill (Jul 2026): occupied table WITH a waiting waiter
                                      order = clickable purple "Order Tayyar" card (claim + load to
@@ -1689,7 +1691,26 @@ window.addEventListener('popstate', function() {
                     </template>
                     <template x-if="boardMenuTable.order">
                         <div class="space-y-2">
+                            {{-- Items list (Pizza Master feedback, Jul 2026): popup mein dikhna
+                                 chahiye ke table par KYA laga hua hai — lazy-fetched on open. --}}
+                            <div class="max-h-36 overflow-y-auto rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 px-3 py-2">
+                                <template x-if="boardMenuItems === null">
+                                    <p class="text-[11px] text-gray-400 text-center py-1">Items load ho rahe hain…</p>
+                                </template>
+                                <template x-if="Array.isArray(boardMenuItems) && boardMenuItems.length === 0">
+                                    <p class="text-[11px] text-gray-400 text-center py-1">Items nahi mile</p>
+                                </template>
+                                <template x-for="(it, idx) in (Array.isArray(boardMenuItems) ? boardMenuItems : [])" :key="idx">
+                                    <div class="flex justify-between gap-2 py-0.5">
+                                        <span class="text-[11px] text-gray-700 dark:text-gray-300 truncate" x-text="(parseFloat(it.quantity) || 1) + ' × ' + it.item_name"></span>
+                                        <span class="text-[11px] font-bold text-gray-500 dark:text-gray-400 flex-shrink-0" x-text="'Rs ' + Math.round(parseFloat(it.subtotal ?? 0) || ((parseFloat(it.quantity)||1) * (parseFloat(it.unit_price)||0))).toLocaleString()"></span>
+                                    </div>
+                                </template>
+                            </div>
                             <button @click="boardViewEdit()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 disabled:opacity-40 transition" x-text="boardBusy ? 'Load ho raha hai…' : 'Bill Kholo / Edit karo'"></button>
+                            {{-- Proof Bill (Pizza Master feedback, Jul 2026): customer ko bill
+                                 dikhana ho to FINAL kiye BAGHAIR parchi — koi invoice nahi banta. --}}
+                            <button @click="boardProofBill()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 disabled:opacity-40 transition">&#128462; Proof Bill Print (bina final)</button>
                             <button @click="boardAskFinal()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-extrabold text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 transition" x-text="'FINAL karo — Rs ' + Math.round(boardMenuTable.order.total_amount).toLocaleString()"></button>
                             @if(($features->kot ?? false) || ($features->kitchen ?? false))
                             <button x-show="boardMenuTable.order.kot_sent_at" @click="boardResendKot()" :disabled="boardBusy" class="w-full py-2 rounded-xl text-xs font-bold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 disabled:opacity-40 transition">↻ KOT Dobara Bhejo</button>
@@ -3169,6 +3190,7 @@ function restaurantPos() {
         tableBoardEnabled: {{ ($features->tables ?? false) ? 'true' : 'false' }},
         tableBoardOpen: false, // board ab MODAL hai (owner 26 Jul 2026) — load par band, Alt+B / TABLE button se khulta hai
         boardMenuTable: null,   // tile clicked → action menu modal
+        boardMenuItems: null,   // lazy-fetched items of the open table's order (null = loading)
         boardConfirm: null,     // { table } → Final CASH/CARD confirm modal
         boardShift: null,       // { table, order } → Table Shift modal (26 Jul 2026)
         boardBusy: false,
@@ -5502,6 +5524,31 @@ function restaurantPos() {
         openBoardMenu(t) {
             if (this.boardBusy) return;
             this.boardMenuTable = t;
+            // Items list (Pizza Master feedback, Jul 2026): lazy-fetch so the
+            // board endpoint stays light — only the OPEN popup pays this cost.
+            this.boardMenuItems = null;
+            if (t && t.order) {
+                fetch('/pos/restaurant/orders/by-table/' + t.id, { headers: { 'Accept': 'application/json' } })
+                    .then(r => r.ok ? r.json() : [])
+                    .then(list => {
+                        // Popup may have moved to another table meanwhile — guard.
+                        if (!this.boardMenuTable || this.boardMenuTable.id !== t.id) return;
+                        const arr = Array.isArray(list) ? list : [];
+                        // Number() dono taraf — live PDO ids ko STRING deta hai.
+                        const ord = arr.find(o => Number(o.id) === Number(t.order.id)) || arr[0];
+                        this.boardMenuItems = (ord && Array.isArray(ord.items)) ? ord.items : [];
+                    })
+                    .catch(() => { if (this.boardMenuTable && this.boardMenuTable.id === t.id) this.boardMenuItems = []; });
+            }
+        },
+        // Proof Bill (Pizza Master, Jul 2026): thermal pre-bill WITHOUT finalizing —
+        // no invoice, no serial, order stays open. Print via the same hidden-iframe
+        // pipeline as receipts (focus wapas milta hai, shortcuts zinda rehte hain).
+        boardProofBill() {
+            const t = this.boardMenuTable;
+            if (!t || !t.order) return;
+            const url = '/pos/restaurant/orders/' + t.order.id + '/proof-bill?auto_print=1';
+            this._printViaIframe('print-receipt-frame', url, 'width=400,height=700');
         },
         // View/Edit → load the table's order into the cart. Waiter orders go via
         // the ATOMIC claim (existing path). Foreign cashier-held orders are NOT
@@ -5989,9 +6036,16 @@ function restaurantPos() {
                     // must print ONLY the new/changed lines — kitchen already has the
                     // rest. Capture before clearCart() nulls recalledOrderId.
                     const wasRecall = !!this.recalledOrderId;
+                    // Pizza Master feedback (Jul 2026): dine-in KOT ke baad cashier
+                    // ko WAPAS tables chart pe le aao — agla order wahin se banta hai.
+                    const wasDineIn = this.orderType === 'dine_in';
                     const successMsg = opts.successMessage || data.message;
                     this.showToast(successMsg, 'success'); this.heldOrders.unshift(data.order); this.clearCart();
-                    this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
+                    if (wasDineIn && this.tableBoardEnabled) {
+                        this.$nextTick(() => this.openTablePicker());
+                    } else {
+                        this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
+                    }
                     // Auto-print KOT when print_on_hold is enabled, OR when the caller explicitly asked
                     // (e.g. "Send to Kitchen" button always prints a ticket).
                     // SKIPPED when KDS Auto-Print owns ticket printing (owner, Jul 2026) —

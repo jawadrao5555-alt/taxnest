@@ -1240,6 +1240,24 @@ class RestaurantPosController extends Controller
         return response()->json($orders);
     }
 
+    /**
+     * Proof Bill (Pizza Master feedback, Jul 2026): a thermal PRE-BILL the
+     * cashier can hand to the customer WITHOUT finalizing — no PosTransaction,
+     * no serial, no PRA reporting; the restaurant order stays open on its table.
+     */
+    public function proofBill($orderId)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        $order = RestaurantOrder::where('company_id', $companyId)
+            ->whereNotIn('status', ['cancelled'])
+            ->with(['items', 'table', 'creator'])
+            ->findOrFail($orderId);
+
+        return view('pos.restaurant.proof-bill', compact('order', 'company'));
+    }
+
     public function kitchenSettings()
     {
         $companyId = app('currentCompanyId');

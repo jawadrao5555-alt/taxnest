@@ -511,13 +511,18 @@
             $qrUrl = \App\Support\QrImage::dataUri($publicUrl);
             $qrCaption = 'Scan to view our menu & info';
         } else {
-            $qrData = json_encode([
+            // ZFC issue #9 (28 Jul 2026): business name OFF => QR payload must
+            // not leak the name either (owner scanned QR, saw "business" field).
+            $qrPayload = [
                 'type' => $rcptIsProvisional ? 'Provisional Bill' : 'Sale Receipt',
                 'inv' => $transaction->invoice_number,
                 'date' => $transaction->created_at->format('d/m/Y H:i'),
                 'total' => number_format($transaction->total_amount, 2),
-                'business' => $transaction->company->name ?? 'NestPOS',
-            ]);
+            ];
+            if ($rp['show_business_name'] ?? true) {
+                $qrPayload['business'] = $transaction->company->name ?? 'NestPOS';
+            }
+            $qrData = json_encode($qrPayload);
             $qrUrl = \App\Support\QrImage::dataUri($qrData);
             $qrCaption = 'Scan for invoice details';
         }

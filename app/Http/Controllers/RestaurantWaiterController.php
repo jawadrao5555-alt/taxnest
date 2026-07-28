@@ -81,7 +81,11 @@ class RestaurantWaiterController extends Controller
         // tax is computed by the cashier's settle path (storeInvoice), never here.
         $cashTaxRate = \App\Models\PosTaxRule::getRateForMethod('cash', $company);
 
-        return view('pos.waiter', compact('company', 'products', 'cashiers', 'cashTaxRate', 'userGridPrefs'));
+        // ZFC issue #13 (28 Jul 2026): tax-INCLUSIVE company => menu price IS the
+        // final price — waiter sees ONE "Total", no before-tax / incl-tax split.
+        $taxInclusive = (bool) ($company->pos_tax_inclusive ?? false);
+
+        return view('pos.waiter', compact('company', 'products', 'cashiers', 'cashTaxRate', 'userGridPrefs', 'taxInclusive'));
     }
 
     /** Live floors + tables — waiter-scoped twin of the sale screen's table-status API. */
@@ -231,11 +235,27 @@ class RestaurantWaiterController extends Controller
                 ]);
             }
 
+            // ZFC issue #10 (28 Jul 2026): waiter punch must ACTUALLY print the
+            // kitchen ticket — before this, only kot_sent_at was stamped and no
+            // print job existed, so the kitchen never got the KOT. Best-effort:
+            // a printer problem must never lose the order.
+            $company = Company::find($companyId);
+            $kot = \App\Services\KotPrintService::enqueueForOrder($company, $order, $user->id);
+            if ($kot['printed'] && !empty($kot['job_ids'])) {
+                $order->update(['kot_print_count' => 1]);
+            }
+
+            $msg = $cashier ? 'Order sent to ' . $cashier->name . '.' : 'Order sent to counter.';
+            if (!$kot['printed']) {
+                $msg .= ' KOT print nahi hui (' . ($kot['reason'] ?? 'error') . ') — cashier screen se print karein.';
+            }
+
             return response()->json([
                 'success' => true,
                 'order_id' => $order->id,
                 'order_number' => $order->order_number,
-                'message' => $cashier ? 'Order sent to ' . $cashier->name . '.' : 'Order sent to counter.',
+                'kot_printed' => (bool) $kot['printed'],
+                'message' => $msg,
             ]);
         });
     }
@@ -294,7 +314,19 @@ class RestaurantWaiterController extends Controller
                 'kot_sent_at' => now(),
             ]);
 
-            return response()->json(['success' => true, 'message' => 'Items added — kitchen gets a delta ticket.']);
+            // ZFC issue #10: print the DELTA ticket (only unprinted rows) right away.
+            $company = Company::find($companyId);
+            $kot = \App\Services\KotPrintService::enqueueForOrder($company, $order, $user->id, true);
+            if ($kot['printed'] && !empty($kot['job_ids'])) {
+                $order->update(['kot_print_count' => DB::raw('COALESCE(kot_print_count, 0) + 1')]);
+            }
+
+            $msg = 'Items added — kitchen gets a delta ticket.';
+            if (!$kot['printed']) {
+                $msg = 'Items added. KOT print nahi hui (' . ($kot['reason'] ?? 'error') . ') — cashier screen se print karein.';
+            }
+
+            return response()->json(['success' => true, 'kot_printed' => (bool) $kot['printed'], 'message' => $msg]);
         });
     }
 

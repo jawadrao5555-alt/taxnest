@@ -31,8 +31,10 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-        {{-- ── LEFT: product picker ──────────────────────────────────────── --}}
-        <div class="lg:col-span-2">
+        {{-- ── LEFT: product picker (ZFC issue #11, 28 Jul 2026: on MOBILE the
+             punched ORDER shows on TOP, search/grid below — waiter had to scroll
+             after every item; desktop stays picker-left / order-right) ──────── --}}
+        <div class="lg:col-span-2 order-2 lg:order-1">
             <input type="text" x-model="search" @input="filterProducts()"
                    autocomplete="off" name="waiter_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                    placeholder="Search items…"
@@ -71,8 +73,8 @@
             </div>
         </div>
 
-        {{-- ── RIGHT: order panel ────────────────────────────────────────── --}}
-        <div class="rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4 flex flex-col gap-3 h-fit lg:sticky lg:top-4">
+        {{-- ── RIGHT: order panel (mobile = TOP, see issue #11 note above) ── --}}
+        <div class="order-1 lg:order-2 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4 flex flex-col gap-3 h-fit lg:sticky lg:top-4">
             <h2 class="text-sm font-black uppercase tracking-wide text-gray-500 dark:text-gray-400" x-text="appendOrderId ? 'New Items' : 'Order'"></h2>
 
             {{-- Cart lines --}}
@@ -101,12 +103,14 @@
 
             <div class="border-t border-gray-100 dark:border-gray-700 pt-3" x-show="cart.length">
                 <div class="flex items-center justify-between">
-                    <span class="text-sm font-bold text-gray-500 dark:text-gray-400">Total (before tax)</span>
+                    {{-- ZFC issue #13: tax-inclusive shop => menu price is FINAL — one clean Total. --}}
+                    <span class="text-sm font-bold text-gray-500 dark:text-gray-400">{{ ($taxInclusive ?? false) ? 'Total' : 'Total (before tax)' }}</span>
                     <span class="text-xl font-black text-gray-900 dark:text-white" x-text="'Rs ' + total().toLocaleString()"></span>
                 </div>
                 {{-- Item #5: indicative tax-inclusive estimate (cash rate) — the REAL bill
-                     (rate by payment method, discounts) is settled on the cashier screen. --}}
-                <div class="flex items-center justify-between mt-0.5" x-show="taxEstimate() > 0">
+                     (rate by payment method, discounts) is settled on the cashier screen.
+                     HIDDEN for tax-inclusive companies (issue #13). --}}
+                <div class="flex items-center justify-between mt-0.5" x-show="taxEstimate() > 0" @if($taxInclusive ?? false) style="display:none !important" @endif>
                     <span class="text-[11px] font-semibold text-gray-400 dark:text-gray-500" x-text="'≈ incl. tax (cash ' + cashTaxRate + '%)'"></span>
                     <span class="text-sm font-bold text-gray-600 dark:text-gray-300" x-text="'Rs ' + (total() + taxEstimate()).toLocaleString()"></span>
                 </div>

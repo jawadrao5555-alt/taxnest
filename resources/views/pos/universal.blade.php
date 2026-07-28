@@ -1708,7 +1708,8 @@ window.addEventListener('popstate', function() {
                                     <p class="text-sm font-bold" :class="incomingForTable(t) ? 'text-purple-700 dark:text-purple-300' : (t.status === 'occupied' ? 'text-red-600' : 'text-gray-900 dark:text-white')" x-text="'T-' + t.table_number"></p>
                                     <template x-if="incomingForTable(t)">
                                         <span>
-                                            <span class="inline-block text-[9px] font-bold text-white bg-purple-600 rounded-full px-1.5 py-px animate-pulse">Order Tayyar</span>
+                                            {{-- ZFC issue #10b: "Order Tayyar" misled — order is only PUNCHED, not ready. --}}
+                                            <span class="inline-block text-[9px] font-bold text-white bg-purple-600 rounded-full px-1.5 py-px animate-pulse">Naya Order</span>
                                             <span class="block text-[9px] text-purple-600 dark:text-purple-300 font-medium truncate" x-text="incomingForTable(t).waiter + ' • Rs ' + Math.round(incomingForTable(t).total_amount).toLocaleString()"></span>
                                         </span>
                                     </template>
@@ -2993,10 +2994,13 @@ window.addEventListener('popstate', function() {
     </div>
 
     <div x-show="toast.show" class="fixed top-4 right-4 z-[60] max-w-sm" :class="toast.show ? 'toast-enter' : 'toast-exit'">
-        <div class="flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl backdrop-blur-xl border" :class="toast.type === 'success' ? 'bg-green-600/95 text-white border-green-500/30' : 'bg-red-600/95 text-white border-red-500/30'" style="box-shadow: 0 20px 60px -15px rgba(0,0,0,0.3);">
-            <div class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center" :class="toast.type === 'success' ? 'bg-white/20' : 'bg-white/20'">
+        {{-- ZFC issue #12 (28 Jul 2026): NEW 'info' toast type — blue, i-icon.
+             Info messages (e.g. waiter order loaded) looked like RED errors. --}}
+        <div class="flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl backdrop-blur-xl border" :class="toast.type === 'success' ? 'bg-green-600/95 text-white border-green-500/30' : (toast.type === 'info' ? 'bg-blue-600/95 text-white border-blue-500/30' : 'bg-red-600/95 text-white border-red-500/30')" style="box-shadow: 0 20px 60px -15px rgba(0,0,0,0.3);">
+            <div class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-white/20">
                 <svg x-show="toast.type === 'success'" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                <svg x-show="toast.type !== 'success'" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                <svg x-show="toast.type === 'info'" x-cloak class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <svg x-show="toast.type !== 'success' && toast.type !== 'info'" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
             </div>
             <span class="text-sm font-semibold" x-text="toast.message"></span>
         </div>
@@ -6151,7 +6155,7 @@ function restaurantPos() {
             // P7 guard — an incoming WAITER order already exists as a held restaurant
             // order (KDS sees it). Re-holding would duplicate it; settle via payment.
             if (this.incomingOrderId) {
-                this.showToast('Waiter order loaded — take payment to settle it (kitchen already has the KOT).', 'error');
+                this.showToast('Waiter order loaded — take payment to settle it (kitchen already has the KOT).', 'info');
                 return null;
             }
             const now = Date.now();

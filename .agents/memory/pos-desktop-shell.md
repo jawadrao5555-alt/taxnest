@@ -54,7 +54,7 @@ Cold-start offline for the sale screen. The web app's IndexedDB bill queue + `of
 - Server: `AgentManagementController::desktopConfig` (route `pos.desktop.agent-config`, pos.auth + company.approval). **CRITICAL PRA-routing guard**: `agentHandlesPra()` has a legacy `?? true` fallback — enabling the agent with NULL `agent_submits_pra` silently flips PRA submission to the agent. desktopConfig therefore ALWAYS pins `agent_submits_pra=false` on fresh-key generation AND when re-enabling with a NULL value; existing enabled key = zero writes. Never remove this pin.
 - Post-beta hardening backlog (architect, non-blocking): desktopConfig is a state-changing GET (SameSite=Lax exposure) — UA-gate or POST-ify later; key generation has a benign last-write-wins race — make it a conditional `whereNull` update.
 
-## v1.6.0 (29 Jul 2026, beta uploaded, GA NOT yet published)
+## v1.6.0 (29 Jul 2026, GA PUBLISHED — owner skipped beta test; release v1.6.0, live zip+symlink refreshed, cache:forget done)
 - FBR POS window: tray "Open FBR POS Screen" → `openFbrPosWindow` in pos-window.js — partition `persist:fbrpos` (separate guard/login), NO auto-config/offline-snapshot/kiosk, keep-alive hide, same popup/offline rules.
 - printer.js: `printHtml` now behind a promise-chain mutex (`printHtmlUnlocked` internal) — queue poller + pos-print-html bridge can't race the shared hidden window. Web-side bridge hook still unwired.
 - Server: desktopConfig key generation race-safe (conditional whereNull/'' update + refresh).

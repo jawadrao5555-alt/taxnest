@@ -54,6 +54,13 @@ Cold-start offline for the sale screen. The web app's IndexedDB bill queue + `of
 - Server: `AgentManagementController::desktopConfig` (route `pos.desktop.agent-config`, pos.auth + company.approval). **CRITICAL PRA-routing guard**: `agentHandlesPra()` has a legacy `?? true` fallback — enabling the agent with NULL `agent_submits_pra` silently flips PRA submission to the agent. desktopConfig therefore ALWAYS pins `agent_submits_pra=false` on fresh-key generation AND when re-enabling with a NULL value; existing enabled key = zero writes. Never remove this pin.
 - Post-beta hardening backlog (architect, non-blocking): desktopConfig is a state-changing GET (SameSite=Lax exposure) — UA-gate or POST-ify later; key generation has a benign last-write-wins race — make it a conditional `whereNull` update.
 
+## v1.6.0 (29 Jul 2026, beta uploaded, GA NOT yet published)
+- FBR POS window: tray "Open FBR POS Screen" → `openFbrPosWindow` in pos-window.js — partition `persist:fbrpos` (separate guard/login), NO auto-config/offline-snapshot/kiosk, keep-alive hide, same popup/offline rules.
+- printer.js: `printHtml` now behind a promise-chain mutex (`printHtmlUnlocked` internal) — queue poller + pos-print-html bridge can't race the shared hidden window. Web-side bridge hook still unwired.
+- Server: desktopConfig key generation race-safe (conditional whereNull/'' update + refresh).
+- Shell printer picker & auto-login intentionally SKIPPED: per-job target printer comes from server Printer Settings; login persists via persist:pos + remember pre-tick.
+- pra-agent/dist now gitignored (137MB zip broke a push — GitHub 100MB cap).
+
 ## Offline telemetry + branch fidelity (v1.5.3, GA-prep)
 - Heartbeat carries `offline_mode` (0/1) + `snapshot_saved_at` via agent.js `setHeartbeatExtraProvider` (main.js wires it; provider failure never breaks the beat). Server stores them on `companies.agent_offline_mode`/`agent_snapshot_at` (Schema::hasColumn-guarded, snapshot clamped to now) — shown on /pos/agent + saas-admin company page. Old agents omit the fields → server leaves columns UNTOUCHED (never wipe on absence).
 - Offline bills snapshot `offline_branch_id` at queue time (universal.blade.php); server honors it only when the branch belongs to THIS company (company-scoped Branch lookup), else falls back to session's current branch — replayed multi-branch bills land in the right branch.

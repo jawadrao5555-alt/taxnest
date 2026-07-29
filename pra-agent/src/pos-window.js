@@ -310,6 +310,120 @@ function closePosWindow() {
     forceClose = true;
     try { win.close(); } catch (e) { forceClose = false; }
   }
+  closeFbrWindow();
 }
 
-module.exports = { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, closePosWindow };
+// ─── FBR POS window (v1.6.0) ────────────────────────────────────────────────
+// A second, SIMPLER shell window for the FBR POS panel (/fbr-pos/). Own
+// persistent partition ('persist:fbrpos' — separate guard/login from PRA POS).
+// Deliberately minimal: no agent auto-config (that is PRA-panel-only), no
+// offline snapshot, no kiosk coupling — just a clean desktop window with
+// keep-alive hide, offline fallback and the same popup rules.
+let fbrWindow = null;
+let fbrForceClose = false;
+let fbrTargetUrl = null;
+
+function getFbrWindowRef() {
+  return fbrWindow && !fbrWindow.isDestroyed() ? fbrWindow : null;
+}
+
+function openFbrPosWindow(config, opts = {}) {
+  const existing = getFbrWindowRef();
+  if (existing) {
+    existing.show();
+    existing.focus();
+    return existing;
+  }
+
+  const origin = deriveOrigin(config);
+  fbrTargetUrl = origin + '/fbr-pos/invoice/create';
+  const isQuittingFn = typeof opts.isQuitting === 'function' ? opts.isQuitting : () => false;
+
+  fbrWindow = new BrowserWindow({
+    width: 1366,
+    height: 820,
+    minWidth: 900,
+    minHeight: 600,
+    title: 'NestPOS Desktop — FBR POS',
+    icon: nestposIcon(process.platform === 'win32' ? 'ico' : 'png') ||
+      path.join(__dirname, '..', 'assets', 'icon.png'),
+    autoHideMenuBar: true,
+    backgroundColor: '#0A4D5C',
+    webPreferences: {
+      partition: 'persist:fbrpos',
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      backgroundThrottling: false,
+    },
+  });
+
+  fbrWindow.on('page-title-updated', (e) => e.preventDefault());
+
+  try {
+    const ua = fbrWindow.webContents.getUserAgent() || '';
+    if (!ua.includes('NestPOSDesktop')) {
+      fbrWindow.webContents.setUserAgent(ua + ' NestPOSDesktop/' + app.getVersion());
+    }
+  } catch (e) {}
+
+  fbrWindow.webContents.on('did-fail-load', (e, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    if (!isMainFrame || errorCode === -3) return;
+    if (!fbrWindow || fbrWindow.isDestroyed()) return;
+    fbrWindow.loadFile(path.join(__dirname, '..', 'offline.html'), {
+      query: { target: fbrTargetUrl || validatedURL || '', err: String(errorDescription || '') },
+    }).catch(() => {});
+  });
+
+  fbrWindow.webContents.setWindowOpenHandler(({ url }) => {
+    try {
+      if (new URL(url).origin === origin) {
+        return {
+          action: 'allow',
+          overrideBrowserWindowOptions: {
+            autoHideMenuBar: true,
+            webPreferences: {
+              partition: 'persist:fbrpos',
+              contextIsolation: true,
+              nodeIntegration: false,
+              sandbox: true,
+            },
+          },
+        };
+      }
+    } catch (err) {}
+    shell.openExternal(url).catch(() => {});
+    return { action: 'deny' };
+  });
+
+  // Keep-alive hide on close (same rule as the PRA POS window).
+  fbrWindow.on('close', (e) => {
+    if (fbrForceClose || isQuittingFn()) return;
+    e.preventDefault();
+    try { fbrWindow.hide(); } catch (err) {}
+  });
+
+  fbrWindow.on('closed', () => {
+    fbrWindow = null;
+    fbrForceClose = false;
+  });
+
+  fbrWindow.loadURL(fbrTargetUrl).catch(() => {
+    if (!fbrWindow || fbrWindow.isDestroyed()) return;
+    fbrWindow.loadFile(path.join(__dirname, '..', 'offline.html'), {
+      query: { target: fbrTargetUrl, err: 'load failed' },
+    }).catch(() => {});
+  });
+
+  return fbrWindow;
+}
+
+function closeFbrWindow() {
+  const win = getFbrWindowRef();
+  if (win) {
+    fbrForceClose = true;
+    try { win.close(); } catch (e) { fbrForceClose = false; }
+  }
+}
+
+module.exports = { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, closePosWindow, openFbrPosWindow, closeFbrWindow };

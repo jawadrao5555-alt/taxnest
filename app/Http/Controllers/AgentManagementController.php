@@ -67,6 +67,10 @@ class AgentManagementController extends Controller
         $hasSubmitsCol = \Schema::hasColumn('companies', 'agent_submits_pra');
 
         if (empty($company->agent_api_key)) {
+            // Race-safe key generation (architect, GA-prep): two simultaneous
+            // desktopConfig calls must not each write a different key (last
+            // write wins = one agent gets a dead key). Conditional UPDATE —
+            // only the FIRST writer lands; everyone reads the winning key back.
             $update = [
                 'agent_api_key' => 'tnk_' . Str::random(48),
                 'agent_enabled' => true,
@@ -74,7 +78,12 @@ class AgentManagementController extends Controller
             if ($hasSubmitsCol) {
                 $update['agent_submits_pra'] = false;
             }
-            $company->update($update);
+            Company::whereKey($company->id)
+                ->where(function ($q) {
+                    $q->whereNull('agent_api_key')->orWhere('agent_api_key', '');
+                })
+                ->update($update);
+            $company->refresh();
         } elseif (!$company->agent_enabled) {
             $update = ['agent_enabled' => true];
             if ($hasSubmitsCol && $company->agent_submits_pra === null) {

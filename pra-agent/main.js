@@ -16,10 +16,10 @@ const Store = require('electron-store');
 const { startAgent, stopAgent, getStatus, setHeartbeatExtraProvider } = require('./src/agent');
 const offlineSnapshot = require('./src/offline-snapshot');
 const { printHtml: printHtmlSilent } = require('./src/printer');
-const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk } = require('./src/pos-window');
+const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, openFbrPosWindow } = require('./src/pos-window');
 
 const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/taxnest/releases/latest';
-const BUILD_TIMESTAMP = '20260725-2';
+const BUILD_TIMESTAMP = '20260729-1';
 let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
 
 // ─── Zip-based SELF-UPDATE ──────────────────────────────────────────────────
@@ -253,6 +253,21 @@ function openPos() {
   }
 }
 
+// FBR POS window (v1.6.0): simpler second shell window for the FBR panel.
+// Failure here must never touch the agent or the PRA POS window.
+function openFbrPos() {
+  try {
+    const config = store.get('config');
+    const posConfig =
+      config && config.serverUrl ? config : { serverUrl: DEFAULT_SERVER_URL };
+    openFbrPosWindow(posConfig, { isQuitting: () => isQuitting });
+    return true;
+  } catch (e) {
+    console.log('[fbr-window] open failed:', e && e.message);
+    return false;
+  }
+}
+
 // ─── NestPOS as a SEPARATE app (Desktop icon + own taskbar identity) ────────
 // The POS window already carries its own Windows AppUserModelID
 // ('com.taxnest.nestpos', set in pos-window.js) so it groups separately on
@@ -437,6 +452,10 @@ function buildTrayMenu() {
     {
       label: '🖥️ Open POS Screen',
       click: () => openPos(),
+    },
+    {
+      label: 'Open FBR POS Screen',
+      click: () => openFbrPos(),
     },
     {
       label: 'Add NestPOS Icon to Desktop',

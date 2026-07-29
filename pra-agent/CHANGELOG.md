@@ -1,5 +1,13 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.6.0 (2026-07-29)
+**FBR POS window + print-bridge hardening (GA prep)**
+
+- **New: "Open FBR POS Screen" in the tray** — FBR POS shops get their own desktop window for the /fbr-pos/ panel, with its own saved login (separate from the PRA POS window), keep-alive hide-on-close and the same offline fallback page. Purely additive — PRA POS window and agent untouched.
+- **Print-window mutex**: the silent-print queue and the in-app print bridge share one hidden window; concurrent calls are now serialized so two jobs can never race and print the wrong content.
+- Server-side: agent key auto-generation made race-safe (two simultaneous first-logins can no longer generate conflicting keys).
+
+
 ## v1.5.3 (2026-07-26)
 **Offline Mode telemetry — admins can monitor it remotely**
 

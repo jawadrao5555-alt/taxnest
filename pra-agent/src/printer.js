@@ -77,9 +77,23 @@ async function reportPrinters() {
   }
 }
 
+// Print-window MUTEX (v1.6.0, architect-flagged): the queue poller and the
+// POS-window bridge (pos-print-html IPC) share ONE hidden window — two
+// concurrent printHtml calls would race loadFile/did-finish-load and can
+// print the wrong content. Chain every call behind the previous one.
+let printChain = Promise.resolve();
+function printHtml(html, deviceName) {
+  const run = () => printHtmlUnlocked(html, deviceName);
+  const p = printChain.then(run, run);
+  // Keep the chain alive regardless of outcome (printHtmlUnlocked never
+  // rejects, but belt-and-braces).
+  printChain = p.catch(() => {});
+  return p;
+}
+
 // Load HTML into the hidden window and print silently on `deviceName`.
 // Resolves { success, error }. Never rejects.
-function printHtml(html, deviceName) {
+function printHtmlUnlocked(html, deviceName) {
   return new Promise((resolve) => {
     let settled = false;
     let win;

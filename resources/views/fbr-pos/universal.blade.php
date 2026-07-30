@@ -1100,7 +1100,10 @@ window.addEventListener('popstate', function() {
             {{-- Cash Received / Wapsi (owner request, Jul 2026): optional input — CASH only.
                  data-cash-input keyboard guard: digits type, Enter pays cash. Under-payment
                  shows a soft warning; the FBR server cash-guard would 422 it, so the payload
-                 only sends the entered amount when it covers the total. --}}
+                 only sends the entered amount when it covers the total.
+                 HIDDEN 30 Jul 2026 (owner): UI abhi nahi chahiye, backend rehne do — the if(false) below
+                 flip to true to re-impose. --}}
+            @if(false)
             <div x-show="payMethodIndex === 0" class="px-4 pb-2" @click.stop>
                 <div class="flex items-center gap-2">
                     <input type="text" inputmode="decimal" x-model="cashReceived" data-cash-input
@@ -1114,6 +1117,7 @@ window.addEventListener('popstate', function() {
                 <p x-show="parseFloat(cashReceived) - roundedTotal > 0.001" x-cloak class="mt-1.5 text-center text-base font-black text-green-600 dark:text-green-400" x-text="'Wapas dein: Rs ' + Math.round(parseFloat(cashReceived) - roundedTotal).toLocaleString()"></p>
                 <p x-show="cashReceived !== '' && parseFloat(cashReceived) > 0 && roundedTotal - parseFloat(cashReceived) > 0.001" x-cloak class="mt-1.5 text-center text-[11px] font-bold text-amber-600 dark:text-amber-400" x-text="'Kam hai: Rs ' + Math.round(roundedTotal - parseFloat(cashReceived)).toLocaleString() + ' aur chahiye'"></p>
             </div>
+            @endif
             <div class="px-4 pb-0.5">
                 <p class="text-center text-[10px] text-gray-400 dark:text-gray-500 font-medium">Use <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&larr;</kbd> <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&rarr;</kbd> to choose &middot; <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">Enter</kbd> to confirm</p>
             </div>

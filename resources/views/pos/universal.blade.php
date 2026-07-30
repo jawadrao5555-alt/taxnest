@@ -1634,7 +1634,10 @@ window.addEventListener('popstate', function() {
             {{-- Cash Received / Wapsi (owner request, Jul 2026): optional input — cashier
                  types the note customer gave; big green "Wapas dein" shows the change.
                  CASH only (hidden when Card highlighted). Soft warning if under-paid —
-                 never blocks. data-cash-input keyboard guard: digits type, Enter pays cash. --}}
+                 never blocks. data-cash-input keyboard guard: digits type, Enter pays cash.
+                 HIDDEN 30 Jul 2026 (owner): UI abhi nahi chahiye, backend rehne do — the if(false) below
+                 flip to true to re-impose. --}}
+            @if(false)
             <div x-show="payMethodIndex === 0" class="px-4 pb-2" @click.stop>
                 <div class="flex items-center gap-2">
                     <input type="text" inputmode="decimal" x-model="cashReceived" data-cash-input
@@ -1648,6 +1651,7 @@ window.addEventListener('popstate', function() {
                 <p x-show="parseFloat(cashReceived) - payModalTotal > 0.001" x-cloak class="mt-1.5 text-center text-base font-black text-green-600 dark:text-green-400" x-text="'Wapas dein: Rs ' + Math.round(parseFloat(cashReceived) - payModalTotal).toLocaleString()"></p>
                 <p x-show="cashReceived !== '' && parseFloat(cashReceived) > 0 && payModalTotal - parseFloat(cashReceived) > 0.001" x-cloak class="mt-1.5 text-center text-[11px] font-bold text-amber-600 dark:text-amber-400" x-text="'Kam hai: Rs ' + Math.round(payModalTotal - parseFloat(cashReceived)).toLocaleString() + ' aur chahiye'"></p>
             </div>
+            @endif
             {{-- Bill note (owner, 26 Jul 2026): per-item note inputs removed from cart rows —
                  THIS is now the single note surface, at final-bill time. Bound to kitchenNotes
                  which already rides every payload (sale/hold/update/offline). data-pay-note

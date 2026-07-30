@@ -621,6 +621,51 @@
     </div>
     @endif
 
+    @if(auth('pos')->user() && !auth('pos')->user()->isPosCashier())
+    @php
+        $currentCutoff = \App\Services\PosBusinessDay::cutoffFor($company->id);
+        $cutoffOptions = [];
+        for ($h = 0; $h < 12; $h++) {
+            foreach (['00', '30'] as $m) {
+                $val = str_pad($h, 2, '0', STR_PAD_LEFT) . ':' . $m;
+                $cutoffOptions[$val] = \Carbon\Carbon::createFromFormat('H:i', $val)->format('g:i A');
+            }
+        }
+    @endphp
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6"
+         x-data="{ cutoff: '{{ $currentCutoff }}', saving: false, msg: '', ok: true,
+            save() {
+                this.saving = true; this.msg = '';
+                fetch('{{ route('pos.settings.dayclose-cutoff') }}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ cutoff: this.cutoff }) })
+                    .then(r => r.json())
+                    .then(d => { this.ok = !!(d && d.success); this.msg = (d && d.message) || (this.ok ? 'Saved.' : 'Setting save nahi hui — dobara koshish karein.'); })
+                    .catch(() => { this.ok = false; this.msg = 'Setting save nahi hui — dobara koshish karein.'; })
+                    .finally(() => { this.saving = false; });
+            } }">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <h3 class="font-semibold text-gray-900 dark:text-white">Din band hone ka waqt</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-xl">
+                    Is waqt se pehle ki sales <span class="font-semibold">pichhle din</span> mein shumar hongi — Z-Report, dashboard aur sales reports sab isi hisaab se banenge.
+                    Auto day-close bhi isi waqt par hoga. Tax record (PRA/FBR) hamesha asal waqt par rehta hai.
+                </p>
+            </div>
+            <div class="flex items-center gap-2">
+                <select x-model="cutoff" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                    @foreach($cutoffOptions as $val => $label)
+                    <option value="{{ $val }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+                <button type="button" @click="save()" :disabled="saving"
+                    class="px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition disabled:opacity-50">
+                    <span x-show="!saving">Save</span><span x-show="saving" x-cloak>Saving…</span>
+                </button>
+            </div>
+        </div>
+        <p x-show="msg" x-cloak class="text-xs mt-2" :class="ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'" x-text="msg"></p>
+    </div>
+    @endif
+
     @if($previousReports->isNotEmpty())
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
         <h3 class="font-semibold text-gray-900 dark:text-white mb-4">Previous Day Close Reports</h3>

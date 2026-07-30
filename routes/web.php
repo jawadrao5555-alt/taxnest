@@ -486,6 +486,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/settings/auto-purge-local-toggle', [PosController::class, 'toggleAutoPurgeLocal'])->name('pos.settings.auto-purge-local-toggle');
     Route::post('/settings/local-billing', [PosController::class, 'updateLocalBillingSettings'])->name('pos.settings.local-billing');
     Route::post('/settings/auto-dayclose-toggle', [PosController::class, 'toggleAutoDayclose'])->name('pos.settings.auto-dayclose-toggle');
+    Route::post('/settings/dayclose-cutoff', [PosController::class, 'updateDaycloseCutoff'])->name('pos.settings.dayclose-cutoff');
     Route::post('/settings/kds-auto-print', [PosController::class, 'toggleKdsAutoPrint'])->name('pos.settings.kds-auto-print');
     Route::get('/invoice/create', [PosController::class, 'createInvoice'])->name('pos.invoice.create');
     Route::get('/v2/invoice/create', [PosController::class, 'universalCreateInvoice'])->name('pos.v2.invoice.create');

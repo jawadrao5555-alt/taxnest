@@ -9,8 +9,9 @@ Late-night shops: sales after midnight (00:00–05:59) belong to the PREVIOUS ca
 
 ## The rule
 - `pos_transactions.business_date` (DATE, indexed with company_id) is assigned at CREATE time by a `creating` hook via `PosBusinessDay::forMoment($companyId, $moment)`:
-  - 06:00 or later → today.
-  - 00:00–05:59 → **yesterday, UNLESS yesterday is already day-closed** (pos_day_closes row exists) → then today. Manual close and 6AM auto-close both flip the boundary immediately.
+  - Cutoff is PER-COMPANY since 30 Jul 2026 (`companies.pos_business_day_cutoff`, 'HH:MM' string default '06:00', set on Day Close page, allowed 00:00–11:30 in :30 steps; hasColumn-guarded fallback 06:00; per-request cache — call `PosBusinessDay::forgetCutoff` after saving).
+  - At/after cutoff → today.
+  - Before cutoff → **yesterday, UNLESS yesterday is already day-closed** (pos_day_closes row exists) → then today. Manual close and the auto-close sweep (also per-company cutoff) both flip the boundary immediately.
 - PRA/FBR submission payloads, tax reports (`buildTaxReportQuery`), and `rider_settled_at` logic stay on REAL `created_at` — legal record never shifts.
 
 ## Traps (why these choices)

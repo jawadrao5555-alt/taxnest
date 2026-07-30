@@ -4398,6 +4398,42 @@ class PosController extends Controller
     }
 
     /**
+     * Day Close page — persist the company's business-day cutoff time
+     * ("Din band hone ka waqt", owner request 30 Jul 2026). Sales before this
+     * time count in the PREVIOUS trading day (business_date) and the auto
+     * day-close sweep waits for it. Restricted to early morning (00:00–11:30)
+     * so a "cutoff" can never swallow daytime trade. PRA/FBR & tax reports
+     * stay on real created_at — this never shifts the legal record.
+     */
+    public function updateDaycloseCutoff(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->isPosCashier()) {
+            return response()->json(['success' => false, 'message' => 'Only POS administrators can change this setting.'], 403);
+        }
+
+        $cutoff = (string) $request->input('cutoff', '');
+        if (!preg_match('/^([01]\d):(00|30)$/', $cutoff) || $cutoff >= '12:00') {
+            return response()->json(['success' => false, 'message' => 'Waqt 12:00 AM se 11:30 AM ke darmiyan chunein.'], 422);
+        }
+
+        $company = Company::find(app('currentCompanyId'));
+        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_business_day_cutoff')) {
+            $company->pos_business_day_cutoff = $cutoff;
+            $company->save();
+            \App\Services\PosBusinessDay::forgetCutoff($company->id);
+        } else {
+            return response()->json(['success' => false, 'message' => 'Setting abhi available nahi — thori dair baad koshish karein.'], 503);
+        }
+
+        return response()->json([
+            'success' => true,
+            'cutoff' => $cutoff,
+            'message' => 'Day-close waqt save ho gaya — ' . \Carbon\Carbon::createFromFormat('H:i', $cutoff)->format('g:i A') . ' se pehle ki sales pichhle din mein shumar hongi.',
+        ]);
+    }
+
+    /**
      * Phase 4 — flip the "auto-print receipt on sale" setting.
      * Reads/writes the existing companies.print_on_pay column (default true).
      */

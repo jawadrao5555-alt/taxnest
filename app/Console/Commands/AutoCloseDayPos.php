@@ -34,20 +34,23 @@ class AutoCloseDayPos extends Command
             return self::SUCCESS;
         }
 
-        // 6 AM NEXT-MORNING rule (owner decision 23 Jul 2026 — replaces the older
+        // NEXT-MORNING rule (owner decision 23 Jul 2026 — replaces the older
         // "second midnight / 1-day grace" rule): if nobody closed a trading day
-        // manually, it auto-closes at 6:00 AM the NEXT morning (Pakistan time;
-        // app tz = Asia/Karachi). Between 00:00–05:59 yesterday stays OPEN — a
-        // late-night shop (or its owner) can still close it manually; from 06:00
-        // onward everything before TODAY is swept. Command runs hourly, so a
-        // missed cron tick self-heals on the next hour.
-        $graceCutoff = now()->hour >= 6
-            ? today()->toDateString()            // >= 6 AM: close everything before today (incl. yesterday)
-            : today()->subDay()->toDateString(); // 00:00–05:59: yesterday keeps its grace window
+        // manually, it auto-closes at the company's day-close cutoff the NEXT
+        // morning (Pakistan time; app tz = Asia/Karachi; default 06:00, per-company
+        // via Day Close page since 30 Jul 2026). Before the cutoff yesterday stays
+        // OPEN — a late-night shop (or its owner) can still close it manually;
+        // from the cutoff onward everything before TODAY is swept. Command runs
+        // hourly, so a missed cron tick self-heals on the next hour.
+        $nowTime = now()->format('H:i');
         $closedTotal = 0;
 
         foreach ($companies as $company) {
             try {
+                $cutoffTime = \App\Services\PosBusinessDay::cutoffFor($company->id);
+                $graceCutoff = $nowTime >= $cutoffTime
+                    ? today()->toDateString()            // past cutoff: close everything before today (incl. yesterday)
+                    : today()->subDay()->toDateString(); // before cutoff: yesterday keeps its grace window
                 // Prior un-closed trading days before the cutoff. Include archived
                 // rows so a day is still detected even if some bills were archived.
                 // Days are keyed by BUSINESS date (owner rule 26 Jul 2026): an
@@ -86,7 +89,7 @@ class AutoCloseDayPos extends Command
                         $company->id,
                         $date,
                         $adminId,
-                        'Auto-closed by system (6:00 AM next day)'
+                        'Auto-closed by system (' . $cutoffTime . ' next day)'
                     );
 
                     if ($result['status'] === 'created') {

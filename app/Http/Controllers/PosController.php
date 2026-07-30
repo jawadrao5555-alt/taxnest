@@ -832,7 +832,9 @@ class PosController extends Controller
 
         // Opening Cash Balance (Jul 2026): today's drawer opening — card on the
         // dashboard prompts entry at day start; locked once today is closed.
-        $todayDate = today()->format('Y-m-d');
+        // Task 56: keys on the BUSINESS day (per-company cutoff) so at 2 AM a
+        // late-night shop still sees/locks yesterday's drawer opening.
+        $todayDate = $bizToday;
         $dayOpening = \App\Models\PosDayOpening::forDate($companyId, $todayDate);
         $todayClosed = PosDayCloseReport::where('company_id', $companyId)
             ->where('report_date', $todayDate)
@@ -863,7 +865,9 @@ class PosController extends Controller
         ]);
         // Opening cash is a TODAY-only entry — the UI never sends a date, and
         // accepting one would let a raw POST seed arbitrary future/past days.
-        $date = today()->format('Y-m-d');
+        // Task 56: "today" = the company's current BUSINESS day (per-company
+        // cutoff), matching the dashboard card that posts here.
+        $date = \App\Services\PosBusinessDay::current($companyId);
 
         if (!\Schema::hasTable('pos_day_openings')) {
             return back()->with('error', 'Opening cash feature is being set up. Try again shortly.');

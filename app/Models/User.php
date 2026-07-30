@@ -21,6 +21,7 @@ class User extends Authenticatable
         'pos_role',
         'is_active',
         'dark_mode',
+        'language', // 'ur' Roman Urdu / 'en' English; NULL = company default (30 Jul 2026)
         'pra_reporting_enabled',
         'pos_team_password_enc',
     ];

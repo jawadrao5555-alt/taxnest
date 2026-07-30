@@ -42,6 +42,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             \App\Http\Middleware\ReadOnlyImpersonation::class,
             \App\Http\Middleware\LogImpersonatedWrites::class,
+            \App\Http\Middleware\SetPosLocale::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

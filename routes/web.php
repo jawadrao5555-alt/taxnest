@@ -478,6 +478,25 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/settings/theme', [PosController::class, 'updateTheme'])->name('pos.settings.theme');
     Route::post('/settings/dashboard-style', [PosController::class, 'updateDashboardStyle'])->name('pos.settings.dashboard-style');
     Route::post('/settings/guided-flow', [PosController::class, 'updateGuidedFlow'])->name('pos.settings.guided-flow');
+    // Language system (30 Jul 2026): per-user choice + company default. 'ur' Roman Urdu / 'en' English.
+    Route::post('/set-language', function (\Illuminate\Http\Request $request) {
+        $lang = $request->input('language');
+        if (in_array($lang, ['ur', 'en'], true)) {
+            $u = auth()->guard('pos')->user();
+            $u->language = $lang;
+            $u->save();
+        }
+        return back()->with('success', __('pos.language_saved'));
+    })->name('pos.set-language');
+    Route::post('/settings/default-language', function (\Illuminate\Http\Request $request) {
+        $u = auth()->guard('pos')->user();
+        abort_unless($u && $u->isPosAdmin(), 403);
+        $lang = $request->input('default_language');
+        if (in_array($lang, ['ur', 'en'], true)) {
+            $u->company->update(['default_language' => $lang]);
+        }
+        return back()->with('success', __('pos.language_saved'));
+    })->name('pos.settings.default-language');
     Route::post('/settings/quick-type', [PosController::class, 'updateQuickType'])->name('pos.settings.quick-type');
     Route::post('/settings/receipt-autoclose', [PosController::class, 'updateReceiptAutoclose'])->name('pos.settings.receipt-autoclose');
     Route::post('/settings/tax-pricing-mode', [PosController::class, 'updateTaxPricingMode'])->name('pos.settings.tax-pricing-mode');
@@ -955,6 +974,25 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/settings/dashboard-style', [FbrPosController::class, 'updateDashboardStyle'])->name('fbrpos.settings.dashboard-style');
     Route::post('/settings/theme', [FbrPosController::class, 'updateTheme'])->name('fbrpos.settings.theme');
     Route::post('/settings/guided-flow', [FbrPosController::class, 'updateGuidedFlow'])->name('fbrpos.settings.guided-flow');
+    // Language system (30 Jul 2026): per-user choice + company default. 'ur' Roman Urdu / 'en' English.
+    Route::post('/set-language', function (\Illuminate\Http\Request $request) {
+        $lang = $request->input('language');
+        if (in_array($lang, ['ur', 'en'], true)) {
+            $u = auth()->guard('fbrpos')->user();
+            $u->language = $lang;
+            $u->save();
+        }
+        return back()->with('success', __('pos.language_saved'));
+    })->name('fbrpos.set-language');
+    Route::post('/settings/default-language', function (\Illuminate\Http\Request $request) {
+        $u = auth()->guard('fbrpos')->user();
+        abort_unless($u && $u->isPosAdmin(), 403);
+        $lang = $request->input('default_language');
+        if (in_array($lang, ['ur', 'en'], true)) {
+            $u->company->update(['default_language' => $lang]);
+        }
+        return back()->with('success', __('pos.language_saved'));
+    })->name('fbrpos.settings.default-language');
     Route::get('/customize', [FbrPosController::class, 'customize'])->name('fbrpos.customize');
 
     // 🎯 Universal Header API — Local / Provisional bills (F10) + Failed bills (F11)

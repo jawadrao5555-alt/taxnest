@@ -247,6 +247,30 @@
                     </button>
                 </div>
 
+                {{-- Company default language (owner, 30 Jul 2026) --}}
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400 flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/></svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.company_default_language') }}</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.company_default_language_hint') }}</p>
+                    </div>
+                    @php $tnCoLang = in_array($company->default_language ?? 'ur', ['ur','en'], true) ? ($company->default_language ?? 'ur') : 'ur'; @endphp
+                    <div class="flex gap-2 shrink-0">
+                        <form method="POST" action="{{ route('pos.settings.default-language') }}">
+                            @csrf
+                            <input type="hidden" name="default_language" value="ur">
+                            <button type="submit" class="px-3 py-1.5 rounded-lg text-[11px] font-bold border transition {{ $tnCoLang === 'ur' ? 'bg-sky-600 text-white border-sky-600' : 'text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800' }}">{{ __('pos.language_roman_urdu') }}</button>
+                        </form>
+                        <form method="POST" action="{{ route('pos.settings.default-language') }}">
+                            @csrf
+                            <input type="hidden" name="default_language" value="en">
+                            <button type="submit" class="px-3 py-1.5 rounded-lg text-[11px] font-bold border transition {{ $tnCoLang === 'en' ? 'bg-sky-600 text-white border-sky-600' : 'text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800' }}">{{ __('pos.language_english') }}</button>
+                        </form>
+                    </div>
+                </div>
+
                 {{-- Receipt popup auto-close (owner, 23 Jul 2026 — default 10 sec) --}}
                 <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
                     <div class="flex items-center gap-3">

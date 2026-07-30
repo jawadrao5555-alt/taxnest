@@ -13,3 +13,4 @@ description: Products-hidden mode desktop layout flip — cart wide LEFT, paymen
 
 - PORTED to fbr-pos/universal.blade.php (30 Jul 2026): same class hooks; FBR's footer div itself carries .tn-cart-side (no wrapper), only .tn-cart-main is a display:contents wrapper; FBR kept its own simpler widecart CSS (no C-style totals card).
 - Guided-flow coach strip (1·Customer…5·Bill bar) REMOVED from BOTH universal screens (owner: screen space); the $hasTypeStep @php block MUST stay — Order-Type overlay uses it. Enter-chain behavior unchanged.
+- Inventory-mode restriction LIFTED (owner, 30 Jul 2026): master Products OFF toggle + widecart now work for inventory_enabled shops too (both screens; JS forced-true guard + blade @if removed). Search-add keeps billing working; manual on-the-fly create is the only thing inventory mode lacks. PIZZA MASTER "split nahi ho raha" = this guard, not a layout bug.

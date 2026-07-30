@@ -579,11 +579,28 @@ class AgentController extends Controller
         // Housekeeping: finished jobs older than 7 days are useless — prune so
         // the table never grows unbounded (failed jobs stay visible on the
         // Printer Settings page until they age out too).
-        DB::table('pos_print_jobs')
-            ->where('company_id', $company->id)
-            ->whereIn('status', ['done', 'failed'])
-            ->where('updated_at', '<', now()->subDays(7))
-            ->delete();
+        // Delete in small LIMIT batches and swallow deadlocks (SQLSTATE 40001):
+        // this purge races with the agent's own claim/update queries on the same
+        // table, and a lost round is harmless — the next poll retries. Logging
+        // it as ERROR just drowned production logs with noise.
+        try {
+            do {
+                $deleted = DB::table('pos_print_jobs')
+                    ->where('company_id', $company->id)
+                    ->whereIn('status', ['done', 'failed'])
+                    ->where('updated_at', '<', now()->subDays(7))
+                    ->limit(100)
+                    ->delete();
+            } while ($deleted === 100);
+        } catch (\Illuminate\Database\QueryException $e) {
+            if (($e->errorInfo[0] ?? null) === '40001' || str_contains($e->getMessage(), 'Deadlock')) {
+                \Log::warning('pos_print_jobs purge skipped this round (deadlock with agent queries)', [
+                    'company_id' => $company->id,
+                ]);
+            } else {
+                throw $e;
+            }
+        }
 
         $token = (string) \Illuminate\Support\Str::uuid();
         DB::table('pos_print_jobs')

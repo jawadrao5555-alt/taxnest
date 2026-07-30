@@ -25,3 +25,8 @@ description: SALE_CACHE cache-first serving of /pos/invoice/create, boot fingerp
 - Old flow (postMessage TN_DROP_SALE_CACHE + 400ms reload) was a RACE: slow/failed network → reload landed on the same stale copy → loop.
 - New contract in bootFpCheck: fetch fresh HTML (cache:'reload') FIRST, page itself `caches.put()`s it into the live `*-sale` cache (name discovered via caches.keys().find(endsWith('-sale')) — never hardcode the version), THEN reload. Network fail → NO reload, cached screen keeps working. sessionStorage one-shot guard set only after fresh copy secured.
 - posBootFingerprint: now()->toDateString() joins `cat` ONLY when company has deals (dealsAgg not '0:...') — deal-less shops no longer force-reload every morning.
+
+## Reload loop root cause (30 Jul 2026 — ZFC "bar bar load")
+Boot fingerprint's `set` hashes `companies.updated_at`. Desktop Agent heartbeat wrote `agent_last_seen` via Eloquent `update()` every ~minute → updated_at bumped → every agent-running shop's cached sale screen looked stale → perpetual reload (+ waiter-order toast re-fired each boot).
+**Rule:** ALL agent telemetry writes (heartbeat, pendingInvoices beats, submitResult beats, reportPrinters) must go through `AgentController::telemetryUpdate()` (timestamps=false) — never a bare `$company->update()`. Any NEW agent endpoint that touches companies must use it too.
+**Residual fragility:** fingerprint still hashes raw company->updated_at — any frequent non-POS write to companies will recreate the loop; long-term fix = explicit POS-config revision.

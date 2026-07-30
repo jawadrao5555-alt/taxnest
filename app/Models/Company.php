@@ -343,7 +343,7 @@ class Company extends Model
             'status', 'company_status', 'suspended_at', 'pos_setup_completed',
             // Look & behaviour
             'pos_theme', 'pos_dashboard_style', 'pos_ui_density', 'use_universal_pos',
-            'pos_guided_flow_enabled', 'pos_quick_type_enabled',
+            'pos_guided_flow_enabled', 'pos_quick_type_enabled', 'default_language',
             'pos_receipt_autoclose_seconds', 'invoice_display_prefs', 'feature_flags',
             // Tax / pricing
             'standard_tax_rate', 'pos_tax_rate_cash', 'pos_tax_rate_card',

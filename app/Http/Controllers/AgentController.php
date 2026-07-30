@@ -14,6 +14,23 @@ use App\Services\FbrService;
 class AgentController extends Controller
 {
     /**
+     * Agent TELEMETRY writes (last-seen beats, printer inventory) must NEVER
+     * bump companies.updated_at: the sale screen's boot fingerprint hashes
+     * that timestamp, so a beating agent made every cached sale screen look
+     * "stale" → endless reload loop on agent-running shops (ZFC, 30 Jul 2026
+     * "NestPOS bar bar load ho raha hai").
+     */
+    private function telemetryUpdate($company, array $attrs): void
+    {
+        $company->timestamps = false;
+        try {
+            $company->update($attrs);
+        } finally {
+            $company->timestamps = true;
+        }
+    }
+
+    /**
      * Self-update advertisement for v1.3.0+ agents, piggybacked on the
      * heartbeat response. Reuses the cached GitHub latest-release info so
      * agents never hit api.github.com directly (shared-ISP rate limits).
@@ -81,7 +98,7 @@ class AgentController extends Controller
             $update['agent_snapshot_at'] = $snapAt;
         }
 
-        $company->update($update);
+        $this->telemetryUpdate($company, $update);
 
         // ===== FBR POS Fiscal Device company =====
         if ($company->agentServesFbr()) {
@@ -208,7 +225,7 @@ class AgentController extends Controller
     {
         $company = $request->attributes->get('agent_company');
 
-        $company->update(['agent_last_seen' => now()]);
+        $this->telemetryUpdate($company, ['agent_last_seen' => now()]);
 
         // ===== FBR POS Fiscal Device company =====
         if ($company->agentServesFbr()) {
@@ -415,7 +432,7 @@ class AgentController extends Controller
             ]);
         }
 
-        $company->update(['agent_last_seen' => now()]);
+        $this->telemetryUpdate($company, ['agent_last_seen' => now()]);
 
         return response()->json(['ok' => true]);
     }
@@ -494,7 +511,7 @@ class AgentController extends Controller
             ]);
         }
 
-        $company->update(['agent_last_seen' => now()]);
+        $this->telemetryUpdate($company, ['agent_last_seen' => now()]);
 
         return response()->json(['ok' => true]);
     }
@@ -527,7 +544,7 @@ class AgentController extends Controller
         ])->values()->all();
         $settings['printers_reported_at'] = now()->toIso8601String();
 
-        $company->update([
+        $this->telemetryUpdate($company, [
             'pos_printer_settings' => $settings,
             'agent_last_seen' => now(),
         ]);

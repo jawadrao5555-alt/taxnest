@@ -1176,8 +1176,12 @@ class PosController extends Controller
             str_starts_with($dealsAgg, '0:') ? '' : now()->toDateString(),
         ]));
 
+        // Task 52 (Jul 2026): NEVER hash raw companies.updated_at here — any
+        // frequent writer to the companies row (agent telemetry, counters)
+        // would make every cached sale screen look stale → reload loop.
+        // posConfigRev() hashes an explicit whitelist of POS-relevant fields.
         $settingsRev = md5(json_encode([
-            optional($company->updated_at)->timestamp,
+            $company->posConfigRev(),
             optional($user->updated_at)->timestamp,
             (bool) $user->praReportingEnabled($company),
             PosTaxRule::effectiveRules($company),

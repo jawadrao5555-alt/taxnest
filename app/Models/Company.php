@@ -317,6 +317,81 @@ class Company extends Model
     }
 
     /**
+     * POS-CONFIG REVISION (Task 52, Jul 2026): explicit whitelist hash of the
+     * company fields that actually shape the sale screen / receipts / POS
+     * behaviour. The boot fingerprint ('set' key in PosController::
+     * posBootFingerprint) used to hash the raw companies.updated_at, so ANY
+     * frequent writer to the companies row (agent heartbeats, counters, sync
+     * telemetry) silently recreated the "NestPOS bar bar load" reload loop.
+     * Telemetry/counter columns (agent_last_seen, agent_version,
+     * agent_snapshot_at, next_*_invoice_number, compliance_score, token
+     * expiries, ...) are deliberately ABSENT from this list — adding a new
+     * volatile column can never break the fingerprint again.
+     *
+     * When you add a NEW company column that the sale screen bakes in,
+     * add it here so a settings change still refreshes cached screens.
+     */
+    public function posConfigRev(): string
+    {
+        $cols = [
+            // Identity / receipt header
+            'name', 'ntn', 'phone', 'mobile', 'address', 'city', 'logo_path',
+            'invoice_number_prefix', 'receipt_footer_note', 'pos_receipt_show_tax',
+            'print_paper_size', 'receipt_printer_size',
+            // Status gates
+            'status', 'company_status', 'suspended_at', 'pos_setup_completed',
+            // Look & behaviour
+            'pos_theme', 'pos_dashboard_style', 'pos_ui_density', 'use_universal_pos',
+            'pos_guided_flow_enabled', 'pos_quick_type_enabled',
+            'pos_receipt_autoclose_seconds', 'invoice_display_prefs', 'feature_flags',
+            // Tax / pricing
+            'standard_tax_rate', 'pos_tax_rate_cash', 'pos_tax_rate_card',
+            'pos_tax_inclusive', 'pos_tax_pricing_mode',
+            // Reporting / integration modes
+            'pra_reporting_enabled', 'pos_integration_mode', 'pra_environment',
+            'pra_pos_id', 'pra_connection_mode', 'agent_enabled', 'agent_submits_pra',
+            'fbr_pos_enabled', 'fbr_universal_enabled', 'fbr_reporting_enabled',
+            'fbr_pos_id', 'fbr_pos_environment', 'fbr_connection_mode',
+            // Inventory / restaurant / printing features
+            'inventory_enabled', 'pos_restock_on_void', 'restaurant_mode',
+            'pos_use_legacy_restaurant', 'kds_enabled', 'pos_kds_auto_print',
+            'kitchen_printer_enabled', 'print_on_hold', 'print_on_pay',
+            'auto_print_kot', 'kot_reprint_enabled', 'dine_in_auto_kot',
+            'pos_kot_full_mode', 'kot_compact', 'kot_show_customer',
+            'kot_show_orderby', 'kot_show_barcode', 'kot_show_footer',
+            'kot_align_center', 'kot_left_margin_mm',
+            // Day-close / limits / pins
+            'pos_auto_purge_local_on_dayclose', 'pos_auto_dayclose_24h',
+            'pos_dayclose_final_local_action', 'pos_dayclose_provisional_action',
+            'pos_customer_spend_persist', 'cashier_discount_limit',
+            'manager_discount_limit', 'manager_override_pin',
+        ];
+
+        $vals = [];
+        foreach ($cols as $c) {
+            $v = $this->getAttribute($c);
+            // Normalize objects (Carbon, casts) into stable scalars.
+            if ($v instanceof \DateTimeInterface) {
+                $v = $v->format('Y-m-d H:i:s');
+            }
+            $vals[$c] = $v;
+        }
+
+        // pos_printer_settings holds BOTH cashier-chosen routing (relevant) and
+        // agent-reported telemetry (available_printers list + reported-at beat,
+        // rewritten every ~5 min by reportPrinters). Hash only the deliberate
+        // routing keys, or every printer report would fake a "settings change".
+        $ps = $this->printerSettings();
+        $vals['printer_routing'] = [
+            'silent_print_enabled' => $ps['silent_print_enabled'],
+            'receipt_printer' => $ps['receipt_printer'],
+            'kot_printer' => $ps['kot_printer'],
+        ];
+
+        return md5(json_encode($vals));
+    }
+
+    /**
      * Normalized silent-print settings (Desktop Sync Agent printer routing).
      * Always returns the full shape with defaults so views/controllers never
      * null-check individual keys.

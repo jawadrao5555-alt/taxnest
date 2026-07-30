@@ -30,3 +30,8 @@ description: SALE_CACHE cache-first serving of /pos/invoice/create, boot fingerp
 Boot fingerprint's `set` hashes `companies.updated_at`. Desktop Agent heartbeat wrote `agent_last_seen` via Eloquent `update()` every ~minute → updated_at bumped → every agent-running shop's cached sale screen looked stale → perpetual reload (+ waiter-order toast re-fired each boot).
 **Rule:** ALL agent telemetry writes (heartbeat, pendingInvoices beats, submitResult beats, reportPrinters) must go through `AgentController::telemetryUpdate()` (timestamps=false) — never a bare `$company->update()`. Any NEW agent endpoint that touches companies must use it too.
 **Residual fragility:** fingerprint still hashes raw company->updated_at — any frequent non-POS write to companies will recreate the loop; long-term fix = explicit POS-config revision.
+
+## Fingerprint 'set' = posConfigRev whitelist (Jul 2026, reload-loop hardening)
+- The boot fingerprint's settings revision NO LONGER hashes raw companies.updated_at — it uses `Company::posConfigRev()`, an explicit whitelist hash of POS-relevant columns. Volatile writers (agent telemetry, counters) can bump updated_at freely without faking staleness.
+- **How to apply:** when a NEW company column is baked into the sale screen, add it to the posConfigRev() whitelist or settings changes won't refresh cached screens. pos_printer_settings is hashed ROUTING-keys-only (silent_print_enabled/receipt_printer/kot_printer) — agent printer reports must never change the rev.
+- Regression pins live in tests/Feature/PosBootFingerprintStabilityTest.php (run: `env -u DATABASE_URL ... APP_ENV=testing php vendor/bin/phpunit ...`; plain `php artisan test` trips the prod-DB guard because APP_ENV stays production).

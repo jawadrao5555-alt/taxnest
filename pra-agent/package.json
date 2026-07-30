@@ -8,7 +8,7 @@
   "scripts": {
     "start": "electron .",
     "build": "electron-builder",
-    "build:win": "electron-builder --win --x64 --publish never",
+    "build:win": "npx --yes electron-builder@26.15.3 --win --x64 --publish never",
     "publish:win": "electron-builder --win --x64 --publish always"
   },
   "dependencies": {
@@ -74,6 +74,7 @@
       "shortcutName": "TaxNest PRA Agent",
       "uninstallDisplayName": "TaxNest PRA Agent",
       "deleteAppDataOnUninstall": false
-    }
+    },
+    "electronVersion": "41.7.1"
   }
 }

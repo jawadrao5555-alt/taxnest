@@ -35,3 +35,8 @@ Boot fingerprint's `set` hashes `companies.updated_at`. Desktop Agent heartbeat 
 - The boot fingerprint's settings revision NO LONGER hashes raw companies.updated_at — it uses `Company::posConfigRev()`, an explicit whitelist hash of POS-relevant columns. Volatile writers (agent telemetry, counters) can bump updated_at freely without faking staleness.
 - **How to apply:** when a NEW company column is baked into the sale screen, add it to the posConfigRev() whitelist or settings changes won't refresh cached screens. pos_printer_settings is hashed ROUTING-keys-only (silent_print_enabled/receipt_printer/kot_printer) — agent printer reports must never change the rev.
 - Regression pins live in tests/Feature/PosBootFingerprintStabilityTest.php (run: `env -u DATABASE_URL ... APP_ENV=testing php vendor/bin/phpunit ...`; plain `php artisan test` trips the prod-DB guard because APP_ENV stays production).
+
+## Logged-out cache bounce (30 Jul 2026, second "bar bar load" report)
+Even with a stable fingerprint, a DEAD SESSION device loops: SW serves the cached sale screen (splash) → bootFpCheck sees redirect/401/419 → bounce to login → reopen POS → same cached splash again. Access-log signature: all /pos/api/* return 302 with sale-screen referer + repeated /sw.js fetches (~10s) from one IP, while the sale-screen navigation itself never hits the server (cache-served, invisible in logs).
+**Fix:** logged-out path in bootFpCheck now posts TN_DROP_SALE_CACHE and waits 250ms BEFORE location.replace(login) — cached copy can't replay.
+**Diag tip:** offline-first pages make reload loops invisible in access logs; count /sw.js fetches per IP to measure real page-boot cadence.

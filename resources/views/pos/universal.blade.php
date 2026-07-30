@@ -3646,10 +3646,18 @@ function restaurantPos() {
                 if (!cur) return;
                 fetch('{{ route('pos.api.boot-check') }}', { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
                     .then(r => {
-                        if (r.redirected || r.status === 401 || r.status === 419) { window.location.replace('{{ route('pos.login') }}'); return null; }
+                        // LOGGED-OUT LOOP FIX (ZFC 30 Jul 2026): a dead session must
+                        // ALSO drop the cached sale screen, or every attempt to open
+                        // POS replays the stale cached copy → splash → bounce to
+                        // login → again and again ("bar bar load"). Drop first, then go.
+                        const toLogin = () => {
+                            try { navigator.serviceWorker?.controller?.postMessage({ type: 'TN_DROP_SALE_CACHE' }); } catch (e) {}
+                            setTimeout(() => window.location.replace('{{ route('pos.login') }}'), 250);
+                        };
+                        if (r.redirected || r.status === 401 || r.status === 419) { toLogin(); return null; }
                         if (!r.ok) return null;
                         const ct = r.headers.get('content-type') || '';
-                        if (!ct.includes('json')) { window.location.replace('{{ route('pos.login') }}'); return null; }
+                        if (!ct.includes('json')) { toLogin(); return null; }
                         return r.json();
                     })
                     .then(d => {

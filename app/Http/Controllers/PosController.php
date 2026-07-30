@@ -281,6 +281,8 @@ class PosController extends Controller
                 'silent_print_enabled' => 'nullable|boolean',
                 'receipt_printer' => 'nullable|string|max:255',
                 'kot_printer' => 'nullable|string|max:255',
+                'counter_kot_printer' => 'nullable|string|max:255',
+                'counter_kot_enabled' => 'nullable|boolean',
             ]);
 
             $settings = $company->printerSettings();
@@ -291,6 +293,10 @@ class PosController extends Controller
             $kot = trim((string) ($validated['kot_printer'] ?? ''));
             $settings['receipt_printer'] = ($receipt !== '' && in_array($receipt, $known, true)) ? $receipt : null;
             $settings['kot_printer'] = ($kot !== '' && in_array($kot, $known, true)) ? $kot : null;
+            // Counter KOT Copy (dine-in only): printer + its own ON/OFF tick.
+            $counterKot = trim((string) ($validated['counter_kot_printer'] ?? ''));
+            $settings['counter_kot_printer'] = ($counterKot !== '' && in_array($counterKot, $known, true)) ? $counterKot : null;
+            $settings['counter_kot_enabled'] = $request->boolean('counter_kot_enabled') && $settings['counter_kot_printer'];
             $settings['silent_print_enabled'] = $request->boolean('silent_print_enabled')
                 && ($settings['receipt_printer'] || $settings['kot_printer']);
             // Manual save = deliberate choice — the sale-screen one-click prompt
@@ -514,6 +520,26 @@ class PosController extends Controller
         $delta = $request->boolean('delta');
         $deltaQ = $delta ? '&delta=1' : '';
         $stations = \App\Models\PosStation::activeFor($companyId);
+        // Counter KOT Copy (owner request 30 Jul 2026): DINE-IN orders only —
+        // one FULL (non-station-split) copy of the KOT on the counter printer,
+        // in ADDITION to the normal kitchen job(s). Best-effort: never blocks
+        // or fails the main kitchen print.
+        $counterCopy = function () use ($settings, $order, $companyId, $user, $delta) {
+            try {
+                if (!($settings['counter_kot_enabled'] ?? false)) return;
+                $printer = $settings['counter_kot_printer'] ?? null;
+                if (!$printer || ($order->order_type ?? null) !== 'dine_in') return;
+                \App\Models\PosPrintJob::create([
+                    'company_id' => $companyId,
+                    'type' => 'kot',
+                    'target_printer' => $printer,
+                    'restaurant_order_id' => $order->id,
+                    'render_query' => $delta ? 'delta=1' : null,
+                    'status' => 'pending',
+                    'created_by' => $user->id,
+                ]);
+            } catch (\Throwable $e) { /* copy is optional — kitchen print already queued */ }
+        };
         $makeJob = function (?string $printer, ?string $renderQuery) use ($companyId, $order, $user) {
             return \App\Models\PosPrintJob::create([
                 'company_id' => $companyId,
@@ -533,6 +559,7 @@ class PosController extends Controller
                 return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
             }
             $job = $makeJob($settings['kot_printer'], $delta ? 'delta=1' : null);
+            $counterCopy();
             return response()->json(['success' => true, 'job_id' => $job->id]);
         }
 
@@ -578,6 +605,7 @@ class PosController extends Controller
         foreach ($plan as [$printer, $rq]) {
             $jobIds[] = $makeJob($printer, $rq)->id;
         }
+        $counterCopy();
         return response()->json(['success' => true, 'job_ids' => $jobIds]);
     }
 

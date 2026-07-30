@@ -403,6 +403,11 @@ class Company extends Model
             'silent_print_enabled' => (bool) ($s['silent_print_enabled'] ?? false),
             'receipt_printer' => $s['receipt_printer'] ?? null,
             'kot_printer' => $s['kot_printer'] ?? null,
+            // Counter KOT Copy (owner request 30 Jul 2026): DINE-IN orders only —
+            // every KOT also prints ONE full copy on this counter printer when
+            // the tick is ON. Other order types never use it.
+            'counter_kot_printer' => $s['counter_kot_printer'] ?? null,
+            'counter_kot_enabled' => (bool) ($s['counter_kot_enabled'] ?? false),
             'available_printers' => is_array($s['available_printers'] ?? null) ? $s['available_printers'] : [],
             'printers_reported_at' => $s['printers_reported_at'] ?? null,
             // One-click silent-print prompt (Jul 2026): timestamp when an admin

@@ -100,10 +100,30 @@
                         </select>
                         <p class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">Kitchen tickets (KOT) go straight to this printer in the kitchen.</p>
                     </div>
+                    {{-- Counter KOT Copy (owner request 30 Jul 2026): DINE-IN orders
+                         only — every KOT also prints one full copy on this counter
+                         printer when the tick is ON. Other order types ignore it. --}}
+                    <div>
+                        <div class="flex items-center justify-between gap-2 mb-1.5">
+                            <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300">Counter KOT Copy Printer <span class="font-normal text-gray-400">(Dine-In only)</span></label>
+                            <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                                <input type="checkbox" name="counter_kot_enabled" value="1" {{ $settings['counter_kot_enabled'] ? 'checked' : '' }} class="rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5">
+                                <span class="text-[11px] font-semibold text-gray-600 dark:text-gray-400">Use karna hai</span>
+                            </label>
+                        </div>
+                        <select name="counter_kot_printer" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                            <option value="">— Not set —</option>
+                            @foreach($settings['available_printers'] as $p)
+                            <option value="{{ $p['name'] }}" {{ $settings['counter_kot_printer'] === $p['name'] ? 'selected' : '' }}>{{ $p['displayName'] ?? $p['name'] }}{{ !empty($p['isDefault']) ? ' (default)' : '' }}</option>
+                            @endforeach
+                        </select>
+                        <p class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">Dine-In orders ki KOT copy cashier counter par bhi nikle gi (tick ON ho to). Takeaway/Delivery par yeh printer use nahi hota.</p>
+                    </div>
+                    <div class="flex items-end">
+                        <button type="submit" class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold transition shadow-sm">Save Printer Settings</button>
+                    </div>
                 </div>
         </div>
-
-        <button type="submit" class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold transition shadow-sm">Save Printer Settings</button>
     </form>
 
     {{-- Recent failed jobs --}}

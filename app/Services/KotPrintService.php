@@ -50,12 +50,25 @@ class KotPrintService
 
             $stations = PosStation::activeFor($company->id);
 
+            // Counter KOT Copy (owner request 30 Jul 2026): DINE-IN orders only —
+            // one FULL copy of the KOT on the counter printer, in addition to the
+            // normal kitchen job(s). Best-effort, never blocks the kitchen print.
+            $counterCopy = function () use ($settings, $order, $makeJob, $delta) {
+                try {
+                    if (!($settings['counter_kot_enabled'] ?? false)) return;
+                    $printer = $settings['counter_kot_printer'] ?? null;
+                    if (!$printer || ($order->order_type ?? null) !== 'dine_in') return;
+                    $makeJob($printer, $delta ? 'delta=1' : null);
+                } catch (\Throwable $e) { /* copy is optional */ }
+            };
+
             // Zero stations => single full/delta KOT on the company KOT printer.
             if ($stations->isEmpty()) {
                 if (!$settings['kot_printer']) {
                     return ['printed' => false, 'reason' => 'no_printer'];
                 }
                 $job = $makeJob($settings['kot_printer'], $delta ? 'delta=1' : null);
+                $counterCopy();
                 return ['printed' => true, 'job_ids' => [$job->id]];
             }
 
@@ -80,6 +93,7 @@ class KotPrintService
             foreach ($plan as [$printer, $rq]) {
                 $jobIds[] = $makeJob($printer, $rq)->id;
             }
+            $counterCopy();
             return ['printed' => true, 'job_ids' => $jobIds];
         } catch (\Throwable $e) {
             \Log::warning('KotPrintService enqueue failed: ' . $e->getMessage(), ['order_id' => $order->id ?? null]);

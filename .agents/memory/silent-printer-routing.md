@@ -37,3 +37,6 @@ description: POS silent printing via Desktop Agent print-job queue — invariant
 - KotPrintService mirrors PosController::apiCreatePrintJob's KOT branch (no-station single job + station split, delta support) — if that branch changes, keep the service in sync. Station-PINNED KDS path stays only in the controller.
 - Cashier settling a waiter-loaded order does NOT re-enqueue KOT (incomingOrderId path passes no KOT order id) — no double print.
 - Toast types in universal.blade.php: success=green, info=blue (new), else red. Info banners must use 'info', not 'error'.
+
+## Counter KOT Copy (Jul 2026)
+- Printer Settings 3rd picker `counter_kot_printer` + `counter_kot_enabled` (normalized in Company::printerSettings). Copy fires ONLY for dine_in, as one extra type='kot' job (best-effort try/catch, never blocks kitchen), in PosController::apiCreatePrintJob + KotPrintService — NOT on station-pinned KDS path or transaction-based KOT branch. Copy MIRRORS what kitchen printed (delta on appends) — owner wants "har KOT ke sath copy", not always-full.

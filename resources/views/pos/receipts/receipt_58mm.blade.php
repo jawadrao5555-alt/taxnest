@@ -397,6 +397,17 @@
             <td class="tot-label">TOTAL:</td>
             <td class="tot-value">PKR {{ number_format($showTaxLines ? $transaction->total_amount : round((float) $transaction->total_amount), 2) }}</td>
         </tr>
+        {{-- Cash Received / Wapsi (owner request, Jul 2026) — mirrors receipt_80mm; keep in sync. --}}
+        @if(strtolower((string) $transaction->payment_method) === 'cash' && (float) ($transaction->cash_received ?? 0) > 0 && (float) ($transaction->change_due ?? 0) > 0.001)
+        <tr>
+            <td class="tot-label">CASH:</td>
+            <td class="tot-value">PKR {{ number_format((float) $transaction->cash_received, 2) }}</td>
+        </tr>
+        <tr class="grand-total">
+            <td class="tot-label">WAPSI:</td>
+            <td class="tot-value">PKR {{ number_format((float) $transaction->change_due, 2) }}</td>
+        </tr>
+        @endif
     </table>
 
     @if(($transaction->order_type ?? '') === 'delivery' || !empty($transaction->delivery_address) || $transaction->rider)

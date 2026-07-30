@@ -1053,7 +1053,7 @@ window.addEventListener('popstate', function() {
          Provisional save is now a SEPARATE button + F9 shortcut
          in the right sidebar (no modal, no checkbox, no key conflict).
          ═══════════════════════════════════════════════════════════════ -->
-    <div x-show="showPayModal" x-cloak x-transition.opacity x-effect="if (showPayModal) { submitting = false; saveAsProvisional = false; payMethodIndex = 0; }" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false">
+    <div x-show="showPayModal" x-cloak x-transition.opacity x-effect="if (showPayModal) { submitting = false; saveAsProvisional = false; payMethodIndex = 0; cashReceived = ''; }" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
             <div class="p-5 text-center border-b border-gray-100 dark:border-gray-800">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">Payment</h3>
@@ -1086,6 +1086,23 @@ window.addEventListener('popstate', function() {
                     <span class="block text-[10px] font-semibold mt-0.5 text-blue-600/60" x-text="'Tax: Rs ' + taxAmount.toFixed(2) + ' (per-item)'"></span>
                     <kbd x-show="!submitting" class="block mt-0.5 text-[9px] font-mono text-blue-500/60">Press 2</kbd>
                 </button>
+            </div>
+            {{-- Cash Received / Wapsi (owner request, Jul 2026): optional input — CASH only.
+                 data-cash-input keyboard guard: digits type, Enter pays cash. Under-payment
+                 shows a soft warning; the FBR server cash-guard would 422 it, so the payload
+                 only sends the entered amount when it covers the total. --}}
+            <div x-show="payMethodIndex === 0" class="px-4 pb-2" @click.stop>
+                <div class="flex items-center gap-2">
+                    <input type="text" inputmode="decimal" x-model="cashReceived" data-cash-input
+                        autocomplete="off" name="pos_cash_received_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                        placeholder="Cash mila? (optional — Rs)"
+                        class="flex-1 min-w-0 text-sm font-bold bg-green-50/60 dark:bg-green-900/10 border border-green-200 dark:border-green-900/40 rounded-lg px-2.5 py-2 text-gray-800 dark:text-gray-200 focus:ring-green-400 placeholder-gray-400">
+                    <template x-for="amt in [500, 1000, 5000]" :key="amt">
+                        <button type="button" @click="cashReceived = String(amt)" class="px-2.5 py-2 rounded-lg text-xs font-bold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-green-100 dark:hover:bg-green-900/30 transition" x-text="amt >= 1000 ? (amt/1000) + 'k' : amt"></button>
+                    </template>
+                </div>
+                <p x-show="parseFloat(cashReceived) - roundedTotal > 0.001" x-cloak class="mt-1.5 text-center text-base font-black text-green-600 dark:text-green-400" x-text="'Wapas dein: Rs ' + Math.round(parseFloat(cashReceived) - roundedTotal).toLocaleString()"></p>
+                <p x-show="cashReceived !== '' && parseFloat(cashReceived) > 0 && roundedTotal - parseFloat(cashReceived) > 0.001" x-cloak class="mt-1.5 text-center text-[11px] font-bold text-amber-600 dark:text-amber-400" x-text="'Kam hai: Rs ' + Math.round(roundedTotal - parseFloat(cashReceived)).toLocaleString() + ' aur chahiye'"></p>
             </div>
             <div class="px-4 pb-0.5">
                 <p class="text-center text-[10px] text-gray-400 dark:text-gray-500 font-medium">Use <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&larr;</kbd> <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&rarr;</kbd> to choose &middot; <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">Enter</kbd> to confirm</p>
@@ -1778,6 +1795,11 @@ window.addEventListener('popstate', function() {
                 </div>
                 {{-- Big total --}}
                 <p class="relative mt-3 text-4xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight" x-text="'Rs. ' + Number(lastTotal).toLocaleString()" style="font-variant-numeric: tabular-nums;"></p>
+                {{-- Cash Received / Wapsi — big green change-due line for the cashier. --}}
+                <div x-show="lastCashReceived > 0" x-cloak class="relative mt-2 mx-auto max-w-xs py-2 px-3 rounded-xl bg-green-600/10 border border-green-500/30">
+                    <p class="text-[11px] font-bold text-gray-600 dark:text-gray-300" x-text="'Cash mila: Rs ' + Number(lastCashReceived).toLocaleString()"></p>
+                    <p x-show="lastCashReceived - lastTotal > 0.001" class="text-xl font-black text-green-600 dark:text-green-400" x-text="'WAPAS DEIN: Rs ' + Math.round(lastCashReceived - lastTotal).toLocaleString()"></p>
+                </div>
                 {{-- FBR fiscal invoice number — shown only once FBR returns it (real "production" number) --}}
                 <div x-show="lastFbrNumber" class="relative mt-3 mx-auto max-w-xs py-2 px-3 rounded-xl bg-emerald-600/10 border border-emerald-500/30">
                     <p class="text-[9px] font-bold uppercase tracking-widest text-emerald-700/70 dark:text-emerald-400/70">FBR Invoice Number</p>
@@ -2143,6 +2165,11 @@ function restaurantPos() {
         // 1 = Card). Arrow keys move it, Enter confirms the highlighted one, and
         // number keys 1/2 jump + fire directly. Reset to 0 each time the modal opens.
         payMethodIndex: 0,
+        // Cash Received / Wapsi (owner request, Jul 2026): optional cashier input in the
+        // Pay modal (CASH only). Server cash-guard blocks under-payment, so the payload
+        // only carries the entered amount when it covers the total.
+        cashReceived: '',
+        lastCashReceived: 0,
         // PROVISIONAL BILL FLOW — when true, the Pay modal saves the bill with
         // fbr_status='local' (no FBR submission). Bill stays editable/deletable
         // and can be promoted to final later via the "Submit to FBR — Make Final"
@@ -3480,6 +3507,13 @@ function restaurantPos() {
             // swallowed by the qty-input block below.
             // ═══════════════════════════════════════════════════════════════
             if (this.showPayModal) {
+                // Cash-received input guard: digits must TYPE (not fire 1/2 payments).
+                // Enter = confirm CASH payment; Esc = blur.
+                if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-cash-input')) {
+                    if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); e.stopPropagation(); e.target.blur(); this.payMethodIndex = 0; this.processPayment('cash'); return; }
+                    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); e.target.blur(); }
+                    return;
+                }
                 // Arrow keys move the payment-method highlight (Cash <-> Card); Enter confirms it.
                 if (e.key === 'ArrowLeft' || e.key === 'ArrowUp')   { e.preventDefault(); e.stopPropagation(); this.payMethodIndex = 0; return; }
                 if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); e.stopPropagation(); this.payMethodIndex = 1; return; }
@@ -4020,6 +4054,8 @@ function restaurantPos() {
 
         async processPayment(method) {
             if (this.submitting) return;
+            // Cash Received / Wapsi: snapshot for the success popup.
+            this.lastCashReceived = (method === 'cash') ? (parseFloat(this.cashReceived) || 0) : 0;
             // Capture provisional flag once at submission start so a stray
             // re-render/checkbox toggle mid-flight cannot flip the path.
             const provisional = !!this.saveAsProvisional;
@@ -4116,10 +4152,10 @@ function restaurantPos() {
                     customer_phone: this.selectedCustomer?.phone || null,
                     // 🧾 Buyer NTN (optional B2B) — typed in the Pay modal, max 30 chars server-side.
                     customer_ntn: (this.customerNtn || '').trim() || null,
-                    // No tendered-cash input in this flow — send the exact total so the
-                    // server-side cash guard passes (change_due = 0). Client total mirrors
-                    // store() math 1:1 (per-item tax, order disc after tax, +Rs1 FBR charge).
-                    cash_received: method === 'cash' ? savedTotal : 0,
+                    // Cash Received / Wapsi (Jul 2026): send the cashier's entered amount
+                    // when it covers the total (server stores change_due for the receipt);
+                    // otherwise fall back to exact total so the server cash-guard passes.
+                    cash_received: method === 'cash' ? ((parseFloat(this.cashReceived) || 0) >= savedTotal ? parseFloat(this.cashReceived) : savedTotal) : 0,
                     tax_inclusive: false,
                     // PROVISIONAL BILL FLOW — when true, store() forces invoice_mode='local'
                     // + fbr_status='local' and skips FBR submission. Promote later via F10.

@@ -262,6 +262,17 @@
             <td class="tot-label">TOTAL:</td>
             <td class="tot-value">PKR {{ number_format($transaction->total_amount, 2) }}</td>
         </tr>
+        {{-- Cash Received / Wapsi (owner request, Jul 2026) — only when change is due. --}}
+        @if(strtolower((string) $transaction->payment_method) === 'cash' && (float) ($transaction->cash_received ?? 0) > 0 && (float) ($transaction->change_due ?? 0) > 0.001)
+        <tr>
+            <td class="tot-label">CASH:</td>
+            <td class="tot-value">PKR {{ number_format((float) $transaction->cash_received, 2) }}</td>
+        </tr>
+        <tr class="grand-total">
+            <td class="tot-label">WAPSI / CHANGE:</td>
+            <td class="tot-value">PKR {{ number_format((float) $transaction->change_due, 2) }}</td>
+        </tr>
+        @endif
     </table>
 
     <div class="separator"></div>

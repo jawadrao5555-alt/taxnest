@@ -848,6 +848,10 @@ class RestaurantPosController extends Controller
                 'exempt_amount' => $taxInclusive ? $inc['exempt_amount'] : (float) ($subtotal - $taxableSubtotal),
                 'total_amount' => (float) $totalAmount,
                 'payment_method' => $paymentMethod,
+                // Cash Received / Wapsi (owner request, Jul 2026): optional cashier
+                // input from the pay modal — parity with PosController::storeInvoice.
+                'cash_received' => $paymentMethod === 'cash' ? ((float) $request->input('cash_received') ?: $totalAmount) : null,
+                'change_due' => $paymentMethod === 'cash' && (float) $request->input('cash_received') > 0 ? max(0, round((float) $request->input('cash_received') - (float) $totalAmount, 2)) : null,
                 'status' => 'completed',
                 'pra_status' => $initialPraStatus,
                 'submission_hash' => $submissionHash,

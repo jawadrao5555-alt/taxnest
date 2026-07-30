@@ -1608,7 +1608,7 @@ window.addEventListener('popstate', function() {
          (ESC / click-away / Cancel). Without this a cancelled held-order payment left the
          stale id behind and the NEXT normal cart sale silently routed to payHeldOrderDirect
          for that old held order (processPayment checks payingHeldOrderId first). --}}
-    <div x-show="showPayModal" x-cloak x-transition.opacity x-effect="if (showPayModal) { submitting = false; saveAsProvisional = false; payMethodIndex = (payPreselect === 1 ? 1 : 0); payPreselect = null; } else if (!submitting) { payingHeldOrderId = null; }" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false">
+    <div x-show="showPayModal" x-cloak x-transition.opacity x-effect="if (showPayModal) { submitting = false; saveAsProvisional = false; payMethodIndex = (payPreselect === 1 ? 1 : 0); payPreselect = null; cashReceived = ''; } else if (!submitting) { payingHeldOrderId = null; }" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
             <div class="p-5 text-center border-b border-gray-100 dark:border-gray-800">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">Payment</h3>
@@ -1641,6 +1641,23 @@ window.addEventListener('popstate', function() {
                     <span class="block text-[10px] font-semibold mt-0.5 text-blue-600/60" x-text="(taxInclusive ? 'Incl. tax ' : 'Tax: ') + (taxRules['debit_card'] || taxRules['card'] || 8) + '%' + (modalCardSaving > 0 ? ' • Save Rs. ' + Number(modalCardSaving).toLocaleString() : '')"></span>
                     <kbd x-show="!submitting" class="block mt-0.5 text-[9px] font-mono text-blue-500/60">Press 2</kbd>
                 </button>
+            </div>
+            {{-- Cash Received / Wapsi (owner request, Jul 2026): optional input — cashier
+                 types the note customer gave; big green "Wapas dein" shows the change.
+                 CASH only (hidden when Card highlighted). Soft warning if under-paid —
+                 never blocks. data-cash-input keyboard guard: digits type, Enter pays cash. --}}
+            <div x-show="payMethodIndex === 0" class="px-4 pb-2" @click.stop>
+                <div class="flex items-center gap-2">
+                    <input type="text" inputmode="decimal" x-model="cashReceived" data-cash-input
+                        autocomplete="off" name="pos_cash_received_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                        placeholder="Cash mila? (optional — Rs)"
+                        class="flex-1 min-w-0 text-sm font-bold bg-green-50/60 dark:bg-green-900/10 border border-green-200 dark:border-green-900/40 rounded-lg px-2.5 py-2 text-gray-800 dark:text-gray-200 focus:ring-green-400 placeholder-gray-400">
+                    <template x-for="amt in [500, 1000, 5000]" :key="amt">
+                        <button type="button" @click="cashReceived = String(amt)" class="px-2.5 py-2 rounded-lg text-xs font-bold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-green-100 dark:hover:bg-green-900/30 transition" x-text="amt >= 1000 ? (amt/1000) + 'k' : amt"></button>
+                    </template>
+                </div>
+                <p x-show="parseFloat(cashReceived) - payModalTotal > 0.001" x-cloak class="mt-1.5 text-center text-base font-black text-green-600 dark:text-green-400" x-text="'Wapas dein: Rs ' + Math.round(parseFloat(cashReceived) - payModalTotal).toLocaleString()"></p>
+                <p x-show="cashReceived !== '' && parseFloat(cashReceived) > 0 && payModalTotal - parseFloat(cashReceived) > 0.001" x-cloak class="mt-1.5 text-center text-[11px] font-bold text-amber-600 dark:text-amber-400" x-text="'Kam hai: Rs ' + Math.round(payModalTotal - parseFloat(cashReceived)).toLocaleString() + ' aur chahiye'"></p>
             </div>
             {{-- Bill note (owner, 26 Jul 2026): per-item note inputs removed from cart rows —
                  THIS is now the single note surface, at final-bill time. Bound to kitchenNotes
@@ -2834,6 +2851,11 @@ window.addEventListener('popstate', function() {
                 </div>
                 {{-- Big total --}}
                 <p class="relative mt-3 text-4xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight" x-text="'Rs. ' + Number(lastTotal).toLocaleString()" style="font-variant-numeric: tabular-nums;"></p>
+                {{-- Cash Received / Wapsi — big green change-due line for the cashier. --}}
+                <div x-show="lastCashReceived > 0" x-cloak class="relative mt-2 mx-auto max-w-xs py-2 px-3 rounded-xl bg-green-600/10 border border-green-500/30">
+                    <p class="text-[11px] font-bold text-gray-600 dark:text-gray-300" x-text="'Cash mila: Rs ' + Number(lastCashReceived).toLocaleString()"></p>
+                    <p x-show="lastCashReceived - lastTotal > 0.001" class="text-xl font-black text-green-600 dark:text-green-400" x-text="'WAPAS DEIN: Rs ' + Math.round(lastCashReceived - lastTotal).toLocaleString()"></p>
+                </div>
                 {{-- PRA fiscal invoice number — shown only once PRA returns it (real "production" number) --}}
                 <div x-show="lastPraNumber" class="relative mt-3 mx-auto max-w-xs py-2 px-3 rounded-xl bg-emerald-600/10 border border-emerald-500/30">
                     <p class="text-[9px] font-bold uppercase tracking-widest text-emerald-700/70 dark:text-emerald-400/70">PRA Invoice Number</p>
@@ -3308,6 +3330,11 @@ function restaurantPos() {
         // resets payMethodIndex to 0 on every open, so a preselect must ride in
         // via this flag — consumed (and nulled) by the x-effect itself.
         payPreselect: null,
+        // Cash Received / Wapsi (owner request, Jul 2026): optional cashier input
+        // in the Pay modal (CASH only). Wapsi = cashReceived - payModalTotal.
+        // Reset on every modal open; lastCashReceived rides to the success popup.
+        cashReceived: '',
+        lastCashReceived: 0,
         // PROVISIONAL BILL FLOW — when true, the Pay modal saves the bill with
         // pra_status='local' (no PRA submission). Bill stays editable/deletable
         // and can be promoted to final later via the "Submit to PRA — Make Final"
@@ -5175,6 +5202,13 @@ function restaurantPos() {
                     if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); e.target.blur(); }
                     return;
                 }
+                // Cash-received input guard: digits must TYPE (not fire 1/2 payments).
+                // Enter = confirm CASH payment (keyboard flow stays unbroken); Esc = blur.
+                if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-cash-input')) {
+                    if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); e.stopPropagation(); e.target.blur(); this.payMethodIndex = 0; this.processPayment('cash'); return; }
+                    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); e.target.blur(); }
+                    return;
+                }
                 // Arrow keys move the payment-method highlight (Cash <-> Card); Enter confirms it.
                 if (e.key === 'ArrowLeft' || e.key === 'ArrowUp')   { e.preventDefault(); e.stopPropagation(); this.payMethodIndex = 0; return; }
                 if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); e.stopPropagation(); this.payMethodIndex = 1; return; }
@@ -6420,6 +6454,9 @@ function restaurantPos() {
 
         async processPayment(method) {
             if (this.submitting) return;
+            // Cash Received / Wapsi: snapshot the entered cash for the success popup
+            // (client-side display works for BOTH cart sales and held-order pays).
+            this.lastCashReceived = (method === 'cash') ? (parseFloat(this.cashReceived) || 0) : 0;
             // EDIT MODE: payments are blocked — update the bill (F9), then use
             // F10 → Make Final (the promote path owns quota/serial/PRA rules).
             if (this.editingBillId) {
@@ -6547,6 +6584,9 @@ function restaurantPos() {
                         _manual: (c.item_type === 'manual' || !c.item_id) ? true : false,
                     })),
                     payment_method: method,
+                    // Cash Received / Wapsi — server stores cash_received + change_due
+                    // so the printed receipt (agent silent print incl.) carries them.
+                    cash_received: (method === 'cash' && parseFloat(this.cashReceived) > 0) ? parseFloat(this.cashReceived) : null,
                     // Order-type flow rules (owner, Jul 2026): backend gates
                     // provisional saves to Delivery-only for restaurant companies.
                     order_type: this.orderType,
@@ -7349,7 +7389,7 @@ function restaurantPos() {
                 // PROVISIONAL BILL FLOW — when true, RestaurantPosController::payOrder
                 // forces pra_status='local' and skips PRA submission. Bill remains
                 // editable / deletable until promoted via "Submit to PRA — Make Final".
-                const res = await fetch(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method, save_as_provisional: !!provisional, delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || null) : null }) });
+                const res = await fetch(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method, save_as_provisional: !!provisional, cash_received: (method === 'cash' && parseFloat(this.cashReceived) > 0) ? parseFloat(this.cashReceived) : null, delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || null) : null }) });
                 if (!res.ok) {
                     const bodyText = await res.text().catch(() => '');
                     console.error('[payOrder] HTTP', res.status, res.statusText, bodyText.slice(0, 500));

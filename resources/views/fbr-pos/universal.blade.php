@@ -134,6 +134,22 @@
 .dark .search-glow:focus { box-shadow: 0 0 0 3px rgba(167,139,250,0.2), 0 0 20px rgba(167,139,250,0.08) !important; }
 @keyframes heldBadgePulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.25); } }
 .held-badge-pulse { animation: heldBadgePulse 1.5s ease-in-out infinite; }
+
+/* ── Wide-cart (Products OFF) — port from PRA universal (30 Jul 2026) ──
+   .tn-cart-main is display:contents by DEFAULT so normal (grid-ON) layout is
+   byte-identical; only .tn-widecart (desktop) activates the split. */
+.tn-cart-main { display: contents; }
+@supports not (display: contents) {
+    .tn-cart-main { display: flex; flex-direction: column; flex: 1 1 0%; min-height: 0; }
+}
+@media (min-width: 768px) {
+    .tn-widecart { flex-direction: column; }
+    .tn-widecart .tn-left-col { flex: 0 0 auto; }
+    .tn-widecart .tn-left-col [x-ref="gridContainer"] { display: none; }
+    .tn-widecart .tn-cart-col { width: 100% !important; flex: 1 1 0%; min-height: 0; flex-direction: row; border-left: 0; border-top: 1px solid rgba(148,163,184,.28); }
+    .tn-widecart .tn-cart-main { display: flex; flex-direction: column; flex: 1 1 0%; min-width: 0; min-height: 0; }
+    .tn-widecart .tn-cart-side { flex: 0 0 400px; width: 400px; min-height: 0; overflow-y: auto; border-left: 1px solid rgba(148,163,184,.28); border-top: 0; }
+}
 .cat-pill.active::after { content: ''; position: absolute; bottom: 0; left: 15%; right: 15%; height: 3px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent); border-radius: 2px; }
 .total-animate { transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
 .confetti-piece { position: absolute; width: 8px; height: 8px; border-radius: 2px; animation: confettiFall 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; pointer-events: none; }
@@ -305,19 +321,8 @@ window.addEventListener('popstate', function() {
         if ($features->delivery) $guidedTypes[] = 'delivery';
         $hasTypeStep = count($guidedTypes) > 1;
     @endphp
-    <div x-show="guidedFlow" x-cloak class="flex items-center justify-center flex-wrap gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-900/20 dark:to-blue-900/20 border-b border-emerald-200 dark:border-emerald-800 flex-shrink-0 text-[11px] font-bold select-none pointer-events-none">
-@if($hasTypeStep)
-        <template x-for="(s, i) in [{k:'customer',l:'1 · Customer'},{k:'items',l:'2 · Items'},{k:'type',l:'3 · Type'},{k:'cart',l:'4 · Cart'},{k:'finish',l:'5 · Bill'}]" :key="s.k">
-@else
-        <template x-for="(s, i) in [{k:'customer',l:'1 · Customer'},{k:'items',l:'2 · Items'},{k:'cart',l:'3 · Cart'},{k:'finish',l:'4 · Bill'}]" :key="s.k">
-@endif
-            <div class="flex items-center gap-1.5">
-                <span :class="flowStep === s.k ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white/70 dark:bg-gray-800/70 text-gray-500 dark:text-gray-400'" class="px-2.5 py-0.5 rounded-full transition" x-text="s.l"></span>
-                <svg x-show="i < {{ $hasTypeStep ? 4 : 3 }}" class="w-3 h-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-            </div>
-        </template>
-        <span class="ml-2 text-[10px] font-medium text-gray-500 dark:text-gray-400 hidden md:inline">Enter = add / next · empty Enter = @if($hasTypeStep)type → @endif cart · P = provisional</span>
-    </div>
+    {{-- Coach strip REMOVED (owner, 30 Jul 2026): payment-flow bar ki zaroorat nahi, screen bara ho.
+         Guided Enter-chain behavior itself is untouched; the hasTypeStep block above still feeds the Order-Type overlay below. --}}
 
     {{-- ═══════════ GUIDED FLOW: ORDER-TYPE STEP (opt-in) ═══════════ --}}
     {{-- Owner-specified keyboard step BETWEEN Items and Cart. Reached by pressing Enter on an
@@ -632,9 +637,12 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
-    <div class="flex flex-1 overflow-hidden">
+    {{-- Wide-cart (Variant A) port from PRA screen (owner, 30 Jul 2026): Products OFF
+         + desktop = body row flips to column, grid hides, cart goes wide LEFT with a
+         400px payment column RIGHT (.tn-cart-side = the existing footer block). --}}
+    <div class="tn-body-row flex flex-1 overflow-hidden" :class="!showProducts ? 'tn-widecart' : ''">
 
-        <div class="flex-1 flex flex-col overflow-hidden" :class="mobileView === 'menu' ? 'flex' : 'hidden md:flex'">
+        <div class="tn-left-col flex-1 flex flex-col overflow-hidden" :class="mobileView === 'menu' ? 'flex' : 'hidden md:flex'">
 
             <div class="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
                 <div class="flex items-center gap-2 overflow-x-auto hide-scrollbar flex-1 min-w-0">
@@ -773,7 +781,8 @@ window.addEventListener('popstate', function() {
             </button>
         </div>
 
-        <div class="w-full md:w-[300px] lg:w-[340px] xl:w-[380px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl" :class="mobileView === 'cart' ? 'flex' : 'hidden md:flex'">
+        <div class="tn-cart-col w-full md:w-[300px] lg:w-[340px] xl:w-[380px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col flex-shrink-0 shadow-xl" :class="mobileView === 'cart' ? 'flex' : 'hidden md:flex'">
+            <div class="tn-cart-main">
             <div class="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800">
                 <button @click="mobileView = 'menu'" class="md:hidden p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
@@ -948,8 +957,9 @@ window.addEventListener('popstate', function() {
                     </div>
                 </template>
             </div>
+            </div>{{-- closes .tn-cart-main --}}
 
-            <div class="border-t border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-sm">
+            <div class="tn-cart-side border-t border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-sm">
                 <div class="px-3 py-1.5">
                     <textarea x-model="kitchenNotes" x-ref="orderNotesInput" rows="1"
                         autocomplete="off" name="pos_order_notes_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore

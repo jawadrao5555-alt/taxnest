@@ -649,19 +649,8 @@ window.addEventListener('popstate', function() {
         if ($features->delivery) $guidedTypes[] = 'delivery';
         $hasTypeStep = count($guidedTypes) > 1;
     @endphp
-    <div x-show="guidedFlow" x-cloak class="tn-flow-strip flex items-center justify-center flex-wrap gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-900/20 dark:to-blue-900/20 border-b border-emerald-200 dark:border-emerald-800 flex-shrink-0 text-[11px] font-bold select-none pointer-events-none">
-@if($hasTypeStep)
-        <template x-for="(s, i) in [{k:'customer',l:'1 · Customer'},{k:'items',l:'2 · Items'},{k:'type',l:'3 · Type'},{k:'cart',l:'4 · Cart'},{k:'finish',l:'5 · Bill'}]" :key="s.k">
-@else
-        <template x-for="(s, i) in [{k:'customer',l:'1 · Customer'},{k:'items',l:'2 · Items'},{k:'cart',l:'3 · Cart'},{k:'finish',l:'4 · Bill'}]" :key="s.k">
-@endif
-            <div class="flex items-center gap-1.5">
-                <span :class="flowStep === s.k ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white/70 dark:bg-gray-800/70 text-gray-500 dark:text-gray-400'" class="px-2.5 py-0.5 rounded-full transition" x-text="s.l"></span>
-                <svg x-show="i < {{ $hasTypeStep ? 4 : 3 }}" class="w-3 h-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-            </div>
-        </template>
-        <span class="ml-2 text-[10px] font-medium text-gray-500 dark:text-gray-400 hidden md:inline">Enter = add / next · empty Enter = @if($hasTypeStep)type → @endif cart<span x-show="canProvisional()"> · P = provisional</span></span>
-    </div>
+    {{-- Coach strip REMOVED (owner, 30 Jul 2026): payment-flow bar ki zaroorat nahi, screen bara ho.
+         Guided Enter-chain behavior itself is untouched; the hasTypeStep block above still feeds the Order-Type overlay below. --}}
 
     {{-- ═══════════ GUIDED FLOW: ORDER-TYPE STEP (opt-in) ═══════════ --}}
     {{-- Owner-specified keyboard step BETWEEN Items and Cart. Reached by pressing Enter on an

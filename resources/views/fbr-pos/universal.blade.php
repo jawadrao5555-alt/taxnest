@@ -655,9 +655,9 @@ window.addEventListener('popstate', function() {
                     <button @click="activeCategory = 'services'; filterProducts()" x-show="showProducts" class="cat-pill px-4 py-1.5 rounded-full text-xs font-semibold border" :class="activeCategory === 'services' ? 'active border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'">Services</button>
                     <span x-show="!showProducts" class="text-[11px] text-gray-400 dark:text-gray-500 italic px-1 whitespace-nowrap">Grid hidden — search to add, or type to create</span>
                 </div>
-                {{-- MASTER products toggle — inventory-OFF (Simple) mode ONLY. In inventory mode the
-                     catalog is mandatory (no on-the-fly manual create), so hiding it would brick billing. --}}
-                @if(!($inventoryEnabled ?? false))
+                {{-- MASTER products toggle — ab inventory mode mein BHI (owner, 30 Jul 2026):
+                     Products OFF sirf grid chhupata hai, search se catalog items add hote rehte
+                     hain, is liye billing brick nahi hoti. Wide-cart split isi par chalta hai. --}}
                 <button type="button" @click="toggleShowProducts()" role="switch" :aria-checked="showProducts ? 'true' : 'false'"
                         class="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-bold border transition"
                         :class="showProducts ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400'"
@@ -668,7 +668,7 @@ window.addEventListener('popstate', function() {
                         <span class="inline-block h-3 w-3 transform rounded-full bg-white transition" :class="showProducts ? 'translate-x-3.5' : 'translate-x-0.5'"></span>
                     </span>
                 </button>
-                @endif
+                
             </div>
 
             <div x-ref="gridContainer" tabindex="0" @keydown.arrow-right.prevent="moveGridFocus(1)" @keydown.arrow-left.prevent="moveGridFocus(-1)" @keydown.arrow-down.prevent="moveGridFocus(gridCols)" @keydown.arrow-up.prevent="moveGridFocus(-gridCols)" @keydown.enter.prevent="addGridFocusedItem()" class="flex-1 overflow-y-auto p-3 outline-none">
@@ -2405,7 +2405,7 @@ function restaurantPos() {
             this.initFit();
             // Honor the saved "hide products" preference ONLY in inventory-OFF mode.
             // Inventory mode must always show the catalog (no manual on-the-fly create).
-            try { if (!this.isInventoryEnabled() && localStorage.getItem('fbr_show_products') === '0') this.showProducts = false; } catch (e) {}
+            try { if (localStorage.getItem('fbr_show_products') === '0') this.showProducts = false; } catch (e) {}
             this.filterProducts();
             setTimeout(() => { this.loading = false; }, 300);
             this.$watch('activeCategory', () => { this.filterProducts(); this.gridFocusIndex = 0; if (this.searchQuery.trim().length > 0) this.onSearchInput(); });
@@ -2727,7 +2727,6 @@ function restaurantPos() {
         // Persisted per-browser (localStorage). When OFF, cashiers bill via manual entry only.
         toggleShowProducts() {
             // Inventory mode requires the catalog — toggle is a no-op (force ON) there.
-            if (this.isInventoryEnabled()) { this.showProducts = true; return; }
             this.showProducts = !this.showProducts;
             try { localStorage.setItem('fbr_show_products', this.showProducts ? '1' : '0'); } catch (e) {}
             // Grid OFF hides the pills — and on <sm screens the category dropdown is hidden too,

@@ -25,17 +25,30 @@ $ENVUNSET php artisan config:clear
 $ENVUNSET php artisan view:clear
 $ENVUNSET php artisan route:clear
 
-# 4. Deploy-gap reminder: merged code only lands in the WORKSPACE — the live
-# cPanel site needs a push + pull. Compare workspace HEAD vs live HEAD and
-# print a loud reminder if live is behind. NEVER fails the merge (best-effort:
-# SSH may be unavailable), hence the trailing `|| true`.
-if [ -f scripts/check-live-deploy.sh ]; then
-  bash scripts/check-live-deploy.sh || {
+# 4. Auto-deploy to live: merged code only lands in the WORKSPACE — the live
+# cPanel site needs push + pull + caches + OPcache reset. If live is behind,
+# run the full one-command deploy (scripts/deploy-live.sh). NEVER fails the
+# merge (best-effort: SSH may be unavailable) — but prints a LOUD warning if
+# the deploy could not complete, so the gap is never silent.
+if [ -f scripts/check-live-deploy.sh ] && [ -f scripts/deploy-live.sh ]; then
+  # NOTE: set -e is active — capture the checker's exit code without letting a
+  # non-zero status (1 = live behind, 2 = SSH unreachable) abort the merge.
+  GAP_RC=0
+  bash scripts/check-live-deploy.sh || GAP_RC=$?
+  if [ "$GAP_RC" -eq 1 ]; then
+    echo "Live is behind — running one-command deploy (scripts/deploy-live.sh)..."
+    bash scripts/deploy-live.sh || {
+      echo "==============================================================="
+      echo "WARNING: AUTO-DEPLOY FAILED — live (cPanel) does NOT have this"
+      echo "merged code yet. Fix and re-run: bash scripts/deploy-live.sh"
+      echo "(runbook: .agents/memory/cpanel-deployment.md)"
+      echo "==============================================================="
+      true
+    }
+  elif [ "$GAP_RC" -eq 2 ]; then
     echo "==============================================================="
-    echo "REMINDER: live (cPanel) may NOT have this merged code yet."
-    echo "Run: bash scripts/check-live-deploy.sh   (and deploy if behind —"
-    echo "see .agents/memory/cpanel-deployment.md runbook)."
+    echo "REMINDER: could not verify live HEAD (SSH issue?). Live may NOT"
+    echo "have this merged code. Run: bash scripts/deploy-live.sh"
     echo "==============================================================="
-    true
-  }
+  fi
 fi

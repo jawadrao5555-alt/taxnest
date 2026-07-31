@@ -6852,6 +6852,24 @@ function restaurantPos() {
         // true ONLY on a 2xx {success:true} — anything else (agent offline,
         // feature off server-side, network error) returns false and the caller
         // falls back to the classic popup/iframe print path.
+        // Print telemetry beacon (Task #63 — 30 Jul vanished-bill case): report
+        // WHY a print didn't fire. sendBeacon survives page unload/navigation
+        // (the prime suspect for the lost delivery bill); fetch keepalive is the
+        // fallback. Fire-and-forget — never blocks or throws into the sale flow.
+        printBeacon(stage, info = {}) {
+            try {
+                const body = JSON.stringify({
+                    stage, ...info,
+                    online: navigator.onLine,
+                    flags: 'auto=' + (this.autoPrintEnabled ? 1 : 0) + ',silentBill=' + (this.silentBillPrint ? 1 : 0) + ',silentKot=' + (this.silentKotPrint ? 1 : 0) + ',kds=' + (this.kdsHandlesKot() ? 1 : 0),
+                    at: new Date().toISOString(),
+                });
+                const url = '/pos/api/print-telemetry';
+                if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }))) return;
+                fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
+            } catch (_) {}
+        },
+
         async trySilentPrint(payload, _retry = true) {
             try {
                 const res = await fetch('/pos/api/print-jobs', {
@@ -6863,6 +6881,8 @@ function restaurantPos() {
                     // One retry on server hiccups (5xx) — a lost print job means a
                     // bill that never comes out of the printer (30 Jul 2026 incident).
                     if (_retry && res.status >= 500) { await new Promise(r => setTimeout(r, 1200)); return this.trySilentPrint(payload, false); }
+                    // 4xx or exhausted retry: the job did NOT reach the queue.
+                    this.printBeacon('silent-print-http-fail', { type: payload.type, transaction_id: payload.transaction_id, order_id: payload.restaurant_order_id, http_status: res.status });
                     return false;
                 }
                 const d = await res.json().catch(() => null);
@@ -6872,6 +6892,7 @@ function restaurantPos() {
             } catch (e) {
                 // Network blip — retry once before giving up to the popup fallback.
                 if (_retry) { await new Promise(r => setTimeout(r, 1200)); return this.trySilentPrint(payload, false); }
+                this.printBeacon('silent-print-network-fail', { type: payload.type, transaction_id: payload.transaction_id, order_id: payload.restaurant_order_id, error: (e && (e.name + ': ' + e.message)) || 'unknown' });
                 return false;
             }
         },
@@ -6900,7 +6921,13 @@ function restaurantPos() {
             if (!this.lastTransactionId) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
             const url = (this.isRestaurantMode ? '/pos/restaurant/receipt/' : '/pos/transaction/') + this.lastTransactionId + (this.isRestaurantMode ? '?auto_print=1' : '/receipt?auto_print=1');
             console.log('[printReceipt] URL=', url, 'isRestaurantMode=', this.isRestaurantMode);
-            const fallback = () => this._printViaIframe('print-receipt-frame', url, 'width=400,height=700', onAfterPrint);
+            const txnId = this.lastTransactionId;
+            const fallback = () => {
+                // Silent path failed → bill now depends on the popup/iframe route
+                // (invisible when blocked). Leave a trail (Task #63).
+                if (this.silentBillPrint) this.printBeacon('bill-popup-fallback', { type: 'bill', transaction_id: txnId });
+                this._printViaIframe('print-receipt-frame', url, 'width=400,height=700', onAfterPrint);
+            };
             if (this.silentBillPrint) {
                 this.trySilentPrint({ type: 'bill', transaction_id: this.lastTransactionId }).then(ok => {
                     if (ok) {
@@ -7053,7 +7080,14 @@ function restaurantPos() {
         // and initial chain start (400ms → 150ms) to feel snappier on thermal printers.
         runAutoPrintChain(orderId, orderType = null, txnKotId = null) {
             // MASTER GATE — auto-print OFF means NOTHING fires automatically.
-            if (!this.autoPrintEnabled) return;
+            // Telemetry (Task #63): silent-print shops expect paper on every sale —
+            // record WHY the chain did nothing so a "bill never printed" report is
+            // diagnosable from server logs (beacon is gated on silent print being
+            // configured, so non-silent shops add no noise).
+            if (!this.autoPrintEnabled) {
+                if (this.silentBillPrint) this.printBeacon('auto-chain-off', { transaction_id: this.lastTransactionId, order_id: orderId, type: orderType || '' });
+                return;
+            }
             const hasReceipt = !!this.lastTransactionId;
             // KDS Auto-Print owns ticket printing → cashier auto-KOT suppressed
             // (owner, Jul 2026). Manual Resend / receipt-popup KOT button stay.
@@ -7072,7 +7106,12 @@ function restaurantPos() {
             // there; a fully-printed order prints NOTHING — no duplicate KOT when
             // the cashier settles a waiter/held bill).
             const kotDelta = true;
-            if (!wantsReceipt && !wantsKot) return;
+            if (!wantsReceipt && !wantsKot) {
+                // Nothing to print at pay-success = the 30 Jul failure signature
+                // (lastTransactionId missing → no receipt job was ever attempted).
+                if (this.silentBillPrint || this.silentKotPrint) this.printBeacon('auto-chain-nothing', { order_id: orderId || txnKotId, type: orderType || '' });
+                return;
+            }
             const fireKot = (cb) => orderId
                 ? this.printKitchenTicket(orderId, cb, kotDelta)
                 : this.printTxnKitchenTicket(txnKotId, cb);

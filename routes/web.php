@@ -561,6 +561,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/api/boot-check', [PosController::class, 'bootCheck'])->name('pos.api.boot-check');
     Route::post('/api/toggle-auto-print', [PosController::class, 'toggleAutoPrint'])->name('pos.api.toggle-auto-print');
     Route::post('/api/print-jobs', [PosController::class, 'apiCreatePrintJob'])->name('pos.api.print-jobs');
+    // Print-failure telemetry beacon (Task #63 — 30 Jul vanished-bill case):
+    // sale screen reports WHY a print didn't fire so server logs carry the root
+    // cause next time. sendBeacon-compatible (pos/* is CSRF-exempt).
+    Route::post('/api/print-telemetry', [PosController::class, 'apiPrintTelemetry'])->name('pos.api.print-telemetry');
     // One-click silent-print prompt (sale-screen banner) — controller enforces
     // a strict admin/manager gate (isPosCashier → 403), same pattern as bulk-sale.
     Route::post('/api/printer-prompt', [PosController::class, 'apiPrinterPrompt'])->name('pos.api.printer-prompt');

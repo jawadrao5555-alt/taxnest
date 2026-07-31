@@ -386,6 +386,39 @@ class PosController extends Controller
     }
 
     /**
+     * Print-failure telemetry beacon (Task #63, 31 Jul 2026 — Pizza Master's
+     * vanished delivery bill: no print job row ever reached the server and the
+     * client-side cause was unprovable). The sale screen now reports print
+     * failures/skips here (navigator.sendBeacon — survives page unload) so the
+     * ROOT CAUSE is in storage/logs next time. Log-only by design: never
+     * blocks, never throws, accepts a minimal whitelisted payload.
+     */
+    public function apiPrintTelemetry(Request $request)
+    {
+        try {
+            $user = auth('pos')->user();
+            $companyId = app()->bound('currentCompanyId') ? app('currentCompanyId') : ($user->company_id ?? null);
+            $data = $request->json()->all();
+            if (!is_array($data)) { $data = []; }
+            \Illuminate\Support\Facades\Log::warning('POS_PRINT_TELEMETRY', [
+                'company_id' => $companyId,
+                'user_id' => $user?->id,
+                'stage' => substr((string) ($data['stage'] ?? ''), 0, 60),
+                'type' => substr((string) ($data['type'] ?? ''), 0, 20),
+                'transaction_id' => is_numeric($data['transaction_id'] ?? null) ? (int) $data['transaction_id'] : null,
+                'order_id' => is_numeric($data['order_id'] ?? null) ? (int) $data['order_id'] : null,
+                'error' => substr((string) ($data['error'] ?? ''), 0, 300),
+                'http_status' => is_numeric($data['http_status'] ?? null) ? (int) $data['http_status'] : null,
+                'flags' => substr((string) ($data['flags'] ?? ''), 0, 200),
+                'online' => $data['online'] ?? null,
+                'at_client' => substr((string) ($data['at'] ?? ''), 0, 40),
+                'ua' => substr((string) $request->userAgent(), 0, 120),
+            ]);
+        } catch (\Throwable $e) { /* telemetry must never 500 */ }
+        return response()->json(['ok' => true]);
+    }
+
+    /**
      * Session-authed enqueue of a silent print job (bill receipt or KOT).
      * Returns 409 when silent printing cannot happen right now (disabled,
      * printer not chosen, or agent offline) — the sale screen falls back to

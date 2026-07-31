@@ -65,3 +65,7 @@ Move an open (status 'held') order to another table: POST /pos/restaurant/orders
 - `GET /pos/restaurant/orders/{id}/proof-bill` renders a thermal pre-bill marked "PROOF BILL — NOT PAID": NO PosTransaction, no serial, no PRA call; order stays open. It must NEVER finalize or mutate the order.
 - Board action popup lazy-fetches items via orders/by-table on open (`boardMenuItems`); keep the table-status polling endpoint light — never bake items into it.
 - Dine-in holdOrder success reopens the table picker (owner flow: KOT → back to tables chart); non-dine-in keeps phone-input focus.
+
+## KDS Auto Print liveness fallback (30 Jul 2026, Pizza Master incident)
+- KDS closed + "KDS Auto Print" ON used to swallow ALL auto-KOTs (nothing printed anywhere). Now: KDS board heartbeats via Cache `kds_seen_{companyId}` (index + liveOrders, ttl 300); sale screen gets alive-flag baked in kitchenSettings.kds_alive AND refreshed every 20s from `X-KDS-Alive` header on /pos/api/incoming-orders (header, not body — response stays a plain array). `kdsHandlesKot()` requires kds_alive, else cashier auto-KOT resumes.
+- KDS side never re-blasts a FULL ticket for an id missing from its localStorage: unprinted_count==0 → adopt silently; partially printed → delta only (checkAutoPrint).

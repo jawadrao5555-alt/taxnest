@@ -40,3 +40,7 @@ description: POS silent printing via Desktop Agent print-job queue — invariant
 
 ## Counter KOT Copy (Jul 2026)
 - Printer Settings 3rd picker `counter_kot_printer` + `counter_kot_enabled` (normalized in Company::printerSettings). Copy fires ONLY for dine_in, as one extra type='kot' job (best-effort try/catch, never blocks kitchen), in PosController::apiCreatePrintJob + KotPrintService — NOT on station-pinned KDS path or transaction-based KOT branch. Copy MIRRORS what kitchen printed (delta on appends) — owner wants "har KOT ke sath copy", not always-full.
+
+## Print-job dedupe & retry (30 Jul 2026, Pizza Master)
+- `trySilentPrint` (pos/universal) retries ONCE (1.2s) on network error/5xx — so `apiCreatePrintJob` now dedupes ALL types (bill AND kot/proof): identical pending/printing job < 2 min = return `deduped:true`, never a second physical copy. KOT key = order/txn + target_printer + render_query (counterCopy included).
+- Dedupe is SAFE for delta KOTs: a pending job renders unprinted rows at PRINT time, so one queued job covers later fires.

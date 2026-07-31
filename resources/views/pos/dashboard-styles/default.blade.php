@@ -41,8 +41,8 @@
 <div class="space-y-5 w-full">
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 slide-up slide-up-1">
         <div>
-            <h1 class="text-xl font-extrabold text-gray-900 dark:text-white tracking-tight">Welcome Back<span class="text-purple-500">.</span></h1>
-            <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{{ now()->format('l, d M Y') }} — {{ $company->name ?? 'Business' }}</p>
+            <h1 class="text-xl font-extrabold text-gray-900 dark:text-white tracking-tight">{{ __("pos.welcome_back") }}<span class="text-purple-500">.</span></h1>
+            <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{{ now()->format('l, d M Y') }} — {{ $company->name ?? __("pos.business_fallback") }}</p>
         </div>
         @include('pos.dashboard-styles._style-picker')
     </div>
@@ -53,43 +53,43 @@
             <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center mb-2.5 shadow-lg">
                 <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
             </div>
-            <p class="text-[11px] font-bold text-gray-900 dark:text-white">POS Screen</p>
-            <p class="text-[9px] text-gray-400 mt-0.5">Start selling</p>
+            <p class="text-[11px] font-bold text-gray-900 dark:text-white">{{ __("pos.pos_screen") }}</p>
+            <p class="text-[9px] text-gray-400 mt-0.5">{{ __("pos.start_selling") }}</p>
         </a>
         <a href="{{ route('pos.transactions') }}" class="tile-card glass-card p-4 text-center group cursor-pointer">
             <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-2.5 shadow-lg shadow-blue-500/20">
                 <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
             </div>
-            <p class="text-[11px] font-bold text-gray-900 dark:text-white">Orders</p>
-            <p class="text-[9px] text-gray-400 mt-0.5">View history</p>
+            <p class="text-[11px] font-bold text-gray-900 dark:text-white">{{ __("pos.orders_word") }}</p>
+            <p class="text-[9px] text-gray-400 mt-0.5">{{ __("pos.view_history") }}</p>
         </a>
         <a href="{{ route('pos.restaurant.tables') }}" class="tile-card glass-card p-4 text-center group cursor-pointer">
             <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center mb-2.5 shadow-lg shadow-amber-500/20">
                 <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"/></svg>
             </div>
-            <p class="text-[11px] font-bold text-gray-900 dark:text-white">Tables</p>
-            <p class="text-[9px] text-gray-400 mt-0.5">{{ $occupiedTables ?? 0 }}/{{ $totalTables ?? 0 }} occupied</p>
+            <p class="text-[11px] font-bold text-gray-900 dark:text-white">{{ __("pos.tables_word") }}</p>
+            <p class="text-[9px] text-gray-400 mt-0.5">{{ $occupiedTables ?? 0 }}/{{ $totalTables ?? 0 }} {{ __("pos.occupied_word_lc") }}</p>
         </a>
         <a href="{{ route('pos.restaurant.kds') }}" class="tile-card glass-card p-4 text-center group cursor-pointer">
             <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center mb-2.5 shadow-lg shadow-orange-500/20">
                 <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
             </div>
-            <p class="text-[11px] font-bold text-gray-900 dark:text-white">Kitchen</p>
-            <p class="text-[9px] text-gray-400 mt-0.5">KDS display</p>
+            <p class="text-[11px] font-bold text-gray-900 dark:text-white">{{ __("pos.kitchen_word") }}</p>
+            <p class="text-[9px] text-gray-400 mt-0.5">{{ __("pos.kds_display") }}</p>
         </a>
         <a href="{{ route('pos.products') }}" class="tile-card glass-card p-4 text-center group cursor-pointer">
             <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mb-2.5 shadow-lg shadow-emerald-500/20">
                 <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
             </div>
-            <p class="text-[11px] font-bold text-gray-900 dark:text-white">Menu</p>
-            <p class="text-[9px] text-gray-400 mt-0.5">Products</p>
+            <p class="text-[11px] font-bold text-gray-900 dark:text-white">{{ __("pos.menu_word") }}</p>
+            <p class="text-[9px] text-gray-400 mt-0.5">{{ __("pos.products_word") }}</p>
         </a>
         <a href="{{ route('pos.restaurant.ingredients') }}" class="tile-card glass-card p-4 text-center group cursor-pointer">
             <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center mb-2.5 shadow-lg shadow-pink-500/20">
                 <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
             </div>
-            <p class="text-[11px] font-bold text-gray-900 dark:text-white">Ingredients</p>
-            <p class="text-[9px] text-gray-400 mt-0.5">{{ ($lowStockItems ?? collect())->count() > 0 ? ($lowStockItems ?? collect())->count() . ' low stock' : 'All stocked' }}</p>
+            <p class="text-[11px] font-bold text-gray-900 dark:text-white">{{ __("pos.ingredients_word") }}</p>
+            <p class="text-[9px] text-gray-400 mt-0.5">{{ ($lowStockItems ?? collect())->count() > 0 ? ($lowStockItems ?? collect())->count() . " " . __("pos.low_stock_suffix") : __("pos.all_stocked") }}</p>
         </a>
     </div>
     @else
@@ -98,36 +98,36 @@
             <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center mb-2.5 shadow-lg">
                 <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
             </div>
-            <p class="text-[11px] font-bold text-gray-900 dark:text-white">New Sale</p>
-            <p class="text-[9px] text-gray-400 mt-0.5">Create invoice</p>
+            <p class="text-[11px] font-bold text-gray-900 dark:text-white">{{ __("pos.new_sale") }}</p>
+            <p class="text-[9px] text-gray-400 mt-0.5">{{ __("pos.create_invoice") }}</p>
         </a>
         <a href="{{ route('pos.transactions') }}" class="tile-card glass-card p-4 text-center group cursor-pointer">
             <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-2.5 shadow-lg shadow-blue-500/20">
                 <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
             </div>
-            <p class="text-[11px] font-bold text-gray-900 dark:text-white">Orders</p>
-            <p class="text-[9px] text-gray-400 mt-0.5">View history</p>
+            <p class="text-[11px] font-bold text-gray-900 dark:text-white">{{ __("pos.orders_word") }}</p>
+            <p class="text-[9px] text-gray-400 mt-0.5">{{ __("pos.view_history") }}</p>
         </a>
         <a href="{{ route('pos.products') }}" class="tile-card glass-card p-4 text-center group cursor-pointer">
             <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mb-2.5 shadow-lg shadow-emerald-500/20">
                 <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
             </div>
-            <p class="text-[11px] font-bold text-gray-900 dark:text-white">Products</p>
-            <p class="text-[9px] text-gray-400 mt-0.5">Manage menu</p>
+            <p class="text-[11px] font-bold text-gray-900 dark:text-white">{{ __("pos.products_word") }}</p>
+            <p class="text-[9px] text-gray-400 mt-0.5">{{ __("pos.manage_menu") }}</p>
         </a>
         <a href="{{ route('pos.customers') }}" class="tile-card glass-card p-4 text-center group cursor-pointer">
             <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center mb-2.5 shadow-lg shadow-pink-500/20">
                 <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
             </div>
-            <p class="text-[11px] font-bold text-gray-900 dark:text-white">Customers</p>
-            <p class="text-[9px] text-gray-400 mt-0.5">Directory</p>
+            <p class="text-[11px] font-bold text-gray-900 dark:text-white">{{ __("pos.customers_word") }}</p>
+            <p class="text-[9px] text-gray-400 mt-0.5">{{ __("pos.directory_word") }}</p>
         </a>
         <a href="{{ route('pos.reports') }}" class="tile-card glass-card p-4 text-center group cursor-pointer">
             <div class="tile-icon w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center mb-2.5 shadow-lg shadow-amber-500/20">
                 <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
             </div>
-            <p class="text-[11px] font-bold text-gray-900 dark:text-white">Reports</p>
-            <p class="text-[9px] text-gray-400 mt-0.5">Analytics</p>
+            <p class="text-[11px] font-bold text-gray-900 dark:text-white">{{ __("pos.reports") }}</p>
+            <p class="text-[9px] text-gray-400 mt-0.5">{{ __("pos.analytics_word") }}</p>
         </a>
     </div>
     @endif
@@ -135,21 +135,21 @@
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 slide-up slide-up-3">
         <div class="stat-card card-reveal bg-gradient-to-br from-emerald-500 to-emerald-700 p-4 shadow-lg shadow-emerald-500/15">
             <div class="relative z-10">
-                <span class="text-[9px] font-bold uppercase tracking-wider text-emerald-100/70">Today's Revenue</span>
+                <span class="text-[9px] font-bold uppercase tracking-wider text-emerald-100/70">{{ __("pos.todays_revenue") }}</span>
                 <p class="text-xl font-extrabold text-white mt-1">Rs. <span data-count-target="{{ $todaySales ?? $todayStats->revenue ?? 0 }}">0</span></p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: {{ min(100, ($monthSales ?? $monthStats->revenue ?? 1) > 0 ? (($todaySales ?? $todayStats->revenue ?? 0) / ($monthSales ?? $monthStats->revenue ?? 1) * 100) : 0) }}%"></div></div>
             </div>
         </div>
         <div class="stat-card card-reveal bg-gradient-to-br from-teal-600 to-teal-800 p-4 shadow-lg shadow-teal-600/15">
             <div class="relative z-10">
-                <span class="text-[9px] font-bold uppercase tracking-wider text-teal-100/70">Orders</span>
+                <span class="text-[9px] font-bold uppercase tracking-wider text-teal-100/70">{{ __("pos.orders_word") }}</span>
                 <p class="text-xl font-extrabold text-white mt-1"><span data-count-target="{{ $todayOrders ?? $todayStats->count ?? 0 }}">0</span></p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: {{ min(100, ($todayOrders ?? $todayStats->count ?? 0) * 5) }}%"></div></div>
             </div>
         </div>
         <div class="stat-card card-reveal bg-gradient-to-br from-purple-500 to-purple-700 p-4 shadow-lg">
             <div class="relative z-10">
-                <span class="text-[9px] font-bold uppercase tracking-wider text-white/70">Avg Order</span>
+                <span class="text-[9px] font-bold uppercase tracking-wider text-white/70">{{ __("pos.avg_order") }}</span>
                 <p class="text-xl font-extrabold text-white mt-1">Rs. <span data-count-target="{{ round($todayStats->avg_ticket ?? (($todayOrders ?? 0) > 0 ? ($todaySales ?? 0) / ($todayOrders ?? 1) : 0)) }}">0</span></p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: 60%"></div></div>
             </div>
@@ -157,7 +157,7 @@
         @if($isRestaurant)
         <div class="stat-card card-reveal bg-gradient-to-br from-amber-500 to-orange-600 p-4 shadow-lg shadow-amber-500/15">
             <div class="relative z-10">
-                <span class="text-[9px] font-bold uppercase tracking-wider text-amber-100/70">Tables</span>
+                <span class="text-[9px] font-bold uppercase tracking-wider text-amber-100/70">{{ __("pos.tables_word") }}</span>
                 <p class="text-xl font-extrabold text-white mt-1"><span data-count-target="{{ $occupiedTables ?? 0 }}">0</span><span class="text-sm text-white/80">/{{ $totalTables ?? 0 }}</span></p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: {{ ($totalTables ?? 0) > 0 ? round(($occupiedTables ?? 0) / ($totalTables ?? 1) * 100) : 0 }}%"></div></div>
             </div>
@@ -165,7 +165,7 @@
         @else
         <div class="stat-card card-reveal bg-gradient-to-br from-amber-500 to-orange-600 p-4 shadow-lg shadow-amber-500/15">
             <div class="relative z-10">
-                <span class="text-[9px] font-bold uppercase tracking-wider text-amber-100/70">Monthly</span>
+                <span class="text-[9px] font-bold uppercase tracking-wider text-amber-100/70">{{ __("pos.monthly_word") }}</span>
                 <p class="text-xl font-extrabold text-white mt-1">Rs. <span data-count-target="{{ $monthSales ?? $monthStats->revenue ?? 0 }}">0</span></p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: 75%"></div></div>
             </div>

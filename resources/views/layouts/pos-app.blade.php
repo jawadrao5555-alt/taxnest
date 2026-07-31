@@ -21,7 +21,7 @@
     $companyName = $companyLayout->name ?? 'My Business';
     $userName = $posUserLayout->name ?? 'User';
     $userInitial = strtoupper(substr($userName, 0, 1));
-    $userRole = $isCashierLayout ? 'Cashier' : 'Admin';
+    $userRole = $isCashierLayout ? __('pos.role_cashier') : __('pos.role_admin');
     $posTheme = $companyLayout->pos_theme ?? 'purple';
     // "What's New" app updates (popup + bell). Admin-controlled via SystemSetting
     // pos_whats_new_enabled. NEVER break POS pages if the table is missing on prod
@@ -339,22 +339,22 @@
                             <a href="{{ route('pos.invoice.create') }}"
                                class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-white">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
-                                New Sale
+                                {{ __('pos.new_sale') }}
                             </a>
                             @endunless
                             @if(($companyLayout->pos_dashboard_style ?? 'default') === 'saaf')
                             {{-- Saaf dashboard (Jul 2026): simplified always-visible nav — 5 core links; everything else stays in the profile menu. --}}
                             <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}"
-                               class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.dashboard') || request()->routeIs('pos.restaurant.dashboard') ? 'active text-white' : 'text-white' }}">Home</a>
+                               class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.dashboard') || request()->routeIs('pos.restaurant.dashboard') ? 'active text-white' : 'text-white' }}">{{ __('pos.nav_home') }}</a>
                             <a href="{{ route('pos.transactions') }}"
-                               class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.transactions') ? 'active text-white' : 'text-white' }}">Bills</a>
+                               class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.transactions') ? 'active text-white' : 'text-white' }}">{{ __('pos.nav_bills') }}</a>
                             <a href="{{ route('pos.products') }}"
-                               class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.products') ? 'active text-white' : 'text-white' }}">Products</a>
+                               class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.products') ? 'active text-white' : 'text-white' }}">{{ __('pos.products_word') }}</a>
                             <a href="{{ route('pos.reports') }}"
-                               class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.reports') ? 'active text-white' : 'text-white' }}">Reports</a>
+                               class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.reports') ? 'active text-white' : 'text-white' }}">{{ __('pos.reports') }}</a>
                             @if(!$isCashierLayout)
                             <a href="{{ route('pos.customize') }}"
-                               class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.customize') ? 'active text-white' : 'text-white' }}">Settings</a>
+                               class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.customize') ? 'active text-white' : 'text-white' }}">{{ __('pos.settings') }}</a>
                             @endif
                             @endif
                         </nav>
@@ -381,35 +381,35 @@
                         {{-- Net/PRA/clock status cluster REMOVED (owner, 26 Jul 2026) — sale screen
                              already has its own Auto-Sync Online/Offline pill; do not re-add. --}}
 
-                        <button @click="$dispatch('open-cmd-palette')" class="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-white hover:bg-white/15 transition group" title="Quick Command (Ctrl+K)">
+                        <button @click="$dispatch('open-cmd-palette')" class="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-white hover:bg-white/15 transition group" title="{{ __('pos.ti_quick_command') }}">
                             <svg class="w-3.5 h-3.5 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                            <span class="text-[10px] font-medium opacity-80">Search</span>
+                            <span class="text-[10px] font-medium opacity-80">{{ __('pos.search_label') }}</span>
                             <kbd class="text-[9px] font-mono bg-white/10 px-1.5 py-0.5 rounded opacity-90 group-hover:opacity-100">⌘K</kbd>
                         </button>
 
                         {{-- Prominent nav-level Download App button — native prompt first, instructions fallback, installed state --}}
-                        <x-pwa-install-menu-item color="teal" app-name="Nest POS" label="Download App" item-class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/20 transition" />
+                        <x-pwa-install-menu-item color="teal" app-name="Nest POS" :label="__('pos.download_app')" item-class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/20 transition" />
                         <x-pwa-refresh-btn color="purple" />
 
                         <button @click="if(!document.fullscreenElement){document.documentElement.requestFullscreen().catch(()=>{}); document.body.classList.add('is-fullscreen');} else {document.exitFullscreen(); document.body.classList.remove('is-fullscreen');}"
-                                class="p-2 rounded-lg text-white hover:bg-white/15 transition" :title="isFs ? 'Exit Fullscreen (F11)' : 'Fullscreen (F11)'">
+                                class="p-2 rounded-lg text-white hover:bg-white/15 transition" :title="isFs ? '{{ __('pos.ti_exit_fullscreen') }}' : '{{ __('pos.ti_fullscreen') }}'">
                             <svg x-show="!isFs" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
                             <svg x-show="isFs" x-cloak class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9V5m0 4H5m10 0V5m0 4h4M9 15v4m0-4H5m10 0v4m0-4h4"/></svg>
                         </button>
 
                         <div class="relative">
-                            <button @click="themeOpen = !themeOpen; profileOpen = false" class="p-2 rounded-lg text-white hover:bg-white/15 transition" title="Change Theme">
+                            <button @click="themeOpen = !themeOpen; profileOpen = false" class="p-2 rounded-lg text-white hover:bg-white/15 transition" title="{{ __('pos.ti_change_theme') }}">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
                             </button>
                             <div x-show="themeOpen" x-cloak @click.outside="themeOpen = false" x-transition class="absolute right-0 top-full mt-2 bg-white dark:bg-gray-900 rounded-xl shadow-2xl shadow-black/20 border border-gray-200/80 dark:border-gray-700/80 p-3 z-[100] w-48">
-                                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">POS Theme</p>
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">{{ __('pos.pos_theme_heading') }}</p>
                                 <div class="grid grid-cols-3 gap-2">
-                                    <button @click="currentTheme='purple'; document.body.setAttribute('data-theme','purple'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'purple'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='purple' && 'active-theme'" style="background:linear-gradient(135deg,#312e81,#7c3aed)" title="Royal Purple"></button>
-                                    <button @click="currentTheme='blue'; document.body.setAttribute('data-theme','blue'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'blue'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='blue' && 'active-theme'" style="background:linear-gradient(135deg,#1e3a5f,#2563eb)" title="Ocean Blue"></button>
-                                    <button @click="currentTheme='emerald'; document.body.setAttribute('data-theme','emerald'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'emerald'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='emerald' && 'active-theme'" style="background:linear-gradient(135deg,#064e3b,#059669)" title="Emerald Green"></button>
-                                    <button @click="currentTheme='orange'; document.body.setAttribute('data-theme','orange'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'orange'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='orange' && 'active-theme'" style="background:linear-gradient(135deg,#7c2d12,#ea580c)" title="Sunset Orange"></button>
-                                    <button @click="currentTheme='midnight'; document.body.setAttribute('data-theme','midnight'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'midnight'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='midnight' && 'active-theme'" style="background:linear-gradient(135deg,#171717,#404040)" title="Midnight Dark"></button>
-                                    <button @click="currentTheme='rose'; document.body.setAttribute('data-theme','rose'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'rose'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='rose' && 'active-theme'" style="background:linear-gradient(135deg,#881337,#e11d48)" title="Rose Pink"></button>
+                                    <button @click="currentTheme='purple'; document.body.setAttribute('data-theme','purple'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'purple'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='purple' && 'active-theme'" style="background:linear-gradient(135deg,#312e81,#7c3aed)" title="{{ __('pos.theme_royal_purple') }}"></button>
+                                    <button @click="currentTheme='blue'; document.body.setAttribute('data-theme','blue'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'blue'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='blue' && 'active-theme'" style="background:linear-gradient(135deg,#1e3a5f,#2563eb)" title="{{ __('pos.theme_ocean_blue') }}"></button>
+                                    <button @click="currentTheme='emerald'; document.body.setAttribute('data-theme','emerald'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'emerald'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='emerald' && 'active-theme'" style="background:linear-gradient(135deg,#064e3b,#059669)" title="{{ __('pos.theme_emerald_green') }}"></button>
+                                    <button @click="currentTheme='orange'; document.body.setAttribute('data-theme','orange'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'orange'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='orange' && 'active-theme'" style="background:linear-gradient(135deg,#7c2d12,#ea580c)" title="{{ __('pos.theme_sunset_orange') }}"></button>
+                                    <button @click="currentTheme='midnight'; document.body.setAttribute('data-theme','midnight'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'midnight'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='midnight' && 'active-theme'" style="background:linear-gradient(135deg,#171717,#404040)" title="{{ __('pos.theme_midnight_dark') }}"></button>
+                                    <button @click="currentTheme='rose'; document.body.setAttribute('data-theme','rose'); fetch('/pos/settings/theme', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'rose'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='rose' && 'active-theme'" style="background:linear-gradient(135deg,#881337,#e11d48)" title="{{ __('pos.theme_rose_pink') }}"></button>
                                 </div>
                                 <div class="mt-2 pt-2 border-t border-gray-100 dark:border-gray-800">
                                     <p class="text-[9px] text-gray-400 text-center" x-text="currentTheme.charAt(0).toUpperCase() + currentTheme.slice(1) + ' Theme'"></p>
@@ -430,16 +430,16 @@
                                     && \Carbon\Carbon::parse($companyLayout->agent_last_seen)->gt(now()->subMinutes(2));
                             @endphp
                             <a href="{{ route('pos.agent') }}"
-                               title="{{ $agentOn ? ($agentOnline ? 'Agent Sync · Online' : 'Agent Sync · Offline! Check desktop agent.') : 'Direct Production — server submits to PRA' }}"
+                               title="{{ $agentOn ? ($agentOnline ? __('pos.ti_agent_sync_online') : __('pos.ti_agent_sync_offline')) : __('pos.ti_direct_production') }}"
                                class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition border
                                       {{ $agentOn
                                             ? ($agentOnline ? 'bg-purple-500/20 text-purple-100 border-purple-300/40 hover:bg-purple-500/30' : 'bg-amber-500/20 text-amber-100 border-amber-300/40 hover:bg-amber-500/30 animate-pulse')
                                             : 'bg-teal-500/20 text-teal-100 border-teal-300/40 hover:bg-teal-500/30' }}">
                                 @if($agentOn)
                                     <span class="w-1.5 h-1.5 rounded-full {{ $agentOnline ? 'bg-emerald-400' : 'bg-red-400 animate-pulse' }}"></span>
-                                    🤖 Agent
+                                    {{ __('pos.agent_badge') }}
                                 @else
-                                    ⚡ Direct
+                                    {{ __('pos.direct_badge') }}
                                 @endif
                             </a>
                         @endif
@@ -452,7 +452,7 @@
                         @endphp
                         @if($suggAllowed)
                         {{-- Feature Suggestion box — customers tell us what to build next --}}
-                        <a href="{{ route('pos.suggestions') }}" title="Feature Suggestion — apni tajweez bhejein"
+                        <a href="{{ route('pos.suggestions') }}" title="{{ __('pos.ti_feature_suggestion') }}"
                            class="relative p-2 rounded-xl text-white hover:bg-white/10 transition cursor-pointer {{ request()->is('pos/suggestions') ? 'bg-white/15' : '' }}">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
                         </a>
@@ -468,7 +468,7 @@
                                         fetch('/pos/whats-new/seen', { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' } }).catch(() => {});
                                     }
                                 } }">
-                            <button @click="toggleBell()" title="App Updates — What's New" class="relative p-2 rounded-xl text-white hover:bg-white/10 transition cursor-pointer">
+                            <button @click="toggleBell()" title="{{ __('pos.ti_app_updates') }}" class="relative p-2 rounded-xl text-white hover:bg-white/10 transition cursor-pointer">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
                                 <span x-show="unseen > 0" x-cloak x-text="unseen"
                                       class="absolute rounded-full bg-red-500 text-white font-bold flex items-center justify-center"
@@ -484,8 +484,8 @@
                                  x-transition:leave-end="opacity-0 scale-95"
                                  class="profile-dropdown absolute right-0 top-full mt-2 w-80 bg-white dark:bg-gray-900 rounded-xl shadow-2xl shadow-black/20 border border-gray-200/80 dark:border-gray-700/80 overflow-hidden z-[100]">
                                 <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800" style="background: linear-gradient(to right, hsla(var(--accent-h), var(--accent-s), 95%, 1), hsla(var(--accent-h), var(--accent-s), 92%, 1))">
-                                    <p class="text-sm font-bold text-gray-900 dark:text-white">🔔 App Updates</p>
-                                    <p class="text-[11px] text-gray-500 dark:text-gray-400">Pichle updates mein kya kya aya</p>
+                                    <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.app_updates_heading') }}</p>
+                                    <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.app_updates_subtitle') }}</p>
                                 </div>
                                 <div class="max-h-96 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
                                     @foreach($whatsNewList as $wnu)
@@ -493,12 +493,12 @@
                                             <div class="flex items-center justify-between gap-2">
                                                 <p class="text-[13px] font-semibold text-gray-800 dark:text-gray-100">{{ $wnu->title }}</p>
                                                 @if(!in_array($wnu->id, $whatsNewSeenIds))
-                                                    <span class="flex-shrink-0 px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold uppercase">New</span>
+                                                    <span class="flex-shrink-0 px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold uppercase">{{ __('pos.new_word') }}</span>
                                                 @endif
                                             </div>
                                             <p class="text-[10px] text-gray-400 mt-0.5">{{ $wnu->created_at->format('d M Y') }}</p>
                                             @if($wnu->image_path ?? null)
-                                                <img src="{{ asset('storage/' . $wnu->image_path) }}" alt="Update image" loading="lazy"
+                                                <img src="{{ asset('storage/' . $wnu->image_path) }}" alt="{{ __('pos.update_image_alt') }}" loading="lazy"
                                                      class="w-full rounded-lg border border-gray-200 dark:border-gray-700 mt-1.5 cursor-zoom-in"
                                                      onclick="window.open(this.src, '_blank')">
                                             @endif
@@ -551,121 +551,121 @@
 
                                 <div class="py-1.5 max-h-[65vh] overflow-y-auto">
                                     <div class="px-3 pt-2 pb-1">
-                                        <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">Quick Access</p>
+                                        <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">{{ __('pos.nav_quick_access') }}</p>
                                     </div>
                                     <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-                                        Dashboard
+                                        {{ __('pos.dashboard') }}
                                     </a>
                                     <a href="{{ route('pos.transactions') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                                        Orders
+                                        {{ __('pos.nav_orders') }}
                                     </a>
                                     <a href="{{ route('pos.products') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                                        Products
+                                        {{ __('pos.products_word') }}
                                     </a>
                                     <a href="{{ route('pos.customers') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                                        Customers
+                                        {{ __('pos.nav_customers') }}
                                     </a>
                                     @if($posFeaturesLayout->tables && !$isCashierLayout)
                                     <a href="{{ route('pos.restaurant.tables') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"/></svg>
-                                        Tables
+                                        {{ __('pos.nav_tables') }}
                                     </a>
                                     @endif
                                     @if($posFeaturesLayout->kitchen && !$isCashierLayout)
                                     <a href="{{ route('pos.restaurant.kds') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                                        Kitchen Display
+                                        {{ __('pos.nav_kitchen_display') }}
                                     </a>
                                     @endif
                                     {{-- Delivery Riders (Jul 2026): board visible to cashiers too (they receive rider cash); Riders CRUD admin-only. --}}
                                     @if(!empty($posFeaturesLayout->delivery))
                                     <a href="{{ route('pos.deliveries') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 11-4 0m10 0a2 2 0 104 0"/></svg>
-                                        Deliveries
+                                        {{ __('pos.nav_deliveries') }}
                                     </a>
                                     @if(!$isCashierLayout)
                                     <a href="{{ route('pos.riders') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                                        Riders
+                                        {{ __('pos.nav_riders') }}
                                     </a>
                                     @endif
                                     @endif
 
                                     <div class="px-3 pt-3 pb-1">
-                                        <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">Reports</p>
+                                        <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">{{ __('pos.reports') }}</p>
                                     </div>
                                     <a href="{{ route('pos.reports') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                                        Sales Reports
+                                        {{ __('pos.nav_sales_reports') }}
                                     </a>
                                     <a href="{{ route('pos.tax-reports') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                                        Tax Reports
+                                        {{ __('pos.nav_tax_reports') }}
                                     </a>
                                     <a href="{{ route('pos.day-close') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                        Day Close
+                                        {{ __('pos.nav_day_close') }}
                                     </a>
 
                                     {{-- Company admin ALWAYS sees Inventory links (full visibility);
                                          pages redirect to POS Features with a prompt when the module is OFF. --}}
                                     @if(!$isCashierLayout)
                                     <div class="px-3 pt-3 pb-1">
-                                        <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">Inventory
-                                            @if(!$inventoryEnabledLayout)<span class="ml-1 normal-case font-medium text-[8px] px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400">OFF</span>@endif
+                                        <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">{{ __('pos.nav_inventory') }}
+                                            @if(!$inventoryEnabledLayout)<span class="ml-1 normal-case font-medium text-[8px] px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400">{{ __('pos.off_badge') }}</span>@endif
                                         </p>
                                     </div>
                                     <a href="{{ route('pos.inventory.dashboard') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
-                                        Stock Overview
+                                        {{ __('pos.nav_stock_overview') }}
                                     </a>
                                     <a href="{{ route('pos.inventory.stock') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                                        Stock Levels
+                                        {{ __('pos.nav_stock_levels') }}
                                     </a>
                                     <a href="{{ route('pos.inventory.movements') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
-                                        Movements
+                                        {{ __('pos.nav_movements') }}
                                     </a>
                                     <a href="{{ route('pos.inventory.low-stock') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-                                        Low Stock Alerts
+                                        {{ __('pos.nav_low_stock_alerts') }}
                                     </a>
                                     @endif
 
                                     @if($isRestaurantLayout && !$isCashierLayout)
                                     <div class="px-3 pt-3 pb-1">
-                                        <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">Restaurant</p>
+                                        <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">{{ __('pos.nav_restaurant') }}</p>
                                     </div>
                                     <a href="{{ route('pos.restaurant.ingredients') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
-                                        Ingredients
+                                        {{ __('pos.nav_ingredients') }}
                                     </a>
                                     <a href="{{ route('pos.restaurant.recipes') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-                                        Recipes
+                                        {{ __('pos.nav_recipes') }}
                                     </a>
                                     @endif
 
                                     @if(!$isCashierLayout)
                                     <div class="px-3 pt-3 pb-1">
-                                        <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">Settings</p>
+                                        <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">{{ __('pos.settings') }}</p>
                                     </div>
                                     <a href="{{ route('pos.customize') }}" class="menu-link flex items-center gap-2.5 px-4 py-2.5 text-[12px] font-bold text-gray-800 dark:text-gray-100 {{ request()->routeIs('pos.customize') ? 'bg-purple-50 dark:bg-purple-900/20' : '' }}">
                                         <svg class="w-4 h-4 text-purple-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                                        Customize POS
-                                        <span class="ml-auto text-[9px] px-1.5 py-0.5 bg-purple-500 text-white rounded font-bold uppercase tracking-wider">All&nbsp;Settings</span>
+                                        {{ __('pos.nav_customize_pos') }}
+                                        <span class="ml-auto text-[9px] px-1.5 py-0.5 bg-purple-500 text-white rounded font-bold uppercase tracking-wider">{{ __('pos.all_settings_badge') }}</span>
                                     </a>
                                     @endif
 
                                     @if($isCashierLayout)
                                     <a href="{{ route('pos.user-profile') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                                        My Profile
+                                        {{ __('pos.nav_my_profile') }}
                                     </a>
                                     @endif
 
@@ -689,9 +689,9 @@
 
                                     {{-- PWA install — always visible for every POS user --}}
                                     <div class="px-3 pt-3 pb-1">
-                                        <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">App</p>
+                                        <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">{{ __('pos.nav_app') }}</p>
                                     </div>
-                                    <x-pwa-install-menu-item color="purple" app-name="Nest POS" label="Install App on this Device" item-class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300" />
+                                    <x-pwa-install-menu-item color="purple" app-name="Nest POS" :label="__('pos.install_app_device')" item-class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300" />
                                 </div>
 
                                 <div class="border-t border-gray-100 dark:border-gray-800 p-2">
@@ -699,7 +699,7 @@
                                         @csrf
                                         <button type="submit" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition">
                                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-                                            Sign Out
+                                            {{ __('pos.sign_out') }}
                                         </button>
                                     </form>
                                 </div>
@@ -716,17 +716,17 @@
                      x-transition:leave-start="opacity-100"
                      x-transition:leave-end="opacity-0 -translate-y-2"
                      class="md:hidden border-t border-white/10 px-3 py-2 flex flex-wrap gap-1.5" style="background: hsla(var(--accent-h), var(--accent-s), 10%, 0.9)">
-                    <a href="{{ route('pos.invoice.create') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">New Sale</a>
+                    <a href="{{ route('pos.invoice.create') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.new_sale') }}</a>
                     @if(($companyLayout->pos_dashboard_style ?? 'default') === 'saaf')
-                    <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">Home</a>
-                    <a href="{{ route('pos.transactions') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">Bills</a>
-                    <a href="{{ route('pos.products') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">Products</a>
-                    <a href="{{ route('pos.reports') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">Reports</a>
+                    <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.nav_home') }}</a>
+                    <a href="{{ route('pos.transactions') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.nav_bills') }}</a>
+                    <a href="{{ route('pos.products') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.products_word') }}</a>
+                    <a href="{{ route('pos.reports') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.reports') }}</a>
                     @if(!$isCashierLayout)
-                    <a href="{{ route('pos.customize') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">Settings</a>
+                    <a href="{{ route('pos.customize') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.settings') }}</a>
                     @endif
                     @endif
-                    <x-pwa-install-menu-item color="teal" app-name="Nest POS" label="Download App" item-class="nav-pill inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 ring-1 ring-white/20" />
+                    <x-pwa-install-menu-item color="teal" app-name="Nest POS" :label="__('pos.download_app')" item-class="nav-pill inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 ring-1 ring-white/20" />
                 </div>
             </header>
 
@@ -758,7 +758,7 @@
         <div id="pageLoadOverlay" class="page-loading-overlay">
             <div class="flex flex-col items-center gap-3">
                 <div class="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
-                <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Loading...</span>
+                <span class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ __('pos.loading_dots') }}</span>
             </div>
         </div>
 
@@ -768,17 +768,17 @@
                 q: '',
                 idx: 0,
                 items: @js([
-                    ['label' => 'New Sale', 'url' => route('pos.invoice.create'), 'icon' => '+', 'kbd' => ''],
-                    ['label' => 'Dashboard', 'url' => $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard'), 'icon' => '◧', 'kbd' => ''],
-                    ['label' => 'Orders / Transactions', 'url' => route('pos.transactions'), 'icon' => '☰', 'kbd' => ''],
-                    ['label' => 'Products', 'url' => route('pos.products'), 'icon' => '◫', 'kbd' => ''],
-                    ['label' => 'Customers', 'url' => route('pos.customers'), 'icon' => '◉', 'kbd' => ''],
-                    ['label' => 'Reports', 'url' => route('pos.reports'), 'icon' => '▤', 'kbd' => ''],
-                    ['label' => 'Day Close', 'url' => route('pos.day-close'), 'icon' => '◆', 'kbd' => ''],
-                    ['label' => 'Billing & Plan', 'url' => route('pos.billing'), 'icon' => '₨', 'kbd' => ''],
-                    ['label' => 'Business Profile', 'url' => route('pos.business-profile'), 'icon' => '◎', 'kbd' => ''],
-                    ['label' => 'Toggle Fullscreen', 'action' => 'fullscreen', 'icon' => '⛶', 'kbd' => 'F11'],
-                    ['label' => 'Toggle Dark Mode', 'action' => 'darkmode', 'icon' => '☾', 'kbd' => ''],
+                    ['label' => __('pos.new_sale'), 'url' => route('pos.invoice.create'), 'icon' => '+', 'kbd' => ''],
+                    ['label' => __('pos.dashboard'), 'url' => $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard'), 'icon' => '◧', 'kbd' => ''],
+                    ['label' => __('pos.nav_orders_transactions'), 'url' => route('pos.transactions'), 'icon' => '☰', 'kbd' => ''],
+                    ['label' => __('pos.products_word'), 'url' => route('pos.products'), 'icon' => '◫', 'kbd' => ''],
+                    ['label' => __('pos.nav_customers'), 'url' => route('pos.customers'), 'icon' => '◉', 'kbd' => ''],
+                    ['label' => __('pos.reports'), 'url' => route('pos.reports'), 'icon' => '▤', 'kbd' => ''],
+                    ['label' => __('pos.nav_day_close'), 'url' => route('pos.day-close'), 'icon' => '◆', 'kbd' => ''],
+                    ['label' => __('pos.nav_billing_plan'), 'url' => route('pos.billing'), 'icon' => '₨', 'kbd' => ''],
+                    ['label' => __('pos.nav_business_profile'), 'url' => route('pos.business-profile'), 'icon' => '◎', 'kbd' => ''],
+                    ['label' => __('pos.cmd_toggle_fullscreen'), 'action' => 'fullscreen', 'icon' => '⛶', 'kbd' => 'F11'],
+                    ['label' => __('pos.cmd_toggle_dark_mode'), 'action' => 'darkmode', 'icon' => '☾', 'kbd' => ''],
                 ]),
                 get filtered() { return this.q.trim() === '' ? this.items : this.items.filter(i => i.label.toLowerCase().includes(this.q.toLowerCase())); },
                 run(item) {
@@ -805,7 +805,7 @@
                                @keydown.arrow-down.prevent="idx = Math.min(idx + 1, filtered.length - 1)"
                                @keydown.arrow-up.prevent="idx = Math.max(0, idx - 1)"
                                @keydown.enter.prevent="if(filtered[idx]) run(filtered[idx])"
-                               type="text" placeholder="Search actions, screens, settings..."
+                               type="text" placeholder="{{ __('pos.ph_cmd_search') }}"
                                class="flex-1 bg-transparent border-0 outline-none focus:ring-0 text-sm text-gray-900 dark:text-white placeholder-gray-400">
                         <kbd class="cmd-kbd">ESC</kbd>
                     </div>
@@ -817,12 +817,12 @@
                                 <kbd x-show="item.kbd" class="cmd-kbd" x-text="item.kbd"></kbd>
                             </div>
                         </template>
-                        <div x-show="filtered.length === 0" class="px-4 py-8 text-center text-xs text-gray-400">No matches</div>
+                        <div x-show="filtered.length === 0" class="px-4 py-8 text-center text-xs text-gray-400">{{ __('pos.no_matches') }}</div>
                     </div>
                     <div class="px-4 py-2 border-t border-gray-100 dark:border-gray-800 flex items-center gap-3 text-[10px] text-gray-400">
-                        <span class="flex items-center gap-1"><kbd class="cmd-kbd">↑↓</kbd> navigate</span>
-                        <span class="flex items-center gap-1"><kbd class="cmd-kbd">↵</kbd> open</span>
-                        <span class="flex items-center gap-1 ml-auto"><kbd class="cmd-kbd">⌘K</kbd> anywhere</span>
+                        <span class="flex items-center gap-1"><kbd class="cmd-kbd">↑↓</kbd> {{ __('pos.cmd_navigate') }}</span>
+                        <span class="flex items-center gap-1"><kbd class="cmd-kbd">↵</kbd> {{ __('pos.cmd_open') }}</span>
+                        <span class="flex items-center gap-1 ml-auto"><kbd class="cmd-kbd">⌘K</kbd> {{ __('pos.cmd_anywhere') }}</span>
                     </div>
                 </div>
             </div>
@@ -899,11 +899,11 @@
                  x-transition:enter-end="opacity-100 scale-100">
                 <div class="px-6 py-5 text-center" style="background: linear-gradient(135deg, hsl(var(--accent-h), var(--accent-s), 42%), hsl(var(--accent-h), var(--accent-s), 28%));">
                     <div class="text-4xl mb-1">🎉</div>
-                    <h2 class="text-xl font-extrabold text-white">{{ $whatsNewUnseenCount > 1 ? $whatsNewUnseenCount . ' Naye Updates Aye Hain!' : 'Naya Update Aya Hai!' }}</h2>
+                    <h2 class="text-xl font-extrabold text-white">{{ $whatsNewUnseenCount > 1 ? __('pos.whats_new_many', ['count' => $whatsNewUnseenCount]) : __('pos.whats_new_one') }}</h2>
                     @if($whatsNewUnseenCount === 1)
                         <p class="text-[12px] text-white/80 mt-1">{{ $whatsNewPopup->title }} · {{ $whatsNewPopup->created_at->format('d M Y') }}</p>
                     @else
-                        <p class="text-[12px] text-white/80 mt-1">Neeche scroll kar ke sab dekhein</p>
+                        <p class="text-[12px] text-white/80 mt-1">{{ __('pos.whats_new_scroll_hint') }}</p>
                     @endif
                 </div>
                 {{-- Owner (21 Jul 2026): ALL unseen updates stacked (newest first) in one
@@ -916,7 +916,7 @@
                             <p class="text-sm font-extrabold text-gray-900 dark:text-white mb-2">{{ $wnp->title }} <span class="font-normal text-[11px] text-gray-400">· {{ $wnp->created_at->format('d M Y') }}</span></p>
                         @endif
                         @if($wnp->image_path ?? null)
-                            <img src="{{ asset('storage/' . $wnp->image_path) }}" alt="Update image" loading="lazy"
+                            <img src="{{ asset('storage/' . $wnp->image_path) }}" alt="{{ __('pos.update_image_alt') }}" loading="lazy"
                                  class="w-full rounded-xl border border-gray-200 dark:border-gray-700 mb-4 cursor-zoom-in"
                                  onclick="window.open(this.src, '_blank')">
                         @endif
@@ -936,7 +936,7 @@
                 <div class="px-6 pb-5">
                     <button @click="wnDismiss()" x-ref="wnBtn" x-init="$nextTick(() => $refs.wnBtn.focus())"
                             class="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm shadow-sm transition cursor-pointer">
-                        ✔ Samajh Gaya
+                        {{ __('pos.whats_new_got_it') }}
                     </button>
                 </div>
             </div>

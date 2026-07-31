@@ -16,7 +16,7 @@
                 <p class="flex-1 text-sm text-amber-900 dark:text-amber-100"><span class="font-bold">{{ $notif->title }}</span> &middot; {{ $notif->message }}</p>
                 <form method="POST" action="{{ route('pos.notifications.dismiss', $notif->id) }}" class="flex-shrink-0">
                     @csrf
-                    <button type="submit" title="Dismiss" aria-label="Dismiss notification" class="p-1.5 rounded-lg text-amber-500 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-800/40 transition">
+                    <button type="submit" title="{{ __('pos.dismiss') }}" aria-label="{{ __('pos.dismiss_notification') }}" class="p-1.5 rounded-lg text-amber-500 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-800/40 transition">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                 </form>
@@ -26,7 +26,7 @@
             <div class="flex justify-end">
                 <form method="POST" action="{{ route('pos.notifications.dismiss-all') }}">
                     @csrf
-                    <button type="submit" class="text-xs font-semibold text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 transition">Dismiss all</button>
+                    <button type="submit" class="text-xs font-semibold text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 transition">{{ __('pos.dismiss_all') }}</button>
                 </form>
             </div>
             @endif
@@ -36,7 +36,7 @@
         {{-- ━━━ PRA POS Universal v2 — Customize CTA (dismissible; hidden on the Saaf clean dashboard) ━━━ --}}
         @if(!$isCashier && ($dashboardStyle ?? 'default') !== 'saaf')
         <div x-data="{ show: localStorage.getItem('hide_universal_cta_v1') !== '1' }" x-show="show" x-cloak class="mb-4 rounded-2xl bg-purple-600 p-4 sm:p-5 text-white shadow-xl relative overflow-hidden">
-            <button @click="show=false; localStorage.setItem('hide_universal_cta_v1','1')" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition" aria-label="Dismiss">
+            <button @click="show=false; localStorage.setItem('hide_universal_cta_v1','1')" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition" aria-label="{{ __('pos.dismiss') }}">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
             <div class="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pr-6">
@@ -44,18 +44,18 @@
                     <div class="text-2xl sm:text-3xl hidden sm:block">🎯</div>
                     <div>
                         <div class="flex items-center gap-1.5 mb-0.5">
-                            <span class="inline-flex items-center px-1.5 py-0.5 rounded-full bg-white/20 backdrop-blur text-[9px] font-bold uppercase tracking-wider">New</span>
-                            <span class="text-sm font-extrabold">PRA POS Universal v2 — One Screen, All Features</span>
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded-full bg-white/20 backdrop-blur text-[9px] font-bold uppercase tracking-wider">{{ __('pos.new_word') }}</span>
+                            <span class="text-sm font-extrabold">{{ __('pos.universal_v2_title') }}</span>
                         </div>
-                        <p class="hidden sm:block text-xs text-white/85">Customize from 9 industry presets (Restaurant, Cafe, Quick Service, Retail, Pharmacy, Salon, Grocery, Wholesale, Hybrid). Toggle KOT, KDS, recipes, inventory, loyalty &amp; more.</p>
+                        <p class="hidden sm:block text-xs text-white/85">{{ __('pos.universal_v2_blurb') }}</p>
                     </div>
                 </div>
                 <div class="flex gap-2 flex-shrink-0 w-full sm:w-auto">
                     <a href="{{ route('pos.features') }}" class="flex-1 sm:flex-initial inline-flex justify-center items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-purple-700 text-xs font-bold hover:bg-purple-50 transition shadow-lg whitespace-nowrap">
-                        Customize POS
+                        {{ __('pos.customize_pos') }}
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                     </a>
-                    <a href="{{ route('pos.v2.invoice.create') }}" class="flex-1 sm:flex-initial inline-flex justify-center items-center px-4 py-2 rounded-lg bg-white/10 backdrop-blur text-white text-xs font-bold hover:bg-white/20 transition border border-white/30 whitespace-nowrap">Open POS</a>
+                    <a href="{{ route('pos.v2.invoice.create') }}" class="flex-1 sm:flex-initial inline-flex justify-center items-center px-4 py-2 rounded-lg bg-white/10 backdrop-blur text-white text-xs font-bold hover:bg-white/20 transition border border-white/30 whitespace-nowrap">{{ __('pos.open_pos') }}</a>
                 </div>
             </div>
         </div>
@@ -72,8 +72,8 @@
                         <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="text-sm font-bold text-gray-900 dark:text-white">Opening Cash: Rs {{ number_format((float) $dayOpening->opening_cash, 2) }}</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Aaj ka din close ho chuka hai — opening cash lock hai.</p>
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.opening_cash') }}: Rs {{ number_format((float) $dayOpening->opening_cash, 2) }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ __('pos.day_closed_opening_locked') }}</p>
                     </div>
                 </div>
                 @else
@@ -82,8 +82,8 @@
                         <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="text-sm font-bold text-gray-900 dark:text-white">Opening Cash</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Aaj ka din close ho chuka hai — ab opening cash enter nahi ho sakta. Kal subah naye din par enter karein.</p>
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.opening_cash') }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ __('pos.day_closed_no_opening_entry') }}</p>
                     </div>
                 </div>
                 @endif
@@ -94,19 +94,19 @@
                         <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="text-sm font-bold text-gray-900 dark:text-white">Aaj ka Opening Cash: <span class="text-teal-700 dark:text-teal-400">Rs {{ number_format((float) $dayOpening->opening_cash, 2) }}</span></p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ $dayOpening->enteredBy?->name ? $dayOpening->enteredBy->name . ' ne enter kiya' : 'Day start par enter kiya gaya' }} · day close par khud-ba-khud istemal hoga</p>
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.todays_opening_cash') }}: <span class="text-teal-700 dark:text-teal-400">Rs {{ number_format((float) $dayOpening->opening_cash, 2) }}</span></p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ $dayOpening->enteredBy?->name ? __('pos.entered_by_name', ['name' => $dayOpening->enteredBy->name]) : __('pos.entered_at_day_start') }} · {{ __('pos.used_at_day_close') }}</p>
                     </div>
-                    <button type="button" @click="editing = !editing" class="px-3 py-1.5 rounded-lg text-xs font-bold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-900/30 hover:bg-teal-100 dark:hover:bg-teal-900/50 transition">Change</button>
+                    <button type="button" @click="editing = !editing" class="px-3 py-1.5 rounded-lg text-xs font-bold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-900/30 hover:bg-teal-100 dark:hover:bg-teal-900/50 transition">{{ __('pos.change_word') }}</button>
                 </div>
                 <form method="POST" action="{{ route('pos.day-opening.save') }}" x-show="editing" x-cloak class="mt-3 flex flex-wrap items-end gap-2">
                     @csrf
                     <div class="flex-1 min-w-[160px]">
-                        <label class="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Naya opening cash (Rs)</label>
+                        <label class="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.new_opening_cash_rs') }}</label>
                         <input type="number" name="opening_cash" step="0.01" min="0" max="99999999" required value="{{ (float) $dayOpening->opening_cash }}"
                             class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-teal-500 focus:border-teal-500">
                     </div>
-                    <button type="submit" class="px-4 py-2 rounded-lg bg-teal-600 text-white text-xs font-bold hover:bg-teal-700 transition">Update</button>
+                    <button type="submit" class="px-4 py-2 rounded-lg bg-teal-600 text-white text-xs font-bold hover:bg-teal-700 transition">{{ __('pos.update_word') }}</button>
                 </form>
             </div>
             @else
@@ -116,18 +116,18 @@
                         <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="text-sm font-bold text-gray-900 dark:text-white">Din ka Aghaz — Opening Cash</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Subah drawer mein jitna cash (khulla/change) rakha hai woh enter karein — raat ko day close par hisaab khud-ba-khud milega.</p>
+                        <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.day_start_opening_cash') }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ __('pos.opening_cash_hint') }}</p>
                     </div>
                 </div>
                 <form method="POST" action="{{ route('pos.day-opening.save') }}" class="mt-3 flex flex-wrap items-end gap-2">
                     @csrf
                     <div class="flex-1 min-w-[160px]">
-                        <label class="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Opening cash (Rs)</label>
-                        <input type="number" name="opening_cash" step="0.01" min="0" max="99999999" required placeholder="e.g. 5000"
+                        <label class="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.opening_cash_rs') }}</label>
+                        <input type="number" name="opening_cash" step="0.01" min="0" max="99999999" required placeholder="{{ __('pos.ph_eg_5000') }}"
                             class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-teal-500 focus:border-teal-500">
                     </div>
-                    <button type="submit" class="px-4 py-2 rounded-lg bg-teal-600 text-white text-xs font-bold hover:bg-teal-700 transition">Save Opening</button>
+                    <button type="submit" class="px-4 py-2 rounded-lg bg-teal-600 text-white text-xs font-bold hover:bg-teal-700 transition">{{ __('pos.save_opening') }}</button>
                 </form>
             </div>
             @endif
@@ -138,7 +138,7 @@
         @if(!$isCashier && isset($profitStats) && ($dashboardStyle ?? 'default') !== 'saaf')
         @php
             $period = $profitStats['period'] ?? 'today';
-            $periodLabel = ['today' => 'Today', 'week' => 'This Week', 'month' => 'This Month'][$period] ?? 'Today';
+            $periodLabel = ['today' => __('pos.period_today'), 'week' => __('pos.period_this_week'), 'month' => __('pos.period_this_month')][$period] ?? __('pos.period_today');
             $coveragePct = ($costCoverage['total'] ?? 0) > 0
                 ? round(($costCoverage['with_cost'] / $costCoverage['total']) * 100)
                 : 0;
@@ -150,12 +150,12 @@
                         <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3v18h18M7 14l4-4 4 4 5-5"/></svg>
                     </div>
                     <div>
-                        <h3 class="text-sm font-extrabold text-gray-900 dark:text-white">Profit & BI</h3>
-                        <p class="text-[10px] text-gray-500 dark:text-gray-400">{{ $periodLabel }} · cost coverage: <span class="font-semibold {{ $coveragePct >= 80 ? 'text-emerald-600' : ($coveragePct >= 40 ? 'text-amber-600' : 'text-red-500') }}">{{ $coveragePct }}%</span> of products have cost set</p>
+                        <h3 class="text-sm font-extrabold text-gray-900 dark:text-white">{{ __('pos.profit_and_bi') }}</h3>
+                        <p class="text-[10px] text-gray-500 dark:text-gray-400">{{ $periodLabel }} · {{ __('pos.cost_coverage_label') }} <span class="font-semibold {{ $coveragePct >= 80 ? 'text-emerald-600' : ($coveragePct >= 40 ? 'text-amber-600' : 'text-red-500') }}">{{ $coveragePct }}%</span> {{ __('pos.of_products_have_cost') }}</p>
                     </div>
                 </div>
                 <div class="inline-flex rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-1 text-[11px] font-semibold shadow-sm">
-                    @foreach (['today' => 'Today', 'week' => 'Week', 'month' => 'Month'] as $key => $label)
+                    @foreach (['today' => __('pos.period_today'), 'week' => __('pos.period_week'), 'month' => __('pos.period_month')] as $key => $label)
                         <a href="{{ route('pos.dashboard', ['period' => $key]) }}"
                            class="px-3 py-1.5 rounded-lg transition {{ $period === $key ? 'bg-emerald-500 text-white shadow' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' }}">
                             {{ $label }}
@@ -167,23 +167,23 @@
             {{-- KPI grid: Sales / Cost / Profit / Margin / Orders --}}
             <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3">
                 <div class="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3">
-                    <p class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold">Sales</p>
+                    <p class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold">{{ __('pos.sales_word') }}</p>
                     <p class="text-lg sm:text-xl font-black text-gray-900 dark:text-white mt-1">Rs. {{ number_format($profitStats['revenue'], 0) }}</p>
                 </div>
                 <div class="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3">
-                    <p class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold">Cost</p>
+                    <p class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold">{{ __('pos.cost_word') }}</p>
                     <p class="text-lg sm:text-xl font-black text-amber-600 mt-1">Rs. {{ number_format($profitStats['cost'], 0) }}</p>
                 </div>
                 <div class="rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white p-3 shadow-md">
-                    <p class="text-[10px] uppercase tracking-wider opacity-80 font-bold">Profit</p>
+                    <p class="text-[10px] uppercase tracking-wider opacity-80 font-bold">{{ __('pos.profit_word') }}</p>
                     <p class="text-lg sm:text-xl font-black mt-1">Rs. {{ number_format($profitStats['profit'], 0) }}</p>
                 </div>
                 <div class="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3">
-                    <p class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold">Margin</p>
+                    <p class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold">{{ __('pos.margin_word') }}</p>
                     <p class="text-lg sm:text-xl font-black {{ $profitStats['margin'] >= 30 ? 'text-emerald-600' : ($profitStats['margin'] >= 15 ? 'text-amber-600' : 'text-red-500') }} mt-1">{{ $profitStats['margin'] }}%</p>
                 </div>
                 <div class="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3">
-                    <p class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold">Orders</p>
+                    <p class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-bold">{{ __('pos.orders_word') }}</p>
                     <p class="text-lg sm:text-xl font-black text-purple-600 mt-1">{{ number_format($profitStats['orders']) }}</p>
                 </div>
             </div>
@@ -191,7 +191,7 @@
             @if($coveragePct < 80)
             <div class="mt-3 flex items-center gap-2 text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-lg px-3 py-2">
                 <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
-                <span>Add cost prices to your products to see accurate profit. <a href="{{ route('pos.products') }}" class="font-bold underline hover:text-amber-900">Open Products →</a></span>
+                <span>{{ __('pos.add_cost_prices_hint') }} <a href="{{ route('pos.products') }}" class="font-bold underline hover:text-amber-900">{{ __('pos.open_products_arrow') }}</a></span>
             </div>
             @endif
 
@@ -200,22 +200,22 @@
                 {{-- Top sold --}}
                 <div class="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3">
                     <p class="text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1.5">
-                        <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span> TOP SOLD
+                        <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span> {{ __('pos.top_sold') }}
                     </p>
                     @forelse($topSold as $row)
                         <div class="flex items-center justify-between py-1.5 text-xs border-b border-gray-50 dark:border-gray-700/50 last:border-b-0">
                             <span class="truncate text-gray-800 dark:text-gray-200">{{ $row->name }}</span>
-                            <span class="text-purple-600 font-bold ml-2 whitespace-nowrap">{{ rtrim(rtrim(number_format($row->qty, 2), '0'), '.') }} sold</span>
+                            <span class="text-purple-600 font-bold ml-2 whitespace-nowrap">{{ rtrim(rtrim(number_format($row->qty, 2), '0'), '.') }} {{ __('pos.sold_suffix') }}</span>
                         </div>
                     @empty
-                        <p class="text-[11px] text-gray-400 py-2">No sales yet for {{ strtolower($periodLabel) }}.</p>
+                        <p class="text-[11px] text-gray-400 py-2">{{ __('pos.no_sales_yet_for_period', ['period' => strtolower($periodLabel)]) }}</p>
                     @endforelse
                 </div>
 
                 {{-- Top profit --}}
                 <div class="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3">
                     <p class="text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1.5">
-                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> MOST PROFITABLE
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> {{ __('pos.most_profitable') }}
                     </p>
                     @forelse($topProfit as $row)
                         <div class="flex items-center justify-between py-1.5 text-xs border-b border-gray-50 dark:border-gray-700/50 last:border-b-0">
@@ -223,14 +223,14 @@
                             <span class="text-emerald-600 font-bold ml-2 whitespace-nowrap">Rs. {{ number_format($row->profit, 0) }}</span>
                         </div>
                     @empty
-                        <p class="text-[11px] text-gray-400 py-2">Add cost prices to see profit by product.</p>
+                        <p class="text-[11px] text-gray-400 py-2">{{ __('pos.add_cost_to_see_profit') }}</p>
                     @endforelse
                 </div>
 
                 {{-- Low margin alerts --}}
                 <div class="rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-3">
                     <p class="text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1.5">
-                        <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> LOW MARGIN <span class="text-gray-400 font-normal">(&lt; 15%)</span>
+                        <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> {{ __('pos.low_margin') }} <span class="text-gray-400 font-normal">(&lt; 15%)</span>
                     </p>
                     @forelse($lowMargin as $row)
                         @php $m = $row->price > 0 ? round((($row->price - $row->cost_price) / $row->price) * 100, 1) : 0; @endphp
@@ -242,7 +242,7 @@
                             <span class="text-red-500 font-bold ml-2 whitespace-nowrap">{{ $m }}%</span>
                         </div>
                     @empty
-                        <p class="text-[11px] text-emerald-600 py-2">All products healthy — no low-margin items.</p>
+                        <p class="text-[11px] text-emerald-600 py-2">{{ __('pos.all_products_healthy') }}</p>
                     @endforelse
                 </div>
             </div>
@@ -263,16 +263,16 @@ function draftsManager() {
         timeAgo(dateStr) {
             if (!dateStr) return '';
             const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
-            if (diff < 60) return 'just now';
-            if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-            if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-            return Math.floor(diff / 86400) + 'd ago';
+            if (diff < 60) return @js(__('pos.just_now'));
+            if (diff < 3600) return Math.floor(diff / 60) + @js(__('pos.minutes_ago_suffix'));
+            if (diff < 86400) return Math.floor(diff / 3600) + @js(__('pos.hours_ago_suffix'));
+            return Math.floor(diff / 86400) + @js(__('pos.days_ago_suffix'));
         },
         formatMethod(m) {
-            return m ? m.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Cash';
+            return m ? m.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : @js(__('pos.cash_title'));
         },
         async deleteDraft(id) {
-            if (!confirm('Delete this draft? This cannot be undone.')) return;
+            if (!confirm(@js(__('pos.confirm_delete_draft')))) return;
             try {
                 const res = await fetch('/pos/api/draft/' + id, {
                     method: 'DELETE',
@@ -282,14 +282,14 @@ function draftsManager() {
                     this.drafts = this.drafts.filter(d => d.id !== id);
                     window.dispatchEvent(new CustomEvent('draft-deleted', { detail: { count: this.drafts.length } }));
                 } else {
-                    alert('Failed to delete draft.');
+                    alert(@js(__('pos.failed_to_delete_draft')));
                 }
             } catch (e) {
-                alert('Network error.');
+                alert(@js(__('pos.network_error_dot')));
             }
         },
         async deleteAllDrafts() {
-            if (!confirm('Delete ALL drafts? This cannot be undone.')) return;
+            if (!confirm(@js(__('pos.confirm_delete_all_drafts')))) return;
             let failed = 0;
             for (const draft of [...this.drafts]) {
                 try {
@@ -303,7 +303,7 @@ function draftsManager() {
                 } catch (e) { failed++; }
             }
             window.dispatchEvent(new CustomEvent('draft-deleted', { detail: { count: this.drafts.length } }));
-            if (failed > 0) alert(failed + ' draft(s) could not be deleted.');
+            if (failed > 0) alert(@js(__('pos.drafts_could_not_be_deleted')).replace(':count', failed));
         }
     };
 }

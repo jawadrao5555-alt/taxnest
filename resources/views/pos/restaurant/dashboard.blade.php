@@ -25,43 +25,43 @@
             // Minutes → "12 min" / "1h 5m"; null → em-dash.
             $fmtMins = function ($m) {
                 if ($m === null) return '—';
-                if ($m < 1) return '< 1 min';
+                if ($m < 1) return __('pos.less_than_one_min');
                 if ($m >= 60) { $h = intdiv((int) $m, 60); $r = (int) round($m - $h * 60); return $h . 'h ' . $r . 'm'; }
-                return (fmod($m, 1) == 0.0 ? (string) (int) $m : (string) $m) . ' min';
+                return (fmod($m, 1) == 0.0 ? (string) (int) $m : (string) $m) . __('pos.min_suffix');
             };
         @endphp
         <div class="mt-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm">
             <div class="flex items-center justify-between gap-3 mb-4">
                 <div>
-                    <h3 class="text-sm font-bold text-gray-900 dark:text-white">Kitchen Efficiency</h3>
-                    <p class="text-[11px] text-gray-400 mt-0.5">Timings from the Kitchen Display (KOT sent → Ready → Cleared)</p>
+                    <h3 class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.kitchen_efficiency') }}</h3>
+                    <p class="text-[11px] text-gray-400 mt-0.5">{{ __('pos.kitchen_efficiency_hint') }}</p>
                 </div>
-                <a href="{{ route('pos.restaurant.kds') }}" class="flex-shrink-0 text-xs font-semibold text-teal-700 dark:text-teal-400 hover:underline">Open Kitchen Display →</a>
+                <a href="{{ route('pos.restaurant.kds') }}" class="flex-shrink-0 text-xs font-semibold text-teal-700 dark:text-teal-400 hover:underline">{{ __('pos.open_kitchen_display') }}</a>
             </div>
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                 <div class="rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-3">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Avg Prep (Today)</p>
+                    <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{{ __('pos.avg_prep_today') }}</p>
                     <p class="text-lg font-extrabold text-teal-700 dark:text-teal-400 mt-1">{{ $fmtMins($kitchenStats['avg_prep_today']) }}</p>
                 </div>
                 <div class="rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-3">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Avg Prep (7 Days)</p>
+                    <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{{ __('pos.avg_prep_week') }}</p>
                     <p class="text-lg font-extrabold text-teal-700 dark:text-teal-400 mt-1">{{ $fmtMins($kitchenStats['avg_prep_week']) }}</p>
                 </div>
                 <div class="rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-3">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Ready → Cleared</p>
+                    <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{{ __('pos.ready_to_cleared') }}</p>
                     <p class="text-lg font-extrabold text-teal-700 dark:text-teal-400 mt-1">{{ $fmtMins($kitchenStats['avg_clear_today']) }}</p>
                 </div>
                 <div class="rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-3">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Cleared Today</p>
+                    <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{{ __('pos.cleared_today') }}</p>
                     <p class="text-lg font-extrabold text-gray-900 dark:text-white mt-1">{{ $kitchenStats['cleared_today'] }}</p>
                 </div>
                 <div class="rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-3">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">In Kitchen Now</p>
+                    <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{{ __('pos.in_kitchen_now') }}</p>
                     <p class="text-lg font-extrabold {{ $kitchenStats['in_kitchen_now'] > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-900 dark:text-white' }} mt-1">{{ $kitchenStats['in_kitchen_now'] }}</p>
                 </div>
             </div>
             @if(is_null($kitchenStats['avg_prep_today']) && $kitchenStats['cleared_today'] === 0)
-            <p class="mt-3 text-[11px] text-gray-400">No kitchen timing data yet today — timings record automatically when orders are marked Preparing / Ready / Cleared on the Kitchen Display (any admin or cashier can open it, a separate kitchen account is optional).</p>
+            <p class="mt-3 text-[11px] text-gray-400">{{ __('pos.no_kitchen_timing_today') }}</p>
             @endif
         </div>
         @endif
@@ -122,7 +122,7 @@ function rDash() {
                 data: {
                     labels: @json($salesChartLabels),
                     datasets: [{
-                        label: 'Revenue (Rs.)',
+                        label: @js(__('pos.revenue_rs')),
                         data: @json($salesChartData),
                         backgroundColor: function(context) {
                             const chart = context.chart;

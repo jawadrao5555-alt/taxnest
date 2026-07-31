@@ -24,21 +24,21 @@
                 @endif
             </span>
             <span class="font-semibold {{ $__agentOnline ? 'text-emerald-800 dark:text-emerald-300' : 'text-red-800 dark:text-red-300' }}">
-                {{ $__agentOnline ? '🟢 Desktop Agent Online — Auto-syncing to PRA' : '🔴 Desktop Agent Offline' }}
+                {{ $__agentOnline ? __("pos.agent_online_syncing") : __("pos.agent_offline") }}
             </span>
             @if($__agentLastSeen)
-                <span class="text-xs text-gray-500 dark:text-gray-400">· Last seen {{ \Carbon\Carbon::parse($__agentLastSeen)->diffForHumans() }}</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400">· {{ __("pos.last_seen") }} {{ \Carbon\Carbon::parse($__agentLastSeen)->diffForHumans() }}</span>
             @endif
         </div>
         @unless($__agentOnline)
-            <a href="{{ route('pos.agent') }}" class="text-xs font-semibold text-red-700 dark:text-red-300 hover:underline">Open agent settings →</a>
+            <a href="{{ route('pos.agent') }}" class="text-xs font-semibold text-red-700 dark:text-red-300 hover:underline">{{ __("pos.open_agent_settings") }}</a>
         @endunless
     </div>
     @endif
 
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-            {{ ($tab ?? 'pra') === 'local' ? 'Local Transactions' : 'POS Transactions' }}
+            {{ ($tab ?? "pra") === "local" ? __("pos.local_transactions") : __("pos.pos_transactions") }}
         </h1>
         <div class="flex flex-wrap items-center gap-2 sm:gap-3">
             @php
@@ -48,17 +48,17 @@
                     ->count();
             @endphp
             @if($failedCount > 0)
-            <form method="POST" action="{{ route('pos.transactions.bulk-retry-pra') }}" onsubmit="return confirm('Retry PRA submission for {{ $failedCount }} invoice(s)?')">
+            <form method="POST" action="{{ route('pos.transactions.bulk-retry-pra') }}" onsubmit="return confirm(@js(__('pos.confirm_bulk_retry_pra', ['count' => $failedCount])))">
                 @csrf
                 <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700 transition">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                    Sync All ({{ $failedCount }})
+                    {{ __("pos.sync_all_count", ["count" => $failedCount]) }}
                 </button>
             </form>
             @endif
             <a href="{{ route('pos.invoice.create') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                New Invoice
+                {{ __("pos.new_invoice") }}
             </a>
         </div>
     </div>
@@ -68,17 +68,17 @@
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <form method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <input type="hidden" name="tab" value="{{ $tab ?? 'pra' }}">
-            <input type="text" name="search" value="{{ request('search') }}" placeholder="Search invoice # or customer..." class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
+            <input type="text" name="search" value="{{ request('search') }}" placeholder="{{ __('pos.ph_search_invoice_customer') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
             <select name="payment_method" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
-                <option value="">All Payment Methods</option>
-                <option value="cash" {{ request('payment_method') === 'cash' ? 'selected' : '' }}>Cash</option>
-                <option value="debit_card" {{ request('payment_method') === 'debit_card' ? 'selected' : '' }}>Debit Card</option>
-                <option value="credit_card" {{ request('payment_method') === 'credit_card' ? 'selected' : '' }}>Credit Card</option>
-                <option value="qr_payment" {{ request('payment_method') === 'qr_payment' ? 'selected' : '' }}>QR / Raast</option>
+                <option value="">{{ __("pos.all_payment_methods") }}</option>
+                <option value="cash" {{ request('payment_method') === 'cash' ? 'selected' : '' }}>{{ __("pos.cash_title") }}</option>
+                <option value="debit_card" {{ request('payment_method') === 'debit_card' ? 'selected' : '' }}>{{ __("pos.debit_card") }}</option>
+                <option value="credit_card" {{ request('payment_method') === 'credit_card' ? 'selected' : '' }}>{{ __("pos.credit_card") }}</option>
+                <option value="qr_payment" {{ request('payment_method') === 'qr_payment' ? 'selected' : '' }}>{{ __("pos.qr_raast") }}</option>
             </select>
             <input type="date" name="date_from" value="{{ request('date_from') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
             <input type="date" name="date_to" value="{{ request('date_to') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
-            <button type="submit" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition">Filter</button>
+            <button type="submit" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition">{{ __("pos.filter_btn") }}</button>
         </form>
     </div>
 
@@ -87,16 +87,16 @@
             <table class="w-full text-sm table-cards">
                 <thead>
                     <tr class="bg-gray-50 dark:bg-gray-800 text-left text-xs text-gray-500 dark:text-gray-400 uppercase">
-                        <th class="px-4 py-3">Invoice #</th>
-                        <th class="px-4 py-3 hidden md:table-cell">Customer</th>
-                        <th class="px-4 py-3 hidden sm:table-cell">Payment</th>
-                        <th class="px-4 py-3 text-right hidden lg:table-cell">Subtotal</th>
-                        <th class="px-4 py-3 text-right hidden lg:table-cell">Tax</th>
-                        <th class="px-4 py-3 text-right">Total</th>
-                        <th class="px-4 py-3 hidden lg:table-cell">PRA Fiscal #</th>
-                        <th class="px-4 py-3 hidden sm:table-cell">PRA Status</th>
-                        <th class="px-4 py-3 hidden md:table-cell">Date</th>
-                        <th class="px-4 py-3">Actions</th>
+                        <th class="px-4 py-3">{{ __("pos.invoice_hash") }}</th>
+                        <th class="px-4 py-3 hidden md:table-cell">{{ __("pos.customer_word") }}</th>
+                        <th class="px-4 py-3 hidden sm:table-cell">{{ __("pos.payment") }}</th>
+                        <th class="px-4 py-3 text-right hidden lg:table-cell">{{ __("pos.subtotal") }}</th>
+                        <th class="px-4 py-3 text-right hidden lg:table-cell">{{ __("pos.tax_word") }}</th>
+                        <th class="px-4 py-3 text-right">{{ __("pos.total_word") }}</th>
+                        <th class="px-4 py-3 hidden lg:table-cell">{{ __("pos.pra_fiscal_hash") }}</th>
+                        <th class="px-4 py-3 hidden sm:table-cell">{{ __("pos.pra_status") }}</th>
+                        <th class="px-4 py-3 hidden md:table-cell">{{ __("pos.date_word") }}</th>
+                        <th class="px-4 py-3">{{ __("pos.actions_word") }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -105,7 +105,7 @@
                         <td class="px-4 py-3 font-medium text-emerald-600">
                             <a href="{{ route('pos.transaction.show', $txn->id) }}" class="hover:underline">{{ $txn->invoice_number }}</a>
                         </td>
-                        <td class="px-4 py-3 text-gray-700 dark:text-gray-300 hidden md:table-cell">{{ $txn->customer_name ?? 'Walk-in' }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-300 hidden md:table-cell">{{ $txn->customer_name ?? __("pos.walk_in") }}</td>
                         <td class="px-4 py-3 hidden sm:table-cell">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
                                 {{ $txn->payment_method === 'cash' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' }}">
@@ -124,44 +124,44 @@
                         </td>
                         <td class="px-4 py-3 hidden sm:table-cell">
                             @if($txn->pra_status === 'submitted')
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">Submitted</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">{{ __("pos.submitted_word") }}</span>
                             @elseif($txn->pra_status === 'failed')
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">Failed</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">{{ __("pos.failed_word") }}</span>
                             @elseif($txn->pra_status === 'pending')
                                 @if($__agentEnabled)
-                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" title="Queued for desktop agent — typically syncs within 10 seconds">
-                                        🟡 Awaiting Sync
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" title="{{ __('pos.ti_queued_for_agent') }}">
+                                        🟡 {{ __("pos.awaiting_sync") }}
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">Pending</span>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">{{ __("pos.pending_word") }}</span>
                                 @endif
                             @elseif($txn->pra_status === 'offline')
                                 @if($__agentEnabled)
                                     {{-- Phase 3: agent-enabled companies should never display the alarming "Offline" badge --}}
-                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" title="Agent will retry on next poll">
-                                        🟡 Awaiting Sync
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" title="{{ __('pos.ti_agent_retry_next_poll') }}">
+                                        🟡 {{ __("pos.awaiting_sync") }}
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">⚠️ Offline</span>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">⚠️ {{ __("pos.offline") }}</span>
                                 @endif
                             @elseif($txn->pra_status === 'local')
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">Local</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">{{ __("pos.local_word") }}</span>
                             @else
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">Local</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">{{ __("pos.local_word") }}</span>
                             @endif
                         </td>
                         <td class="px-4 py-3 text-gray-500 text-xs hidden md:table-cell">{{ $txn->created_at->format('d M Y H:i') }}</td>
                         <td class="px-4 py-3">
                             <div class="flex items-center gap-2">
-                                <a href="{{ route('pos.receipt', $txn->id) }}" class="text-emerald-600 hover:underline text-xs font-medium">Receipt</a>
+                                <a href="{{ route('pos.receipt', $txn->id) }}" class="text-emerald-600 hover:underline text-xs font-medium">{{ __("pos.receipt_word") }}</a>
                                 @if(!$txn->pra_invoice_number)
-                                <a href="{{ route('pos.transaction.edit', $txn->id) }}" class="text-amber-600 hover:text-amber-700 text-xs font-medium" title="Edit">
+                                <a href="{{ route('pos.transaction.edit', $txn->id) }}" class="text-amber-600 hover:text-amber-700 text-xs font-medium" title="{{ __('pos.edit') }}">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                 </a>
-                                <form method="POST" action="{{ route('pos.transaction.delete', $txn->id) }}" class="inline" onsubmit="return confirm('Delete {{ $txn->invoice_number }}?')">
+                                <form method="POST" action="{{ route('pos.transaction.delete', $txn->id) }}" class="inline" onsubmit="return confirm(@js(__('pos.confirm_delete_invoice', ['invoice' => $txn->invoice_number])))">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-medium" title="Delete">
+                                    <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-medium" title="{{ __('pos.delete') }}">
                                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                     </button>
                                 </form>
@@ -169,7 +169,7 @@
                                 @if(in_array($txn->pra_status, ['failed', 'offline', 'pending']) && !$txn->pra_invoice_number)
                                 <form method="POST" action="{{ route('pos.transaction.retry-pra', $txn->id) }}" class="inline">
                                     @csrf
-                                    <button type="submit" class="text-orange-600 hover:text-orange-700 text-xs font-medium" title="Retry PRA">
+                                    <button type="submit" class="text-orange-600 hover:text-orange-700 text-xs font-medium" title="{{ __('pos.ti_retry_pra') }}">
                                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                                     </button>
                                 </form>
@@ -179,21 +179,21 @@
                                      "Submit to PRA" — CURRENT month only; older months are closed. --}}
                                 @if(($tab ?? 'pra') === 'local' && !$txn->pra_invoice_number && ($txn->pra_status === 'local' || is_null($txn->pra_status)))
                                     @if($txn->created_at->gte(now()->startOfMonth()))
-                                    <form method="POST" action="{{ route('pos.transaction.retry-pra', $txn->id) }}" class="inline" onsubmit="return confirm('Submit {{ $txn->invoice_number }} to PRA? Bill ko POS fiscal serial mil jayega.')">
+                                    <form method="POST" action="{{ route('pos.transaction.retry-pra', $txn->id) }}" class="inline" onsubmit="return confirm(@js(__('pos.confirm_submit_to_pra', ['invoice' => $txn->invoice_number])))">
                                         @csrf
                                         <button type="submit" class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-purple-600 text-white hover:bg-purple-700 transition whitespace-nowrap">
-                                            Submit to PRA
+                                            {{ __("pos.submit_to_pra") }}
                                         </button>
                                     </form>
                                     @else
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400 whitespace-nowrap">Month closed</span>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400 whitespace-nowrap">{{ __("pos.month_closed") }}</span>
                                     @endif
                                 @endif
                             </div>
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="10" class="px-4 py-12 text-center text-gray-400">No transactions found</td></tr>
+                    <tr><td colspan="10" class="px-4 py-12 text-center text-gray-400">{{ __("pos.no_transactions_found") }}</td></tr>
                     @endforelse
                 </tbody>
             </table>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Product Labels — {{ $company->name ?? 'POS' }}</title>
+    <title>{{ __('pos.product_labels') }} — {{ $company->name ?? 'POS' }}</title>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <style>
         * { box-sizing: border-box; }
@@ -35,18 +35,18 @@
 </head>
 <body>
     <div class="toolbar">
-        <h1>🏷️ Product Labels &mdash; {{ $products->count() }} item(s)</h1>
+        <h1>🏷️ {{ __('pos.product_labels') }} — {{ __('pos.n_items_count', ['count' => $products->count()]) }}</h1>
         <div class="spacer"></div>
-        <label class="field">Columns
+        <label class="field">{{ __('pos.columns_label') }}
             <input type="number" id="cols" value="3" min="1" max="5" onchange="setCols(this.value)">
         </label>
-        <a href="{{ route('pos.products') }}" class="btn btn-back">← Back</a>
-        <button class="btn btn-print" onclick="window.print()">🖨 Print</button>
+        <a href="{{ route('pos.products') }}" class="btn btn-back">← {{ __('pos.back_word') }}</a>
+        <button class="btn btn-print" onclick="window.print()">🖨 {{ __('pos.print') }}</button>
     </div>
 
     <div class="sheet">
         @if($products->count() === 0)
-            <div class="empty">No products to print.</div>
+            <div class="empty">{{ __('pos.no_products_to_print') }}</div>
         @else
         <div class="grid" id="grid">
             @foreach($products as $p)

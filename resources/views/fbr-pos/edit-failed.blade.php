@@ -17,15 +17,15 @@
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
             </div>
             <div class="flex-1 min-w-0">
-                <div class="text-xs font-bold uppercase tracking-wider text-red-700 dark:text-red-300">FBR Submission Failed — Edit & Retry</div>
+                <div class="text-xs font-bold uppercase tracking-wider text-red-700 dark:text-red-300">{{ __('pos.fbr_submission_failed_edit_retry') }}</div>
                 <h1 class="text-2xl font-black text-slate-900 dark:text-white mt-1">{{ $transaction->invoice_number }}</h1>
                 <div class="text-sm text-slate-700 dark:text-slate-300 mt-1 font-semibold">
                     {{ $transaction->created_at->format('d M Y · h:i A') }}
-                    @if($transaction->customer_name) · Customer: <span class="font-bold">{{ $transaction->customer_name }}</span> @endif
+                    @if($transaction->customer_name) · {{ __('pos.customer_word') }}: <span class="font-bold">{{ $transaction->customer_name }}</span> @endif
                 </div>
                 @if($lastError)
                 <div class="mt-3 p-3 rounded-lg bg-white dark:bg-slate-900 border border-red-200 dark:border-red-800">
-                    <div class="text-xs font-bold uppercase tracking-wide text-red-700 dark:text-red-400 mb-1">FBR Last Error</div>
+                    <div class="text-xs font-bold uppercase tracking-wide text-red-700 dark:text-red-400 mb-1">{{ __('pos.fbr_last_error') }}</div>
                     <div class="text-sm text-slate-800 dark:text-slate-200 font-mono break-words">{{ $lastError }}</div>
                 </div>
                 @endif
@@ -48,24 +48,24 @@
             <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
                 <h3 class="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
                     <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                    Edit Line Items — Fix the issue (HS code, qty, price, tax %)
+                    {{ __('pos.edit_line_items_fix') }}
                 </h3>
-                <p class="text-xs text-slate-600 dark:text-slate-400 mt-1 font-semibold">Original cart preserved as audit snapshot. Totals auto-recalculate.</p>
+                <p class="text-xs text-slate-600 dark:text-slate-400 mt-1 font-semibold">{{ __('pos.original_cart_snapshot_hint') }}</p>
             </div>
 
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700 table-cards">
                     <thead class="bg-slate-50 dark:bg-slate-800">
                         <tr>
-                            <th class="px-3 py-3 text-left text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">Item Name</th>
-                            <th class="px-3 py-3 text-left text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">HS Code</th>
-                            <th class="px-3 py-3 text-center text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">UoM</th>
-                            <th class="px-3 py-3 text-right text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">Qty</th>
-                            <th class="px-3 py-3 text-right text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">Price</th>
-                            <th class="px-3 py-3 text-right text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">Tax %</th>
-                            <th class="px-3 py-3 text-center text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">Exempt</th>
-                            <th class="px-3 py-3 text-right text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">Discount</th>
-                            <th class="px-3 py-3 text-right text-xs font-bold text-slate-900 dark:text-white uppercase">Line Total</th>
+                            <th class="px-3 py-3 text-left text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">{{ __('pos.item_name') }}</th>
+                            <th class="px-3 py-3 text-left text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">{{ __('pos.th_hs_code') }}</th>
+                            <th class="px-3 py-3 text-center text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">{{ __('pos.th_uom') }}</th>
+                            <th class="px-3 py-3 text-right text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">{{ __('pos.th_qty') }}</th>
+                            <th class="px-3 py-3 text-right text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">{{ __('pos.th_price') }}</th>
+                            <th class="px-3 py-3 text-right text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">{{ __('pos.th_tax_pct') }}</th>
+                            <th class="px-3 py-3 text-center text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">{{ __('pos.exempt') }}</th>
+                            <th class="px-3 py-3 text-right text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">{{ __('pos.discount_word') }}</th>
+                            <th class="px-3 py-3 text-right text-xs font-bold text-slate-900 dark:text-white uppercase">{{ __('pos.line_total') }}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
@@ -136,41 +136,41 @@
             <div class="px-5 py-4 bg-blue-50 dark:bg-blue-900/20 border-t-2 border-blue-300 dark:border-blue-700">
                 <div class="max-w-md ml-auto space-y-1 text-sm">
                     <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold">
-                        <span>Subtotal (after item discounts)</span>
+                        <span>{{ __('pos.subtotal_after_item_discounts') }}</span>
                         <span class="tabular-nums" x-text="'Rs ' + fmt(cartSubtotal())"></span>
                     </div>
                     <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold">
-                        <span>Tax</span>
+                        <span>{{ __('pos.th_tax') }}</span>
                         <span class="tabular-nums" x-text="'Rs ' + fmt(cartTax())"></span>
                     </div>
                     @if($svcCharge > 0)
                     <div class="flex justify-between text-slate-700 dark:text-slate-200 font-semibold">
-                        <span>FBR Service Charge</span>
+                        <span>{{ __('pos.fbr_service_charge') }}</span>
                         <span class="tabular-nums">Rs {{ number_format($svcCharge, 2) }}</span>
                     </div>
                     @endif
 
                     <div class="flex justify-between pt-2 mt-2 border-t-2 border-blue-400 dark:border-blue-600 text-base font-black text-blue-800 dark:text-blue-300">
-                        <span>Preview (before bill discount/loyalty)</span>
+                        <span>{{ __('pos.preview_before_bill_discount') }}</span>
                         <span class="tabular-nums" x-text="'Rs ' + fmt(cartTotal() + {{ $svcCharge }})"></span>
                     </div>
 
                     @if($hasDiscount || $hasLoyalty)
                     <div class="mt-2 p-2 rounded bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 text-xs text-amber-900 dark:text-amber-200 font-bold">
-                        ⚠ Bill-level adjustments will be re-applied by the server on save:
+                        ⚠ {{ __('pos.bill_level_adjustments_note') }}
                         <ul class="mt-1 ml-3 list-disc space-y-0.5">
                             @if($hasDiscount)
-                            <li>Bill discount: <b>{{ ucfirst($transaction->discount_type) }} {{ $transaction->discount_value }}{{ $transaction->discount_type === 'percentage' ? '%' : '' }}</b> (auto-recalculated on new subtotal)</li>
+                            <li>{{ __('pos.bill_discount_colon') }} <b>{{ ucfirst($transaction->discount_type) }} {{ $transaction->discount_value }}{{ $transaction->discount_type === 'percentage' ? '%' : '' }}</b> {{ __('pos.auto_recalculated_on_new_subtotal') }}</li>
                             @endif
                             @if($hasLoyalty)
-                            <li>Loyalty redemption: <b>Rs {{ number_format($loyalty, 2) }}</b> (preserved)</li>
+                            <li>{{ __('pos.loyalty_redemption_colon') }} <b>Rs {{ number_format($loyalty, 2) }}</b> {{ __('pos.preserved_paren') }}</li>
                             @endif
                         </ul>
                     </div>
                     @endif
 
                     <div class="text-xs text-slate-600 dark:text-slate-400 text-right font-semibold pt-2">
-                        Original total: Rs {{ number_format($transaction->total_amount, 2) }}
+                        {{ __('pos.original_total_colon') }} Rs {{ number_format($transaction->total_amount, 2) }}
                     </div>
                 </div>
             </div>
@@ -179,10 +179,10 @@
         {{-- 📝 Optional edit reason --}}
         <div class="mb-5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
             <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-2">
-                Edit Reason (optional, for audit log)
+                {{ __('pos.edit_reason_optional') }}
             </label>
             <input type="text" name="edit_reason" maxlength="500"
-                   placeholder="e.g. Fixed wrong HS code on line 2"
+                   placeholder="{{ __('pos.ph_fixed_wrong_hs_code') }}"
                    class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500">
         </div>
 
@@ -190,25 +190,25 @@
         <div class="flex flex-col sm:flex-row gap-3 sticky bottom-0 bg-white dark:bg-slate-900 p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 shadow-2xl">
             <a href="{{ route('fbrpos.show', $transaction->id) }}"
                class="flex-1 sm:flex-initial px-5 py-3 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-white font-bold text-center hover:bg-slate-300 dark:hover:bg-slate-600 transition">
-                ← Cancel
+                ← {{ __('pos.cancel') }}
             </a>
             <button type="submit" :disabled="savingNow"
                     :class="savingNow ? 'opacity-60 cursor-wait' : 'hover:from-emerald-700 hover:to-blue-700'"
                     class="flex-1 px-5 py-3 rounded-lg bg-gradient-to-r from-emerald-600 to-blue-600 text-white font-black text-base shadow-lg flex items-center justify-center gap-2 transition">
                 <svg x-show="!savingNow" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                 <svg x-show="savingNow" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                <span x-text="savingNow ? 'Saving & submitting to FBR…' : '💾 Save & Re-Submit to FBR'"></span>
+                <span x-text="savingNow ? @js(__('pos.saving_submitting_to_fbr')) : @js(__('pos.save_resubmit_to_fbr'))"></span>
             </button>
         </div>
     </form>
 
     <div class="mt-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 text-xs text-amber-800 dark:text-amber-200">
-        <div class="font-bold mb-1">ℹ How this works:</div>
+        <div class="font-bold mb-1">ℹ {{ __('pos.how_this_works') }}</div>
         <ul class="list-disc list-inside space-y-0.5 font-semibold">
-            <li>Original cart is snapshotted to audit log <b>before</b> any change.</li>
-            <li>Common FBR rejections: wrong HS code, wrong tax rate, missing UoM. Fix and resubmit.</li>
-            <li>If FBR still rejects after edit, your changes are kept — you can edit again and retry.</li>
-            <li>Once FBR accepts the bill, this edit option disappears (locked for compliance).</li>
+            <li>{!! __('pos.edit_failed_bullet_1') !!}</li>
+            <li>{{ __('pos.edit_failed_bullet_2') }}</li>
+            <li>{{ __('pos.edit_failed_bullet_3') }}</li>
+            <li>{{ __('pos.edit_failed_bullet_4') }}</li>
         </ul>
     </div>
 </div>

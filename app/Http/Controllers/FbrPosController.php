@@ -33,7 +33,7 @@ class FbrPosController extends Controller
         // same rule as transactions?tab=local. 30-min verified-session window.
         $pinCompany = Company::find($companyId);
         if (!empty($pinCompany?->confidential_pin) && !$this->isPinSessionValid()) {
-            return response()->json(['success' => false, 'pin_required' => true, 'message' => 'PIN verification required.'], 403);
+            return response()->json(['success' => false, 'pin_required' => true, 'message' => __('pos.pin_verification_required')], 403);
         }
         $bills = \App\Models\FbrPosTransaction::where('company_id', $companyId)
             ->where('invoice_mode', 'local')
@@ -62,7 +62,7 @@ class FbrPosController extends Controller
         // 🔒 CONFIDENTIAL PIN GATE — mirrors apiProvisionalBills.
         $pinCompany = Company::find($companyId);
         if (!empty($pinCompany?->confidential_pin) && !$this->isPinSessionValid()) {
-            return response()->json(['success' => false, 'pin_required' => true, 'message' => 'PIN verification required.'], 403);
+            return response()->json(['success' => false, 'pin_required' => true, 'message' => __('pos.pin_verification_required')], 403);
         }
         $bill = \App\Models\FbrPosTransaction::where('company_id', $companyId)
             ->where('id', $id)
@@ -70,7 +70,7 @@ class FbrPosController extends Controller
             ->where('fbr_status', 'local')
             ->first();
         if (!$bill) {
-            return response()->json(['success' => false, 'message' => 'Provisional bill not found'], 404);
+            return response()->json(['success' => false, 'message' => __('pos.provisional_bill_not_found')], 404);
         }
         \DB::transaction(function () use ($bill) {
             \App\Models\FbrPosTransactionItem::where('transaction_id', $bill->id)->delete();
@@ -85,7 +85,7 @@ class FbrPosController extends Controller
         // 🔒 CONFIDENTIAL PIN GATE — mirrors apiProvisionalBills.
         $pinCompany = Company::find($companyId);
         if (!empty($pinCompany?->confidential_pin) && !$this->isPinSessionValid()) {
-            return response()->json(['success' => false, 'pin_required' => true, 'message' => 'PIN verification required.'], 403);
+            return response()->json(['success' => false, 'pin_required' => true, 'message' => __('pos.pin_verification_required')], 403);
         }
         // Reporting-OFF Finals Invariant — mirrors PosController::apiPromoteProvisional:
         // reporting-ON promote → fbr/'pending' (queued for submission);
@@ -103,13 +103,13 @@ class FbrPosController extends Controller
                 'updated_at' => now(),
             ]);
         if ($affected === 0) {
-            return response()->json(['success' => false, 'message' => 'Bill not found or already promoted'], 409);
+            return response()->json(['success' => false, 'message' => __('pos.bill_not_found_or_promoted')], 409);
         }
         if (!$reportingOn) {
             return response()->json([
                 'success'   => true,
                 'submitted' => false,
-                'message'   => '✓ Bill is now FINAL — FBR reporting is OFF, no submission needed.',
+                'message'   => __('pos.bill_now_final_fbr_off'),
                 'id'        => $id,
             ]);
         }
@@ -121,7 +121,7 @@ class FbrPosController extends Controller
         $theme = $request->input('theme', 'blue');
         $allowed = ['purple', 'blue', 'emerald', 'orange', 'midnight', 'rose'];
         if (!in_array($theme, $allowed)) {
-            return response()->json(['success' => false, 'message' => 'Invalid theme'], 422);
+            return response()->json(['success' => false, 'message' => __('pos.invalid_theme')], 422);
         }
         $companyId = Auth::guard('fbrpos')->user()->company_id ?? app('currentCompanyId');
         Company::where('id', $companyId)->update(['pos_theme' => $theme]);
@@ -131,12 +131,12 @@ class FbrPosController extends Controller
     public function updateDashboardStyle(Request $request)
     {
         if (Auth::guard('fbrpos')->user()->role !== 'company_admin') {
-            return response()->json(['success' => false, 'message' => 'Only company admin can change dashboard style.'], 403);
+            return response()->json(['success' => false, 'message' => __('pos.only_company_admin_change_dashboard_style')], 403);
         }
         $style = $request->json('style') ?? $request->input('style', 'default');
         $allowed = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify'];
         if (!in_array($style, $allowed)) {
-            return response()->json(['success' => false, 'message' => 'Invalid style'], 422);
+            return response()->json(['success' => false, 'message' => __('pos.invalid_style')], 422);
         }
         $companyId = app('currentCompanyId');
         Company::where('id', $companyId)->update(['pos_dashboard_style' => $style]);
@@ -856,11 +856,11 @@ class FbrPosController extends Controller
                         'invoice_mode' => 'local',
                         'fbr_status' => 'local',
                         'fbr_invoice_number' => null,
-                        'message' => "Local sale #{$transaction->invoice_number} created — FBR Reporting is OFF.",
+                        'message' => __('pos.local_sale_created_fbr_off', ['number' => $transaction->invoice_number]),
                     ]);
                 }
                 return redirect()->route('fbrpos.show', $transaction->id)
-                    ->with('success', "Local sale #{$transaction->invoice_number} created (PKR " . number_format($transaction->total_amount, 2) . "). FBR Reporting is OFF — invoice saved locally.");
+                    ->with('success', __('pos.local_sale_created_fbr_off_full', ['number' => $transaction->invoice_number, 'amount' => number_format($transaction->total_amount, 2)]));
             }
 
             // FBR-reporting-OFF company, FINAL sale — bill is saved as a normal
@@ -876,11 +876,11 @@ class FbrPosController extends Controller
                         'invoice_mode' => 'fbr',
                         'fbr_status' => null,
                         'fbr_invoice_number' => null,
-                        'message' => "✓ Bill #{$transaction->invoice_number} created — PKR " . number_format($transaction->total_amount, 2) . " (FBR Reporting is OFF).",
+                        'message' => __('pos.bill_created_fbr_off_json', ['number' => $transaction->invoice_number, 'amount' => number_format($transaction->total_amount, 2)]),
                     ]);
                 }
                 return redirect()->route('fbrpos.show', $transaction->id)
-                    ->with('success', "Bill #{$transaction->invoice_number} created (PKR " . number_format($transaction->total_amount, 2) . "). FBR Reporting is OFF.");
+                    ->with('success', __('pos.bill_created_fbr_off_flash', ['number' => $transaction->invoice_number, 'amount' => number_format($transaction->total_amount, 2)]));
             }
 
             // FISCAL DEVICE MODE — FBR retired cloud bulk PostData (Code 112). Instead of a direct
@@ -899,11 +899,11 @@ class FbrPosController extends Controller
                         'invoice_mode' => 'fbr',
                         'fbr_status' => 'pending',
                         'fbr_invoice_number' => null,
-                        'message' => "✓ Bill #{$transaction->invoice_number} saved — queued for FBR Fiscal Device. The invoice number appears once the shop PC submits it.",
+                        'message' => __('pos.bill_queued_fiscal_device_json', ['number' => $transaction->invoice_number]),
                     ]);
                 }
                 return redirect()->route('fbrpos.show', $transaction->id)
-                    ->with('success', "Bill #{$transaction->invoice_number} saved (PKR " . number_format($transaction->total_amount, 2) . "). Queued for FBR Fiscal Device — the invoice number appears once it is submitted from the shop PC.");
+                    ->with('success', __('pos.bill_queued_fiscal_device_flash', ['number' => $transaction->invoice_number, 'amount' => number_format($transaction->total_amount, 2)]));
             }
 
             $transaction->load(['items', 'company']);
@@ -921,11 +921,11 @@ class FbrPosController extends Controller
                         'invoice_mode' => 'fbr',
                         'fbr_status' => 'success',
                         'fbr_invoice_number' => $fbrResult['fbr_invoice_number'] ?? null,
-                        'message' => "Sale #{$transaction->invoice_number} submitted to FBR — Invoice: " . ($fbrResult['fbr_invoice_number'] ?? ''),
+                        'message' => __('pos.sale_submitted_fbr_json', ['number' => $transaction->invoice_number, 'fbr' => $fbrResult['fbr_invoice_number'] ?? '']),
                     ]);
                 }
                 return redirect()->route('fbrpos.show', $transaction->id)
-                    ->with('success', "Sale #{$transaction->invoice_number} created and submitted to FBR successfully! FBR Invoice: {$fbrResult['fbr_invoice_number']}");
+                    ->with('success', __('pos.sale_created_submitted_fbr', ['number' => $transaction->invoice_number, 'fbr' => $fbrResult['fbr_invoice_number']]));
             }
 
             $fbrErrors = implode(', ', $fbrResult['errors'] ?? ['Unknown error']);
@@ -953,20 +953,20 @@ class FbrPosController extends Controller
                         'invoice_mode' => 'fbr',
                         'fbr_status' => 'pending',
                         'fbr_invoice_number' => null,
-                        'message' => "Sale #{$transaction->invoice_number} saved.",
-                        'warning' => "FBR submission temporarily failed — auto-retry scheduled (3 attempts).",
+                        'message' => __('pos.sale_saved', ['number' => $transaction->invoice_number]),
+                        'warning' => __('pos.fbr_temp_failed_autoretry'),
                     ]);
                 }
                 return redirect()->route('fbrpos.show', $transaction->id)
-                    ->with('success', "Sale #{$transaction->invoice_number} saved (PKR " . number_format($transaction->total_amount, 2) . ").")
-                    ->with('warning', "FBR submission temporarily failed: {$fbrErrors}. Auto-retry scheduled (3 attempts, 10s apart).");
+                    ->with('success', __('pos.sale_saved_amount', ['number' => $transaction->invoice_number, 'amount' => number_format($transaction->total_amount, 2)]))
+                    ->with('warning', __('pos.fbr_temp_failed_autoretry_detail', ['error' => $fbrErrors]));
             }
 
             // ✅ Sale was saved locally. FBR is a separate retry-able step — don't scare the cashier with red error.
             $isTokenIssue = str_contains(strtolower($fbrErrors), 'token');
             $warningMsg = $isTokenIssue
-                ? "✓ Bill saved successfully. FBR submission pending — your FBR token is not configured yet. Go to Settings → FBR Settings to set it up, then retry from Fail Queue."
-                : "✓ Bill saved successfully. FBR submission pending: {$fbrErrors}. Retry from this page or the Fail Queue.";
+                ? __('pos.bill_saved_token_pending')
+                : __('pos.bill_saved_fbr_pending', ['error' => $fbrErrors]);
 
             if ($request->wantsJson()) {
                 return response()->json([
@@ -978,13 +978,13 @@ class FbrPosController extends Controller
                     'invoice_mode' => 'fbr',
                     'fbr_status' => 'failed',
                     'fbr_invoice_number' => null,
-                    'message' => "✓ Bill #{$transaction->invoice_number} created — PKR " . number_format($transaction->total_amount, 2),
+                    'message' => __('pos.bill_created_amount', ['number' => $transaction->invoice_number, 'amount' => number_format($transaction->total_amount, 2)]),
                     'warning' => $warningMsg,
                 ]);
             }
 
             return redirect()->route('fbrpos.show', $transaction->id)
-                ->with('success', "✓ Bill #{$transaction->invoice_number} created — PKR " . number_format($transaction->total_amount, 2))
+                ->with('success', __('pos.bill_created_amount', ['number' => $transaction->invoice_number, 'amount' => number_format($transaction->total_amount, 2)]))
                 ->with('warning', $warningMsg);
 
         } catch (\Illuminate\Validation\ValidationException $ve) {
@@ -996,9 +996,9 @@ class FbrPosController extends Controller
         } catch (\Exception $e) {
             Log::error('FBR POS Store Error', ['error' => $e->getMessage()]);
             if ($request->wantsJson()) {
-                return response()->json(['success' => false, 'message' => 'Failed to create sale: ' . $e->getMessage()], 500);
+                return response()->json(['success' => false, 'message' => __('pos.failed_create_sale', ['error' => $e->getMessage()])], 500);
             }
-            return back()->withInput()->with('error', 'Failed to create sale: ' . $e->getMessage());
+            return back()->withInput()->with('error', __('pos.failed_create_sale', ['error' => $e->getMessage()]));
         }
     }
 
@@ -1016,7 +1016,7 @@ class FbrPosController extends Controller
         if ($tab === 'local') {
             if (!empty($company->confidential_pin) && !$this->isPinSessionValid()) {
                 return redirect()->route('fbrpos.transactions', ['tab' => 'fbr'])
-                    ->with('error', 'PIN verification required to access local invoices.');
+                    ->with('error', __('pos.pin_required_local_invoices'));
             }
             $query->where('invoice_mode', 'local');
         } else {
@@ -1090,7 +1090,7 @@ class FbrPosController extends Controller
             $company = Company::find($companyId);
             if (!empty($company->confidential_pin) && !$this->isPinSessionValid()) {
                 return redirect()->route('fbrpos.transactions')
-                    ->with('error', 'PIN verification required to view local invoices.');
+                    ->with('error', __('pos.pin_required_view_local_invoices'));
             }
         }
 
@@ -1103,11 +1103,11 @@ class FbrPosController extends Controller
         $transaction = FbrPosTransaction::where('company_id', $companyId)->findOrFail($id);
 
         if ($transaction->fbr_status === 'submitted') {
-            return redirect()->route('fbrpos.show', $id)->with('error', 'This transaction is already submitted to FBR.');
+            return redirect()->route('fbrpos.show', $id)->with('error', __('pos.already_submitted_fbr'));
         }
 
         if ($transaction->invoice_mode === 'local') {
-            return redirect()->route('fbrpos.show', $id)->with('error', 'Local invoices cannot be submitted to FBR.');
+            return redirect()->route('fbrpos.show', $id)->with('error', __('pos.local_cannot_submit_fbr'));
         }
 
         $transaction->fbr_submission_hash = null;
@@ -1119,12 +1119,12 @@ class FbrPosController extends Controller
 
         if ($fbrResult['status'] === 'success') {
             return redirect()->route('fbrpos.show', $id)
-                ->with('success', "FBR submission successful! FBR Invoice: {$fbrResult['fbr_invoice_number']}");
+                ->with('success', __('pos.fbr_submission_successful_num', ['fbr' => $fbrResult['fbr_invoice_number']]));
         }
 
         $fbrErrors = implode(', ', $fbrResult['errors'] ?? ['Unknown error']);
         return redirect()->route('fbrpos.show', $id)
-            ->with('error', "FBR retry failed: {$fbrErrors}");
+            ->with('error', __('pos.fbr_retry_failed', ['error' => $fbrErrors]));
     }
 
     /**
@@ -1141,19 +1141,19 @@ class FbrPosController extends Controller
 
         if ($transaction->fbr_status === 'submitted') {
             return redirect()->route('fbrpos.show', $id)
-                ->with('error', 'Already submitted to FBR — cannot edit a successful submission.');
+                ->with('error', __('pos.already_submitted_no_edit'));
         }
 
         if ($transaction->invoice_mode === 'local') {
             return redirect()->route('fbrpos.show', $id)
-                ->with('error', 'Local invoices have no FBR submission to retry.');
+                ->with('error', __('pos.local_no_fbr_retry'));
         }
 
         // 🔒 Concurrency guard — only allow edits on `failed` (terminal-failed). `pending`/`pending_verification`
         // may have a queued retry job in-flight (RetryFbrPosSubmissionJob), so editing them risks duplicate FBR sends.
         if ($transaction->fbr_status !== 'failed') {
             return redirect()->route('fbrpos.show', $id)
-                ->with('error', 'Edit & Retry is only available for FAILED bills. Pending bills must finish their automatic retry first.');
+                ->with('error', __('pos.edit_retry_failed_only'));
         }
 
         $lastError = optional($transaction->fbrLogs->first())->error_message;
@@ -1175,17 +1175,17 @@ class FbrPosController extends Controller
 
         if ($transaction->fbr_status === 'submitted') {
             return redirect()->route('fbrpos.show', $id)
-                ->with('error', 'Already submitted to FBR — cannot edit a successful submission.');
+                ->with('error', __('pos.already_submitted_no_edit'));
         }
         if ($transaction->invoice_mode === 'local') {
             return redirect()->route('fbrpos.show', $id)
-                ->with('error', 'Local invoices cannot be submitted to FBR.');
+                ->with('error', __('pos.local_cannot_submit_fbr'));
         }
         // 🔒 Concurrency guard — only `failed` is editable. `pending`/`pending_verification` may collide
         // with the queued RetryFbrPosSubmissionJob and trigger duplicate FBR submissions.
         if ($transaction->fbr_status !== 'failed') {
             return redirect()->route('fbrpos.show', $id)
-                ->with('error', 'Edit & Retry is only available for FAILED bills.');
+                ->with('error', __('pos.edit_retry_failed_only_short'));
         }
 
         $request->validate([
@@ -1210,14 +1210,14 @@ class FbrPosController extends Controller
         $submittedIds = collect($request->items)->pluck('id')->map(fn($v) => (int) $v)->sort()->values()->all();
         if (count($submittedIds) !== count(array_unique($submittedIds))) {
             return redirect()->route('fbrpos.editFailed', $id)
-                ->with('error', 'Duplicate item IDs in submission. Reload the page and try again.');
+                ->with('error', __('pos.duplicate_item_ids'));
         }
         if ($existingIds !== $submittedIds) {
             $missing = array_diff($existingIds, $submittedIds);
             $extra = array_diff($submittedIds, $existingIds);
-            $msg = 'Item set mismatch — original cart has been preserved.';
-            if (!empty($missing)) $msg .= ' Missing IDs: ' . implode(',', $missing) . '.';
-            if (!empty($extra))   $msg .= ' Unknown IDs: ' . implode(',', $extra) . '.';
+            $msg = __('pos.item_set_mismatch');
+            if (!empty($missing)) $msg .= __('pos.item_set_missing_ids', ['ids' => implode(',', $missing)]);
+            if (!empty($extra))   $msg .= __('pos.item_set_unknown_ids', ['ids' => implode(',', $extra)]);
             return redirect()->route('fbrpos.editFailed', $id)->with('error', $msg);
         }
 
@@ -1373,12 +1373,12 @@ class FbrPosController extends Controller
 
         if ($fbrResult['status'] === 'success') {
             return redirect()->route('fbrpos.show', $id)
-                ->with('success', "✅ Edited & submitted to FBR successfully! FBR Invoice: {$fbrResult['fbr_invoice_number']}");
+                ->with('success', __('pos.edited_submitted_fbr', ['fbr' => $fbrResult['fbr_invoice_number']]));
         }
 
         $fbrErrors = implode(', ', $fbrResult['errors'] ?? ['Unknown error']);
         return redirect()->route('fbrpos.editFailed', $id)
-            ->with('error', "Edits saved but FBR still rejected: {$fbrErrors}. Fix and try again — cart is preserved.");
+            ->with('error', __('pos.edits_saved_fbr_rejected', ['error' => $fbrErrors]));
     }
 
     /**
@@ -1445,7 +1445,7 @@ class FbrPosController extends Controller
         }
 
         return redirect()->route('fbrpos.failQueue')
-            ->with('success', "Scheduled auto-retry for {$count} failed invoice(s). Each will retry up to 3 times (10s/20s/30s apart).");
+            ->with('success', __('pos.autoretry_scheduled_failed', ['count' => $count]));
     }
 
     /**
@@ -1457,14 +1457,14 @@ class FbrPosController extends Controller
         $tx = FbrPosTransaction::where('company_id', $companyId)->findOrFail($id);
 
         if ($tx->fbr_status === 'submitted') {
-            return back()->with('error', 'Already submitted to FBR.');
+            return back()->with('error', __('pos.already_submitted_fbr_short'));
         }
 
         $tx->fbr_submission_hash = null;
         $tx->save();
         \App\Jobs\RetryFbrPosSubmissionJob::dispatch($tx->id)->delay(now()->addSeconds(5));
 
-        return back()->with('success', "Auto-retry scheduled for invoice #{$tx->invoice_number}.");
+        return back()->with('success', __('pos.autoretry_scheduled_one', ['number' => $tx->invoice_number]));
     }
 
     public function fbrSettings(Request $request)
@@ -1474,23 +1474,23 @@ class FbrPosController extends Controller
         $user = Auth::guard('fbrpos')->user();
 
         if ($user->role !== 'company_admin') {
-            return back()->with('error', 'Only company admin can access FBR settings.');
+            return back()->with('error', __('pos.only_company_admin_fbr_settings'));
         }
 
         if ($request->isMethod('post')) {
             if ($request->has('pin_update')) {
                 if ($request->has('remove_pin')) {
                     $company->update(['confidential_pin' => null]);
-                    return back()->with('success', 'Confidential PIN removed successfully.');
+                    return back()->with('success', __('pos.confidential_pin_removed'));
                 }
 
                 if ($request->filled('confidential_pin')) {
                     $request->validate(['confidential_pin' => 'required|digits_between:4,6']);
                     $company->update(['confidential_pin' => \Hash::make($request->confidential_pin)]);
-                    return back()->with('success', 'Confidential PIN updated successfully.');
+                    return back()->with('success', __('pos.confidential_pin_updated'));
                 }
 
-                return back()->with('error', 'Please enter a valid 4-6 digit PIN.');
+                return back()->with('error', __('pos.enter_valid_pin'));
             }
 
             // Regenerate the Desktop Sync Agent API key (Fiscal Device mode). Invalidates the old key,
@@ -1501,7 +1501,7 @@ class FbrPosController extends Controller
                     'agent_enabled' => true,
                     'agent_api_key' => 'tnk_' . \Illuminate\Support\Str::random(48),
                 ]);
-                return back()->with('success', 'Agent API key regenerated. Re-enter it in the Desktop Sync Agent on the shop PC.');
+                return back()->with('success', __('pos.agent_key_regenerated'));
             }
 
             $request->validate([
@@ -1546,7 +1546,7 @@ class FbrPosController extends Controller
 
             $company->update($updateData);
 
-            return back()->with('success', 'FBR POS settings updated successfully.');
+            return back()->with('success', __('pos.fbr_settings_updated'));
         }
 
         $fbrLogs = FbrPosLog::where('company_id', $companyId)->orderBy('created_at', 'desc')->take(20)->get();
@@ -1575,7 +1575,7 @@ class FbrPosController extends Controller
         $company = Company::find($companyId);
 
         if (Auth::guard('fbrpos')->user()->role !== 'company_admin') {
-            return response()->json(['success' => false, 'message' => 'Only company admin can test connection.']);
+            return response()->json(['success' => false, 'message' => __('pos.only_company_admin_test_connection')]);
         }
 
         $env = $company->fbr_pos_environment ?? 'sandbox';
@@ -1588,7 +1588,7 @@ class FbrPosController extends Controller
         if (empty($token)) {
             return response()->json([
                 'success' => false,
-                'message' => "No {$env} token configured. Please set your FBR token first.",
+                'message' => __('pos.no_token_configured', ['env' => $env]),
             ]);
         }
 
@@ -1615,7 +1615,7 @@ class FbrPosController extends Controller
             if ($curlError) {
                 return response()->json([
                     'success' => false,
-                    'message' => "Connection failed: {$curlError}",
+                    'message' => __('pos.connection_failed_detail', ['error' => $curlError]),
                 ]);
             }
 
@@ -1628,47 +1628,47 @@ class FbrPosController extends Controller
                 $faultCode = $m[1];
             }
 
-            $envLabel = $env === 'production' ? 'Production (Live)' : 'Sandbox (Testing)';
-            $otherLabel = $env === 'production' ? 'Sandbox' : 'Production';
+            $envLabel = $env === 'production' ? __('pos.env_production_live') : __('pos.env_sandbox_testing');
+            $otherLabel = $env === 'production' ? __('pos.env_sandbox') : __('pos.env_production');
 
             if ($faultCode === '900901' || $httpCode === 401) {
                 return response()->json([
                     'success' => false,
-                    'message' => "FBR rejected this token (900901 – Invalid Credentials). Your token does NOT match the \"{$envLabel}\" environment. Fix: enter the {$envLabel} token from your FBR IRIS portal, OR switch the environment to {$otherLabel} and use its token. Sandbox and Production tokens are different.",
+                    'message' => __('pos.fbr_token_rejected_env', ['envLabel' => $envLabel, 'otherLabel' => $otherLabel]),
                 ]);
             }
 
             if ($faultCode === '900908') {
                 return response()->json([
                     'success' => false,
-                    'message' => "FBR says this API is not enabled for your account in {$envLabel} (900908). Your NTN is not yet enrolled for IMS POS in this environment. Contact FBR/PRAL to enable IMS POS for your NTN.",
+                    'message' => __('pos.fbr_api_not_enabled', ['envLabel' => $envLabel]),
                 ]);
             }
 
             if ($faultCode === '900902') {
                 return response()->json([
                     'success' => false,
-                    'message' => "No token was received by FBR (900902). Please re-enter your FBR IMS POS token and save again.",
+                    'message' => __('pos.fbr_no_token_received'),
                 ]);
             }
 
             if ($faultCode !== null) {
                 return response()->json([
                     'success' => false,
-                    'message' => "FBR gateway rejected the request (code {$faultCode}) in {$envLabel}. Check your token and environment.",
+                    'message' => __('pos.fbr_gateway_rejected', ['code' => $faultCode, 'envLabel' => $envLabel]),
                 ]);
             }
 
             return response()->json([
                 'success' => true,
-                'message' => "Token accepted by FBR {$envLabel} server (HTTP {$httpCode}). Your token and environment match — you are ready to submit invoices.",
+                'message' => __('pos.fbr_token_accepted', ['envLabel' => $envLabel, 'code' => $httpCode]),
                 'environment' => $env,
                 'http_code' => $httpCode,
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Connection error: ' . $e->getMessage(),
+                'message' => __('pos.connection_error', ['error' => $e->getMessage()]),
             ]);
         }
     }
@@ -1676,7 +1676,7 @@ class FbrPosController extends Controller
     public function toggleFbrReporting()
     {
         if (Auth::guard('fbrpos')->user()->role !== 'company_admin') {
-            return response()->json(['success' => false, 'message' => 'Only company admin can toggle FBR reporting.'], 403);
+            return response()->json(['success' => false, 'message' => __('pos.only_company_admin_toggle_fbr')], 403);
         }
 
         $companyId = app('currentCompanyId');
@@ -1687,7 +1687,7 @@ class FbrPosController extends Controller
         return response()->json([
             'success' => true,
             'enabled' => $company->fbr_reporting_enabled,
-            'message' => $company->fbr_reporting_enabled ? 'FBR Reporting enabled' : 'FBR Reporting disabled',
+            'message' => $company->fbr_reporting_enabled ? __('pos.fbr_reporting_enabled_msg') : __('pos.fbr_reporting_disabled_msg'),
         ]);
     }
 
@@ -1698,7 +1698,7 @@ class FbrPosController extends Controller
     public function toggleUniversal()
     {
         if (Auth::guard('fbrpos')->user()->role !== 'company_admin') {
-            return response()->json(['success' => false, 'message' => 'Only company admin can toggle the Universal sale screen.'], 403);
+            return response()->json(['success' => false, 'message' => __('pos.only_company_admin_toggle_universal')], 403);
         }
 
         $companyId = app('currentCompanyId');
@@ -1710,8 +1710,8 @@ class FbrPosController extends Controller
             'success' => true,
             'enabled' => (bool) $company->fbr_universal_enabled,
             'message' => $company->fbr_universal_enabled
-                ? 'Universal sale screen enabled'
-                : 'Universal sale screen disabled — classic screen active',
+                ? __('pos.universal_enabled')
+                : __('pos.universal_disabled'),
         ]);
     }
 
@@ -1741,7 +1741,7 @@ class FbrPosController extends Controller
     public function updateGuidedFlow(Request $request)
     {
         if (Auth::guard('fbrpos')->user()->role !== 'company_admin') {
-            return response()->json(['success' => false, 'message' => 'Only company admin can change this setting.'], 403);
+            return response()->json(['success' => false, 'message' => __('pos.only_company_admin_change_setting')], 403);
         }
         $enabled = $request->boolean('enabled');
         $companyId = app('currentCompanyId');
@@ -1756,7 +1756,7 @@ class FbrPosController extends Controller
 
         if (empty($company->confidential_pin)) {
             session(['fbr_pos_pin_verified' => true, 'fbr_pos_pin_verified_at' => now()->timestamp]);
-            return response()->json(['success' => true, 'message' => 'No PIN set — access granted.']);
+            return response()->json(['success' => true, 'message' => __('pos.no_pin_set_access_granted')]);
         }
 
         $cacheKey = "fbrpos_pin_lockout_{$companyId}";
@@ -1766,7 +1766,7 @@ class FbrPosController extends Controller
             $remaining = (int) ceil((cache()->get($cacheKey) - now()->timestamp) / 60);
             return response()->json([
                 'success' => false,
-                'message' => "Account locked. Try again in {$remaining} minute(s).",
+                'message' => __('pos.account_locked_minutes', ['minutes' => $remaining]),
             ], 429);
         }
 
@@ -1781,20 +1781,20 @@ class FbrPosController extends Controller
                 cache()->forget($attemptsKey);
                 return response()->json([
                     'success' => false,
-                    'message' => 'Too many failed attempts. Locked for 15 minutes.',
+                    'message' => __('pos.too_many_failed_locked'),
                 ], 429);
             }
 
             return response()->json([
                 'success' => false,
-                'message' => 'Incorrect PIN. ' . (5 - $attempts) . ' attempt(s) remaining.',
+                'message' => __('pos.incorrect_pin_remaining', ['count' => 5 - $attempts]),
             ]);
         }
 
         cache()->forget($attemptsKey);
         session(['fbr_pos_pin_verified' => true, 'fbr_pos_pin_verified_at' => now()->timestamp]);
 
-        return response()->json(['success' => true, 'message' => 'PIN verified.']);
+        return response()->json(['success' => true, 'message' => __('pos.pin_verified')]);
     }
 
     public function checkPinSession()
@@ -2233,7 +2233,7 @@ class FbrPosController extends Controller
                 'invoice_display_prefs' => $prefs,
             ])->save();
 
-            return redirect()->route('fbrpos.business-profile')->with('success', 'Business profile updated successfully.');
+            return redirect()->route('fbrpos.business-profile')->with('success', __('pos.business_profile_updated'));
         }
 
         return view('fbr-pos.business-profile', compact('company'));
@@ -2260,13 +2260,13 @@ class FbrPosController extends Controller
 
             if (!empty($validated['current_password'])) {
                 if (!\Hash::check($validated['current_password'], $user->password)) {
-                    return back()->withErrors(['current_password' => 'Current password is incorrect.']);
+                    return back()->withErrors(['current_password' => __('pos.current_password_incorrect')]);
                 }
                 $user->password = \Hash::make($validated['new_password']);
             }
 
             $user->save();
-            return redirect()->route('fbrpos.my-profile')->with('success', 'Profile updated successfully.');
+            return redirect()->route('fbrpos.my-profile')->with('success', __('pos.profile_updated_success'));
         }
 
         return view('fbr-pos.my-profile', compact('user'));
@@ -2467,7 +2467,7 @@ class FbrPosController extends Controller
         $alreadyClosed = FbrDayCloseReport::where('company_id', $companyId)
             ->where('report_date', $date)->exists();
         if ($alreadyClosed) {
-            return back()->with('error', 'Day Close Report for this date already exists.');
+            return back()->with('error', __('pos.dayclose_report_exists'));
         }
 
         // Cash reconciliation (optional): opening float + physically-counted cash.
@@ -2487,10 +2487,10 @@ class FbrPosController extends Controller
         $report = $this->performDayClose($companyId, $date, $user->id, $request->input('notes'), $cashRecon);
 
         if (!$report) {
-            return back()->with('error', 'No transactions found for this date.');
+            return back()->with('error', __('pos.dayclose_no_transactions'));
         }
 
-        return back()->with('success', 'Day Close Report ' . $report->report_number . ' generated successfully for ' . \Carbon\Carbon::parse($date)->format('d M Y'));
+        return back()->with('success', __('pos.dayclose_report_generated_for', ['number' => $report->report_number, 'date' => \Carbon\Carbon::parse($date)->format('d M Y')]));
     }
 
     public function dayCloseReportPdf($id)
@@ -2602,7 +2602,7 @@ class FbrPosController extends Controller
             'default_tax_rate' => $taxRate,
         ]);
 
-        return redirect()->route('fbrpos.products')->with('success', 'Product created successfully.');
+        return redirect()->route('fbrpos.products')->with('success', __('pos.product_created_success'));
     }
 
     public function editProduct($id)
@@ -2645,7 +2645,7 @@ class FbrPosController extends Controller
             'default_tax_rate' => $taxRate,
         ]);
 
-        return redirect()->route('fbrpos.products')->with('success', 'Product updated successfully.');
+        return redirect()->route('fbrpos.products')->with('success', __('pos.product_updated_success'));
     }
 
     public function toggleProduct($id)
@@ -2654,7 +2654,7 @@ class FbrPosController extends Controller
         $companyId = app('currentCompanyId');
         $product = Product::where('company_id', $companyId)->findOrFail($id);
         $product->update(['is_active' => !$product->is_active]);
-        return redirect()->route('fbrpos.products')->with('success', 'Product status updated.');
+        return redirect()->route('fbrpos.products')->with('success', __('pos.product_status_updated'));
     }
 
     /**
@@ -2667,7 +2667,7 @@ class FbrPosController extends Controller
         $companyId = app('currentCompanyId');
         $product = Product::where('company_id', $companyId)->findOrFail($id);
         $product->update(['show_on_sale' => !$product->show_on_sale]);
-        return back()->with('success', $product->show_on_sale ? 'Product is now visible on the sale screen.' : 'Product hidden from the sale screen.');
+        return back()->with('success', $product->show_on_sale ? __('pos.product_visible_on_sale') : __('pos.product_hidden_from_sale'));
     }
 
     /**
@@ -2693,8 +2693,9 @@ class FbrPosController extends Controller
             ->where('show_on_sale', !$show)
             ->update(['show_on_sale' => $show]);
 
-        $msg = number_format($count) . ' products sale screen '
-            . ($show ? 'par show kar diye.' : 'se hide kar diye.');
+        $msg = $show
+            ? __('pos.products_shown_scope', ['count' => number_format($count), 'scope' => ''])
+            : __('pos.products_hidden_scope', ['count' => number_format($count), 'scope' => '']);
         return back()->with('success', $msg);
     }
 
@@ -2705,7 +2706,7 @@ class FbrPosController extends Controller
         $product = Product::where('company_id', $companyId)->findOrFail($id);
         $name = $product->name;
         $product->delete();
-        return redirect()->route('fbrpos.products')->with('success', "Product \"{$name}\" deleted.");
+        return redirect()->route('fbrpos.products')->with('success', __('pos.product_deleted_named', ['name' => $name]));
     }
 
     public function searchProducts(Request $request)
@@ -2789,20 +2790,20 @@ class FbrPosController extends Controller
         if ($claimed === 0) {
             $tx = FbrPosTransaction::where('company_id', $companyId)->where('id', $id)->first();
             if (!$tx) {
-                return response()->json(['success' => false, 'message' => 'Bill not found'], 404);
+                return response()->json(['success' => false, 'message' => __('pos.bill_not_found')], 404);
             }
             if ($tx->fbr_invoice_number) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Already submitted. FBR #: ' . $tx->fbr_invoice_number,
+                    'message' => __('pos.already_submitted_fbr_num', ['number' => $tx->fbr_invoice_number]),
                 ], 422);
             }
             if ($tx->invoice_mode === 'local') {
-                return response()->json(['success' => false, 'message' => 'Local bill — not submitted to FBR by design.'], 422);
+                return response()->json(['success' => false, 'message' => __('pos.local_bill_not_submitted_design')], 422);
             }
             return response()->json([
                 'success' => false,
-                'message' => 'Cannot retry — already in progress or status changed (' . $tx->fbr_status . ')',
+                'message' => __('pos.cannot_retry_status_changed', ['status' => $tx->fbr_status]),
             ], 409);
         }
 
@@ -2820,7 +2821,7 @@ class FbrPosController extends Controller
                 return response()->json([
                     'success'   => true,
                     'submitted' => true,
-                    'message'   => 'FBR submission successful! FBR #: ' . ($transaction->fbr_invoice_number ?? 'N/A'),
+                    'message'   => __('pos.fbr_submission_successful_num_short', ['number' => $transaction->fbr_invoice_number ?? 'N/A']),
                     'fbr_invoice_number' => $transaction->fbr_invoice_number,
                     'id' => $transaction->id,
                 ]);
@@ -2828,12 +2829,12 @@ class FbrPosController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'FBR retry failed: ' . implode(', ', $result['errors'] ?? ['Unknown error']),
+                'message' => __('pos.fbr_retry_failed_errors', ['error' => implode(', ', $result['errors'] ?? [__('pos.unknown_error')])]),
             ], 422);
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Exception: ' . $e->getMessage(),
+                'message' => __('pos.exception_error', ['error' => $e->getMessage()]),
             ], 500);
         }
     }

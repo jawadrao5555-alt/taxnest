@@ -10,34 +10,34 @@
            style="position:fixed; top:-9999px; left:-9999px; opacity:0; width:1px; height:1px;">
     <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Kitchen Display System</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Active orders for kitchen staff</p>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.kds_page_title') }}</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('pos.kds_page_subtitle') }}</p>
         </div>
         <div class="flex items-center gap-3 flex-wrap">
             <div class="flex gap-2 text-xs">
-                <span class="px-2 py-1 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">New: <span x-text="filteredOrders.filter(o => kstate(o) === 'new').length"></span></span>
-                <span class="px-2 py-1 rounded bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 font-medium">Preparing: <span x-text="filteredOrders.filter(o => kstate(o) === 'preparing').length"></span></span>
-                <span class="px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium">Ready: <span x-text="filteredOrders.filter(o => kstate(o) === 'ready').length"></span></span>
+                <span class="px-2 py-1 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">{{ __('pos.kds_new_colon') }} <span x-text="filteredOrders.filter(o => kstate(o) === 'new').length"></span></span>
+                <span class="px-2 py-1 rounded bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 font-medium">{{ __('pos.kds_preparing_colon') }} <span x-text="filteredOrders.filter(o => kstate(o) === 'preparing').length"></span></span>
+                <span class="px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium">{{ __('pos.kds_ready_colon') }} <span x-text="filteredOrders.filter(o => kstate(o) === 'ready').length"></span></span>
             </div>
             @if(($kdsStations ?? collect())->isNotEmpty())
             {{-- Counter/Station picker: pin THIS display to one counter — cards, items
                  and auto-prints then cover only that counter's dishes. Persists per device. --}}
             <select x-model="stationFilter"
                     class="text-xs font-semibold rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 py-1.5 pl-2 pr-7 focus:ring-purple-500 focus:border-purple-500">
-                <option value="all">🍽 All Counters</option>
-                <option value="0">Main Kitchen</option>
+                <option value="all">{{ __('pos.all_counters') }}</option>
+                <option value="0">{{ __('pos.main_kitchen') }}</option>
                 @foreach($kdsStations as $st)
                 <option value="{{ $st->id }}">{{ $st->name }}</option>
                 @endforeach
             </select>
             @endif
             <div class="inline-flex rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600 text-xs font-semibold">
-                <button @click="viewMode = 'list'" :class="viewMode === 'list' ? 'bg-purple-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'" class="px-3 py-1.5">📋 List</button>
-                <button @click="viewMode = 'aggregate'" :class="viewMode === 'aggregate' ? 'bg-purple-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'" class="px-3 py-1.5">📊 Aggregate</button>
+                <button @click="viewMode = 'list'" :class="viewMode === 'list' ? 'bg-purple-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'" class="px-3 py-1.5">{{ __('pos.view_list') }}</button>
+                <button @click="viewMode = 'aggregate'" :class="viewMode === 'aggregate' ? 'bg-purple-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'" class="px-3 py-1.5">{{ __('pos.view_aggregate') }}</button>
             </div>
-            <button @click="openCamera()" class="px-3 py-1.5 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-medium">📷 Camera Scan</button>
-            <button @click="refreshOrders()" class="px-3 py-1.5 text-sm rounded-lg bg-purple-600 text-white hover:bg-purple-700 font-medium">Refresh</button>
-            <button @click="clearAll()" x-show="filteredOrders.length > 0" class="px-3 py-1.5 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 font-medium">🧹 Clear All</button>
+            <button @click="openCamera()" class="px-3 py-1.5 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-medium">{{ __('pos.camera_scan_btn') }}</button>
+            <button @click="refreshOrders()" class="px-3 py-1.5 text-sm rounded-lg bg-purple-600 text-white hover:bg-purple-700 font-medium">{{ __('pos.refresh_btn') }}</button>
+            <button @click="clearAll()" x-show="filteredOrders.length > 0" class="px-3 py-1.5 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 font-medium">{{ __('pos.clear_all_btn') }}</button>
         </div>
     </div>
 
@@ -47,8 +47,8 @@
         <div class="flex items-center gap-3">
             <svg class="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7V5a2 2 0 012-2h2M4 17v2a2 2 0 002 2h2m8-18h2a2 2 0 012 2v2m-4 14h2a2 2 0 002-2v-2M8 12h.01M12 12h.01M16 12h.01"/></svg>
             <div>
-                <div class="text-sm font-bold text-emerald-800 dark:text-emerald-300">📡 Scanner Active — Scan KOT barcode to CLEAR order from board</div>
-                <div class="text-xs text-emerald-700 dark:text-emerald-400">Buffer: <span x-text="scanBuffer || '(waiting…)'" class="font-mono"></span> &nbsp;|&nbsp; Click anywhere to refocus &nbsp;|&nbsp; 📷 button for camera scan</div>
+                <div class="text-sm font-bold text-emerald-800 dark:text-emerald-300">{{ __('pos.scanner_active_banner') }}</div>
+                <div class="text-xs text-emerald-700 dark:text-emerald-400">{{ __('pos.buffer_colon') }} <span x-text="scanBuffer || {{ Js::from(__('pos.waiting_paren')) }}" class="font-mono"></span> &nbsp;|&nbsp; {{ __('pos.click_anywhere_refocus') }} &nbsp;|&nbsp; {{ __('pos.camera_scan_hint_short') }}</div>
             </div>
         </div>
     </div>
@@ -68,12 +68,12 @@
                      class="bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-700 rounded-xl p-3 text-center transition-all duration-300">
                     <div class="text-3xl font-black text-purple-700 dark:text-purple-300" x-text="row.qty"></div>
                     <div class="text-sm font-bold text-gray-900 dark:text-white mt-1 truncate" :title="row.name" x-text="row.name"></div>
-                    <div class="text-[10px] text-gray-500 mt-1" x-text="row.orders + ' order(s)'"></div>
+                    <div class="text-[10px] text-gray-500 mt-1" x-text="row.orders + {{ Js::from(__('pos.sfx_order_s')) }}"></div>
                 </div>
             </template>
         </div>
         <div x-show="aggregateItems.length === 0" class="text-center py-12 text-gray-500 dark:text-gray-400 text-sm">
-            No pending items. All caught up!
+            {{ __('pos.no_pending_items') }}
         </div>
     </div>
 
@@ -97,10 +97,10 @@
                     <div>
                         <span class="font-bold text-gray-900 dark:text-white text-sm" x-text="order.order_number"></span>
                         <span x-show="order.table" class="ml-2 text-xs bg-white dark:bg-gray-800 px-1.5 py-0.5 rounded text-purple-600 dark:text-purple-400 font-medium" x-text="'T-' + order.table"></span>
-                        <span x-show="order.priority" class="ml-1 text-[9px] bg-red-600 text-white px-1.5 py-0.5 rounded-full font-black animate-pulse">RUSH</span>
+                        <span x-show="order.priority" class="ml-1 text-[9px] bg-red-600 text-white px-1.5 py-0.5 rounded-full font-black animate-pulse">{{ __('pos.rush_badge') }}</span>
                     </div>
                     <div class="text-right">
-                        <div class="text-xs font-bold px-2 py-0.5 rounded-full inline-block" :class="order.elapsed_minutes <= 5 ? 'kds-timer-green' : (order.elapsed_minutes <= 15 ? 'kds-timer-yellow' : 'kds-timer-red')" x-text="order.elapsed_minutes + ' min'"></div>
+                        <div class="text-xs font-bold px-2 py-0.5 rounded-full inline-block" :class="order.elapsed_minutes <= 5 ? 'kds-timer-green' : (order.elapsed_minutes <= 15 ? 'kds-timer-yellow' : 'kds-timer-red')" x-text="order.elapsed_minutes + {{ Js::from(__('pos.min_suffix')) }}"></div>
                         <div class="text-[10px] text-gray-400 mt-0.5" x-text="order.created_at"></div>
                     </div>
                 </div>
@@ -116,22 +116,22 @@
                         </div>
                     </template>
                     <div x-show="order.kitchen_notes" class="mt-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded text-xs text-amber-700 dark:text-amber-400">
-                        <strong>Note:</strong> <span x-text="order.kitchen_notes"></span>
+                        <strong>{{ __('pos.note_label') }}</strong> <span x-text="order.kitchen_notes"></span>
                     </div>
                 </div>
 
                 <div class="px-4 py-3 bg-gray-50 dark:bg-gray-800 flex gap-2">
                     <template x-if="kstate(order) === 'new'">
-                        <button @click="kitchenUpdate(order.id, 'preparing')" class="flex-1 py-2 text-xs rounded-lg bg-teal-600 text-white hover:bg-teal-700 font-semibold">Start Preparing</button>
+                        <button @click="kitchenUpdate(order.id, 'preparing')" class="flex-1 py-2 text-xs rounded-lg bg-teal-600 text-white hover:bg-teal-700 font-semibold">{{ __('pos.start_preparing') }}</button>
                     </template>
                     <template x-if="kstate(order) === 'preparing'">
-                        <button @click="kitchenUpdate(order.id, 'ready')" class="flex-1 py-2 text-xs rounded-lg bg-green-600 text-white hover:bg-green-700 font-semibold">Mark Ready</button>
+                        <button @click="kitchenUpdate(order.id, 'ready')" class="flex-1 py-2 text-xs rounded-lg bg-green-600 text-white hover:bg-green-700 font-semibold">{{ __('pos.mark_ready') }}</button>
                     </template>
                     <template x-if="kstate(order) === 'ready'">
-                        <span class="flex-1 py-2 text-xs rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-semibold text-center">Ready for Pickup</span>
+                        <span class="flex-1 py-2 text-xs rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-semibold text-center">{{ __('pos.ready_for_pickup') }}</span>
                     </template>
-                    <button @click="reprintTicket(order.id)" class="py-2 px-3 text-xs rounded-lg border border-teal-300 text-teal-700 hover:bg-teal-50 dark:border-teal-700 dark:text-teal-300 dark:hover:bg-teal-900/20 font-semibold" title="Print this KOT again (duplicate ticket)">🖨 KOT</button>
-                    <button @click="kitchenUpdate(order.id, 'cleared')" class="py-2 px-3 text-xs rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 font-semibold" title="Remove from kitchen board (bill stays with cashier)">Clear</button>
+                    <button @click="reprintTicket(order.id)" class="py-2 px-3 text-xs rounded-lg border border-teal-300 text-teal-700 hover:bg-teal-50 dark:border-teal-700 dark:text-teal-300 dark:hover:bg-teal-900/20 font-semibold" title="{{ __('pos.ti_reprint_kot') }}">{{ __('pos.kot_btn') }}</button>
+                    <button @click="kitchenUpdate(order.id, 'cleared')" class="py-2 px-3 text-xs rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 font-semibold" title="{{ __('pos.ti_clear_from_board') }}">{{ __('pos.clear') }}</button>
                 </div>
             </div>
         </template>
@@ -139,20 +139,20 @@
 
     <div x-show="filteredOrders.length === 0" class="text-center py-16">
         <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">All Clear!</h3>
-        <p class="text-gray-500 dark:text-gray-400 text-sm">No active kitchen orders</p>
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.all_clear') }}</h3>
+        <p class="text-gray-500 dark:text-gray-400 text-sm">{{ __('pos.no_active_kitchen_orders') }}</p>
     </div>
 
     {{-- Camera scan modal (P5) — html5-qrcode reads the KOT QR/barcode with the device camera --}}
     <div x-show="cameraOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" @click.self="closeCamera()">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
             <div class="px-4 py-3 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
-                <h3 class="font-bold text-gray-900 dark:text-white text-sm">📷 Scan KOT — Camera</h3>
+                <h3 class="font-bold text-gray-900 dark:text-white text-sm">{{ __('pos.scan_kot_camera') }}</h3>
                 <button @click="closeCamera()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none">&times;</button>
             </div>
             <div class="p-4">
                 <div id="kdsCameraReader" class="w-full rounded-lg overflow-hidden bg-black" style="min-height: 260px;"></div>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">Point the camera at the KOT QR code or barcode — the order clears automatically.</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">{{ __('pos.point_camera_hint') }}</p>
             </div>
         </div>
     </div>
@@ -397,7 +397,7 @@ function kdsScreen() {
             if (!this.printedIds.includes(orderId)) { this.printedIds.push(orderId); this.savePrintedIds(); }
             this.printQueue.push({ id: orderId, delta: false });
             this.processPrintQueue();
-            this.showToast('KOT sent to printer', 'success');
+            this.showToast(@js(__('pos.kot_sent_to_printer')), 'success');
         },
 
         processPrintQueue() {
@@ -470,7 +470,7 @@ function kdsScreen() {
                     () => {}
                 );
             } catch (e) {
-                this.showToast('Camera not available on this device', 'error');
+                this.showToast(@js(__('pos.camera_not_available')), 'error');
                 this.cameraOpen = false;
             }
         },
@@ -514,11 +514,11 @@ function kdsScreen() {
                     }
                 } else {
                     this.playScanBeep(false);
-                    this.showToast(data.message || 'Scan failed', 'error');
+                    this.showToast(data.message || @js(__('pos.scan_failed')), 'error');
                 }
             } catch (e) {
                 this.playScanBeep(false);
-                this.showToast('Scan error', 'error');
+                this.showToast(@js(__('pos.scan_error')), 'error');
             }
         },
 
@@ -539,8 +539,8 @@ function kdsScreen() {
         async clearAll() {
             const ids = this.filteredOrders.map(o => o.id);
             if (!ids.length) return;
-            const label = (this.hasStations && this.stationFilter !== 'all') ? 'this counter\'s' : 'ALL';
-            if (!confirm(`Clear ${label} ${ids.length} order(s) from the kitchen board?\n\nBills stay with the cashier — this only clears the kitchen display.`)) return;
+            const label = (this.hasStations && this.stationFilter !== 'all') ? @js(__('pos.this_counters')) : @js(__('pos.all_caps'));
+            if (!confirm(@js(__('pos.confirm_clear_board')).replace(':label', label).replace(':count', ids.length))) return;
             try {
                 const res = await fetch('{{ route("pos.restaurant.kds.clear-all") }}', {
                     method: 'POST',
@@ -553,10 +553,10 @@ function kdsScreen() {
                     this.showToast(data.message, 'success');
                     this.refreshOrders();
                 } else {
-                    this.showToast(data.message || 'Clear all failed', 'error');
+                    this.showToast(data.message || @js(__('pos.clear_all_failed')), 'error');
                 }
             } catch (e) {
-                this.showToast('Network error — clear all failed', 'error');
+                this.showToast(@js(__('pos.network_error_clear_all')), 'error');
             }
         },
 
@@ -579,11 +579,11 @@ function kdsScreen() {
                         if (order) order.kitchen_status = kstatus;
                     }
                 } else {
-                    this.showToast(data.message || 'Update failed', 'error');
+                    this.showToast(data.message || @js(__('pos.update_failed')), 'error');
                     // State may be stale (e.g. cleared elsewhere) — resync.
                     this.refreshOrders();
                 }
-            } catch (e) { this.showToast('Error updating order', 'error'); }
+            } catch (e) { this.showToast(@js(__('pos.error_updating_order')), 'error'); }
         },
 
         showToast(msg, type) {

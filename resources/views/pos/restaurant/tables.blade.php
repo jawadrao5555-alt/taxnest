@@ -2,18 +2,18 @@
 <div x-data="tableView()" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     <div class="flex items-center justify-between mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Tables Overview</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Real-time table status</p>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.tables_overview') }}</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('pos.realtime_table_status') }}</p>
         </div>
         <div class="flex items-center gap-2">
             @php $tvUser = auth('pos')->user(); @endphp
             @if($tvUser && !$tvUser->isPosCashier())
             <a href="{{ route('pos.restaurant.table-management') }}" class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 font-medium">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                Table Setup
+                {{ __('pos.table_setup') }}
             </a>
             @endif
-            <button @click="refreshStatus()" class="px-4 py-2 text-sm rounded-lg bg-purple-600 text-white hover:bg-purple-700 font-medium">Refresh</button>
+            <button @click="refreshStatus()" class="px-4 py-2 text-sm rounded-lg bg-purple-600 text-white hover:bg-purple-700 font-medium">{{ __('pos.refresh_btn') }}</button>
         </div>
     </div>
 
@@ -38,9 +38,9 @@
                     </svg>
                 </div>
                 <div class="text-lg font-bold text-gray-900 dark:text-white">{{ $table->table_number }}</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400">{{ $table->seats }} seats</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">{{ $table->seats }}{{ __('pos.sfx_seats') }}</div>
                 <div class="mt-1 text-xs font-medium {{ $table->status === 'available' ? 'text-green-600 dark:text-green-400' : ($table->status === 'occupied' ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400') }}">
-                    {{ ucfirst($table->status) }}
+                    {{ Lang::has('pos.table_status_' . $table->status) ? __('pos.table_status_' . $table->status) : ucfirst($table->status) }}
                 </div>
                 @php
                     // Occupied timer (owner, Jul 2026): occupied → occupied_since; reserved → locked_at.
@@ -61,12 +61,12 @@
     @empty
     <div class="text-center py-16 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
         <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"/></svg>
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Tables Configured</h3>
-        <p class="text-gray-500 dark:text-gray-400 mb-4">Set up your restaurant floor and tables first.</p>
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">{{ __('pos.no_tables_configured') }}</h3>
+        <p class="text-gray-500 dark:text-gray-400 mb-4">{{ __('pos.no_tables_configured_hint') }}</p>
         @if($tvUser && !$tvUser->isPosCashier())
-        <a href="{{ route('pos.restaurant.table-management') }}" class="inline-flex items-center px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 text-sm font-medium">Go to Table Setup</a>
+        <a href="{{ route('pos.restaurant.table-management') }}" class="inline-flex items-center px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 text-sm font-medium">{{ __('pos.go_to_table_setup') }}</a>
         @else
-        <p class="text-sm text-gray-400">Ask your POS admin to configure tables.</p>
+        <p class="text-sm text-gray-400">{{ __('pos.ask_admin_configure_tables') }}</p>
         @endif
     </div>
     @endforelse

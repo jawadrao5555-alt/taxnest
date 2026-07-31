@@ -17,7 +17,7 @@
             <div class="flex items-start justify-between gap-4 mb-10">
                 <div>
                     <p class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">{{ now()->format('l, d M Y') }}</p>
-                    <p class="text-sm text-slate-400 mt-2">{{ $company->name ?? 'Business' }} — FBR POS</p>
+                    <p class="text-sm text-slate-400 mt-2">{{ $company->name ?? __('pos.business_fallback') }} — FBR POS</p>
                 </div>
                 <div class="flex items-center gap-2">
                     @include('fbr-pos.dashboard-styles._style-picker')
@@ -29,52 +29,52 @@
             </div>
 
             <div class="mb-2">
-                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Today's Revenue</p>
+                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{{ __('pos.todays_revenue') }}</p>
                 <p class="text-5xl sm:text-6xl font-black text-white mt-2 tracking-tight" style="font-variant-numeric:tabular-nums;letter-spacing:-0.03em">Rs.{{ number_format($todayStats->revenue ?? 0) }}</p>
             </div>
 
             <div class="flex gap-10 mt-8 pt-6 border-t border-white/5">
-                <div><p class="text-3xl font-black text-white">{{ $todayStats->count ?? 0 }}</p><p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">Orders</p></div>
-                <div><p class="text-3xl font-black text-emerald-400">{{ $fbrSubmitted }}</p><p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">FBR Done</p></div>
-                <div><p class="text-3xl font-black text-amber-400">{{ $fbrPending }}</p><p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">Pending</p></div>
+                <div><p class="text-3xl font-black text-white">{{ $todayStats->count ?? 0 }}</p><p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">{{ __('pos.orders_word') }}</p></div>
+                <div><p class="text-3xl font-black text-emerald-400">{{ $fbrSubmitted }}</p><p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">{{ __('pos.fbr_done') }}</p></div>
+                <div><p class="text-3xl font-black text-amber-400">{{ $fbrPending }}</p><p class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">{{ __('pos.pending_word') }}</p></div>
             </div>
 
-            <div class="mt-6"><a href="{{ route('fbrpos.create') }}" class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition shadow-lg shadow-indigo-500/20"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>New Sale</a></div>
+            <div class="mt-6"><a href="{{ route('fbrpos.create') }}" class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition shadow-lg shadow-indigo-500/20"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>{{ __('pos.new_sale') }}</a></div>
         </div>
     </div>
 
     @if($company->fbr_pos_id)
     <div class="fbs-min p-4 flex items-center gap-3 fbs-a fbs-2">
         <div class="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center"><svg class="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg></div>
-        <div><p class="text-[12px] font-bold text-gray-900 dark:text-white">FBR Integrated</p><p class="text-[10px] text-gray-400">POS #{{ $company->fbr_pos_id }} · {{ ucfirst($company->fbr_pos_environment ?? 'sandbox') }}</p></div>
+        <div><p class="text-[12px] font-bold text-gray-900 dark:text-white">{{ __('pos.fbr_integrated') }}</p><p class="text-[10px] text-gray-400">POS #{{ $company->fbr_pos_id }} · {{ ucfirst($company->fbr_pos_environment ?? 'sandbox') }}</p></div>
     </div>
     @endif
 
     <div class="fbs-min p-5 fbs-a fbs-3">
         <div class="flex items-center gap-8 flex-wrap">
-            <div><p class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Monthly Revenue</p><p class="text-xl font-black text-gray-900 dark:text-white mt-0.5">Rs.{{ number_format($monthStats->revenue ?? 0) }}</p><p class="text-[9px] text-gray-400">{{ $monthStats->count ?? 0 }} transactions</p></div>
+            <div><p class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">{{ __('pos.monthly_revenue') }}</p><p class="text-xl font-black text-gray-900 dark:text-white mt-0.5">Rs.{{ number_format($monthStats->revenue ?? 0) }}</p><p class="text-[9px] text-gray-400">{{ __('pos.n_transactions', ['count' => $monthStats->count ?? 0]) }}</p></div>
             <div class="w-px h-10 bg-gray-100 dark:bg-gray-800"></div>
-            <div><p class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Monthly Tax</p><p class="text-xl font-black text-gray-900 dark:text-white mt-0.5">Rs.{{ number_format($monthStats->tax ?? 0) }}</p></div>
+            <div><p class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">{{ __('pos.monthly_tax') }}</p><p class="text-xl font-black text-gray-900 dark:text-white mt-0.5">Rs.{{ number_format($monthStats->tax ?? 0) }}</p></div>
             <div class="w-px h-10 bg-gray-100 dark:bg-gray-800"></div>
-            <div><p class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Today's Tax</p><p class="text-xl font-black text-gray-900 dark:text-white mt-0.5">Rs.{{ number_format($todayStats->tax ?? 0) }}</p></div>
+            <div><p class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">{{ __('pos.todays_tax') }}</p><p class="text-xl font-black text-gray-900 dark:text-white mt-0.5">Rs.{{ number_format($todayStats->tax ?? 0) }}</p></div>
         </div>
     </div>
 
     <div class="fbs-min overflow-hidden fbs-a fbs-4">
         <div class="px-5 py-3 border-b border-gray-100 dark:border-gray-800/50 flex items-center justify-between">
-            <h3 class="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">Recent Transactions</h3>
-            <a href="{{ route('fbrpos.transactions') }}" class="fbs-link">View all →</a>
+            <h3 class="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">{{ __('pos.recent_transactions') }}</h3>
+            <a href="{{ route('fbrpos.transactions') }}" class="fbs-link">{{ __('pos.view_all_arrow_lc') }}</a>
         </div>
-        <div class="overflow-x-auto"><table class="w-full"><thead><tr class="text-left text-[9px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/40 dark:bg-gray-800/20"><th class="py-2.5 px-5">Invoice</th><th class="py-2.5 px-3">Customer</th><th class="py-2.5 px-3 text-right">Amount</th><th class="py-2.5 px-3 text-center">FBR</th><th class="py-2.5 px-3">Date</th></tr></thead><tbody>
+        <div class="overflow-x-auto"><table class="w-full"><thead><tr class="text-left text-[9px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/40 dark:bg-gray-800/20"><th class="py-2.5 px-5">{{ __('pos.invoice_word') }}</th><th class="py-2.5 px-3">{{ __('pos.customer_word') }}</th><th class="py-2.5 px-3 text-right">{{ __('pos.amount_word') }}</th><th class="py-2.5 px-3 text-center">FBR</th><th class="py-2.5 px-3">{{ __('pos.date_word') }}</th></tr></thead><tbody>
             @forelse($recentTransactions as $txn)
             <tr class="border-b border-gray-50 dark:border-gray-800/30 hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition">
                 <td class="py-3 px-5"><a href="{{ route('fbrpos.show', $txn->id) }}" class="text-[12px] font-bold text-indigo-600 dark:text-indigo-400">{{ $txn->invoice_number }}</a></td>
-                <td class="py-3 px-3 text-[11px] text-gray-500 dark:text-gray-400">{{ $txn->customer_name ?? 'Walk-in' }}</td>
+                <td class="py-3 px-3 text-[11px] text-gray-500 dark:text-gray-400">{{ $txn->customer_name ?? __('pos.walk_in') }}</td>
                 <td class="py-3 px-3 text-right text-[12px] font-black text-gray-900 dark:text-white">Rs.{{ number_format($txn->total_amount, 2) }}</td>
                 <td class="py-3 px-3 text-center"><span class="text-[9px] font-bold px-2.5 py-1 rounded-lg {{ $txn->fbr_status === 'submitted' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' : ($txn->fbr_status === 'failed' ? 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400' : 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400') }}">{{ ucfirst($txn->fbr_status ?? 'pending') }}</span></td>
                 <td class="py-3 px-3 text-[10px] text-gray-400">{{ $txn->created_at->format('d M h:i A') }}</td>
             </tr>
-            @empty<tr><td colspan="5" class="py-10 text-center text-[12px] text-gray-400">No transactions yet</td></tr>@endforelse
+            @empty<tr><td colspan="5" class="py-10 text-center text-[12px] text-gray-400">{{ __('pos.no_transactions_yet') }}</td></tr>@endforelse
         </tbody></table></div>
     </div>
 </div>

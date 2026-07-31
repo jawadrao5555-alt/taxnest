@@ -7,27 +7,27 @@
                 <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-lg">
                     <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                 </div>
-                Inventory Dashboard
+                {{ __('pos.inventory_dashboard') }}
             </h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Real-time overview of stock levels, movements, and alerts</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.inventory_dashboard_sub') }}</p>
         </div>
         <a href="{{ route('pos.inventory.adjust') }}" class="w-full sm:w-auto inline-flex items-center justify-center px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-xl transition shadow-sm">
             <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-            Adjust Stock
+            {{ __('pos.adjust_stock') }}
         </a>
     </div>
 
     <div class="flex flex-wrap gap-2 mb-6">
-        <a href="{{ route('pos.inventory.dashboard') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-purple-600 text-white shadow-sm">Dashboard</a>
-        <a href="{{ route('pos.inventory.stock') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">Stock Levels</a>
-        <a href="{{ route('pos.inventory.movements') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">Movements</a>
+        <a href="{{ route('pos.inventory.dashboard') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-purple-600 text-white shadow-sm">{{ __('pos.dashboard') }}</a>
+        <a href="{{ route('pos.inventory.stock') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.stock_levels') }}</a>
+        <a href="{{ route('pos.inventory.movements') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.movements') }}</a>
         <a href="{{ route('pos.inventory.low-stock') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700 {{ $lowStockItems->count() > 0 ? 'relative' : '' }}">
-            Low Stock Alerts
+            {{ __('pos.low_stock_alerts') }}
             @if($lowStockItems->count() > 0)
             <span class="ml-1 inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold bg-red-500 text-white rounded-full animate-pulse">{{ $lowStockItems->count() }}</span>
             @endif
         </a>
-        <a href="{{ route('pos.inventory.adjust') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">Adjust Stock</a>
+        <a href="{{ route('pos.inventory.adjust') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.adjust_stock') }}</a>
     </div>
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -39,7 +39,7 @@
                 </div>
             </div>
             <p class="text-3xl font-black text-gray-900 dark:text-white">{{ number_format($totalProducts) }}</p>
-            <p class="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-1">Total Products</p>
+            <p class="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-1">{{ __('pos.total_products') }}</p>
         </div>
         <div class="group bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg p-5 relative overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
             <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-teal-500 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-500"></div>
@@ -49,7 +49,7 @@
                 </div>
             </div>
             <p class="text-2xl font-black text-emerald-600">PKR {{ number_format($totalStockValue, 0) }}</p>
-            <p class="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-1">Stock Value</p>
+            <p class="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-1">{{ __('pos.stock_value') }}</p>
         </div>
         <div class="group bg-white dark:bg-gray-900 rounded-2xl border {{ $lowStockItems->count() > 0 ? 'border-amber-200 dark:border-amber-800/50' : 'border-gray-100 dark:border-gray-700' }} shadow-lg p-5 relative overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
             <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-orange-500 {{ $lowStockItems->count() > 0 ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100' }} transform transition-transform origin-left duration-500"></div>
@@ -59,7 +59,7 @@
                 </div>
             </div>
             <p class="text-3xl font-black {{ $lowStockItems->count() > 0 ? 'text-amber-600' : 'text-gray-900 dark:text-white' }}">{{ $lowStockItems->count() }}</p>
-            <p class="text-[11px] font-semibold {{ $lowStockItems->count() > 0 ? 'text-amber-500' : 'text-gray-400 dark:text-gray-500' }} uppercase tracking-wider mt-1">Low Stock</p>
+            <p class="text-[11px] font-semibold {{ $lowStockItems->count() > 0 ? 'text-amber-500' : 'text-gray-400 dark:text-gray-500' }} uppercase tracking-wider mt-1">{{ __('pos.low_stock') }}</p>
         </div>
         <div class="group bg-white dark:bg-gray-900 rounded-2xl border {{ $outOfStockCount > 0 ? 'border-red-200 dark:border-red-800/50' : 'border-gray-100 dark:border-gray-700' }} shadow-lg p-5 relative overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
             <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 to-rose-500 {{ $outOfStockCount > 0 ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100' }} transform transition-transform origin-left duration-500"></div>
@@ -69,7 +69,7 @@
                 </div>
             </div>
             <p class="text-3xl font-black {{ $outOfStockCount > 0 ? 'text-red-600' : 'text-gray-900 dark:text-white' }}">{{ $outOfStockCount }}</p>
-            <p class="text-[11px] font-semibold {{ $outOfStockCount > 0 ? 'text-red-500' : 'text-gray-400 dark:text-gray-500' }} uppercase tracking-wider mt-1">Out of Stock</p>
+            <p class="text-[11px] font-semibold {{ $outOfStockCount > 0 ? 'text-red-500' : 'text-gray-400 dark:text-gray-500' }} uppercase tracking-wider mt-1">{{ __('pos.out_of_stock') }}</p>
         </div>
     </div>
 
@@ -80,14 +80,14 @@
                 <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
                     <svg class="w-4 h-4 text-amber-600 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                 </div>
-                <h3 class="text-sm font-bold text-amber-800 dark:text-amber-300">Low Stock Alerts</h3>
+                <h3 class="text-sm font-bold text-amber-800 dark:text-amber-300">{{ __('pos.low_stock_alerts') }}</h3>
             </div>
-            <a href="{{ route('pos.inventory.low-stock') }}" class="text-xs font-semibold text-amber-700 hover:text-amber-900 transition">View All &rarr;</a>
+            <a href="{{ route('pos.inventory.low-stock') }}" class="text-xs font-semibold text-amber-700 hover:text-amber-900 transition">{{ __('pos.view_all_arrow') }}</a>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             @foreach($lowStockItems->take(6) as $item)
             <div class="flex items-center justify-between bg-white/80 dark:bg-gray-900/80 rounded-xl p-3 border border-amber-100 dark:border-amber-800/50 backdrop-blur-sm">
-                <span class="text-sm font-medium text-gray-900 dark:text-white truncate mr-2">{{ $item->posProduct->name ?? 'Unknown' }}</span>
+                <span class="text-sm font-medium text-gray-900 dark:text-white truncate mr-2">{{ $item->posProduct->name ?? __('pos.unknown_word') }}</span>
                 <div class="flex items-center gap-2 flex-shrink-0">
                     <div class="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
                         @php $pct = $item->min_stock_level > 0 ? min(($item->quantity / $item->min_stock_level) * 100, 100) : 0; @endphp
@@ -106,7 +106,7 @@
             <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center">
                 <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
             </div>
-            <h3 class="text-sm font-bold text-gray-900 dark:text-white">Stock Health Overview</h3>
+            <h3 class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.stock_health_overview') }}</h3>
         </div>
         @php
             $healthPct = $totalTracked > 0 ? round(($healthyCount / $totalTracked) * 100) : 100;
@@ -124,15 +124,15 @@
                         <span class="text-2xl font-black text-gray-900 dark:text-white" x-text="pct + '%'">0%</span>
                     </div>
                 </div>
-                <p class="text-xs font-semibold text-gray-500 mt-2">Healthy Stock</p>
+                <p class="text-xs font-semibold text-gray-500 mt-2">{{ __('pos.healthy_stock') }}</p>
             </div>
             <div class="sm:col-span-3 space-y-3">
                 <div class="flex items-center gap-3">
                     <div class="w-3 h-3 rounded-full bg-emerald-500 flex-shrink-0"></div>
                     <div class="flex-1">
                         <div class="flex items-center justify-between mb-1">
-                            <span class="text-xs font-semibold text-gray-700 dark:text-gray-300">In Stock</span>
-                            <span class="text-xs font-bold text-emerald-600">{{ $healthyCount }} products</span>
+                            <span class="text-xs font-semibold text-gray-700 dark:text-gray-300">{{ __('pos.in_stock') }}</span>
+                            <span class="text-xs font-bold text-emerald-600">{{ __('pos.n_products', ['count' => $healthyCount]) }}</span>
                         </div>
                         <div class="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2">
                             <div class="h-2 rounded-full bg-emerald-500 transition-all duration-700" style="width: {{ $healthPct }}%"></div>
@@ -143,8 +143,8 @@
                     <div class="w-3 h-3 rounded-full bg-amber-500 flex-shrink-0"></div>
                     <div class="flex-1">
                         <div class="flex items-center justify-between mb-1">
-                            <span class="text-xs font-semibold text-gray-700 dark:text-gray-300">Low Stock</span>
-                            <span class="text-xs font-bold text-amber-600">{{ $lowStockItems->count() }} products</span>
+                            <span class="text-xs font-semibold text-gray-700 dark:text-gray-300">{{ __('pos.low_stock') }}</span>
+                            <span class="text-xs font-bold text-amber-600">{{ __('pos.n_products', ['count' => $lowStockItems->count()]) }}</span>
                         </div>
                         <div class="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2">
                             <div class="h-2 rounded-full bg-amber-500 transition-all duration-700" style="width: {{ $lowPct }}%"></div>
@@ -155,8 +155,8 @@
                     <div class="w-3 h-3 rounded-full bg-red-500 flex-shrink-0"></div>
                     <div class="flex-1">
                         <div class="flex items-center justify-between mb-1">
-                            <span class="text-xs font-semibold text-gray-700 dark:text-gray-300">Out of Stock</span>
-                            <span class="text-xs font-bold text-red-600">{{ $outOfStockCount }} products</span>
+                            <span class="text-xs font-semibold text-gray-700 dark:text-gray-300">{{ __('pos.out_of_stock') }}</span>
+                            <span class="text-xs font-bold text-red-600">{{ __('pos.n_products', ['count' => $outOfStockCount]) }}</span>
                         </div>
                         <div class="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2">
                             <div class="h-2 rounded-full bg-red-500 transition-all duration-700" style="width: {{ $outPct }}%"></div>
@@ -174,9 +174,9 @@
                     <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
                         <svg class="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
                     </div>
-                    <h3 class="text-sm font-bold text-gray-900 dark:text-white">Recent Movements</h3>
+                    <h3 class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.recent_movements') }}</h3>
                 </div>
-                <a href="{{ route('pos.inventory.movements') }}" class="text-xs font-semibold text-purple-600 hover:text-purple-800 transition">View All &rarr;</a>
+                <a href="{{ route('pos.inventory.movements') }}" class="text-xs font-semibold text-purple-600 hover:text-purple-800 transition">{{ __('pos.view_all_arrow') }}</a>
             </div>
             <div class="space-y-3">
                 @forelse($recentMovements as $m)
@@ -190,7 +190,7 @@
                             @endif
                         </div>
                         <div>
-                            <p class="font-semibold text-gray-900 dark:text-white text-sm">{{ $m->posProduct->name ?? 'Unknown' }}</p>
+                            <p class="font-semibold text-gray-900 dark:text-white text-sm">{{ $m->posProduct->name ?? __('pos.unknown_word') }}</p>
                             <p class="text-xs text-gray-400">{{ ucwords(str_replace('_', ' ', $m->type)) }} &middot; {{ $m->created_at->diffForHumans() }}</p>
                         </div>
                     </div>
@@ -203,7 +203,7 @@
                     <div class="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-3">
                         <svg class="w-6 h-6 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
                     </div>
-                    <p class="text-sm text-gray-400">No movements recorded yet</p>
+                    <p class="text-sm text-gray-400">{{ __('pos.no_movements_yet') }}</p>
                 </div>
                 @endforelse
             </div>
@@ -215,7 +215,7 @@
                     <div class="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
                         <svg class="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
                     </div>
-                    <h3 class="text-sm font-bold text-gray-900 dark:text-white">Top Selling Products (30 Days)</h3>
+                    <h3 class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.top_selling_30_days') }}</h3>
                 </div>
             </div>
             <div class="space-y-3">
@@ -223,7 +223,7 @@
                 <div class="flex items-center justify-between text-sm border-b border-gray-50 dark:border-gray-800 pb-3 last:border-0 last:pb-0">
                     <div class="flex items-center gap-3">
                         <span class="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center text-xs font-bold text-white shadow-sm">{{ $i + 1 }}</span>
-                        <span class="font-semibold text-gray-900 dark:text-white">{{ $m->posProduct->name ?? 'Unknown' }}</span>
+                        <span class="font-semibold text-gray-900 dark:text-white">{{ $m->posProduct->name ?? __('pos.unknown_word') }}</span>
                     </div>
                     <div class="flex items-center gap-2">
                         <div class="w-16 bg-gray-100 dark:bg-gray-800 rounded-full h-1.5 hidden sm:block">
@@ -238,7 +238,7 @@
                     <div class="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-3">
                         <svg class="w-6 h-6 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
                     </div>
-                    <p class="text-sm text-gray-400">No sales data yet</p>
+                    <p class="text-sm text-gray-400">{{ __('pos.no_sales_data_yet') }}</p>
                 </div>
                 @endforelse
             </div>

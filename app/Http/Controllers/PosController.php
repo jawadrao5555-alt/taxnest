@@ -33,7 +33,7 @@ class PosController extends Controller
         $theme = $request->input('theme', 'purple');
         $allowed = ['purple', 'blue', 'emerald', 'orange', 'midnight', 'rose'];
         if (!in_array($theme, $allowed)) {
-            return response()->json(['success' => false, 'message' => 'Invalid theme'], 422);
+            return response()->json(['success' => false, 'message' => __('pos.invalid_theme')], 422);
         }
         $companyId = app('currentCompanyId');
         Company::where('id', $companyId)->update(['pos_theme' => $theme]);
@@ -45,12 +45,12 @@ class PosController extends Controller
         $user = auth('pos')->user();
         $isAdmin = in_array($user->pos_role ?? $user->role ?? '', ['pos_admin', 'pos_manager', 'company_admin']);
         if (!$isAdmin) {
-            return response()->json(['success' => false, 'message' => 'Only admin can change dashboard style.'], 403);
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_dashboard_style')], 403);
         }
         $style = $request->json('style') ?? $request->input('style', 'default');
         $allowed = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify', 'saaf'];
         if (!in_array($style, $allowed)) {
-            return response()->json(['success' => false, 'message' => 'Invalid style'], 422);
+            return response()->json(['success' => false, 'message' => __('pos.invalid_style')], 422);
         }
         $companyId = app('currentCompanyId');
         Company::where('id', $companyId)->update(['pos_dashboard_style' => $style]);
@@ -61,7 +61,7 @@ class PosController extends Controller
     {
         $user = auth('pos')->user();
         if (!$user || $user->isPosCashier()) {
-            return response()->json(['success' => false, 'message' => 'Only POS administrators can change this setting.'], 403);
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
         $enabled = $request->boolean('enabled');
         $companyId = app('currentCompanyId');
@@ -78,7 +78,7 @@ class PosController extends Controller
     {
         $user = auth('pos')->user();
         if (!$user || $user->isPosCashier()) {
-            return response()->json(['success' => false, 'message' => 'Only POS administrators can change this setting.'], 403);
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
         $enabled = $request->boolean('enabled');
         $companyId = app('currentCompanyId');
@@ -96,15 +96,15 @@ class PosController extends Controller
     {
         $user = auth('pos')->user();
         if (!$user || $user->isPosCashier()) {
-            return response()->json(['success' => false, 'message' => 'Only POS administrators can change this setting.'], 403);
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
         // Prod schema drift guard — never pretend to save into a missing column.
         if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_receipt_autoclose_seconds')) {
-            return response()->json(['success' => false, 'message' => 'This setting is not available yet — please try again after the pending system update.'], 503);
+            return response()->json(['success' => false, 'message' => __('pos.setting_not_available_yet')], 503);
         }
         $secs = (int) $request->input('seconds', 10);
         if (!in_array($secs, [0, 5, 10, 15, 20, 30], true)) {
-            return response()->json(['success' => false, 'message' => 'Invalid value'], 422);
+            return response()->json(['success' => false, 'message' => __('pos.invalid_value')], 422);
         }
         $companyId = app('currentCompanyId');
         Company::where('id', $companyId)->update(['pos_receipt_autoclose_seconds' => $secs]);
@@ -120,13 +120,13 @@ class PosController extends Controller
     {
         $user = auth('pos')->user();
         if (!$user || $user->isPosCashier()) {
-            return response()->json(['success' => false, 'message' => 'Only POS administrators can change this setting.'], 403);
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
         // Prod schema drift guard: never accept the switch if the column is
         // missing — bills would silently store inclusive prices under
         // exclusive semantics (wrong tax to PRA).
         if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_tax_inclusive')) {
-            return response()->json(['success' => false, 'message' => 'This setting is not available yet — please try again after the pending system update.'], 503);
+            return response()->json(['success' => false, 'message' => __('pos.setting_not_available_yet')], 503);
         }
         // Three modes (owner Jul 2026): 'exclusive' | 'inclusive' | 'inclusive_card_save'.
         // Back-compat: older clients send {"inclusive": bool} only.
@@ -137,7 +137,7 @@ class PosController extends Controller
         $modeColumnExists = \Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_tax_pricing_mode');
         if ($mode === 'inclusive_card_save'
             && (!$modeColumnExists || !\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'tax_menu_rate'))) {
-            return response()->json(['success' => false, 'message' => 'This mode is not available yet — please try again after the pending system update.'], 503);
+            return response()->json(['success' => false, 'message' => __('pos.mode_not_available_yet')], 503);
         }
         $companyId = app('currentCompanyId');
         // pos_tax_inclusive stays SYNCED (1 for both inclusive variants) so every
@@ -154,7 +154,7 @@ class PosController extends Controller
     {
         $user = auth('pos')->user();
         if (!$user || $user->isPosCashier()) {
-            return response()->json(['success' => false, 'message' => 'Only POS administrators can change this setting.'], 403);
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
         $enabled = $request->boolean('enabled');
         $companyId = app('currentCompanyId');
@@ -166,7 +166,7 @@ class PosController extends Controller
     {
         $user = auth('pos')->user();
         if (!$user || $user->isPosCashier()) {
-            return response()->json(['success' => false, 'message' => 'Only POS administrators can change this setting.'], 403);
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
         $enabled = $request->boolean('enabled');
         $companyId = app('currentCompanyId');
@@ -254,7 +254,7 @@ class PosController extends Controller
                 // last save from either page wins. Missing/invalid input keeps 80mm default.
                 'receipt_printer_size' => $request->input('rp_printer_size', $company->receipt_printer_size ?? '80mm'),
             ]);
-            return redirect()->route('pos.receipt-settings')->with('success', 'Receipt display settings saved.');
+            return redirect()->route('pos.receipt-settings')->with('success', __('pos.receipt_display_settings_saved'));
         }
 
         return view('pos.receipt-settings', compact('company'));
@@ -305,7 +305,7 @@ class PosController extends Controller
 
             $company->update(['pos_printer_settings' => $settings]);
 
-            return redirect()->route('pos.printer-settings')->with('success', 'Printer settings saved.');
+            return redirect()->route('pos.printer-settings')->with('success', __('pos.printer_settings_saved'));
         }
 
         $settings = $company->printerSettings();
@@ -948,7 +948,7 @@ class PosController extends Controller
         $date = \App\Services\PosBusinessDay::current($companyId);
 
         if (!\Schema::hasTable('pos_day_openings')) {
-            return back()->with('error', 'Opening cash feature is being set up. Try again shortly.');
+            return back()->with('error', __('pos.opening_cash_feature_setup'));
         }
 
         // Once the day is closed the Z-report is immutable — opening locks too.
@@ -956,7 +956,7 @@ class PosController extends Controller
             ->where('report_date', $date)
             ->exists();
         if ($closed) {
-            return back()->with('error', 'Yeh din close ho chuka hai — opening cash ab change nahi ho sakta.');
+            return back()->with('error', __('pos.day_closed_opening_cash_locked'));
         }
 
         \App\Models\PosDayOpening::updateOrCreate(
@@ -968,7 +968,7 @@ class PosController extends Controller
             ]
         );
 
-        return back()->with('success', 'Opening cash Rs ' . number_format((float) $request->input('opening_cash'), 2) . ' save ho gaya — day close par khud-ba-khud istemal hoga.');
+        return back()->with('success', __('pos.opening_cash_saved', ['amount' => number_format((float) $request->input('opening_cash'), 2)]));
     }
 
     /**
@@ -1035,7 +1035,7 @@ class PosController extends Controller
                     $lockedTerminal = PosTerminal::find($draftInvoice->locked_by_terminal_id);
                     $terminalName = $lockedTerminal ? $lockedTerminal->terminal_name : 'Unknown';
                     return redirect()->route('pos.invoice.create')
-                        ->with('error', "This invoice is currently being edited on another terminal ({$terminalName}).");
+                        ->with('error', __('pos.invoice_being_edited_terminal', ['terminal' => $terminalName]));
                 }
 
                 if ($currentTerminalId) {
@@ -1430,7 +1430,7 @@ class PosController extends Controller
         ]);
 
         // Step 3 "Start Using POS" → drop the cashier straight onto the sale screen.
-        return redirect()->route('pos.invoice.create')->with('success', 'Your POS is ready — start billing!');
+        return redirect()->route('pos.invoice.create')->with('success', __('pos.pos_ready_start_billing'));
     }
 
     public function resetFeaturesToCategory(Request $request)
@@ -1453,7 +1453,7 @@ class PosController extends Controller
             'feature_flags' => $defaults,
             'inventory_enabled' => (bool) ($defaults['inventory'] ?? false),
         ]);
-        return redirect()->route('pos.features')->with('success', 'Features reset to ' . $category . ' defaults.');
+        return redirect()->route('pos.features')->with('success', __('pos.features_reset_defaults', ['category' => $category]));
     }
 
     public function storeInvoice(Request $request)
@@ -1505,7 +1505,7 @@ class PosController extends Controller
                 ->where('offline_uuid', $offlineUuid)
                 ->first();
             if ($existing) {
-                $replayMessage = 'Invoice already synced. POS Invoice Number: ' . $existing->invoice_number;
+                $replayMessage = __('pos.invoice_already_synced', ['number' => $existing->invoice_number]);
                 if ($request->wantsJson()) {
                     return response()->json([
                         'success' => true,
@@ -1606,7 +1606,7 @@ class PosController extends Controller
         if ($request->terminal_id) {
             $terminal = PosTerminal::where('company_id', $companyId)->where('id', $request->terminal_id)->where('is_active', true)->first();
             if (!$terminal) {
-                return back()->withInput()->with('error', 'Invalid or inactive terminal selected.');
+                return back()->withInput()->with('error', __('pos.invalid_inactive_terminal'));
             }
         }
 
@@ -1624,7 +1624,7 @@ class PosController extends Controller
         if ($saveAsProvisional && $request->filled('order_type') && $request->input('order_type') !== 'delivery') {
             $flowFeatures = PosFeatureService::forCompany($company);
             if (($flowFeatures->tables ?? false) || ($flowFeatures->kot ?? false) || ($flowFeatures->kitchen ?? false) || ($flowFeatures->delivery ?? false)) {
-                $flowMsg = 'Provisional bills are for Delivery orders only. Dine-In uses Hold / KOT; Takeaway is billed as a final bill.';
+                $flowMsg = __('pos.provisional_delivery_only_flow');
                 if ($request->expectsJson()) {
                     return response()->json(['success' => false, 'error' => $flowMsg, 'message' => $flowMsg], 422);
                 }
@@ -1873,7 +1873,7 @@ class PosController extends Controller
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
-            $errMsg = 'Failed to create invoice: ' . $e->getMessage();
+            $errMsg = __('pos.failed_create_invoice', ['error' => $e->getMessage()]);
             if ($request->wantsJson()) {
                 return response()->json(['success' => false, 'message' => $errMsg], 500);
             }
@@ -1920,7 +1920,7 @@ class PosController extends Controller
             // agentHandlesPra() NOT agent_enabled — Direct Production shops may keep the agent connected for silent printing.
             if ($company->agentHandlesPra()) {
                 $transaction->update(['pra_status' => 'pending']);
-                $praMessage = ' | 🟡 Awaiting Sync: Desktop agent will submit to PRA from your local PC.';
+                $praMessage = __('pos.pra_msg_awaiting_sync');
             } else {
                 try {
                     $praService = new PraIntegrationService($company);
@@ -1928,21 +1928,21 @@ class PosController extends Controller
                     $transaction->refresh();
 
                     if ($praResult['success']) {
-                        $praMessage = ' | PRA Fiscal Invoice Number: ' . ($transaction->pra_invoice_number ?? 'N/A');
+                        $praMessage = __('pos.pra_msg_fiscal_number', ['number' => $transaction->pra_invoice_number ?? 'N/A']);
                     } else {
                         $transaction->update(['pra_status' => 'offline']);
-                        $praMessage = ' | Offline Mode: Invoice saved locally and will sync automatically.';
+                        $praMessage = __('pos.pra_msg_offline_mode');
                     }
                 } catch (\Exception $e) {
                     $transaction->update(['pra_status' => 'offline']);
-                    $praMessage = ' | Offline Mode: Invoice saved locally and will sync automatically.';
+                    $praMessage = __('pos.pra_msg_offline_mode');
                 }
             }
         } else {
-            $praMessage = ' | Local invoice (PRA reporting is off).';
+            $praMessage = __('pos.pra_msg_local_reporting_off');
         }
 
-        $successMessage = 'Invoice Created Successfully! POS Invoice Number: ' . $invoiceNumber . $praMessage;
+        $successMessage = __('pos.invoice_created_success', ['number' => $invoiceNumber, 'pra' => $praMessage]);
 
         // JSON callers (Universal POS manual-cart bypass) expect a structured
         // response so the receipt modal can render in-place. Legacy form-POST
@@ -1974,7 +1974,7 @@ class PosController extends Controller
 
         if ($transaction->pra_invoice_number) {
             return redirect()->route('pos.transaction.show', $id)
-                ->with('error', 'Cannot edit — this invoice has been submitted to PRA. PRA Fiscal #: ' . $transaction->pra_invoice_number);
+                ->with('error', __('pos.cannot_edit_submitted_pra_num', ['number' => $transaction->pra_invoice_number]));
         }
 
         $products = PosProduct::where('company_id', $companyId)->where('is_active', true)->where('show_on_sale', true)->get();
@@ -2002,10 +2002,10 @@ class PosController extends Controller
 
         if ($transaction->pra_invoice_number) {
             if ($request->wantsJson()) {
-                return response()->json(['success' => false, 'message' => 'Cannot edit — this invoice has been submitted to PRA. PRA Fiscal #: ' . $transaction->pra_invoice_number], 422);
+                return response()->json(['success' => false, 'message' => __('pos.cannot_edit_submitted_pra_num', ['number' => $transaction->pra_invoice_number])], 422);
             }
             return redirect()->route('pos.transaction.show', $id)
-                ->with('error', 'Cannot edit — this invoice has been submitted to PRA.');
+                ->with('error', __('pos.cannot_edit_submitted_pra'));
         }
 
         // Snapshot the OLD line items before they are replaced, so the edit can
@@ -2117,15 +2117,15 @@ class PosController extends Controller
             // same gates as the per-bill "Submit to PRA" promote paths.
             if (!$posEditUser?->isPosAdmin()) {
                 if ($request->wantsJson()) {
-                    return response()->json(['success' => false, 'message' => 'Sirf POS admin local bill ko PRA par report kar sakta hai.'], 403);
+                    return response()->json(['success' => false, 'message' => __('pos.only_pos_admin_report_local_pra')], 403);
                 }
-                return back()->withInput()->with('error', 'Sirf POS admin local bill ko PRA par report kar sakta hai.');
+                return back()->withInput()->with('error', __('pos.only_pos_admin_report_local_pra'));
             }
             if ($transaction->created_at && $transaction->created_at->lt(now()->startOfMonth())) {
                 if ($request->wantsJson()) {
-                    return response()->json(['success' => false, 'message' => 'Sirf CURRENT month ke local bills PRA par submit ho sakte hain.'], 422);
+                    return response()->json(['success' => false, 'message' => __('pos.only_current_month_local_pra_short')], 422);
                 }
-                return back()->withInput()->with('error', 'Sirf CURRENT month ke local bills PRA par submit ho sakte hain — pichhle month ke bills close ho chuke hain.');
+                return back()->withInput()->with('error', __('pos.only_current_month_local_pra'));
             }
         }
 
@@ -2223,9 +2223,9 @@ class PosController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             if ($request->wantsJson()) {
-                return response()->json(['success' => false, 'message' => 'Failed to update invoice: ' . $e->getMessage()], 500);
+                return response()->json(['success' => false, 'message' => __('pos.failed_update_invoice', ['error' => $e->getMessage()])], 500);
             }
-            return back()->withInput()->with('error', 'Failed to update invoice: ' . $e->getMessage());
+            return back()->withInput()->with('error', __('pos.failed_update_invoice', ['error' => $e->getMessage()]));
         }
 
         $praMessage = '';
@@ -2242,14 +2242,14 @@ class PosController extends Controller
                     $transaction->refresh();
 
                     if ($praResult['success']) {
-                        $praMessage = ' | PRA Fiscal #: ' . ($transaction->pra_invoice_number ?? 'N/A');
+                        $praMessage = __('pos.pra_msg_fiscal_num_short', ['number' => $transaction->pra_invoice_number ?? 'N/A']);
                     } else {
                         $transaction->update(['pra_status' => 'offline']);
-                        $praMessage = ' | Offline: Will sync automatically.';
+                        $praMessage = __('pos.pra_msg_offline_will_sync');
                     }
                 } catch (\Exception $e) {
                     $transaction->update(['pra_status' => 'offline']);
-                    $praMessage = ' | Offline: Will sync automatically.';
+                    $praMessage = __('pos.pra_msg_offline_will_sync');
                 }
             }
         }
@@ -2261,7 +2261,7 @@ class PosController extends Controller
                 'success' => true,
                 'invoice_number' => $transaction->invoice_number,
                 'total_amount' => (float) $transaction->total_amount,
-                'message' => 'Invoice updated successfully!' . $praMessage,
+                'message' => __('pos.invoice_updated_success', ['pra' => $praMessage]),
             ]);
         }
 
@@ -2269,11 +2269,11 @@ class PosController extends Controller
         // straight back to the sale screen instead of the transaction detail page.
         if ($request->input('from') === 'sale') {
             return redirect()->route('pos.invoice.create')
-                ->with('success', 'Invoice updated successfully!' . $praMessage);
+                ->with('success', __('pos.invoice_updated_success', ['pra' => $praMessage]));
         }
 
         return redirect()->route('pos.transaction.show', $transaction->id)
-            ->with('success', 'Invoice updated successfully!' . $praMessage);
+            ->with('success', __('pos.invoice_updated_success', ['pra' => $praMessage]));
     }
 
     public function deleteTransaction($id)
@@ -2285,14 +2285,14 @@ class PosController extends Controller
         // deletion is a company-admin decision (owner rule Jul 2026).
         $posUser = auth('pos')->user();
         if ($posUser && $posUser->isPosCashier()) {
-            return back()->with('error', 'Aap ke paas bill delete karne ki ijazat nahi — sirf company admin bill delete kar sakta hai.');
+            return back()->with('error', __('pos.no_permission_delete_bill'));
         }
 
         $transaction = PosTransaction::where('company_id', $companyId)->with('items')->findOrFail($id);
 
         if ($transaction->pra_invoice_number) {
             return redirect()->route('pos.transaction.show', $id)
-                ->with('error', 'Cannot delete — this invoice has been submitted to PRA. PRA Fiscal #: ' . $transaction->pra_invoice_number);
+                ->with('error', __('pos.cannot_delete_submitted_pra_num', ['number' => $transaction->pra_invoice_number]));
         }
 
         DB::beginTransaction();
@@ -2319,11 +2319,11 @@ class PosController extends Controller
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Failed to delete invoice: ' . $e->getMessage());
+            return back()->with('error', __('pos.failed_delete_invoice', ['error' => $e->getMessage()]));
         }
 
         return redirect()->route('pos.transactions')
-            ->with('success', 'Invoice ' . $transaction->invoice_number . ' deleted successfully.');
+            ->with('success', __('pos.invoice_deleted_success', ['number' => $transaction->invoice_number]));
     }
 
     /**
@@ -2436,11 +2436,11 @@ class PosController extends Controller
         $transaction = $retryQuery->findOrFail($id);
 
         if ($transaction->pra_invoice_number) {
-            return back()->with('error', 'This invoice has already been submitted to PRA. PRA Fiscal Invoice #: ' . $transaction->pra_invoice_number);
+            return back()->with('error', __('pos.invoice_already_submitted_pra_num', ['number' => $transaction->pra_invoice_number]));
         }
 
         if ($transaction->pra_status === 'submitted') {
-            return back()->with('error', 'This invoice has already been successfully submitted to PRA.');
+            return back()->with('error', __('pos.invoice_already_submitted_pra'));
         }
 
         // Reporting-OFF final = LOCAL-category bill: completed, NULL pra_status,
@@ -2452,17 +2452,17 @@ class PosController extends Controller
         // "Submit to PRA — Make Final" path. They will be re-queued as 'pending'
         // and submitted just like any pending/failed/offline retry.
         if (!in_array($transaction->pra_status, ['pending', 'failed', 'offline', 'local']) && !$isNullFinal) {
-            return back()->with('error', 'This invoice cannot be submitted. Current status: ' . $transaction->pra_status);
+            return back()->with('error', __('pos.invoice_cannot_submit_status', ['status' => $transaction->pra_status]));
         }
 
         if ($isNullFinal) {
             // Admin-only (matches Local tab visibility) + MONTH GATE. NO quota
             // re-charge — reporting-OFF finals already consumed quota at creation.
             if (!auth('pos')->user()?->isPosAdmin()) {
-                return back()->with('error', 'Sirf POS admin local bill ko PRA par report kar sakta hai.');
+                return back()->with('error', __('pos.only_pos_admin_report_local_pra'));
             }
             if ($transaction->created_at && $transaction->created_at->lt(now()->startOfMonth())) {
-                return back()->with('error', 'Sirf CURRENT month ke local bills PRA par submit ho sakte hain — pichhle month ke bills close ho chuke hain.');
+                return back()->with('error', __('pos.only_current_month_local_pra'));
             }
         }
 
@@ -2478,7 +2478,7 @@ class PosController extends Controller
             // MONTH GATE (owner rule Jul 2026): only CURRENT-MONTH local bills may be
             // promoted to PRA — previous months are closed (report/view only).
             if ($transaction->created_at && $transaction->created_at->lt(now()->startOfMonth())) {
-                return back()->with('error', 'Sirf CURRENT month ke local bills PRA par submit ho sakte hain — pichhle month ke bills close ho chuke hain.');
+                return back()->with('error', __('pos.only_current_month_local_pra'));
             }
         }
 
@@ -2487,12 +2487,12 @@ class PosController extends Controller
             // PRA submission: 'pra' mode + NULL pra_status = normal final bill.
             if ($transaction->pra_status === 'local') {
                 if (!$this->promoteLocalToPosSerial($transaction, $companyId, null)) {
-                    return back()->with('error', 'Bill is no longer a provisional/local bill — refresh the page and try again.');
+                    return back()->with('error', __('pos.bill_no_longer_provisional'));
                 }
-                return back()->with('success', 'Bill ' . $transaction->invoice_number . ' is now FINAL. PRA reporting is OFF — no PRA submission needed.');
+                return back()->with('success', __('pos.bill_now_final_pra_off', ['number' => $transaction->invoice_number]));
             }
             if (!$isNullFinal) {
-                return back()->with('error', 'PRA reporting is currently disabled. Enable it from PRA Settings first.');
+                return back()->with('error', __('pos.pra_reporting_disabled_enable'));
             }
             // NULL final + explicit per-bill "Submit to PRA": the admin's personal
             // reporting toggle does NOT block a deliberate submit — fall through.
@@ -2502,21 +2502,21 @@ class PosController extends Controller
         // generators / templates treat it as a real PRA invoice from this point onward.
         if ($transaction->pra_status === 'local') {
             if (!$this->promoteLocalToPosSerial($transaction, $companyId, 'pending')) {
-                return back()->with('error', 'Bill is no longer a provisional/local bill — refresh the page and try again.');
+                return back()->with('error', __('pos.bill_no_longer_provisional'));
             }
         } elseif ($isNullFinal) {
             // Reporting-OFF final going to PRA: allot a real POS fiscal serial
             // (keeps a POS- serial if it already has one — never renumber downward)
             // and queue as 'pending'. Race-safe: locked + re-verified inside.
             if (!$this->promoteNullFinalToPra($transaction, $companyId)) {
-                return back()->with('error', 'Bill is no longer a local final — refresh the page and try again.');
+                return back()->with('error', __('pos.bill_no_longer_local_final'));
             }
         }
 
         // ENTERPRISE SAFE MODE — Phase 1: Agent-Sync companies just re-queue; the agent polls every 10s.
         if ($company->agentHandlesPra()) {
             $transaction->update(['pra_status' => 'pending', 'pra_response_code' => null]);
-            return back()->with('success', '🟡 Re-queued for desktop agent — will sync within seconds.');
+            return back()->with('success', __('pos.requeued_desktop_agent'));
         }
 
         try {
@@ -2525,13 +2525,13 @@ class PosController extends Controller
             $transaction->refresh();
 
             if ($praResult['success']) {
-                return back()->with('success', 'PRA submission successful! PRA Fiscal Invoice Number: ' . ($transaction->pra_invoice_number ?? 'N/A'));
+                return back()->with('success', __('pos.pra_submission_successful_num', ['number' => $transaction->pra_invoice_number ?? 'N/A']));
             } else {
-                return back()->with('error', 'PRA submission failed: ' . ($praResult['message'] ?? 'Unknown error'));
+                return back()->with('error', __('pos.pra_submission_failed', ['error' => $praResult['message'] ?? __('pos.unknown_error')]));
             }
         } catch (\Exception $e) {
             $transaction->update(['pra_status' => 'offline']);
-            return back()->with('error', 'PRA connection failed — invoice will sync automatically when connection is restored.');
+            return back()->with('error', __('pos.pra_connection_failed_sync'));
         }
     }
 
@@ -2541,7 +2541,7 @@ class PosController extends Controller
         $company = Company::find($companyId);
 
         if (!auth('pos')->user()?->praReportingEnabled($company)) {
-            return back()->with('error', 'PRA reporting is currently disabled. Enable it from PRA Settings first.');
+            return back()->with('error', __('pos.pra_reporting_disabled_enable'));
         }
 
         $pendingInvoices = PosTransaction::where('company_id', $companyId)
@@ -2551,7 +2551,7 @@ class PosController extends Controller
             ->get();
 
         if ($pendingInvoices->isEmpty()) {
-            return back()->with('info', 'No failed or offline invoices to retry.');
+            return back()->with('info', __('pos.no_failed_offline_retry'));
         }
 
         // ENTERPRISE SAFE MODE — Phase 1: Agent-Sync companies just bulk re-queue; the agent will pick them up.
@@ -2561,7 +2561,7 @@ class PosController extends Controller
                 ->where('company_id', $companyId)
                 ->whereIn('id', $pendingInvoices->pluck('id'))
                 ->update(['pra_status' => 'pending', 'pra_response_code' => null, 'updated_at' => now()]);
-            return back()->with('success', "🟡 {$count} invoice(s) re-queued for desktop agent.");
+            return back()->with('success', __('pos.invoices_requeued_agent', ['count' => $count]));
         }
 
         $praService = new PraIntegrationService($company);
@@ -2576,21 +2576,21 @@ class PosController extends Controller
                     $successCount++;
                 } else {
                     $failCount++;
-                    $errors[] = $transaction->invoice_number . ': ' . ($result['message'] ?? 'Unknown error');
+                    $errors[] = $transaction->invoice_number . ': ' . ($result['message'] ?? __('pos.unknown_error'));
                 }
             } catch (\Exception $e) {
                 $failCount++;
                 $transaction->update(['pra_status' => 'offline']);
-                $errors[] = $transaction->invoice_number . ': Connection failed';
+                $errors[] = $transaction->invoice_number . ': ' . __('pos.connection_failed_word');
             }
         }
 
         $message = '';
         if ($successCount > 0) {
-            $message = $successCount . ' invoice(s) successfully submitted to PRA.';
+            $message = __('pos.invoices_submitted_pra', ['count' => $successCount]);
         }
         if ($failCount > 0) {
-            $errorDetail = $failCount . ' invoice(s) failed.';
+            $errorDetail = __('pos.invoices_failed_count', ['count' => $failCount]);
             if ($successCount > 0) {
                 return back()->with('warning', $message . ' ' . $errorDetail);
             }
@@ -2742,7 +2742,7 @@ class PosController extends Controller
         if ($posUser && $posUser->isPosCashier()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Aap ke paas bill delete karne ki ijazat nahi — sirf company admin delete kar sakta hai.',
+                'message' => __('pos.no_permission_delete_bill_short'),
             ], 403);
         }
 
@@ -2750,12 +2750,12 @@ class PosController extends Controller
         $tx = PosTransaction::where('company_id', $companyId)->where('id', $id)->with('items')->first();
 
         if (!$tx) {
-            return response()->json(['success' => false, 'message' => 'Bill not found'], 404);
+            return response()->json(['success' => false, 'message' => __('pos.bill_not_found')], 404);
         }
         if ($tx->pra_status !== 'local' || $tx->status !== 'completed' || $tx->invoice_mode !== 'local') {
             return response()->json([
                 'success' => false,
-                'message' => 'Only provisional (local) bills can be deleted via this endpoint.',
+                'message' => __('pos.only_provisional_deleted_endpoint'),
             ], 422);
         }
 
@@ -2783,7 +2783,7 @@ class PosController extends Controller
             $tx->delete();
         });
 
-        return response()->json(['success' => true, 'message' => 'Provisional bill deleted', 'id' => $id]);
+        return response()->json(['success' => true, 'message' => __('pos.provisional_bill_deleted_msg'), 'id' => $id]);
     }
 
     /**
@@ -2797,7 +2797,7 @@ class PosController extends Controller
         $company = Company::find($companyId);
 
         if (!$company) {
-            return response()->json(['success' => false, 'message' => 'Company not found'], 404);
+            return response()->json(['success' => false, 'message' => __('pos.company_not_found')], 404);
         }
 
         // ── LOCAL FINAL (owner request Jul 2026): finalize WITHOUT sending to PRA ──
@@ -2815,7 +2815,7 @@ class PosController extends Controller
                 ->where('pra_status', 'local')
                 ->first();
             if (!$tx) {
-                return response()->json(['success' => false, 'message' => 'Bill not found'], 404);
+                return response()->json(['success' => false, 'message' => __('pos.bill_not_found')], 404);
             }
             $tx->update(['is_archived' => true, 'archived_at' => now()]);
             return response()->json([
@@ -2824,7 +2824,7 @@ class PosController extends Controller
                 'local_final'    => true,
                 'invoice_number' => $tx->invoice_number,
                 'total_amount'   => (float) $tx->total_amount,
-                'message'        => '✓ Bill ' . $tx->invoice_number . ' finalized as LOCAL (Rs. ' . number_format((float) $tx->total_amount) . ') — NOT sent to PRA.',
+                'message'        => __('pos.bill_finalized_local_not_pra', ['number' => $tx->invoice_number, 'amount' => number_format((float) $tx->total_amount)]),
                 'id'             => $tx->id,
             ]);
         }
@@ -2989,29 +2989,29 @@ class PosController extends Controller
         } catch (\RuntimeException $e) {
             $msg = $e->getMessage();
             if ($msg === 'NOT_FOUND') {
-                return response()->json(['success' => false, 'message' => 'Bill not found'], 404);
+                return response()->json(['success' => false, 'message' => __('pos.bill_not_found')], 404);
             }
             if ($msg === 'MONTH_CLOSED') {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Sirf CURRENT month ke local bills PRA par submit ho sakte hain — pichhle month ke bills close ho chuke hain (sirf report mein dekhe ja sakte hain).',
+                    'message' => __('pos.only_current_month_local_pra_report_only'),
                 ], 422);
             }
             if ($msg === 'ARCHIVED_ADMIN_ONLY') {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Ye bill LOCAL FINAL ho chuka hai — sirf company admin ise PRA par submit kar sakta hai.',
+                    'message' => __('pos.bill_local_final_admin_only'),
                 ], 403);
             }
             if (str_starts_with($msg, 'NOT_PROVISIONAL:')) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Only completed provisional (local) bills can be promoted. Current status: ' . substr($msg, 16),
+                    'message' => __('pos.only_completed_provisional_promoted', ['status' => substr($msg, 16)]),
                 ], 422);
             }
-            return response()->json(['success' => false, 'message' => 'Promote failed: ' . $msg], 500);
+            return response()->json(['success' => false, 'message' => __('pos.promote_failed', ['error' => $msg])], 500);
         } catch (\Throwable $e) {
-            return response()->json(['success' => false, 'message' => 'Promote failed: ' . $e->getMessage()], 500);
+            return response()->json(['success' => false, 'message' => __('pos.promote_failed', ['error' => $e->getMessage()])], 500);
         }
 
         // ── Post-commit: PRA submission happens STRICTLY outside the transaction ──
@@ -3021,7 +3021,7 @@ class PosController extends Controller
                 'submitted'      => false,
                 'invoice_number' => $newNumber,
                 'total_amount'   => $newTotal,
-                'message'        => '✓ Bill ' . $newNumber . ' is now FINAL (Rs. ' . number_format($newTotal) . ') — PRA reporting is OFF, no submission needed.',
+                'message'        => __('pos.bill_now_final_pra_off_amount', ['number' => $newNumber, 'amount' => number_format($newTotal)]),
                 'id'             => $id,
             ]);
         }
@@ -3035,7 +3035,7 @@ class PosController extends Controller
                 'queued'         => true,
                 'invoice_number' => $newNumber,
                 'total_amount'   => $newTotal,
-                'message'        => '🟡 Bill ' . $newNumber . ' re-queued for desktop agent — will sync within seconds.',
+                'message'        => __('pos.bill_requeued_agent', ['number' => $newNumber]),
                 'id'             => $id,
             ]);
         }
@@ -3051,7 +3051,7 @@ class PosController extends Controller
                     'submitted'      => true,
                     'invoice_number' => $newNumber,
                     'total_amount'   => $newTotal,
-                    'message'        => 'PRA submission successful! PRA Fiscal Invoice Number: ' . ($tx->pra_invoice_number ?? 'N/A'),
+                    'message'        => __('pos.pra_submission_successful_num', ['number' => $tx->pra_invoice_number ?? 'N/A']),
                     'pra_number'     => $tx->pra_invoice_number,
                     'id'             => $id,
                 ]);
@@ -3059,7 +3059,7 @@ class PosController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'PRA submission failed: ' . ($result['message'] ?? 'Unknown error'),
+                'message' => __('pos.pra_submission_failed', ['error' => $result['message'] ?? __('pos.unknown_error')]),
                 'id'      => $id,
             ], 502);
         } catch (\Exception $e) {
@@ -3067,7 +3067,7 @@ class PosController extends Controller
             return response()->json([
                 'success' => false,
                 'offline' => true,
-                'message' => 'PRA connection failed — will sync automatically when restored.',
+                'message' => __('pos.pra_connection_failed_short'),
                 'id'      => $id,
             ], 503);
         }
@@ -3121,7 +3121,7 @@ class PosController extends Controller
         if (!$company || !auth('pos')->user()?->praReportingEnabled($company)) {
             return response()->json([
                 'success' => false,
-                'message' => 'PRA reporting is currently disabled. Enable it from PRA Settings first.',
+                'message' => __('pos.pra_reporting_disabled_enable'),
             ], 422);
         }
 
@@ -3139,17 +3139,17 @@ class PosController extends Controller
             // request claimed it. Re-fetch to give the cashier the right reason.
             $tx = PosTransaction::where('company_id', $companyId)->where('id', $id)->first();
             if (!$tx) {
-                return response()->json(['success' => false, 'message' => 'Bill not found'], 404);
+                return response()->json(['success' => false, 'message' => __('pos.bill_not_found')], 404);
             }
             if ($tx->pra_invoice_number) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Already submitted. PRA #: ' . $tx->pra_invoice_number,
+                    'message' => __('pos.already_submitted_pra_num', ['number' => $tx->pra_invoice_number]),
                 ], 422);
             }
             return response()->json([
                 'success' => false,
-                'message' => 'Cannot retry — already in progress or status changed (' . $tx->pra_status . ')',
+                'message' => __('pos.cannot_retry_status_changed', ['status' => $tx->pra_status]),
             ], 409);
         }
 
@@ -3159,7 +3159,7 @@ class PosController extends Controller
             return response()->json([
                 'success' => true,
                 'queued'  => true,
-                'message' => '🟡 Re-queued for desktop agent — will sync within seconds.',
+                'message' => __('pos.requeued_desktop_agent'),
                 'id'      => $id,
             ]);
         }
@@ -3173,7 +3173,7 @@ class PosController extends Controller
                 return response()->json([
                     'success'    => true,
                     'submitted'  => true,
-                    'message'    => 'PRA submission successful! PRA #: ' . ($tx->pra_invoice_number ?? 'N/A'),
+                    'message'    => __('pos.pra_submission_successful_num_short', ['number' => $tx->pra_invoice_number ?? 'N/A']),
                     'pra_number' => $tx->pra_invoice_number,
                     'id'         => $id,
                 ]);
@@ -3181,7 +3181,7 @@ class PosController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'PRA submission failed: ' . ($result['message'] ?? 'Unknown error'),
+                'message' => __('pos.pra_submission_failed', ['error' => $result['message'] ?? __('pos.unknown_error')]),
                 'id'      => $id,
             ], 502);
         } catch (\Exception $e) {
@@ -3189,7 +3189,7 @@ class PosController extends Controller
             return response()->json([
                 'success' => false,
                 'offline' => true,
-                'message' => 'PRA connection failed — will sync automatically when restored.',
+                'message' => __('pos.pra_connection_failed_short'),
                 'id'      => $id,
             ], 503);
         }
@@ -3217,13 +3217,13 @@ class PosController extends Controller
 
         if ($isCashier) {
             if (empty($company->confidential_pin)) {
-                return redirect()->back()->with('error', 'Local data access is restricted. Admin must set a PIN first.');
+                return redirect()->back()->with('error', __('pos.local_data_access_restricted'));
             }
             if (!$this->verifyPinSession()) {
-                return redirect()->back()->with('error', 'PIN verification required to access local data.');
+                return redirect()->back()->with('error', __('pos.pin_required_local_data'));
             }
         } elseif (!empty($company->confidential_pin) && !$this->verifyPinSession()) {
-            return redirect()->back()->with('error', 'PIN verification required to access local data.');
+            return redirect()->back()->with('error', __('pos.pin_required_local_data'));
         }
 
         $this->clearPinSession();
@@ -4167,7 +4167,7 @@ class PosController extends Controller
             'is_tax_exempt' => $request->has('is_tax_exempt'),
         ]);
 
-        return back()->with('success', 'Service added successfully.');
+        return back()->with('success', __('pos.service_added_success'));
     }
 
     public function updateService(Request $request, $id)
@@ -4189,14 +4189,14 @@ class PosController extends Controller
             'is_tax_exempt' => $request->has('is_tax_exempt'),
         ]);
 
-        return back()->with('success', 'Service updated successfully.');
+        return back()->with('success', __('pos.service_updated_success'));
     }
 
     public function deleteService($id)
     {
         $companyId = app('currentCompanyId');
         PosService::where('company_id', $companyId)->findOrFail($id)->delete();
-        return back()->with('success', 'Service deleted.');
+        return back()->with('success', __('pos.service_deleted'));
     }
 
     // ── Deals (Jul 2026) — fast-food combo promos at one promo price ──────────
@@ -4281,7 +4281,7 @@ class PosController extends Controller
             }
         });
 
-        return back()->with('success', 'Deal added successfully.');
+        return back()->with('success', __('pos.deal_added_success'));
     }
 
     public function updateDeal(Request $request, $id)
@@ -4299,7 +4299,7 @@ class PosController extends Controller
             }
         });
 
-        return back()->with('success', 'Deal updated successfully.');
+        return back()->with('success', __('pos.deal_updated_success'));
     }
 
     public function deleteDeal($id)
@@ -4312,7 +4312,7 @@ class PosController extends Controller
         });
         // Sold bills keep their own deal_snapshot — deleting a deal never
         // touches historical transactions.
-        return back()->with('success', 'Deal deleted.');
+        return back()->with('success', __('pos.deal_deleted'));
     }
 
     public function getTaxRate(Request $request)
@@ -4337,7 +4337,7 @@ class PosController extends Controller
         // first. NTN is optional at registration; the company adds it here in the profile.
         if (empty($company->ntn)) {
             return redirect()->route('pos.business-profile')
-                ->with('error', 'PRA integration se pehle apna NTN (National Tax Number) Business Profile mein daalein.');
+                ->with('error', __('pos.ntn_required_pra_integration'));
         }
 
         if (($company->pos_integration_mode ?? 'pra') === 'standalone') {
@@ -4345,7 +4345,7 @@ class PosController extends Controller
             $company->save();
         }
 
-        return redirect()->route('pos.pra-settings')->with('success', 'PRA integration enabled — configure your PRA credentials below, then turn on PRA Reporting when ready.');
+        return redirect()->route('pos.pra-settings')->with('success', __('pos.pra_integration_enabled'));
     }
 
     public function togglePra(Request $request)
@@ -4360,7 +4360,7 @@ class PosController extends Controller
             return response()->json([
                 'success' => false,
                 'enabled' => false,
-                'message' => 'PRA Reporting is not available on the Standalone edition. Enable PRA Integration from PRA Settings first.',
+                'message' => __('pos.pra_not_available_standalone'),
             ], 422);
         }
 
@@ -4377,7 +4377,7 @@ class PosController extends Controller
             return response()->json([
                 'success' => false,
                 'enabled' => (bool) $effectiveNow,
-                'message' => 'PRA Reporting aap ke liye admin set karta hai — status change karwane ke liye admin se rabta karein.',
+                'message' => __('pos.pra_reporting_set_by_admin'),
             ], 403);
         }
 
@@ -4387,7 +4387,7 @@ class PosController extends Controller
             return response()->json([
                 'success' => false,
                 'enabled' => false,
-                'message' => 'PRA Reporting on karne se pehle apna NTN Business Profile mein daalein.',
+                'message' => __('pos.ntn_required_pra_on'),
             ], 422);
         }
 
@@ -4398,8 +4398,8 @@ class PosController extends Controller
             'success' => true,
             'enabled' => (bool) $togglingUser->pra_reporting_enabled,
             'message' => $togglingUser->pra_reporting_enabled
-                ? 'PRA Reporting enabled (sirf aap ke apne bills ke liye)'
-                : 'PRA Reporting disabled (sirf aap ke apne bills ke liye)',
+                ? __('pos.pra_reporting_enabled_self')
+                : __('pos.pra_reporting_disabled_self'),
         ]);
     }
 
@@ -4412,7 +4412,7 @@ class PosController extends Controller
     {
         $user = auth('pos')->user();
         if (!$user || $user->isPosCashier()) {
-            return response()->json(['success' => false, 'message' => 'Only POS administrators can change this setting.'], 403);
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
         $company = Company::find(app('currentCompanyId'));
         $company->pos_auto_purge_local_on_dayclose = $request->boolean('enabled');
@@ -4421,7 +4421,7 @@ class PosController extends Controller
         return response()->json([
             'success' => true,
             'enabled' => (bool) $company->pos_auto_purge_local_on_dayclose,
-            'message' => $company->pos_auto_purge_local_on_dayclose ? 'Auto-archive on day-close enabled' : 'Auto-archive on day-close disabled',
+            'message' => $company->pos_auto_purge_local_on_dayclose ? __('pos.auto_archive_dayclose_enabled') : __('pos.auto_archive_dayclose_disabled'),
         ]);
     }
 
@@ -4440,7 +4440,7 @@ class PosController extends Controller
     {
         $user = auth('pos')->user();
         if (!$user || $user->isPosCashier()) {
-            return response()->json(['success' => false, 'message' => 'Only POS administrators can change this setting.'], 403);
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
 
         $validated = $request->validate(['enabled' => 'required|boolean']);
@@ -4452,7 +4452,7 @@ class PosController extends Controller
         return response()->json([
             'success' => true,
             'enabled' => (bool) $company->pos_kds_auto_print,
-            'message' => $company->pos_kds_auto_print ? 'KDS auto-print enabled' : 'KDS auto-print disabled',
+            'message' => $company->pos_kds_auto_print ? __('pos.kds_auto_print_enabled') : __('pos.kds_auto_print_disabled'),
         ]);
     }
 
@@ -4460,7 +4460,7 @@ class PosController extends Controller
     {
         $user = auth('pos')->user();
         if (!$user || $user->isPosCashier()) {
-            return response()->json(['success' => false, 'message' => 'Only POS administrators can change this setting.'], 403);
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
 
         $validated = $request->validate([
@@ -4480,7 +4480,7 @@ class PosController extends Controller
             'final_action' => $company->pos_dayclose_final_local_action,
             'provisional_action' => $company->pos_dayclose_provisional_action,
             'spend_persist' => (bool) $company->pos_customer_spend_persist,
-            'message' => 'Local billing day-close policy saved.',
+            'message' => __('pos.local_billing_policy_saved'),
         ]);
     }
 
@@ -4494,7 +4494,7 @@ class PosController extends Controller
     {
         $user = auth('pos')->user();
         if (!$user || $user->isPosCashier()) {
-            return response()->json(['success' => false, 'message' => 'Only POS administrators can change this setting.'], 403);
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
         $company = Company::find(app('currentCompanyId'));
         $company->pos_auto_dayclose_24h = $request->boolean('enabled');
@@ -4503,7 +4503,7 @@ class PosController extends Controller
         return response()->json([
             'success' => true,
             'enabled' => (bool) $company->pos_auto_dayclose_24h,
-            'message' => $company->pos_auto_dayclose_24h ? 'Auto day-close enabled' : 'Auto day-close disabled',
+            'message' => $company->pos_auto_dayclose_24h ? __('pos.auto_dayclose_enabled') : __('pos.auto_dayclose_disabled'),
         ]);
     }
 
@@ -4519,12 +4519,12 @@ class PosController extends Controller
     {
         $user = auth('pos')->user();
         if (!$user || $user->isPosCashier()) {
-            return response()->json(['success' => false, 'message' => 'Only POS administrators can change this setting.'], 403);
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
 
         $cutoff = (string) $request->input('cutoff', '');
         if (!preg_match('/^([01]\d):(00|30)$/', $cutoff) || $cutoff >= '12:00') {
-            return response()->json(['success' => false, 'message' => 'Waqt 12:00 AM se 11:30 AM ke darmiyan chunein.'], 422);
+            return response()->json(['success' => false, 'message' => __('pos.dayclose_time_range')], 422);
         }
 
         $company = Company::find(app('currentCompanyId'));
@@ -4533,13 +4533,13 @@ class PosController extends Controller
             $company->save();
             \App\Services\PosBusinessDay::forgetCutoff($company->id);
         } else {
-            return response()->json(['success' => false, 'message' => 'Setting abhi available nahi — thori dair baad koshish karein.'], 503);
+            return response()->json(['success' => false, 'message' => __('pos.setting_not_available_try_later')], 503);
         }
 
         return response()->json([
             'success' => true,
             'cutoff' => $cutoff,
-            'message' => 'Day-close waqt save ho gaya — ' . \Carbon\Carbon::createFromFormat('H:i', $cutoff)->format('g:i A') . ' se pehle ki sales pichhle din mein shumar hongi.',
+            'message' => __('pos.dayclose_time_saved', ['time' => \Carbon\Carbon::createFromFormat('H:i', $cutoff)->format('g:i A')]),
         ]);
     }
 
@@ -4557,7 +4557,7 @@ class PosController extends Controller
         return response()->json([
             'success' => true,
             'enabled' => (bool) $company->print_on_pay,
-            'message' => $company->print_on_pay ? 'Auto-print enabled' : 'Auto-print disabled',
+            'message' => $company->print_on_pay ? __('pos.auto_print_enabled') : __('pos.auto_print_disabled'),
         ]);
     }
 
@@ -4575,7 +4575,7 @@ class PosController extends Controller
         if (!$features->kot) {
             return response()->json([
                 'success' => false,
-                'message' => 'Auto-KOT requires the KOT feature to be enabled (Customize POS → Modules).',
+                'message' => __('pos.auto_kot_requires_feature'),
             ], 422);
         }
 
@@ -4585,7 +4585,7 @@ class PosController extends Controller
         return response()->json([
             'success' => true,
             'enabled' => (bool) $company->auto_print_kot,
-            'message' => $company->auto_print_kot ? 'Auto-KOT enabled' : 'Auto-KOT disabled',
+            'message' => $company->auto_print_kot ? __('pos.auto_kot_enabled') : __('pos.auto_kot_disabled'),
         ]);
     }
 
@@ -4613,7 +4613,7 @@ class PosController extends Controller
             'is_active' => true,
         ]);
 
-        return back()->with('success', 'Terminal added successfully.');
+        return back()->with('success', __('pos.terminal_added_success'));
     }
 
     public function updateTerminal(Request $request, $id)
@@ -4634,7 +4634,7 @@ class PosController extends Controller
             'is_active' => $request->has('is_active'),
         ]);
 
-        return back()->with('success', 'Terminal updated successfully.');
+        return back()->with('success', __('pos.terminal_updated_success'));
     }
 
     public function deleteTerminal($id)
@@ -4643,11 +4643,11 @@ class PosController extends Controller
         $terminal = PosTerminal::where('company_id', $companyId)->findOrFail($id);
 
         if ($terminal->transactions()->exists()) {
-            return back()->with('error', 'Cannot delete terminal with existing transactions. Deactivate it instead.');
+            return back()->with('error', __('pos.cannot_delete_terminal_transactions'));
         }
 
         $terminal->delete();
-        return back()->with('success', 'Terminal deleted.');
+        return back()->with('success', __('pos.terminal_deleted'));
     }
 
     public function praSettings(Request $request)
@@ -4658,7 +4658,7 @@ class PosController extends Controller
 
         if ($request->isMethod('post')) {
             if ($user->isPosCashier()) {
-                return back()->with('error', 'Only company admin can change settings.');
+                return back()->with('error', __('pos.only_company_admin_change_settings'));
             }
 
             $request->validate([
@@ -4711,15 +4711,15 @@ class PosController extends Controller
                 $company->update([
                     'confidential_pin' => bcrypt($request->confidential_pin),
                 ]);
-                return back()->with('success', 'Settings & Confidential PIN updated.');
+                return back()->with('success', __('pos.settings_pin_updated'));
             }
 
             if ($request->has('remove_pin') && $request->remove_pin) {
                 $company->update(['confidential_pin' => null]);
-                return back()->with('success', 'Settings updated. Confidential PIN removed.');
+                return back()->with('success', __('pos.settings_pin_removed'));
             }
 
-            return back()->with('success', 'PRA settings updated successfully.');
+            return back()->with('success', __('pos.pra_settings_updated'));
         }
 
         $praLogs = PraLog::where('company_id', $companyId)->orderBy('created_at', 'desc')->take(20)->get();
@@ -4739,20 +4739,20 @@ class PosController extends Controller
             $remaining = cache()->get($lockKey) - now()->timestamp;
             return response()->json([
                 'success' => false,
-                'message' => 'Too many wrong attempts. Try again in ' . ceil($remaining / 60) . ' minutes.',
+                'message' => __('pos.too_many_wrong_attempts_minutes', ['minutes' => ceil($remaining / 60)]),
                 'locked' => true,
             ], 429);
         }
 
         if (empty($company->confidential_pin)) {
-            return response()->json(['success' => false, 'message' => 'Confidential PIN not set. Admin must set it from Settings.'], 400);
+            return response()->json(['success' => false, 'message' => __('pos.confidential_pin_not_set')], 400);
         }
 
         $pin = $request->input('pin', '');
         if (\Hash::check($pin, $company->confidential_pin)) {
             cache()->forget($attemptsKey);
             session(['confidential_pin_verified' => true, 'confidential_pin_verified_at' => now()->timestamp]);
-            return response()->json(['success' => true, 'message' => 'PIN verified.']);
+            return response()->json(['success' => true, 'message' => __('pos.pin_verified')]);
         }
 
         $attempts = (int) cache()->get($attemptsKey, 0) + 1;
@@ -4763,14 +4763,14 @@ class PosController extends Controller
             cache()->forget($attemptsKey);
             return response()->json([
                 'success' => false,
-                'message' => 'Too many wrong attempts. Locked for 15 minutes.',
+                'message' => __('pos.too_many_wrong_attempts_locked'),
                 'locked' => true,
             ], 429);
         }
 
         return response()->json([
             'success' => false,
-            'message' => 'Wrong PIN. ' . (5 - $attempts) . ' attempts remaining.',
+            'message' => __('pos.wrong_pin_attempts_remaining', ['count' => 5 - $attempts]),
             'remaining' => 5 - $attempts,
         ], 401);
     }
@@ -4790,7 +4790,7 @@ class PosController extends Controller
         $user = auth('pos')->user();
 
         if ($user->isPosCashier()) {
-            return redirect()->route('pos.dashboard')->with('error', 'Access denied.');
+            return redirect()->route('pos.dashboard')->with('error', __('pos.access_denied'));
         }
 
         $team = User::where('company_id', $companyId)
@@ -4830,7 +4830,7 @@ class PosController extends Controller
         $user = auth('pos')->user();
 
         if ($user->isPosCashier()) {
-            return back()->with('error', 'Access denied.');
+            return back()->with('error', __('pos.access_denied'));
         }
 
         $request->validate([
@@ -4875,8 +4875,8 @@ class PosController extends Controller
         }
         User::create($newUserData);
 
-        $roleLabel = ['pos_manager' => 'Manager', 'pos_kitchen' => 'Kitchen', 'pos_waiter' => 'Waiter', 'pos_delivery' => 'Delivery Manager'][$newRole] ?? 'Cashier';
-        return back()->with('success', "{$roleLabel} account created successfully.");
+        $roleLabel = ['pos_manager' => __('pos.role_manager'), 'pos_kitchen' => __('pos.role_kitchen'), 'pos_waiter' => __('pos.role_waiter'), 'pos_delivery' => __('pos.role_delivery_manager')][$newRole] ?? __('pos.role_cashier');
+        return back()->with('success', __('pos.account_created_success', ['role' => $roleLabel]));
     }
 
     /**
@@ -4891,7 +4891,7 @@ class PosController extends Controller
         $user = auth('pos')->user();
 
         if (!$user || $user->isPosCashier()) {
-            return back()->with('error', 'Access denied.');
+            return back()->with('error', __('pos.access_denied'));
         }
 
         $request->validate(['enabled' => 'required|boolean']);
@@ -4906,18 +4906,18 @@ class PosController extends Controller
         // Standalone edition has no PRA integration; and turning reporting ON
         // requires an NTN on file (mirrors togglePra's server-side guards).
         if ($enable && ($company->pos_integration_mode ?? 'pra') === 'standalone') {
-            return back()->with('error', 'PRA Reporting is not available on the Standalone edition.');
+            return back()->with('error', __('pos.pra_not_available_standalone'));
         }
         if ($enable && empty($company->ntn)) {
-            return back()->with('error', 'Cashier ko Online karne se pehle apna NTN Business Profile mein daalein.');
+            return back()->with('error', __('pos.ntn_required_pra_on'));
         }
 
         $cashier->pra_reporting_enabled = $enable;
         $cashier->save();
 
         return back()->with('success', $enable
-            ? "{$cashier->name} ab ONLINE hai — is ke bills PRA ko report honge."
-            : "{$cashier->name} ab OFFLINE hai — is ke bills sirf local (L-series) banenge.");
+            ? __('pos.cashier_online_now', ['name' => $cashier->name])
+            : __('pos.cashier_offline_now', ['name' => $cashier->name]));
     }
 
     public function updateCashier(Request $request, $id)
@@ -4926,7 +4926,7 @@ class PosController extends Controller
         $user = auth('pos')->user();
 
         if ($user->isPosCashier()) {
-            return back()->with('error', 'Access denied.');
+            return back()->with('error', __('pos.access_denied'));
         }
 
         $cashier = User::where('company_id', $companyId)->whereIn('pos_role', ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter', 'pos_delivery'])->findOrFail($id);
@@ -4957,7 +4957,7 @@ class PosController extends Controller
             $cashier->update($pwUpdate);
         }
 
-        return back()->with('success', 'Cashier updated.');
+        return back()->with('success', __('pos.cashier_updated'));
     }
 
     // ── Item #1 (Jul 2026): customer saved delivery addresses ──────────────
@@ -5000,7 +5000,7 @@ class PosController extends Controller
         $customer = \App\Models\PosCustomer::where('company_id', $companyId)
             ->find((int) $request->customer_id);
         if (!$customer) {
-            return response()->json(['success' => false, 'message' => 'Customer not found'], 404);
+            return response()->json(['success' => false, 'message' => __('pos.customer_not_found')], 404);
         }
 
         // First-ever address becomes the customer's default (address #1) so the
@@ -5014,7 +5014,7 @@ class PosController extends Controller
         $count = \App\Models\PosCustomerAddress::where('company_id', $companyId)
             ->where('customer_id', $customer->id)->count();
         if ($count >= 15) {
-            return response()->json(['success' => false, 'message' => 'Address limit reached (15) — delete an old one first.'], 422);
+            return response()->json(['success' => false, 'message' => __('pos.address_limit_reached')], 422);
         }
 
         $addr = \App\Models\PosCustomerAddress::create([
@@ -5033,7 +5033,7 @@ class PosController extends Controller
         $user = auth('pos')->user();
 
         if ($user->isPosCashier()) {
-            return back()->with('error', 'Access denied.');
+            return back()->with('error', __('pos.access_denied'));
         }
 
         $cashier = User::where('company_id', $companyId)->whereIn('pos_role', ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter', 'pos_delivery'])->findOrFail($id);
@@ -5050,7 +5050,7 @@ class PosController extends Controller
 
         $cashier->update(['is_active' => !$cashier->is_active]);
 
-        return back()->with('success', $cashier->is_active ? 'Cashier activated.' : 'Cashier deactivated.');
+        return back()->with('success', $cashier->is_active ? __('pos.cashier_activated') : __('pos.cashier_deactivated'));
     }
 
     public function products()
@@ -5373,12 +5373,12 @@ class PosController extends Controller
         }
 
         // Build feedback message with recipe context so cashier sees exactly what landed
-        $msg = 'Product added successfully.';
+        $msg = __('pos.product_added_success');
         if ($recipeAdded > 0) {
-            $msg .= " Recipe: {$recipeAdded} ingredient" . ($recipeAdded === 1 ? '' : 's') . " linked.";
+            $msg .= __('pos.product_recipe_linked', ['count' => $recipeAdded]);
         }
         if ($recipeSkipped > 0) {
-            $msg .= " ({$recipeSkipped} recipe row" . ($recipeSkipped === 1 ? '' : 's') . " skipped — missing qty or duplicate.)";
+            $msg .= __('pos.product_recipe_skipped', ['count' => $recipeSkipped]);
         }
         return back()->with('success', $msg);
     }
@@ -5492,14 +5492,14 @@ class PosController extends Controller
                 : $this->readImportRowsCsv($file->getRealPath());
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('POS product import parse failed: ' . $e->getMessage());
-            return back()->with('error', 'File parhi nahi ja saki — file kharab ya password-protected lag rahi hai. Template dobara download kar ke usi file mein products likhein.');
+            return back()->with('error', __('pos.file_unreadable'));
         }
 
         if (count($rows) < 2) {
-            return back()->with('error', 'File khali hai — header ke neeche products ki rows likhein.');
+            return back()->with('error', __('pos.file_empty_rows'));
         }
         if (count($rows) > 5001) {
-            return back()->with('error', 'Ek waqt mein zyada se zyada 5000 products import karein — file ko do hisson mein baant lein.');
+            return back()->with('error', __('pos.file_max_products'));
         }
 
         $header = array_map(function ($h) {
@@ -5510,7 +5510,7 @@ class PosController extends Controller
         $priceIdx = $this->findColumn($header, ['price', 'sale price', 'rate', 'unit price', 'price (rs)', 'price rs']);
 
         if ($nameIdx === false || $priceIdx === false) {
-            return back()->with('error', 'File mein "Name" aur "Price" columns nahi mile. Template download karein aur USI file mein products likh kar wapis upload karein — headers wali pehli row mat delete karein.');
+            return back()->with('error', __('pos.file_missing_name_price'));
         }
 
         $descIdx = $this->findColumn($header, ['description', 'details']);
@@ -5647,12 +5647,12 @@ class PosController extends Controller
         }
 
         $parts = [];
-        if ($added > 0) $parts[] = "{$added} naye products add hue";
-        if ($updated > 0) $parts[] = "{$updated} update hue";
-        if ($samplesSkipped > 0) $parts[] = "{$samplesSkipped} sample rows skip hui";
-        if ($skipped > 0) $parts[] = "{$skipped} rows skip hui";
-        $msg = $parts ? implode(', ', $parts) . '.' : 'File mein koi import karne wali row nahi mili.';
-        if (!empty($errors)) $msg .= ' Masail: ' . implode('; ', array_slice($errors, 0, 5)) . (count($errors) > 5 ? ' …aur ' . (count($errors) - 5) . ' mazeed.' : '');
+        if ($added > 0) $parts[] = __('pos.import_new_products_added', ['count' => $added]);
+        if ($updated > 0) $parts[] = __('pos.import_updated', ['count' => $updated]);
+        if ($samplesSkipped > 0) $parts[] = __('pos.import_sample_rows_skipped', ['count' => $samplesSkipped]);
+        if ($skipped > 0) $parts[] = __('pos.import_rows_skipped', ['count' => $skipped]);
+        $msg = $parts ? implode(', ', $parts) . '.' : __('pos.import_no_rows');
+        if (!empty($errors)) $msg .= __('pos.import_issues', ['issues' => implode('; ', array_slice($errors, 0, 5))]) . (count($errors) > 5 ? __('pos.import_more_suffix', ['count' => count($errors) - 5]) : '');
 
         if ($added === 0 && $updated === 0) {
             return back()->with('error', $msg);
@@ -5880,7 +5880,7 @@ class PosController extends Controller
             } catch (\Exception $e) {}
         }
 
-        return back()->with('success', 'Product updated successfully.');
+        return back()->with('success', __('pos.product_updated_success'));
     }
 
     public function deleteProduct($id)
@@ -5893,7 +5893,7 @@ class PosController extends Controller
         \App\Models\InventoryStock::where('company_id', $companyId)
             ->where('product_id', $product->id)
             ->delete();
-        return back()->with('success', 'Product deleted successfully.');
+        return back()->with('success', __('pos.product_deleted_success'));
     }
 
     public function toggleProduct($id)
@@ -5901,7 +5901,7 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $product = PosProduct::where('company_id', $companyId)->findOrFail($id);
         $product->update(['is_active' => !$product->is_active]);
-        return back()->with('success', $product->is_active ? 'Product activated.' : 'Product deactivated.');
+        return back()->with('success', $product->is_active ? __('pos.product_activated') : __('pos.product_deactivated'));
     }
 
     public function toggleProductSale($id)
@@ -5909,7 +5909,7 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $product = PosProduct::where('company_id', $companyId)->findOrFail($id);
         $product->update(['show_on_sale' => !$product->show_on_sale]);
-        return back()->with('success', $product->show_on_sale ? 'Product is now visible on the sale screen.' : 'Product hidden from the sale screen.');
+        return back()->with('success', $product->show_on_sale ? __('pos.product_visible_on_sale') : __('pos.product_hidden_from_sale'));
     }
 
     /**
@@ -5943,9 +5943,10 @@ class PosController extends Controller
         }
         $count = $query->update(['show_on_sale' => $show]);
 
-        $scope = $request->filled('category') ? '"' . $request->input('category') . '" category ke ' : '';
-        $msg = number_format($count) . ' ' . $scope . 'products sale screen '
-            . ($show ? 'par show kar diye.' : 'se hide kar diye.');
+        $scope = $request->filled('category') ? __('pos.scope_category_prefix', ['category' => $request->input('category')]) : '';
+        $msg = $show
+            ? __('pos.products_shown_scope', ['count' => number_format($count), 'scope' => $scope])
+            : __('pos.products_hidden_scope', ['count' => number_format($count), 'scope' => $scope]);
         return back()->with('success', $msg);
     }
 
@@ -5972,24 +5973,24 @@ class PosController extends Controller
         switch ($request->action) {
             case 'activate':
                 $query->update(['is_active' => true]);
-                $msg = "{$count} product(s) activated.";
+                $msg = __('pos.products_activated_count', ['count' => $count]);
                 break;
             case 'deactivate':
                 $query->update(['is_active' => false]);
-                $msg = "{$count} product(s) deactivated.";
+                $msg = __('pos.products_deactivated_count', ['count' => $count]);
                 break;
             case 'category':
                 $query->update(['category' => $request->category_value ?: null]);
-                $msg = "{$count} product(s) re-categorized.";
+                $msg = __('pos.products_recategorized_count', ['count' => $count]);
                 break;
             case 'price':
                 // Fixed price for all selected (small same-price groups).
                 if ($request->input('price_value') === null || $request->input('price_value') === '') {
-                    return back()->with('error', 'Nayi price likhein.');
+                    return back()->with('error', __('pos.enter_new_price'));
                 }
                 $newPrice = round((float) $request->input('price_value'), 2);
                 $query->update(['price' => $newPrice]);
-                $msg = "{$count} product(s) ki price Rs {$newPrice} set ho gayi.";
+                $msg = __('pos.products_price_set', ['count' => $count, 'price' => $newPrice]);
                 break;
             case 'price_percent':
                 // Percent increase/decrease — inflation reprice across a list.
@@ -5997,21 +5998,21 @@ class PosController extends Controller
                 // stay one UPDATE (no per-row loop on shared cPanel PHP).
                 $pct = (float) $request->input('percent_value');
                 if ($request->input('percent_value') === null || $request->input('percent_value') === '' || abs($pct) < 0.001) {
-                    return back()->with('error', 'Percent likhein — masalan 10 (izafa) ya -5 (kami).');
+                    return back()->with('error', __('pos.enter_percent'));
                 }
                 $factor = sprintf('%.6F', 1 + $pct / 100);
                 $query->update(['price' => DB::raw("ROUND(GREATEST(price * {$factor}, 0), 2)")]);
-                $msg = "{$count} product(s) ki price " . ($pct > 0 ? "+{$pct}%" : "{$pct}%") . " update ho gayi.";
+                $msg = __('pos.products_price_updated_pct', ['count' => $count, 'pct' => ($pct > 0 ? "+{$pct}%" : "{$pct}%")]);
                 break;
             case 'exempt_on':
                 // Flag only — sale math reads is_tax_exempt (tax_rate untouched so
                 // switching back OFF restores the product's own rate).
                 $query->update(['is_tax_exempt' => true]);
-                $msg = "{$count} product(s) TAX EXEMPT ho gaye — bill par in par tax nahi lagega.";
+                $msg = __('pos.products_tax_exempt_on', ['count' => $count]);
                 break;
             case 'exempt_off':
                 $query->update(['is_tax_exempt' => false]);
-                $msg = "{$count} product(s) par tax dobara ON ho gaya.";
+                $msg = __('pos.products_tax_exempt_off', ['count' => $count]);
                 break;
             case 'delete':
                 // Clean up images before delete
@@ -6021,10 +6022,10 @@ class PosController extends Controller
                     }
                 }
                 $query->delete();
-                $msg = "{$count} product(s) deleted.";
+                $msg = __('pos.products_deleted_count', ['count' => $count]);
                 break;
             default:
-                $msg = 'No action taken.';
+                $msg = __('pos.no_action_taken');
         }
 
         return back()->with('success', $msg);
@@ -6082,7 +6083,7 @@ class PosController extends Controller
             return response()->json(['success' => true, 'customer' => ['id' => $customer->id, 'name' => $customer->name, 'phone' => $customer->phone]]);
         }
 
-        return back()->with('success', 'Customer added successfully.');
+        return back()->with('success', __('pos.customer_added_success'));
     }
 
     public function updateCustomer(Request $request, $id)
@@ -6102,7 +6103,7 @@ class PosController extends Controller
         ]);
 
         $customer->update($request->only(['name', 'email', 'phone', 'address', 'city', 'ntn', 'cnic', 'type']));
-        return back()->with('success', 'Customer updated successfully.');
+        return back()->with('success', __('pos.customer_updated_success'));
     }
 
     public function deleteCustomer($id)
@@ -6110,7 +6111,7 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $customer = PosCustomer::where('company_id', $companyId)->findOrFail($id);
         $customer->delete();
-        return back()->with('success', 'Customer deleted successfully.');
+        return back()->with('success', __('pos.customer_deleted_success'));
     }
 
     public function toggleCustomer($id)
@@ -6118,7 +6119,7 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $customer = PosCustomer::where('company_id', $companyId)->findOrFail($id);
         $customer->update(['is_active' => !$customer->is_active]);
-        return back()->with('success', $customer->is_active ? 'Customer activated.' : 'Customer deactivated.');
+        return back()->with('success', $customer->is_active ? __('pos.customer_activated') : __('pos.customer_deactivated'));
     }
 
     /**
@@ -6236,13 +6237,13 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $handle = fopen($request->file('file')->getRealPath(), 'r');
         if ($handle === false) {
-            return back()->with('error', 'Could not read the uploaded file.');
+            return back()->with('error', __('pos.customer_import_could_not_read'));
         }
 
         $header = fgetcsv($handle);
         if (!$header) {
             fclose($handle);
-            return back()->with('error', 'The CSV file appears to be empty.');
+            return back()->with('error', __('pos.customer_import_empty'));
         }
         // Strip a UTF-8 BOM that Excel may prepend to the first header cell.
         if (isset($header[0])) {
@@ -6351,11 +6352,11 @@ class PosController extends Controller
             DB::rollBack();
             fclose($handle);
             \Log::error('POS customer import failed', ['company_id' => $companyId, 'error' => $e->getMessage()]);
-            return back()->with('error', 'Import failed due to an unexpected error. Please check the file format and try again.');
+            return back()->with('error', __('pos.customer_import_failed'));
         }
         fclose($handle);
 
-        $msg = "Import complete: {$imported} added, {$updated} updated" . ($skipped ? ", {$skipped} skipped" : '') . '.';
+        $msg = __('pos.customer_import_complete', ['added' => $imported, 'updated' => $updated, 'skipped' => ($skipped ? __('pos.customer_import_skipped_part', ['count' => $skipped]) : '')]);
         return back()->with('success', $msg)->with('import_errors', $errors);
     }
 
@@ -6527,7 +6528,7 @@ class PosController extends Controller
             ->first();
 
         if (!$last) {
-            return response()->json(['success' => false, 'message' => 'No previous order found.']);
+            return response()->json(['success' => false, 'message' => __('pos.no_previous_order')]);
         }
 
         $items = \DB::table('pos_transaction_items')
@@ -6574,7 +6575,7 @@ class PosController extends Controller
 
             if ($draft) {
                 if ($draft->isLocked() && $draft->locked_by_terminal_id != $request->input('terminal_id')) {
-                    return response()->json(['success' => false, 'message' => 'This invoice is currently being edited on another terminal.'], 423);
+                    return response()->json(['success' => false, 'message' => __('pos.invoice_being_edited_terminal_generic')], 423);
                 }
 
                 $draft->update([
@@ -6683,7 +6684,7 @@ class PosController extends Controller
             ->first();
 
         if (!$draft) {
-            return response()->json(['success' => false, 'message' => 'Draft not found.'], 404);
+            return response()->json(['success' => false, 'message' => __('pos.draft_not_found')], 404);
         }
 
         $draft->items()->delete();
@@ -6699,7 +6700,7 @@ class PosController extends Controller
         $terminalId = $request->input('terminal_id');
 
         if (!$terminalId) {
-            return response()->json(['success' => false, 'message' => 'Terminal ID required.'], 400);
+            return response()->json(['success' => false, 'message' => __('pos.terminal_id_required')], 400);
         }
 
         $transaction = PosTransaction::where('company_id', $companyId)->findOrFail($id);
@@ -6709,7 +6710,7 @@ class PosController extends Controller
             $terminalName = $lockedTerminal ? $lockedTerminal->terminal_name : 'Unknown';
             return response()->json([
                 'success' => false,
-                'message' => "This invoice is currently being edited on another terminal ({$terminalName}).",
+                'message' => __('pos.invoice_being_edited_terminal', ['terminal' => $terminalName]),
                 'locked_by' => $terminalName,
                 'lock_time' => $transaction->lock_time?->toISOString(),
             ], 423);
@@ -6966,7 +6967,7 @@ class PosController extends Controller
             // while PRA reporting is live, or subsequent submissions would carry a null NTN.
             // (NTN is optional at registration; it only becomes mandatory once PRA is ON.)
             if ($company->praReportingActive() && $request->has('ntn') && trim((string) $request->input('ntn')) === '') {
-                return back()->withInput()->with('error', 'PRA Reporting on hai — NTN khali nahi kiya ja sakta. Pehle PRA Reporting band karein ya sahi NTN daalein.');
+                return back()->withInput()->with('error', __('pos.ntn_cannot_clear_pra_on'));
             }
 
             $data = $request->only(['name', 'owner_name', 'ntn', 'email', 'phone', 'mobile', 'address', 'city', 'business_activity', 'website']);
@@ -7001,7 +7002,7 @@ class PosController extends Controller
             }
 
             $company->update($data);
-            return redirect()->route('pos.customize')->with('success', 'Business profile updated successfully.');
+            return redirect()->route('pos.customize')->with('success', __('pos.business_profile_updated'));
         }
 
         // F8 — public profile + menu builder data (admin-only section in the view)
@@ -7034,7 +7035,7 @@ class PosController extends Controller
                 ]);
 
                 $user->update($request->only(['name', 'email', 'phone', 'username']));
-                return back()->with('success', 'Profile updated successfully.');
+                return back()->with('success', __('pos.profile_updated_success'));
             }
 
             if ($action === 'change_password') {
@@ -7044,7 +7045,7 @@ class PosController extends Controller
                 ]);
 
                 if (!\Illuminate\Support\Facades\Hash::check($request->current_password, $user->password)) {
-                    return back()->withErrors(['current_password' => 'Current password is incorrect.']);
+                    return back()->withErrors(['current_password' => __('pos.current_password_incorrect')]);
                 }
 
                 $passwordUpdate = [
@@ -7060,7 +7061,7 @@ class PosController extends Controller
                     $passwordUpdate['pos_team_password_enc'] = \Illuminate\Support\Facades\Crypt::encryptString($request->new_password);
                 }
                 $user->update($passwordUpdate);
-                return back()->with('success', 'Password changed successfully.');
+                return back()->with('success', __('pos.password_changed_success'));
             }
         }
 
@@ -7221,22 +7222,22 @@ class PosController extends Controller
         $result = $this->performDayClose($companyId, $date, $user?->id, $request->input('notes'), $cashRecon);
 
         if ($result['status'] === 'exists') {
-            return back()->with('error', 'Day Close Report for this date already exists.');
+            return back()->with('error', __('pos.dayclose_report_exists'));
         }
         if ($result['status'] === 'empty') {
-            return back()->with('error', 'No transactions found for this date.');
+            return back()->with('error', __('pos.dayclose_no_transactions'));
         }
 
-        $msg = 'Day Close Report ' . $result['report_number'] . ' generated for ' . \Carbon\Carbon::parse($date)->format('d M Y');
+        $msg = __('pos.dayclose_report_generated', ['number' => $result['report_number'], 'date' => \Carbon\Carbon::parse($date)->format('d M Y')]);
         if ($result['archived'] > 0) {
-            $msg .= " — {$result['archived']} local bill(s) moved to Archive.";
+            $msg .= __('pos.dayclose_bills_archived', ['count' => $result['archived']]);
         }
         if (($result['deleted'] ?? 0) > 0) {
-            $msg .= " — {$result['deleted']} local bill(s) deleted per company policy.";
+            $msg .= __('pos.dayclose_bills_deleted', ['count' => $result['deleted']]);
         }
         $backlogSwept = array_sum(array_column($result['summary'] ?? [], 'backlog'));
         if ($backlogSwept > 0) {
-            $msg .= " Includes {$backlogSwept} leftover local bill(s) from earlier dates.";
+            $msg .= __('pos.dayclose_backlog_included', ['count' => $backlogSwept]);
         }
         return back()->with('success', $msg);
     }

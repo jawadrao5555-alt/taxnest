@@ -1,8 +1,8 @@
 <x-pos-layout>
 <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="mb-6">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Kitchen Settings</h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Configure how orders flow to the kitchen</p>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.kitchen_settings') }}</h1>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.kitchen_settings_subtitle') }}</p>
     </div>
 
     @if(session('success'))
@@ -16,8 +16,8 @@
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
             <div class="p-5 flex items-center justify-between">
                 <div>
-                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Kitchen Display System (KDS)</h3>
-                    <p class="text-xs text-gray-500 mt-0.5">Show orders on the KDS screen when held</p>
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.kds_title') }}</h3>
+                    <p class="text-xs text-gray-500 mt-0.5">{{ __('pos.kds_hint') }}</p>
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer">
                     <input type="hidden" name="kds_enabled" value="0">
@@ -27,8 +27,8 @@
             </div>
             <div class="p-5 flex items-center justify-between">
                 <div>
-                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Kitchen Printer</h3>
-                    <p class="text-xs text-gray-500 mt-0.5">Enable kitchen order ticket (KOT) printing</p>
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.kitchen_printer') }}</h3>
+                    <p class="text-xs text-gray-500 mt-0.5">{{ __('pos.kitchen_printer_hint') }}</p>
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer">
                     <input type="hidden" name="kitchen_printer_enabled" value="0">
@@ -38,8 +38,8 @@
             </div>
             <div class="p-5 flex items-center justify-between">
                 <div>
-                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Print KOT on Hold</h3>
-                    <p class="text-xs text-gray-500 mt-0.5">Automatically print kitchen ticket when order is held</p>
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.print_kot_on_hold') }}</h3>
+                    <p class="text-xs text-gray-500 mt-0.5">{{ __('pos.print_kot_on_hold_hint') }}</p>
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer">
                     <input type="hidden" name="print_on_hold" value="0">
@@ -49,8 +49,8 @@
             </div>
             <div class="p-5 flex items-center justify-between">
                 <div>
-                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Dine-In Auto KOT on Table Select</h3>
-                    <p class="text-xs text-gray-500 mt-0.5">Table select becomes the last step: order auto-holds, KOT fires to kitchen, bill lands in Recall — no extra Hold/KOT press</p>
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.dine_in_auto_kot_title') }}</h3>
+                    <p class="text-xs text-gray-500 mt-0.5">{{ __('pos.dine_in_auto_kot_hint') }}</p>
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer">
                     <input type="hidden" name="dine_in_auto_kot" value="0">
@@ -60,8 +60,8 @@
             </div>
             <div class="p-5 flex items-center justify-between">
                 <div>
-                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Always Print Full KOT</h3>
-                    <p class="text-xs text-gray-500 mt-0.5">Every kitchen ticket prints the COMPLETE order — newly added dishes get a bold NEW tag (instead of a short added-items-only slip)</p>
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.always_full_kot') }}</h3>
+                    <p class="text-xs text-gray-500 mt-0.5">{{ __('pos.always_full_kot_hint') }}</p>
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer">
                     <input type="hidden" name="pos_kot_full_mode" value="0">
@@ -71,8 +71,8 @@
             </div>
             <div class="p-5 flex items-center justify-between">
                 <div>
-                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Print Receipt on Pay</h3>
-                    <p class="text-xs text-gray-500 mt-0.5">Automatically print customer receipt after payment</p>
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.print_receipt_on_pay') }}</h3>
+                    <p class="text-xs text-gray-500 mt-0.5">{{ __('pos.print_receipt_on_pay_hint') }}</p>
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer">
                     <input type="hidden" name="print_on_pay" value="0">
@@ -86,14 +86,14 @@
              toggles + print position. Defaults keep the ticket exactly as before. --}}
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
             <div class="p-5 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="text-sm font-bold text-gray-900 dark:text-white">KOT Print Style — Paper Saving</h3>
-                <p class="text-xs text-gray-500 mt-0.5">Shorten the kitchen ticket by hiding parts you don't need, and adjust where it prints on the paper</p>
+                <h3 class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.kot_print_style') }}</h3>
+                <p class="text-xs text-gray-500 mt-0.5">{{ __('pos.kot_print_style_hint') }}</p>
             </div>
             <div class="divide-y divide-gray-200 dark:divide-gray-700">
                 <div class="p-5 flex items-center justify-between">
                     <div>
-                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Compact KOT</h3>
-                        <p class="text-xs text-gray-500 mt-0.5">Smaller fonts and tighter spacing — a noticeably shorter ticket</p>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.compact_kot') }}</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">{{ __('pos.compact_kot_hint') }}</p>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="hidden" name="kot_compact" value="0">
@@ -103,8 +103,8 @@
                 </div>
                 <div class="p-5 flex items-center justify-between">
                     <div>
-                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Show Customer Name</h3>
-                        <p class="text-xs text-gray-500 mt-0.5">Print the customer's name on the kitchen ticket</p>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.show_customer_name') }}</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">{{ __('pos.show_customer_name_hint') }}</p>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="hidden" name="kot_show_customer" value="0">
@@ -114,8 +114,8 @@
                 </div>
                 <div class="p-5 flex items-center justify-between">
                     <div>
-                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Show "Order by" &amp; Item Count</h3>
-                        <p class="text-xs text-gray-500 mt-0.5">The footer lines with the staff name and total item count</p>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.show_order_by_item_count') }}</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">{{ __('pos.show_order_by_item_count_hint') }}</p>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="hidden" name="kot_show_orderby" value="0">
@@ -125,8 +125,8 @@
                 </div>
                 <div class="p-5 flex items-center justify-between">
                     <div>
-                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Show Barcode</h3>
-                        <p class="text-xs text-gray-500 mt-0.5">Needed for KDS scan-to-clear — turn off only if the kitchen never scans tickets</p>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.show_barcode') }}</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">{{ __('pos.show_barcode_hint') }}</p>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="hidden" name="kot_show_barcode" value="0">
@@ -136,8 +136,8 @@
                 </div>
                 <div class="p-5 flex items-center justify-between">
                     <div>
-                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Show Business Name at Bottom</h3>
-                        <p class="text-xs text-gray-500 mt-0.5">Print your business name at the end of the ticket</p>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.show_business_name_bottom') }}</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">{{ __('pos.show_business_name_bottom_hint') }}</p>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="hidden" name="kot_show_footer" value="0">
@@ -148,18 +148,18 @@
                 <div class="p-5">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-semibold text-gray-900 dark:text-white mb-1">Print Position</label>
+                            <label class="block text-sm font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.print_position') }}</label>
                             <select name="kot_align_center" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm">
-                                <option value="0" {{ !($company->kot_align_center ?? false) ? 'selected' : '' }}>Left edge (default — safest)</option>
-                                <option value="1" {{ ($company->kot_align_center ?? false) ? 'selected' : '' }}>Center of paper</option>
+                                <option value="0" {{ !($company->kot_align_center ?? false) ? 'selected' : '' }}>{{ __('pos.print_pos_left_edge') }}</option>
+                                <option value="1" {{ ($company->kot_align_center ?? false) ? 'selected' : '' }}>{{ __('pos.print_pos_center') }}</option>
                             </select>
-                            <p class="text-[11px] text-amber-600 dark:text-amber-400 mt-1">Use Center ONLY if the printer's paper size is set to 80mm roll. On an A4/Letter queue, Center pushes the print off the paper and the slip comes out blank.</p>
+                            <p class="text-[11px] text-amber-600 dark:text-amber-400 mt-1">{{ __('pos.print_pos_center_warn') }}</p>
                         </div>
                         <div>
-                            <label class="block text-sm font-semibold text-gray-900 dark:text-white mb-1">Left Margin (mm)</label>
+                            <label class="block text-sm font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.left_margin_mm') }}</label>
                             <input type="number" name="kot_left_margin_mm" min="0" max="30" step="1" value="{{ (int) ($company->kot_left_margin_mm ?? 0) }}"
                                    class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm">
-                            <p class="text-[11px] text-gray-400 mt-1">Shifts the print to the right (0–30mm). Used only with "Left edge" position. Start with 3–5mm if the print sits too far left.</p>
+                            <p class="text-[11px] text-gray-400 mt-1">{{ __('pos.left_margin_mm_hint') }}</p>
                         </div>
                     </div>
                 </div>
@@ -167,7 +167,7 @@
         </div>
 
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 p-5">
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">Order Flow</h3>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">{{ __('pos.order_flow') }}</h3>
             <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                 <span class="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-lg font-medium">HOLD</span>
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
@@ -177,11 +177,11 @@
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                 <span class="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-lg font-medium">PAY</span>
             </div>
-            <p class="text-xs text-gray-400 mt-2">Inventory deducts ONLY on payment. KOT prints on hold (if enabled).</p>
+            <p class="text-xs text-gray-400 mt-2">{{ __('pos.order_flow_hint') }}</p>
         </div>
 
         <button type="submit" class="w-full py-2.5 rounded-xl text-sm font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-sm transition-all">
-            Save Kitchen Settings
+            {{ __('pos.save_kitchen_settings') }}
         </button>
     </form>
 
@@ -194,8 +194,8 @@
          classic single KOT (feature dormant). --}}
     <div class="mt-8" x-data="{ addOpen: {{ $errors->any() ? 'true' : 'false' }}, editId: null }">
         <div class="mb-4">
-            <h2 class="text-lg font-bold text-gray-900 dark:text-white">Counters / Stations</h2>
-            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Split one order's kitchen ticket across counters (e.g. Kitchen, Ice Cream, Shakes) by product category. Each counter prints only its own items. Anything unassigned goes to the main Kitchen.</p>
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ __('pos.counters_stations') }}</h2>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.counters_stations_hint') }}</p>
         </div>
 
         @if($errors->any())
@@ -208,7 +208,7 @@
 
         @if(($categories ?? collect())->isEmpty())
         <div class="mb-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3 text-xs text-amber-700 dark:text-amber-400">
-            No product categories found yet — set categories on your products first, then assign them to counters here.
+            {{ __('pos.no_product_categories_yet') }}
         </div>
         @endif
 
@@ -224,18 +224,18 @@
                             @endif
                         </div>
                         <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            {{ collect($st->categories ?? [])->isEmpty() ? 'No categories assigned' : collect($st->categories)->implode(', ') }}
+                            {{ collect($st->categories ?? [])->isEmpty() ? __('pos.no_categories_assigned') : collect($st->categories)->implode(', ') }}
                             <span class="mx-1">·</span>
-                            Printer: {{ $st->printer_name ?: 'company KOT printer' }}
+                            {{ __('pos.printer_colon') }} {{ $st->printer_name ?: __('pos.company_kot_printer') }}
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
                         <button type="button" @click="editId = editId === {{ $st->id }} ? null : {{ $st->id }}"
-                                class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-300 dark:hover:bg-purple-900/20">Edit</button>
+                                class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-300 dark:hover:bg-purple-900/20">{{ __('pos.edit') }}</button>
                         <form method="POST" action="{{ route('pos.restaurant.stations.delete', $st->id) }}"
-                              onsubmit="return confirm('Remove counter \'{{ addslashes($st->name) }}\'? Its categories will print with the main Kitchen again.');">
+                              onsubmit="return confirm({{ Js::from(__('pos.confirm_remove_counter', ['name' => $st->name])) }});">
                             @csrf
-                            <button type="submit" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/20">Remove</button>
+                            <button type="submit" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/20">{{ __('pos.remove_word') }}</button>
                         </form>
                     </div>
                 </div>
@@ -244,14 +244,14 @@
                     @csrf
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Counter Name</label>
+                            <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.counter_name') }}</label>
                             <input type="text" name="name" value="{{ $st->name }}" required maxlength="60"
                                    class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Printer (Desktop Agent)</label>
+                            <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.printer_desktop_agent') }}</label>
                             <select name="printer_name" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm">
-                                <option value="">— Use company KOT printer —</option>
+                                <option value="">{{ __('pos.use_company_kot_printer') }}</option>
                                 @foreach(($printers ?? collect()) as $p)
                                 <option value="{{ $p }}" {{ $st->printer_name === $p ? 'selected' : '' }}>{{ $p }}</option>
                                 @endforeach
@@ -259,7 +259,7 @@
                         </div>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Product Categories</label>
+                        <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.product_categories') }}</label>
                         <div class="flex flex-wrap gap-2">
                             @foreach(($categories ?? collect()) as $cat)
                             <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-xs text-gray-700 dark:text-gray-300 cursor-pointer hover:border-purple-400">
@@ -275,9 +275,9 @@
                         <label class="inline-flex items-center gap-2 text-xs font-semibold text-gray-700 dark:text-gray-300 cursor-pointer">
                             <input type="hidden" name="is_active" value="0">
                             <input type="checkbox" name="is_active" value="1" {{ $st->is_active ? 'checked' : '' }} class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
-                            Active
+                            {{ __('pos.active_word') }}
                         </label>
-                        <button type="submit" class="px-4 py-2 text-xs font-bold rounded-lg bg-purple-600 hover:bg-purple-700 text-white">Save Counter</button>
+                        <button type="submit" class="px-4 py-2 text-xs font-bold rounded-lg bg-purple-600 hover:bg-purple-700 text-white">{{ __('pos.save_counter') }}</button>
                     </div>
                 </form>
             </div>
@@ -287,22 +287,22 @@
         <div class="mt-3">
             <button type="button" @click="addOpen = !addOpen" x-show="!addOpen"
                     class="w-full py-2.5 rounded-xl text-sm font-bold border-2 border-dashed border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20">
-                + Add Counter
+                {{ __('pos.add_counter_btn') }}
             </button>
             <form method="POST" action="{{ route('pos.restaurant.stations.store') }}" x-show="addOpen" x-cloak
                   class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 p-4 space-y-3">
                 @csrf
-                <h3 class="text-sm font-bold text-gray-900 dark:text-white">New Counter</h3>
+                <h3 class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.new_counter') }}</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Counter Name</label>
-                        <input type="text" name="name" value="{{ old('name') }}" required maxlength="60" placeholder="e.g. Ice Cream Counter"
+                        <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.counter_name') }}</label>
+                        <input type="text" name="name" value="{{ old('name') }}" required maxlength="60" placeholder="{{ __('pos.ph_eg_ice_cream_counter') }}"
                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Printer (Desktop Agent)</label>
+                        <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.printer_desktop_agent') }}</label>
                         <select name="printer_name" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm">
-                            <option value="">— Use company KOT printer —</option>
+                            <option value="">{{ __('pos.use_company_kot_printer') }}</option>
                             @foreach(($printers ?? collect()) as $p)
                             <option value="{{ $p }}" {{ old('printer_name') === $p ? 'selected' : '' }}>{{ $p }}</option>
                             @endforeach
@@ -310,7 +310,7 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Product Categories</label>
+                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.product_categories') }}</label>
                     <div class="flex flex-wrap gap-2">
                         @foreach(($categories ?? collect()) as $cat)
                         <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-xs text-gray-700 dark:text-gray-300 cursor-pointer hover:border-purple-400">
@@ -321,17 +321,17 @@
                         </label>
                         @endforeach
                     </div>
-                    <p class="text-[11px] text-gray-400 mt-1">A category can belong to only one active counter. Unassigned categories print with the main Kitchen.</p>
+                    <p class="text-[11px] text-gray-400 mt-1">{{ __('pos.category_one_counter_hint') }}</p>
                 </div>
                 <div class="flex items-center justify-between">
                     <label class="inline-flex items-center gap-2 text-xs font-semibold text-gray-700 dark:text-gray-300 cursor-pointer">
                         <input type="hidden" name="is_active" value="0">
                         <input type="checkbox" name="is_active" value="1" checked class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
-                        Active
+                        {{ __('pos.active_word') }}
                     </label>
                     <div class="flex items-center gap-2">
-                        <button type="button" @click="addOpen = false" class="px-4 py-2 text-xs font-semibold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300">Cancel</button>
-                        <button type="submit" class="px-4 py-2 text-xs font-bold rounded-lg bg-purple-600 hover:bg-purple-700 text-white">Add Counter</button>
+                        <button type="button" @click="addOpen = false" class="px-4 py-2 text-xs font-semibold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300">{{ __('pos.cancel') }}</button>
+                        <button type="submit" class="px-4 py-2 text-xs font-bold rounded-lg bg-purple-600 hover:bg-purple-700 text-white">{{ __('pos.add_counter') }}</button>
                     </div>
                 </div>
             </form>

@@ -3,19 +3,19 @@
     @include('pos.partials.back-link')
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-            {{ ($tab ?? 'pra') === 'local' ? 'Local Reports' : 'POS Reports' }}
+            {{ ($tab ?? 'pra') === 'local' ? __('pos.local_reports') : __('pos.pos_reports') }}
         </h1>
         <div class="flex items-center gap-2 flex-wrap">
             @if(auth('pos')->user()?->isPosAdmin())
             {{-- Staff Hazri (owner batch, 26 Jul 2026) — ADMIN/MANAGER-ONLY --}}
             <a href="{{ route('pos.reports.hazri') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 transition">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                Staff Hazri
+                {{ __('pos.staff_hazri') }}
             </a>
             @endif
             <a href="{{ route('pos.reports.csv', array_filter(['tab' => $tab, 'cashier' => $selectedCashier, 'from' => request('from'), 'to' => request('to')])) }}" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                Download CSV
+                {{ __('pos.download_csv') }}
             </a>
         </div>
     </div>
@@ -28,15 +28,15 @@
             @if(request()->filled('from'))<input type="hidden" name="from" value="{{ request('from') }}">@endif
             @if(request()->filled('to'))<input type="hidden" name="to" value="{{ request('to') }}">@endif
             <div class="w-full sm:w-auto">
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">View Sales By</label>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.lbl_view_sales_by') }}</label>
                 <select name="cashier" onchange="this.form.submit()" class="w-full sm:w-56 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500 transition">
-                    <option value="all" {{ $selectedCashier === 'all' ? 'selected' : '' }}>All Company Sales</option>
+                    <option value="all" {{ $selectedCashier === 'all' ? 'selected' : '' }}>{{ __('pos.opt_all_company_sales') }}</option>
                     @if($isCashier)
-                    <option value="{{ $user->id }}" {{ $selectedCashier == $user->id ? 'selected' : '' }}>My Sales Only</option>
+                    <option value="{{ $user->id }}" {{ $selectedCashier == $user->id ? 'selected' : '' }}>{{ __('pos.opt_my_sales_only') }}</option>
                     @else
                     @foreach($teamMembers as $member)
                     <option value="{{ $member->id }}" {{ $selectedCashier == $member->id ? 'selected' : '' }}>
-                        {{ $member->name }} ({{ $member->pos_role === 'pos_admin' ? 'Admin' : ($member->pos_role === 'pos_manager' ? 'Manager' : 'Cashier') }})
+                        {{ $member->name }} ({{ $member->pos_role === 'pos_admin' ? __('pos.role_admin') : ($member->pos_role === 'pos_manager' ? __('pos.role_manager') : __('pos.role_cashier')) }})
                     </option>
                     @endforeach
                     @endif
@@ -46,12 +46,12 @@
             <div class="flex items-center gap-2">
                 <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
                     @if($isCashier && $selectedCashier == $user->id)
-                        Showing: My Sales
+                        {{ __('pos.showing_my_sales') }}
                     @else
-                        Showing: {{ $teamMembers->firstWhere('id', $selectedCashier)?->name ?? 'Staff' }}
+                        {{ __('pos.showing_name', ['name' => $teamMembers->firstWhere('id', $selectedCashier)?->name ?? __('pos.th_staff')]) }}
                     @endif
                 </span>
-                <a href="{{ route('pos.reports', array_filter(['tab' => $tab, 'cashier' => 'all', 'from' => request('from'), 'to' => request('to')])) }}" class="text-xs text-gray-500 hover:text-purple-600 underline">Clear</a>
+                <a href="{{ route('pos.reports', array_filter(['tab' => $tab, 'cashier' => 'all', 'from' => request('from'), 'to' => request('to')])) }}" class="text-xs text-gray-500 hover:text-purple-600 underline">{{ __('pos.clear') }}</a>
             </div>
             @endif
         </form>
@@ -70,31 +70,31 @@
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3 mb-4">
             <div>
-                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Sales Analytics</h2>
-                <p class="text-xs text-gray-500">{{ \Carbon\Carbon::parse($ra->from)->format('d M Y') }} — {{ \Carbon\Carbon::parse($ra->to)->format('d M Y') }} ({{ \Carbon\Carbon::parse($ra->from)->diffInDays(\Carbon\Carbon::parse($ra->to)) + 1 }} days)</p>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ __('pos.sales_analytics') }}</h2>
+                <p class="text-xs text-gray-500">{{ \Carbon\Carbon::parse($ra->from)->format('d M Y') }} — {{ \Carbon\Carbon::parse($ra->to)->format('d M Y') }} {{ __('pos.days_count_paren', ['count' => \Carbon\Carbon::parse($ra->from)->diffInDays(\Carbon\Carbon::parse($ra->to)) + 1]) }}</p>
             </div>
             <form method="GET" action="{{ route('pos.reports') }}" class="flex flex-wrap items-end gap-2">
                 <input type="hidden" name="tab" value="{{ $tab }}">
                 <input type="hidden" name="cashier" value="{{ $selectedCashier }}">
                 <div>
-                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">From</label>
+                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.lbl_from') }}</label>
                     <input type="date" name="from" value="{{ $ra->from }}" max="{{ today()->toDateString() }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">To</label>
+                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.lbl_to') }}</label>
                     <input type="date" name="to" value="{{ $ra->to }}" max="{{ today()->toDateString() }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
                 </div>
-                <button type="submit" class="px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition">Apply</button>
+                <button type="submit" class="px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition">{{ __('pos.apply_btn') }}</button>
                 <a href="{{ route('pos.reports.analytics-pdf', ['tab' => $tab, 'cashier' => $selectedCashier, 'from' => $ra->from, 'to' => $ra->to]) }}" class="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition">PDF</a>
             </form>
         </div>
         <div class="flex flex-wrap gap-2 mb-5">
             @foreach([
-                'Today' => [today()->toDateString(), today()->toDateString()],
-                'Last 7 Days' => [today()->subDays(6)->toDateString(), today()->toDateString()],
-                'This Month' => [today()->startOfMonth()->toDateString(), today()->toDateString()],
-                'Last Month' => [today()->subMonthNoOverflow()->startOfMonth()->toDateString(), today()->subMonthNoOverflow()->endOfMonth()->toDateString()],
-                'Last 90 Days' => [today()->subDays(89)->toDateString(), today()->toDateString()],
+                __('pos.opt_today') => [today()->toDateString(), today()->toDateString()],
+                __('pos.preset_last_7_days') => [today()->subDays(6)->toDateString(), today()->toDateString()],
+                __('pos.opt_this_month') => [today()->startOfMonth()->toDateString(), today()->toDateString()],
+                __('pos.opt_last_month') => [today()->subMonthNoOverflow()->startOfMonth()->toDateString(), today()->subMonthNoOverflow()->endOfMonth()->toDateString()],
+                __('pos.preset_last_90_days') => [today()->subDays(89)->toDateString(), today()->toDateString()],
             ] as $label => $preset)
             <a href="{{ route('pos.reports', ['tab' => $tab, 'cashier' => $selectedCashier, 'from' => $preset[0], 'to' => $preset[1]]) }}"
                class="px-3 py-1.5 rounded-full text-xs font-semibold transition {{ $ra->from === $preset[0] && $ra->to === $preset[1] ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-purple-100 hover:text-purple-700 dark:bg-gray-800 dark:text-gray-300' }}">{{ $label }}</a>
@@ -104,60 +104,60 @@
         {{-- Summary KPIs + previous-period comparison --}}
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
             <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                <p class="text-xs text-gray-500 uppercase font-medium">Revenue</p>
+                <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.kpi_revenue') }}</p>
                 <p class="text-lg font-bold text-gray-900 dark:text-white mt-0.5">PKR {{ number_format($ra->summary->revenue) }}</p>
                 {!! $raPct($ra->previous->revenue_pct) !!}
             </div>
             <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                <p class="text-xs text-gray-500 uppercase font-medium">Bills</p>
+                <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.th_bills') }}</p>
                 <p class="text-lg font-bold text-gray-900 dark:text-white mt-0.5">{{ number_format($ra->summary->bills) }}</p>
                 {!! $raPct($ra->previous->bills_pct) !!}
             </div>
             <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                <p class="text-xs text-gray-500 uppercase font-medium">Tax</p>
+                <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.receipt_tax') }}</p>
                 <p class="text-lg font-bold text-gray-900 dark:text-white mt-0.5">PKR {{ number_format($ra->summary->tax) }}</p>
                 {!! $raPct($ra->previous->tax_pct) !!}
             </div>
             <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                <p class="text-xs text-gray-500 uppercase font-medium">Avg Bill</p>
+                <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.th_avg_bill') }}</p>
                 <p class="text-lg font-bold text-gray-900 dark:text-white mt-0.5">PKR {{ number_format($ra->summary->avg_bill) }}</p>
             </div>
             <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                <p class="text-xs text-gray-500 uppercase font-medium">Discounts</p>
+                <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.kpi_discounts') }}</p>
                 <p class="text-lg font-bold text-gray-900 dark:text-white mt-0.5">PKR {{ number_format($ra->summary->discount) }}</p>
             </div>
             <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                <p class="text-xs text-gray-500 uppercase font-medium">Customers</p>
+                <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.kpi_customers') }}</p>
                 <p class="text-lg font-bold text-gray-900 dark:text-white mt-0.5">{{ number_format($ra->summary->unique_customers) }}</p>
             </div>
         </div>
-        <p class="text-xs text-gray-500 -mt-3 mb-5">Comparison vs previous {{ \Carbon\Carbon::parse($ra->previous->from)->diffInDays(\Carbon\Carbon::parse($ra->previous->to)) + 1 }} days ({{ \Carbon\Carbon::parse($ra->previous->from)->format('d M') }} — {{ \Carbon\Carbon::parse($ra->previous->to)->format('d M Y') }}: PKR {{ number_format($ra->previous->revenue) }}, {{ $ra->previous->bills }} bills)</p>
+        <p class="text-xs text-gray-500 -mt-3 mb-5">{{ __('pos.comparison_vs_previous', ['days' => \Carbon\Carbon::parse($ra->previous->from)->diffInDays(\Carbon\Carbon::parse($ra->previous->to)) + 1, 'from' => \Carbon\Carbon::parse($ra->previous->from)->format('d M'), 'to' => \Carbon\Carbon::parse($ra->previous->to)->format('d M Y'), 'amount' => number_format($ra->previous->revenue), 'bills' => $ra->previous->bills]) }}</p>
 
         {{-- Profit (ADMIN-ONLY, cost-price based) --}}
         @if($ra->profit !== null)
         <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 mb-5">
             <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
-                <p class="text-sm font-bold text-gray-900 dark:text-white">Profit Estimate <span class="text-xs font-medium text-gray-500">(admin only — cost price wale products par)</span></p>
-                <span class="text-xs font-semibold px-2 py-0.5 rounded-full {{ $ra->profit->coverage_pct >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' }}">{{ $ra->profit->coverage_pct }}% items covered</span>
+                <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.profit_estimate') }} <span class="text-xs font-medium text-gray-500">{{ __('pos.profit_estimate_note') }}</span></p>
+                <span class="text-xs font-semibold px-2 py-0.5 rounded-full {{ $ra->profit->coverage_pct >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' }}">{{ __('pos.pct_items_covered', ['pct' => $ra->profit->coverage_pct]) }}</span>
             </div>
             @if($ra->profit->cost <= 0 && $ra->profit->revenue <= 0)
-            <p class="text-sm text-gray-500">Kisi bike hue product ka cost price set nahi — Products page par cost price add karein to profit yahan nazar aayega.</p>
+            <p class="text-sm text-gray-500">{{ __('pos.no_cost_price_hint') }}</p>
             @else
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
-                    <p class="text-xs text-gray-500 uppercase font-medium">Sales (costed items)</p>
+                    <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.kpi_sales_costed_items') }}</p>
                     <p class="text-lg font-bold text-gray-900 dark:text-white">PKR {{ number_format($ra->profit->revenue) }}</p>
                 </div>
                 <div>
-                    <p class="text-xs text-gray-500 uppercase font-medium">Cost</p>
+                    <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.kpi_cost') }}</p>
                     <p class="text-lg font-bold text-gray-900 dark:text-white">PKR {{ number_format($ra->profit->cost) }}</p>
                 </div>
                 <div>
-                    <p class="text-xs text-gray-500 uppercase font-medium">Gross Profit</p>
+                    <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.kpi_gross_profit') }}</p>
                     <p class="text-lg font-bold {{ $ra->profit->profit >= 0 ? 'text-emerald-600' : 'text-red-500' }}">PKR {{ number_format($ra->profit->profit) }}</p>
                 </div>
                 <div>
-                    <p class="text-xs text-gray-500 uppercase font-medium">Margin</p>
+                    <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.kpi_margin') }}</p>
                     <p class="text-lg font-bold text-gray-900 dark:text-white">{{ $ra->profit->margin_pct !== null ? $ra->profit->margin_pct . '%' : '—' }}</p>
                 </div>
             </div>
@@ -169,33 +169,33 @@
         @if($ra->summary->bills > 0)
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-5">
             <div>
-                <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">Category Share</h4>
+                <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">{{ __('pos.chart_category_share') }}</h4>
                 <div class="relative h-64"><canvas id="raCategoryPie"></canvas></div>
             </div>
             <div>
-                <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">Daily Revenue Trend</h4>
+                <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">{{ __('pos.chart_daily_revenue_trend') }}</h4>
                 <div class="relative h-64"><canvas id="raDailyTrend"></canvas></div>
             </div>
         </div>
         <div class="mb-5">
-            <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">Hourly Sales Pattern</h4>
+            <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">{{ __('pos.chart_hourly_sales_pattern') }}</h4>
             <div class="relative h-48"><canvas id="raHourly"></canvas></div>
         </div>
         @endif
 
         {{-- Category breakdown w/ product drill-down --}}
         <div x-data="{ open: null }" class="mb-5">
-            <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">Category Breakdown <span class="text-xs font-normal text-gray-500">(row par click karein — products drill-down)</span></h4>
+            <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">{{ __('pos.category_breakdown') }} <span class="text-xs font-normal text-gray-500">{{ __('pos.category_breakdown_note') }}</span></h4>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm table-cards">
                     <thead>
                         <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-700">
-                            <th class="pb-2">Category</th>
-                            <th class="pb-2 text-right">Qty</th>
-                            <th class="pb-2 text-right">Revenue</th>
-                            <th class="pb-2 text-right">Tax</th>
-                            @if($ra->is_admin_view)<th class="pb-2 text-right">Profit</th>@endif
-                            <th class="pb-2 text-right">Share</th>
+                            <th class="pb-2">{{ __('pos.th_category') }}</th>
+                            <th class="pb-2 text-right">{{ __('pos.receipt_qty') }}</th>
+                            <th class="pb-2 text-right">{{ __('pos.kpi_revenue') }}</th>
+                            <th class="pb-2 text-right">{{ __('pos.receipt_tax') }}</th>
+                            @if($ra->is_admin_view)<th class="pb-2 text-right">{{ __('pos.th_profit') }}</th>@endif
+                            <th class="pb-2 text-right">{{ __('pos.th_share') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -215,9 +215,9 @@
                                 <table class="w-full text-xs">
                                     <thead>
                                         <tr class="text-left text-gray-500 uppercase">
-                                            <th class="py-1">Product</th>
-                                            <th class="py-1 text-right">Qty</th>
-                                            <th class="py-1 text-right">Revenue</th>
+                                            <th class="py-1">{{ __('pos.th_product') }}</th>
+                                            <th class="py-1 text-right">{{ __('pos.receipt_qty') }}</th>
+                                            <th class="py-1 text-right">{{ __('pos.kpi_revenue') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -233,7 +233,7 @@
                             </td>
                         </tr>
                         @empty
-                        <tr><td colspan="{{ $ra->is_admin_view ? 6 : 5 }}" class="py-6 text-center text-gray-400">Is range mein koi sale nahi</td></tr>
+                        <tr><td colspan="{{ $ra->is_admin_view ? 6 : 5 }}" class="py-6 text-center text-gray-400">{{ __('pos.no_sale_in_range') }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -243,15 +243,15 @@
         {{-- Cashier performance + top customers --}}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
-                <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">Cashier Performance</h4>
+                <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">{{ __('pos.cashier_performance') }}</h4>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm table-cards">
                         <thead>
                             <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-700">
-                                <th class="pb-2">Cashier</th>
-                                <th class="pb-2 text-right">Bills</th>
-                                <th class="pb-2 text-right">Revenue</th>
-                                <th class="pb-2 text-right">Avg Bill</th>
+                                <th class="pb-2">{{ __('pos.receipt_cashier') }}</th>
+                                <th class="pb-2 text-right">{{ __('pos.th_bills') }}</th>
+                                <th class="pb-2 text-right">{{ __('pos.kpi_revenue') }}</th>
+                                <th class="pb-2 text-right">{{ __('pos.th_avg_bill') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -263,22 +263,22 @@
                                 <td class="py-2.5 text-right text-gray-700 dark:text-gray-300">PKR {{ number_format($c->avg) }}</td>
                             </tr>
                             @empty
-                            <tr><td colspan="4" class="py-6 text-center text-gray-400">No data</td></tr>
+                            <tr><td colspan="4" class="py-6 text-center text-gray-400">{{ __('pos.no_data') }}</td></tr>
                             @endforelse
                         </tbody>
                     </table>
                 </div>
             </div>
             <div>
-                <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">Top Customers</h4>
+                <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">{{ __('pos.top_customers') }}</h4>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm table-cards">
                         <thead>
                             <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-700">
                                 <th class="pb-2">#</th>
-                                <th class="pb-2">Customer</th>
-                                <th class="pb-2 text-right">Visits</th>
-                                <th class="pb-2 text-right">Spent</th>
+                                <th class="pb-2">{{ __('pos.customer_word') }}</th>
+                                <th class="pb-2 text-right">{{ __('pos.th_visits') }}</th>
+                                <th class="pb-2 text-right">{{ __('pos.th_spent') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -290,7 +290,7 @@
                                 <td class="py-2.5 text-right font-medium text-gray-900 dark:text-white">PKR {{ number_format($cu->revenue) }}</td>
                             </tr>
                             @empty
-                            <tr><td colspan="4" class="py-6 text-center text-gray-400">Walk-in sales only — koi named customer nahi</td></tr>
+                            <tr><td colspan="4" class="py-6 text-center text-gray-400">{{ __('pos.walk_in_only_no_named') }}</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -303,15 +303,15 @@
              actually has waiter-settled bills. --}}
         @if($ra->waiters->isNotEmpty())
         <div class="mt-6">
-            <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">Sales by Waiter</h4>
+            <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">{{ __('pos.sales_by_waiter') }}</h4>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm table-cards">
                     <thead>
                         <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-700">
-                            <th class="pb-2">Waiter</th>
-                            <th class="pb-2 text-right">Orders</th>
-                            <th class="pb-2 text-right">Revenue</th>
-                            <th class="pb-2 text-right">Avg Bill</th>
+                            <th class="pb-2">{{ __('pos.role_waiter') }}</th>
+                            <th class="pb-2 text-right">{{ __('pos.th_orders') }}</th>
+                            <th class="pb-2 text-right">{{ __('pos.kpi_revenue') }}</th>
+                            <th class="pb-2 text-right">{{ __('pos.th_avg_bill') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -367,7 +367,7 @@
                 type: 'line',
                 data: {
                     labels: {!! $raJson($raDayLabels) !!},
-                    datasets: [{ label: 'Revenue (PKR)', data: {!! $raJson($raDayValues) !!}, borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.12)', fill: true, tension: 0.3, pointRadius: 2 }]
+                    datasets: [{ label: @json(__('pos.chart_revenue_pkr')), data: {!! $raJson($raDayValues) !!}, borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.12)', fill: true, tension: 0.3, pointRadius: 2 }]
                 },
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: textColor, maxTicksLimit: 12 }, grid: { color: gridColor } }, y: { ticks: { color: textColor }, grid: { color: gridColor }, beginAtZero: true } } }
             });
@@ -379,7 +379,7 @@
                 type: 'bar',
                 data: {
                     labels: {!! $raJson($raHourLabels) !!},
-                    datasets: [{ label: 'Revenue (PKR)', data: {!! $raJson($raHourValues) !!}, backgroundColor: '#7c3aed', borderRadius: 3 }]
+                    datasets: [{ label: @json(__('pos.chart_revenue_pkr')), data: {!! $raJson($raHourValues) !!}, backgroundColor: '#7c3aed', borderRadius: 3 }]
                 },
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: textColor }, grid: { display: false } }, y: { ticks: { color: textColor }, grid: { color: gridColor }, beginAtZero: true } } }
             });
@@ -395,20 +395,20 @@
          view/report only, the promote option disappears. --}}
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Local Invoices</h3>
-            <span class="text-xs text-gray-500">Sirf current month ke bills PRA par submit ho sakte hain</span>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.local_invoices') }}</h3>
+            <span class="text-xs text-gray-500">{{ __('pos.only_current_month_submit') }}</span>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm table-cards">
                 <thead>
                     <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-700">
-                        <th class="pb-2">Date</th>
-                        <th class="pb-2">Invoice #</th>
-                        <th class="pb-2">Customer</th>
-                        <th class="pb-2">Method</th>
-                        <th class="pb-2 text-right">Total</th>
-                        <th class="pb-2">Cashier</th>
-                        <th class="pb-2 text-right">Action</th>
+                        <th class="pb-2">{{ __('pos.th_date') }}</th>
+                        <th class="pb-2">{{ __('pos.th_invoice_no') }}</th>
+                        <th class="pb-2">{{ __('pos.customer_word') }}</th>
+                        <th class="pb-2">{{ __('pos.th_method') }}</th>
+                        <th class="pb-2 text-right">{{ __('pos.total_word') }}</th>
+                        <th class="pb-2">{{ __('pos.receipt_cashier') }}</th>
+                        <th class="pb-2 text-right">{{ __('pos.th_action') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -416,7 +416,7 @@
                     <tr class="border-b border-gray-50 dark:border-gray-800">
                         <td class="py-2.5 text-gray-700 dark:text-gray-300 whitespace-nowrap">{{ $bill->created_at->format('d M Y H:i') }}</td>
                         <td class="py-2.5 font-medium text-gray-900 dark:text-white">{{ $bill->invoice_number }}</td>
-                        <td class="py-2.5 text-gray-700 dark:text-gray-300">{{ $bill->customer_name ?: 'Walk-in' }}</td>
+                        <td class="py-2.5 text-gray-700 dark:text-gray-300">{{ $bill->customer_name ?: __('pos.walk_in_short') }}</td>
                         <td class="py-2.5 text-gray-700 dark:text-gray-300">{{ ucwords(str_replace('_', ' ', $bill->payment_method)) }}</td>
                         <td class="py-2.5 text-right font-medium text-gray-900 dark:text-white">PKR {{ number_format($bill->total_amount) }}</td>
                         <td class="py-2.5 text-gray-700 dark:text-gray-300">{{ $bill->creator?->name ?? '-' }}</td>
@@ -426,30 +426,30 @@
                                 <button type="button"
                                     onclick="promoteLocalBill(this, {{ $bill->id }}, '{{ $bill->invoice_number }}')"
                                     class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 text-white hover:bg-purple-700 transition">
-                                    Submit to PRA
+                                    {{ __('pos.submit_to_pra') }}
                                 </button>
                                 @else
-                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">Month closed</span>
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">{{ __('pos.month_closed') }}</span>
                                 @endif
                             @else
                             {{-- Reporting-OFF final ("local" — no PRA fiscal). Owner rule
                                  (Jul 2026 update): these CAN also be submitted per-bill —
                                  current month only; older months are closed. --}}
                                 @if($bill->created_at->gte($monthStart))
-                                <form method="POST" action="{{ route('pos.transaction.retry-pra', $bill->id) }}" class="inline" onsubmit="return confirm('Submit {{ $bill->invoice_number }} to PRA? Bill ko POS fiscal serial mil jayega.')">
+                                <form method="POST" action="{{ route('pos.transaction.retry-pra', $bill->id) }}" class="inline" onsubmit="return confirm({{ Js::from(__('pos.confirm_submit_bill_to_pra', ['invoice' => $bill->invoice_number])) }})">
                                     @csrf
                                     <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 text-white hover:bg-purple-700 transition">
-                                        Submit to PRA
+                                        {{ __('pos.submit_to_pra') }}
                                     </button>
                                 </form>
                                 @else
-                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">Month closed</span>
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">{{ __('pos.month_closed') }}</span>
                                 @endif
                             @endif
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="7" class="py-6 text-center text-gray-400">No local invoices</td></tr>
+                    <tr><td colspan="7" class="py-6 text-center text-gray-400">{{ __('pos.no_local_invoices') }}</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -460,8 +460,8 @@
     </div>
     <script>
         function promoteLocalBill(btn, id, number) {
-            if (!confirm('Bill ' + number + ' ko PRA par submit karein?\n\n• Ye bill FINAL ho jayega aur naya POS serial number milega\n• Monthly bill quota mein count hoga\n• Ye action wapis nahi ho sakta')) return;
-            btn.disabled = true; btn.textContent = 'Submitting…';
+            if (!confirm({{ Js::from(__('pos.confirm_promote_local_bill')) }}.replace(':invoice', number))) return;
+            btn.disabled = true; btn.textContent = @js(__('pos.submitting_ellipsis'));
             fetch('{{ url('/pos/api/provisional-bills') }}/' + id + '/promote', {
                 method: 'POST',
                 headers: {
@@ -473,13 +473,13 @@
             })
             .then(function (r) { return r.json(); })
             .then(function (data) {
-                alert(data.message || (data.success ? 'Done' : 'Failed'));
+                alert(data.message || (data.success ? @js(__('pos.done_word')) : @js(__('pos.failed_word'))));
                 if (data.success) { window.location.reload(); }
-                else { btn.disabled = false; btn.textContent = 'Submit to PRA'; }
+                else { btn.disabled = false; btn.textContent = @js(__('pos.submit_to_pra')); }
             })
             .catch(function () {
-                alert('Network error — dobara koshish karein.');
-                btn.disabled = false; btn.textContent = 'Submit to PRA';
+                alert(@js(__('pos.network_error_try_again')));
+                btn.disabled = false; btn.textContent = @js(__('pos.submit_to_pra'));
             });
         }
     </script>
@@ -487,15 +487,15 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Payment Method Summary (This Month)</h3>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">{{ __('pos.payment_method_summary_month') }}</h3>
             <div class="overflow-x-auto -mx-5 px-5">
             <table class="w-full text-sm table-cards">
                 <thead>
                     <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-700">
-                        <th class="pb-2">Method</th>
-                        <th class="pb-2 text-right">Count</th>
-                        <th class="pb-2 text-right">Revenue</th>
-                        <th class="pb-2 text-right">Tax Collected</th>
+                        <th class="pb-2">{{ __('pos.th_method') }}</th>
+                        <th class="pb-2 text-right">{{ __('pos.th_count') }}</th>
+                        <th class="pb-2 text-right">{{ __('pos.kpi_revenue') }}</th>
+                        <th class="pb-2 text-right">{{ __('pos.th_tax_collected') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -511,7 +511,7 @@
                         <td class="py-2.5 text-right text-gray-700 dark:text-gray-300">PKR {{ number_format($ps->tax) }}</td>
                     </tr>
                     @empty
-                    <tr><td colspan="4" class="py-6 text-center text-gray-400">No data this month</td></tr>
+                    <tr><td colspan="4" class="py-6 text-center text-gray-400">{{ __('pos.no_data_this_month') }}</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -519,15 +519,15 @@
         </div>
 
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Top Selling Items (This Month)</h3>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">{{ __('pos.top_selling_items_month') }}</h3>
             <div class="overflow-x-auto -mx-5 px-5">
             <table class="w-full text-sm table-cards">
                 <thead>
                     <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-700">
                         <th class="pb-2">#</th>
-                        <th class="pb-2">Item</th>
-                        <th class="pb-2 text-right">Qty Sold</th>
-                        <th class="pb-2 text-right">Revenue</th>
+                        <th class="pb-2">{{ __('pos.receipt_item') }}</th>
+                        <th class="pb-2 text-right">{{ __('pos.th_qty_sold') }}</th>
+                        <th class="pb-2 text-right">{{ __('pos.kpi_revenue') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -539,7 +539,7 @@
                         <td class="py-2.5 text-right font-medium text-gray-900 dark:text-white">PKR {{ number_format($item->total_revenue) }}</td>
                     </tr>
                     @empty
-                    <tr><td colspan="4" class="py-6 text-center text-gray-400">No data this month</td></tr>
+                    <tr><td colspan="4" class="py-6 text-center text-gray-400">{{ __('pos.no_data_this_month') }}</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -548,14 +548,14 @@
     </div>
 
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
-        <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Daily Sales (Last 30 Days)</h3>
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">{{ __('pos.daily_sales_last_30') }}</h3>
         <div class="overflow-x-auto">
             <table class="w-full text-sm table-cards">
                 <thead>
                     <tr class="text-left text-xs text-gray-500 uppercase border-b border-gray-200 dark:border-gray-700">
-                        <th class="pb-2">Date</th>
-                        <th class="pb-2 text-right">Transactions</th>
-                        <th class="pb-2 text-right">Revenue</th>
+                        <th class="pb-2">{{ __('pos.th_date') }}</th>
+                        <th class="pb-2 text-right">{{ __('pos.transactions') }}</th>
+                        <th class="pb-2 text-right">{{ __('pos.kpi_revenue') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -566,7 +566,7 @@
                         <td class="py-2.5 text-right font-medium text-gray-900 dark:text-white">PKR {{ number_format($day->revenue) }}</td>
                     </tr>
                     @empty
-                    <tr><td colspan="3" class="py-6 text-center text-gray-400">No sales data</td></tr>
+                    <tr><td colspan="3" class="py-6 text-center text-gray-400">{{ __('pos.no_sales_data') }}</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -574,7 +574,7 @@
     </div>
 
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-        <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Monthly Trend (Last 6 Months)</h3>
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">{{ __('pos.monthly_trend_last_6') }}</h3>
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             @foreach($monthlyTrend as $mt)
             <div class="text-center p-3 rounded-lg bg-gray-50 dark:bg-gray-800">

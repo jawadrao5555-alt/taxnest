@@ -1,8 +1,8 @@
 <x-fbr-pos-layout>
 <div class="max-w-3xl mx-auto">
     <div class="mb-6">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">My Profile</h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Update your personal information and password</p>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.my_profile') }}</h1>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.my_profile_desc') }}</p>
     </div>
 
     <form method="POST" action="{{ route('fbrpos.my-profile') }}">
@@ -20,13 +20,13 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name *</label>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.full_name_req') }}</label>
                     <input type="text" name="name" value="{{ old('name', $user->name) }}" required
                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
                     @error('name') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email *</label>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.email_req') }}</label>
                     <input type="email" name="email" value="{{ old('email', $user->email) }}" required
                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
                     @error('email') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
@@ -34,37 +34,37 @@
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone</label>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.phone_label') }}</label>
                     <input type="text" name="phone" value="{{ old('phone', $user->phone) }}"
                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="0300-1234567">
                     @error('phone') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.username_label') }}</label>
                     <input type="text" name="username" value="{{ old('username', $user->username) }}"
-                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="e.g. johndoe123">
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="{{ __('pos.ph_eg_johndoe123') }}">
                     @error('username') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                 </div>
             </div>
 
             <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
-                <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">Change Password</h3>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">{{ __('pos.change_password') }}</h3>
                 <div class="space-y-3">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Current Password</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.current_password') }}</label>
                         <input type="password" name="current_password"
                             class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
                         @error('current_password') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">New Password</label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.new_password') }}</label>
                             <input type="password" name="new_password"
                                 class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
                             @error('new_password') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Confirm New Password</label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.confirm_new_password') }}</label>
                             <input type="password" name="new_password_confirmation"
                                 class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
                         </div>
@@ -74,7 +74,7 @@
 
             <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
                 <button type="submit" class="px-6 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition text-sm">
-                    Save Profile
+                    {{ __('pos.save_profile') }}
                 </button>
             </div>
         </div>

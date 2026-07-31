@@ -12,17 +12,17 @@
     {{-- ── Header ─────────────────────────────────────────────────────────── --}}
     <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Waiter Tablet</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Compose the order, then send it to a cashier for payment.</p>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.waiter_tablet') }}</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('pos.waiter_tablet_subtitle') }}</p>
         </div>
         <div class="flex items-center gap-2">
             {{-- ZFC (29 Jul 2026): manual refresh — waiter phones keep this tab
                  open for days; this pulls the LATEST code with a cache-buster. --}}
-            <button @click="hardRefresh()" title="Refresh app" class="px-3 py-2 rounded-xl text-sm font-bold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-teal-500 transition">
+            <button @click="hardRefresh()" title="{{ __('pos.ti_refresh_app') }}" class="px-3 py-2 rounded-xl text-sm font-bold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-teal-500 transition">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
             </button>
             <button @click="openMyOrders()" class="relative px-4 py-2 rounded-xl text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white transition">
-                My Orders
+                {{ __('pos.my_orders') }}
                 <span x-show="myOrders.length > 0" x-cloak class="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 bg-amber-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="myOrders.length"></span>
             </button>
         </div>
@@ -30,14 +30,14 @@
 
     {{-- ── New-version banner (auto-update check, ZFC 29 Jul 2026) ────────── --}}
     <div x-show="updateAvailable" x-cloak class="mb-3 rounded-xl bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 px-4 py-2.5 flex items-center justify-between gap-2 flex-wrap">
-        <span class="text-sm font-bold text-blue-800 dark:text-blue-300">Nayi update aa gayi hai — Refresh karein.</span>
-        <button @click="hardRefresh()" class="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold">REFRESH</button>
+        <span class="text-sm font-bold text-blue-800 dark:text-blue-300">{{ __('pos.new_update_refresh') }}</span>
+        <button @click="hardRefresh()" class="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold">{{ __('pos.refresh_caps') }}</button>
     </div>
 
     {{-- ── Append-mode banner ─────────────────────────────────────────────── --}}
     <div x-show="appendOrderId" x-cloak class="mb-3 rounded-xl bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 px-4 py-2.5 flex items-center justify-between gap-2 flex-wrap">
-        <span class="text-sm font-bold text-amber-800 dark:text-amber-300">Adding items to <span class="font-mono" x-text="appendOrderNumber"></span> — only the NEW items will print in the kitchen.</span>
-        <button @click="cancelAppend()" class="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-800 text-xs font-bold text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600">Cancel</button>
+        <span class="text-sm font-bold text-amber-800 dark:text-amber-300">{{ __('pos.adding_items_to') }} <span class="font-mono" x-text="appendOrderNumber"></span> {{ __('pos.only_new_items_print') }}</span>
+        <button @click="cancelAppend()" class="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-800 text-xs font-bold text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600">{{ __('pos.cancel') }}</button>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -48,10 +48,10 @@
         <div class="lg:col-span-2 order-2 lg:order-1">
             <input type="text" x-model="search" @input="filterProducts()"
                    autocomplete="off" name="waiter_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
-                   placeholder="Search items…"
+                   placeholder="{{ __('pos.ph_search_items') }}"
                    class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-base px-4 py-3 focus:ring-teal-500 focus:border-teal-500 mb-3">
             <div class="flex gap-2 overflow-x-auto pb-2 mb-2" x-show="categories.length > 1">
-                <button @click="activeCategory = 'all'; filterProducts()" :class="activeCategory === 'all' ? 'bg-teal-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'" class="px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition">All</button>
+                <button @click="activeCategory = 'all'; filterProducts()" :class="activeCategory === 'all' ? 'bg-teal-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'" class="px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition">{{ __('pos.all_word') }}</button>
                 <template x-for="c in categories" :key="c">
                     <button @click="activeCategory = c; filterProducts()" :class="activeCategory === c ? 'bg-teal-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'" class="px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition" x-text="c"></button>
                 </template>
@@ -64,29 +64,29 @@
                         :class="gridEditMode ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'">
                     <svg x-show="!gridEditMode" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                     <svg x-show="gridEditMode" x-cloak class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                    <span x-text="gridEditMode ? 'Ho Gaya' : 'Grid Tarteeb'"></span>
+                    <span x-text="gridEditMode ? {{ Js::from(__('pos.done_word')) }} : {{ Js::from(__('pos.grid_arrange')) }}"></span>
                 </button>
                 <button type="button" x-show="gridEditMode && hiddenPrefCount > 0" x-cloak @click="resetGridPrefs()" :disabled="gridPrefBusy"
                         class="px-3 py-1.5 rounded-full text-xs font-bold border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 transition disabled:opacity-50">
-                    Sab Wapas Dikhao
+                    {{ __('pos.show_all_again') }}
                 </button>
-                <span x-show="gridEditMode" x-cloak class="text-[11px] font-semibold text-teal-700 dark:text-teal-300">Item par tap karein — chhupane / dikhane ke liye</span>
+                <span x-show="gridEditMode" x-cloak class="text-[11px] font-semibold text-teal-700 dark:text-teal-300">{{ __('pos.tap_item_hide_show') }}</span>
             </div>
             <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2.5 max-h-[60vh] overflow-y-auto pr-1">
                 <template x-for="p in filtered" :key="p.id">
                     <button @click="gridEditMode ? toggleItemVisibility(p) : addToCart(p)" class="rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-teal-500 dark:hover:border-teal-500 p-3 text-left transition active:scale-95" :class="gridEditMode && !isItemVisible(p) ? 'opacity-40' : ''">
                         <span class="block text-sm font-bold text-gray-800 dark:text-gray-100 leading-snug" x-text="p.name"></span>
                         <span class="block mt-1 text-xs font-black text-teal-700 dark:text-teal-400" x-text="'Rs ' + p.price.toLocaleString()"></span>
-                        <span x-show="gridEditMode" x-cloak class="block mt-1 text-[10px] font-bold" :class="isItemVisible(p) ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'" x-text="isItemVisible(p) ? 'Dikh raha hai' : 'Chhupa hua'"></span>
+                        <span x-show="gridEditMode" x-cloak class="block mt-1 text-[10px] font-bold" :class="isItemVisible(p) ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'" x-text="isItemVisible(p) ? {{ Js::from(__('pos.visible_word')) }} : {{ Js::from(__('pos.hidden_word')) }}"></span>
                     </button>
                 </template>
-                <div x-show="filtered.length === 0" class="col-span-full text-center py-8 text-sm text-gray-400">No items match.</div>
+                <div x-show="filtered.length === 0" class="col-span-full text-center py-8 text-sm text-gray-400">{{ __('pos.no_items_match') }}</div>
             </div>
         </div>
 
         {{-- ── RIGHT: order panel (mobile = TOP, see issue #11 note above) ── --}}
         <div class="order-1 lg:order-2 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4 flex flex-col gap-3 h-fit lg:sticky lg:top-4">
-            <h2 class="text-sm font-black uppercase tracking-wide text-gray-500 dark:text-gray-400" x-text="appendOrderId ? 'New Items' : 'Order'"></h2>
+            <h2 class="text-sm font-black uppercase tracking-wide text-gray-500 dark:text-gray-400" x-text="appendOrderId ? {{ Js::from(__('pos.new_items')) }} : {{ Js::from(__('pos.order_word')) }}"></h2>
 
             {{-- Cart lines --}}
             <div class="space-y-2 max-h-[32vh] overflow-y-auto" x-show="cart.length">
@@ -104,25 +104,25 @@
                             </div>
                             <span class="text-sm font-black text-gray-700 dark:text-gray-200" x-text="'Rs ' + Math.round(line.quantity * line.unit_price).toLocaleString()"></span>
                         </div>
-                        <input type="text" x-model="line.special_notes" placeholder="Note for kitchen (optional)"
+                        <input type="text" x-model="line.special_notes" placeholder="{{ __('pos.ph_note_for_kitchen') }}"
                                autocomplete="off" :name="'waiter_note_' + i + '_nofill'" data-lpignore="true" data-form-type="other" data-1p-ignore
                                class="mt-2 w-full rounded-lg border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-xs px-2.5 py-1.5 focus:ring-teal-500 focus:border-teal-500">
                     </div>
                 </template>
             </div>
-            <div x-show="!cart.length" class="text-center py-6 text-sm text-gray-400">Tap items to add them.</div>
+            <div x-show="!cart.length" class="text-center py-6 text-sm text-gray-400">{{ __('pos.tap_items_to_add') }}</div>
 
             <div class="border-t border-gray-100 dark:border-gray-700 pt-3" x-show="cart.length">
                 <div class="flex items-center justify-between">
                     {{-- ZFC issue #13: tax-inclusive shop => menu price is FINAL — one clean Total. --}}
-                    <span class="text-sm font-bold text-gray-500 dark:text-gray-400">{{ ($taxInclusive ?? false) ? 'Total' : 'Total (before tax)' }}</span>
+                    <span class="text-sm font-bold text-gray-500 dark:text-gray-400">{{ ($taxInclusive ?? false) ? __('pos.total_word') : __('pos.total_before_tax') }}</span>
                     <span class="text-xl font-black text-gray-900 dark:text-white" x-text="'Rs ' + total().toLocaleString()"></span>
                 </div>
                 {{-- Item #5: indicative tax-inclusive estimate (cash rate) — the REAL bill
                      (rate by payment method, discounts) is settled on the cashier screen.
                      HIDDEN for tax-inclusive companies (issue #13). --}}
                 <div class="flex items-center justify-between mt-0.5" x-show="taxEstimate() > 0" @if($taxInclusive ?? false) style="display:none !important" @endif>
-                    <span class="text-[11px] font-semibold text-gray-400 dark:text-gray-500" x-text="'≈ incl. tax (cash ' + cashTaxRate + '%)'"></span>
+                    <span class="text-[11px] font-semibold text-gray-400 dark:text-gray-500" x-text="{{ Js::from(__('pos.approx_incl_tax_cash')) }} + cashTaxRate + '%)'"></span>
                     <span class="text-sm font-bold text-gray-600 dark:text-gray-300" x-text="'Rs ' + (total() + taxEstimate()).toLocaleString()"></span>
                 </div>
             </div>
@@ -131,41 +131,41 @@
             <template x-if="!appendOrderId">
                 <div class="space-y-3">
                     <div class="grid grid-cols-2 gap-2">
-                        <button @click="orderType = 'dine_in'" :class="orderType === 'dine_in' ? 'bg-teal-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'" class="py-2.5 rounded-xl text-xs font-bold transition">Dine In</button>
-                        <button @click="orderType = 'takeaway'; selectedTable = null" :class="orderType === 'takeaway' ? 'bg-teal-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'" class="py-2.5 rounded-xl text-xs font-bold transition">Take Away</button>
+                        <button @click="orderType = 'dine_in'" :class="orderType === 'dine_in' ? 'bg-teal-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'" class="py-2.5 rounded-xl text-xs font-bold transition">{{ __('pos.dine_in') }}</button>
+                        <button @click="orderType = 'takeaway'; selectedTable = null" :class="orderType === 'takeaway' ? 'bg-teal-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'" class="py-2.5 rounded-xl text-xs font-bold transition">{{ __('pos.take_away') }}</button>
                     </div>
                     <button x-show="orderType === 'dine_in'" @click="openTables()" class="w-full py-2.5 rounded-xl text-sm font-bold border-2 border-dashed transition"
                             :class="selectedTable ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300' : 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400'"
-                            x-text="selectedTable ? ('Table T-' + selectedTable.table_number + ' · ' + selectedTable.floor) : 'Choose Table'"></button>
-                    <input type="text" x-model="customerName" placeholder="Customer name (optional)"
+                            x-text="selectedTable ? ({{ Js::from(__('pos.table_t_prefix2')) }} + selectedTable.table_number + ' · ' + selectedTable.floor) : {{ Js::from(__('pos.choose_table')) }}"></button>
+                    <input type="text" x-model="customerName" placeholder="{{ __('pos.ph_customer_name_optional') }}"
                            autocomplete="off" name="waiter_customer_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                            class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm px-3 py-2.5 focus:ring-teal-500 focus:border-teal-500">
-                    <input type="text" x-model="customerPhone" placeholder="Customer phone (optional)" inputmode="tel"
+                    <input type="text" x-model="customerPhone" placeholder="{{ __('pos.ph_customer_phone_optional') }}" inputmode="tel"
                            autocomplete="off" name="waiter_phone_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                            class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm px-3 py-2.5 focus:ring-teal-500 focus:border-teal-500">
-                    <textarea x-model="kitchenNotes" rows="2" placeholder="Kitchen note for the whole order (optional)"
+                    <textarea x-model="kitchenNotes" rows="2" placeholder="{{ __('pos.ph_kitchen_note_order') }}"
                               autocomplete="off" name="waiter_kn_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                               class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm px-3 py-2.5 focus:ring-teal-500 focus:border-teal-500"></textarea>
                     <div>
                         {{-- Cashier pick is OPTIONAL (customer feedback, 23 Jul 2026): default = counter,
                              order shows on EVERY cashier's incoming list. Picking a specific cashier
                              still works and sticks for the day (owner, 20 Jul 2026). --}}
-                        <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Send to</label>
+                        <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.send_to') }}</label>
                         <select x-model="cashierId" class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm px-3 py-2.5 focus:ring-teal-500 focus:border-teal-500">
-                            <option value="">Counter — sab cashiers</option>
+                            <option value="">{{ __('pos.counter_all_cashiers') }}</option>
                             @foreach($cashiers as $c)
                                 <option value="{{ $c->id }}">{{ $c->name }}</option>
                             @endforeach
                         </select>
-                        <p x-show="cashierId" class="mt-1 text-[11px] text-teal-600 dark:text-teal-400 font-medium">✓ Aaj ke liye yaad rahega — kal dobara select hoga</p>
-                        <p x-show="!cashierId" class="mt-1 text-[11px] text-gray-400">Counter par sab cashiers ko nazar aayega</p>
+                        <p x-show="cashierId" class="mt-1 text-[11px] text-teal-600 dark:text-teal-400 font-medium">{{ __('pos.cashier_remembered_today') }}</p>
+                        <p x-show="!cashierId" class="mt-1 text-[11px] text-gray-400">{{ __('pos.all_cashiers_will_see') }}</p>
                     </div>
                 </div>
             </template>
 
             <button @click="send()" :disabled="sending || !cart.length"
                     class="w-full py-3.5 rounded-xl bg-teal-600 hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-base font-black transition"
-                    x-text="sending ? 'Sending…' : (appendOrderId ? 'ADD ITEMS TO ORDER' : 'SEND ORDER')"></button>
+                    x-text="sending ? {{ Js::from(__('pos.sending_ellipsis')) }} : (appendOrderId ? {{ Js::from(__('pos.add_items_to_order')) }} : {{ Js::from(__('pos.send_order')) }})"></button>
         </div>
     </div>
 
@@ -174,23 +174,23 @@
         <div class="absolute inset-0 bg-black/60" @click="showTables = false"></div>
         <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
             <div class="px-5 py-4 bg-teal-600 flex items-center justify-between">
-                <h3 class="text-white font-bold">Choose Table</h3>
+                <h3 class="text-white font-bold">{{ __('pos.choose_table') }}</h3>
                 <button @click="showTables = false" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/25 text-white font-black">×</button>
             </div>
             <div class="flex-1 overflow-y-auto p-4">
-                <div x-show="tablesLoading" class="text-center py-8 text-sm text-gray-400">Loading…</div>
+                <div x-show="tablesLoading" class="text-center py-8 text-sm text-gray-400">{{ __('pos.loading_ellipsis') }}</div>
                 <div class="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
                     <template x-for="t in tables" :key="t.id">
                         <button @click="pickTable(t)" :disabled="t.status === 'occupied'"
                                 :class="t.status === 'occupied' ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-400 cursor-not-allowed' : (t.status === 'reserved' ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300' : 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:border-emerald-500')"
                                 class="rounded-xl border-2 p-3 text-center transition">
                             <span class="block text-base font-black" x-text="'T-' + t.table_number"></span>
-                            <span class="block text-[10px] font-bold mt-0.5" x-text="t.floor + ' · ' + t.seats + ' seats'"></span>
+                            <span class="block text-[10px] font-bold mt-0.5" x-text="t.floor + ' · ' + t.seats + {{ Js::from(__('pos.sfx_seats')) }}"></span>
                             <span class="block text-[10px] font-bold uppercase mt-0.5" x-text="t.status"></span>
                         </button>
                     </template>
                 </div>
-                <div x-show="!tablesLoading && tables.length === 0" class="text-center py-8 text-sm text-gray-400">No tables configured.</div>
+                <div x-show="!tablesLoading && tables.length === 0" class="text-center py-8 text-sm text-gray-400">{{ __('pos.no_tables_configured_dot') }}</div>
             </div>
         </div>
     </div>
@@ -200,19 +200,19 @@
         <div class="absolute inset-0 bg-black/60" @click="showMyOrders = false"></div>
         <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-xl max-h-[80vh] flex flex-col overflow-hidden">
             <div class="px-5 py-4 bg-teal-600 flex items-center justify-between">
-                <h3 class="text-white font-bold">My Open Orders</h3>
+                <h3 class="text-white font-bold">{{ __('pos.my_open_orders') }}</h3>
                 <button @click="showMyOrders = false" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/25 text-white font-black">×</button>
             </div>
             <div class="flex-1 overflow-y-auto p-4 space-y-3">
-                <div x-show="myOrdersLoading" class="text-center py-8 text-sm text-gray-400">Loading…</div>
-                <div x-show="!myOrdersLoading && myOrders.length === 0" class="text-center py-8 text-sm text-gray-400">No open orders — everything is settled.</div>
+                <div x-show="myOrdersLoading" class="text-center py-8 text-sm text-gray-400">{{ __('pos.loading_ellipsis') }}</div>
+                <div x-show="!myOrdersLoading && myOrders.length === 0" class="text-center py-8 text-sm text-gray-400">{{ __('pos.no_open_orders_settled') }}</div>
                 <template x-for="o in myOrders" :key="o.id">
                     <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
                         <div class="flex items-center justify-between gap-2 flex-wrap">
                             <div class="flex items-center gap-2 flex-wrap">
                                 <span class="font-mono text-sm font-bold text-gray-800 dark:text-gray-100" x-text="o.order_number"></span>
                                 <span x-show="o.table" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" x-text="'T-' + o.table"></span>
-                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300" x-text="'→ ' + (o.assigned_cashier || 'any cashier')"></span>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300" x-text="'→ ' + (o.assigned_cashier || {{ Js::from(__('pos.any_cashier')) }})"></span>
                             </div>
                             <span class="text-sm font-black text-gray-900 dark:text-white" x-text="'Rs ' + Math.round(o.total_amount).toLocaleString()"></span>
                         </div>
@@ -220,10 +220,10 @@
                             <template x-for="(it, ix) in o.items" :key="ix"><span><span x-text="it.quantity + '× ' + it.name"></span><span x-show="ix < o.items.length - 1"> · </span></span></template>
                         </div>
                         <div class="mt-2.5 flex items-center gap-2">
-                            <button @click="startAppend(o)" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition">Add Items</button>
+                            <button @click="startAppend(o)" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition">{{ __('pos.add_items') }}</button>
                             {{-- Table Shift (owner batch, 26 Jul 2026): sirf dine-in
                                  orders (table wale); khali table par hi jayega. --}}
-                            <button x-show="o.table_id" @click="startShift(o)" class="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-teal-300 dark:border-teal-700 text-teal-700 dark:text-teal-300 hover:bg-teal-50 text-xs font-bold transition">&#8644; Table Badlein</button>
+                            <button x-show="o.table_id" @click="startShift(o)" class="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-teal-300 dark:border-teal-700 text-teal-700 dark:text-teal-300 hover:bg-teal-50 text-xs font-bold transition">⇄ {{ __('pos.change_table') }}</button>
                         </div>
                     </div>
                 </template>
@@ -238,18 +238,18 @@
         <div class="absolute inset-0 bg-black/60" @click="if (!shiftBusy) shiftFor = null"></div>
         <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-xl max-h-[80vh] flex flex-col overflow-hidden">
             <div class="px-5 py-4 bg-teal-600 flex items-center justify-between">
-                <h3 class="text-white font-bold" x-text="shiftFor ? (shiftFor.order_number + ' — naya table chunein') : ''"></h3>
+                <h3 class="text-white font-bold" x-text="shiftFor ? (shiftFor.order_number + {{ Js::from(__('pos.pick_new_table_suffix')) }}) : ''"></h3>
                 <button @click="shiftFor = null" :disabled="shiftBusy" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/25 text-white font-black">×</button>
             </div>
             <div class="flex-1 overflow-y-auto p-4">
-                <p class="text-[11px] text-gray-500 dark:text-gray-400 mb-3">Sirf KHALI tables — timer chalta rahega, KOT dobara nahi chalega.</p>
-                <div x-show="shiftTablesLoading" class="text-center py-8 text-sm text-gray-400">Loading…</div>
-                <div x-show="!shiftTablesLoading && shiftFreeTables().length === 0" class="text-center py-8 text-sm text-gray-400">Koi khali table nahi.</div>
+                <p class="text-[11px] text-gray-500 dark:text-gray-400 mb-3">{{ __('pos.only_empty_tables_hint') }}</p>
+                <div x-show="shiftTablesLoading" class="text-center py-8 text-sm text-gray-400">{{ __('pos.loading_ellipsis') }}</div>
+                <div x-show="!shiftTablesLoading && shiftFreeTables().length === 0" class="text-center py-8 text-sm text-gray-400">{{ __('pos.no_empty_table_dot') }}</div>
                 <div class="grid grid-cols-3 sm:grid-cols-4 gap-2">
                     <template x-for="t in shiftFreeTables()" :key="'shift' + t.id">
                         <button @click="doShift(t)" :disabled="shiftBusy" class="rounded-xl border-2 p-3 text-center transition bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:border-emerald-500 disabled:opacity-40">
                             <span class="block text-base font-black" x-text="'T-' + t.table_number"></span>
-                            <span class="block text-[10px] font-bold mt-0.5" x-text="t.floor + ' · ' + t.seats + ' seats'"></span>
+                            <span class="block text-[10px] font-bold mt-0.5" x-text="t.floor + ' · ' + t.seats + {{ Js::from(__('pos.sfx_seats')) }}"></span>
                         </button>
                     </template>
                 </div>
@@ -395,7 +395,7 @@ function waiterApp() {
                 this.filterProducts();
             } catch (e) {
                 if (prev === undefined) delete this.userGridPrefs[key]; else this.userGridPrefs[key] = prev;
-                this.showToast('Save nahi hua — dobara try karein', 'error');
+                this.showToast(@js(__('pos.save_failed_try_again')), 'error');
             }
         },
         async resetGridPrefs() {
@@ -409,9 +409,9 @@ function waiterApp() {
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 this.userGridPrefs = {};
                 this.filterProducts();
-                this.showToast('Sab items wapas dikh rahe hain', 'success');
+                this.showToast(@js(__('pos.all_items_visible_again')), 'success');
             } catch (e) {
-                this.showToast('Reset nahi hua — dobara try karein', 'error');
+                this.showToast(@js(__('pos.reset_failed_try_again')), 'error');
             } finally {
                 this.gridPrefBusy = false;
             }
@@ -470,7 +470,7 @@ function waiterApp() {
         },
 
         startAppend(o) {
-            if (this.cart.length && !confirm('Discard the current unsent items?')) return;
+            if (this.cart.length && !confirm(@js(__('pos.discard_unsent_items_q')))) return;
             this.cart = [];
             this.appendOrderId = o.id;
             this.appendOrderNumber = o.order_number;
@@ -507,14 +507,14 @@ function waiterApp() {
                 });
                 const data = await res.json().catch(() => null);
                 if (data && data.success) {
-                    this.showToast(data.message || ('Order T-' + t.table_number + ' par shift ho gaya'), 'success');
+                    this.showToast(data.message || (@js(__('pos.order_shifted_to_prefix')) + t.table_number + @js(__('pos.order_shifted_to_suffix'))), 'success');
                     this.shiftFor = null;
                     this.loadMyOrders();
                 } else {
-                    this.showToast((data && data.message) || 'Shift nahi hua', 'error');
+                    this.showToast((data && data.message) || @js(__('pos.shift_failed')), 'error');
                 }
             } catch (e) {
-                this.showToast('Network error — try again.', 'error');
+                this.showToast(@js(__('pos.network_error_try_again')), 'error');
             }
             this.shiftBusy = false;
         },
@@ -546,9 +546,9 @@ function waiterApp() {
                 });
                 const data = await res.json().catch(() => null);
                 if (!res.ok || !data || !data.success) {
-                    this.showToast((data && data.message) || 'Failed (HTTP ' + res.status + ')', 'error');
+                    this.showToast((data && data.message) || (@js(__('pos.failed_http_prefix')) + res.status + ')'), 'error');
                 } else {
-                    this.showToast(data.message || 'Sent!', 'success');
+                    this.showToast(data.message || @js(__('pos.sent_excl')), 'success');
                     this.cart = [];
                     this.customerName = ''; this.customerPhone = ''; this.kitchenNotes = '';
                     this.selectedTable = null;
@@ -556,7 +556,7 @@ function waiterApp() {
                     this.loadMyOrders();
                 }
             } catch (e) {
-                this.showToast('Network error — try again.', 'error');
+                this.showToast(@js(__('pos.network_error_try_again')), 'error');
             }
             this.sending = false;
         },

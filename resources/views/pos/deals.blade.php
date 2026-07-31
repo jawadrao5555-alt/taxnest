@@ -7,12 +7,12 @@
      x-data="{ products: {{ json_encode($productsJson, JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]' }} }">
     <a href="{{ route('pos.customize') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition mb-3">
         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-        Back to Customize
+        {{ __('pos.back_to_customize') }}
     </a>
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Deals</h1>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.deals_title') }}</h1>
     </div>
-    <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Combo deals at one promo price — pick the products, set the price, choose the days. Active deals appear automatically on the sale screen under the "Deals" tab.</p>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">{{ __('pos.deals_intro') }}</p>
 
     @if(session('success'))
     <div class="mb-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 text-sm">{{ session('success') }}</div>
@@ -28,26 +28,26 @@
     {{-- Add New Deal --}}
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6"
          x-data="{ rows: [{ product_id: '', quantity: 1 }] }">
-        <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Add New Deal</h3>
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">{{ __('pos.add_new_deal') }}</h3>
         <form method="POST" action="{{ route('pos.deals.store') }}">
             @csrf
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <div>
-                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Deal Name</label>
-                    <input type="text" name="name" required maxlength="255" placeholder="e.g. Sunday Deal" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.deal_name') }}</label>
+                    <input type="text" name="name" required maxlength="255" placeholder="{{ __('pos.ph_deal_name_eg') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Deal Price (PKR)</label>
+                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.deal_price_pkr') }}</label>
                     <input type="number" name="price" required step="0.01" min="0" placeholder="0.00" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
                 </div>
                 <div class="sm:col-span-2">
-                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Description <span class="text-gray-400">(optional)</span></label>
-                    <input type="text" name="description" maxlength="255" placeholder="e.g. Burger + Fries + Drink" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
+                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.description_label') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label>
+                    <input type="text" name="description" maxlength="255" placeholder="{{ __('pos.ph_deal_desc_eg') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
                 </div>
             </div>
 
             <div class="mb-4">
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Active Days <span class="text-gray-400">(none selected = every day)</span></label>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">{{ __('pos.active_days') }} <span class="text-gray-400">{{ __('pos.none_selected_every_day') }}</span></label>
                 <div class="flex flex-wrap gap-2">
                     @foreach($dayNames as $num => $label)
                     <label class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-semibold text-gray-700 dark:text-gray-300 cursor-pointer has-[:checked]:bg-purple-600 has-[:checked]:text-white has-[:checked]:border-purple-600 transition">
@@ -60,38 +60,38 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <div>
-                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Start Date <span class="text-gray-400">(optional)</span></label>
+                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.start_date') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label>
                     <input type="date" name="starts_on" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">End Date <span class="text-gray-400">(optional)</span></label>
+                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.end_date') }} <span class="text-gray-400">{{ __('pos.paren_optional') }}</span></label>
                     <input type="date" name="ends_on" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
                 </div>
             </div>
 
             <div class="mb-4">
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Deal Items (products included)</label>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">{{ __('pos.deal_items_included') }}</label>
                 <template x-for="(row, idx) in rows" :key="idx">
                     <div class="flex items-center gap-2 mb-2">
                         <select :name="'items[' + idx + '][product_id]'" x-model="row.product_id" required class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
-                            <option value="">Select product…</option>
+                            <option value="">{{ __('pos.select_product_dots') }}</option>
                             <template x-for="p in products" :key="p.id">
                                 <option :value="p.id" x-text="p.name + ' — Rs. ' + p.price" :selected="String(row.product_id) === String(p.id)"></option>
                             </template>
                         </select>
-                        <input type="number" :name="'items[' + idx + '][quantity]'" x-model.number="row.quantity" required min="1" max="999" class="w-20 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500" title="Quantity">
-                        <button type="button" @click="rows.splice(idx, 1)" x-show="rows.length > 1" class="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="Remove item">
+                        <input type="number" :name="'items[' + idx + '][quantity]'" x-model.number="row.quantity" required min="1" max="999" class="w-20 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500" title="{{ __('pos.quantity_label') }}">
+                        <button type="button" @click="rows.splice(idx, 1)" x-show="rows.length > 1" class="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="{{ __('pos.remove_item') }}">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                         </button>
                     </div>
                 </template>
                 <button type="button" @click="rows.push({ product_id: '', quantity: 1 })" class="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition">
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                    Add Item
+                    {{ __('pos.add_item') }}
                 </button>
             </div>
 
-            <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition">Add Deal</button>
+            <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition">{{ __('pos.add_deal') }}</button>
         </form>
     </div>
 
@@ -111,17 +111,17 @@
                         <h4 class="text-sm font-bold text-gray-900 dark:text-white">{{ $deal->name }}</h4>
                         @if($deal->is_active)
                             @if($deal->isActiveOn())
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">LIVE TODAY</span>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">{{ __('pos.live_today') }}</span>
                             @else
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">Active</span>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">{{ __('pos.active_word') }}</span>
                             @endif
                         @else
-                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">Inactive</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">{{ __('pos.inactive_word') }}</span>
                         @endif
                     </div>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">{{ $componentsText ?: 'No items' }}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">{{ $componentsText ?: __('pos.no_items') }}</p>
                     <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
-                        Days: {{ empty($dealDays) ? 'Every day' : collect($dealDays)->map(fn($d) => $dayNames[$d] ?? $d)->implode(', ') }}
+                        {{ __('pos.days_colon') }} {{ empty($dealDays) ? __('pos.every_day') : collect($dealDays)->map(fn($d) => $dayNames[$d] ?? $d)->implode(', ') }}
                         @if($deal->starts_on || $deal->ends_on)
                             · {{ $deal->starts_on?->format('d M Y') ?? '…' }} → {{ $deal->ends_on?->format('d M Y') ?? '…' }}
                         @endif
@@ -129,10 +129,10 @@
                 </div>
                 <div class="flex items-center gap-3 shrink-0">
                     <span class="text-lg font-extrabold text-gray-900 dark:text-white">Rs. {{ number_format((float) $deal->price, 2) }}</span>
-                    <button type="button" @click="editing = !editing" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition" x-text="editing ? 'Close' : 'Edit'"></button>
-                    <form method="POST" action="{{ route('pos.deals.delete', $deal->id) }}" onsubmit="return confirm('Delete this deal? Sold bills are not affected.');">
+                    <button type="button" @click="editing = !editing" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition" x-text="editing ? @js(__('pos.close')) : @js(__('pos.edit'))"></button>
+                    <form method="POST" action="{{ route('pos.deals.delete', $deal->id) }}" onsubmit="return confirm({{ Js::from(__('pos.confirm_delete_deal')) }});">
                         @csrf @method('DELETE')
-                        <button type="submit" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition">Delete</button>
+                        <button type="submit" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition">{{ __('pos.delete') }}</button>
                     </form>
                 </div>
             </div>
@@ -143,20 +143,20 @@
                     @csrf @method('PUT')
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                         <div>
-                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Deal Name</label>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.deal_name') }}</label>
                             <input type="text" name="name" required maxlength="255" value="{{ $deal->name }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Deal Price (PKR)</label>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.deal_price_pkr') }}</label>
                             <input type="number" name="price" required step="0.01" min="0" value="{{ $deal->price }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
                         </div>
                         <div class="sm:col-span-2">
-                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Description</label>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.description_label') }}</label>
                             <input type="text" name="description" maxlength="255" value="{{ $deal->description }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
                         </div>
                     </div>
                     <div class="mb-4">
-                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Active Days <span class="text-gray-400">(none = every day)</span></label>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">{{ __('pos.active_days') }} <span class="text-gray-400">{{ __('pos.none_every_day') }}</span></label>
                         <div class="flex flex-wrap gap-2">
                             @foreach($dayNames as $num => $label)
                             <label class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-semibold text-gray-700 dark:text-gray-300 cursor-pointer has-[:checked]:bg-purple-600 has-[:checked]:text-white has-[:checked]:border-purple-600 transition">
@@ -168,48 +168,48 @@
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                         <div>
-                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Start Date</label>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.start_date') }}</label>
                             <input type="date" name="starts_on" value="{{ $deal->starts_on?->format('Y-m-d') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">End Date</label>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.end_date') }}</label>
                             <input type="date" name="ends_on" value="{{ $deal->ends_on?->format('Y-m-d') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
                         </div>
                         <div class="flex items-end pb-1">
                             <label class="inline-flex items-center gap-2 cursor-pointer">
                                 <input type="checkbox" name="is_active" value="1" @checked($deal->is_active) class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
-                                <span class="text-xs font-medium text-gray-600 dark:text-gray-400">Active</span>
+                                <span class="text-xs font-medium text-gray-600 dark:text-gray-400">{{ __('pos.active_word') }}</span>
                             </label>
                         </div>
                     </div>
                     <div class="mb-4">
-                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Deal Items</label>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">{{ __('pos.deal_items') }}</label>
                         <template x-for="(row, idx) in rows" :key="idx">
                             <div class="flex items-center gap-2 mb-2">
                                 <select :name="'items[' + idx + '][product_id]'" x-model="row.product_id" required class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
-                                    <option value="">Select product…</option>
+                                    <option value="">{{ __('pos.select_product_dots') }}</option>
                                     <template x-for="p in products" :key="p.id">
                                         <option :value="p.id" x-text="p.name + ' — Rs. ' + p.price" :selected="String(row.product_id) === String(p.id)"></option>
                                     </template>
                                 </select>
-                                <input type="number" :name="'items[' + idx + '][quantity]'" x-model.number="row.quantity" required min="1" max="999" class="w-20 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500" title="Quantity">
-                                <button type="button" @click="rows.splice(idx, 1)" x-show="rows.length > 1" class="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="Remove item">
+                                <input type="number" :name="'items[' + idx + '][quantity]'" x-model.number="row.quantity" required min="1" max="999" class="w-20 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500" title="{{ __('pos.quantity_label') }}">
+                                <button type="button" @click="rows.splice(idx, 1)" x-show="rows.length > 1" class="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition" title="{{ __('pos.remove_item') }}">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                                 </button>
                             </div>
                         </template>
                         <button type="button" @click="rows.push({ product_id: '', quantity: 1 })" class="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition">
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                            Add Item
+                            {{ __('pos.add_item') }}
                         </button>
                     </div>
-                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition">Save Changes</button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition">{{ __('pos.save_changes') }}</button>
                 </form>
             </div>
         </div>
         @empty
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-10 text-center">
-            <p class="text-sm text-gray-500 dark:text-gray-400">No deals yet — create your first deal above. It will appear on the sale screen automatically on its active days.</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('pos.no_deals_yet') }}</p>
         </div>
         @endforelse
     </div>

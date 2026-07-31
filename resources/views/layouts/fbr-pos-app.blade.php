@@ -245,7 +245,7 @@
 
                     <div class="flex items-center gap-3">
                         {{-- ☰ Sidebar Drawer Toggle (Ctrl+M) --}}
-                        <button @click="sidebarOpen = !sidebarOpen" type="button" class="p-2 rounded-lg text-white hover:bg-white/15 transition" title="Menu (Ctrl+M)">
+                        <button @click="sidebarOpen = !sidebarOpen" type="button" class="p-2 rounded-lg text-white hover:bg-white/15 transition" title="{{ __('pos.ti_menu_ctrl_m') }}">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                         </button>
 
@@ -265,7 +265,7 @@
                         <nav class="hidden md:flex items-center gap-1">
                             <a href="{{ route('fbrpos.create') }}"
                                class="nav-pill px-3 py-1.5 rounded-lg text-xs font-semibold {{ request()->routeIs('fbrpos.create') ? 'active text-white' : 'text-white/90' }}">
-                                New Sale
+                                {{ __('pos.new_sale') }}
                             </a>
                         </nav>
 
@@ -276,39 +276,39 @@
 
                     <div class="flex items-center gap-2">
                         {{-- Prominent nav-level Download App button — native prompt first, instructions fallback, installed state --}}
-                        <x-pwa-install-menu-item color="blue" app-name="Nest FBR POS" label="Download App" item-class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/20 transition" />
+                        <x-pwa-install-menu-item color="blue" app-name="Nest FBR POS" :label="__('pos.download_app')" item-class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/20 transition" />
                         <x-pwa-refresh-btn color="blue" />
 
                         {{-- 🟦 Local Bills (F10) — Provisional / Saved bills --}}
-                        <button @click="openLocal()" type="button" class="relative hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/20 transition" title="Local Bills (F10)">
+                        <button @click="openLocal()" type="button" class="relative hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/20 transition" title="{{ __('pos.ti_local_bills_f10') }}">
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
-                            <span>Local</span>
+                            <span>{{ __('pos.local_word') }}</span>
                             <span x-show="localCount > 0" x-cloak x-text="localCount" class="ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-amber-400 text-amber-950 text-[10px] font-black"></span>
                             <span class="hidden md:inline text-[9px] opacity-70 ml-1">F10</span>
                         </button>
 
                         {{-- 🟥 Failed Bills (Shift+F11) — F11 plain stays for browser fullscreen --}}
-                        <button @click="openFailed()" type="button" class="relative hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-red-600/85 hover:bg-red-600 ring-1 ring-red-300/40 transition" title="Failed Bills (Shift+F11)">
+                        <button @click="openFailed()" type="button" class="relative hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-red-600/85 hover:bg-red-600 ring-1 ring-red-300/40 transition" title="{{ __('pos.ti_failed_bills_f11') }}">
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/></svg>
-                            <span>Failed</span>
+                            <span>{{ __('pos.failed_word') }}</span>
                             <span x-show="failedCount > 0" x-cloak x-text="failedCount" class="ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-white text-red-700 text-[10px] font-black animate-pulse"></span>
                             <span class="hidden md:inline text-[9px] opacity-70 ml-1">⇧F11</span>
                         </button>
 
                         {{-- 🎨 Theme Switcher (Customize) --}}
                         <div class="relative">
-                            <button @click="themeOpen = !themeOpen; profileOpen = false" class="p-2 rounded-lg text-white hover:bg-white/15 transition" title="Customize Theme">
+                            <button @click="themeOpen = !themeOpen; profileOpen = false" class="p-2 rounded-lg text-white hover:bg-white/15 transition" title="{{ __('pos.ti_customize_theme') }}">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
                             </button>
                             <div x-show="themeOpen" x-cloak @click.outside="themeOpen = false" x-transition class="absolute right-0 top-full mt-2 bg-white dark:bg-gray-900 rounded-xl shadow-2xl shadow-black/20 border border-gray-200/80 dark:border-gray-700/80 p-3 z-[100] w-48">
-                                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">FBR POS Theme</p>
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">{{ __('pos.fbr_pos_theme_heading') }}</p>
                                 <div class="grid grid-cols-3 gap-2">
-                                    <button @click="currentTheme='purple'; document.body.setAttribute('data-theme','purple'); fetch('{{ route('fbrpos.settings.theme') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'purple'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='purple' && 'active-theme'" style="background:linear-gradient(135deg,#312e81,#7c3aed)" title="Royal Purple"></button>
-                                    <button @click="currentTheme='blue'; document.body.setAttribute('data-theme','blue'); fetch('{{ route('fbrpos.settings.theme') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'blue'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='blue' && 'active-theme'" style="background:linear-gradient(135deg,#1e3a5f,#2563eb)" title="Ocean Blue"></button>
-                                    <button @click="currentTheme='emerald'; document.body.setAttribute('data-theme','emerald'); fetch('{{ route('fbrpos.settings.theme') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'emerald'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='emerald' && 'active-theme'" style="background:linear-gradient(135deg,#064e3b,#059669)" title="Emerald Green"></button>
-                                    <button @click="currentTheme='orange'; document.body.setAttribute('data-theme','orange'); fetch('{{ route('fbrpos.settings.theme') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'orange'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='orange' && 'active-theme'" style="background:linear-gradient(135deg,#7c2d12,#ea580c)" title="Sunset Orange"></button>
-                                    <button @click="currentTheme='midnight'; document.body.setAttribute('data-theme','midnight'); fetch('{{ route('fbrpos.settings.theme') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'midnight'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='midnight' && 'active-theme'" style="background:linear-gradient(135deg,#171717,#404040)" title="Midnight Dark"></button>
-                                    <button @click="currentTheme='rose'; document.body.setAttribute('data-theme','rose'); fetch('{{ route('fbrpos.settings.theme') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'rose'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='rose' && 'active-theme'" style="background:linear-gradient(135deg,#881337,#e11d48)" title="Rose Pink"></button>
+                                    <button @click="currentTheme='purple'; document.body.setAttribute('data-theme','purple'); fetch('{{ route('fbrpos.settings.theme') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'purple'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='purple' && 'active-theme'" style="background:linear-gradient(135deg,#312e81,#7c3aed)" title="{{ __('pos.theme_royal_purple') }}"></button>
+                                    <button @click="currentTheme='blue'; document.body.setAttribute('data-theme','blue'); fetch('{{ route('fbrpos.settings.theme') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'blue'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='blue' && 'active-theme'" style="background:linear-gradient(135deg,#1e3a5f,#2563eb)" title="{{ __('pos.theme_ocean_blue') }}"></button>
+                                    <button @click="currentTheme='emerald'; document.body.setAttribute('data-theme','emerald'); fetch('{{ route('fbrpos.settings.theme') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'emerald'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='emerald' && 'active-theme'" style="background:linear-gradient(135deg,#064e3b,#059669)" title="{{ __('pos.theme_emerald_green') }}"></button>
+                                    <button @click="currentTheme='orange'; document.body.setAttribute('data-theme','orange'); fetch('{{ route('fbrpos.settings.theme') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'orange'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='orange' && 'active-theme'" style="background:linear-gradient(135deg,#7c2d12,#ea580c)" title="{{ __('pos.theme_sunset_orange') }}"></button>
+                                    <button @click="currentTheme='midnight'; document.body.setAttribute('data-theme','midnight'); fetch('{{ route('fbrpos.settings.theme') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'midnight'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='midnight' && 'active-theme'" style="background:linear-gradient(135deg,#171717,#404040)" title="{{ __('pos.theme_midnight_dark') }}"></button>
+                                    <button @click="currentTheme='rose'; document.body.setAttribute('data-theme','rose'); fetch('{{ route('fbrpos.settings.theme') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({theme:'rose'})}); themeOpen=false" class="theme-swatch" :class="currentTheme==='rose' && 'active-theme'" style="background:linear-gradient(135deg,#881337,#e11d48)" title="{{ __('pos.theme_rose_pink') }}"></button>
                                 </div>
                                 <div class="mt-2 pt-2 border-t border-gray-100 dark:border-gray-800">
                                     <p class="text-[9px] text-gray-400 text-center" x-text="currentTheme.charAt(0).toUpperCase() + currentTheme.slice(1) + ' Theme'"></p>
@@ -318,7 +318,7 @@
 
                         <span class="hidden lg:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider fbr-badge-premium">
                             <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z"/></svg>
-                            FBR CERTIFIED
+                            {{ __('pos.fbr_certified') }}
                         </span>
 
                         <div class="relative">
@@ -348,14 +348,14 @@
                                 </div>
 
                                 <div class="py-1">
-                                    <p class="px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Navigation</p>
+                                    <p class="px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ __('pos.navigation') }}</p>
                                     <a href="{{ route('fbrpos.dashboard') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-                                        Dashboard
+                                        {{ __('pos.dashboard') }}
                                     </a>
                                     <a href="{{ route('fbrpos.transactions') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                                        Orders
+                                        {{ __('pos.nav_orders') }}
                                     </a>
                                     @php
                                         $failQueueCount = 0;
@@ -369,46 +369,46 @@
                                     @endphp
                                     <a href="{{ route('fbrpos.failQueue') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 {{ $failQueueCount > 0 ? 'text-red-500' : 'text-gray-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.74-2.991l-7-12a2 2 0 00-3.48 0l-7 12A2 2 0 005 19z"/></svg>
-                                        <span class="flex-1">Fail Queue</span>
+                                        <span class="flex-1">{{ __('pos.nav_fail_queue') }}</span>
                                         @if($failQueueCount > 0)
                                             <span class="px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-bold">{{ $failQueueCount }}</span>
                                         @endif
                                     </a>
                                     <a href="{{ route('fbrpos.products') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                                        Products
+                                        {{ __('pos.products_word') }}
                                     </a>
                                     <a href="{{ route('fbrpos.reports') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                                        Reports
+                                        {{ __('pos.reports') }}
                                     </a>
                                     <a href="{{ route('fbrpos.tax-reports') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                                        Tax Reports
+                                        {{ __('pos.nav_tax_reports') }}
                                     </a>
                                     <a href="{{ route('fbrpos.day-close') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                        Day Close (Z-Report)
+                                        {{ __('pos.nav_day_close_z') }}
                                     </a>
                                 </div>
 
                                 <div class="border-t border-gray-100 dark:border-gray-700 py-1">
-                                    <p class="px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Settings</p>
+                                    <p class="px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ __('pos.settings') }}</p>
                                     <a href="{{ route('fbrpos.business-profile') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                                        Business Profile
+                                        {{ __('pos.nav_business_profile') }}
                                     </a>
                                     <a href="{{ route('fbrpos.settings') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                                        FBR Settings
+                                        {{ __('pos.nav_fbr_settings') }}
                                     </a>
                                     <a href="{{ route('fbrpos.billing') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-                                        Billing
+                                        {{ __('pos.nav_billing') }}
                                     </a>
                                     <a href="{{ route('fbrpos.my-profile') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                                        My Profile
+                                        {{ __('pos.nav_my_profile') }}
                                     </a>
                                     {{-- Language picker (30 Jul 2026) — per-user Roman Urdu / English --}}
                                     <p class="px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ __('pos.language') }}</p>
@@ -426,7 +426,7 @@
                                         </form>
                                     </div>
                                     {{-- PWA install — always visible --}}
-                                    <x-pwa-install-menu-item color="blue" app-name="Nest FBR POS" label="Install App on this Device" item-class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300" />
+                                    <x-pwa-install-menu-item color="blue" app-name="Nest FBR POS" :label="__('pos.install_app_device')" item-class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300" />
                                 </div>
 
                                 <div class="border-t border-gray-100 dark:border-gray-700 py-1">
@@ -434,7 +434,7 @@
                                         @csrf
                                         <button type="submit" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-red-600 dark:text-red-400 w-full">
                                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-                                            Sign Out
+                                            {{ __('pos.sign_out') }}
                                         </button>
                                     </form>
                                 </div>
@@ -456,8 +456,8 @@
                      x-transition:leave-start="opacity-100"
                      x-transition:leave-end="opacity-0 -translate-y-2"
                      class="md:hidden border-t border-white/10 px-3 py-2 flex flex-wrap gap-1.5" style="background: rgba(12,25,41,0.9)">
-                    <a href="{{ route('fbrpos.create') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('fbrpos.create') ? 'active text-white' : 'text-white/90' }}">New Sale</a>
-                    <x-pwa-install-menu-item color="blue" app-name="Nest FBR POS" label="Download App" item-class="nav-pill inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 ring-1 ring-white/20" />
+                    <a href="{{ route('fbrpos.create') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('fbrpos.create') ? 'active text-white' : 'text-white/90' }}">{{ __('pos.new_sale') }}</a>
+                    <x-pwa-install-menu-item color="blue" app-name="Nest FBR POS" :label="__('pos.download_app')" item-class="nav-pill inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 ring-1 ring-white/20" />
                 </div>
             </header>
 
@@ -494,7 +494,7 @@
                             <p class="text-[10px] text-white/60 leading-tight">{{ $companyName }}</p>
                         </div>
                     </div>
-                    <button @click="sidebarOpen = false" class="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition" title="Close (Esc)">
+                    <button @click="sidebarOpen = false" class="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition" title="{{ __('pos.ti_close_esc') }}">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -512,107 +512,107 @@
                         @endphp
                         <a href="{{ route('fbrpos.create') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.create') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                            <span class="flex-1">New Sale</span>
+                            <span class="flex-1">{{ __('pos.new_sale') }}</span>
                             <span class="text-[9px] font-bold opacity-50">F2</span>
                         </a>
                         <a href="{{ route('fbrpos.dashboard') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.dashboard') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-                            Dashboard
+                            {{ __('pos.dashboard') }}
                         </a>
                         <a href="{{ route('fbrpos.transactions') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.transactions') || request()->routeIs('fbrpos.show') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                            Orders / Transactions
+                            {{ __('pos.nav_orders_transactions') }}
                         </a>
                         <button @click="sidebarOpen=false; openLocal()" type="button" class="{{ $sidebarBase }} {{ $sidebarInactive }} w-full text-left">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
-                            <span class="flex-1">Local / Provisional</span>
+                            <span class="flex-1">{{ __('pos.nav_local_provisional') }}</span>
                             <span x-show="localCount > 0" x-text="localCount" class="inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full bg-amber-400 text-amber-950 text-[10px] font-black"></span>
                             <span class="text-[9px] font-bold opacity-50 ml-1">F10</span>
                         </button>
                         <button @click="sidebarOpen=false; openFailed()" type="button" class="{{ $sidebarBase }} {{ $sidebarInactive }} w-full text-left">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/></svg>
-                            <span class="flex-1">Failed Bills</span>
+                            <span class="flex-1">{{ __('pos.nav_failed_bills') }}</span>
                             <span x-show="failedCount > 0" x-text="failedCount" class="inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 rounded-full bg-red-500 text-white text-[10px] font-black animate-pulse"></span>
                             <span class="text-[9px] font-bold opacity-50 ml-1">⇧F11</span>
                         </button>
                         <a href="{{ route('fbrpos.failQueue') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.failQueue') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                            <span class="flex-1">Fail Queue (FBR Sync)</span>
+                            <span class="flex-1">{{ __('pos.nav_fail_queue_sync') }}</span>
                         </a>
                     </div>
 
                     {{-- Inventory Section --}}
                     <div>
-                        <p class="px-3 mb-1.5 text-[9px] font-black uppercase tracking-[0.15em] text-white/40">Inventory</p>
+                        <p class="px-3 mb-1.5 text-[9px] font-black uppercase tracking-[0.15em] text-white/40">{{ __('pos.nav_inventory') }}</p>
                         <a href="{{ route('fbrpos.products') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.products') && !request()->routeIs('fbrpos.products.create') && !request()->routeIs('fbrpos.products.edit') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                            Products
+                            {{ __('pos.products_word') }}
                         </a>
                         <a href="{{ route('fbrpos.products.create') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.products.create') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                            Add Product
+                            {{ __('pos.nav_add_product') }}
                         </a>
                     </div>
 
                     {{-- Reports Section --}}
                     <div>
-                        <p class="px-3 mb-1.5 text-[9px] font-black uppercase tracking-[0.15em] text-white/40">Reports</p>
+                        <p class="px-3 mb-1.5 text-[9px] font-black uppercase tracking-[0.15em] text-white/40">{{ __('pos.reports') }}</p>
                         <a href="{{ route('fbrpos.day-close') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.day-close') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                            <span class="flex-1">Day Close (Z-Report)</span>
+                            <span class="flex-1">{{ __('pos.nav_day_close_z') }}</span>
                         </a>
                         <a href="{{ route('fbrpos.reports') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.reports') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                            Sales Reports
+                            {{ __('pos.nav_sales_reports') }}
                         </a>
                         <a href="{{ route('fbrpos.tax-reports') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.tax-reports') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
-                            Tax Reports
+                            {{ __('pos.nav_tax_reports') }}
                         </a>
                     </div>
 
                     {{-- Operations Section (Phase 2 features) --}}
                     <div>
-                        <p class="px-3 mb-1.5 text-[9px] font-black uppercase tracking-[0.15em] text-white/40">Operations</p>
+                        <p class="px-3 mb-1.5 text-[9px] font-black uppercase tracking-[0.15em] text-white/40">{{ __('pos.nav_operations') }}</p>
                         <a href="{{ route('fbrpos.phase2.shifts') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.phase2.shifts') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                            Shifts & Cash Drawer
+                            {{ __('pos.nav_shifts_cash_drawer') }}
                         </a>
                         <a href="{{ route('fbrpos.phase2.promotions') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.phase2.promotions') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
-                            Promotions
+                            {{ __('pos.nav_promotions') }}
                         </a>
                         <a href="{{ route('fbrpos.phase2.loyalty') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.phase2.loyalty') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
-                            Loyalty Program
+                            {{ __('pos.nav_loyalty_program') }}
                         </a>
                     </div>
 
                     {{-- Setup Section --}}
                     <div>
-                        <p class="px-3 mb-1.5 text-[9px] font-black uppercase tracking-[0.15em] text-white/40">Setup</p>
+                        <p class="px-3 mb-1.5 text-[9px] font-black uppercase tracking-[0.15em] text-white/40">{{ __('pos.nav_setup') }}</p>
                         <a href="{{ route('fbrpos.customize') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.customize') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
-                            Customize POS
+                            {{ __('pos.nav_customize_pos') }}
                         </a>
                         <a href="{{ route('fbrpos.business-profile') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.business-profile') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                            Business Profile
+                            {{ __('pos.nav_business_profile') }}
                         </a>
                         <a href="{{ route('fbrpos.settings') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.settings') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                            FBR Settings
+                            {{ __('pos.nav_fbr_settings') }}
                         </a>
                         <a href="{{ route('fbrpos.billing') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.billing') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-                            Billing & Subscription
+                            {{ __('pos.nav_billing_subscription') }}
                         </a>
                         <a href="{{ route('fbrpos.my-profile') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.my-profile') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                            My Profile
+                            {{ __('pos.nav_my_profile') }}
                         </a>
                         {{-- PWA install — always visible --}}
-                        <x-pwa-install-menu-item color="blue" app-name="Nest FBR POS" label="Install App on this Device" :item-class="$sidebarBase . ' ' . $sidebarInactive" />
+                        <x-pwa-install-menu-item color="blue" app-name="Nest FBR POS" :label="__('pos.install_app_device')" :item-class="$sidebarBase . ' ' . $sidebarInactive" />
                     </div>
                 </nav>
 
@@ -622,10 +622,10 @@
                         @csrf
                         <button type="submit" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold text-red-200 hover:bg-red-500/20 hover:text-white transition">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-                            Sign Out
+                            {{ __('pos.sign_out') }}
                         </button>
                     </form>
-                    <p class="text-center text-[9px] text-white/30 mt-1.5 pt-1.5 border-t border-white/5">FBR POS · Ctrl+M to toggle</p>
+                    <p class="text-center text-[9px] text-white/30 mt-1.5 pt-1.5 border-t border-white/5">{{ __('pos.sidebar_footer_hint') }}</p>
                 </div>
             </aside>
 
@@ -645,7 +645,7 @@
                             <span class="text-xl leading-none">⚠️</span>
                             <div class="flex-1">{{ session('warning') }}
                                 @if(str_contains(strtolower(session('warning')), 'token'))
-                                    <a href="{{ route('fbrpos.settings') }}" class="ml-2 inline-flex items-center px-2.5 py-1 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold">⚙ Configure FBR Token →</a>
+                                    <a href="{{ route('fbrpos.settings') }}" class="ml-2 inline-flex items-center px-2.5 py-1 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold">{{ __('pos.configure_fbr_token') }}</a>
                                 @endif
                             </div>
                         </div>
@@ -716,16 +716,16 @@
                 <div class="px-5 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-gradient-to-r from-amber-50 to-amber-100 dark:from-amber-950/30 dark:to-amber-900/20">
                     <div>
                         <h3 class="text-base font-black text-amber-900 dark:text-amber-200 flex items-center gap-2">
-                            <span>🟦 Local / Provisional Bills</span>
-                            <span x-text="localCount + ' total'" class="px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-800 text-[10px] font-bold"></span>
+                            <span>🟦 {{ __('pos.local_provisional_bills') }}</span>
+                            <span x-text="localCount + @js(__('pos.total_suffix'))" class="px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-800 text-[10px] font-bold"></span>
                         </h3>
-                        <p class="text-[11px] text-amber-700 dark:text-amber-300 mt-0.5">↑↓ navigate · Enter promote to FBR · D delete · Esc close</p>
+                        <p class="text-[11px] text-amber-700 dark:text-amber-300 mt-0.5">{{ __('pos.local_modal_nav_hint') }}</p>
                     </div>
                     <button @click="localOpen = false" class="p-1.5 rounded-lg hover:bg-amber-200/50 dark:hover:bg-amber-800/40"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                 </div>
                 <div class="max-h-[60vh] overflow-y-auto">
                     <template x-if="localBills.length === 0">
-                        <div class="p-10 text-center text-gray-400 text-sm">No local bills. Saved-but-unsubmitted bills appear here.</div>
+                        <div class="p-10 text-center text-gray-400 text-sm">{{ __('pos.no_local_bills_hint') }}</div>
                     </template>
                     <template x-for="(bill, idx) in localBills" :key="bill.id">
                         <div :class="idx === localSelectedIdx ? 'bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-500' : 'border-l-4 border-transparent'"
@@ -734,15 +734,15 @@
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2">
                                     <span class="font-mono font-bold text-sm text-gray-800 dark:text-gray-200" x-text="bill.invoice_number"></span>
-                                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 font-bold uppercase tracking-wide">Local</span>
+                                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 font-bold uppercase tracking-wide">{{ __('pos.local_word') }}</span>
                                 </div>
                                 <div class="text-[11px] text-gray-500 mt-0.5" x-text="bill.customer_name + ' · ' + bill.created_at"></div>
                             </div>
                             <div class="text-right ml-3">
                                 <div class="font-black text-base text-gray-900 dark:text-white">Rs <span x-text="Number(bill.total_amount).toLocaleString()"></span></div>
                                 <div class="flex gap-1 mt-1">
-                                    <button @click.stop="promoteLocal(bill.id)" class="text-[10px] px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold">↑ Promote</button>
-                                    <button @click.stop="deleteLocal(bill.id)" class="text-[10px] px-2 py-0.5 rounded bg-red-600 hover:bg-red-700 text-white font-bold">Delete</button>
+                                    <button @click.stop="promoteLocal(bill.id)" class="text-[10px] px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold">{{ __('pos.promote_btn') }}</button>
+                                    <button @click.stop="deleteLocal(bill.id)" class="text-[10px] px-2 py-0.5 rounded bg-red-600 hover:bg-red-700 text-white font-bold">{{ __('pos.delete') }}</button>
                                 </div>
                             </div>
                         </div>
@@ -759,16 +759,16 @@
                 <div class="px-5 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-gradient-to-r from-red-50 to-red-100 dark:from-red-950/30 dark:to-red-900/20">
                     <div>
                         <h3 class="text-base font-black text-red-900 dark:text-red-200 flex items-center gap-2">
-                            <span>🟥 Failed FBR Bills</span>
-                            <span x-text="failedCount + ' total'" class="px-2 py-0.5 rounded-full bg-red-200 dark:bg-red-800 text-[10px] font-bold"></span>
+                            <span>🟥 {{ __('pos.failed_fbr_bills') }}</span>
+                            <span x-text="failedCount + @js(__('pos.total_suffix'))" class="px-2 py-0.5 rounded-full bg-red-200 dark:bg-red-800 text-[10px] font-bold"></span>
                         </h3>
-                        <p class="text-[11px] text-red-700 dark:text-red-300 mt-0.5">↑↓ navigate · Enter retry · D delete · Esc close</p>
+                        <p class="text-[11px] text-red-700 dark:text-red-300 mt-0.5">{{ __('pos.failed_modal_nav_hint') }}</p>
                     </div>
                     <button @click="failedOpen = false" class="p-1.5 rounded-lg hover:bg-red-200/50 dark:hover:bg-red-800/40"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                 </div>
                 <div class="max-h-[60vh] overflow-y-auto">
                     <template x-if="failedBills.length === 0">
-                        <div class="p-10 text-center text-gray-400 text-sm">No failed bills. FBR-rejected or pending bills will appear here.</div>
+                        <div class="p-10 text-center text-gray-400 text-sm">{{ __('pos.no_failed_bills_hint') }}</div>
                     </template>
                     <template x-for="(bill, idx) in failedBills" :key="bill.id">
                         <div :class="idx === failedSelectedIdx ? 'bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500' : 'border-l-4 border-transparent'"
@@ -779,7 +779,7 @@
                                     <span class="font-mono font-bold text-sm text-gray-800 dark:text-gray-200" x-text="bill.invoice_number"></span>
                                     <span class="text-[10px] px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 font-bold uppercase tracking-wide" x-text="bill.fbr_status || 'failed'"></span>
                                 </div>
-                                <div class="text-[11px] text-gray-500 mt-0.5 truncate" x-text="(bill.customer_name || 'Walk-in') + ' · ' + (bill.created_at || '')"></div>
+                                <div class="text-[11px] text-gray-500 mt-0.5 truncate" x-text="(bill.customer_name || @js(__('pos.walk_in'))) + ' · ' + (bill.created_at || '')"></div>
                                 <template x-if="bill.error_message">
                                     <div class="text-[10px] text-red-600 dark:text-red-400 mt-0.5 truncate" x-text="bill.error_message"></div>
                                 </template>
@@ -787,7 +787,7 @@
                             <div class="text-right ml-3">
                                 <div class="font-black text-base text-gray-900 dark:text-white">Rs <span x-text="Number(bill.total_amount).toLocaleString()"></span></div>
                                 <div class="flex gap-1 mt-1">
-                                    <button @click.stop="retryFailed(bill.id)" :disabled="bill._retrying" class="text-[10px] px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold">↻ <span x-text="bill._retrying ? 'Retrying' : 'Retry'"></span></button>
+                                    <button @click.stop="retryFailed(bill.id)" :disabled="bill._retrying" class="text-[10px] px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold">↻ <span x-text="bill._retrying ? @js(__('pos.retrying_word')) : @js(__('pos.retry_word'))"></span></button>
                                 </div>
                             </div>
                         </div>
@@ -889,7 +889,7 @@
                         else if (e.key === 'Enter') { e.preventDefault(); const b = this.failedBills[this.failedSelectedIdx]; if (b) this.retryFailed(b.id); }
                     },
                     async deleteLocal(id) {
-                        if (!confirm('Delete this local bill permanently?')) return;
+                        if (!confirm(@js(__('pos.delete_local_bill_confirm')))) return;
                         const r = await fetch(`/fbr-pos/api/provisional-bills/${id}/delete`, {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': this._csrf},
@@ -899,14 +899,14 @@
                             this.localBills = this.localBills.filter(b => b.id !== id);
                             this.localCount = this.localBills.length;
                             if (this.localSelectedIdx >= this.localBills.length) this.localSelectedIdx = Math.max(0, this.localBills.length - 1);
-                        } else { alert(r.message || 'Failed to delete'); }
+                        } else { alert(r.message || @js(__('pos.failed_to_delete'))); }
                     },
                     async promoteLocal(id) {
                         const r = await fetch(`/fbr-pos/api/provisional-bills/${id}/promote`, {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': this._csrf},
                             credentials: 'same-origin'
-                        }).then(r => r.json()).catch(() => ({success: false, message: 'Network error'}));
+                        }).then(r => r.json()).catch(() => ({success: false, message: @js(__('pos.network_error'))}));
                         if (r.success) {
                             // Remove from local list in place — no redirect to avoid cart loss on /create
                             this.localBills = this.localBills.filter(b => b.id !== id);
@@ -920,7 +920,7 @@
                                 this.localOpen = false;
                                 window.location.href = r.redirect || '{{ route('fbrpos.failQueue') }}';
                             }
-                        } else { alert(r.message || 'Promote failed'); }
+                        } else { alert(r.message || @js(__('pos.promote_failed'))); }
                     },
                     async retryFailed(id) {
                         const bill = this.failedBills.find(b => b.id === id);
@@ -938,9 +938,9 @@
                                 if (this.failedSelectedIdx >= this.failedBills.length) this.failedSelectedIdx = Math.max(0, this.failedBills.length - 1);
                             } else {
                                 bill._retrying = false;
-                                alert(r.message || 'Retry failed');
+                                alert(r.message || @js(__('pos.retry_failed')));
                             }
-                        } catch (e) { bill._retrying = false; alert('Network error'); }
+                        } catch (e) { bill._retrying = false; alert(@js(__('pos.network_error'))); }
                     },
                 };
             }

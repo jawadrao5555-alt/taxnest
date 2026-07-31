@@ -5,38 +5,38 @@
         <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
             <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
         </div>
-        Stock Movements
+        {{ __('pos.stock_movements') }}
     </h1>
 
     <div class="flex flex-wrap gap-2 mb-6">
-        <a href="{{ route('pos.inventory.dashboard') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">Dashboard</a>
-        <a href="{{ route('pos.inventory.stock') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">Stock Levels</a>
-        <a href="{{ route('pos.inventory.movements') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-purple-600 text-white shadow-sm">Movements</a>
-        <a href="{{ route('pos.inventory.low-stock') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">Low Stock Alerts</a>
-        <a href="{{ route('pos.inventory.adjust') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">Adjust Stock</a>
+        <a href="{{ route('pos.inventory.dashboard') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.dashboard') }}</a>
+        <a href="{{ route('pos.inventory.stock') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.stock_levels') }}</a>
+        <a href="{{ route('pos.inventory.movements') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-purple-600 text-white shadow-sm">{{ __('pos.movements') }}</a>
+        <a href="{{ route('pos.inventory.low-stock') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.low_stock_alerts') }}</a>
+        <a href="{{ route('pos.inventory.adjust') }}" class="px-4 py-2 text-xs font-semibold rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition shadow-sm border border-gray-200 dark:border-gray-700">{{ __('pos.adjust_stock') }}</a>
     </div>
 
     <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-lg p-5 mb-6">
         <form method="GET" action="{{ route('pos.inventory.movements') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <select name="type" class="rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2.5 focus:ring-2 focus:ring-purple-500 transition">
-                <option value="">All Types</option>
-                <option value="sale" {{ request('type') === 'sale' ? 'selected' : '' }}>Sale</option>
-                <option value="purchase" {{ request('type') === 'purchase' ? 'selected' : '' }}>Purchase</option>
-                <option value="adjustment_in" {{ request('type') === 'adjustment_in' ? 'selected' : '' }}>Adjustment In</option>
-                <option value="adjustment_out" {{ request('type') === 'adjustment_out' ? 'selected' : '' }}>Adjustment Out</option>
-                <option value="opening" {{ request('type') === 'opening' ? 'selected' : '' }}>Opening</option>
+                <option value="">{{ __('pos.all_types') }}</option>
+                <option value="sale" {{ request('type') === 'sale' ? 'selected' : '' }}>{{ __('pos.type_sale') }}</option>
+                <option value="purchase" {{ request('type') === 'purchase' ? 'selected' : '' }}>{{ __('pos.type_purchase') }}</option>
+                <option value="adjustment_in" {{ request('type') === 'adjustment_in' ? 'selected' : '' }}>{{ __('pos.type_adjustment_in') }}</option>
+                <option value="adjustment_out" {{ request('type') === 'adjustment_out' ? 'selected' : '' }}>{{ __('pos.type_adjustment_out') }}</option>
+                <option value="opening" {{ request('type') === 'opening' ? 'selected' : '' }}>{{ __('pos.type_opening') }}</option>
             </select>
             <select name="product_id" class="rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2.5 focus:ring-2 focus:ring-purple-500 transition">
-                <option value="">All Products</option>
+                <option value="">{{ __('pos.all_products') }}</option>
                 @foreach($products as $p)
                 <option value="{{ $p->id }}" {{ request('product_id') == $p->id ? 'selected' : '' }}>{{ $p->name }}</option>
                 @endforeach
             </select>
-            <input type="date" name="date_from" value="{{ request('date_from') }}" class="rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2.5 focus:ring-2 focus:ring-purple-500 transition" placeholder="From">
-            <input type="date" name="date_to" value="{{ request('date_to') }}" class="rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2.5 focus:ring-2 focus:ring-purple-500 transition" placeholder="To">
+            <input type="date" name="date_from" value="{{ request('date_from') }}" class="rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2.5 focus:ring-2 focus:ring-purple-500 transition" placeholder="{{ __('pos.from_label') }}">
+            <input type="date" name="date_to" value="{{ request('date_to') }}" class="rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2.5 focus:ring-2 focus:ring-purple-500 transition" placeholder="{{ __('pos.to_label') }}">
             <div class="flex gap-2">
-                <button type="submit" class="flex-1 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-xl transition shadow-sm">Filter</button>
-                <a href="{{ route('pos.inventory.movements') }}" class="px-3 py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-sm rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition border border-gray-200 dark:border-gray-700">Clear</a>
+                <button type="submit" class="flex-1 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-xl transition shadow-sm">{{ __('pos.filter_btn') }}</button>
+                <a href="{{ route('pos.inventory.movements') }}" class="px-3 py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-sm rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition border border-gray-200 dark:border-gray-700">{{ __('pos.clear') }}</a>
             </div>
         </form>
     </div>
@@ -46,14 +46,14 @@
             <table class="w-full text-sm table-cards">
                 <thead>
                     <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase border-b border-gray-100 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/50">
-                        <th class="px-5 py-3.5 font-semibold">Date</th>
-                        <th class="px-5 py-3.5 font-semibold">Product</th>
-                        <th class="px-5 py-3.5 font-semibold">Type</th>
-                        <th class="px-5 py-3.5 text-right font-semibold">Qty</th>
-                        <th class="px-5 py-3.5 text-right font-semibold">Balance</th>
-                        <th class="px-5 py-3.5 font-semibold hidden md:table-cell">Reference</th>
-                        <th class="px-5 py-3.5 font-semibold hidden lg:table-cell">By</th>
-                        <th class="px-5 py-3.5 font-semibold hidden lg:table-cell">Notes</th>
+                        <th class="px-5 py-3.5 font-semibold">{{ __('pos.receipt_date') }}</th>
+                        <th class="px-5 py-3.5 font-semibold">{{ __('pos.product_col') }}</th>
+                        <th class="px-5 py-3.5 font-semibold">{{ __('pos.type_label') }}</th>
+                        <th class="px-5 py-3.5 text-right font-semibold">{{ __('pos.receipt_qty') }}</th>
+                        <th class="px-5 py-3.5 text-right font-semibold">{{ __('pos.balance_col') }}</th>
+                        <th class="px-5 py-3.5 font-semibold hidden md:table-cell">{{ __('pos.reference_col') }}</th>
+                        <th class="px-5 py-3.5 font-semibold hidden lg:table-cell">{{ __('pos.by_col') }}</th>
+                        <th class="px-5 py-3.5 font-semibold hidden lg:table-cell">{{ __('pos.notes_col') }}</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-50 dark:divide-gray-800">
@@ -70,7 +70,7 @@
                     @endphp
                     <tr class="hover:bg-gray-50/80 dark:hover:bg-gray-800/30 transition">
                         <td class="px-5 py-3.5 text-gray-600 dark:text-gray-400 whitespace-nowrap text-xs">{{ $m->created_at->format('d M Y H:i') }}</td>
-                        <td class="px-5 py-3.5 font-semibold text-gray-900 dark:text-white">{{ $m->posProduct->name ?? 'Unknown' }}</td>
+                        <td class="px-5 py-3.5 font-semibold text-gray-900 dark:text-white">{{ $m->posProduct->name ?? __('pos.unknown_word') }}</td>
                         <td class="px-5 py-3.5 whitespace-nowrap">
                             <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold {{ $typeColors[$m->type] ?? 'bg-gray-100 text-gray-600' }}">
                                 {{ ucwords(str_replace('_', ' ', $m->type)) }}
@@ -88,8 +88,8 @@
                             <div class="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-3">
                                 <svg class="w-7 h-7 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
                             </div>
-                            <p class="text-sm font-medium text-gray-500">No movements found</p>
-                            <p class="text-xs text-gray-400 mt-1">Stock movements will appear here as transactions occur</p>
+                            <p class="text-sm font-medium text-gray-500">{{ __('pos.no_movements_found') }}</p>
+                            <p class="text-xs text-gray-400 mt-1">{{ __('pos.movements_appear_hint') }}</p>
                         </td>
                     </tr>
                     @endforelse

@@ -30,13 +30,13 @@
                     <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                 </div>
                 <div>
-                    <h1 class="text-xl font-black text-white">{{ $company->name ?? 'Business' }}</h1>
-                    <p class="text-[10px] text-teal-200/60">{{ now()->format('l, d M Y') }} — FBR/PRA Compliant</p>
+                    <h1 class="text-xl font-black text-white">{{ $company->name ?? __("pos.business_fallback") }}</h1>
+                    <p class="text-[10px] text-teal-200/60">{{ now()->format("l, d M Y") }} — {{ __("pos.fbr_pra_compliant") }}</p>
                 </div>
             </div>
             <div class="flex items-center gap-3">
                 <div class="text-right hidden sm:block">
-                    <p class="text-[9px] text-teal-200/50 font-bold uppercase">Tax Collected</p>
+                    <p class="text-[9px] text-teal-200/50 font-bold uppercase">{{ __("pos.tax_collected") }}</p>
                     <p class="text-lg font-black text-white">Rs.{{ number_format($todayTax ?? $todayStats->tax ?? 0) }}</p>
                 </div>
                 @include('pos.dashboard-styles._style-picker')
@@ -46,29 +46,29 @@
 
     <div class="os-stat-strip os-anim os-d2">
         <div class="os-stat-cell">
-            <p class="text-[9px] font-bold text-teal-600 uppercase">Revenue</p>
+            <p class="text-[9px] font-bold text-teal-600 uppercase">{{ __("pos.revenue_word") }}</p>
             <p class="text-xl font-black text-gray-900 dark:text-white" style="font-variant-numeric:tabular-nums">Rs.{{ number_format($todaySales ?? $todayStats->revenue ?? 0) }}</p>
             @php $yest=$yesterdaySales??0;$today=$todaySales??$todayStats->revenue??0;$pct=$yest>0?round(($today-$yest)/$yest*100):0; @endphp
             @if($pct!=0)<p class="text-[9px] font-bold mt-0.5 {{ $pct>=0?'text-emerald-600':'text-red-500' }}">{{ $pct>=0?'▲':'▼' }} {{ abs($pct) }}%</p>@endif
         </div>
         <div class="os-stat-cell">
-            <p class="text-[9px] font-bold text-teal-600 uppercase">Orders</p>
+            <p class="text-[9px] font-bold text-teal-600 uppercase">{{ __("pos.orders_word") }}</p>
             <p class="text-xl font-black text-gray-900 dark:text-white">{{ $todayOrders ?? $todayStats->count ?? 0 }}</p>
-            <p class="text-[9px] text-gray-400 mt-0.5">{{ $heldCount ?? 0 }} held</p>
+            <p class="text-[9px] text-gray-400 mt-0.5">{{ $heldCount ?? 0 }} {{ __("pos.held_lc") }}</p>
         </div>
         <div class="os-stat-cell">
-            <p class="text-[9px] font-bold text-teal-600 uppercase">Avg Ticket</p>
+            <p class="text-[9px] font-bold text-teal-600 uppercase">{{ __("pos.avg_ticket") }}</p>
             <p class="text-xl font-black text-gray-900 dark:text-white">Rs.{{ number_format($todayStats->avg_ticket ?? (($todayOrders ?? 0) > 0 ? ($todaySales ?? 0) / ($todayOrders ?? 1) : 0)) }}</p>
         </div>
         <div class="os-stat-cell">
             @if($isRestaurant)
-            <p class="text-[9px] font-bold text-teal-600 uppercase">Tables</p>
+            <p class="text-[9px] font-bold text-teal-600 uppercase">{{ __("pos.tables_word") }}</p>
             <p class="text-xl font-black text-gray-900 dark:text-white">{{ $occupiedTables ?? 0 }}<span class="text-sm text-gray-300">/{{ $totalTables ?? 0 }}</span></p>
-            <p class="text-[9px] text-gray-400 mt-0.5">{{ ($totalTables ?? 0) > 0 ? round(($occupiedTables ?? 0) / ($totalTables ?? 1) * 100) : 0 }}% full</p>
+            <p class="text-[9px] text-gray-400 mt-0.5">{{ ($totalTables ?? 0) > 0 ? round(($occupiedTables ?? 0) / ($totalTables ?? 1) * 100) : 0 }}% {{ __("pos.full_lc") }}</p>
             @else
-            <p class="text-[9px] font-bold text-teal-600 uppercase">Monthly</p>
+            <p class="text-[9px] font-bold text-teal-600 uppercase">{{ __("pos.monthly_word") }}</p>
             <p class="text-xl font-black text-gray-900 dark:text-white">Rs.{{ number_format($monthSales ?? $monthStats->revenue ?? 0) }}</p>
-            <p class="text-[9px] text-gray-400 mt-0.5">{{ $monthStats->count ?? 0 }} orders</p>
+            <p class="text-[9px] text-gray-400 mt-0.5">{{ $monthStats->count ?? 0 }} {{ __("pos.orders_lc") }}</p>
             @endif
         </div>
     </div>
@@ -76,74 +76,74 @@
     <div class="flex flex-wrap gap-2 os-anim os-d2">
         @if($isRestaurant)
         @php $navItems = [
-            ['route' => 'pos.invoice.create', 'label' => '📱 POS Screen', 'primary' => true],
-            ['route' => 'pos.transactions', 'label' => '📋 Orders'],
-            ['route' => 'pos.restaurant.tables', 'label' => '🪑 Tables'],
-            ['route' => 'pos.restaurant.kds', 'label' => '👨‍🍳 Kitchen'],
-            ['route' => 'pos.products', 'label' => '📦 Menu'],
-            ['route' => 'pos.restaurant.ingredients', 'label' => '🧪 Ingredients'],
+            ['route' => 'pos.invoice.create', "label" => "📱 " . __("pos.pos_screen"), 'primary' => true],
+            ['route' => 'pos.transactions', "label" => "📋 " . __("pos.orders_word")],
+            ['route' => 'pos.restaurant.tables', "label" => "🪑 " . __("pos.tables_word")],
+            ['route' => 'pos.restaurant.kds', "label" => "👨‍🍳 " . __("pos.kitchen_word")],
+            ['route' => 'pos.products', "label" => "📦 " . __("pos.menu_word")],
+            ['route' => 'pos.restaurant.ingredients', "label" => "🧪 " . __("pos.ingredients_word")],
         ]; @endphp
         @foreach($navItems as $nav)
         <a href="{{ route($nav['route']) }}" class="px-3 py-2 rounded-lg text-[11px] font-bold transition {{ ($nav['primary'] ?? false) ? 'bg-teal-600 text-white hover:bg-teal-700 shadow-sm' : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-teal-300 hover:text-teal-600' }}">{{ $nav['label'] }}</a>
         @endforeach
         @else
-        <a href="{{ route('pos.invoice.create') }}" class="px-3 py-2 rounded-lg text-[11px] font-bold bg-teal-600 text-white hover:bg-teal-700 shadow-sm transition">+ New Sale</a>
-        <a href="{{ route('pos.transactions') }}" class="px-3 py-2 rounded-lg text-[11px] font-bold bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-teal-300 transition">Orders</a>
-        <a href="{{ route('pos.products') }}" class="px-3 py-2 rounded-lg text-[11px] font-bold bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-teal-300 transition">Products</a>
-        <a href="{{ route('pos.customers') }}" class="px-3 py-2 rounded-lg text-[11px] font-bold bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-teal-300 transition">Customers</a>
-        <a href="{{ route('pos.reports') }}" class="px-3 py-2 rounded-lg text-[11px] font-bold bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-teal-300 transition">Reports</a>
+        <a href="{{ route('pos.invoice.create') }}" class="px-3 py-2 rounded-lg text-[11px] font-bold bg-teal-600 text-white hover:bg-teal-700 shadow-sm transition">+ {{ __("pos.new_sale") }}</a>
+        <a href="{{ route('pos.transactions') }}" class="px-3 py-2 rounded-lg text-[11px] font-bold bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-teal-300 transition">{{ __("pos.orders_word") }}</a>
+        <a href="{{ route('pos.products') }}" class="px-3 py-2 rounded-lg text-[11px] font-bold bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-teal-300 transition">{{ __("pos.products_word") }}</a>
+        <a href="{{ route('pos.customers') }}" class="px-3 py-2 rounded-lg text-[11px] font-bold bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-teal-300 transition">{{ __("pos.customers_word") }}</a>
+        <a href="{{ route('pos.reports') }}" class="px-3 py-2 rounded-lg text-[11px] font-bold bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-teal-300 transition">{{ __("pos.reports") }}</a>
         @endif
     </div>
 
     @if(isset($isAdmin) && $isAdmin && $isRestaurant)
     <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 os-anim os-d3">
-        <div class="os-card os-accent-top os-accent-emerald p-3 pt-5"><p class="text-[8px] text-gray-400 font-bold uppercase">Profit</p><p class="text-base font-black {{ ($todayProfit ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600' }}">Rs.{{ number_format($todayProfit ?? 0) }}</p></div>
-        <div class="os-card os-accent-top os-accent-blue p-3 pt-5"><p class="text-[8px] text-gray-400 font-bold uppercase">Cost</p><p class="text-base font-black text-gray-900 dark:text-white">Rs.{{ number_format($todayCost ?? 0) }}</p></div>
-        <div class="os-card os-accent-top os-accent-amber p-3 pt-5"><p class="text-[8px] text-gray-400 font-bold uppercase">Margin</p><p class="text-base font-black text-amber-600">{{ ($todaySales ?? 0) > 0 ? round(($todayProfit ?? 0) / ($todaySales ?? 1) * 100) : 0 }}%</p></div>
-        <div class="os-card os-accent-top os-accent-blue p-3 pt-5"><p class="text-[8px] text-gray-400 font-bold uppercase">Tax</p><p class="text-base font-black text-teal-600">Rs.{{ number_format($todayTax ?? $todayStats->tax ?? 0) }}</p></div>
-        <div class="os-card os-accent-top os-accent-red p-3 pt-5"><p class="text-[8px] text-gray-400 font-bold uppercase">Discounts</p><p class="text-base font-black text-red-500">Rs.{{ number_format($todayDiscount ?? 0) }}</p></div>
+        <div class="os-card os-accent-top os-accent-emerald p-3 pt-5"><p class="text-[8px] text-gray-400 font-bold uppercase">{{ __("pos.profit_word") }}</p><p class="text-base font-black {{ ($todayProfit ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600' }}">Rs.{{ number_format($todayProfit ?? 0) }}</p></div>
+        <div class="os-card os-accent-top os-accent-blue p-3 pt-5"><p class="text-[8px] text-gray-400 font-bold uppercase">{{ __("pos.cost_word") }}</p><p class="text-base font-black text-gray-900 dark:text-white">Rs.{{ number_format($todayCost ?? 0) }}</p></div>
+        <div class="os-card os-accent-top os-accent-amber p-3 pt-5"><p class="text-[8px] text-gray-400 font-bold uppercase">{{ __("pos.margin_word") }}</p><p class="text-base font-black text-amber-600">{{ ($todaySales ?? 0) > 0 ? round(($todayProfit ?? 0) / ($todaySales ?? 1) * 100) : 0 }}%</p></div>
+        <div class="os-card os-accent-top os-accent-blue p-3 pt-5"><p class="text-[8px] text-gray-400 font-bold uppercase">{{ __("pos.tax_word") }}</p><p class="text-base font-black text-teal-600">Rs.{{ number_format($todayTax ?? $todayStats->tax ?? 0) }}</p></div>
+        <div class="os-card os-accent-top os-accent-red p-3 pt-5"><p class="text-[8px] text-gray-400 font-bold uppercase">{{ __("pos.discounts_word") }}</p><p class="text-base font-black text-red-500">Rs.{{ number_format($todayDiscount ?? 0) }}</p></div>
     </div>
     @endif
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 os-anim os-d4">
         @if($isRestaurant && isset($salesChartLabels))
         <div class="lg:col-span-2 os-card p-4">
-            <h2 class="text-[11px] font-bold text-gray-900 dark:text-white uppercase mb-3">Revenue — Last 7 Days</h2>
+            <h2 class="text-[11px] font-bold text-gray-900 dark:text-white uppercase mb-3">{{ __("pos.revenue_last_7_days") }}</h2>
             <div style="height: 180px;"><canvas id="salesChart"></canvas></div>
         </div>
         @endif
 
         @if($isRestaurant && isset($orderTypeCounts))
         <div class="os-card p-4">
-            <h2 class="text-[11px] font-bold text-gray-900 dark:text-white uppercase mb-3">Order Types</h2>
+            <h2 class="text-[11px] font-bold text-gray-900 dark:text-white uppercase mb-3">{{ __("pos.order_types") }}</h2>
             <div style="height: 180px;"><canvas id="orderTypeChart"></canvas></div>
         </div>
         @endif
 
         @if(!$isRestaurant && isset($paymentBreakdown))
         <div class="os-card p-4">
-            <h3 class="text-[11px] font-bold text-gray-900 dark:text-white uppercase mb-3">Payments</h3>
+            <h3 class="text-[11px] font-bold text-gray-900 dark:text-white uppercase mb-3">{{ __("pos.payments_word") }}</h3>
             @forelse($paymentBreakdown as $pb)
             <div class="flex items-center justify-between py-2 border-b border-gray-50 dark:border-gray-800 last:border-0">
                 <span class="text-[11px] font-bold text-gray-700 dark:text-gray-300">{{ ucwords(str_replace('_', ' ', $pb->payment_method)) }}</span>
                 <span class="text-[11px] font-black text-gray-900 dark:text-white">Rs.{{ number_format($pb->total) }}</span>
             </div>
-            @empty<p class="text-[11px] text-gray-400 py-4 text-center">No sales</p>@endforelse
+            @empty<p class="text-[11px] text-gray-400 py-4 text-center">{{ __("pos.no_sales") }}</p>@endforelse
         </div>
         <div class="lg:col-span-2 os-card overflow-hidden">
             <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-                <h3 class="text-[11px] font-bold text-gray-900 dark:text-white uppercase">Recent Transactions</h3>
-                <a href="{{ route('pos.transactions') }}" class="text-[10px] font-bold text-teal-600">VIEW ALL →</a>
+                <h3 class="text-[11px] font-bold text-gray-900 dark:text-white uppercase">{{ __("pos.recent_transactions") }}</h3>
+                <a href="{{ route('pos.transactions') }}" class="text-[10px] font-bold text-teal-600">{{ __("pos.view_all_arrow") }}</a>
             </div>
-            <table class="w-full"><thead><tr class="bg-gray-50/60 dark:bg-gray-800/30 text-left text-[9px] font-bold text-gray-400 uppercase"><th class="py-2 px-4">Invoice</th><th class="py-2 px-3">Customer</th><th class="py-2 px-3 text-right">Amount</th><th class="py-2 px-3">Time</th></tr></thead><tbody>
+            <table class="w-full"><thead><tr class="bg-gray-50/60 dark:bg-gray-800/30 text-left text-[9px] font-bold text-gray-400 uppercase"><th class="py-2 px-4">{{ __("pos.invoice_word") }}</th><th class="py-2 px-3">{{ __("pos.customer_word") }}</th><th class="py-2 px-3 text-right">{{ __("pos.amount_word") }}</th><th class="py-2 px-3">{{ __("pos.time_word") }}</th></tr></thead><tbody>
                 @forelse($recentTransactions as $txn)
                 <tr class="border-b border-gray-50 dark:border-gray-800/50 hover:bg-teal-50/20 transition">
                     <td class="py-2 px-4 text-[11px] font-bold text-teal-600">{{ $txn->invoice_number }}</td>
-                    <td class="py-2 px-3 text-[11px] text-gray-600 dark:text-gray-400">{{ $txn->customer_name ?? 'Walk-in' }}</td>
+                    <td class="py-2 px-3 text-[11px] text-gray-600 dark:text-gray-400">{{ $txn->customer_name ?? __("pos.walk_in") }}</td>
                     <td class="py-2 px-3 text-right text-[11px] font-black text-gray-900 dark:text-white">Rs.{{ number_format($txn->total_amount) }}</td>
                     <td class="py-2 px-3 text-[10px] text-gray-400">{{ $txn->created_at->diffForHumans() }}</td>
                 </tr>
-                @empty<tr><td colspan="4" class="py-6 text-center text-[11px] text-gray-400">No transactions</td></tr>@endforelse
+                @empty<tr><td colspan="4" class="py-6 text-center text-[11px] text-gray-400">{{ __("pos.no_transactions") }}</td></tr>@endforelse
             </tbody></table>
         </div>
         @endif
@@ -152,7 +152,7 @@
     @if($isRestaurant)
     <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 os-anim os-d5">
         <div class="lg:col-span-2 os-card p-4">
-            <h2 class="text-[11px] font-bold text-gray-900 dark:text-white uppercase mb-3">🏆 Best Sellers</h2>
+            <h2 class="text-[11px] font-bold text-gray-900 dark:text-white uppercase mb-3">🏆 {{ __("pos.best_sellers") }}</h2>
             <div class="space-y-2">
                 @forelse(($topProducts ?? collect())->take(5) as $idx => $p)
                 <div class="flex items-center gap-3">
@@ -163,14 +163,14 @@
                     </div>
                     <div class="text-right flex-shrink-0"><p class="text-[11px] font-black text-gray-900 dark:text-white">Rs.{{ number_format($p->total_revenue) }}</p><p class="text-[9px] text-gray-400">{{ $p->total_qty }}x</p></div>
                 </div>
-                @empty<p class="text-[11px] text-gray-400 py-4 text-center">No data</p>@endforelse
+                @empty<p class="text-[11px] text-gray-400 py-4 text-center">{{ __("pos.no_data") }}</p>@endforelse
             </div>
         </div>
 
         <div class="lg:col-span-3 os-card overflow-hidden">
             <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-                <h2 class="text-[11px] font-bold text-gray-900 dark:text-white uppercase">Order Timeline</h2>
-                <a href="{{ route('pos.transactions') }}" class="text-[10px] font-bold text-teal-600">VIEW ALL →</a>
+                <h2 class="text-[11px] font-bold text-gray-900 dark:text-white uppercase">{{ __("pos.order_timeline") }}</h2>
+                <a href="{{ route('pos.transactions') }}" class="text-[10px] font-bold text-teal-600">{{ __("pos.view_all_arrow") }}</a>
             </div>
             <div class="p-4">
                 <div class="os-timeline space-y-4">
@@ -188,7 +188,7 @@
                             </div>
                         </div>
                     </div>
-                    @empty<p class="text-[11px] text-gray-400 text-center py-4">No orders today</p>@endforelse
+                    @empty<p class="text-[11px] text-gray-400 text-center py-4">{{ __("pos.no_orders_today") }}</p>@endforelse
                 </div>
             </div>
         </div>
@@ -196,8 +196,8 @@
 
     <div class="os-card overflow-hidden os-anim os-d5">
         <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-{{ ($lowStockItems ?? collect())->count() > 0 ? 'amber' : 'emerald' }}-50/50 dark:bg-transparent">
-            <h2 class="text-[11px] font-bold text-gray-900 dark:text-white uppercase">📦 Inventory Status</h2>
-            @if(($lowStockItems ?? collect())->count() > 0)<span class="text-[8px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">{{ $lowStockItems->count() }} alerts</span>@endif
+            <h2 class="text-[11px] font-bold text-gray-900 dark:text-white uppercase">📦 {{ __("pos.inventory_status") }}</h2>
+            @if(($lowStockItems ?? collect())->count() > 0)<span class="text-[8px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">{{ $lowStockItems->count() }} {{ __("pos.alerts_lc") }}</span>@endif
         </div>
         @if(($lowStockItems ?? collect())->count() > 0)
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
@@ -210,7 +210,7 @@
             @endforeach
         </div>
         @else
-        <div class="text-center py-8"><svg class="w-8 h-8 mx-auto text-emerald-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><p class="text-[11px] text-emerald-600 font-bold">All ingredients fully stocked</p></div>
+        <div class="text-center py-8"><svg class="w-8 h-8 mx-auto text-emerald-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><p class="text-[11px] text-emerald-600 font-bold">{{ __("pos.all_ingredients_fully_stocked") }}</p></div>
         @endif
     </div>
     @endif

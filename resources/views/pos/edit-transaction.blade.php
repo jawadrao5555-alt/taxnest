@@ -6,18 +6,18 @@
                 <div class="flex items-center space-x-3">
                     <a href="{{ request('from') === 'sale' ? route('pos.invoice.create') : route('pos.transaction.show', $transaction->id) }}" class="inline-flex items-center text-gray-500 hover:text-emerald-600 transition text-sm">
                         <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-                        Back
+                        {{ __('pos.back_word') }}
                     </a>
-                    <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100">Edit Invoice: {{ $transaction->invoice_number }}</h2>
+                    <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100">{{ __('pos.edit_invoice_label') }}: {{ $transaction->invoice_number }}</h2>
                 </div>
                 <div class="mt-2 sm:mt-0 flex items-center space-x-2">
                     <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-                        Editing
+                        {{ __('pos.editing_word') }}
                     </span>
                     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold"
                         :class="praEnabled ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'">
                         <span class="w-2 h-2 rounded-full mr-1.5" :class="praEnabled ? 'bg-emerald-500' : 'bg-gray-400'"></span>
-                        PRA: <span x-text="praEnabled ? 'Active' : 'Inactive'" class="ml-1"></span>
+                        PRA: <span x-text="praEnabled ? @js(__('pos.active_word')) : @js(__('pos.inactive_word'))" class="ml-1"></span>
                     </span>
                 </div>
             </div>
@@ -26,7 +26,7 @@
             <div class="mb-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl p-4">
                 <div class="flex items-start gap-3">
                     <svg class="w-5 h-5 text-amber-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-                    <div class="text-sm text-amber-800 dark:text-amber-300">This invoice previously failed PRA submission. After saving, it will be re-submitted to PRA automatically.</div>
+                    <div class="text-sm text-amber-800 dark:text-amber-300">{{ __('pos.invoice_failed_pra_resubmit_note') }}</div>
                 </div>
             </div>
             @endif
@@ -62,33 +62,33 @@
                         <label class="flex items-start gap-3 cursor-pointer">
                             <input type="checkbox" name="report_to_pra" value="1" class="mt-0.5 w-5 h-5 rounded border-gray-300 text-teal-600 focus:ring-teal-500">
                             <span class="text-sm text-teal-800 dark:text-teal-300">
-                                <span class="font-semibold block">Report this bill to PRA after saving?</span>
-                                Ye LOCAL bill hai. Checkbox tick karne par save ke baad ye PRA par submit hoga aur isay naya POS fiscal serial milega. Khali chhorne par bill LOCAL hi rahega (number {{ $transaction->invoice_number }} same rahega).
+                                <span class="font-semibold block">{{ __('pos.report_bill_to_pra_q') }}</span>
+                                {{ __('pos.local_bill_report_note', ['invoice' => $transaction->invoice_number]) }}
                             </span>
                         </label>
                     </div>
                     @elseif(!$editMonthOpen)
                     <div class="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 text-sm text-gray-500 dark:text-gray-400">
-                        <span class="font-semibold text-gray-600 dark:text-gray-300">Month closed</span> — pichhle month ka local bill ab PRA par report nahi ho sakta. Save karne par bill LOCAL hi rahega.
+                        <span class="font-semibold text-gray-600 dark:text-gray-300">{{ __('pos.month_closed') }}</span> {{ __('pos.month_closed_local_note') }}
                     </div>
                     @endif
                 @endif
 
                 <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Customer & Terminal</h3>
+                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">{{ __('pos.customer_and_terminal') }}</h3>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
-                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Customer Name</label>
-                            <input type="text" name="customer_name" x-model="customerName" placeholder="Walk-in Customer" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition">
+                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.customer_name') }}</label>
+                            <input type="text" name="customer_name" x-model="customerName" placeholder="{{ __('pos.walk_in_customer') }}" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition">
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Phone</label>
-                            <input type="text" name="customer_phone" x-model="customerPhone" placeholder="03XX-XXXXXXX" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition">
+                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.phone_word') }}</label>
+                            <input type="text" name="customer_phone" x-model="customerPhone" placeholder="{{ __('pos.ph_phone_number') }}" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition">
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Terminal</label>
+                            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.terminal_word') }}</label>
                             <select name="terminal_id" x-model="terminalId" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition">
-                                <option value="">Select Terminal</option>
+                                <option value="">{{ __('pos.select_terminal') }}</option>
                                 @foreach($terminals as $terminal)
                                 <option value="{{ $terminal->id }}">{{ $terminal->terminal_name }} ({{ $terminal->terminal_code }})</option>
                                 @endforeach
@@ -99,33 +99,33 @@
 
                 <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Invoice Items</h3>
+                        <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ __('pos.invoice_items') }}</h3>
                         <button type="button" @click="addItem()" class="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition">
                             <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                            Add Item
+                            {{ __('pos.add_item') }}
                         </button>
                     </div>
 
                     <div class="hidden sm:grid sm:grid-cols-12 gap-2 text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 px-1">
-                        <div class="col-span-2">Type</div>
-                        <div class="col-span-4">Item Name</div>
-                        <div class="col-span-2">Qty</div>
-                        <div class="col-span-2">Unit Price</div>
-                        <div class="col-span-1">Subtotal</div>
+                        <div class="col-span-2">{{ __('pos.type_word') }}</div>
+                        <div class="col-span-4">{{ __('pos.item_name') }}</div>
+                        <div class="col-span-2">{{ __('pos.qty') }}</div>
+                        <div class="col-span-2">{{ __('pos.unit_price') }}</div>
+                        <div class="col-span-1">{{ __('pos.subtotal') }}</div>
                         <div class="col-span-1"></div>
                     </div>
 
                     <template x-for="(item, index) in items" :key="item._uid">
                         <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 mb-3 p-3 sm:p-1 bg-gray-50 dark:bg-gray-800/50 sm:bg-transparent sm:dark:bg-transparent rounded-lg sm:rounded-none border sm:border-0 border-gray-200 dark:border-gray-700">
                             <div class="sm:col-span-2">
-                                <label class="block sm:hidden text-xs text-gray-500 mb-1">Type</label>
+                                <label class="block sm:hidden text-xs text-gray-500 mb-1">{{ __('pos.type_word') }}</label>
                                 <select x-model="item.type" @change="onTypeChange(index)" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition">
-                                    <option value="product">Product</option>
-                                    <option value="service">Service</option>
+                                    <option value="product">{{ __('pos.product_word') }}</option>
+                                    <option value="service">{{ __('pos.service_word') }}</option>
                                 </select>
                             </div>
                             <div class="sm:col-span-4 relative" x-data="{ open: false, search: '' }" x-init="search = item.name || ''">
-                                <label class="block sm:hidden text-xs text-gray-500 mb-1">Item Name</label>
+                                <label class="block sm:hidden text-xs text-gray-500 mb-1">{{ __('pos.item_name') }}</label>
                                 <div class="relative">
                                     <input type="text"
                                         x-model="search"
@@ -133,7 +133,7 @@
                                         @focus="open = true"
                                         @click.away="open = false"
                                         @keydown.escape="open = false"
-                                        placeholder="Type or search product..."
+                                        placeholder="{{ __('pos.ph_type_or_search_product') }}"
                                         class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 pr-8 focus:ring-2 focus:ring-emerald-500 transition">
                                     <div class="absolute inset-y-0 right-0 flex items-center pr-2">
                                         <template x-if="item.item_id">
@@ -169,15 +169,15 @@
                                 </div>
                             </div>
                             <div class="sm:col-span-2">
-                                <label class="block sm:hidden text-xs text-gray-500 mb-1">Qty</label>
+                                <label class="block sm:hidden text-xs text-gray-500 mb-1">{{ __('pos.qty') }}</label>
                                 <input type="text" inputmode="decimal" pattern="[0-9]*\.?[0-9]*" autocomplete="off" maxlength="10" :value="item.quantity" @input="(() => { let v = $event.target.value.replace(/[^0-9.]/g,''); const p = v.split('.'); if(p.length > 2) v = p[0] + '.' + p.slice(1).join(''); if(p[1] && p[1].length > 3) v = p[0] + '.' + p[1].slice(0,3); item.quantity = (v === '' || v === '.') ? '' : (parseFloat(v) || 0); $event.target.value = v; recalculate(); })()" @focus="$nextTick(() => $event.target.select())" @mousedown="if(document.activeElement !== $event.target){ $event.preventDefault(); $event.target.focus(); $event.target.select(); }" @blur="if(item.quantity === '' || item.quantity === null || item.quantity < 0.001){ item.quantity = 1; recalculate(); }" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition text-center font-semibold">
                             </div>
                             <div class="sm:col-span-2">
-                                <label class="block sm:hidden text-xs text-gray-500 mb-1">Unit Price</label>
+                                <label class="block sm:hidden text-xs text-gray-500 mb-1">{{ __('pos.unit_price') }}</label>
                                 <input type="number" x-model.number="item.unit_price" min="0" step="0.01" @input="recalculate()" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-2 py-2 focus:ring-2 focus:ring-emerald-500 transition">
                             </div>
                             <div class="sm:col-span-1 flex items-center">
-                                <label class="block sm:hidden text-xs text-gray-500 mb-1 mr-2">Subtotal</label>
+                                <label class="block sm:hidden text-xs text-gray-500 mb-1 mr-2">{{ __('pos.subtotal') }}</label>
                                 <span class="text-sm font-semibold text-gray-800 dark:text-gray-200" x-text="'Rs ' + (item.quantity * item.unit_price).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
                             </div>
                             <div class="sm:col-span-1 flex items-center justify-end">
@@ -191,17 +191,17 @@
 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-                        <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Discount</h3>
+                        <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">{{ __('pos.discount_word') }}</h3>
                         <div class="flex items-center space-x-2 mb-3">
                             <button type="button" @click="discountType = 'percentage'; recalculate()"
                                 :class="discountType === 'percentage' ? 'bg-emerald-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'"
                                 class="px-4 py-2 rounded-lg text-sm font-medium transition">
-                                % Percentage
+                                % {{ __('pos.percentage_word') }}
                             </button>
                             <button type="button" @click="discountType = 'amount'; recalculate()"
                                 :class="discountType === 'amount' ? 'bg-emerald-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'"
                                 class="px-4 py-2 rounded-lg text-sm font-medium transition">
-                                Rs Amount
+                                Rs {{ __('pos.amount_word') }}
                             </button>
                         </div>
                         <div class="flex items-center space-x-3">
@@ -213,7 +213,7 @@
                     </div>
 
                     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-                        <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Payment Method</h3>
+                        <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">{{ __('pos.payment_method') }}</h3>
                         <div class="grid grid-cols-2 gap-2">
                             <template x-for="pm in paymentMethods" :key="pm.value">
                                 <button type="button" @click="selectPaymentMethod(pm.value)"
@@ -228,26 +228,26 @@
                 </div>
 
                 <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Tax Calculation Summary</h3>
+                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">{{ __('pos.tax_calculation_summary') }}</h3>
                     <div class="space-y-2">
                         <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-                            <span>Subtotal</span>
+                            <span>{{ __('pos.subtotal') }}</span>
                             <span class="font-medium text-gray-800 dark:text-gray-200" x-text="'Rs ' + subtotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
                         </div>
                         <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-                            <span>Discount <span x-show="discountValue > 0" class="text-xs">(<span x-text="discountType === 'percentage' ? discountValue + '%' : 'Fixed'"></span>)</span></span>
+                            <span>{{ __('pos.discount_word') }} <span x-show="discountValue > 0" class="text-xs">(<span x-text="discountType === 'percentage' ? discountValue + '%' : @js(__('pos.fixed_word'))"></span>)</span></span>
                             <span class="font-medium text-red-500" x-text="'- Rs ' + discountAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
                         </div>
                         <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400 border-t border-gray-100 dark:border-gray-800 pt-2">
-                            <span>After Discount</span>
+                            <span>{{ __('pos.after_discount') }}</span>
                             <span class="font-medium text-gray-800 dark:text-gray-200" x-text="'Rs ' + afterDiscount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
                         </div>
                         <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-                            <span>Tax (<span x-text="taxRate + '%' + (taxInclusive ? ' incl.' : '')"></span>)</span>
+                            <span>{{ __('pos.tax_word') }} (<span x-text="taxRate + '%' + (taxInclusive ? ' ' + @js(__('pos.incl_suffix')) : '')"></span>)</span>
                             <span class="font-medium text-gray-800 dark:text-gray-200" x-text="'Rs ' + taxAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
                         </div>
                         <div class="flex justify-between text-base font-bold text-gray-900 dark:text-white border-t-2 border-gray-200 dark:border-gray-700 pt-3 mt-2">
-                            <span>Total</span>
+                            <span>{{ __('pos.total_word') }}</span>
                             <span class="text-emerald-600" x-text="'Rs ' + total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
                         </div>
                     </div>
@@ -269,12 +269,12 @@
 
                 <div class="flex justify-between">
                     <a href="{{ route('pos.transaction.show', $transaction->id) }}" class="inline-flex items-center px-5 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-semibold rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition">
-                        Cancel
+                        {{ __('pos.cancel') }}
                     </a>
                     <button type="submit" :disabled="items.length === 0 || submitting" class="inline-flex items-center px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl shadow-sm transition">
                         <svg x-show="!submitting" class="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                         <svg x-show="submitting" class="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                        <span x-text="submitting ? 'Saving...' : 'Save Changes'"></span>
+                        <span x-text="submitting ? @js(__('pos.saving_dots')) : @js(__('pos.save_changes'))"></span>
                     </button>
                 </div>
             </form>
@@ -284,24 +284,24 @@
             <div class="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
                 <div class="flex items-center space-x-6 text-sm">
                     <div>
-                        <span class="text-gray-400 text-xs">Items</span>
+                        <span class="text-gray-400 text-xs">{{ __('pos.items') }}</span>
                         <p class="font-semibold text-gray-800 dark:text-gray-200" x-text="items.length"></p>
                     </div>
                     <div>
-                        <span class="text-gray-400 text-xs">Subtotal</span>
+                        <span class="text-gray-400 text-xs">{{ __('pos.subtotal') }}</span>
                         <p class="font-semibold text-gray-800 dark:text-gray-200" x-text="'Rs ' + subtotal.toLocaleString(undefined, {minimumFractionDigits: 2})"></p>
                     </div>
                     <div class="hidden sm:block">
-                        <span class="text-gray-400 text-xs">Discount</span>
+                        <span class="text-gray-400 text-xs">{{ __('pos.discount_word') }}</span>
                         <p class="font-semibold text-red-500" x-text="'- Rs ' + discountAmount.toLocaleString(undefined, {minimumFractionDigits: 2})"></p>
                     </div>
                     <div class="hidden sm:block">
-                        <span class="text-gray-400 text-xs">Tax</span>
+                        <span class="text-gray-400 text-xs">{{ __('pos.tax_word') }}</span>
                         <p class="font-semibold text-gray-800 dark:text-gray-200" x-text="'Rs ' + taxAmount.toLocaleString(undefined, {minimumFractionDigits: 2})"></p>
                     </div>
                 </div>
                 <div class="text-right">
-                    <span class="text-gray-400 text-xs">Total</span>
+                    <span class="text-gray-400 text-xs">{{ __('pos.total_word') }}</span>
                     <p class="font-bold text-lg text-emerald-600" x-text="'Rs ' + total.toLocaleString(undefined, {minimumFractionDigits: 2})"></p>
                 </div>
             </div>
@@ -343,10 +343,10 @@
                 submitting: false,
 
                 paymentMethods: [
-                    { value: 'cash', label: 'Cash', icon: '💵' },
-                    { value: 'debit_card', label: 'Debit Card', icon: '💳' },
-                    { value: 'credit_card', label: 'Credit Card', icon: '🏦' },
-                    { value: 'qr_payment', label: 'QR / Raast', icon: '📱' }
+                    { value: 'cash', label: @js(__('pos.cash_title')), icon: '💵' },
+                    { value: 'debit_card', label: @js(__('pos.debit_card')), icon: '💳' },
+                    { value: 'credit_card', label: @js(__('pos.credit_card')), icon: '🏦' },
+                    { value: 'qr_payment', label: @js(__('pos.qr_raast')), icon: '📱' }
                 ],
 
                 init() {

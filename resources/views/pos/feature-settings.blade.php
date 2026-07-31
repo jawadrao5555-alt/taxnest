@@ -18,8 +18,8 @@
             <div class="flex items-start gap-3">
                 <div class="text-3xl">👋</div>
                 <div>
-                    <h1 class="text-xl sm:text-2xl font-extrabold mb-1">Welcome — let's set up your POS</h1>
-                    <p class="text-sm text-white/85 max-w-2xl">Just 3 quick steps: pick your business type, choose the features you need, and start billing. You can change all of this anytime from <span class="font-bold">Customize POS</span>.</p>
+                    <h1 class="text-xl sm:text-2xl font-extrabold mb-1">{{ __('pos.wizard_welcome_title') }}</h1>
+                    <p class="text-sm text-white/85 max-w-2xl">{!! __('pos.wizard_welcome_sub_html', ['customize' => '<span class="font-bold">' . e(__('pos.customize_pos')) . '</span>']) !!}</p>
                 </div>
             </div>
         </div>
@@ -61,8 +61,8 @@
             {{-- ════════════════════ STEP 1 — BUSINESS TYPE ════════════════════ --}}
             <div x-show="step === 1" x-transition.opacity>
                 <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 sm:p-6 shadow-sm">
-                    <h2 class="text-lg font-extrabold text-gray-900 dark:text-white">What type of business is this?</h2>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-5">Pick the closest match — we'll switch on the features most businesses like yours use. You can fine-tune everything in the next step.</p>
+                    <h2 class="text-lg font-extrabold text-gray-900 dark:text-white">{{ __('pos.what_type_of_business') }}</h2>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-5">{{ __('pos.pick_closest_match') }}</p>
 
                     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                         @foreach($presetKeys as $preset)
@@ -90,9 +90,9 @@
                 </div>
 
                 <div class="mt-4 flex items-center justify-between">
-                    <a href="{{ route('pos.customize') }}" class="inline-flex items-center px-4 py-2.5 text-sm font-semibold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">Cancel</a>
+                    <a href="{{ route('pos.customize') }}" class="inline-flex items-center px-4 py-2.5 text-sm font-semibold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">{{ __('pos.cancel') }}</a>
                     <button type="button" @click="next()" class="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded-lg bg-purple-600 hover:bg-purple-700 text-white shadow-sm">
-                        Next — Choose Features
+                        {{ __('pos.next_choose_features') }}
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                     </button>
                 </div>
@@ -103,8 +103,8 @@
                 <div class="mb-3 flex items-center gap-2 text-sm">
                     <span class="text-2xl" x-text="selectedPresetMeta.icon"></span>
                     <div>
-                        <p class="font-extrabold text-gray-900 dark:text-white">Features for <span class="text-purple-700 dark:text-purple-300" x-text="selectedPresetMeta.label"></span></p>
-                        <p class="text-[11px] text-gray-500 dark:text-gray-400">Recommended features are already on. Add or remove anything you need.</p>
+                        <p class="font-extrabold text-gray-900 dark:text-white">{{ __('pos.features_for') }} <span class="text-purple-700 dark:text-purple-300" x-text="selectedPresetMeta.label"></span></p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.recommended_already_on') }}</p>
                     </div>
                 </div>
 
@@ -113,11 +113,11 @@
                     <span class="text-lg leading-none">🔒</span>
                     <div>
                         @if(!empty($restaurantTrialEnded))
-                            <p class="text-sm font-bold text-amber-900 dark:text-amber-200">Your free trial ended — Restaurant &amp; Kitchen features are switched off</p>
-                            <p class="text-[11px] text-amber-800 dark:text-amber-300/90 leading-snug">KOT, Kitchen Display Screen, Table Management, Kitchen Notes and Recipes were part of your trial. Your saved kitchen setup is kept — subscribe to the Pro or Unlimited plan and it comes right back. <a href="{{ route('pos.billing') }}" class="font-bold underline hover:no-underline">View plans →</a></p>
+                            <p class="text-sm font-bold text-amber-900 dark:text-amber-200">{{ __('pos.trial_ended_restaurant_off') }}</p>
+                            <p class="text-[11px] text-amber-800 dark:text-amber-300/90 leading-snug">{!! __('pos.trial_ended_restaurant_body_html', ['link' => '<a href="' . e(route('pos.billing')) . '" class="font-bold underline hover:no-underline">' . e(__('pos.view_plans_arrow')) . '</a>']) !!}</p>
                         @else
-                            <p class="text-sm font-bold text-amber-900 dark:text-amber-200">Restaurant &amp; Kitchen features need the Pro or Unlimited plan</p>
-                            <p class="text-[11px] text-amber-800 dark:text-amber-300/90 leading-snug">KOT, Kitchen Display Screen, Table Management, Kitchen Notes and Recipes are included in the Pro and Unlimited packages. <a href="{{ route('pos.billing') }}" class="font-bold underline hover:no-underline">Upgrade your plan</a> to unlock them.</p>
+                            <p class="text-sm font-bold text-amber-900 dark:text-amber-200">{{ __('pos.restaurant_needs_pro') }}</p>
+                            <p class="text-[11px] text-amber-800 dark:text-amber-300/90 leading-snug">{!! __('pos.restaurant_needs_pro_body_html', ['link' => '<a href="' . e(route('pos.billing')) . '" class="font-bold underline hover:no-underline">' . e(__('pos.upgrade_your_plan')) . '</a>']) !!}</p>
                         @endif
                     </div>
                 </div>
@@ -127,8 +127,8 @@
                 <div class="mb-4 p-3.5 rounded-xl border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20 flex items-start gap-2.5">
                     <span class="text-lg leading-none">🍽️</span>
                     <div>
-                        <p class="text-sm font-bold text-orange-900 dark:text-orange-200">Restaurant &amp; Kitchen features are part of your free trial</p>
-                        <p class="text-[11px] text-orange-800 dark:text-orange-300/90 leading-snug">KOT, Kitchen Display Screen, Table Management, Kitchen Notes and Recipes switch off automatically when the trial ends. Your setup is saved — upgrade to the Pro or Unlimited plan to keep them. <a href="{{ route('pos.billing') }}" class="font-bold underline hover:no-underline">View plans →</a></p>
+                        <p class="text-sm font-bold text-orange-900 dark:text-orange-200">{{ __('pos.restaurant_part_of_trial') }}</p>
+                        <p class="text-[11px] text-orange-800 dark:text-orange-300/90 leading-snug">{!! __('pos.restaurant_trial_body_html', ['link' => '<a href="' . e(route('pos.billing')) . '" class="font-bold underline hover:no-underline">' . e(__('pos.view_plans_arrow')) . '</a>']) !!}</p>
                     </div>
                 </div>
                 @endif
@@ -136,8 +136,8 @@
                 {{-- RECOMMENDED --}}
                 <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm mb-4" x-show="recommendedFlags.length">
                     <div class="flex items-center gap-2 mb-3">
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-extrabold uppercase tracking-wider">✓ Recommended</span>
-                        <span class="text-[11px] text-gray-500 dark:text-gray-400">Pre-selected for your business type</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-extrabold uppercase tracking-wider">✓ {{ __('pos.recommended_word') }}</span>
+                        <span class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.preselected_for_type') }}</span>
                     </div>
                     <div class="grid sm:grid-cols-2 gap-2.5">
                         <template x-for="f in recommendedFlags" :key="'rec-'+f">
@@ -151,10 +151,10 @@
                                     </div>
                                     <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug" x-text="flagDesc(f)"></p>
                                     <template x-if="isLocked(f)">
-                                        <span class="mt-1.5 inline-flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-wider text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded">🔒 Pro / Unlimited plan</span>
+                                        <span class="mt-1.5 inline-flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-wider text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded">🔒 {{ __('pos.pro_unlimited_plan') }}</span>
                                     </template>
                                     <template x-if="!isLocked(f) && flagDeps(f).length">
-                                        <span class="mt-1.5 inline-flex items-center gap-1 text-[9px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded" x-text="'Auto-includes: ' + flagDeps(f).map(flagLabel).join(', ')"></span>
+                                        <span class="mt-1.5 inline-flex items-center gap-1 text-[9px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded" x-text="{{ Js::from(__('pos.auto_includes_prefix') . ' ') }} + flagDeps(f).map(flagLabel).join(', ')"></span>
                                     </template>
                                 </div>
                             </label>
@@ -165,8 +165,8 @@
                 {{-- EXTRA --}}
                 <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm mb-4" x-show="extraFlags.length">
                     <div class="flex items-center gap-2 mb-3">
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-[10px] font-extrabold uppercase tracking-wider">+ Extra</span>
-                        <span class="text-[11px] text-gray-500 dark:text-gray-400">Optional — switch on only if you need them</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-[10px] font-extrabold uppercase tracking-wider">+ {{ __('pos.extra_word') }}</span>
+                        <span class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.optional_switch_on') }}</span>
                     </div>
                     <div class="grid sm:grid-cols-2 gap-2.5">
                         <template x-for="f in extraFlags" :key="'extra-'+f">
@@ -180,10 +180,10 @@
                                     </div>
                                     <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug" x-text="flagDesc(f)"></p>
                                     <template x-if="isLocked(f)">
-                                        <span class="mt-1.5 inline-flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-wider text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded">🔒 Pro / Unlimited plan</span>
+                                        <span class="mt-1.5 inline-flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-wider text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded">🔒 {{ __('pos.pro_unlimited_plan') }}</span>
                                     </template>
                                     <template x-if="!isLocked(f) && flagDeps(f).length">
-                                        <span class="mt-1.5 inline-flex items-center gap-1 text-[9px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded" x-text="'Auto-includes: ' + flagDeps(f).map(flagLabel).join(', ')"></span>
+                                        <span class="mt-1.5 inline-flex items-center gap-1 text-[9px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded" x-text="{{ Js::from(__('pos.auto_includes_prefix') . ' ') }} + flagDeps(f).map(flagLabel).join(', ')"></span>
                                     </template>
                                 </div>
                             </label>
@@ -195,15 +195,15 @@
                 <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
                     <div class="flex items-center gap-2 mb-3">
                         <span class="text-lg">⚙️</span>
-                        <h3 class="text-sm font-extrabold text-gray-900 dark:text-white">Cashier &amp; Receipt Preferences</h3>
+                        <h3 class="text-sm font-extrabold text-gray-900 dark:text-white">{{ __('pos.cashier_receipt_prefs') }}</h3>
                     </div>
 
-                    <p class="text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-2">Cashier screen density</p>
+                    <p class="text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-2">{{ __('pos.cashier_screen_density') }}</p>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-4">
                         @foreach([
-                            'simple' => ['Simple', 'Big buttons, minimal info', '🟢'],
-                            'standard' => ['Standard', 'Balanced — recommended', '🟡'],
-                            'premium' => ['Premium', 'All info visible', '🟣'],
+                            'simple' => [__('pos.density_simple'), __('pos.density_simple_desc'), '🟢'],
+                            'standard' => [__('pos.density_standard'), __('pos.density_standard_desc'), '🟡'],
+                            'premium' => [__('pos.density_premium'), __('pos.density_premium_desc'), '🟣'],
                         ] as $key => $info)
                             <label class="cursor-pointer">
                                 <input type="radio" name="pos_ui_density" value="{{ $key }}" x-model="density" class="peer sr-only">
@@ -220,22 +220,22 @@
                         <label class="flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition" :class="guidedFlow ? 'border-amber-500 bg-amber-50/40 dark:bg-amber-900/10' : 'border-gray-200 dark:border-gray-700'">
                             <input type="checkbox" name="pos_guided_flow_enabled" value="1" x-model="guidedFlow" class="mt-0.5 w-4 h-4 text-amber-600 rounded">
                             <div class="flex-1 min-w-0">
-                                <div class="text-sm font-bold text-gray-900 dark:text-white">⌨️ Guided Keyboard Billing</div>
-                                <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug">Step-by-step Enter-key flow: Customer → Items → Cart → Bill. All shortcuts keep working.</p>
+                                <div class="text-sm font-bold text-gray-900 dark:text-white">⌨️ {{ __('pos.guided_keyboard_billing') }}</div>
+                                <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug">{{ __('pos.guided_keyboard_billing_desc') }}</p>
                             </div>
                         </label>
                         <label class="flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition" :class="autoPrintKot ? 'border-amber-500 bg-amber-50/40 dark:bg-amber-900/10' : 'border-gray-200 dark:border-gray-700'" x-show="flags.kot">
                             <input type="checkbox" name="auto_print_kot" value="1" x-model="autoPrintKot" class="mt-0.5 w-4 h-4 text-amber-600 rounded">
                             <div class="flex-1 min-w-0">
-                                <div class="text-sm font-bold text-gray-900 dark:text-white">🖨️ Auto-Print KOT</div>
-                                <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug">Automatically print the kitchen ticket when an order is sent to the kitchen.</p>
+                                <div class="text-sm font-bold text-gray-900 dark:text-white">🖨️ {{ __('pos.auto_print_kot') }}</div>
+                                <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug">{{ __('pos.auto_print_kot_desc') }}</p>
                             </div>
                         </label>
                         <label class="flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition" :class="kotReprint ? 'border-amber-500 bg-amber-50/40 dark:bg-amber-900/10' : 'border-gray-200 dark:border-gray-700'" x-show="flags.kot">
                             <input type="checkbox" name="kot_reprint_enabled" value="1" x-model="kotReprint" class="mt-0.5 w-4 h-4 text-amber-600 rounded">
                             <div class="flex-1 min-w-0">
-                                <div class="text-sm font-bold text-gray-900 dark:text-white">🔁 Allow KOT Reprint</div>
-                                <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug">Let cashiers reprint a kitchen ticket from the held-orders screen.</p>
+                                <div class="text-sm font-bold text-gray-900 dark:text-white">🔁 {{ __('pos.allow_kot_reprint') }}</div>
+                                <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug">{{ __('pos.allow_kot_reprint_desc') }}</p>
                             </div>
                         </label>
                     </div>
@@ -245,29 +245,31 @@
                 <div class="mt-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
                     <div class="flex items-center gap-2 mb-1">
                         <span class="text-lg">🧾</span>
-                        <h3 class="text-sm font-extrabold text-gray-900 dark:text-white">Sales Tax Rates (PRA)</h3>
+                        <h3 class="text-sm font-extrabold text-gray-900 dark:text-white">{{ __('pos.sales_tax_rates_pra') }}</h3>
                     </div>
                     <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug mb-3">
-                        Set your company's tax rates for POS billing. Leave a field blank to use the system default.
-                        Current defaults: <strong>{{ rtrim(rtrim(number_format($globalTaxRates['cash'], 2, '.', ''), '0'), '.') }}%</strong> cash,
-                        <strong>{{ rtrim(rtrim(number_format($globalTaxRates['card'], 2, '.', ''), '0'), '.') }}%</strong> card / digital payments.
+                        {{ __('pos.tax_rates_intro') }}
+                        {!! __('pos.tax_rates_defaults_html', [
+                            'cash' => '<strong>' . e(rtrim(rtrim(number_format($globalTaxRates['cash'], 2, '.', ''), '0'), '.')) . '%</strong>',
+                            'card' => '<strong>' . e(rtrim(rtrim(number_format($globalTaxRates['card'], 2, '.', ''), '0'), '.')) . '%</strong>',
+                        ]) !!}
                     </p>
                     <div class="grid sm:grid-cols-2 gap-2.5">
                         <label class="block p-3 rounded-xl border-2 border-gray-200 dark:border-gray-700">
-                            <div class="text-sm font-bold text-gray-900 dark:text-white mb-0.5">💵 Cash Rate (%)</div>
-                            <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug mb-2">Applied when the customer pays by cash.</p>
+                            <div class="text-sm font-bold text-gray-900 dark:text-white mb-0.5">💵 {{ __('pos.cash_rate_pct') }}</div>
+                            <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug mb-2">{{ __('pos.cash_rate_desc') }}</p>
                             <input type="number" name="pos_tax_rate_cash" step="0.01" min="0" max="100" inputmode="decimal"
                                 value="{{ $company->pos_tax_rate_cash !== null ? rtrim(rtrim(number_format((float) $company->pos_tax_rate_cash, 2, '.', ''), '0'), '.') : '' }}"
-                                placeholder="Default: {{ rtrim(rtrim(number_format($globalTaxRates['cash'], 2, '.', ''), '0'), '.') }}"
+                                placeholder="{{ __('pos.ph_default_value', ['value' => rtrim(rtrim(number_format($globalTaxRates['cash'], 2, '.', ''), '0'), '.')]) }}"
                                 autocomplete="off" data-lpignore="true"
                                 class="w-full px-3 py-2 text-sm font-bold rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                         </label>
                         <label class="block p-3 rounded-xl border-2 border-gray-200 dark:border-gray-700">
-                            <div class="text-sm font-bold text-gray-900 dark:text-white mb-0.5">💳 Card / Digital Rate (%)</div>
-                            <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug mb-2">Applied to debit/credit card, QR and other digital-channel payments.</p>
+                            <div class="text-sm font-bold text-gray-900 dark:text-white mb-0.5">💳 {{ __('pos.card_digital_rate_pct') }}</div>
+                            <p class="text-[11px] text-gray-600 dark:text-gray-400 leading-snug mb-2">{{ __('pos.card_rate_desc') }}</p>
                             <input type="number" name="pos_tax_rate_card" step="0.01" min="0" max="100" inputmode="decimal"
                                 value="{{ $company->pos_tax_rate_card !== null ? rtrim(rtrim(number_format((float) $company->pos_tax_rate_card, 2, '.', ''), '0'), '.') : '' }}"
-                                placeholder="Default: {{ rtrim(rtrim(number_format($globalTaxRates['card'], 2, '.', ''), '0'), '.') }}"
+                                placeholder="{{ __('pos.ph_default_value', ['value' => rtrim(rtrim(number_format($globalTaxRates['card'], 2, '.', ''), '0'), '.')]) }}"
                                 autocomplete="off" data-lpignore="true"
                                 class="w-full px-3 py-2 text-sm font-bold rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
                         </label>
@@ -277,10 +279,10 @@
                 <div class="mt-4 flex items-center justify-between">
                     <button type="button" @click="back()" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                        Back
+                        {{ __('pos.back_word') }}
                     </button>
                     <button type="button" @click="next()" class="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded-lg bg-purple-600 hover:bg-purple-700 text-white shadow-sm">
-                        Next — Review
+                        {{ __('pos.next_review') }}
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                     </button>
                 </div>
@@ -289,18 +291,18 @@
             {{-- ════════════════════ STEP 3 — SUMMARY ════════════════════ --}}
             <div x-show="step === 3" x-transition.opacity>
                 <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 sm:p-6 shadow-sm">
-                    <h2 class="text-lg font-extrabold text-gray-900 dark:text-white mb-1">Review &amp; start</h2>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-5">Here's how your POS will work. You can come back and change this anytime.</p>
+                    <h2 class="text-lg font-extrabold text-gray-900 dark:text-white mb-1">{{ __('pos.review_and_start') }}</h2>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-5">{{ __('pos.review_sub') }}</p>
 
                     <div class="rounded-xl border-2 border-purple-200 dark:border-purple-800 bg-purple-50/40 dark:bg-purple-900/10 p-4 mb-5 flex items-center gap-3">
                         <span class="text-3xl" x-text="selectedPresetMeta.icon"></span>
                         <div>
-                            <p class="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Business type</p>
+                            <p class="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">{{ __('pos.business_type') }}</p>
                             <p class="text-base font-extrabold text-gray-900 dark:text-white" x-text="selectedPresetMeta.label"></p>
                         </div>
                     </div>
 
-                    <p class="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Features turned ON (<span x-text="enabledFlags.length"></span>)</p>
+                    <p class="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">{{ __('pos.features_turned_on') }} (<span x-text="enabledFlags.length"></span>)</p>
                     <div class="grid sm:grid-cols-2 gap-2 mb-5">
                         <template x-for="f in enabledFlags" :key="'sum-'+f">
                             <div class="flex items-center gap-2 p-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/15 border border-emerald-100 dark:border-emerald-900/40">
@@ -308,24 +310,24 @@
                                 <span class="text-sm font-semibold text-gray-800 dark:text-gray-100" x-text="flagIcon(f) + ' ' + flagLabel(f)"></span>
                             </div>
                         </template>
-                        <div x-show="enabledFlags.length === 0" class="text-sm text-gray-400 italic p-2">Basic billing only — no extra modules. Perfect for a simple counter.</div>
+                        <div x-show="enabledFlags.length === 0" class="text-sm text-gray-400 italic p-2">{{ __('pos.basic_billing_only') }}</div>
                     </div>
 
-                    <p class="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Preferences</p>
+                    <p class="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">{{ __('pos.preferences_word') }}</p>
                     <div class="flex flex-wrap gap-2">
-                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-200">Screen: <span class="capitalize" x-text="density"></span></span>
-                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-200" x-text="guidedFlow ? '⌨️ Guided billing ON' : 'Guided billing off'"></span>
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-200">{{ __('pos.screen_colon') }} <span class="capitalize" x-text="density"></span></span>
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-200" x-text="guidedFlow ? {{ Js::from('⌨️ ' . __('pos.guided_billing_on')) }} : {{ Js::from(__('pos.guided_billing_off')) }}"></span>
                     </div>
                 </div>
 
                 <div class="mt-4 flex items-center justify-between">
                     <button type="button" @click="back()" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                        Back
+                        {{ __('pos.back_word') }}
                     </button>
                     <button type="submit" class="inline-flex items-center gap-2 px-7 py-3 text-sm font-extrabold rounded-lg bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white shadow-lg shadow-emerald-500/30">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                        Start Using POS
+                        {{ __('pos.start_using_pos') }}
                     </button>
                 </div>
             </div>
@@ -337,9 +339,9 @@
             return {
                 step: 1,
                 steps: [
-                    { n: 1, label: 'Business' },
-                    { n: 2, label: 'Features' },
-                    { n: 3, label: 'Review' },
+                    { n: 1, label: (__('pos.step_business')) },
+                    { n: 2, label: (__('pos.step_features')) },
+                    { n: 3, label: (__('pos.step_review')) },
                 ],
                 selectedPreset: @json($currentCategory),
                 flags: @json($flagState),
@@ -357,7 +359,7 @@
                 restaurantFlags: @json(\App\Services\PosFeatureService::RESTAURANT_FLAGS),
 
                 get selectedPresetMeta() {
-                    return this.presetMeta[this.selectedPreset] || { label: 'Custom', icon: '⚙️', description: '' };
+                    return this.presetMeta[this.selectedPreset] || { label: (__('pos.custom_word')), icon: '⚙️', description: '' };
                 },
                 get recommendedFlags() {
                     const d = this.categoryDefaults[this.selectedPreset] || {};

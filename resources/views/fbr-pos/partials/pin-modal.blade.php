@@ -4,8 +4,8 @@
             <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
                 <svg class="w-8 h-8 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
             </div>
-            <h3 class="text-lg font-bold text-gray-900 dark:text-white">Confidential PIN Required</h3>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Enter your company's confidential PIN to access local data</p>
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ __('pos.confidential_pin_required') }}</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.confidential_pin_hint') }}</p>
         </div>
 
         <div id="fbrPosPinError" class="hidden mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm text-center"></div>
@@ -20,8 +20,8 @@
         </div>
 
         <div class="flex gap-3">
-            <button onclick="closeFbrPosPinModal()" class="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 transition">Cancel</button>
-            <button onclick="submitFbrPosPin()" id="fbrPosPinSubmitBtn" class="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-50" disabled>Verify</button>
+            <button onclick="closeFbrPosPinModal()" class="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 transition">{{ __('pos.cancel') }}</button>
+            <button onclick="submitFbrPosPin()" id="fbrPosPinSubmitBtn" class="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-50" disabled>{{ __('pos.verify') }}</button>
         </div>
     </div>
 </div>
@@ -82,7 +82,7 @@ function submitFbrPosPin() {
     if (pin.length < 4) return;
 
     document.getElementById('fbrPosPinSubmitBtn').disabled = true;
-    document.getElementById('fbrPosPinSubmitBtn').textContent = 'Verifying...';
+    document.getElementById('fbrPosPinSubmitBtn').textContent = @js(__('pos.verifying_ellipsis'));
 
     fetch('{{ route("fbrpos.api.verify-pin") }}', {
         method: 'POST',
@@ -101,13 +101,13 @@ function submitFbrPosPin() {
             document.querySelector('.fbr-pos-pin-digit[data-index="0"]').focus();
         }
         document.getElementById('fbrPosPinSubmitBtn').disabled = false;
-        document.getElementById('fbrPosPinSubmitBtn').textContent = 'Verify';
+        document.getElementById('fbrPosPinSubmitBtn').textContent = @js(__('pos.verify'));
     })
     .catch(() => {
-        document.getElementById('fbrPosPinError').textContent = 'Network error. Please try again.';
+        document.getElementById('fbrPosPinError').textContent = @js(__('pos.network_error_try_again'));
         document.getElementById('fbrPosPinError').classList.remove('hidden');
         document.getElementById('fbrPosPinSubmitBtn').disabled = false;
-        document.getElementById('fbrPosPinSubmitBtn').textContent = 'Verify';
+        document.getElementById('fbrPosPinSubmitBtn').textContent = @js(__('pos.verify'));
     });
 }
 

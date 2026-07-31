@@ -2,12 +2,12 @@
 <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     <a href="{{ route('pos.customize') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition mb-3">
         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-        Back to Customize
+        {{ __('pos.back_to_customize') }}
     </a>
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Team Management</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage cashier accounts for your POS</p>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.team_management') }}</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.team_management_sub') }}</p>
         </div>
     </div>
 
@@ -25,41 +25,41 @@
 
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6" x-data="{ showForm: false }">
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Add Team Member</h3>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.add_team_member') }}</h3>
             <button @click="showForm = !showForm" class="text-sm text-purple-600 hover:text-purple-700 font-medium">
-                <span x-text="showForm ? 'Cancel' : '+ Add Member'"></span>
+                <span x-text="showForm ? @js(__('pos.cancel')) : @js(__('pos.add_member_btn'))"></span>
             </button>
         </div>
         <form x-show="showForm" x-transition method="POST" action="{{ route('pos.team.store-cashier') }}" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             @csrf
             <div>
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Full Name</label>
-                <input type="text" name="name" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500" placeholder="Cashier name">
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.full_name') }}</label>
+                <input type="text" name="name" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500" placeholder="{{ __('pos.ph_cashier_name') }}">
             </div>
             <div>
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Email</label>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.email_label') }}</label>
                 <input type="email" name="email" required class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500" placeholder="cashier@email.com">
             </div>
             <div>
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Phone (optional)</label>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.phone_optional') }}</label>
                 <input type="text" name="phone" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500" placeholder="03001234567">
             </div>
             <div>
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Password</label>
-                <input type="password" name="password" required minlength="6" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500" placeholder="Min 6 characters">
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.password_label') }}</label>
+                <input type="password" name="password" required minlength="6" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500" placeholder="{{ __('pos.ph_min_6_chars') }}">
             </div>
             <div>
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Role</label>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.role_label') }}</label>
                 <select name="pos_role" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
-                    <option value="pos_cashier">Cashier — sale screen &amp; billing only</option>
-                    <option value="pos_manager">Manager — full admin access</option>
-                    <option value="pos_kitchen">Kitchen — Kitchen Display only (free, no team-slot)</option>
-                    <option value="pos_waiter">Waiter — tablet ordering only (free, no team-slot)</option>
-                    <option value="pos_delivery">Delivery Manager — Deliveries board only (free, no team-slot)</option>
+                    <option value="pos_cashier">{{ __('pos.role_opt_cashier') }}</option>
+                    <option value="pos_manager">{{ __('pos.role_opt_manager') }}</option>
+                    <option value="pos_kitchen">{{ __('pos.role_opt_kitchen') }}</option>
+                    <option value="pos_waiter">{{ __('pos.role_opt_waiter') }}</option>
+                    <option value="pos_delivery">{{ __('pos.role_opt_delivery') }}</option>
                 </select>
             </div>
             <div class="sm:col-span-2">
-                <button type="submit" class="px-6 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition font-semibold">Create Account</button>
+                <button type="submit" class="px-6 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition font-semibold">{{ __('pos.create_account') }}</button>
             </div>
         </form>
     </div>
@@ -69,14 +69,14 @@
             <table class="w-full text-sm table-cards">
                 <thead>
                     <tr class="bg-gray-50 dark:bg-gray-800 text-left text-xs text-gray-500 dark:text-gray-400 uppercase">
-                        <th class="px-4 py-3">Name</th>
-                        <th class="px-4 py-3">Email</th>
-                        <th class="px-4 py-3 hidden sm:table-cell">Phone</th>
-                        <th class="px-4 py-3">Password</th>
-                        <th class="px-4 py-3">Role</th>
-                        <th class="px-4 py-3">Status</th>
-                        <th class="px-4 py-3">PRA Reporting</th>
-                        <th class="px-4 py-3">Actions</th>
+                        <th class="px-4 py-3">{{ __('pos.name_label') }}</th>
+                        <th class="px-4 py-3">{{ __('pos.email_label') }}</th>
+                        <th class="px-4 py-3 hidden sm:table-cell">{{ __('pos.phone_label') }}</th>
+                        <th class="px-4 py-3">{{ __('pos.password_label') }}</th>
+                        <th class="px-4 py-3">{{ __('pos.role_label') }}</th>
+                        <th class="px-4 py-3">{{ __('pos.status_label') }}</th>
+                        <th class="px-4 py-3">{{ __('pos.pra_reporting') }}</th>
+                        <th class="px-4 py-3">{{ __('pos.actions_label') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -108,37 +108,37 @@
                             @if(isset($teamPasswords[$member->id]))
                             <div class="flex items-center gap-1.5">
                                 <span class="font-mono text-xs text-gray-700 dark:text-gray-300" x-text="showPw ? {{ \Illuminate\Support\Js::from($teamPasswords[$member->id]) }} : '••••••••'"></span>
-                                <button type="button" @click="showPw = !showPw" class="text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition" :title="showPw ? 'Hide password' : 'Show password'">
+                                <button type="button" @click="showPw = !showPw" class="text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition" :title="showPw ? @js(__('pos.ti_hide_password')) : @js(__('pos.ti_show_password'))">
                                     <svg x-show="!showPw" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                                     <svg x-show="showPw" x-cloak class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
                                 </button>
                             </div>
                             @elseif(in_array($member->pos_role, ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter', 'pos_delivery'], true))
-                            <span class="text-xs text-gray-400" title="Is account ka password abhi save nahi hua — Edit se naya password set karein, phir yahan nazar aayega.">Set new password to view</span>
+                            <span class="text-xs text-gray-400" title="{{ __('pos.ti_password_not_saved') }}">{{ __('pos.set_new_password_to_view') }}</span>
                             @else
                             <span class="text-xs text-gray-400">—</span>
                             @endif
                         </td>
                         <td class="px-4 py-3">
                             @if($member->pos_role === 'pos_admin' || $member->role === 'company_admin')
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">Admin</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">{{ __('pos.role_admin') }}</span>
                             @elseif($member->pos_role === 'pos_manager')
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400">Manager</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400">{{ __('pos.role_manager') }}</span>
                             @elseif($member->pos_role === 'pos_kitchen')
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">Kitchen</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">{{ __('pos.role_kitchen') }}</span>
                             @elseif($member->pos_role === 'pos_waiter')
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">Waiter</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">{{ __('pos.role_waiter') }}</span>
                             @elseif($member->pos_role === 'pos_delivery')
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">Delivery Manager</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">{{ __('pos.role_delivery_manager') }}</span>
                             @else
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">Cashier</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">{{ __('pos.role_cashier') }}</span>
                             @endif
                         </td>
                         <td class="px-4 py-3">
                             @if($member->is_active)
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">Active</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">{{ __('pos.active_word') }}</span>
                             @else
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">Inactive</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">{{ __('pos.inactive_word') }}</span>
                             @endif
                         </td>
                         <td class="px-4 py-3">
@@ -153,19 +153,19 @@
                                 @csrf
                                 <input type="hidden" name="enabled" value="{{ $memberPraOn ? 0 : 1 }}">
                                 <button type="submit"
-                                    title="{{ $memberPraOn ? 'Click: is cashier ko OFFLINE karein (bills sirf local banenge)' : 'Click: is cashier ko ONLINE karein (bills PRA ko report honge)' }}"
+                                    title="{{ $memberPraOn ? __('pos.ti_set_cashier_offline') : __('pos.ti_set_cashier_online') }}"
                                     class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide transition {{ $memberPraOn ? 'bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50' : 'bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700' }}">
                                     <span class="w-2 h-2 rounded-full {{ $memberPraOn ? 'bg-emerald-500' : 'bg-gray-400' }}"></span>
-                                    {{ $memberPraOn ? 'Online' : 'Offline' }}
+                                    {{ $memberPraOn ? __('pos.online') : __('pos.offline') }}
                                     <svg class="w-3 h-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
                                 </button>
                             </form>
                             @elseif($member->pos_role === 'pos_admin' || $member->pos_role === 'pos_manager' || $member->role === 'company_admin')
                             @php $memberPraOn = (bool) $member->praReportingEnabled($company); @endphp
-                            <span title="Admin/Manager apna PRA Reporting toggle sale screen par khud control karte hain."
+                            <span title="{{ __('pos.ti_admin_controls_own_pra') }}"
                                 class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide {{ $memberPraOn ? 'bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400' }}">
                                 <span class="w-2 h-2 rounded-full {{ $memberPraOn ? 'bg-emerald-500' : 'bg-gray-400' }}"></span>
-                                {{ $memberPraOn ? 'Online' : 'Offline' }}
+                                {{ $memberPraOn ? __('pos.online') : __('pos.offline') }}
                             </span>
                             @else
                             <span class="text-xs text-gray-400">—</span>
@@ -174,7 +174,7 @@
                         <td class="px-4 py-3">
                             @if(in_array($member->pos_role, ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter', 'pos_delivery'], true))
                             <div class="flex items-center gap-2">
-                                <button x-show="!editing" @click="editing = true" class="text-amber-600 hover:text-amber-700 text-xs font-medium" title="Edit">
+                                <button x-show="!editing" @click="editing = true" class="text-amber-600 hover:text-amber-700 text-xs font-medium" title="{{ __('pos.edit') }}">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                 </button>
                                 <template x-if="editing">
@@ -186,25 +186,25 @@
                                         {{-- Item #7: optional password reset — blank keeps the current one.
                                              Setting a new password also refreshes the admin-viewable
                                              encrypted copy shown in the Password column. --}}
-                                        <input form="edit-{{ $member->id }}" type="password" name="password" placeholder="New password (optional)" autocomplete="new-password" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-36 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1.5 focus:ring-purple-500 focus:border-purple-500">
-                                        <button form="edit-{{ $member->id }}" type="submit" class="text-emerald-600 hover:text-emerald-700 text-xs font-medium">Save</button>
-                                        <button @click="editing = false" class="text-gray-400 hover:text-gray-600 text-xs font-medium">Cancel</button>
+                                        <input form="edit-{{ $member->id }}" type="password" name="password" placeholder="{{ __('pos.ph_new_password_optional') }}" autocomplete="new-password" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-36 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1.5 focus:ring-purple-500 focus:border-purple-500">
+                                        <button form="edit-{{ $member->id }}" type="submit" class="text-emerald-600 hover:text-emerald-700 text-xs font-medium">{{ __('pos.save_btn') }}</button>
+                                        <button @click="editing = false" class="text-gray-400 hover:text-gray-600 text-xs font-medium">{{ __('pos.cancel') }}</button>
                                     </div>
                                 </template>
                                 <form method="POST" action="{{ route('pos.team.toggle-cashier', $member->id) }}" class="inline">
                                     @csrf
-                                    <button type="submit" class="{{ $member->is_active ? 'text-red-500 hover:text-red-700' : 'text-emerald-600 hover:text-emerald-700' }} text-xs font-medium" title="{{ $member->is_active ? 'Deactivate' : 'Activate' }}">
-                                        {{ $member->is_active ? 'Deactivate' : 'Activate' }}
+                                    <button type="submit" class="{{ $member->is_active ? 'text-red-500 hover:text-red-700' : 'text-emerald-600 hover:text-emerald-700' }} text-xs font-medium" title="{{ $member->is_active ? __('pos.deactivate') : __('pos.activate') }}">
+                                        {{ $member->is_active ? __('pos.deactivate') : __('pos.activate') }}
                                     </button>
                                 </form>
                             </div>
                             @else
-                            <span class="text-xs text-gray-400">Owner</span>
+                            <span class="text-xs text-gray-400">{{ __('pos.owner_word') }}</span>
                             @endif
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="8" class="px-4 py-12 text-center text-gray-400">No team members yet. Add your first cashier above.</td></tr>
+                    <tr><td colspan="8" class="px-4 py-12 text-center text-gray-400">{{ __('pos.no_team_members') }}</td></tr>
                     @endforelse
                 </tbody>
             </table>

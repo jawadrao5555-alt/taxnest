@@ -3,13 +3,13 @@
     @include('pos.partials.back-link')
     <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Day Close Report (Z-Report)</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">PRA Compliance — End-of-Day Summary</p>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.day_close_report_z') }}</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.pra_compliance_eod') }}</p>
         </div>
         <form method="GET" action="{{ route('pos.day-close') }}" class="flex items-center gap-2">
             <input type="date" name="date" value="{{ $date }}" max="{{ today()->format('Y-m-d') }}"
                 class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
-            <button type="submit" class="px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition">View</button>
+            <button type="submit" class="px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition">{{ __('pos.view_btn') }}</button>
         </form>
     </div>
 
@@ -21,18 +21,18 @@
                     <svg class="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </div>
                 <div>
-                    <p class="font-bold text-emerald-800 dark:text-emerald-300">Day Closed — {{ $existingReport->report_number }}</p>
-                    <p class="text-xs text-emerald-600 dark:text-emerald-400">Closed on {{ $existingReport->created_at->format('d M Y h:i A') }}</p>
+                    <p class="font-bold text-emerald-800 dark:text-emerald-300">{{ __('pos.day_closed_report', ['number' => $existingReport->report_number]) }}</p>
+                    <p class="text-xs text-emerald-600 dark:text-emerald-400">{{ __('pos.closed_on', ['datetime' => $existingReport->created_at->format('d M Y h:i A')]) }}</p>
                 </div>
             </div>
             <div class="flex items-center gap-2">
                 <a href="{{ route('pos.day-close-thermal', $existingReport->id) }}" target="_blank" class="px-4 py-2 bg-gray-800 text-white text-sm font-semibold rounded-lg hover:bg-gray-900 transition flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                    Thermal Z-Report
+                    {{ __('pos.thermal_z_report') }}
                 </a>
                 <a href="{{ route('pos.day-close-pdf', $existingReport->id) }}" class="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                    Download PDF
+                    {{ __('pos.download_pdf') }}
                 </a>
             </div>
         </div>
@@ -50,29 +50,29 @@
     @if($stats->total_invoices > 0 || $lbPending > 0)
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total Invoices</p>
+            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ __('pos.kpi_total_invoices') }}</p>
             <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ $stats->total_invoices }}</p>
             <div class="flex flex-wrap gap-2 mt-2">
-                <span class="text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">PRA: {{ $stats->pra_invoices }}</span>
-                <span class="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">Local: {{ $stats->local_invoices }}</span>
+                <span class="text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">{{ __('pos.badge_pra_count', ['count' => $stats->pra_invoices]) }}</span>
+                <span class="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">{{ __('pos.badge_local_count', ['count' => $stats->local_invoices]) }}</span>
                 @if($stats->offline_invoices > 0)
-                <span class="text-xs px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">Offline: {{ $stats->offline_invoices }}</span>
+                <span class="text-xs px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">{{ __('pos.badge_offline_count', ['count' => $stats->offline_invoices]) }}</span>
                 @endif
             </div>
         </div>
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Gross Sales</p>
+            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ __('pos.kpi_gross_sales') }}</p>
             <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">PKR {{ number_format($stats->gross_sales) }}</p>
             @if($stats->total_discount > 0)
-            <p class="text-xs text-red-500 mt-1">Discount: -PKR {{ number_format($stats->total_discount) }}</p>
+            <p class="text-xs text-red-500 mt-1">{{ __('pos.discount_minus_pkr', ['amount' => number_format($stats->total_discount)]) }}</p>
             @endif
         </div>
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total Tax</p>
+            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ __('pos.kpi_total_tax') }}</p>
             <p class="text-2xl font-bold text-purple-600 mt-1">PKR {{ number_format($stats->total_tax) }}</p>
         </div>
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Net Revenue</p>
+            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ __('pos.kpi_net_revenue') }}</p>
             <p class="text-2xl font-bold text-emerald-600 mt-1">PKR {{ number_format($stats->total_amount) }}</p>
         </div>
     </div>
@@ -81,7 +81,7 @@
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <h3 class="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                 <svg class="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                Payment Breakdown
+                {{ __('pos.payment_breakdown') }}
             </h3>
             <div class="space-y-3">
                 <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
@@ -89,7 +89,7 @@
                         <div class="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
                             <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                         </div>
-                        <span class="font-medium text-gray-900 dark:text-white">Cash</span>
+                        <span class="font-medium text-gray-900 dark:text-white">{{ __('pos.cash_title') }}</span>
                     </div>
                     <span class="font-bold text-gray-900 dark:text-white">PKR {{ number_format($stats->cash_amount, 2) }}</span>
                 </div>
@@ -98,7 +98,7 @@
                         <div class="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
                             <svg class="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                         </div>
-                        <span class="font-medium text-gray-900 dark:text-white">Card</span>
+                        <span class="font-medium text-gray-900 dark:text-white">{{ __('pos.card_title') }}</span>
                     </div>
                     <span class="font-bold text-gray-900 dark:text-white">PKR {{ number_format($stats->card_amount, 2) }}</span>
                 </div>
@@ -108,7 +108,7 @@
                         <div class="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
                             <svg class="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </div>
-                        <span class="font-medium text-gray-900 dark:text-white">Other</span>
+                        <span class="font-medium text-gray-900 dark:text-white">{{ __('pos.other_word') }}</span>
                     </div>
                     <span class="font-bold text-gray-900 dark:text-white">PKR {{ number_format($stats->other_amount, 2) }}</span>
                 </div>
@@ -119,16 +119,16 @@
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <h3 class="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                 <svg class="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                Cashier Breakdown
+                {{ __('pos.cashier_breakdown') }}
             </h3>
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-cards">
                     <thead>
                         <tr>
-                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cashier</th>
-                            <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Sales</th>
-                            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Revenue</th>
-                            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Tax</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ __('pos.receipt_cashier') }}</th>
+                            <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">{{ __('pos.th_sales') }}</th>
+                            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">{{ __('pos.kpi_revenue') }}</th>
+                            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">{{ __('pos.receipt_tax') }}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
@@ -147,15 +147,15 @@
     </div>
 
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
-        <h3 class="font-semibold text-gray-900 dark:text-white mb-4">Invoice Range</h3>
+        <h3 class="font-semibold text-gray-900 dark:text-white mb-4">{{ __('pos.invoice_range') }}</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                <p class="text-xs text-gray-500 uppercase font-medium">First Invoice</p>
+                <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.first_invoice') }}</p>
                 <p class="font-bold text-gray-900 dark:text-white">{{ $stats->first_invoice->invoice_number ?? '-' }}</p>
                 <p class="text-xs text-gray-500">{{ $stats->first_invoice ? $stats->first_invoice->created_at->format('h:i A') : '-' }}</p>
             </div>
             <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                <p class="text-xs text-gray-500 uppercase font-medium">Last Invoice</p>
+                <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.last_invoice') }}</p>
                 <p class="font-bold text-gray-900 dark:text-white">{{ $stats->last_invoice->invoice_number ?? '-' }}</p>
                 <p class="text-xs text-gray-500">{{ $stats->last_invoice ? $stats->last_invoice->created_at->format('h:i A') : '-' }}</p>
             </div>
@@ -176,29 +176,29 @@
     @endphp
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Average Bill</p>
+            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ __('pos.kpi_average_bill') }}</p>
             <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">PKR {{ number_format($analytics->avg_bill) }}</p>
         </div>
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Unique Customers</p>
+            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ __('pos.kpi_unique_customers') }}</p>
             <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ $analytics->unique_customers }}</p>
-            <p class="text-xs text-gray-500 mt-1">Named / saved customers only</p>
+            <p class="text-xs text-gray-500 mt-1">{{ __('pos.named_customers_only') }}</p>
         </div>
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Vs Yesterday</p>
+            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ __('pos.kpi_vs_yesterday') }}</p>
             <div class="flex items-baseline gap-2 mt-1">
                 <p class="text-lg font-bold text-gray-900 dark:text-white">PKR {{ number_format($cmp->yesterday->revenue) }}</p>
                 {!! $pctBadge($cmp->vs_yesterday_revenue_pct) !!}
             </div>
-            <p class="text-xs text-gray-500 mt-1">{{ $cmp->yesterday->invoices }} bills {!! $pctBadge($cmp->vs_yesterday_invoices_pct) !!}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ __('pos.n_bills', ['count' => $cmp->yesterday->invoices]) }} {!! $pctBadge($cmp->vs_yesterday_invoices_pct) !!}</p>
         </div>
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Vs Last {{ \Carbon\Carbon::parse($date)->format('l') }}</p>
+            <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ __('pos.kpi_vs_last_weekday', ['day' => \Carbon\Carbon::parse($date)->format('l')]) }}</p>
             <div class="flex items-baseline gap-2 mt-1">
                 <p class="text-lg font-bold text-gray-900 dark:text-white">PKR {{ number_format($cmp->last_week->revenue) }}</p>
                 {!! $pctBadge($cmp->vs_last_week_revenue_pct) !!}
             </div>
-            <p class="text-xs text-gray-500 mt-1">{{ $cmp->last_week->invoices }} bills {!! $pctBadge($cmp->vs_last_week_invoices_pct) !!}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ __('pos.n_bills', ['count' => $cmp->last_week->invoices]) }} {!! $pctBadge($cmp->vs_last_week_invoices_pct) !!}</p>
         </div>
     </div>
 
@@ -206,32 +206,32 @@
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <h3 class="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
             <svg class="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-            PRA Submission Health
+            {{ __('pos.pra_submission_health') }}
         </h3>
         <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <div class="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-center">
                 <p class="text-2xl font-bold text-emerald-600">{{ $analytics->pra_health->submitted }}</p>
-                <p class="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase mt-0.5">Submitted</p>
+                <p class="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase mt-0.5">{{ __('pos.status_submitted') }}</p>
             </div>
             <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 text-center">
                 <p class="text-2xl font-bold text-gray-700 dark:text-gray-300">{{ $analytics->pra_health->pending }}</p>
-                <p class="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase mt-0.5">Pending</p>
+                <p class="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase mt-0.5">{{ __('pos.status_pending') }}</p>
             </div>
             <div class="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-center">
                 <p class="text-2xl font-bold text-amber-600">{{ $analytics->pra_health->offline }}</p>
-                <p class="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase mt-0.5">Offline Queue</p>
+                <p class="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase mt-0.5">{{ __('pos.status_offline_queue') }}</p>
             </div>
             <div class="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-center">
                 <p class="text-2xl font-bold text-red-600">{{ $analytics->pra_health->failed }}</p>
-                <p class="text-xs font-semibold text-red-700 dark:text-red-400 uppercase mt-0.5">Failed</p>
+                <p class="text-xs font-semibold text-red-700 dark:text-red-400 uppercase mt-0.5">{{ __('pos.failed_word') }}</p>
             </div>
             <div class="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 text-center">
                 <p class="text-2xl font-bold text-gray-700 dark:text-gray-300">{{ $analytics->pra_health->not_reported }}</p>
-                <p class="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase mt-0.5">Not Reported</p>
+                <p class="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase mt-0.5">{{ __('pos.status_not_reported') }}</p>
             </div>
         </div>
         @if($analytics->pra_health->offline > 0 || $analytics->pra_health->failed > 0)
-        <p class="text-xs text-amber-700 dark:text-amber-400 font-semibold mt-3">Kuch bills abhi PRA tak nahi pohnche — offline queue khud retry hoti rahegi; failed bills ko Bills page se Edit &amp; Retry karein.</p>
+        <p class="text-xs text-amber-700 dark:text-amber-400 font-semibold mt-3">{{ __('pos.some_bills_not_reached_pra') }}</p>
         @endif
     </div>
 
@@ -240,10 +240,10 @@
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <h3 class="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                 <svg class="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                Category-wise Sales
+                {{ __('pos.category_wise_sales') }}
             </h3>
             @if($analytics->categories->isEmpty())
-            <p class="text-sm text-gray-500">No item data for this day.</p>
+            <p class="text-sm text-gray-500">{{ __('pos.no_item_data_for_day') }}</p>
             @else
             <div class="space-y-3">
                 @foreach($analytics->categories as $catName => $cat)
@@ -264,19 +264,19 @@
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <h3 class="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                 <svg class="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-                Top Products of the Day
+                {{ __('pos.top_products_of_day') }}
             </h3>
             @if($analytics->top_products->isEmpty())
-            <p class="text-sm text-gray-500">No item data for this day.</p>
+            <p class="text-sm text-gray-500">{{ __('pos.no_item_data_for_day') }}</p>
             @else
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-cards">
                     <thead>
                         <tr>
                             <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                            <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Qty</th>
-                            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Revenue</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ __('pos.th_product') }}</th>
+                            <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">{{ __('pos.receipt_qty') }}</th>
+                            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">{{ __('pos.kpi_revenue') }}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
@@ -303,15 +303,15 @@
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <h3 class="font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
             <svg class="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            Hourly Sales
+            {{ __('pos.hourly_sales') }}
         </h3>
         @if($activeHours->isEmpty())
-        <p class="text-sm text-gray-500 mt-3">No sales recorded yet.</p>
+        <p class="text-sm text-gray-500 mt-3">{{ __('pos.no_sales_recorded_yet') }}</p>
         @else
-        <p class="text-xs text-gray-500 mb-4">Peak hour: <b class="text-gray-700 dark:text-gray-300">{{ \Carbon\Carbon::createFromTime($activeHours->sortByDesc('revenue')->keys()->first())->format('g A') }}</b> — PKR {{ number_format($activeHours->max('revenue')) }}</p>
+        <p class="text-xs text-gray-500 mb-4">{{ __('pos.peak_hour_label') }} <b class="text-gray-700 dark:text-gray-300">{{ \Carbon\Carbon::createFromTime($activeHours->sortByDesc('revenue')->keys()->first())->format('g A') }}</b> — PKR {{ number_format($activeHours->max('revenue')) }}</p>
         <div class="flex items-end gap-1 h-32">
             @foreach($analytics->hourly as $hour => $h)
-            <div class="flex-1 flex flex-col items-center justify-end h-full" title="{{ \Carbon\Carbon::createFromTime($hour)->format('g A') }} — {{ $h->count }} bills, PKR {{ number_format($h->revenue) }}">
+            <div class="flex-1 flex flex-col items-center justify-end h-full" title="{{ \Carbon\Carbon::createFromTime($hour)->format('g A') }} — {{ __('pos.n_bills', ['count' => $h->count]) }}, PKR {{ number_format($h->revenue) }}">
                 <div class="w-full rounded-t {{ $h->revenue > 0 ? 'bg-purple-600' : 'bg-gray-100 dark:bg-gray-800' }}" style="height: {{ $h->revenue > 0 ? max(4, round($h->revenue / $maxHourRevenue * 100)) : 2 }}%"></div>
                 <span class="text-[9px] text-gray-400 mt-1 {{ $hour % 3 === 0 ? '' : 'invisible' }}">{{ \Carbon\Carbon::createFromTime($hour)->format('gA') }}</span>
             </div>
@@ -325,28 +325,28 @@
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <h3 class="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                 <svg class="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
-                Discount Summary
+                {{ __('pos.discount_summary') }}
             </h3>
             @if($analytics->discounts->total <= 0)
-            <p class="text-sm text-gray-500">No discounts given this day.</p>
+            <p class="text-sm text-gray-500">{{ __('pos.no_discounts_this_day') }}</p>
             @else
             <div class="grid grid-cols-2 gap-3">
                 <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <p class="text-xs text-gray-500 uppercase font-medium">Bills With Discount</p>
+                    <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.bills_with_discount') }}</p>
                     <p class="text-xl font-bold text-gray-900 dark:text-white mt-0.5">{{ $analytics->discounts->bill_count }}</p>
                 </div>
                 <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <p class="text-xs text-gray-500 uppercase font-medium">Total Discount</p>
+                    <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.kpi_total_discount') }}</p>
                     <p class="text-xl font-bold text-red-500 mt-0.5">PKR {{ number_format($analytics->discounts->total) }}</p>
                     @if($analytics->discounts->item_total > 0)
-                    <p class="text-[10px] text-gray-500 mt-0.5">Bill: {{ number_format($analytics->discounts->bill_total) }} + Item: {{ number_format($analytics->discounts->item_total) }}</p>
+                    <p class="text-[10px] text-gray-500 mt-0.5">{{ __('pos.bill_item_discount_split', ['bill' => number_format($analytics->discounts->bill_total), 'item' => number_format($analytics->discounts->item_total)]) }}</p>
                     @endif
                 </div>
             </div>
             @endif
 
             @if($analytics->restaurant_enabled && $analytics->deals->isNotEmpty())
-            <h4 class="font-semibold text-gray-900 dark:text-white text-sm mt-5 mb-2">Deals Performance</h4>
+            <h4 class="font-semibold text-gray-900 dark:text-white text-sm mt-5 mb-2">{{ __('pos.deals_performance') }}</h4>
             <div class="space-y-2">
                 @foreach($analytics->deals as $dealName => $deal)
                 <div class="flex items-center justify-between p-2.5 bg-gray-50 dark:bg-gray-800 rounded-lg text-sm">
@@ -363,13 +363,13 @@
             <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                 <h3 class="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                     <svg class="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h18v6H3zM3 15h18v6H3z"/></svg>
-                    Order Type Split
+                    {{ __('pos.order_type_split') }}
                 </h3>
                 <div class="grid grid-cols-2 gap-3">
                     @foreach($analytics->order_types as $type => $ot)
                     <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <p class="text-xs text-gray-500 uppercase font-medium">{{ ['dine_in' => 'Dine-In', 'takeaway' => 'Takeaway', 'delivery' => 'Delivery', 'counter' => 'Counter'][$type] ?? ucfirst(str_replace('_', ' ', $type)) }}</p>
-                        <p class="text-lg font-bold text-gray-900 dark:text-white mt-0.5">{{ $ot->count }} <span class="text-xs font-semibold text-gray-500">bills</span></p>
+                        <p class="text-xs text-gray-500 uppercase font-medium">{{ ['dine_in' => __('pos.dine_in'), 'takeaway' => __('pos.takeaway'), 'delivery' => __('pos.delivery'), 'counter' => __('pos.counter_word')][$type] ?? ucfirst(str_replace('_', ' ', $type)) }}</p>
+                        <p class="text-lg font-bold text-gray-900 dark:text-white mt-0.5">{{ $ot->count }} <span class="text-xs font-semibold text-gray-500">{{ __('pos.bills_word') }}</span></p>
                         <p class="text-xs font-semibold text-gray-700 dark:text-gray-300">PKR {{ number_format($ot->revenue) }}</p>
                     </div>
                     @endforeach
@@ -383,31 +383,31 @@
             <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                 <h3 class="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                     <svg class="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                    Cash Reconciliation
+                    {{ __('pos.cash_reconciliation') }}
                 </h3>
                 <div class="grid grid-cols-2 gap-3 text-sm">
                     <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <p class="text-xs text-gray-500 uppercase font-medium">Opening Float</p>
+                        <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.opening_float') }}</p>
                         <p class="font-bold text-gray-900 dark:text-white mt-0.5">PKR {{ number_format($existingReport->opening_float ?? 0, 2) }}</p>
                     </div>
                     <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <p class="text-xs text-gray-500 uppercase font-medium">Cash Sales</p>
+                        <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.cash_sales') }}</p>
                         <p class="font-bold text-gray-900 dark:text-white mt-0.5">PKR {{ number_format($existingReport->cash_amount, 2) }}</p>
                     </div>
                     <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <p class="text-xs text-gray-500 uppercase font-medium">Expected in Drawer</p>
+                        <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.expected_in_drawer') }}</p>
                         <p class="font-bold text-gray-900 dark:text-white mt-0.5">PKR {{ number_format($existingReport->expected_cash ?? 0, 2) }}</p>
                     </div>
                     <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <p class="text-xs text-gray-500 uppercase font-medium">Counted Cash</p>
-                        <p class="font-bold text-gray-900 dark:text-white mt-0.5">{{ $existingReport->counted_cash !== null ? 'PKR ' . number_format($existingReport->counted_cash, 2) : '— (nahin gina gaya)' }}</p>
+                        <p class="text-xs text-gray-500 uppercase font-medium">{{ __('pos.counted_cash') }}</p>
+                        <p class="font-bold text-gray-900 dark:text-white mt-0.5">{{ $existingReport->counted_cash !== null ? 'PKR ' . number_format($existingReport->counted_cash, 2) : __('pos.not_counted_dash') }}</p>
                     </div>
                 </div>
                 @if($existingReport->counted_cash !== null)
                 <div class="mt-3 p-3 rounded-lg {{ abs($variance) < 0.01 ? 'bg-emerald-50 dark:bg-emerald-900/20' : ($variance < 0 ? 'bg-red-50 dark:bg-red-900/20' : 'bg-amber-50 dark:bg-amber-900/20') }}">
                     <div class="flex items-center justify-between">
                         <p class="text-sm font-bold {{ abs($variance) < 0.01 ? 'text-emerald-700 dark:text-emerald-400' : ($variance < 0 ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400') }}">
-                            {{ abs($variance) < 0.01 ? 'Balanced — no variance' : ($variance < 0 ? 'Short (kami)' : 'Over (zyada)') }}
+                            {{ abs($variance) < 0.01 ? __('pos.balanced_no_variance') : ($variance < 0 ? __('pos.variance_short') : __('pos.variance_over')) }}
                         </p>
                         <p class="text-lg font-bold {{ abs($variance) < 0.01 ? 'text-emerald-700 dark:text-emerald-400' : ($variance < 0 ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400') }}">{{ $variance > 0 ? '+' : '' }}{{ number_format($variance, 2) }}</p>
                     </div>
@@ -423,30 +423,30 @@
          left over from earlier un-closed dates. --}}
     @if(!$existingReport && $lbPending > 0)
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-teal-200 dark:border-teal-800 shadow-md p-5 mb-6">
-        <h3 class="font-semibold text-gray-900 dark:text-white mb-1">Local Bills — Will Be Closed With This Day</h3>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">In bills par PRA fiscal number nahi hai — day close par company policy ke mutabiq archive ya delete honge. Purani dates ke bache hue local bills bhi isi close mein shamil hain.</p>
+        <h3 class="font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.local_bills_will_close') }}</h3>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">{{ __('pos.local_bills_will_close_hint') }}</p>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             @if($localWash->prov_count > 0)
             <div class="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg border border-teal-100 dark:border-teal-900/40">
                 <div class="flex items-center justify-between">
-                    <p class="text-xs font-bold uppercase text-teal-700 dark:text-teal-300">Provisional Bills (L-series)</p>
-                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ ($company->pos_dayclose_provisional_action ?? 'save') === 'delete' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300' }}">{{ ($company->pos_dayclose_provisional_action ?? 'save') === 'delete' ? 'DELETE' : 'ARCHIVE' }}</span>
+                    <p class="text-xs font-bold uppercase text-teal-700 dark:text-teal-300">{{ __('pos.provisional_bills_l_series') }}</p>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ ($company->pos_dayclose_provisional_action ?? 'save') === 'delete' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300' }}">{{ ($company->pos_dayclose_provisional_action ?? 'save') === 'delete' ? __('pos.badge_delete') : __('pos.badge_archive') }}</span>
                 </div>
-                <p class="text-xl font-bold text-gray-900 dark:text-white mt-1">{{ $localWash->prov_count }} <span class="text-sm font-semibold text-gray-500">bills — PKR {{ number_format($localWash->prov_amount) }}</span></p>
+                <p class="text-xl font-bold text-gray-900 dark:text-white mt-1">{{ $localWash->prov_count }} <span class="text-sm font-semibold text-gray-500">{{ __('pos.bills_word') }} — PKR {{ number_format($localWash->prov_amount) }}</span></p>
                 @if($localWash->prov_backlog > 0)
-                <p class="text-xs text-amber-700 dark:text-amber-400 font-semibold mt-1">{{ $localWash->prov_backlog }} purani date(s) se pending</p>
+                <p class="text-xs text-amber-700 dark:text-amber-400 font-semibold mt-1">{{ __('pos.n_older_dates_pending', ['count' => $localWash->prov_backlog]) }}</p>
                 @endif
             </div>
             @endif
             @if($localWash->final_count > 0)
             <div class="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg border border-teal-100 dark:border-teal-900/40">
                 <div class="flex items-center justify-between">
-                    <p class="text-xs font-bold uppercase text-teal-700 dark:text-teal-300">Final Bills (Reporting OFF)</p>
-                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ ($company->pos_dayclose_final_local_action ?? 'save') === 'delete' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300' }}">{{ ($company->pos_dayclose_final_local_action ?? 'save') === 'delete' ? 'DELETE' : 'ARCHIVE' }}</span>
+                    <p class="text-xs font-bold uppercase text-teal-700 dark:text-teal-300">{{ __('pos.final_bills_reporting_off') }}</p>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ ($company->pos_dayclose_final_local_action ?? 'save') === 'delete' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300' }}">{{ ($company->pos_dayclose_final_local_action ?? 'save') === 'delete' ? __('pos.badge_delete') : __('pos.badge_archive') }}</span>
                 </div>
-                <p class="text-xl font-bold text-gray-900 dark:text-white mt-1">{{ $localWash->final_count }} <span class="text-sm font-semibold text-gray-500">bills — PKR {{ number_format($localWash->final_amount) }}</span></p>
+                <p class="text-xl font-bold text-gray-900 dark:text-white mt-1">{{ $localWash->final_count }} <span class="text-sm font-semibold text-gray-500">{{ __('pos.bills_word') }} — PKR {{ number_format($localWash->final_amount) }}</span></p>
                 @if($localWash->final_backlog > 0)
-                <p class="text-xs text-amber-700 dark:text-amber-400 font-semibold mt-1">{{ $localWash->final_backlog }} purani date(s) se pending</p>
+                <p class="text-xs text-amber-700 dark:text-amber-400 font-semibold mt-1">{{ __('pos.n_older_dates_pending', ['count' => $localWash->final_backlog]) }}</p>
                 @endif
             </div>
             @endif
@@ -456,14 +456,14 @@
 
     @if(!$existingReport)
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
-        <h3 class="font-semibold text-gray-900 dark:text-white mb-3">Close Day</h3>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Generate an official Day Close (Z-Report) for {{ \Carbon\Carbon::parse($date)->format('d M Y') }}. Once closed, the report becomes immutable and tamper-proof with SHA-256 hashing.</p>
+        <h3 class="font-semibold text-gray-900 dark:text-white mb-3">{{ __('pos.close_day') }}</h3>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">{{ __('pos.close_day_hint', ['date' => \Carbon\Carbon::parse($date)->format('d M Y')]) }}</p>
         <form method="POST" action="{{ route('pos.close-day') }}">
             @csrf
             <input type="hidden" name="date" value="{{ $date }}">
             <div class="mb-4">
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Notes (Optional)</label>
-                <textarea name="notes" rows="2" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500" placeholder="Any additional notes for this day's report..."></textarea>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.lbl_notes_optional') }}</label>
+                <textarea name="notes" rows="2" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500" placeholder="{{ __('pos.ph_day_notes') }}"></textarea>
             </div>
 
             {{-- Cash reconciliation (optional, Z-report style): live variance preview via Alpine.
@@ -476,35 +476,35 @@
                            riderOut: {{ (float) ($rf['cash_out'] ?? 0) }}, riderIn: {{ (float) ($rf['cash_in'] ?? 0) }},
                            get expected() { return (parseFloat(this.float) || 0) + this.cashSales - this.riderOut + this.riderIn; },
                            get variance() { return this.counted === '' ? null : (parseFloat(this.counted) || 0) - this.expected; } }">
-                <p class="text-sm font-bold text-gray-900 dark:text-white mb-1">Cash Reconciliation (Optional)</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Drawer ka cash gin kar enter karein — system expected cash se compare kar ke kami/zyadati report mein save karega.</p>
+                <p class="text-sm font-bold text-gray-900 dark:text-white mb-1">{{ __('pos.cash_reconciliation_optional') }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ __('pos.cash_reconciliation_hint') }}</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Opening Float (subah drawer mein rakha cash)</label>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.lbl_opening_float') }}</label>
                         <input type="number" name="opening_float" x-model="float" step="0.01" min="0" placeholder="0.00"
                             class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
                         @if($openingFromDayStart !== null)
-                        <p class="text-[11px] text-teal-700 dark:text-teal-400 font-semibold mt-1">✓ Subah ka opening cash (Rs {{ number_format($openingFromDayStart, 2) }}) khud-ba-khud aa gaya hai</p>
+                        <p class="text-[11px] text-teal-700 dark:text-teal-400 font-semibold mt-1">{{ __('pos.opening_cash_autofilled', ['amount' => number_format($openingFromDayStart, 2)]) }}</p>
                         @endif
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Counted Cash (ginti ke baad total)</label>
+                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.lbl_counted_cash') }}</label>
                         <input type="number" name="counted_cash" x-model="counted" step="0.01" min="0" placeholder="0.00"
                             class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
                     </div>
                 </div>
                 <div class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
-                    <span class="text-gray-600 dark:text-gray-400">Cash sales today: <b class="text-gray-900 dark:text-white">PKR {{ number_format($stats->cash_amount, 2) }}</b></span>
+                    <span class="text-gray-600 dark:text-gray-400">{{ __('pos.cash_sales_today') }} <b class="text-gray-900 dark:text-white">PKR {{ number_format($stats->cash_amount, 2) }}</b></span>
                     @if(!empty($rf['active']) && ($rf['cash_out'] ?? 0) > 0)
-                    <span class="text-amber-700 dark:text-amber-400">Rider ke paas (unsettled): <b>− PKR {{ number_format($rf['cash_out'], 2) }}</b></span>
+                    <span class="text-amber-700 dark:text-amber-400">{{ __('pos.with_rider_unsettled') }} <b>− PKR {{ number_format($rf['cash_out'], 2) }}</b></span>
                     @endif
                     @if(!empty($rf['active']) && ($rf['cash_in'] ?? 0) > 0)
-                    <span class="text-emerald-700 dark:text-emerald-400">Rider settlements (purane bills): <b>+ PKR {{ number_format($rf['cash_in'], 2) }}</b></span>
+                    <span class="text-emerald-700 dark:text-emerald-400">{{ __('pos.rider_settlements_old_bills') }} <b>+ PKR {{ number_format($rf['cash_in'], 2) }}</b></span>
                     @endif
-                    <span class="text-gray-600 dark:text-gray-400">Expected in drawer: <b class="text-gray-900 dark:text-white" x-text="'PKR ' + expected.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></b></span>
+                    <span class="text-gray-600 dark:text-gray-400">{{ __('pos.expected_in_drawer_colon') }} <b class="text-gray-900 dark:text-white" x-text="'PKR ' + expected.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></b></span>
                     <template x-if="variance !== null">
                         <span class="font-bold" :class="Math.abs(variance) < 0.01 ? 'text-emerald-600' : (variance < 0 ? 'text-red-600' : 'text-amber-600')"
-                              x-text="(Math.abs(variance) < 0.01 ? 'Balanced' : (variance < 0 ? 'Short: ' : 'Over: +')) + (Math.abs(variance) < 0.01 ? '' : variance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}))"></span>
+                              x-text="(Math.abs(variance) < 0.01 ? @js(__('pos.balanced_word')) : (variance < 0 ? @js(__('pos.short_colon')) : @js(__('pos.over_plus')))) + (Math.abs(variance) < 0.01 ? '' : variance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}))"></span>
                     </template>
                 </div>
             </div>
@@ -514,11 +514,11 @@
             @endphp
             <div class="mb-4 p-3 rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800">
                 <div class="text-sm">
-                    <span class="font-bold text-teal-800 dark:text-teal-300">Local bills policy (company setting)</span>
+                    <span class="font-bold text-teal-800 dark:text-teal-300">{{ __('pos.local_bills_policy') }}</span>
                     <p class="text-xs text-teal-700 dark:text-teal-400 mt-0.5">
-                        Day-close par final local bills <b>{{ $lbFinal === 'delete' ? 'DELETE' : 'ARCHIVE (save)' }}</b> aur provisional bills <b>{{ $lbProv === 'delete' ? 'DELETE' : 'ARCHIVE (save)' }}</b> honge.
-                        PRA ko bheje gaye bills bilkul untouched rahenge. Policy badalni ho to
-                        <a href="{{ route('pos.customize') }}" class="underline font-semibold">Customize POS → Local Billing</a>.
+                        {!! __('pos.local_bills_policy_line', ['final' => '<b>' . ($lbFinal === 'delete' ? e(__('pos.badge_delete')) : e(__('pos.badge_archive_save'))) . '</b>', 'prov' => '<b>' . ($lbProv === 'delete' ? e(__('pos.badge_delete')) : e(__('pos.badge_archive_save'))) . '</b>']) !!}
+                        {{ __('pos.pra_bills_untouched_policy') }}
+                        <a href="{{ route('pos.customize') }}" class="underline font-semibold">{{ __('pos.customize_pos_local_billing') }}</a>.
                     </p>
                 </div>
             </div>
@@ -527,17 +527,17 @@
                  tables are still open — they dangle into tomorrow otherwise. --}}
             <div class="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-400 dark:border-amber-700">
                 <div class="text-sm">
-                    <span class="font-bold text-amber-800 dark:text-amber-300">⚠️ {{ $openOrders }} open order{{ $openOrders > 1 ? 's' : '' }} abhi settle nahi {{ $openOrders > 1 ? 'hue' : 'hua' }}{{ ($occupiedTables ?? 0) > 0 ? ' — ' . $occupiedTables . ' table' . ($occupiedTables > 1 ? 's' : '') . ' occupied' : '' }}</span>
+                    <span class="font-bold text-amber-800 dark:text-amber-300">{{ __('pos.open_orders_warning', ['count' => $openOrders]) }}{{ ($occupiedTables ?? 0) > 0 ? ' — ' . __('pos.n_tables_occupied', ['count' => $occupiedTables]) : '' }}</span>
                     <p class="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-                        Day close karne se pehle held orders settle ya cancel kar lein — warna yeh orders (aur occupied tables) agle din ke TABLE board par latakte rahenge aur aaj ki sales mein count nahi honge.
+                        {{ __('pos.settle_held_before_close') }}
                     </p>
                 </div>
             </div>
             @endif
-            <button type="submit" onclick="return confirm('{{ ($openOrders ?? 0) > 0 ? $openOrders . ' order(s) abhi OPEN hain! Phir bhi day close karna hai?\n\n' : '' }}Are you sure you want to close this day? This action cannot be undone.')"
+            <button type="submit" onclick="return confirm({{ Js::from((($openOrders ?? 0) > 0 ? __('pos.confirm_open_orders_prefix', ['count' => $openOrders]) . "\n\n" : '') . __('pos.confirm_close_day')) }})"
                 class="px-6 py-2.5 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition text-sm flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                Close Day & Generate Z-Report
+                {{ __('pos.close_day_generate_z') }}
             </button>
         </form>
     </div>
@@ -546,7 +546,7 @@
     @else
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-10 text-center mb-6">
         <svg class="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-        <p class="text-gray-500 dark:text-gray-400">No transactions found for {{ \Carbon\Carbon::parse($date)->format('d M Y') }}</p>
+        <p class="text-gray-500 dark:text-gray-400">{{ __('pos.no_transactions_for_date', ['date' => \Carbon\Carbon::parse($date)->format('d M Y')]) }}</p>
     </div>
     @endif
 
@@ -555,19 +555,19 @@
          sales, yet its wash summary must still show. --}}
     @if($existingReport && is_array($existingReport->local_summary) && collect($existingReport->local_summary)->sum('count') > 0)
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
-        <h3 class="font-semibold text-gray-900 dark:text-white mb-4">Local Bills Closed With This Day</h3>
+        <h3 class="font-semibold text-gray-900 dark:text-white mb-4">{{ __('pos.local_bills_closed_with_day') }}</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            @foreach(['provisional' => 'Provisional Bills (L-series)', 'final_local' => 'Final Bills (Reporting OFF)'] as $kind => $label)
+            @foreach(['provisional' => __('pos.provisional_bills_l_series'), 'final_local' => __('pos.final_bills_reporting_off')] as $kind => $label)
                 @php $ls = $existingReport->local_summary[$kind] ?? null; @endphp
                 @if($ls && ($ls['count'] ?? 0) > 0)
                 <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                     <div class="flex items-center justify-between">
                         <p class="text-xs font-bold uppercase text-gray-600 dark:text-gray-300">{{ $label }}</p>
-                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ ($ls['action'] ?? 'save') === 'delete' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300' }}">{{ ($ls['action'] ?? 'save') === 'delete' ? 'DELETED' : 'ARCHIVED' }}</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ ($ls['action'] ?? 'save') === 'delete' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300' }}">{{ ($ls['action'] ?? 'save') === 'delete' ? __('pos.badge_deleted') : __('pos.badge_archived') }}</span>
                     </div>
-                    <p class="text-xl font-bold text-gray-900 dark:text-white mt-1">{{ $ls['count'] }} <span class="text-sm font-semibold text-gray-500">bills — PKR {{ number_format($ls['amount'] ?? 0) }}</span></p>
+                    <p class="text-xl font-bold text-gray-900 dark:text-white mt-1">{{ $ls['count'] }} <span class="text-sm font-semibold text-gray-500">{{ __('pos.bills_word') }} — PKR {{ number_format($ls['amount'] ?? 0) }}</span></p>
                     @if(($ls['backlog'] ?? 0) > 0)
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ $ls['backlog'] }} purani date(s) ke bhi shamil thay</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.n_older_dates_included', ['count' => $ls['backlog']]) }}</p>
                     @endif
                 </div>
                 @endif
@@ -580,20 +580,20 @@
          Same placement logic as the wash summary — shows even when PRA sales are zero. --}}
     @if($existingReport && is_array($existingReport->rider_summary) && !empty($existingReport->rider_summary['riders']))
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
-        <h3 class="font-semibold text-gray-900 dark:text-white mb-1">Delivery Riders — Day Summary</h3>
+        <h3 class="font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.delivery_riders_day_summary') }}</h3>
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">
-            Rider ke paas jo cash close ke waqt tha woh drawer ke expected cash se minus hota hai; purane dinon ke bills ki settlement plus hoti hai.
+            {{ __('pos.rider_cash_summary_hint') }}
         </p>
         <div class="overflow-x-auto">
             <table class="min-w-full text-sm">
                 <thead>
                     <tr class="text-left text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        <th class="px-3 py-2">Rider</th>
-                        <th class="px-3 py-2 text-center">Deliveries</th>
-                        <th class="px-3 py-2 text-center">Delivered</th>
-                        <th class="px-3 py-2 text-center">Returned</th>
-                        <th class="px-3 py-2 text-right">Cash Bills</th>
-                        <th class="px-3 py-2 text-right">Unsettled at Close</th>
+                        <th class="px-3 py-2">{{ __('pos.role_rider') }}</th>
+                        <th class="px-3 py-2 text-center">{{ __('pos.th_deliveries') }}</th>
+                        <th class="px-3 py-2 text-center">{{ __('pos.th_delivered') }}</th>
+                        <th class="px-3 py-2 text-center">{{ __('pos.th_returned') }}</th>
+                        <th class="px-3 py-2 text-right">{{ __('pos.th_cash_bills') }}</th>
+                        <th class="px-3 py-2 text-right">{{ __('pos.th_unsettled_at_close') }}</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -604,7 +604,7 @@
                         <td class="px-3 py-2 text-center text-emerald-600 dark:text-emerald-400">{{ $rr['delivered'] ?? 0 }}</td>
                         <td class="px-3 py-2 text-center {{ ($rr['returned'] ?? 0) > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-400' }}">{{ $rr['returned'] ?? 0 }}</td>
                         <td class="px-3 py-2 text-right text-gray-700 dark:text-gray-300">PKR {{ number_format($rr['cash_total'] ?? 0) }}</td>
-                        <td class="px-3 py-2 text-right font-semibold {{ ($rr['cash_pending'] ?? 0) > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400' }}">{{ ($rr['cash_pending'] ?? 0) > 0 ? 'PKR ' . number_format($rr['cash_pending']) : 'Clear' }}</td>
+                        <td class="px-3 py-2 text-right font-semibold {{ ($rr['cash_pending'] ?? 0) > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400' }}">{{ ($rr['cash_pending'] ?? 0) > 0 ? 'PKR ' . number_format($rr['cash_pending']) : __('pos.clear_word') }}</td>
                     </tr>
                     @endforeach
                 </tbody>
@@ -612,10 +612,10 @@
         </div>
         <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs">
             @if(($existingReport->rider_summary['cash_out'] ?? 0) > 0)
-            <span class="text-amber-700 dark:text-amber-400">Rider ke paas at close: <b>− PKR {{ number_format($existingReport->rider_summary['cash_out'], 2) }}</b></span>
+            <span class="text-amber-700 dark:text-amber-400">{{ __('pos.with_rider_at_close') }} <b>− PKR {{ number_format($existingReport->rider_summary['cash_out'], 2) }}</b></span>
             @endif
             @if(($existingReport->rider_summary['cash_in'] ?? 0) > 0)
-            <span class="text-emerald-700 dark:text-emerald-400">Purane bills ki settlement aaj: <b>+ PKR {{ number_format($existingReport->rider_summary['cash_in'], 2) }}</b></span>
+            <span class="text-emerald-700 dark:text-emerald-400">{{ __('pos.old_bills_settled_today') }} <b>+ PKR {{ number_format($existingReport->rider_summary['cash_in'], 2) }}</b></span>
             @endif
         </div>
     </div>
@@ -638,16 +638,15 @@
                 this.saving = true; this.msg = '';
                 fetch('{{ route('pos.settings.dayclose-cutoff') }}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ cutoff: this.cutoff }) })
                     .then(r => r.json())
-                    .then(d => { this.ok = !!(d && d.success); this.msg = (d && d.message) || (this.ok ? 'Saved.' : 'Setting save nahi hui — dobara koshish karein.'); })
-                    .catch(() => { this.ok = false; this.msg = 'Setting save nahi hui — dobara koshish karein.'; })
+                    .then(d => { this.ok = !!(d && d.success); this.msg = (d && d.message) || (this.ok ? @js(__('pos.saved_dot')) : @js(__('pos.setting_save_failed'))); })
+                    .catch(() => { this.ok = false; this.msg = @js(__('pos.setting_save_failed')); })
                     .finally(() => { this.saving = false; });
             } }">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-                <h3 class="font-semibold text-gray-900 dark:text-white">Din band hone ka waqt</h3>
+                <h3 class="font-semibold text-gray-900 dark:text-white">{{ __('pos.day_cutoff_title') }}</h3>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-xl">
-                    Is waqt se pehle ki sales <span class="font-semibold">pichhle din</span> mein shumar hongi — Z-Report, dashboard aur sales reports sab isi hisaab se banenge.
-                    Auto day-close bhi isi waqt par hoga. Tax record (PRA/FBR) hamesha asal waqt par rehta hai.
+                    {!! __('pos.day_cutoff_hint', ['previous_day' => '<span class="font-semibold">' . e(__('pos.previous_day_word')) . '</span>']) !!}
                 </p>
             </div>
             <div class="flex items-center gap-2">
@@ -658,7 +657,7 @@
                 </select>
                 <button type="button" @click="save()" :disabled="saving"
                     class="px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition disabled:opacity-50">
-                    <span x-show="!saving">Save</span><span x-show="saving" x-cloak>Saving…</span>
+                    <span x-show="!saving">{{ __('pos.save_btn') }}</span><span x-show="saving" x-cloak>{{ __('pos.saving_ellipsis') }}</span>
                 </button>
             </div>
         </div>
@@ -668,17 +667,17 @@
 
     @if($previousReports->isNotEmpty())
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
-        <h3 class="font-semibold text-gray-900 dark:text-white mb-4">Previous Day Close Reports</h3>
+        <h3 class="font-semibold text-gray-900 dark:text-white mb-4">{{ __('pos.previous_day_close_reports') }}</h3>
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-cards">
                 <thead>
                     <tr>
-                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Report #</th>
-                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Invoices</th>
-                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Revenue</th>
-                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Tax</th>
-                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ __('pos.th_report_no') }}</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ __('pos.th_date') }}</th>
+                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">{{ __('pos.kpi_invoices') }}</th>
+                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">{{ __('pos.kpi_revenue') }}</th>
+                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">{{ __('pos.receipt_tax') }}</th>
+                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">{{ __('pos.th_actions') }}</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
@@ -692,7 +691,7 @@
                         <td class="px-3 py-2 text-sm text-center">
                             <a href="{{ route('pos.day-close-pdf', $rpt->id) }}" class="text-purple-600 hover:text-purple-800 font-medium">PDF</a>
                             <span class="mx-1 text-gray-300">|</span>
-                            <a href="{{ route('pos.day-close', ['date' => $rpt->report_date->format('Y-m-d')]) }}" class="text-gray-600 hover:text-gray-800 dark:text-gray-400 font-medium">View</a>
+                            <a href="{{ route('pos.day-close', ['date' => $rpt->report_date->format('Y-m-d')]) }}" class="text-gray-600 hover:text-gray-800 dark:text-gray-400 font-medium">{{ __('pos.view_btn') }}</a>
                         </td>
                     </tr>
                     @endforeach

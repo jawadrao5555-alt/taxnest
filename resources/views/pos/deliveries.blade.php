@@ -16,18 +16,18 @@
             <button type="button"
                     onclick="if (history.length > 1) { history.back(); } else { window.location = '{{ route('pos.dashboard') }}'; }"
                     class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-semibold hover:bg-gray-200 dark:hover:bg-gray-700 transition"
-                    title="Go back">
+                    title="{{ __('pos.ti_go_back') }}">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                Back
+                {{ __('pos.back_word') }}
             </button>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Deliveries</h1>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.deliveries') }}</h1>
         </div>
         <form method="GET" action="{{ route('pos.deliveries') }}" class="flex items-center gap-2">
             <input type="date" name="date" value="{{ $day->format('Y-m-d') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
-            <button type="submit" class="px-3 py-2 rounded-lg bg-purple-600 text-white text-xs font-semibold shadow-sm hover:bg-purple-700 transition">Go</button>
+            <button type="submit" class="px-3 py-2 rounded-lg bg-purple-600 text-white text-xs font-semibold shadow-sm hover:bg-purple-700 transition">{{ __('pos.go_btn') }}</button>
         </form>
     </div>
-    <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Assign riders on delivery bills, track dispatch → delivered, and settle cash when the rider hands it over. Cash bills stay on the rider's khata until settled.</p>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">{{ __('pos.deliveries_page_intro') }}</p>
 
     @if(session('success'))
     <div class="mb-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 text-sm">{{ session('success') }}</div>
@@ -55,37 +55,37 @@
             <div class="flex items-center justify-between mb-1">
                 <div class="font-semibold text-gray-900 dark:text-white text-sm truncate">
                     {{ $rider->name }}
-                    @unless($rider->is_active)<span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 align-middle">Inactive</span>@endunless
+                    @unless($rider->is_active)<span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 align-middle">{{ __('pos.inactive_word') }}</span>@endunless
                 </div>
                 @if($rider->phone)<div class="text-[11px] text-gray-400">{{ $rider->phone }}</div>@endif
             </div>
             @if($owed > 0)
                 <div class="text-lg font-bold text-amber-600 dark:text-amber-400">Rs. {{ number_format($owed) }}</div>
-                <div class="text-[11px] text-gray-400 mb-3">{{ $open->count() }} unsettled cash {{ $open->count() === 1 ? 'bill' : 'bills' }}</div>
+                <div class="text-[11px] text-gray-400 mb-3">{{ __('pos.unsettled_cash_bills', ['count' => $open->count()]) }}</div>
                 <button type="button" class="w-full px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-semibold shadow-sm hover:bg-purple-700 transition"
-                        @click="settleRider = {{ $rider->id }}; settleTotal = {{ $owed }}">Settle Cash</button>
+                        @click="settleRider = {{ $rider->id }}; settleTotal = {{ $owed }}">{{ __('pos.settle_cash') }}</button>
             @else
-                <div class="text-lg font-bold text-emerald-600 dark:text-emerald-400">Clear</div>
-                <div class="text-[11px] text-gray-400">No cash pending</div>
+                <div class="text-lg font-bold text-emerald-600 dark:text-emerald-400">{{ __('pos.clear') }}</div>
+                <div class="text-[11px] text-gray-400">{{ __('pos.no_cash_pending') }}</div>
             @endif
             {{-- Bulk update: mark ALL of this rider's open (assigned/dispatched)
                  deliveries in one go. Delivered/returned bills stay untouched. --}}
             @php $openDel = (int) ($openDeliveryCounts[$rider->id] ?? 0); @endphp
             @if($openDel > 0)
             <div class="mt-2 pt-2 border-t border-gray-100 dark:border-gray-800">
-                <div class="text-[11px] text-gray-400 mb-1.5">{{ $openDel }} {{ $openDel === 1 ? 'order' : 'orders' }} out for delivery</div>
+                <div class="text-[11px] text-gray-400 mb-1.5">{{ __('pos.orders_out_for_delivery', ['count' => $openDel]) }}</div>
                 <div class="flex gap-1.5">
                     <form method="POST" action="{{ route('pos.deliveries.bulk', $rider->id) }}" class="flex-1"
-                          onsubmit="return confirm('Mark ALL {{ $openDel }} open {{ $openDel === 1 ? 'delivery' : 'deliveries' }} of this rider as DELIVERED?');">
+                          onsubmit="return confirm({{ Js::from(__('pos.confirm_all_delivered', ['count' => $openDel])) }});">
                         @csrf
                         <input type="hidden" name="delivery_status" value="delivered">
-                        <button type="submit" class="w-full px-2 py-1.5 rounded-lg bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700 transition">All Delivered</button>
+                        <button type="submit" class="w-full px-2 py-1.5 rounded-lg bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700 transition">{{ __('pos.all_delivered') }}</button>
                     </form>
                     <form method="POST" action="{{ route('pos.deliveries.bulk', $rider->id) }}" class="flex-1"
-                          onsubmit="return confirm('Mark ALL {{ $openDel }} open {{ $openDel === 1 ? 'delivery' : 'deliveries' }} of this rider as RETURNED? Cash comes off the khata — bills stay recorded.');">
+                          onsubmit="return confirm({{ Js::from(__('pos.confirm_all_returned', ['count' => $openDel])) }});">
                         @csrf
                         <input type="hidden" name="delivery_status" value="returned">
-                        <button type="submit" class="w-full px-2 py-1.5 rounded-lg bg-red-600 text-white text-[11px] font-semibold hover:bg-red-700 transition">All Returned</button>
+                        <button type="submit" class="w-full px-2 py-1.5 rounded-lg bg-red-600 text-white text-[11px] font-semibold hover:bg-red-700 transition">{{ __('pos.all_returned') }}</button>
                     </form>
                 </div>
             </div>
@@ -98,8 +98,8 @@
             <div x-show="settleRider === {{ $rider->id }}" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
                 <div class="absolute inset-0 bg-black/50" @click="settleRider = null"></div>
                 <div class="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-lg p-5 max-h-[85vh] overflow-y-auto">
-                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">Settle Cash — {{ $rider->name }}</h3>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Tick the bills the rider is paying for right now. Untick any bill he'll pay later (partial settlement).</p>
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.settle_cash') }} — {{ $rider->name }}</h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">{{ __('pos.settle_cash_hint') }}</p>
                     <form method="POST" action="{{ route('pos.riders.settle', $rider->id) }}" x-init="recalcSettle($el)" @change="recalcSettle($event.target.closest('form'))">
                         @csrf
                         <div class="space-y-1.5 mb-4">
@@ -115,14 +115,14 @@
                             @endforeach
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Notes (optional)</label>
-                            <input type="text" name="notes" maxlength="500" placeholder="e.g. evening handover" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.notes_optional') }}</label>
+                            <input type="text" name="notes" maxlength="500" placeholder="{{ __('pos.ph_eg_evening_handover') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
                         </div>
                         <div class="flex items-center justify-between mt-5">
-                            <div class="text-sm font-bold text-gray-900 dark:text-white">Receiving: Rs. <span x-text="settleTotal.toLocaleString()"></span></div>
+                            <div class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.receiving_colon') }} Rs. <span x-text="settleTotal.toLocaleString()"></span></div>
                             <div class="flex gap-2">
-                                <button type="button" class="px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition" @click="settleRider = null">Cancel</button>
-                                <button type="submit" class="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold shadow-sm hover:bg-purple-700 transition">Confirm Settlement</button>
+                                <button type="button" class="px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition" @click="settleRider = null">{{ __('pos.cancel') }}</button>
+                                <button type="submit" class="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold shadow-sm hover:bg-purple-700 transition">{{ __('pos.confirm_settlement') }}</button>
                             </div>
                         </div>
                     </form>
@@ -134,27 +134,27 @@
     </div>
     @else
     <div class="mb-6 p-4 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400">
-        No active riders yet. <a href="{{ route('pos.riders') }}" class="font-semibold text-purple-600 dark:text-purple-400 underline">Add riders</a> to start assigning deliveries.
+        {{ __('pos.no_active_riders_yet') }} <a href="{{ route('pos.riders') }}" class="font-semibold text-purple-600 dark:text-purple-400 underline">{{ __('pos.add_riders_link') }}</a> {{ __('pos.to_start_assigning') }}
     </div>
     @endif
 
     {{-- Day's delivery bills --}}
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
         <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Delivery Bills — {{ $day->format('d M Y') }}</h3>
-            <span class="text-[11px] text-gray-400">{{ $bills->count() }} bills</span>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.delivery_bills') }} — {{ $day->format('d M Y') }}</h3>
+            <span class="text-[11px] text-gray-400">{{ $bills->count() }}{{ __('pos.sfx_bills') }}</span>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-full text-sm">
                 <thead class="bg-gray-50 dark:bg-gray-800/60">
                     <tr class="text-left text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        <th class="px-4 py-3">Bill</th>
-                        <th class="px-4 py-3">Customer</th>
-                        <th class="px-4 py-3">Amount</th>
-                        <th class="px-4 py-3">Payment</th>
-                        <th class="px-4 py-3">Rider</th>
-                        <th class="px-4 py-3">Status</th>
-                        <th class="px-4 py-3 text-right">Update</th>
+                        <th class="px-4 py-3">{{ __('pos.bill_label') }}</th>
+                        <th class="px-4 py-3">{{ __('pos.customer_word') }}</th>
+                        <th class="px-4 py-3">{{ __('pos.amount_label') }}</th>
+                        <th class="px-4 py-3">{{ __('pos.payment_label') }}</th>
+                        <th class="px-4 py-3">{{ __('pos.rider_label') }}</th>
+                        <th class="px-4 py-3">{{ __('pos.status_label') }}</th>
+                        <th class="px-4 py-3 text-right">{{ __('pos.update_label') }}</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -165,18 +165,18 @@
                             <div class="text-[11px] text-gray-400">{{ $b->created_at->format('h:i A') }}</div>
                         </td>
                         <td class="px-4 py-3">
-                            <div class="text-gray-700 dark:text-gray-300">{{ $b->customer_name ?: 'Walk-in' }}</div>
+                            <div class="text-gray-700 dark:text-gray-300">{{ $b->customer_name ?: __('pos.walk_in') }}</div>
                             @if($b->delivery_address)<div class="text-[11px] text-gray-400 max-w-[200px] truncate">{{ $b->delivery_address }}</div>@endif
                         </td>
                         <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">Rs. {{ number_format((float) $b->total_amount) }}</td>
                         <td class="px-4 py-3">
                             @if($b->payment_method === 'cash')
-                                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">Cash</span>
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">{{ __('pos.cash_word') }}</span>
                             @else
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">{{ ucwords(str_replace('_',' ', $b->payment_method)) }}</span>
                             @endif
                             @if($b->rider_settlement_id)
-                                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400">Settled</span>
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400">{{ __('pos.settled_word') }}</span>
                             @endif
                         </td>
                         <td class="px-4 py-3">
@@ -189,13 +189,13 @@
                             <form method="POST" action="{{ route('pos.deliveries.assign', $b->id) }}">
                                 @csrf
                                 <select name="rider_id" onchange="this.form.submit()" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1 focus:ring-purple-500 focus:border-purple-500">
-                                    <option value="">— no rider —</option>
+                                    <option value="">{{ __('pos.no_rider_opt') }}</option>
                                     {{-- Int-cast compare: PDO can return rider_id as a STRING on the
                                          cPanel host — strict === then never matches and the dropdown
                                          falls back to "— no rider —" even though the rider is saved. --}}
                                     @foreach($riders as $r)
                                     @if($r->is_active || (int) $b->rider_id === (int) $r->id)
-                                    <option value="{{ $r->id }}" {{ (int) $b->rider_id === (int) $r->id ? 'selected' : '' }}>{{ $r->name }}{{ $r->is_active ? '' : ' (inactive)' }}</option>
+                                    <option value="{{ $r->id }}" {{ (int) $b->rider_id === (int) $r->id ? 'selected' : '' }}>{{ $r->name }}{{ $r->is_active ? '' : __('pos.sfx_inactive_paren') }}</option>
                                     @endif
                                     @endforeach
                                 </select>
@@ -212,33 +212,33 @@
                                     'returned' => 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400',
                                 ][$st] ?? 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400';
                             @endphp
-                            <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold {{ $stClass }}">{{ $st ? ucfirst($st) : '—' }}</span>
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold {{ $stClass }}">{{ $st ? (Lang::has('pos.delivery_status_' . $st) ? __('pos.delivery_status_' . $st) : ucfirst($st)) : '—' }}</span>
                         </td>
                         <td class="px-4 py-3 text-right whitespace-nowrap">
                             @if($b->rider_id && !$b->rider_settlement_id)
                                 @if(in_array($st, ['assigned']))
                                 <form method="POST" action="{{ route('pos.deliveries.status', $b->id) }}" class="inline">
                                     @csrf<input type="hidden" name="delivery_status" value="dispatched">
-                                    <button type="submit" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition">Dispatch</button>
+                                    <button type="submit" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition">{{ __('pos.dispatch_btn') }}</button>
                                 </form>
                                 @endif
                                 @if(in_array($st, ['assigned', 'dispatched']))
                                 <form method="POST" action="{{ route('pos.deliveries.status', $b->id) }}" class="inline">
                                     @csrf<input type="hidden" name="delivery_status" value="delivered">
-                                    <button type="submit" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition">Delivered</button>
+                                    <button type="submit" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition">{{ __('pos.delivered_word') }}</button>
                                 </form>
                                 @endif
                                 @if($st !== 'returned')
-                                <form method="POST" action="{{ route('pos.deliveries.status', $b->id) }}" class="inline" onsubmit="return confirm('Mark this delivery as RETURNED? The bill stays recorded — it only comes off the rider\'s cash khata.');">
+                                <form method="POST" action="{{ route('pos.deliveries.status', $b->id) }}" class="inline" onsubmit="return confirm({{ Js::from(__('pos.confirm_mark_returned')) }});">
                                     @csrf<input type="hidden" name="delivery_status" value="returned">
-                                    <button type="submit" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 transition">Returned</button>
+                                    <button type="submit" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 transition">{{ __('pos.returned_word') }}</button>
                                 </form>
                                 @endif
                             @endif
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="7" class="px-4 py-8 text-center text-sm text-gray-400">No delivery bills on this day.</td></tr>
+                    <tr><td colspan="7" class="px-4 py-8 text-center text-sm text-gray-400">{{ __('pos.no_delivery_bills_day') }}</td></tr>
                     @endforelse
                 </tbody>
             </table>

@@ -30,7 +30,7 @@
         .toolbar { display: none; }
         @php $zIs58 = ($company->print_paper_size ?? 'thermal') === 'thermal58'; @endphp
         {{-- 58mm rolls print ~48mm — cap at printable width, never the physical width. --}}
-        .receipt { width: 100%; max-width: {{ $zIs58 ? '48mm' : '80mm' }}; margin: 0; padding: 0 2mm; {{ $zIs58 ? 'font-size: 10px;' : '' }} }
+        .receipt { width: 100%; max-width: {{ $zIs58 ? '48mm' : '72mm' }}; margin: 0; padding: 0 2mm; {{ $zIs58 ? 'font-size: 10px;' : '' }} }
         @page { margin: 3mm; size: {{ $zIs58 ? '58mm' : '80mm' }} auto; }
     }
     {{-- COMPANY PRINT POSITION (31 Jul 2026): same opt-in options as PRA slips

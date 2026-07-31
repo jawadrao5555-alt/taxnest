@@ -2193,6 +2193,8 @@ class FbrPosController extends Controller
                 'email' => 'nullable|email|max:255',
                 'ntn' => 'nullable|string|max:20',
                 'print_paper_size' => 'nullable|in:thermal,thermal58,a4',
+                'kot_align_center' => 'nullable|in:0,1',
+                'kot_left_margin_mm' => 'nullable|integer|min:0|max:30',
                 'receipt_footer_note' => 'nullable|string|max:255',
                 'logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
                 'remove_logo' => 'nullable|boolean',

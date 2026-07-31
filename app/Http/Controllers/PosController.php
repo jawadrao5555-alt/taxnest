@@ -470,6 +470,18 @@ class PosController extends Controller
             if (!$exists) {
                 return response()->json(['success' => false, 'reason' => 'not_found'], 404);
             }
+            // In-flight dedupe (30 Jul 2026): the client now RETRIES on network
+            // blips — a first request that succeeded server-side must not print
+            // a second physical copy. Mirrors the bill double-press guard.
+            $inFlight = \App\Models\PosPrintJob::where('company_id', $companyId)
+                ->where('type', 'proof')
+                ->where('restaurant_order_id', (int) $validated['restaurant_order_id'])
+                ->whereIn('status', ['pending', 'printing'])
+                ->where('created_at', '>=', now()->subMinutes(2))
+                ->orderByDesc('id')->first();
+            if ($inFlight) {
+                return response()->json(['success' => true, 'job_id' => $inFlight->id, 'deduped' => true]);
+            }
             $job = \App\Models\PosPrintJob::create([
                 'company_id' => $companyId,
                 'type' => 'proof',
@@ -497,6 +509,16 @@ class PosController extends Controller
                 ->exists();
             if (!$exists) {
                 return response()->json(['success' => false, 'reason' => 'not_found'], 404);
+            }
+            // In-flight dedupe — see proof branch (client-side retry, 30 Jul 2026).
+            $inFlight = \App\Models\PosPrintJob::where('company_id', $companyId)
+                ->where('type', 'kot')
+                ->where('transaction_id', (int) $validated['transaction_id'])
+                ->whereIn('status', ['pending', 'printing'])
+                ->where('created_at', '>=', now()->subMinutes(2))
+                ->orderByDesc('id')->first();
+            if ($inFlight) {
+                return response()->json(['success' => true, 'job_id' => $inFlight->id, 'deduped' => true]);
             }
             $job = \App\Models\PosPrintJob::create([
                 'company_id' => $companyId,
@@ -529,6 +551,16 @@ class PosController extends Controller
                 if (!($settings['counter_kot_enabled'] ?? false)) return;
                 $printer = $settings['counter_kot_printer'] ?? null;
                 if (!$printer || ($order->order_type ?? null) !== 'dine_in') return;
+                // In-flight dedupe — client retry must not double the counter copy.
+                $dupe = \App\Models\PosPrintJob::where('company_id', $companyId)
+                    ->where('type', 'kot')
+                    ->where('restaurant_order_id', $order->id)
+                    ->where('target_printer', $printer)
+                    ->where(fn($q) => $delta ? $q->where('render_query', 'delta=1') : $q->whereNull('render_query'))
+                    ->whereIn('status', ['pending', 'printing'])
+                    ->where('created_at', '>=', now()->subMinutes(2))
+                    ->exists();
+                if ($dupe) return;
                 \App\Models\PosPrintJob::create([
                     'company_id' => $companyId,
                     'type' => 'kot',
@@ -541,6 +573,19 @@ class PosController extends Controller
             } catch (\Throwable $e) { /* copy is optional — kitchen print already queued */ }
         };
         $makeJob = function (?string $printer, ?string $renderQuery) use ($companyId, $order, $user) {
+            // In-flight dedupe (client retry + KDS/cashier race, 30 Jul 2026):
+            // an identical queued/printing job < 2 min old = same physical ticket
+            // already on its way. Safe for deltas too — a PENDING delta job
+            // renders unprinted rows at PRINT time, so one job covers both fires.
+            $inFlight = \App\Models\PosPrintJob::where('company_id', $companyId)
+                ->where('type', 'kot')
+                ->where('restaurant_order_id', $order->id)
+                ->where('target_printer', $printer)
+                ->where(fn($q) => $renderQuery === null ? $q->whereNull('render_query') : $q->where('render_query', $renderQuery))
+                ->whereIn('status', ['pending', 'printing'])
+                ->where('created_at', '>=', now()->subMinutes(2))
+                ->orderByDesc('id')->first();
+            if ($inFlight) return $inFlight;
             return \App\Models\PosPrintJob::create([
                 'company_id' => $companyId,
                 'type' => 'kot',

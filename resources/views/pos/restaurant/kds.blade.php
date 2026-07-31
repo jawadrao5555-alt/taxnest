@@ -348,6 +348,26 @@ function kdsScreen() {
                 if (this.stationPinned && this.myItems(o).length === 0) return;
                 // Brand-new order → FULL ticket (station-scoped when pinned).
                 if (!this.printedIds.includes(o.id)) {
+                    // Cashier-fallback guard (30 Jul 2026): while this KDS was
+                    // closed, the sale screen may have printed the ticket itself
+                    // (rows get kot_printed_at stamped). Never re-blast a FULL copy:
+                    // fully printed → adopt silently; partially printed → delta only.
+                    const unprintedNew = this.stationPinned
+                        ? Number((o.unprinted_by_station || {})[String(this.stationFilter)] || 0)
+                        : (o.unprinted_count || 0);
+                    const totalRows = this.stationPinned ? this.myItems(o).length : ((o.items || []).length);
+                    if (totalRows > 0 && unprintedNew === 0) {
+                        this.printedIds.push(o.id); this.savePrintedIds();
+                        return;
+                    }
+                    if (totalRows > 0 && unprintedNew < totalRows) {
+                        this.printedIds.push(o.id); this.savePrintedIds();
+                        if (!this.printQueue.some(q => q.id === o.id && q.delta)) {
+                            this._deltaFiredAt[o.id] = Date.now();
+                            this.printQueue.push({ id: o.id, delta: true });
+                        }
+                        return;
+                    }
                     if (!this.printQueue.some(q => q.id === o.id && !q.delta)) {
                         this.printQueue.push({ id: o.id, delta: false });
                     }

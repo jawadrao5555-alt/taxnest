@@ -21,7 +21,9 @@
         @page { size: 80mm auto; margin: 0; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Courier New', 'Lucida Console', monospace;
+            /* Owner (31 Jul 2026): KOT gets the same clean font as the proof
+               bill / receipt_80mm — typewriter font retired here too. */
+            font-family: Arial, 'Helvetica Neue', Helvetica, 'Segoe UI', sans-serif;
             font-size: 13px;
             width: 80mm;
             max-width: 80mm;
@@ -29,11 +31,13 @@
             padding: 3mm;
             background: #fff;
             color: #000;
-            line-height: 1.5;
+            /* Owner (30-31 Jul 2026): "beech mein gap bohat zyada" — tighter rows,
+               same as the proof bill. */
+            line-height: 1.3;
         }
-        .separator { border-top: 2px dashed #000; margin: 6px 0; }
-        .separator-light { border-top: 1px dashed #000; margin: 4px 0; }
-        .separator-station { border-top: 3px solid #000; margin: 8px 0 4px; }
+        .separator { border-top: 2px dashed #000; margin: 4px 0; }
+        .separator-light { border-top: 1px dashed #000; margin: 3px 0; }
+        .separator-station { border-top: 3px solid #000; margin: 6px 0 3px; }
         .bold { font-weight: bold; }
         .text-center { text-align: center; }
         .text-lg { font-size: 16px; }
@@ -45,7 +49,9 @@
         .mb-1 { margin-bottom: 4px; }
         .flex { display: flex; justify-content: space-between; align-items: center; }
         .items-table { width: 100%; border-collapse: collapse; margin: 4px 0; }
-        .items-table td { padding: 5px 2px; vertical-align: top; font-size: 14px; color: #000; }
+        /* Owner (31 Jul 2026): proof-bill-style density — compact rows; the dashed
+           line under every item (below) stays as the row separator. */
+        .items-table td { padding: 3px 2px; vertical-align: top; font-size: 14px; color: #000; }
         /* ZFC feedback Jul 2026: match the familiar "Item | Qty" slip layout —
            name LEFT, qty RIGHT as a plain number under a ruled header row
            (the old "x2" prefix on the left read as part of the item name). */

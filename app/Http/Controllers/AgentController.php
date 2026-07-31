@@ -641,16 +641,6 @@ class AgentController extends Controller
         // Views + nested render logic may read the container binding.
         app()->instance('currentCompanyId', $company->id);
 
-        // Receipt language (Task #61, 31 Jul 2026): agent requests carry no web
-        // session, so SetPosLocale never runs here — resolve the locale from the
-        // bill's creator (per-user override) falling back to the company default.
-        // KOT/proof stay English by design (kitchen tickets carry no Roman Urdu).
-        try {
-            $langUser = $job->created_by ? \App\Models\User::find($job->created_by) : null;
-            $lang = $langUser->language ?? $company->default_language ?? 'ur';
-            app()->setLocale(in_array($lang, ['ur', 'en'], true) ? $lang : 'ur');
-        } catch (\Throwable $e) { /* never block a print over locale */ }
-
         if ($job->type === 'bill') {
             $transaction = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $company->id)
@@ -659,6 +649,20 @@ class AgentController extends Controller
             if (!$transaction) {
                 return response()->json(['error' => 'Transaction not found'], 404);
             }
+            // Receipt language (Task #61, 31 Jul 2026): agent requests carry no
+            // web session, so SetPosLocale never runs here — resolve the locale
+            // from the BILL's creator (per-user override), falling back to the
+            // print-job presser, then the company default. Reprints by another
+            // user must match the language the bill was made in. KOT/proof stay
+            // English by design (kitchen tickets carry no Roman Urdu).
+            try {
+                $presser = $job->created_by ? \App\Models\User::find($job->created_by) : null;
+                $lang = $transaction->creator?->language
+                    ?? $presser?->language
+                    ?? $company->default_language
+                    ?? 'ur';
+                app()->setLocale(in_array($lang, ['ur', 'en'], true) ? $lang : 'ur');
+            } catch (\Throwable $e) { /* never block a print over locale */ }
             $printerSize = $company->receipt_printer_size ?? '80mm';
             $receiptView = $printerSize === '58mm' ? 'pos.receipts.receipt_58mm' : 'pos.receipts.receipt_80mm';
             return response(view($receiptView, compact('transaction', 'company'))->render())

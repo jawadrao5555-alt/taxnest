@@ -298,7 +298,7 @@
         <div class="local-box" style="border: 1.5px dashed #7c3aed; color: #5b21b6;">
             <strong style="font-size: 12px;">{{ __('pos.receipt_provisional_bill') }}</strong><br>
             {{ $transaction->invoice_number }}<br>
-            <span style="font-size: 9px;">This is a provisional bill for your reference</span>
+            <span style="font-size: 9px;">{{ __('pos.receipt_provisional_note') }}</span>
         </div>
         @else
         <div class="local-box" style="border: 1.5px solid #374151; color: #111827;">

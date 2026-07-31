@@ -96,7 +96,7 @@ args = "mysqld --defaults-file=/home/runner/workspace/.local/mysql_run/my.cnf"
 
 [[ports]]
 localPort = 5000
-externalPort = 80
+externalPort = 5000
 
 [[ports]]
 localPort = 9000
@@ -104,7 +104,7 @@ externalPort = 9000
 
 [[ports]]
 localPort = 23636
-externalPort = 3001
+externalPort = 80
 
 [nix]
 channel = "stable-25_05"

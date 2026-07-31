@@ -23,7 +23,8 @@
             padding: 4mm 4mm 1mm;
             background: #fff;
             color: #000;
-            line-height: 1.5;
+            /* Owner (30 Jul 2026): "beech mein gap bohat zyada" — tighter rows. */
+            line-height: 1.3;
         }
         .separator { border-top: 2px dashed #000; margin: 6px 0; }
         .bold { font-weight: bold; }
@@ -33,9 +34,13 @@
         .mt-1 { margin-top: 4px; }
         .flex { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; }
         .items-table { width: 100%; border-collapse: collapse; margin: 4px 0; }
-        .items-table td { padding: 4px 2px; vertical-align: top; font-size: 13px; }
-        .items-table .qty { width: 12%; font-weight: bold; }
-        .items-table .amt { width: 25%; text-align: right; white-space: nowrap; }
+        /* Owner (30 Jul 2026): compact rows + dashed line under every item + more
+           room for the item name (naam do line mein na toote). */
+        .items-table td { padding: 2px; vertical-align: top; font-size: 12px; }
+        .items-table tr.item-row td { border-bottom: 1px dashed #000; padding-bottom: 3px; }
+        .items-table .qty { width: 9%; font-weight: bold; }
+        .items-table .amt { width: 19%; text-align: right; white-space: nowrap; }
+        .items-table td.amt-last { width: 21%; }
         .items-table tr.head { border-top: 2px solid #000; border-bottom: 2px solid #000; }
         .items-table tr.head td { font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding: 3px 2px; }
         .totals td { padding: 2px 2px; font-size: 13px; }
@@ -70,13 +75,13 @@
         <span>{{ $order->created_at->format('g:i A') }}</span>
     </div>
     <table class="items-table">
-        <tr class="head"><td>Item</td><td class="qty" style="text-align:center;">Qty</td><td class="amt">Price</td><td class="amt">Amount</td></tr>
+        <tr class="head"><td>Item</td><td class="qty" style="text-align:center;">Qty</td><td class="amt">Price</td><td class="amt amt-last">Amount</td></tr>
         @foreach($order->items as $item)
-        <tr>
+        <tr class="item-row">
             <td>{{ $item->item_name }}</td>
             <td class="qty" style="text-align:center;">{{ rtrim(rtrim(number_format((float)$item->quantity, 2), '0'), '.') }}</td>
             <td class="amt">{{ number_format((float)$item->unit_price, 0) }}</td>
-            <td class="amt">{{ number_format((float)($item->subtotal ?? ((float)$item->quantity * (float)$item->unit_price)), 0) }}</td>
+            <td class="amt amt-last">{{ number_format((float)($item->subtotal ?? ((float)$item->quantity * (float)$item->unit_price)), 0) }}</td>
         </tr>
         @endforeach
     </table>

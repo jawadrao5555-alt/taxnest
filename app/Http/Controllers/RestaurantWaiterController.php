@@ -396,7 +396,15 @@ class RestaurantWaiterController extends Controller
 
         $orders = $q->orderBy('id')->get()->map(fn($o) => $this->orderJson($o));
 
-        return response()->json($orders);
+        // KDS liveness flag (Jul 2026): sale screens poll this endpoint every 20s.
+        // Header (not body) so the response stays a plain array — existing clients
+        // keep working. "Alive" = KDS board polled within the last 90s (its own
+        // poll is every 15s). Drives the KDS-auto-print fallback: KDS closed →
+        // cashier-side auto-KOT resumes instead of tickets silently vanishing.
+        $kdsSeen = (int) \Illuminate\Support\Facades\Cache::get('kds_seen_' . $companyId, 0);
+        $kdsAlive = (time() - $kdsSeen) < 90;
+
+        return response()->json($orders)->header('X-KDS-Alive', $kdsAlive ? '1' : '0');
     }
 
     /**

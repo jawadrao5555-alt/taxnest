@@ -3109,6 +3109,9 @@ $kitchenSettings = [
     'print_on_hold' => (bool)($company->print_on_hold ?? false),
     'print_on_pay' => (bool)($company->print_on_pay ?? true),
     'dine_in_auto_kot' => (bool)($company->dine_in_auto_kot ?? false),
+    // KDS liveness (Jul 2026): baked snapshot — refreshed every 20s via the
+    // incoming-orders poll's X-KDS-Alive header. KDS closed → cashier auto-KOT.
+    'kds_alive' => (time() - (int)\Illuminate\Support\Facades\Cache::get('kds_seen_' . $company->id, 0)) < 90,
 ];
 // UTF-8-SAFE JSON for x-data: a single product/customer/order with a broken byte
 // sequence makes json_encode() return false → @json emits NOTHING → "allProducts: ,"
@@ -6849,26 +6852,38 @@ function restaurantPos() {
         // true ONLY on a 2xx {success:true} — anything else (agent offline,
         // feature off server-side, network error) returns false and the caller
         // falls back to the classic popup/iframe print path.
-        async trySilentPrint(payload) {
+        async trySilentPrint(payload, _retry = true) {
             try {
                 const res = await fetch('/pos/api/print-jobs', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                     body: JSON.stringify(payload),
                 });
-                if (!res.ok) return false;
+                if (!res.ok) {
+                    // One retry on server hiccups (5xx) — a lost print job means a
+                    // bill that never comes out of the printer (30 Jul 2026 incident).
+                    if (_retry && res.status >= 500) { await new Promise(r => setTimeout(r, 1200)); return this.trySilentPrint(payload, false); }
+                    return false;
+                }
                 const d = await res.json().catch(() => null);
                 // Return the payload (truthy) so callers can read flags like
                 // `deduped` (double-press guard) — false keeps the fallback path.
                 return (d && d.success) ? d : false;
-            } catch (e) { return false; }
+            } catch (e) {
+                // Network blip — retry once before giving up to the popup fallback.
+                if (_retry) { await new Promise(r => setTimeout(r, 1200)); return this.trySilentPrint(payload, false); }
+                return false;
+            }
         },
 
         // TRUE when the KDS station auto-prints tickets itself — cashier-side
         // AUTOMATIC KOT fires (hold-time + pay-time chain) are duplicates and
         // must be skipped. Explicit reprints (Resend, receipt-popup KOT button)
         // intentionally bypass this.
-        kdsHandlesKot() { return !!(this.kitchenSettings.kds_enabled && this.kitchenSettings.kds_auto_print); },
+        // KDS Auto Print only owns ticket printing while a KDS board is actually
+        // OPEN (heartbeat within 90s) — otherwise cashier-side auto-KOT resumes.
+        // Pizza Master incident (30 Jul 2026): KDS closed + toggle ON = no KOT anywhere.
+        kdsHandlesKot() { return !!(this.kitchenSettings.kds_enabled && this.kitchenSettings.kds_auto_print && this.kitchenSettings.kds_alive); },
 
         // KOT gateway for the popup-window call sites (hold / resend-kitchen):
         // silent first, identical popup fallback. delta=true prints ONLY
@@ -6945,6 +6960,9 @@ function restaurantPos() {
             try {
                 const res = await fetch('/pos/api/incoming-orders', { headers: { 'Accept': 'application/json' } });
                 if (!res.ok) return;
+                // KDS liveness refresh — keeps the KDS-auto-print suppression honest.
+                const kdsAlive = res.headers.get('X-KDS-Alive');
+                if (kdsAlive !== null) this.kitchenSettings.kds_alive = (kdsAlive === '1');
                 this.incomingOrders = await res.json();
                 this.maybeAutoLoadIncoming();
             } catch (e) { /* silent — badge just goes stale until next poll */ }

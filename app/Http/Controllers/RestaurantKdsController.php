@@ -12,6 +12,9 @@ class RestaurantKdsController extends Controller
     {
         $companyId = app('currentCompanyId');
 
+        // KDS liveness heartbeat — see liveOrders().
+        \Illuminate\Support\Facades\Cache::put('kds_seen_' . $companyId, time(), 300);
+
         // P5 (F4): the KDS board is driven by the KITCHEN lifecycle, not the billing
         // one. Cleared orders (scan or manual Clear) disappear from the board even
         // though the cashier still has them held for payment.
@@ -220,6 +223,12 @@ class RestaurantKdsController extends Controller
     public function liveOrders()
     {
         $companyId = app('currentCompanyId');
+
+        // KDS liveness heartbeat (Jul 2026, Pizza Master incident): the KDS board
+        // polls this every 15s. Sale screens use this timestamp to decide whether
+        // "KDS Auto Print" may suppress cashier-side auto-KOT — a CLOSED KDS must
+        // never swallow kitchen tickets.
+        \Illuminate\Support\Facades\Cache::put('kds_seen_' . $companyId, time(), 300);
 
         $orders = RestaurantOrder::where('company_id', $companyId)
             ->whereIn('status', ['held', 'preparing', 'ready'])

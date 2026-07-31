@@ -36,3 +36,5 @@ Once the deploy gap is CLOSED — live `git log -1` is on the correct commit, th
 3. Cashier just reloads the sale screen (not SW-cached, so the fix shows immediately). A one-time hard refresh covers any browser HTTP cache.
 
 **Why:** repeatedly the owner reported "still broken on live" for fixes that were already correct in code — every time the true cause was that the code had not actually been deployed to the live server (and/or not pushed to GitHub), not a caching artifact. Prove the fix is in the live commit FIRST; never re-fix already-fixed code, and don't prescribe cache-clearing as the primary remedy.
+
+- 31 Jul 2026 repeat: TASK-AGENT MERGES land only on workspace main — live never gets them until a manual `git push origin HEAD:main` + cPanel pull. ZFC's "update aya but kaam nahi karta" = merged task #60 undeployed. After EVERY task merge, compare workspace HEAD vs live `git log -1`.

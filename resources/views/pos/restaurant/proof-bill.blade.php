@@ -52,6 +52,18 @@
            so the bill came out as a thin right-edge strip (ZFC photo 28 Jul 2026).
            Mirror receipt_80mm's print block: width auto + 72mm cap + margin 0. */
         @media print { body { width: auto; max-width: 72mm; margin: 0; padding: 4mm 4mm 1mm; } }
+        {{-- COMPANY PRINT POSITION (31 Jul 2026, Pizza Master): center/left-margin
+             options apply to ALL slips now (see receipt_80mm). Opt-in; default OFF
+             keeps the left-align rule above untouched. --}}
+        @php
+            $pmAlign = (bool) ($company->kot_align_center ?? false);
+            $pmMm    = max(0, min(30, (int) ($company->kot_left_margin_mm ?? 0)));
+        @endphp
+        @if($pmAlign)
+        @media print { html body { margin-left: auto; margin-right: auto; } }
+        @elseif($pmMm > 0)
+        @media print { html body { margin-left: {{ $pmMm }}mm; } }
+        @endif
     </style>
 </head>
 <body>

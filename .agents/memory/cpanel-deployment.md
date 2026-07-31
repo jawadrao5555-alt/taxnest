@@ -8,6 +8,10 @@ description: Exact paths/commands to deploy TaxNest to the owner's shared cPanel
 - Host/port/user also in env vars CPANEL_SSH_HOST / CPANEL_SSH_PORT / CPANEL_SSH_USERNAME (no password needed).
 - So the flow is now: `git push origin HEAD:main` from the workspace, then run the deploy runbook below OVER SSH yourself — no more copy-paste blocks for the owner (still offer them as fallback if SSH breaks).
 
+# RULE: after EVERY task merge, verify live HEAD (31 Jul 2026)
+- Task-agent merges land ONLY in the workspace — live gets NOTHING automatically. A merge without a deploy = "update aa gaya but kaam nahi karta" complaints.
+- **How to apply:** after any task merge, run `bash scripts/check-live-deploy.sh` (compares workspace HEAD vs live HEAD over SSH; exit 1 = live behind). The post-merge script also runs it best-effort and prints a loud reminder. If behind: `git push origin HEAD:main`, then the deploy runbook below over SSH.
+
 # Where the live site actually is
 - Host: shared cPanel, server node `eu1`, cPanel user `taxnestc`.
 - LIVE Laravel app root: `/home/taxnestc/public_html` — this IS the git repo (remote = GitHub `jawadrao5555-alt/taxnest`, branch `main`). Document root serves from `public_html/public/` (there is NO `public_html/index.php`; the real entry is `public_html/public/index.php`).

@@ -24,3 +24,18 @@ $ENVUNSET php artisan migrate --force
 $ENVUNSET php artisan config:clear
 $ENVUNSET php artisan view:clear
 $ENVUNSET php artisan route:clear
+
+# 4. Deploy-gap reminder: merged code only lands in the WORKSPACE — the live
+# cPanel site needs a push + pull. Compare workspace HEAD vs live HEAD and
+# print a loud reminder if live is behind. NEVER fails the merge (best-effort:
+# SSH may be unavailable), hence the trailing `|| true`.
+if [ -f scripts/check-live-deploy.sh ]; then
+  bash scripts/check-live-deploy.sh || {
+    echo "==============================================================="
+    echo "REMINDER: live (cPanel) may NOT have this merged code yet."
+    echo "Run: bash scripts/check-live-deploy.sh   (and deploy if behind —"
+    echo "see .agents/memory/cpanel-deployment.md runbook)."
+    echo "==============================================================="
+    true
+  }
+fi

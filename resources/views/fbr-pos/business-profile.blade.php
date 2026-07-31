@@ -130,9 +130,9 @@
                 @error('print_paper_size') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
             </div>
 
-            {{-- Print position (31 Jul 2026): same company-wide options as PRA slips
-                 (kot_align_center / kot_left_margin_mm) — applies to receipt + Z-report. --}}
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {{-- Print position (31 Jul 2026 — mirrors PRA slips): opt-in per-company
+                 center / left-margin correction for printer-driver offsets. --}}
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.print_position') }}</label>
                     <select name="kot_align_center" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm">

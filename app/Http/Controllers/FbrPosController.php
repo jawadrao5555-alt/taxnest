@@ -2224,6 +2224,15 @@ class FbrPosController extends Controller
                 'show_footer' => $request->has('rd_show_footer'),
             ];
 
+            // Print position (31 Jul 2026 — mirrors PRA slips): opt-in center /
+            // left-margin correction. hasColumn guards = prod self-heal parity.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_align_center')) {
+                $company->kot_align_center = (bool) $request->input('kot_align_center');
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_left_margin_mm')) {
+                $company->kot_left_margin_mm = max(0, min(30, (int) $request->input('kot_left_margin_mm', 0)));
+            }
+
             $company->fill([
                 'name' => $validated['name'],
                 'address' => $validated['address'] ?? null,

@@ -104,10 +104,11 @@
             body { padding: 10px; }
             .no-print { margin-bottom: 15px; text-align: center; font-family: Arial, sans-serif; }
         }
-        {{-- COMPANY PRINT POSITION (31 Jul 2026): same opt-in options as PRA slips
-             (kot_align_center / kot_left_margin_mm). Default OFF keeps the v2
-             centered behavior above untouched. Center opt-in forces auto margins
-             even in the A4 branch; left-margin shifts the print right. --}}
+        {{-- COMPANY PRINT POSITION (31 Jul 2026, ported from PRA receipt_80mm):
+             per-company center / left-margin options to correct a driver-side
+             offset from OUR settings. Opt-in; default (all OFF) keeps the
+             existing centered behavior untouched. `html body` outranks the
+             base `body` print rules above (incl. the A4 branch). --}}
         @php
             $pmAlign = (bool) ($company->kot_align_center ?? false);
             $pmMm    = max(0, min(30, (int) ($company->kot_left_margin_mm ?? 0)));
@@ -115,7 +116,7 @@
         @if($pmAlign)
         @media print { html body { margin-left: auto; margin-right: auto; } }
         @elseif($pmMm > 0)
-        @media print { html body { margin-left: {{ $pmMm }}mm; margin-right: 0; } }
+        @media print { html body { margin-left: {{ $pmMm }}mm; margin-right: auto; } }
         @endif
     </style>
 </head>

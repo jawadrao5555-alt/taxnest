@@ -159,8 +159,8 @@
 </head>
 <body>
     <div class="no-print" id="receiptActions">
-        <button onclick="window.print()" style="padding: 10px 30px; background: #059669; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; margin-right: 10px;">Print Receipt</button>
-        <a href="{{ route('pos.transactions') }}" target="_top" style="padding: 10px 30px; background: #6b7280; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; text-decoration: none; display: inline-block;">Back to Transactions</a>
+        <button onclick="window.print()" style="padding: 10px 30px; background: #059669; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; margin-right: 10px;">{{ __('pos.receipt_print') }}</button>
+        <a href="{{ route('pos.transactions') }}" target="_top" style="padding: 10px 30px; background: #6b7280; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; text-decoration: none; display: inline-block;">{{ __('pos.receipt_back') }}</a>
     </div>
     <script>
         var isInIframe = (window.self !== window.top);
@@ -279,20 +279,20 @@
 
     @if($rcptTopBadge)
     <div class="invoice-numbers" style="text-align:center; padding:4px 5px;">
-        <strong style="font-size:12px; color:#000;">{{ $rcptTopProvisional ? 'PROVISIONAL BILL' : 'SALE RECEIPT' }}</strong><br>
+        <strong style="font-size:12px; color:#000;">{{ $rcptTopProvisional ? __('pos.receipt_provisional_bill') : __('pos.receipt_sale_receipt') }}</strong><br>
         <span style="font-size:13px; font-weight:bold; color:#000;">{{ $transaction->invoice_number }}</span>
-        @if($rcptTopProvisional)<br><span style="font-size:9px; color:#000;">This is a provisional bill for your reference</span>@endif
+        @if($rcptTopProvisional)<br><span style="font-size:9px; color:#000;">{{ __('pos.receipt_provisional_note') }}</span>@endif
     </div>
     @else
     <div class="invoice-numbers">
         <table class="inv-table">
             <tr>
-                <td class="inv-label">POS Invoice #:</td>
+                <td class="inv-label">{{ __('pos.receipt_pos_invoice') }}:</td>
                 <td class="inv-value">{{ $transaction->invoice_number }}</td>
             </tr>
             @if($transaction->pra_invoice_number)
             <tr>
-                <td class="inv-label">PRA Fiscal #:</td>
+                <td class="inv-label">{{ __('pos.receipt_pra_fiscal') }}:</td>
                 <td class="inv-value">{{ $transaction->pra_invoice_number }}</td>
             </tr>
             @endif
@@ -318,26 +318,26 @@
     @endif
 
     <table class="info-table">
-        <tr><td class="info-label">Date:</td><td class="info-value">{{ $transaction->created_at->format('d/m/Y h:i A') }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.receipt_date') }}:</td><td class="info-value">{{ $transaction->created_at->format('d/m/Y h:i A') }}</td></tr>
         @if($transaction->terminal)
-        <tr><td class="info-label">Terminal:</td><td class="info-value">{{ $transaction->terminal->terminal_name }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.receipt_terminal') }}:</td><td class="info-value">{{ $transaction->terminal->terminal_name }}</td></tr>
         @endif
         @if($transaction->customer_name)
-        <tr><td class="info-label">Customer:</td><td class="info-value">{{ $transaction->customer_name }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.receipt_customer') }}:</td><td class="info-value">{{ $transaction->customer_name }}</td></tr>
         @endif
         @if($transaction->customer_phone)
-        <tr><td class="info-label">Phone:</td><td class="info-value">{{ $transaction->customer_phone }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.receipt_phone') }}:</td><td class="info-value">{{ $transaction->customer_phone }}</td></tr>
         @endif
         @if($transaction->delivery_address)
-        <tr><td class="info-label">Deliver:</td><td class="info-value">{{ $transaction->delivery_address }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.receipt_deliver') }}:</td><td class="info-value">{{ $transaction->delivery_address }}</td></tr>
         @endif
         {{-- Delivery Riders (Jul 2026): assigned rider on delivery receipts (display-only, all branches). --}}
         @if($transaction->rider)
-        <tr><td class="info-label">Rider:</td><td class="info-value">{{ $transaction->rider->name }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.receipt_rider') }}:</td><td class="info-value">{{ $transaction->rider->name }}</td></tr>
         @endif
-        <tr><td class="info-label">Payment:</td><td class="info-value">{{ ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.receipt_payment_mode') }}:</td><td class="info-value">{{ ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</td></tr>
         @if($transaction->creator && $rp['show_cashier'])
-        <tr><td class="info-label">Cashier:</td><td class="info-value">{{ $transaction->creator->name }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.receipt_cashier') }}:</td><td class="info-value">{{ $transaction->creator->name }}</td></tr>
         @endif
     </table>
 
@@ -379,10 +379,10 @@
     <table class="items-table">
         <thead>
             <tr>
-                <th class="col-item">Item</th>
-                <th class="col-qty">Qty</th>
-                <th class="col-rate">Rate</th>
-                <th class="col-total">Amt</th>
+                <th class="col-item">{{ __('pos.receipt_item') }}</th>
+                <th class="col-qty">{{ __('pos.receipt_qty') }}</th>
+                <th class="col-rate">{{ __('pos.receipt_rate') }}</th>
+                <th class="col-total">{{ __('pos.receipt_amount') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -417,7 +417,7 @@
 
     @if(!empty($transaction->notes))
     <div class="separator"></div>
-    <div style="font-size:10px; font-weight:normal; color:#000; padding:2px 0;">Note: {{ $transaction->notes }}</div>
+    <div style="font-size:10px; font-weight:normal; color:#000; padding:2px 0;">{{ __('pos.receipt_note') }}: {{ $transaction->notes }}</div>
     @endif
 
     <div class="separator"></div>
@@ -425,25 +425,25 @@
     <table class="totals-table">
         @if($showTaxLines || $rcptCardSave)
         <tr>
-            <td class="tot-label">{{ $rcptCardSave ? 'Menu Total' : 'Subtotal' }}:</td>
+            <td class="tot-label">{{ $rcptCardSave ? __('pos.receipt_menu_total') : __('pos.receipt_subtotal') }}:</td>
             <td class="tot-value">PKR {{ number_format($rcptSubtotal, 2) }}</td>
         </tr>
         @endif
         @if($transaction->discount_amount > 0)
         <tr>
-            <td class="tot-label">Discount{{ $transaction->discount_type === 'percentage' ? ' ('.$transaction->discount_value.'%)' : '' }}:</td>
+            <td class="tot-label">{{ __('pos.receipt_discount') }}{{ $transaction->discount_type === 'percentage' ? ' ('.$transaction->discount_value.'%)' : '' }}:</td>
             <td class="tot-value">-PKR {{ number_format($showTaxLines ? $transaction->discount_amount : round((float) $transaction->discount_amount), 2) }}</td>
         </tr>
         @endif
         @if($rcptCardSave && $rcptCardSaving > 0.009)
         <tr>
-            <td class="tot-label">Card Discount:</td>
+            <td class="tot-label">{{ __('pos.receipt_card_discount') }}:</td>
             <td class="tot-value">-PKR {{ number_format($rcptCardSaving, 2) }}</td>
         </tr>
         @endif
         @if($showTaxLines)
         <tr>
-            <td class="tot-label">Tax ({{ number_format($transaction->tax_rate, 0) }}%{{ $rcptInclusive ? ' incl.' : '' }}):</td>
+            <td class="tot-label">{{ __('pos.receipt_tax') }} ({{ number_format($transaction->tax_rate, 0) }}%{{ $rcptInclusive ? ' incl.' : '' }}):</td>
             <td class="tot-value">PKR {{ number_format($transaction->tax_amount, 2) }}</td>
         </tr>
         @endif
@@ -451,18 +451,18 @@
     <div class="double-separator"></div>
     <table class="totals-table">
         <tr class="grand-total">
-            <td class="tot-label">TOTAL:</td>
+            <td class="tot-label">{{ __('pos.receipt_total_caps') }}:</td>
             <td class="tot-value">PKR {{ number_format($showTaxLines ? $transaction->total_amount : round((float) $transaction->total_amount), 2) }}</td>
         </tr>
         {{-- Cash Received / Wapsi (owner request, Jul 2026): printed only when the
              cashier actually typed the received cash AND change is due. --}}
         @if(strtolower((string) $transaction->payment_method) === 'cash' && (float) ($transaction->cash_received ?? 0) > 0 && (float) ($transaction->change_due ?? 0) > 0.001)
         <tr>
-            <td class="tot-label">CASH:</td>
+            <td class="tot-label">{{ __('pos.receipt_cash') }}:</td>
             <td class="tot-value">PKR {{ number_format((float) $transaction->cash_received, 2) }}</td>
         </tr>
         <tr class="grand-total">
-            <td class="tot-label">WAPSI / CHANGE:</td>
+            <td class="tot-label">{{ __('pos.receipt_change') }}:</td>
             <td class="tot-value">PKR {{ number_format((float) $transaction->change_due, 2) }}</td>
         </tr>
         @endif
@@ -487,7 +487,7 @@
 
     @if($transaction->pra_status === 'submitted' && $transaction->pra_invoice_number)
     <div class="pra-badge">
-        <div class="pra-title">PRA FISCAL INVOICE</div>
+        <div class="pra-title">{{ __('pos.receipt_pra_fiscal_invoice') }}</div>
         <div>POS: {{ $transaction->invoice_number }}</div>
         <div class="pra-number">PRA: {{ $transaction->pra_invoice_number }}</div>
     </div>
@@ -500,13 +500,13 @@
     @if($praQr)
     <div class="qr-code">
         <img src="{{ $praQr }}" alt="PRA Verification QR">
-        <p>Scan with PRA Sahulat App to verify</p>
+        <p>{{ __('pos.receipt_scan_verify') }}</p>
     </div>
     @endif
     @elseif($transaction->pra_status === 'offline')
     <div class="local-badge">
-        OFFLINE INVOICE<br>
-        Will sync to PRA automatically<br>
+        {{ __('pos.receipt_offline_invoice') }}<br>
+        {{ __('pos.receipt_offline_sync_auto') }}<br>
         {{ $transaction->invoice_number }}
     </div>
     @else
@@ -521,7 +521,7 @@
         $publicUrl = \App\Http\Controllers\PublicProfileController::publicUrlFor($transaction->company);
         if ($publicUrl) {
             $qrUrl = \App\Support\QrImage::dataUri($publicUrl);
-            $qrCaption = 'Scan to view our menu & info';
+            $qrCaption = __('pos.receipt_scan_menu');
         } else {
             // ZFC issue #9 (28 Jul 2026): business name OFF => QR payload must
             // not leak the name either (owner scanned QR, saw "business" field).
@@ -536,7 +536,7 @@
             }
             $qrData = json_encode($qrPayload);
             $qrUrl = \App\Support\QrImage::dataUri($qrData);
-            $qrCaption = 'Scan for invoice details';
+            $qrCaption = __('pos.receipt_scan_invoice');
         }
     @endphp
     {{-- Bottom SALE RECEIPT / PROVISIONAL badge removed (owner, Jul 2026) — the
@@ -550,7 +550,7 @@
     @endif
 
     <div class="footer text-center">
-        @if($rp['show_footer'])<p>{{ $rp['footer_text'] ?? 'Thank you for your purchase!' }}</p>@endif
+        @if($rp['show_footer'])<p>{{ $rp['footer_text'] ?? __('pos.receipt_thank_purchase') }}</p>@endif
         @if($rp['show_developed_by'] ?? true)<p>Developed by: taxnest.com.pk</p>@endif
         <p>{{ now()->format('d/m/Y h:i:s A') }}</p>
     </div>

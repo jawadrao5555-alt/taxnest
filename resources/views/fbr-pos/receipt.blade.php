@@ -108,8 +108,8 @@
 </head>
 <body>
     <div class="no-print" id="receiptActions">
-        <button onclick="window.print()" style="padding: 10px 30px; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; margin-right: 10px;">Print Receipt</button>
-        <a href="{{ route('fbrpos.transactions') }}" target="_top" style="padding: 10px 30px; background: #6b7280; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; text-decoration: none; display: inline-block;">Back to Transactions</a>
+        <button onclick="window.print()" style="padding: 10px 30px; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; margin-right: 10px;">{{ __('pos.receipt_print') }}</button>
+        <a href="{{ route('fbrpos.transactions') }}" target="_top" style="padding: 10px 30px; background: #6b7280; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; text-decoration: none; display: inline-block;">{{ __('pos.receipt_back') }}</a>
     </div>
     <script>
         var isInIframe = (window.self !== window.top);
@@ -154,19 +154,19 @@
     @endphp
     @if($fbrRcptTopBadge)
     <div class="top-badge" @if($fbrRcptTopProvisional) style="border-style: dashed;" @endif>
-        <div class="tb-title">{{ $fbrRcptTopProvisional ? 'PROVISIONAL BILL' : 'SALE RECEIPT' }}</div>
+        <div class="tb-title">{{ $fbrRcptTopProvisional ? __('pos.receipt_provisional_bill') : __('pos.receipt_sale_receipt') }}</div>
         <div class="tb-serial">{{ $transaction->invoice_number }}</div>
     </div>
     @else
     <div class="invoice-numbers">
         <table class="inv-table">
             <tr>
-                <td class="inv-label">FBR POS #:</td>
+                <td class="inv-label">{{ __('pos.receipt_pos_invoice') }}:</td>
                 <td class="inv-value">{{ $transaction->invoice_number }}</td>
             </tr>
             @if($transaction->fbr_invoice_number)
             <tr>
-                <td class="inv-label">FBR Invoice #:</td>
+                <td class="inv-label">{{ __('pos.receipt_fbr_invoice') }}:</td>
                 <td class="inv-value">{{ $transaction->fbr_invoice_number }}</td>
             </tr>
             @endif
@@ -175,20 +175,20 @@
     @endif
 
     <table class="info-table">
-        <tr><td class="info-label">Date:</td><td class="info-value">{{ $transaction->created_at->format('d/m/Y h:i A') }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.receipt_date') }}:</td><td class="info-value">{{ $transaction->created_at->format('d/m/Y h:i A') }}</td></tr>
         @if($transaction->customer_name)
-        <tr><td class="info-label">Customer:</td><td class="info-value">{{ $transaction->customer_name }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.receipt_customer') }}:</td><td class="info-value">{{ $transaction->customer_name }}</td></tr>
         @endif
         @if($transaction->customer_phone)
-        <tr><td class="info-label">Phone:</td><td class="info-value">{{ $transaction->customer_phone }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.receipt_phone') }}:</td><td class="info-value">{{ $transaction->customer_phone }}</td></tr>
         @endif
         @if($transaction->customer_ntn)
         <tr><td class="info-label">NTN:</td><td class="info-value">{{ $transaction->customer_ntn }}</td></tr>
         @endif
         <tr><td class="info-label">Tax Period:</td><td class="info-value">{{ $transaction->created_at->format('M Y') }}</td></tr>
-        <tr><td class="info-label">Payment:</td><td class="info-value">{{ ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.receipt_payment_mode') }}:</td><td class="info-value">{{ ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</td></tr>
         @if($rd['show_cashier'] && $transaction->creator)
-        <tr><td class="info-label">Cashier:</td><td class="info-value">{{ $transaction->creator->name }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.receipt_cashier') }}:</td><td class="info-value">{{ $transaction->creator->name }}</td></tr>
         @endif
         @if($company->fbr_pos_id)
         <tr><td class="info-label">POS Reg #:</td><td class="info-value">{{ $company->fbr_pos_id }}</td></tr>
@@ -200,11 +200,11 @@
     <table class="items-table">
         <thead>
             <tr>
-                <th class="col-item">Item</th>
+                <th class="col-item">{{ __('pos.receipt_item') }}</th>
                 <th class="col-uom">UoM</th>
-                <th class="col-qty">Qty</th>
-                <th class="col-price">Price</th>
-                <th class="col-total">Total</th>
+                <th class="col-qty">{{ __('pos.receipt_qty') }}</th>
+                <th class="col-price">{{ __('pos.receipt_price') }}</th>
+                <th class="col-total">{{ __('pos.receipt_total') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -224,7 +224,7 @@
             </tr>
             @if(($item->item_discount ?? 0) > 0)
             <tr>
-                <td class="col-item" colspan="4" style="font-size: 0.9em; color: #000; padding-left: 8px; font-weight: bold;">&#x21B3; Item Discount</td>
+                <td class="col-item" colspan="4" style="font-size: 0.9em; color: #000; padding-left: 8px; font-weight: bold;">&#x21B3; {{ __('pos.receipt_discount') }}</td>
                 <td class="col-total" style="font-size: 0.9em; color: #000; font-weight: bold;">-{{ number_format($item->item_discount, 0) }}</td>
             </tr>
             @endif
@@ -236,17 +236,17 @@
 
     <table class="totals-table">
         <tr>
-            <td class="tot-label">Subtotal:</td>
+            <td class="tot-label">{{ __('pos.receipt_subtotal') }}:</td>
             <td class="tot-value">PKR {{ number_format($transaction->subtotal, 2) }}</td>
         </tr>
         @if($transaction->discount_amount > 0)
         <tr>
-            <td class="tot-label">Discount{{ $transaction->discount_type === 'percentage' ? ' ('.$transaction->discount_value.'%)' : '' }}:</td>
+            <td class="tot-label">{{ __('pos.receipt_discount') }}{{ $transaction->discount_type === 'percentage' ? ' ('.$transaction->discount_value.'%)' : '' }}:</td>
             <td class="tot-value">-PKR {{ number_format($transaction->discount_amount, 2) }}</td>
         </tr>
         @endif
         <tr>
-            <td class="tot-label">Tax ({{ number_format($transaction->tax_rate, 0) }}%):</td>
+            <td class="tot-label">{{ __('pos.receipt_tax') }} ({{ number_format($transaction->tax_rate, 0) }}%):</td>
             <td class="tot-value">PKR {{ number_format($transaction->tax_amount, 2) }}</td>
         </tr>
         @if($transaction->fbr_service_charge > 0)
@@ -259,17 +259,17 @@
     <div class="double-separator"></div>
     <table class="totals-table">
         <tr class="grand-total">
-            <td class="tot-label">TOTAL:</td>
+            <td class="tot-label">{{ __('pos.receipt_total_caps') }}:</td>
             <td class="tot-value">PKR {{ number_format($transaction->total_amount, 2) }}</td>
         </tr>
         {{-- Cash Received / Wapsi (owner request, Jul 2026) — only when change is due. --}}
         @if(strtolower((string) $transaction->payment_method) === 'cash' && (float) ($transaction->cash_received ?? 0) > 0 && (float) ($transaction->change_due ?? 0) > 0.001)
         <tr>
-            <td class="tot-label">CASH:</td>
+            <td class="tot-label">{{ __('pos.receipt_cash') }}:</td>
             <td class="tot-value">PKR {{ number_format((float) $transaction->cash_received, 2) }}</td>
         </tr>
         <tr class="grand-total">
-            <td class="tot-label">WAPSI / CHANGE:</td>
+            <td class="tot-label">{{ __('pos.receipt_change') }}:</td>
             <td class="tot-value">PKR {{ number_format((float) $transaction->change_due, 2) }}</td>
         </tr>
         @endif
@@ -319,13 +319,13 @@
          bottom — same as PRA finals — so every bill is scannable. --}}
     <div style="text-align: center; margin: 4px 0;">
         <img src="{{ $qrUrl }}" alt="QR Code" style="width:{{ $is58 ? '85px' : '100px' }}; height:{{ $is58 ? '85px' : '100px' }}; margin:0 auto; display:block;">
-        <div style="font-size:9px; margin-top:2px;">Scan for bill details</div>
+        <div style="font-size:9px; margin-top:2px;">{{ __('pos.receipt_scan_details') }}</div>
     </div>
     @endif
 
     <div class="footer text-center">
         @if($rd['show_footer'])
-        <p>Thank you for your purchase!</p>
+        <p>{{ __('pos.receipt_thank_purchase') }}</p>
         @if(!empty($company->receipt_footer_note))
         <p style="font-style: italic; margin-top:2px;">{{ $company->receipt_footer_note }}</p>
         @endif

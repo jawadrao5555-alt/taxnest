@@ -132,8 +132,8 @@
 </head>
 <body>
     <div class="no-print" id="receiptActions">
-        <button onclick="window.print()" style="padding: 8px 24px; background: #059669; color: white; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; margin-right: 8px;">Print</button>
-        <a href="{{ route('pos.transactions') }}" target="_top" style="padding: 8px 24px; background: #6b7280; color: white; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; text-decoration: none; display: inline-block;">Back</a>
+        <button onclick="window.print()" style="padding: 8px 24px; background: #059669; color: white; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; margin-right: 8px;">{{ __('pos.receipt_print') }}</button>
+        <a href="{{ route('pos.transactions') }}" target="_top" style="padding: 8px 24px; background: #6b7280; color: white; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; text-decoration: none; display: inline-block;">{{ __('pos.receipt_back') }}</a>
     </div>
     <script>
         var isInIframe = (window.self !== window.top);
@@ -234,20 +234,20 @@
 
     @if($rcptTopBadge)
     <div class="invoice-numbers" style="text-align:center; padding:3px 4px;">
-        <strong style="font-size:10px; color:#000;">{{ $rcptTopProvisional ? 'PROVISIONAL BILL' : 'SALE RECEIPT' }}</strong><br>
+        <strong style="font-size:10px; color:#000;">{{ $rcptTopProvisional ? __('pos.receipt_provisional_bill') : __('pos.receipt_sale_receipt') }}</strong><br>
         <span style="font-size:11px; font-weight:bold; color:#000;">{{ $transaction->invoice_number }}</span>
-        @if($rcptTopProvisional)<br><span style="font-size:8px; color:#000;">Provisional bill for your reference</span>@endif
+        @if($rcptTopProvisional)<br><span style="font-size:8px; color:#000;">{{ __('pos.receipt_provisional_note') }}</span>@endif
     </div>
     @else
     <div class="invoice-numbers">
         <table class="inv-table">
             <tr>
-                <td class="inv-label">POS#:</td>
+                <td class="inv-label">{{ __('pos.receipt_pos_invoice') }}:</td>
                 <td class="inv-value">{{ $transaction->invoice_number }}</td>
             </tr>
             @if($transaction->pra_invoice_number)
             <tr>
-                <td class="inv-label">PRA#:</td>
+                <td class="inv-label">{{ __('pos.receipt_pra_fiscal') }}:</td>
                 <td class="inv-value">{{ $transaction->pra_invoice_number }}</td>
             </tr>
             @endif
@@ -271,23 +271,23 @@
     @endif
 
     <table class="info-table">
-        <tr><td class="info-label">Date:</td><td class="info-value">{{ $transaction->created_at->format('d/m/Y h:i A') }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.receipt_date') }}:</td><td class="info-value">{{ $transaction->created_at->format('d/m/Y h:i A') }}</td></tr>
         @if($transaction->terminal)
-        <tr><td class="info-label">Terminal:</td><td class="info-value">{{ $transaction->terminal->terminal_name }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.receipt_terminal') }}:</td><td class="info-value">{{ $transaction->terminal->terminal_name }}</td></tr>
         @endif
         @if($transaction->customer_name)
-        <tr><td class="info-label">Cust:</td><td class="info-value">{{ $transaction->customer_name }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.receipt_customer') }}:</td><td class="info-value">{{ $transaction->customer_name }}</td></tr>
         @endif
         @if($transaction->delivery_address)
-        <tr><td class="info-label">Deliver:</td><td class="info-value">{{ $transaction->delivery_address }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.receipt_deliver') }}:</td><td class="info-value">{{ $transaction->delivery_address }}</td></tr>
         @endif
         {{-- Delivery Riders (Jul 2026): assigned rider on delivery receipts (display-only, all branches). --}}
         @if($transaction->rider)
-        <tr><td class="info-label">Rider:</td><td class="info-value">{{ $transaction->rider->name }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.receipt_rider') }}:</td><td class="info-value">{{ $transaction->rider->name }}</td></tr>
         @endif
-        <tr><td class="info-label">Pay:</td><td class="info-value">{{ ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.receipt_payment_mode') }}:</td><td class="info-value">{{ ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</td></tr>
         @if($transaction->creator && $rp['show_cashier'])
-        <tr><td class="info-label">Cashier:</td><td class="info-value">{{ $transaction->creator->name }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.receipt_cashier') }}:</td><td class="info-value">{{ $transaction->creator->name }}</td></tr>
         @endif
     </table>
 
@@ -323,10 +323,10 @@
     <table class="items-table">
         <thead>
             <tr>
-                <th class="col-item">Item</th>
-                <th class="col-qty">Qty</th>
-                <th class="col-rate">Rate</th>
-                <th class="col-total">Amt</th>
+                <th class="col-item">{{ __('pos.receipt_item') }}</th>
+                <th class="col-qty">{{ __('pos.receipt_qty') }}</th>
+                <th class="col-rate">{{ __('pos.receipt_rate') }}</th>
+                <th class="col-total">{{ __('pos.receipt_amount') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -368,25 +368,25 @@
     <table class="totals-table">
         @if($showTaxLines || $rcptCardSave)
         <tr>
-            <td class="tot-label">{{ $rcptCardSave ? 'Menu Total' : 'Subtotal' }}:</td>
+            <td class="tot-label">{{ $rcptCardSave ? __('pos.receipt_menu_total') : __('pos.receipt_subtotal') }}:</td>
             <td class="tot-value">{{ number_format($rcptSubtotal, 2) }}</td>
         </tr>
         @endif
         @if($transaction->discount_amount > 0)
         <tr>
-            <td class="tot-label">Disc:</td>
+            <td class="tot-label">{{ __('pos.receipt_discount') }}:</td>
             <td class="tot-value">-{{ number_format($showTaxLines ? $transaction->discount_amount : round((float) $transaction->discount_amount), 2) }}</td>
         </tr>
         @endif
         @if($rcptCardSave && $rcptCardSaving > 0.009)
         <tr>
-            <td class="tot-label">Card Disc:</td>
+            <td class="tot-label">{{ __('pos.receipt_card_discount') }}:</td>
             <td class="tot-value">-{{ number_format($rcptCardSaving, 2) }}</td>
         </tr>
         @endif
         @if($showTaxLines)
         <tr>
-            <td class="tot-label">Tax ({{ number_format($transaction->tax_rate, 0) }}%{{ $rcptInclusive ? ' incl.' : '' }}):</td>
+            <td class="tot-label">{{ __('pos.receipt_tax') }} ({{ number_format($transaction->tax_rate, 0) }}%{{ $rcptInclusive ? ' incl.' : '' }}):</td>
             <td class="tot-value">{{ number_format($transaction->tax_amount, 2) }}</td>
         </tr>
         @endif
@@ -394,17 +394,17 @@
     <div class="double-separator"></div>
     <table class="totals-table">
         <tr class="grand-total">
-            <td class="tot-label">TOTAL:</td>
+            <td class="tot-label">{{ __('pos.receipt_total_caps') }}:</td>
             <td class="tot-value">PKR {{ number_format($showTaxLines ? $transaction->total_amount : round((float) $transaction->total_amount), 2) }}</td>
         </tr>
         {{-- Cash Received / Wapsi (owner request, Jul 2026) — mirrors receipt_80mm; keep in sync. --}}
         @if(strtolower((string) $transaction->payment_method) === 'cash' && (float) ($transaction->cash_received ?? 0) > 0 && (float) ($transaction->change_due ?? 0) > 0.001)
         <tr>
-            <td class="tot-label">CASH:</td>
+            <td class="tot-label">{{ __('pos.receipt_cash') }}:</td>
             <td class="tot-value">PKR {{ number_format((float) $transaction->cash_received, 2) }}</td>
         </tr>
         <tr class="grand-total">
-            <td class="tot-label">WAPSI:</td>
+            <td class="tot-label">{{ __('pos.receipt_change') }}:</td>
             <td class="tot-value">PKR {{ number_format((float) $transaction->change_due, 2) }}</td>
         </tr>
         @endif
@@ -427,7 +427,7 @@
 
     @if($transaction->pra_status === 'submitted' && $transaction->pra_invoice_number)
     <div class="pra-badge">
-        <div class="pra-title">PRA FISCAL</div>
+        <div class="pra-title">{{ __('pos.receipt_pra_fiscal_short') }}</div>
         <div class="pra-number">{{ $transaction->pra_invoice_number }}</div>
     </div>
     @php
@@ -438,11 +438,11 @@
     @if($praQr)
     <div class="qr-code">
         <img src="{{ $praQr }}" alt="PRA QR">
-        <p>Scan with PRA Sahulat App</p>
+        <p>{{ __('pos.receipt_scan_verify_short') }}</p>
     </div>
     @endif
     @elseif($transaction->pra_status === 'offline')
-    <div class="local-badge">OFFLINE - Will sync to PRA</div>
+    <div class="local-badge">{{ __('pos.receipt_offline_sync') }}</div>
     @else
     @php
         // Reporting-OFF FINALS vs provisionals (client report Jul 2026 — ZFC):
@@ -470,7 +470,7 @@
             }
             $qrData = json_encode($qrPayload);
             $qrUrl = \App\Support\QrImage::dataUri($qrData);
-            $qrCaption = 'Scan for details';
+            $qrCaption = __('pos.receipt_scan_details');
         }
     @endphp
     {{-- Bottom SALE RECEIPT / PROVISIONAL badge removed (owner, Jul 2026) — the

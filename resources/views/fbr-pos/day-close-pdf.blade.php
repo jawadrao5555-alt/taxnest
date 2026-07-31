@@ -63,11 +63,11 @@
 
     <div class="info-box">
         <div class="info-row">
-            <div class="lbl">Report Number:</div>
+            <div class="lbl">{{ __('pos.dc_report_no') }}:</div>
             <div class="val">{{ $report->report_number }}</div>
         </div>
         <div class="info-row">
-            <div class="lbl">Report Date:</div>
+            <div class="lbl">{{ __('pos.dc_date') }}:</div>
             <div class="val">{{ $report->report_date->format('d/m/Y') }}</div>
         </div>
         @if($company->fbr_pos_id)
@@ -77,7 +77,7 @@
         </div>
         @endif
         <div class="info-row">
-            <div class="lbl">Generated:</div>
+            <div class="lbl">{{ __('pos.dc_generated') }}:</div>
             <div class="val">{{ $report->created_at->format('d/m/Y h:i A') }}</div>
         </div>
     </div>
@@ -112,7 +112,7 @@
         </tbody>
         <tfoot>
             <tr>
-                <td>Total Invoices</td>
+                <td>{{ __('pos.dc_total_invoices') }}</td>
                 <td class="c" style="font-weight:bold;">{{ $report->total_invoices }}</td>
                 <td class="r">-</td>
             </tr>
@@ -129,17 +129,17 @@
         </thead>
         <tbody>
             <tr>
-                <td>Gross Sales</td>
+                <td>{{ __('pos.dc_gross_sales') }}</td>
                 <td class="r">{{ number_format($report->gross_sales, 2) }}</td>
             </tr>
             @if($report->total_discount > 0)
             <tr>
-                <td>Total Discount</td>
+                <td>{{ __('pos.dc_discount') }}</td>
                 <td class="r" style="color:#dc2626;">-{{ number_format($report->total_discount, 2) }}</td>
             </tr>
             @endif
             <tr>
-                <td>Net Sales</td>
+                <td>{{ __('pos.dc_net_sales') }}</td>
                 <td class="r">{{ number_format($report->net_sales, 2) }}</td>
             </tr>
             <tr>
@@ -156,7 +156,7 @@
     </table>
 
     <div class="summary-box">
-        <div class="lbl">TOTAL REVENUE</div>
+        <div class="lbl">{{ __('pos.dc_total_revenue') }}</div>
         <div class="val">PKR {{ number_format($report->total_amount, 2) }}</div>
     </div>
 
@@ -170,16 +170,16 @@
         </thead>
         <tbody>
             <tr>
-                <td>Cash</td>
+                <td>{{ __('pos.dc_cash') }}</td>
                 <td class="r">{{ number_format($report->cash_amount, 2) }}</td>
             </tr>
             <tr>
-                <td>Card</td>
+                <td>{{ __('pos.dc_card') }}</td>
                 <td class="r">{{ number_format($report->card_amount, 2) }}</td>
             </tr>
             @if($report->other_amount > 0)
             <tr>
-                <td>Other</td>
+                <td>{{ __('pos.dc_other') }}</td>
                 <td class="r">{{ number_format($report->other_amount, 2) }}</td>
             </tr>
             @endif
@@ -187,15 +187,15 @@
     </table>
 
     @if($report->counted_cash !== null)
-    <div class="section-title">Cash Reconciliation</div>
+    <div class="section-title">{{ __('pos.dc_cash_recon') }}</div>
     <table class="data">
         <thead>
             <tr>
-                <th class="r">Opening Float</th>
-                <th class="r">Cash Sales</th>
-                <th class="r">Expected in Drawer</th>
-                <th class="r">Counted Cash</th>
-                <th class="r">Variance</th>
+                <th class="r">{{ __('pos.dc_opening_float') }}</th>
+                <th class="r">{{ __('pos.dc_cash_sales') }}</th>
+                <th class="r">{{ __('pos.dc_expected_drawer') }}</th>
+                <th class="r">{{ __('pos.dc_counted_cash') }}</th>
+                <th class="r">{{ __('pos.dc_variance') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -236,7 +236,7 @@
     @endif
 
     @if($analytics->top_products->isNotEmpty())
-    <div class="section-title">Top Products of the Day</div>
+    <div class="section-title">{{ __('pos.dc_top_products') }}</div>
     <table class="data">
         <thead>
             <tr>
@@ -265,9 +265,9 @@
     <table class="data">
         <thead>
             <tr>
-                <th class="c">Submitted</th>
-                <th class="c">Pending</th>
-                <th class="c">Failed</th>
+                <th class="c">{{ __('pos.dc_submitted') }}</th>
+                <th class="c">{{ __('pos.dc_pending') }}</th>
+                <th class="c">{{ __('pos.dc_failed') }}</th>
                 <th class="c">Local</th>
             </tr>
         </thead>
@@ -306,37 +306,37 @@
     <div class="section-title">Day Statistics &amp; Comparison</div>
     <div class="info-box">
         <div class="info-row">
-            <div class="lbl">Average Bill:</div>
+            <div class="lbl">{{ __('pos.dc_avg_bill') }}:</div>
             <div class="val">PKR {{ number_format($analytics->avg_bill, 2) }}</div>
         </div>
         <div class="info-row">
-            <div class="lbl">Unique Customers (named):</div>
+            <div class="lbl">{{ __('pos.dc_unique_customers') }} (named):</div>
             <div class="val">{{ $analytics->unique_customers }}</div>
         </div>
         <div class="info-row">
-            <div class="lbl">Vs Yesterday ({{ \Carbon\Carbon::parse($analytics->comparison->yesterday->date)->format('d M') }}):</div>
+            <div class="lbl">{{ __('pos.dc_vs_yesterday') }} ({{ \Carbon\Carbon::parse($analytics->comparison->yesterday->date)->format('d M') }}):</div>
             <div class="val">PKR {{ number_format($analytics->comparison->yesterday->revenue, 2) }} ({{ $analytics->comparison->yesterday->invoices }} bills){{ $analytics->comparison->vs_yesterday_revenue_pct !== null ? ' — ' . ($analytics->comparison->vs_yesterday_revenue_pct >= 0 ? '+' : '') . $analytics->comparison->vs_yesterday_revenue_pct . '% today' : '' }}</div>
         </div>
         <div class="info-row">
-            <div class="lbl">Vs Last Week ({{ \Carbon\Carbon::parse($analytics->comparison->last_week->date)->format('d M') }}):</div>
+            <div class="lbl">{{ __('pos.dc_vs_last_week') }} ({{ \Carbon\Carbon::parse($analytics->comparison->last_week->date)->format('d M') }}):</div>
             <div class="val">PKR {{ number_format($analytics->comparison->last_week->revenue, 2) }} ({{ $analytics->comparison->last_week->invoices }} bills){{ $analytics->comparison->vs_last_week_revenue_pct !== null ? ' — ' . ($analytics->comparison->vs_last_week_revenue_pct >= 0 ? '+' : '') . $analytics->comparison->vs_last_week_revenue_pct . '% today' : '' }}</div>
         </div>
     </div>
 
-    <div class="section-title">Invoice Range</div>
+    <div class="section-title">{{ __('pos.dc_invoice_range') }}</div>
     <div class="info-box">
         <div class="info-row">
-            <div class="lbl">First Invoice:</div>
+            <div class="lbl">{{ __('pos.dc_first_inv') }}:</div>
             <div class="val">{{ $report->first_invoice_number ?? '-' }} @ {{ $report->first_invoice_time ? $report->first_invoice_time->format('h:i A') : '-' }}</div>
         </div>
         <div class="info-row">
-            <div class="lbl">Last Invoice:</div>
+            <div class="lbl">{{ __('pos.dc_last_inv') }}:</div>
             <div class="val">{{ $report->last_invoice_number ?? '-' }} @ {{ $report->last_invoice_time ? $report->last_invoice_time->format('h:i A') : '-' }}</div>
         </div>
     </div>
 
     @if($report->notes)
-    <div class="section-title">Notes</div>
+    <div class="section-title">{{ __('pos.receipt_notes') }}</div>
     <p style="font-size:10px; color:#374151; padding:4px 0;">{{ $report->notes }}</p>
     @endif
 
@@ -348,7 +348,7 @@
     <div class="footer">
         <p>This is a system-generated Day Close Report as required under FBR Rule 150R-4(f)</p>
         <div class="brand">Powered by TaxNest FBR POS</div>
-        <p>Generated: {{ $report->created_at->format('d/m/Y h:i:s A') }}</p>
+        <p>{{ __('pos.dc_generated') }}: {{ $report->created_at->format('d/m/Y h:i:s A') }}</p>
     </div>
 </body>
 </html>

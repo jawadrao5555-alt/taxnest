@@ -63,7 +63,7 @@
 
     <div class="info-box">
         <div class="info-row">
-            <div class="lbl">Report Number:</div>
+            <div class="lbl">{{ __('pos.dc_report_no') }}:</div>
             <div class="val">{{ $report->report_number }}</div>
         </div>
         <div class="info-row">
@@ -71,7 +71,7 @@
             <div class="val">{{ $report->report_date->format('d/m/Y') }}</div>
         </div>
         <div class="info-row">
-            <div class="lbl">Generated:</div>
+            <div class="lbl">{{ __('pos.dc_generated') }}:</div>
             <div class="val">{{ $report->created_at->format('d/m/Y h:i A') }}</div>
         </div>
     </div>
@@ -160,7 +160,7 @@
 
     {{-- Delivery Riders (Jul 2026): rider day detail stored on the report --}}
     @if(is_array($report->rider_summary) && !empty($report->rider_summary['riders']))
-    <div class="section-title">Delivery Riders</div>
+    <div class="section-title">{{ __('pos.dc_delivery_riders') }}</div>
     <table class="data">
         <thead>
             <tr>
@@ -197,7 +197,7 @@
         </thead>
         <tbody>
             <tr>
-                <td>Gross Sales</td>
+                <td>{{ __('pos.dc_gross_sales') }}</td>
                 <td class="r">{{ number_format($report->gross_sales, 2) }}</td>
             </tr>
             @if($report->total_discount > 0)
@@ -207,7 +207,7 @@
             </tr>
             @endif
             <tr>
-                <td>Net Sales</td>
+                <td>{{ __('pos.dc_net_sales') }}</td>
                 <td class="r">{{ number_format($report->net_sales, 2) }}</td>
             </tr>
             <tr>
@@ -218,7 +218,7 @@
     </table>
 
     <div class="summary-box">
-        <div class="lbl">TOTAL REVENUE</div>
+        <div class="lbl">{{ __('pos.dc_total_revenue') }}</div>
         <div class="val">PKR {{ number_format($report->total_amount, 2) }}</div>
     </div>
 
@@ -232,16 +232,16 @@
         </thead>
         <tbody>
             <tr>
-                <td>Cash</td>
+                <td>{{ __('pos.dc_cash') }}</td>
                 <td class="r">{{ number_format($report->cash_amount, 2) }}</td>
             </tr>
             <tr>
-                <td>Card</td>
+                <td>{{ __('pos.dc_card') }}</td>
                 <td class="r">{{ number_format($report->card_amount, 2) }}</td>
             </tr>
             @if($report->other_amount > 0)
             <tr>
-                <td>Other</td>
+                <td>{{ __('pos.dc_other') }}</td>
                 <td class="r">{{ number_format($report->other_amount, 2) }}</td>
             </tr>
             @endif
@@ -249,7 +249,7 @@
     </table>
 
     @if($report->counted_cash !== null || $report->opening_float !== null)
-    <div class="section-title">Cash Reconciliation</div>
+    <div class="section-title">{{ __('pos.dc_cash_recon') }}</div>
     <table class="data">
         <thead>
             <tr>
@@ -259,11 +259,11 @@
         </thead>
         <tbody>
             <tr>
-                <td>Opening Float</td>
+                <td>{{ __('pos.dc_opening_float') }}</td>
                 <td class="r">{{ number_format($report->opening_float ?? 0, 2) }}</td>
             </tr>
             <tr>
-                <td>Cash Sales</td>
+                <td>{{ __('pos.dc_cash_sales') }}</td>
                 <td class="r">{{ number_format($report->cash_amount, 2) }}</td>
             </tr>
             @if(is_array($report->rider_summary) && ($report->rider_summary['cash_out'] ?? 0) > 0)
@@ -288,7 +288,7 @@
             </tr>
             @if($report->counted_cash !== null)
             <tr>
-                <td style="font-weight:bold;">Variance {{ abs((float) $report->cash_variance) < 0.01 ? '(Balanced)' : ((float) $report->cash_variance < 0 ? '(Short)' : '(Over)') }}</td>
+                <td style="font-weight:bold;">{{ __('pos.dc_variance') }} {{ abs((float) $report->cash_variance) < 0.01 ? '(Balanced)' : ((float) $report->cash_variance < 0 ? '(Short)' : '(Over)') }}</td>
                 <td class="r" style="font-weight:bold; {{ abs((float) $report->cash_variance) < 0.01 ? '' : 'color:#dc2626;' }}">{{ (float) $report->cash_variance > 0 ? '+' : '' }}{{ number_format($report->cash_variance, 2) }}</td>
             </tr>
             @endif
@@ -492,7 +492,7 @@
         <tbody>
             @foreach($analytics->order_types as $type => $ot)
             <tr>
-                <td>{{ ['dine_in' => 'Dine-In', 'takeaway' => 'Takeaway', 'delivery' => 'Delivery', 'counter' => 'Counter'][$type] ?? ucfirst(str_replace('_', ' ', $type)) }}</td>
+                <td>{{ ['dine_in' => __('pos.dc_dine_in'), 'takeaway' => __('pos.dc_takeaway'), 'delivery' => __('pos.dc_delivery'), 'counter' => __('pos.dc_counter')][$type] ?? ucfirst(str_replace('_', ' ', $type)) }}</td>
                 <td class="c">{{ $ot->count }}</td>
                 <td class="r">{{ number_format($ot->revenue, 2) }}</td>
             </tr>
@@ -512,16 +512,16 @@
             <div class="val">{{ $analytics->unique_customers }}</div>
         </div>
         <div class="info-row">
-            <div class="lbl">Vs Yesterday ({{ \Carbon\Carbon::parse($analytics->comparison->yesterday->date)->format('d M') }}):</div>
+            <div class="lbl">{{ __('pos.dc_vs_yesterday') }} ({{ \Carbon\Carbon::parse($analytics->comparison->yesterday->date)->format('d M') }}):</div>
             <div class="val">PKR {{ number_format($analytics->comparison->yesterday->revenue, 2) }} ({{ $analytics->comparison->yesterday->invoices }} bills){{ $analytics->comparison->vs_yesterday_revenue_pct !== null ? ' — ' . ($analytics->comparison->vs_yesterday_revenue_pct >= 0 ? '+' : '') . $analytics->comparison->vs_yesterday_revenue_pct . '% today' : '' }}</div>
         </div>
         <div class="info-row">
-            <div class="lbl">Vs Last Week ({{ \Carbon\Carbon::parse($analytics->comparison->last_week->date)->format('d M') }}):</div>
+            <div class="lbl">{{ __('pos.dc_vs_last_week') }} ({{ \Carbon\Carbon::parse($analytics->comparison->last_week->date)->format('d M') }}):</div>
             <div class="val">PKR {{ number_format($analytics->comparison->last_week->revenue, 2) }} ({{ $analytics->comparison->last_week->invoices }} bills){{ $analytics->comparison->vs_last_week_revenue_pct !== null ? ' — ' . ($analytics->comparison->vs_last_week_revenue_pct >= 0 ? '+' : '') . $analytics->comparison->vs_last_week_revenue_pct . '% today' : '' }}</div>
         </div>
     </div>
 
-    <div class="section-title">Invoice Range</div>
+    <div class="section-title">{{ __('pos.dc_invoice_range') }}</div>
     <div class="info-box">
         <div class="info-row">
             <div class="lbl">First Invoice:</div>

@@ -35,8 +35,8 @@
 </head>
 <body>
 <div class="toolbar">
-    <button class="btn-print" onclick="window.print()">🖨 Print Z-Report</button>
-    <a class="btn-back" href="{{ route('pos.day-close', ['date' => $report->report_date->format('Y-m-d')]) }}">Back</a>
+    <button class="btn-print" onclick="window.print()">🖨 {{ __('pos.dc_print_zreport') }}</button>
+    <a class="btn-back" href="{{ route('pos.day-close', ['date' => $report->report_date->format('Y-m-d')]) }}">{{ __('pos.receipt_back') }}</a>
 </div>
 
 <div class="receipt">
@@ -44,51 +44,51 @@
     @if($company->address)<div class="c sm">{{ $company->address }}</div>@endif
     @if($company->ntn)<div class="c sm">NTN: {{ $company->ntn }}</div>@endif
     <div class="hr2"></div>
-    <div class="c b xl">Z-REPORT (DAY CLOSE)</div>
+    <div class="c b xl">{{ __('pos.dc_zreport') }}</div>
     <div class="c">{{ $report->report_number }}</div>
     <div class="c">{{ $report->report_date->format('l, d M Y') }}</div>
-    <div class="c sm">Closed: {{ $report->created_at->format('d/m/Y h:i A') }}@if($report->closedByUser) by {{ $report->closedByUser->name }}@endif</div>
+    <div class="c sm">{{ __('pos.dc_closed') }}: {{ $report->created_at->format('d/m/Y h:i A') }}@if($report->closedByUser) by {{ $report->closedByUser->name }}@endif</div>
     <div class="hr2"></div>
 
-    <div class="sec">Sales Summary</div>
+    <div class="sec">{{ __('pos.dc_sales_summary') }}</div>
     <table>
-        <tr><td>Total Invoices</td><td class="r b">{{ $report->total_invoices }}</td></tr>
-        <tr><td>Gross Sales</td><td class="r">{{ number_format($report->gross_sales, 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_total_invoices') }}</td><td class="r b">{{ $report->total_invoices }}</td></tr>
+        <tr><td>{{ __('pos.dc_gross_sales') }}</td><td class="r">{{ number_format($report->gross_sales, 2) }}</td></tr>
         @if($report->total_discount > 0)
-        <tr><td>Discount</td><td class="r">-{{ number_format($report->total_discount, 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_discount') }}</td><td class="r">-{{ number_format($report->total_discount, 2) }}</td></tr>
         @endif
-        <tr><td>Net Sales</td><td class="r">{{ number_format($report->net_sales, 2) }}</td></tr>
-        <tr><td>Sales Tax</td><td class="r">{{ number_format($report->total_tax, 2) }}</td></tr>
-        <tr><td class="b lg">TOTAL REVENUE</td><td class="r b lg">{{ number_format($report->total_amount, 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_net_sales') }}</td><td class="r">{{ number_format($report->net_sales, 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_sales_tax') }}</td><td class="r">{{ number_format($report->total_tax, 2) }}</td></tr>
+        <tr><td class="b lg">{{ __('pos.dc_total_revenue') }}</td><td class="r b lg">{{ number_format($report->total_amount, 2) }}</td></tr>
     </table>
     <div class="hr"></div>
 
-    <div class="sec">Payments</div>
+    <div class="sec">{{ __('pos.dc_payments') }}</div>
     <table>
-        <tr><td>Cash</td><td class="r">{{ number_format($report->cash_amount, 2) }}</td></tr>
-        <tr><td>Card</td><td class="r">{{ number_format($report->card_amount, 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_cash') }}</td><td class="r">{{ number_format($report->cash_amount, 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_card') }}</td><td class="r">{{ number_format($report->card_amount, 2) }}</td></tr>
         @if($report->other_amount > 0)
-        <tr><td>Other</td><td class="r">{{ number_format($report->other_amount, 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_other') }}</td><td class="r">{{ number_format($report->other_amount, 2) }}</td></tr>
         @endif
     </table>
     <div class="hr"></div>
 
     @if($report->counted_cash !== null || $report->opening_float !== null)
-    <div class="sec">Cash Reconciliation</div>
+    <div class="sec">{{ __('pos.dc_cash_recon') }}</div>
     <table>
-        <tr><td>Opening Float</td><td class="r">{{ number_format($report->opening_float ?? 0, 2) }}</td></tr>
-        <tr><td>Cash Sales</td><td class="r">{{ number_format($report->cash_amount, 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_opening_float') }}</td><td class="r">{{ number_format($report->opening_float ?? 0, 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_cash_sales') }}</td><td class="r">{{ number_format($report->cash_amount, 2) }}</td></tr>
         @if(is_array($report->rider_summary) && ($report->rider_summary['cash_out'] ?? 0) > 0)
-        <tr><td>Rider Cash (Unsettled)</td><td class="r">-{{ number_format($report->rider_summary['cash_out'], 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_rider_cash') }}</td><td class="r">-{{ number_format($report->rider_summary['cash_out'], 2) }}</td></tr>
         @endif
         @if(is_array($report->rider_summary) && ($report->rider_summary['cash_in'] ?? 0) > 0)
-        <tr><td>Rider Settlements (Old)</td><td class="r">+{{ number_format($report->rider_summary['cash_in'], 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_rider_settlements_old') }}</td><td class="r">+{{ number_format($report->rider_summary['cash_in'], 2) }}</td></tr>
         @endif
-        <tr><td>Expected in Drawer</td><td class="r">{{ number_format($report->expected_cash ?? 0, 2) }}</td></tr>
-        <tr><td>Counted Cash</td><td class="r">{{ $report->counted_cash !== null ? number_format($report->counted_cash, 2) : '-' }}</td></tr>
+        <tr><td>{{ __('pos.dc_expected_drawer') }}</td><td class="r">{{ number_format($report->expected_cash ?? 0, 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_counted_cash') }}</td><td class="r">{{ $report->counted_cash !== null ? number_format($report->counted_cash, 2) : '-' }}</td></tr>
         @if($report->counted_cash !== null)
         <tr>
-            <td class="b">Variance {{ abs((float) $report->cash_variance) < 0.01 ? '(BALANCED)' : ((float) $report->cash_variance < 0 ? '(SHORT)' : '(OVER)') }}</td>
+            <td class="b">{{ __('pos.dc_variance') }} {{ abs((float) $report->cash_variance) < 0.01 ? '(BALANCED)' : ((float) $report->cash_variance < 0 ? '(SHORT)' : '(OVER)') }}</td>
             <td class="r b">{{ (float) $report->cash_variance > 0 ? '+' : '' }}{{ number_format($report->cash_variance, 2) }}</td>
         </tr>
         @endif
@@ -97,7 +97,7 @@
     @endif
 
     @if(is_array($report->rider_summary) && !empty($report->rider_summary['riders']))
-    <div class="sec">Delivery Riders</div>
+    <div class="sec">{{ __('pos.dc_delivery_riders') }}</div>
     <table>
         @foreach($report->rider_summary['riders'] as $rr)
         <tr>
@@ -109,18 +109,18 @@
     <div class="hr"></div>
     @endif
 
-    <div class="sec">PRA Status</div>
+    <div class="sec">{{ __('pos.dc_pra_status') }}</div>
     <table>
-        <tr><td>Submitted</td><td class="r">{{ $analytics->pra_health->submitted }}</td></tr>
-        @if($analytics->pra_health->pending > 0)<tr><td>Pending</td><td class="r">{{ $analytics->pra_health->pending }}</td></tr>@endif
-        @if($analytics->pra_health->offline > 0)<tr><td>Offline Queue</td><td class="r">{{ $analytics->pra_health->offline }}</td></tr>@endif
-        @if($analytics->pra_health->failed > 0)<tr><td>Failed</td><td class="r">{{ $analytics->pra_health->failed }}</td></tr>@endif
-        @if($analytics->pra_health->not_reported > 0)<tr><td>Not Reported</td><td class="r">{{ $analytics->pra_health->not_reported }}</td></tr>@endif
+        <tr><td>{{ __('pos.dc_submitted') }}</td><td class="r">{{ $analytics->pra_health->submitted }}</td></tr>
+        @if($analytics->pra_health->pending > 0)<tr><td>{{ __('pos.dc_pending') }}</td><td class="r">{{ $analytics->pra_health->pending }}</td></tr>@endif
+        @if($analytics->pra_health->offline > 0)<tr><td>{{ __('pos.dc_offline_queue') }}</td><td class="r">{{ $analytics->pra_health->offline }}</td></tr>@endif
+        @if($analytics->pra_health->failed > 0)<tr><td>{{ __('pos.dc_failed') }}</td><td class="r">{{ $analytics->pra_health->failed }}</td></tr>@endif
+        @if($analytics->pra_health->not_reported > 0)<tr><td>{{ __('pos.dc_not_reported') }}</td><td class="r">{{ $analytics->pra_health->not_reported }}</td></tr>@endif
     </table>
     <div class="hr"></div>
 
     @if($analytics->categories->isNotEmpty())
-    <div class="sec">Category Sales</div>
+    <div class="sec">{{ __('pos.dc_category_sales') }}</div>
     <table>
         @foreach($analytics->categories as $catName => $cat)
         <tr><td>{{ \Illuminate\Support\Str::limit($catName, 18) }}</td><td class="ct">{{ rtrim(rtrim(number_format($cat->qty, 2), '0'), '.') }}</td><td class="r">{{ number_format($cat->revenue, 2) }}</td></tr>
@@ -130,7 +130,7 @@
     @endif
 
     @if($analytics->top_products->isNotEmpty())
-    <div class="sec">Top Products</div>
+    <div class="sec">{{ __('pos.dc_top_products') }}</div>
     <table>
         @foreach($analytics->top_products->take(5) as $pname => $p)
         <tr><td>{{ \Illuminate\Support\Str::limit($pname, 18) }}</td><td class="ct">{{ rtrim(rtrim(number_format($p->qty, 2), '0'), '.') }}</td><td class="r">{{ number_format($p->revenue, 2) }}</td></tr>
@@ -140,17 +140,17 @@
     @endif
 
     @if($analytics->restaurant_enabled && $analytics->order_types->isNotEmpty())
-    <div class="sec">Order Types</div>
+    <div class="sec">{{ __('pos.dc_order_types') }}</div>
     <table>
         @foreach($analytics->order_types as $type => $ot)
-        <tr><td>{{ ['dine_in' => 'Dine-In', 'takeaway' => 'Takeaway', 'delivery' => 'Delivery', 'counter' => 'Counter'][$type] ?? ucfirst(str_replace('_', ' ', $type)) }}</td><td class="ct">{{ $ot->count }}</td><td class="r">{{ number_format($ot->revenue, 2) }}</td></tr>
+        <tr><td>{{ ['dine_in' => __('pos.dc_dine_in'), 'takeaway' => __('pos.dc_takeaway'), 'delivery' => __('pos.dc_delivery'), 'counter' => __('pos.dc_counter')][$type] ?? ucfirst(str_replace('_', ' ', $type)) }}</td><td class="ct">{{ $ot->count }}</td><td class="r">{{ number_format($ot->revenue, 2) }}</td></tr>
         @endforeach
     </table>
     <div class="hr"></div>
     @endif
 
     @if($cashierBreakdown->isNotEmpty())
-    <div class="sec">Cashiers</div>
+    <div class="sec">{{ __('pos.dc_cashiers') }}</div>
     <table>
         @foreach($cashierBreakdown as $name => $data)
         <tr><td>{{ \Illuminate\Support\Str::limit($name, 18) }}</td><td class="ct">{{ $data->count }}</td><td class="r">{{ number_format($data->revenue, 2) }}</td></tr>
@@ -162,7 +162,7 @@
     {{-- Staff Attendance / Hazri (owner batch, 26 Jul 2026). * = no logout
          pressed — last activity time shown instead. --}}
     @if(!empty($hazri))
-    <div class="sec">Staff Hazri</div>
+    <div class="sec">{{ __('pos.dc_staff_hazri') }}</div>
     <table>
         @foreach($hazri as $h)
         <tr>
@@ -174,19 +174,19 @@
     <div class="hr"></div>
     @endif
 
-    <div class="sec">Stats</div>
+    <div class="sec">{{ __('pos.dc_stats') }}</div>
     <table>
-        <tr><td>Average Bill</td><td class="r">{{ number_format($analytics->avg_bill, 2) }}</td></tr>
-        <tr><td>Unique Customers</td><td class="r">{{ $analytics->unique_customers }}</td></tr>
+        <tr><td>{{ __('pos.dc_avg_bill') }}</td><td class="r">{{ number_format($analytics->avg_bill, 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_unique_customers') }}</td><td class="r">{{ $analytics->unique_customers }}</td></tr>
         @if($analytics->discounts->total > 0)
-        <tr><td>Discounts ({{ $analytics->discounts->bill_count }} bills)</td><td class="r">{{ number_format($analytics->discounts->total, 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_discounts') }} ({{ $analytics->discounts->bill_count }} {{ __('pos.dc_bills_sfx') }})</td><td class="r">{{ number_format($analytics->discounts->total, 2) }}</td></tr>
         @endif
     </table>
     <div class="hr"></div>
 
     <table>
-        <tr><td>First Inv</td><td class="r">{{ $report->first_invoice_number ?? '-' }}</td></tr>
-        <tr><td>Last Inv</td><td class="r">{{ $report->last_invoice_number ?? '-' }}</td></tr>
+        <tr><td>{{ __('pos.dc_first_inv') }}</td><td class="r">{{ $report->first_invoice_number ?? '-' }}</td></tr>
+        <tr><td>{{ __('pos.dc_last_inv') }}</td><td class="r">{{ $report->last_invoice_number ?? '-' }}</td></tr>
     </table>
     <div class="hr2"></div>
     <div class="c sm">SHA-256 Integrity Hash</div>

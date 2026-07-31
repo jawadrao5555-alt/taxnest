@@ -99,12 +99,12 @@
 
         <div class="invoice-box">
             <div class="invoice-row">
-                <div class="lbl">POS Invoice #:</div>
+                <div class="lbl">{{ __('pos.receipt_pos_invoice') }}:</div>
                 <div class="val">{{ $transaction->invoice_number }}</div>
             </div>
             @if($transaction->pra_invoice_number)
             <div class="invoice-row">
-                <div class="lbl">PRA Fiscal #:</div>
+                <div class="lbl">{{ __('pos.receipt_pra_fiscal') }}:</div>
                 <div class="val">{{ $transaction->pra_invoice_number }}</div>
             </div>
             @endif
@@ -112,34 +112,34 @@
 
         <div class="info-section">
             <div class="info-row">
-                <div class="lbl">Date</div>
+                <div class="lbl">{{ __('pos.receipt_date') }}</div>
                 <div class="val">{{ $transaction->created_at->format('d/m/Y h:i A') }}</div>
             </div>
             @if($transaction->terminal)
             <div class="info-row">
-                <div class="lbl">Terminal</div>
+                <div class="lbl">{{ __('pos.receipt_terminal') }}</div>
                 <div class="val">{{ $transaction->terminal->terminal_name }}</div>
             </div>
             @endif
             <div class="info-row">
-                <div class="lbl">Customer</div>
-                <div class="val">{{ $transaction->customer_name ?? 'Walk-in Customer' }}</div>
+                <div class="lbl">{{ __('pos.receipt_customer') }}</div>
+                <div class="val">{{ $transaction->customer_name ?? __('pos.receipt_walkin') }}</div>
             </div>
             @if($transaction->customer_phone)
             <div class="info-row">
-                <div class="lbl">Phone</div>
+                <div class="lbl">{{ __('pos.receipt_phone') }}</div>
                 <div class="val">{{ $transaction->customer_phone }}</div>
             </div>
             @endif
             <div class="info-row">
-                <div class="lbl">Payment</div>
+                <div class="lbl">{{ __('pos.receipt_payment_mode') }}</div>
                 <div class="val">{{ ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</div>
             </div>
             {{-- Owner (Jul 2026): PRA and Local bills each have their OWN display set. --}}
             @php $rpPdf = optional($transaction->company)->posReceiptPrefsFor($transaction) ?? \App\Models\Company::defaultDisplayPrefs(); @endphp
             @if($transaction->creator && $rpPdf['show_cashier'])
             <div class="info-row">
-                <div class="lbl">Cashier</div>
+                <div class="lbl">{{ __('pos.receipt_cashier') }}</div>
                 <div class="val">{{ $transaction->creator->name }}</div>
             </div>
             @endif
@@ -155,17 +155,17 @@
             // Per-type since Jul 2026: resolved via posReceiptPrefsFor() in $rpPdf above.
             $showTaxLines = (bool) ($rpPdf['show_tax'] ?? true);
         @endphp
-        <div class="section-label">Order Items</div>
+        <div class="section-label">{{ __('pos.receipt_order_items') }}</div>
         <table class="items">
             <thead>
                 <tr>
-                    <th style="width:{{ $showTaxLines ? '40%' : '50%' }};">Item</th>
-                    <th class="c" style="width:10%;">Qty</th>
+                    <th style="width:{{ $showTaxLines ? '40%' : '50%' }};">{{ __('pos.receipt_item') }}</th>
+                    <th class="c" style="width:10%;">{{ __('pos.receipt_qty') }}</th>
                     @if($showTaxLines)
                     <th class="r" style="width:10%;">Tax%</th>
                     @endif
-                    <th class="r" style="width:20%;">Price</th>
-                    <th class="r" style="width:20%;">Total</th>
+                    <th class="r" style="width:20%;">{{ __('pos.receipt_price') }}</th>
+                    <th class="r" style="width:20%;">{{ __('pos.receipt_total') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -227,32 +227,32 @@
         <div class="totals-box">
             @if($showTaxLines || $pdfCardSave)
             <div class="total-row">
-                <div class="lbl">{{ $pdfCardSave ? 'Menu Total' : 'Subtotal' }}</div>
+                <div class="lbl">{{ $pdfCardSave ? __('pos.receipt_menu_total') : __('pos.receipt_subtotal') }}</div>
                 <div class="val">PKR {{ number_format($pdfDisplaySubtotal, 2) }}</div>
             </div>
             @endif
             @if($transaction->discount_amount > 0)
             <div class="total-row discount">
-                <div class="lbl">Discount{{ $transaction->discount_type === 'percentage' ? ' ('.$transaction->discount_value.'%)' : '' }}</div>
+                <div class="lbl">{{ __('pos.receipt_discount') }}{{ $transaction->discount_type === 'percentage' ? ' ('.$transaction->discount_value.'%)' : '' }}</div>
                 <div class="val">-PKR {{ number_format($showTaxLines ? $transaction->discount_amount : round((float) $transaction->discount_amount), 2) }}</div>
             </div>
             @endif
             @if($pdfCardSave && $pdfCardSaving > 0.009)
             <div class="total-row discount">
-                <div class="lbl">Card Discount</div>
+                <div class="lbl">{{ __('pos.receipt_card_discount') }}</div>
                 <div class="val">-PKR {{ number_format($pdfCardSaving, 2) }}</div>
             </div>
             @endif
             @if($showTaxLines)
             <div class="total-row">
-                <div class="lbl">Tax ({{ number_format($transaction->tax_rate, 0) }}%{{ $pdfInclusive ? ' incl.' : '' }})</div>
+                <div class="lbl">{{ __('pos.receipt_tax') }} ({{ number_format($transaction->tax_rate, 0) }}%{{ $pdfInclusive ? ' incl.' : '' }})</div>
                 <div class="val">PKR {{ number_format($transaction->tax_amount, 2) }}</div>
             </div>
             @endif
         </div>
 
         <div class="grand-total-box">
-            <div class="lbl">TOTAL</div>
+            <div class="lbl">{{ __('pos.receipt_total_caps') }}</div>
             <div class="val">PKR {{ number_format($showTaxLines ? $transaction->total_amount : round((float) $transaction->total_amount), 2) }}</div>
         </div>
 
@@ -270,12 +270,12 @@
         @if($praQr)
         <div class="qr-section">
             <img src="{{ $praQr }}" alt="PRA QR">
-            <p>Scan with PRA Sahulat App to verify</p>
+            <p>{{ __('pos.receipt_scan_verify') }}</p>
         </div>
         @endif
         @elseif($transaction->pra_status === 'offline')
         <div class="local-box">
-            OFFLINE INVOICE — Will sync to PRA automatically<br>
+            {{ __('pos.receipt_offline_invoice') }} — {{ __('pos.receipt_offline_sync_auto') }}<br>
             {{ $transaction->invoice_number }}
         </div>
         @else
@@ -296,26 +296,26 @@
         @endphp
         @if($rcptIsProvisional)
         <div class="local-box" style="border: 1.5px dashed #7c3aed; color: #5b21b6;">
-            <strong style="font-size: 12px;">PROVISIONAL BILL</strong><br>
+            <strong style="font-size: 12px;">{{ __('pos.receipt_provisional_bill') }}</strong><br>
             {{ $transaction->invoice_number }}<br>
             <span style="font-size: 9px;">This is a provisional bill for your reference</span>
         </div>
         @else
         <div class="local-box" style="border: 1.5px solid #374151; color: #111827;">
-            <strong style="font-size: 12px;">SALE RECEIPT</strong><br>
+            <strong style="font-size: 12px;">{{ __('pos.receipt_sale_receipt') }}</strong><br>
             {{ $transaction->invoice_number }}
         </div>
         @endif
         @if($qrUrl)
         <div class="qr-section" style="text-align: center; margin: 8px 0;">
             <img src="{{ $qrUrl }}" alt="Invoice QR" style="width: 120px; height: 120px; margin: 0 auto;">
-            <p style="font-size: 9px; color: #6b7280; margin-top: 4px;">Scan for invoice details</p>
+            <p style="font-size: 9px; color: #6b7280; margin-top: 4px;">{{ __('pos.receipt_scan_invoice') }}</p>
         </div>
         @endif
         @endif
 
         <div class="footer">
-            <p>Thank you for your purchase!</p>
+            <p>{{ __('pos.receipt_thank_purchase') }}</p>
             <div class="brand">Developed by: taxnest.com.pk</div>
             <p>{{ now()->format('d/m/Y h:i:s A') }}</p>
         </div>

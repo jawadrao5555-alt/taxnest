@@ -7112,6 +7112,11 @@ function restaurantPos() {
                 if (this.silentBillPrint || this.silentKotPrint) this.printBeacon('auto-chain-nothing', { order_id: orderId || txnKotId, type: orderType || '' });
                 return;
             }
+            // Blind-spot beacon (review catch): KOT will print but NO receipt is
+            // possible (lastTransactionId missing) — the bill itself vanishes.
+            if (wantsKot && !wantsReceipt && (this.silentBillPrint || this.silentKotPrint)) {
+                this.printBeacon('kot-without-receipt', { order_id: orderId || txnKotId, type: orderType || '' });
+            }
             const fireKot = (cb) => orderId
                 ? this.printKitchenTicket(orderId, cb, kotDelta)
                 : this.printTxnKitchenTicket(txnKotId, cb);

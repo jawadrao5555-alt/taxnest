@@ -360,7 +360,7 @@
 
     @if(!empty($transaction->notes))
     <div class="separator"></div>
-    <div style="font-size:9px; font-weight:normal; color:#000; padding:1px 0;">Note: {{ $transaction->notes }}</div>
+    <div style="font-size:9px; font-weight:normal; color:#000; padding:1px 0;">{{ __('pos.receipt_note') }}: {{ $transaction->notes }}</div>
     @endif
 
     <div class="separator"></div>
@@ -455,7 +455,7 @@
         $publicUrl = \App\Http\Controllers\PublicProfileController::publicUrlFor($transaction->company);
         if ($publicUrl) {
             $qrUrl = \App\Support\QrImage::dataUri($publicUrl);
-            $qrCaption = 'Scan for menu & info';
+            $qrCaption = __('pos.receipt_scan_menu');
         } else {
             // ZFC issue #9 (28 Jul 2026): business name OFF => QR payload must
             // not leak the name either.
@@ -484,7 +484,7 @@
     @endif
 
     <div class="footer text-center">
-        @if($rp['show_footer'])<p>{{ $rp['footer_text'] ?? 'Thank you!' }}</p>@endif
+        @if($rp['show_footer'])<p>{{ $rp['footer_text'] ?? __('pos.receipt_thank_you') }}</p>@endif
         @if($rp['show_developed_by'] ?? true)<p>Developed by: taxnest.com.pk</p>@endif
         <p>{{ now()->format('d/m/Y h:i A') }}</p>
     </div>

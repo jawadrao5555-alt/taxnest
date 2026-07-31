@@ -2229,6 +2229,9 @@ class FbrPosController extends Controller
                 'email' => $validated['email'] ?? null,
                 'ntn' => $validated['ntn'] ?? null,
                 'print_paper_size' => $validated['print_paper_size'] ?? 'thermal',
+                // Print position (31 Jul 2026): shared company columns with PRA slips.
+                'kot_align_center' => (bool) $request->input('kot_align_center', false),
+                'kot_left_margin_mm' => max(0, min(30, (int) $request->input('kot_left_margin_mm', 0))),
                 'receipt_footer_note' => $validated['receipt_footer_note'] ?? null,
                 'invoice_display_prefs' => $prefs,
             ])->save();

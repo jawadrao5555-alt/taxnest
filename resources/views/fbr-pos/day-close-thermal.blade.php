@@ -33,6 +33,17 @@
         .receipt { width: 100%; max-width: {{ $zIs58 ? '48mm' : '80mm' }}; margin: 0; padding: 0 2mm; {{ $zIs58 ? 'font-size: 10px;' : '' }} }
         @page { margin: 3mm; size: {{ $zIs58 ? '58mm' : '80mm' }} auto; }
     }
+    {{-- COMPANY PRINT POSITION (31 Jul 2026): same opt-in options as PRA slips
+         (kot_align_center / kot_left_margin_mm). Default OFF = unchanged. --}}
+    @php
+        $pmAlign = (bool) ($company->kot_align_center ?? false);
+        $pmMm    = max(0, min(30, (int) ($company->kot_left_margin_mm ?? 0)));
+    @endphp
+    @if($pmAlign)
+    @media print { html body .receipt { margin-left: auto; margin-right: auto; } }
+    @elseif($pmMm > 0)
+    @media print { html body .receipt { margin-left: {{ $pmMm }}mm; } }
+    @endif
 </style>
 </head>
 <body>

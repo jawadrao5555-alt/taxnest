@@ -44,3 +44,9 @@ description: POS silent printing via Desktop Agent print-job queue — invariant
 ## Print-job dedupe & retry (30 Jul 2026, Pizza Master)
 - `trySilentPrint` (pos/universal) retries ONCE (1.2s) on network error/5xx — so `apiCreatePrintJob` now dedupes ALL types (bill AND kot/proof): identical pending/printing job < 2 min = return `deduped:true`, never a second physical copy. KOT key = order/txn + target_printer + render_query (counterCopy included).
 - Dedupe is SAFE for delta KOTs: a pending job renders unprinted rows at PRINT time, so one queued job covers later fires.
+
+## Print telemetry (Task #63, 31 Jul 2026)
+- Sale screen beacons print failures to POST /pos/api/print-telemetry (throttle 30/min, pos-auth, log-only → storage/logs `POS_PRINT_TELEMETRY`).
+- Stages: silent-print-http-fail, silent-print-network-fail, bill-popup-fallback, auto-chain-off, auto-chain-nothing (the 30 Jul vanished-bill signature: lastTransactionId missing at pay success), kot-without-receipt.
+- Uses navigator.sendBeacon (survives page unload) + fetch keepalive fallback; beacons gated on silent-print being configured to avoid noise.
+- **How to apply:** a "bill never printed" report → grep live laravel.log for POS_PRINT_TELEMETRY + company_id before touching code.

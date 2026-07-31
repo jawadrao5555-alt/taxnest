@@ -24,3 +24,5 @@ In `@media print`, body margin must be `margin: 0` — NEVER `margin: 0 auto`. *
 ## margin:0 in @media print (28 Jul 2026, ZFC proof bill)
 - `margin: 0 auto` in the PRINT block centers the capped body on the driver's wider canvas — the thermal head prints only the left slice, so the bill comes out as a thin right-edge strip.
 - Every thermal template's @media print body must be `width:auto; max-width:72mm; margin:0` (mirror receipt_80mm). Screen-side `margin:0 auto` is fine.
+
+- 31 Jul 2026: company print-position options (kot_align_center / kot_left_margin_mm) now apply to ALL slips (receipt 80/58mm, proof bill, KOT) via opt-in `html body` @media print overrides appended AFTER each template's width-fix block; default OFF = v5/v6 left-align untouched. Any NEW thermal template must append the same block.

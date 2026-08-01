@@ -90,13 +90,28 @@
         </form>
     </div>
 
-    {{-- Customer search (owner request, 1 Aug 2026 — ZFC): filter by name / phone / city / CNIC / NTN --}}
+    {{-- Customer search — SERVER-SIDE (Aug 2026, ZFC 10k+ customers): the page is
+         paginated now, so the search must hit the DB (kisi bhi page se milta hai).
+         The old client-side row filter stays as an instant filter WITHIN the page. --}}
     <div class="mb-3">
-        <div class="relative max-w-md">
-            <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg>
-            <input type="text" id="custSearchInput" placeholder="{{ __('pos.search_customer_placeholder') }}" autocomplete="off" name="pos_cust_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
-                   class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white pl-9 pr-3 py-2 focus:ring-2 focus:ring-purple-500">
-        </div>
+        <form method="GET" action="{{ route('pos.customers') }}" class="flex items-center gap-2 max-w-xl">
+            <div class="relative flex-1">
+                <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg>
+                <input type="text" id="custSearchInput" name="q" value="{{ $q ?? '' }}" placeholder="{{ __('pos.search_customer_placeholder') }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                       class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white pl-9 pr-3 py-2 focus:ring-2 focus:ring-purple-500">
+            </div>
+            <button type="submit" class="px-4 py-2 text-sm font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-lg">{{ __('pos.search_btn') }}</button>
+            @if(($q ?? '') !== '')
+            <a href="{{ route('pos.customers') }}" class="px-3 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">{{ __('pos.clear_btn') }}</a>
+            @endif
+        </form>
+        <p class="text-xs text-gray-400 mt-1">
+            @if(($q ?? '') !== '')
+                {{ __('pos.customers_found_of_total', ['found' => $customers->total(), 'total' => $totalCount ?? $customers->total()]) }}
+            @else
+                {{ __('pos.customers_total_line', ['total' => $totalCount ?? $customers->total()]) }}
+            @endif
+        </p>
         <p id="custSearchCount" class="text-xs text-gray-400 mt-1 hidden"></p>
     </div>
 
@@ -227,5 +242,9 @@
         });
     })();
     </script>
+
+    @if($customers->hasPages())
+    <div class="mt-4 px-1">{{ $customers->links() }}</div>
+    @endif
 </div>
 </x-pos-layout>

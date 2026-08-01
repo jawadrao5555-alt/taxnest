@@ -6105,13 +6105,31 @@ class PosController extends Controller
         return view('pos.product-labels', compact('products', 'company'));
     }
 
-    public function customers()
+    public function customers(Request $request)
     {
         $companyId = app('currentCompanyId');
-        $customers = PosCustomer::where('company_id', $companyId)->orderBy('name')->get();
+        // ZFC (Aug 2026): shops with 10k+ customers froze this page — it rendered
+        // EVERY row server-side. Now: server-side search + pagination (100/page).
+        // The search box filters on the SERVER so any phone/name is findable
+        // regardless of page.
+        $q = trim((string) $request->query('q', ''));
+        $query = PosCustomer::where('company_id', $companyId);
+        if ($q !== '') {
+            $query->where(function ($w) use ($q) {
+                $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $q) . '%';
+                $w->where('name', 'like', $like)
+                    ->orWhere('phone', 'like', $like)
+                    ->orWhere('email', 'like', $like)
+                    ->orWhere('city', 'like', $like)
+                    ->orWhere('cnic', 'like', $like)
+                    ->orWhere('ntn', 'like', $like);
+            });
+        }
+        $totalCount = PosCustomer::where('company_id', $companyId)->count();
+        $customers = $query->orderBy('name')->paginate(100)->withQueryString();
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
-        return view('pos.customers', compact('customers', 'isCashier'));
+        return view('pos.customers', compact('customers', 'isCashier', 'q', 'totalCount'));
     }
 
     public function storeCustomer(Request $request)

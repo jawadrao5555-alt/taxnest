@@ -345,3 +345,6 @@ Sale screen ki mazeed cheezein:
 
 ## Customer ka purana delivery address delete (Aug 2026)
 - Sale screen par delivery customer chun kar address dropdown se koi address select karein — sath surkh ✕ button aata hai, dabane par (confirm ke baad) woh saved address delete ho jata hai. Default address bhi isi tarah hat sakta hai. Customers page ka chakkar nahi lagana parta. Naya address "+ New" se pehle jaisa save hota hai.
+
+## POS Customers page tez (Aug 2026)
+- Bahut zyada customers (hazaron) wale shops par POS Customers page ab 100 customers fi page dikhata hai (pagination) — pehle saray ek sath load hote thay aur page atak jata tha. Search ab database se hoti hai: number ya naam likh kar Talash dabayen, kisi bhi page ka customer mil jayega.

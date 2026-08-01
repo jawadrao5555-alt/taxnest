@@ -3186,6 +3186,7 @@ function restaurantPos() {
             try { autoFlag = localStorage.getItem('pos_show_products_auto') === '1'; } catch (e) {}
             if (count === 0 && this.showProducts) {
                 this.showProducts = false;
+                if (this.activeCategory !== 'all') this.activeCategory = 'all'; // match manual-toggle behavior
                 this.filterProducts();
                 try {
                     localStorage.setItem('pos_show_products', '0');

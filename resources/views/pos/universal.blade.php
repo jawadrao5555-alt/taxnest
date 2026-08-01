@@ -2922,12 +2922,12 @@ window.addEventListener('popstate', function() {
                     </button>
                     {{-- 2. KOT (K) - shown only when an orderId exists (restaurant flow) + admin allows reprint --}}
                     @if(($company->kot_reprint_enabled ?? true))
-                    <button x-show="lastOrderId" @click="printKitchenTicket()" :disabled="!lastOrderId" class="py-3 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-sm flex items-center justify-center gap-1.5" title="{{ __('pos.ti_print_kot') }}">
+                    <button x-show="lastOrderId || lastTxnKotId" @click="lastOrderId ? printKitchenTicket() : printTxnKitchenTicket(lastTxnKotId)" :disabled="!lastOrderId && !lastTxnKotId" class="py-3 text-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition shadow-sm flex items-center justify-center gap-1.5" title="{{ __('pos.ti_print_kot') }}">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
                         KOT <kbd class="text-[8px] bg-orange-500/40 px-1 rounded font-mono">K</kbd>
                     </button>
                     {{-- Spacer when KOT hidden so grid stays balanced --}}
-                    <div x-show="!lastOrderId"></div>
+                    <div x-show="!lastOrderId && !lastTxnKotId"></div>
                     @else
                     {{-- Reprint disabled by admin — keep grid cell balanced --}}
                     <div></div>
@@ -3531,6 +3531,9 @@ function restaurantPos() {
         lastInvoiceNumber: '',
         lastTransactionId: null,
         lastOrderId: null,
+        // "Payment pehle, KOT baad": promoted delivery bill ki txn-KOT id — receipt
+        // popup ka K button/shortcut is se manual reprint kar sakta hai (recovery path).
+        lastTxnKotId: null,
         lastTotal: 0,
         lastPaymentMethod: '',
         // Success-popup extras: item count + sale timestamp + PRA copy state.
@@ -5274,7 +5277,7 @@ function restaurantPos() {
                 if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); this.showReceipt = false; return; }
                 if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); return; }
                 if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.lastIsOffline ? this.printOfflineReceipt() : this.printReceipt(); return; }
-                if ((e.key === 'k' || e.key === 'K') && this.lastOrderId) { e.preventDefault(); this.printKitchenTicket(); return; }
+                if ((e.key === 'k' || e.key === 'K') && (this.lastOrderId || this.lastTxnKotId)) { e.preventDefault(); this.lastOrderId ? this.printKitchenTicket() : this.printTxnKitchenTicket(this.lastTxnKotId); return; }
                 return;
             }
             // CART QTY INPUT: special-case so arrow keys ALWAYS navigate cart rows
@@ -6706,6 +6709,7 @@ function restaurantPos() {
                 // P7: waiter-origin sales DO have a restaurant order — keep its id so
                 // the receipt popup's KOT button can reprint the full kitchen ticket.
                 this.lastOrderId = this.incomingOrderId || null;
+                this.lastTxnKotId = null; // fresh sale — purani promoted-KOT id clear
                 this.lastTotal = Math.round(savedTotal || data.total_amount || 0);
                 this.lastPaymentMethod = method;
                 this.lastPraNumber = data.pra_invoice_number || '';
@@ -7366,9 +7370,14 @@ function restaurantPos() {
                     this.scheduleReceiptAutoClose();
                     // "Payment pehle, KOT baad" (1 Aug 2026): held KOT ab release —
                     // promote = payment confirm, isi waqt kitchen ticket (txn se) fire hoti hai.
+                    // DIRECT fire (review catch): auto-print/auto-KOT master switches se
+                    // AZAAD — warna un shops par KOT kabhi na nikalti jahan auto-print OFF hai.
+                    // printTxnKitchenTicket silent-first hai, warna print popup fallback.
                     const promoKotId = (!!this.kitchenSettings.delivery_kot_after_payment && bill.order_type === 'delivery')
                         ? (data.id || bill.id) : null;
-                    this.runAutoPrintChain(null, bill.order_type || null, promoKotId);
+                    this.lastTxnKotId = promoKotId; // receipt popup ka K button bhi isi se chalega
+                    if (promoKotId && !this.kdsHandlesKot()) this.printTxnKitchenTicket(promoKotId);
+                    this.runAutoPrintChain(null);
                 } else {
                     // Failed — refresh list so cashier sees current state.
                     this.showToast((data && data.message) || window.TXT.submit_failed, 'error');

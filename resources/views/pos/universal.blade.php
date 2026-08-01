@@ -723,14 +723,14 @@ window.addEventListener('popstate', function() {
                  Teal count chip = waiter orders waiting in the picker (Table-se-Bill
                  badge — top Table button ke saath yahan shift hua; INLINE chip,
                  absolute nahi — parent div overflow-hidden badge kaat deta). --}}
-            <button @click="setOrderType('dine_in')" class="flex items-center gap-1 px-2 py-1.5 text-[10px] font-bold transition-all" :class="orderType === 'dine_in' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">
+            <button @click="setOrderType('dine_in')" class="flex items-center gap-1 px-3.5 py-2 text-xs font-bold transition-all" :class="orderType === 'dine_in' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">
                 <span x-text="selectedTable ? window.TXT.dine_in_t_prefix + selectedTable.table_number : window.TXT.dine_in"></span>
                 <span x-show="incomingOrders.length > 0" x-cloak class="min-w-[16px] h-[16px] px-1 bg-teal-600 text-white text-[9px] rounded-full inline-flex items-center justify-center font-bold animate-pulse" x-text="incomingOrders.length"></span>
             </button>
             @endif
-            <button @click="setOrderType('takeaway')" class="px-2 py-1.5 text-[10px] font-bold transition-all border-x border-gray-200 dark:border-gray-700" :class="orderType === 'takeaway' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">{{ __('pos.takeaway') }}</button>
+            <button @click="setOrderType('takeaway')" class="px-3.5 py-2 text-xs font-bold transition-all border-x border-gray-200 dark:border-gray-700" :class="orderType === 'takeaway' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">{{ __('pos.takeaway') }}</button>
             @if($features->delivery)
-            <button @click="setOrderType('delivery')" class="px-2 py-1.5 text-[10px] font-bold transition-all" :class="orderType === 'delivery' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">{{ __('pos.delivery') }}</button>
+            <button @click="setOrderType('delivery')" class="px-3.5 py-2 text-xs font-bold transition-all" :class="orderType === 'delivery' ? 'bg-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">{{ __('pos.delivery') }}</button>
             @endif
             <span class="tn-key-chip px-1.5 py-1.5 text-[8px] font-mono text-gray-400 bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">F2</span>
         </div>

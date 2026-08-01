@@ -26,7 +26,13 @@ const listing = execSync('npx --yes @electron/asar@3 list "' + asar + '"', {
 const lines = new Set(listing.split(/\r?\n/));
 
 const norm = new Set([...lines].map((l) => l.replace(/\\/g, '/')));
-const bad = deps.filter((d) => !norm.has('/' + d + '/package.json'));
+// A nested lockfile entry (a/node_modules/b) may legitimately be hoisted to
+// top-level node_modules/b inside the asar — accept either location.
+const bad = deps.filter((d) => {
+  if (norm.has('/' + d + '/package.json')) return false;
+  const name = d.replace(/^.*node_modules\//, '');
+  return !norm.has('/node_modules/' + name + '/package.json');
+});
 if (bad.length) {
   console.error('[verify-asar] FATAL: app.asar is missing runtime deps: ' + bad.join(', '));
   console.error('[verify-asar] Do NOT ship this build.');

@@ -206,7 +206,8 @@ class SubscriptionAccessService
         if (!$subscription
             || $subscription->override_type !== 'none'
             || !$subscription->end_date
-            || ($subscription->pricingPlan && $subscription->pricingPlan->is_trial)) {
+            || !$subscription->pricingPlan
+            || $subscription->pricingPlan->is_trial) {
             return null;
         }
 

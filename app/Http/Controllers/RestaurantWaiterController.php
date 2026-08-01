@@ -346,7 +346,12 @@ class RestaurantWaiterController extends Controller
             $company = Company::find($companyId);
             $kot = \App\Services\KotPrintService::enqueueForOrder($company, $order, $user->id, true);
             if ($kot['printed'] && !empty($kot['job_ids'])) {
-                $order->update(['kot_print_count' => DB::raw('COALESCE(kot_print_count, 0) + 1')]);
+                // Query-builder update (NOT $order->update): the model's
+                // 'integer' cast chokes on DB::raw Expression —
+                // "Object of class ...Expression could not be converted to int"
+                // (live bug, waiter Add Items, 1 Aug 2026).
+                RestaurantOrder::whereKey($order->id)
+                    ->update(['kot_print_count' => DB::raw('COALESCE(kot_print_count, 0) + 1'), 'updated_at' => now()]);
             }
 
             $msg = 'Items added — kitchen gets a delta ticket.';

@@ -1214,6 +1214,7 @@ window.addEventListener('popstate', function() {
                                     <button @click="showAddrNew = !showAddrNew; if (showAddrNew) $nextTick(() => document.getElementById('tnNewAddrInput')?.focus())" class="text-xs font-bold text-blue-600 dark:text-blue-300 px-2 py-1.5 rounded-md border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 whitespace-nowrap">{{ __('pos.new_short') }}</button>
                                 </div>
                                 <div x-show="showAddrNew" x-cloak class="flex items-center gap-1">
+                                    <input id="tnNewAddrLabel" type="text" x-model="newAddrLabel" @keydown.enter.prevent="saveNewAddress()" @keydown.escape.prevent="showAddrNew = false" placeholder="{{ __('pos.ph_addr_label') }}" autocomplete="off" name="pos_new_addr_label_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-24 flex-none text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
                                     <input id="tnNewAddrInput" type="text" x-model="newAddrText" @keydown.enter.prevent="saveNewAddress()" @keydown.escape.prevent="showAddrNew = false" placeholder="{{ __('pos.ph_full_delivery_address') }}" autocomplete="off" name="pos_new_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="flex-1 min-w-0 text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
                                     <button @click="saveNewAddress()" class="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-2 py-1.5 rounded-md">{{ __('pos.save_btn') }}</button>
                                 </div>
@@ -3415,6 +3416,7 @@ function restaurantPos() {
         selectedDeliveryAddress: '',
         showAddrNew: false,
         newAddrText: '',
+        newAddrLabel: '',
         cart: [],
         kitchenNotes: '',
         selectedTable: {!! $jsEnc($selectedTableJson, 'null') !!},
@@ -5549,7 +5551,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.kitchenNotes = ''; this.showCartNote = false; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.incomingOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.fixCartIndex(); this.clearCartStorage(); },
+        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.kitchenNotes = ''; this.showCartNote = false; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.incomingOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm(window.TXT.current_order_has + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast(window.TXT.new_sale_started, 'success');
@@ -5619,7 +5621,7 @@ function restaurantPos() {
         // so later address edits never rewrite old receipts. Walk-in customers (no id)
         // can still type a one-off address — it snapshots without being saved.
         async loadCustomerAddresses() {
-            this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = '';
+            this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';
             const c = this.selectedCustomer;
             if (!c || !c.id) return;
             try {
@@ -5632,25 +5634,26 @@ function restaurantPos() {
         async saveNewAddress() {
             const text = (this.newAddrText || '').trim();
             if (!text) return;
+            const label = (this.newAddrLabel || '').trim();
             const c = this.selectedCustomer;
             if (!c || !c.id) {
                 // Walk-in: one-off snapshot only, nothing to persist against.
-                this.customerAddresses.push({ id: null, label: null, address: text });
+                this.customerAddresses.push({ id: null, label: label || null, address: text });
                 this.selectedDeliveryAddress = text;
-                this.showAddrNew = false; this.newAddrText = '';
+                this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';
                 return;
             }
             try {
                 const res = await fetch('/pos/api/customer-addresses', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: JSON.stringify({ customer_id: c.id, address: text }),
+                    body: JSON.stringify({ customer_id: c.id, address: text, label: label || null }),
                 });
                 const data = await res.json().catch(() => null);
                 if (data && data.success && data.address) {
                     this.customerAddresses.push(data.address);
                     this.selectedDeliveryAddress = data.address.address;
-                    this.showAddrNew = false; this.newAddrText = '';
+                    this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';
                     this.showToast(window.TXT.address_saved, 'success');
                 } else {
                     this.showToast((data && data.message) || window.TXT.could_not_save_address, 'error');
@@ -6418,7 +6421,7 @@ function restaurantPos() {
             this.selectedCustomer = null;
             this.customerStats = null;
             // Item #1: addresses belong to the cleared customer — drop them.
-            this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = '';
+            this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';
             this.$refs.customerPhoneInput?.focus();
         },
 

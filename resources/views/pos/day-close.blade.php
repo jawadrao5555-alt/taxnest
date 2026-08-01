@@ -578,7 +578,7 @@
                 <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                     <div class="flex items-center justify-between">
                         <p class="text-xs font-bold uppercase text-gray-600 dark:text-gray-300">{{ $label }}</p>
-                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ ($ls['action'] ?? 'save') === 'delete' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300' }}">{{ ($ls['action'] ?? 'save') === 'delete' ? __('pos.badge_deleted') : __('pos.badge_archived') }}</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ ($ls['action'] ?? 'save') === 'delete' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : (($ls['action'] ?? 'save') === 'carry' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' : 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300') }}">{{ ($ls['action'] ?? 'save') === 'delete' ? __('pos.badge_deleted') : (($ls['action'] ?? 'save') === 'carry' ? __('pos.badge_carried') : __('pos.badge_archived')) }}</span>
                     </div>
                     <p class="text-xl font-bold text-gray-900 dark:text-white mt-1">{{ $ls['count'] }} <span class="text-sm font-semibold text-gray-500">{{ __('pos.bills_word') }} — PKR {{ number_format($ls['amount'] ?? 0) }}</span></p>
                     @if(($ls['backlog'] ?? 0) > 0)

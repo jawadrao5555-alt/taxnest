@@ -147,7 +147,7 @@
                 @if($ls && ($ls['count'] ?? 0) > 0)
                 <tr>
                     <td>{{ $label }}</td>
-                    <td class="c">{{ ($ls['action'] ?? 'save') === 'delete' ? __('pos.dcp_deleted_per_policy') : __('pos.dcp_archived') }}</td>
+                    <td class="c">{{ ($ls['action'] ?? 'save') === 'delete' ? __('pos.dcp_deleted_per_policy') : (($ls['action'] ?? 'save') === 'carry' ? __('pos.dcp_carried') : __('pos.dcp_archived')) }}</td>
                     <td class="c">{{ $ls['count'] }}</td>
                     <td class="c">{{ $ls['backlog'] ?? 0 }}</td>
                     <td class="r">{{ number_format($ls['amount'] ?? 0, 2) }}</td>

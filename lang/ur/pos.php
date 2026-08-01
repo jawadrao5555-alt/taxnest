@@ -390,6 +390,8 @@ return [
     'ph_bill_note_multi' => 'Kitchen/bill ke liye note... (har item ki alag line — Enter dabayen)',
     'send_kot' => 'KOT',
     'badge_carry' => 'Agle Din (Carry)',
+    'badge_carried' => 'Agle Din Gaye',
+    'dcp_carried' => 'Agle din carry (abhi pending)',
     'ti_carry_forward' => 'Pending provisional bills day close ke baad bhi F10 mein rahenge — agle din final kar sakenge',
     'prov_carry_note' => 'Policy Carry Forward hai: yeh bills close ke baad bhi F10 mein rahenge, kal Make Final ho sakenge.',
     'prov_pending_final_warning' => 'Yeh bills abhi FINAL nahi hue — day close ke baad Make Final nahi ho sakenge. Pehle F10 se final karein, ya policy Carry Forward rakhein.',

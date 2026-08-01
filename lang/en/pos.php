@@ -390,6 +390,8 @@ return [
     'ph_bill_note_multi' => 'Note for kitchen/bill... (Enter = new line per item)',
     'send_kot' => 'KOT',
     'badge_carry' => 'Carry Forward',
+    'badge_carried' => 'Carried Forward',
+    'dcp_carried' => 'Carried forward (still pending)',
     'ti_carry_forward' => 'Pending provisional bills survive day close and stay in F10 for the next day',
     'prov_carry_note' => 'Policy is Carry Forward: these bills stay in F10 after close and can be made final tomorrow.',
     'prov_pending_final_warning' => 'These bills are NOT final yet — after day close they can no longer be made final. Finalize them first (F10), or set the policy to Carry Forward.',

@@ -551,6 +551,24 @@ window.addEventListener('popstate', function() {
                         </div>
                     </div>
                     @endif
+
+                    @if($features->restaurant_mode ?? false)
+                    {{-- Order Sound (owner request, 1 Aug 2026): chime when a NEW waiter
+                         order lands. DEVICE-level pref (localStorage) — sound is a
+                         per-counter choice, not a company setting. Default ON. --}}
+                    <div class="flex items-center justify-between gap-2" title="{{ __('pos.ti_order_sound_hint') }}">
+                        <span class="text-[10px] uppercase tracking-wider font-extrabold text-teal-700 dark:text-teal-300">{{ __('pos.order_sound_label') }}</span>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button"
+                                @click="orderSound = !orderSound; try { localStorage.setItem('pos_order_sound', orderSound ? '1' : '0'); } catch(e) {} if (orderSound) playOrderChime(); window.tnNotify && window.tnNotify(window.TXT.order_sound_label, orderSound ? window.TXT.enabled_word : window.TXT.disabled_word);"
+                                :class="orderSound ? 'bg-teal-600' : 'bg-gray-400 dark:bg-gray-600'"
+                                class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out shadow-inner">
+                                <span :class="orderSound ? 'translate-x-5' : 'translate-x-0.5'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5"></span>
+                            </button>
+                            <span x-text="orderSound ? 'ON' : 'OFF'" :class="orderSound ? 'text-teal-700 dark:text-teal-300' : 'text-gray-500 dark:text-gray-400'" class="text-[10px] font-black w-7"></span>
+                        </div>
+                    </div>
+                    @endif
                 </div>
             </div>
         </div>
@@ -3370,6 +3388,8 @@ function restaurantPos() {
         newCustomerName: '',
         newCustomerAddress: '',
         highlightIndex: 0,
+        // Order Sound (Aug 2026): device-level chime pref for incoming waiter orders.
+        orderSound: (function () { try { return localStorage.getItem('pos_order_sound') !== '0'; } catch (e) { return true; } })(),
         activeCartIndex: -1,
         cartMode: false,
         get mode() { return this.cartMode ? 'cart' : 'search'; },
@@ -7140,11 +7160,39 @@ function restaurantPos() {
         // This is just the one-time toast nudge per new order.
         maybeAutoLoadIncoming() {
             if (!this.isRestaurantMode || !this.incomingOrders.length || document.hidden) return;
+            let fresh = 0;
             this.incomingOrders.forEach(o => {
                 if (this.notifiedIncoming.includes(o.id)) return;
                 this.notifiedIncoming.push(o.id);
+                fresh++;
                 this.showToast(window.TXT.new_waiter_order_prefix + o.order_number + (o.table ? ' (T-' + o.table + ')' : '') + ' — TABLE board (Alt+B) se kholein', 'success');
             });
+            // Order Sound (Aug 2026): ONE chime per poll batch, not per order —
+            // three orders at once must not turn the counter into an alarm clock.
+            if (fresh > 0 && this.orderSound) this.playOrderChime();
+        },
+        // Two-tone WebAudio chime — no audio file, works offline, ~0.35s. Browsers
+        // block audio before the first user gesture; the try/catch swallows that
+        // (cashier screens always get a click/keypress long before an order lands).
+        playOrderChime() {
+            try {
+                const Ctx = window.AudioContext || window.webkitAudioContext;
+                if (!Ctx) return;
+                if (!this._chimeCtx) this._chimeCtx = new Ctx();
+                const ctx = this._chimeCtx;
+                if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+                const t0 = ctx.currentTime;
+                [[880, 0], [1174.66, 0.16]].forEach(([freq, dt]) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine'; osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.0001, t0 + dt);
+                    gain.gain.exponentialRampToValueAtTime(0.25, t0 + dt + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dt + 0.30);
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.start(t0 + dt); osc.stop(t0 + dt + 0.32);
+                });
+            } catch (e) { /* silent — sound is best-effort */ }
         },
         openIncoming() {
             this.showIncoming = true;

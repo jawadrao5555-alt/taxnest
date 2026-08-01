@@ -393,6 +393,8 @@ return [
     'ti_delete_address' => 'Delete this saved address',
     'confirm_delete_address' => 'Delete this saved address?',
     'address_deleted' => 'Address deleted',
+    'order_sound_label' => 'Order Sound',
+    'ti_order_sound_hint' => 'Play a chime on this device when a new waiter order arrives',
     'search_btn' => 'Search',
     'clear_btn' => 'Clear',
     'customers_found_of_total' => ':found of :total customers matched',

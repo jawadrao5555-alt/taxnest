@@ -393,6 +393,8 @@ return [
     'ti_delete_address' => 'Yeh saved address delete karein',
     'confirm_delete_address' => 'Yeh saved address delete kar dein?',
     'address_deleted' => 'Address delete ho gaya',
+    'order_sound_label' => 'Order Awaz',
+    'ti_order_sound_hint' => 'Naya waiter order aane par is device par awaz baje',
     'search_btn' => 'Talash',
     'clear_btn' => 'Saaf karein',
     'customers_found_of_total' => ':total mein se :found customers milay',

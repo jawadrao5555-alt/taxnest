@@ -351,3 +351,6 @@ Sale screen ki mazeed cheezein:
 
 ## Waiter orders sab se naya oopar (Aug 2026)
 - Cashier ki Incoming/Counter orders list mein ab sab se naya waiter order sab se OOPAR dikhta hai. Naye order ki itla (green message + Dine In par ginti ka badge) pehle se aati hai — screen har 20 second mein khud check karti hai.
+
+## Order Sound — naye waiter order par awaz (Aug 2026)
+- Restaurant mode mein cashier screen ke Switches menu mein "Order Awaz" ka switch hai (default ON). Naya waiter order aate hi chhoti si ghanti bajti hai (green message aur badge ke sath). Har counter/device apni awaz alag on/off kar sakta hai — yeh setting sirf usi computer par lagoo hoti hai.

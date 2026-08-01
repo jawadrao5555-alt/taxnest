@@ -944,8 +944,12 @@
         @endif
         <x-pwa-update color="purple" />
         <x-trial-lock-modal />
-        {{-- Madadgar unified support bubble (AI chat + WhatsApp) — replaces the plain WhatsApp bubble on POS (owner, 22 Jul 2026) --}}
-        <x-madadgar-support />
+        {{-- Madadgar unified support bubble (AI chat + WhatsApp) — replaces the plain WhatsApp bubble on POS (owner, 22 Jul 2026).
+             Waiters ko nahi (ZFC, 2 Aug 2026): tablet par bubble search box ke
+             upar aata tha — support ka rabta admin/cashier ka kaam hai. --}}
+        @if (auth('pos')->user()?->pos_role !== 'pos_waiter')
+            <x-madadgar-support />
+        @endif
         <script src="{{ asset('js/wheel-scroll.js?v=1') }}" defer></script>
     </body>
 </html>

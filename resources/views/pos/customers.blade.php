@@ -206,8 +206,21 @@
                 row.style.display = hit ? '' : 'none';
                 if (hit) shown++;
                 // Keep the inline edit row in sync with its parent row.
+                // Only force-HIDE on non-match; on match, remove our own inline
+                // display so Alpine's x-show keeps controlling it (never clear
+                // Alpine's display:none, or collapsed edit rows would pop open).
                 var next = row.nextElementSibling;
-                if (next && !next.classList.contains('cust-row')) next.style.display = hit ? '' : 'none';
+                if (next && !next.classList.contains('cust-row')) {
+                    if (hit) {
+                        if (next.dataset.searchHidden === '1') {
+                            next.style.display = ('prevDisplay' in next.dataset) ? next.dataset.prevDisplay : 'none';
+                            delete next.dataset.searchHidden; delete next.dataset.prevDisplay;
+                        }
+                    } else if (next.dataset.searchHidden !== '1') {
+                        next.dataset.prevDisplay = next.style.display;
+                        next.style.display = 'none'; next.dataset.searchHidden = '1';
+                    }
+                }
             });
             if (q) { count.textContent = shown + ' ' + label; count.classList.remove('hidden'); }
             else { count.classList.add('hidden'); }

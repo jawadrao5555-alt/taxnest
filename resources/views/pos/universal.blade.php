@@ -3113,6 +3113,9 @@ $kitchenSettings = [
     'print_on_hold' => (bool)($company->print_on_hold ?? false),
     'print_on_pay' => (bool)($company->print_on_pay ?? true),
     'dine_in_auto_kot' => (bool)($company->dine_in_auto_kot ?? false),
+    // Delivery: payment pehle, KOT baad (1 Aug 2026) — provisional delivery
+    // bills par KOT promote tak ruki rehti hai.
+    'delivery_kot_after_payment' => (bool)($company->delivery_kot_after_payment ?? false),
     // KDS liveness (Jul 2026): baked snapshot — refreshed every 20s via the
     // incoming-orders poll's X-KDS-Alive header. KDS closed → cashier auto-KOT.
     'kds_alive' => (time() - (int)\Illuminate\Support\Facades\Cache::get('kds_seen_' . $company->id, 0)) < 90,
@@ -6715,8 +6718,14 @@ function restaurantPos() {
                 // Auto-print receipt for manual-cart bills too (parity with held-order pay).
                 // DELIVERY bills saved here (provisional rider khata + manual-cart finals)
                 // have NO restaurant order — KOT prints from the TRANSACTION (ZFC 28 Jul 2026).
-                const txnKotId = (this.isRestaurantMode && this.orderType === 'delivery' && !this.incomingOrderId)
+                // "Payment pehle, KOT baad" (1 Aug 2026): toggle ON ho to PROVISIONAL
+                // delivery bills (pra_status 'local') par KOT ruk jati hai — promote
+                // (payment confirm) par nikalti hai. Final bills = payment ho chuki → KOT abhi.
+                const kotHeldForPayment = !!this.kitchenSettings.delivery_kot_after_payment
+                    && this.orderType === 'delivery' && (data.pra_status === 'local');
+                const txnKotId = (this.isRestaurantMode && this.orderType === 'delivery' && !this.incomingOrderId && !kotHeldForPayment)
                     ? (data.transaction_id || null) : null;
+                if (kotHeldForPayment) this.showToast(window.TXT.kot_held_until_payment, 'info');
                 this.runAutoPrintChain(null, this.orderType, txnKotId);
                 // P7: settle the linked waiter order (atomic server-side claim) —
                 // frees the table and clears it from every cashier's Incoming list.
@@ -7355,7 +7364,11 @@ function restaurantPos() {
                     this.lastSaleAt = Date.now();
                     this.showReceipt = true;
                     this.scheduleReceiptAutoClose();
-                    this.runAutoPrintChain(null);
+                    // "Payment pehle, KOT baad" (1 Aug 2026): held KOT ab release —
+                    // promote = payment confirm, isi waqt kitchen ticket (txn se) fire hoti hai.
+                    const promoKotId = (!!this.kitchenSettings.delivery_kot_after_payment && bill.order_type === 'delivery')
+                        ? (data.id || bill.id) : null;
+                    this.runAutoPrintChain(null, bill.order_type || null, promoKotId);
                 } else {
                     // Failed — refresh list so cashier sees current state.
                     this.showToast((data && data.message) || window.TXT.submit_failed, 'error');

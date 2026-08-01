@@ -1412,6 +1412,11 @@ class RestaurantPosController extends Controller
         if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_kot_full_mode')) {
             $updates['pos_kot_full_mode'] = (bool) $request->pos_kot_full_mode;
         }
+        // Delivery: payment pehle, KOT baad (customer voice note, 1 Aug 2026) —
+        // provisional delivery bills par KOT promote/finalize tak ruki rahti hai.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'delivery_kot_after_payment')) {
+            $updates['delivery_kot_after_payment'] = (bool) $request->delivery_kot_after_payment;
+        }
         // KOT Print Style (customer feedback 27 Jul 2026): paper-saving toggles +
         // print position. hasColumn guards = prod self-heal parity.
         foreach (['kot_compact', 'kot_show_customer', 'kot_show_orderby', 'kot_show_barcode', 'kot_show_footer', 'kot_align_center'] as $kotFlag) {

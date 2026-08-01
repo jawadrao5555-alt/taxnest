@@ -31,11 +31,23 @@
                 ];
             }
 
+            // Paid subscription ending within 2 days (owner, 1 Aug 2026)
+            if (!$reminder) {
+                $pe = \App\Services\SubscriptionAccessService::paidEndingReminder($rCompany);
+                if ($pe) {
+                    $reminder = [
+                        'text' => 'Your subscription ' . ($pe['days_left'] <= 0 ? 'ends today' : ('ends ' . $pe['until'] . ' — ' . $pe['days_left'] . ' day' . ($pe['days_left'] == 1 ? '' : 's') . ' left')) . '. Renew now to avoid interruption.',
+                        'key' => 'sub_ending_reminder_' . now()->toDateString() . '_' . $pe['days_left'],
+                    ];
+                }
+            }
+
             $status = $reminder ? null : \App\Services\SubscriptionAccessService::trialStatus($rCompany);
             if ($status && $status['on_trial']) {
                 $daysLeft = $status['days_left'];
                 $invLeft = $status['invoices_left'];
-                $dayUrgent = $daysLeft !== null && $daysLeft <= 1;
+                // 2-day early warning (owner, 1 Aug 2026)
+                $dayUrgent = $daysLeft !== null && $daysLeft <= 2;
                 $invUrgent = $invLeft !== null && $invLeft <= 5;
                 if ($dayUrgent || $invUrgent) {
                     $parts = [];

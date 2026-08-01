@@ -52,7 +52,9 @@ class SendTrialReminders extends Command
             $daysLeft = $status['days_left'];
             $invLeft = $status['invoices_left'];
 
-            if ($daysLeft !== null && $daysLeft <= 1) {
+            // 2-day early warning (owner, 1 Aug 2026). Dedup type kept so
+            // companies already mailed at the old 1-day threshold get no repeat.
+            if ($daysLeft !== null && $daysLeft <= 2) {
                 $when = $daysLeft <= 0 ? 'today' : "in {$daysLeft} day(s)";
                 if ($this->fire(
                     $company,
@@ -85,6 +87,73 @@ class SendTrialReminders extends Command
                 )) {
                     $sent++;
                 }
+            }
+        }
+
+        // ---- Temporary/grace override ending within 2 days (owner, 1 Aug 2026) ----
+        $ovSubs = Subscription::where('active', true)
+            ->whereIn('override_type', ['temporary', 'grace'])
+            ->whereNotNull('override_until')
+            ->whereBetween('override_until', [now(), now()->addDays(2)->endOfDay()])
+            ->whereHas('company', fn ($q) => $q->where('is_internal_account', false))
+            ->with('company')
+            ->get();
+
+        foreach ($ovSubs as $sub) {
+            $company = $sub->company;
+            $email = $company ? $this->recipientEmail($company) : null;
+            if (!$email) {
+                continue;
+            }
+            $until = $sub->override_until->format('d M Y');
+            // Dedup per expiry date so an extended override warns again before the NEW date.
+            if ($this->fire(
+                $company,
+                'override_reminder_' . $sub->override_until->toDateString(),
+                $email,
+                'Your TaxNest access is ending soon',
+                'Access ending soon',
+                "The free access granted to {$company->name} ends on {$until}.",
+                [
+                    'To keep your billing running without interruption, please subscribe to a plan before that date.',
+                    'Log in to your account and open the Billing page to choose the package that fits your business.',
+                ]
+            )) {
+                $sent++;
+            }
+        }
+
+        // ---- Paid subscription ending within 2 days (owner, 1 Aug 2026) ----
+        $paidSubs = Subscription::where('active', true)
+            ->where('override_type', 'none')
+            ->whereNotNull('end_date')
+            ->whereBetween('end_date', [now()->startOfDay(), now()->addDays(2)->endOfDay()])
+            ->whereHas('pricingPlan', fn ($q) => $q->where('is_trial', false))
+            ->whereHas('company', fn ($q) => $q->where('is_internal_account', false))
+            ->with('company')
+            ->get();
+
+        foreach ($paidSubs as $sub) {
+            $company = $sub->company;
+            $email = $company ? $this->recipientEmail($company) : null;
+            if (!$email) {
+                continue;
+            }
+            $until = \Carbon\Carbon::parse($sub->end_date)->format('d M Y');
+            // Dedup per end_date so each renewal period warns once.
+            if ($this->fire(
+                $company,
+                'sub_renewal_reminder_' . \Carbon\Carbon::parse($sub->end_date)->toDateString(),
+                $email,
+                'Your TaxNest subscription is ending soon',
+                'Subscription ending soon',
+                "The subscription for {$company->name} ends on {$until}.",
+                [
+                    'Please renew before that date to keep your billing running without interruption.',
+                    'Log in to your account and open the Billing page to renew your package.',
+                ]
+            )) {
+                $sent++;
             }
         }
 

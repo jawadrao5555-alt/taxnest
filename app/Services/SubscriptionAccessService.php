@@ -190,6 +190,42 @@ class SubscriptionAccessService
      * Lifetime overrides return null (no banner — permanent access).
      * Returns null once hasAccess() denies (the lock modal owns messaging then).
      */
+    /**
+     * Paid (non-trial, non-override) subscription ending within 2 days.
+     * Owner request (1 Aug 2026): warn 2 days ahead so shops renew in time.
+     * Returns null unless an active standard subscription's end_date is
+     * today..+2 days.
+     */
+    public static function paidEndingReminder(Company $company): ?array
+    {
+        $subscription = Subscription::where('company_id', $company->id)
+            ->where('active', true)
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$subscription
+            || $subscription->override_type !== 'none'
+            || !$subscription->end_date
+            || ($subscription->pricingPlan && $subscription->pricingPlan->is_trial)) {
+            return null;
+        }
+
+        $end = Carbon::parse($subscription->end_date)->endOfDay();
+        if ($end->isPast()) {
+            return null;
+        }
+
+        $daysLeft = (int) now()->startOfDay()->diffInDays($end->copy()->startOfDay());
+        if ($daysLeft > 2) {
+            return null;
+        }
+
+        return [
+            'until' => $end->format('Y-m-d'),
+            'days_left' => $daysLeft,
+        ];
+    }
+
     public static function overrideReminder(Company $company): ?array
     {
         $subscription = Subscription::where('company_id', $company->id)

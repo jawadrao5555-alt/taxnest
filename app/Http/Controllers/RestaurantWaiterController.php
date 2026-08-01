@@ -119,7 +119,7 @@ class RestaurantWaiterController extends Controller
 
         $tables = RestaurantTable::where('company_id', $companyId)
             ->where('is_active', true)
-            ->with(['floor', 'activeOrders'])
+            ->with(['floor', 'activeOrders' => fn($q) => $q->withCount('items')])
             ->get()
             ->map(fn($t) => [
                 'id' => $t->id,
@@ -133,6 +133,14 @@ class RestaurantWaiterController extends Controller
                 // stays un-tappable instead of advertising a shift that would fail.
                 'order_id' => optional($t->activeOrders->firstWhere('status', 'held'))->id,
                 'order_number' => optional($t->activeOrders->firstWhere('status', 'held'))->order_number,
+                // Multi-order shift (Task 104, Aug 2026): saare HELD orders ki
+                // list — 1 se zyada hon to waiter tablet order-selection step
+                // dikhata hai (order number + items count) phir shift modal.
+                'held_orders' => $t->activeOrders->where('status', 'held')->values()->map(fn($o) => [
+                    'id' => $o->id,
+                    'order_number' => $o->order_number,
+                    'items_count' => (int) ($o->items_count ?? 0),
+                ])->all(),
             ]);
 
         return response()->json($tables);

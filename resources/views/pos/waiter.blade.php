@@ -250,6 +250,27 @@
         </div>
     </div>
 
+    {{-- ── Multi-order shift: order-selection step (Task 104, Aug 2026) ──────
+         Table par 1 se zyada HELD orders → pehle waiter chune kaunsa order
+         shift hoga (order number + items count), phir shift modal. --}}
+    <div x-show="shiftPickFor" x-cloak class="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/60" @click="shiftPickFor = null"></div>
+        <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-xs max-h-[70vh] flex flex-col overflow-hidden">
+            <div class="px-5 py-4 bg-amber-500 flex items-center justify-between">
+                <h3 class="text-white font-bold" x-text="shiftPickFor ? ('T-' + shiftPickFor.table_number + ' — ' + {{ Js::from(__('pos.which_order_shift_q')) }}) : ''"></h3>
+                <button @click="shiftPickFor = null" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/25 text-white font-black">×</button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 space-y-2.5">
+                <template x-for="o in (shiftPickFor ? shiftPickFor.held_orders : [])" :key="'shiftpick' + o.id">
+                    <button @click="pickShiftOrder(o)" class="w-full py-3 px-4 rounded-xl border-2 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-left hover:border-amber-500 transition flex items-center justify-between gap-2">
+                        <span class="font-mono text-sm font-bold text-gray-800 dark:text-gray-100" x-text="o.order_number"></span>
+                        <span class="text-[11px] font-bold text-amber-700 dark:text-amber-300" x-text="o.items_count + {{ Js::from(__('pos.sfx_items')) }}"></span>
+                    </button>
+                </template>
+            </div>
+        </div>
+    </div>
+
     {{-- ── Table Shift modal (owner batch, 26 Jul 2026) ───────────────────────
          Waiter apna held dine-in order KHALI table par shift kare. Timer
          continue, KOT dobara nahi. Race-safe server-side. --}}
@@ -313,6 +334,7 @@ function waiterApp() {
         appendOrderNumber: '',
         tableActionFor: null,    // occupied-tile chooser (Add Items / Shift)
         shiftFor: null,          // Table Shift (26 Jul 2026): order being shifted
+        shiftPickFor: null,      // Multi-order shift (Task 104): table whose held order is being chosen
         shiftBusy: false,
         shiftTablesLoading: false,
         toast: '',
@@ -520,10 +542,24 @@ function waiterApp() {
         },
         // Shift from the table picker (ZFC, 1 Aug 2026): occupied tile tap —
         // shift that table's ACTIVE order (any creator) to an empty table.
+        // Multi-order tables (Task 104, Aug 2026): 1 se zyada HELD orders hon
+        // to pehle chhota order-selection step, phir shift modal.
         startShiftFromTable(t) {
             if (!t.order_id) return;
+            const held = Array.isArray(t.held_orders) ? t.held_orders : [];
+            if (held.length > 1) {
+                this.shiftPickFor = t;
+                return;
+            }
             this.showTables = false;
             this.startShift({ id: t.order_id, order_number: t.order_number || ('T-' + t.table_number), table_id: t.id });
+        },
+        pickShiftOrder(o) {
+            const t = this.shiftPickFor;
+            this.shiftPickFor = null;
+            if (!t || !o) return;
+            this.showTables = false;
+            this.startShift({ id: o.id, order_number: o.order_number || ('T-' + t.table_number), table_id: t.id });
         },
         // ── Table Shift (owner batch, 26 Jul 2026) ──────────────────────────
         async startShift(o) {

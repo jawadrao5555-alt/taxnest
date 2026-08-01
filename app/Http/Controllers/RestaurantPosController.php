@@ -538,6 +538,16 @@ class RestaurantPosController extends Controller
                 $order->cancelled_by = Auth::guard('pos')->id();
             }
             $order->save();
+            // Item-wise made/unmade (ZFC, 2 Aug 2026): modal se aaye ids jin par
+            // cashier ne "ban gaya tha" tick kiya. Sirf tab likho jab client ne
+            // bheja ho (warna NULL = poochha nahi gaya).
+            if ($request->has('made_item_ids') && Schema::hasColumn('restaurant_order_items', 'was_made')) {
+                $madeIds = array_filter(array_map('intval', (array) $request->input('made_item_ids', [])));
+                $order->items()->update(['was_made' => false]);
+                if ($madeIds) {
+                    $order->items()->whereIn('id', $madeIds)->update(['was_made' => true]);
+                }
+            }
             // F3 (Jul 2026): deleting a held order frees its table — unless another
             // active order is still parked on the same table.
             if ($tableId) {
@@ -2109,6 +2119,12 @@ class RestaurantPosController extends Controller
         $summary = [
             'count' => $orders->total(),
             'value' => (float) $this->cancelledOrdersQuery($request)->sum('total_amount'),
+            // Waste = cancel ke waqt "ban gaya tha" tick hue items ki maliyat
+            'waste' => Schema::hasColumn('restaurant_order_items', 'was_made')
+                ? (float) RestaurantOrderItem::where('was_made', true)
+                    ->whereIn('order_id', $this->cancelledOrdersQuery($request)->select('id'))
+                    ->sum('subtotal')
+                : 0.0,
         ];
         return view('pos.cancelled-orders', compact('company', 'orders', 'from', 'to', 'summary'));
     }
@@ -2121,15 +2137,17 @@ class RestaurantPosController extends Controller
         return response()->streamDownload(function () use ($orders) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM (Excel)
-            fputcsv($out, ['Order #', 'Date/Time Cancelled', 'Table', 'Order Type', 'Items', 'Amount (Rs)', 'KOT Sent', 'Punched By']);
+            fputcsv($out, ['Order #', 'Date/Time Cancelled', 'Table', 'Order Type', 'Items', 'Made Items', 'Amount (Rs)', 'KOT Sent', 'Punched By']);
             foreach ($orders as $o) {
                 $items = $o->items->map(fn ($i) => $i->quantity . 'x ' . $i->item_name)->implode('; ');
+                $made = $o->items->where('was_made', true)->map(fn ($i) => $i->quantity . 'x ' . $i->item_name)->implode('; ');
                 fputcsv($out, [
                     $o->order_number,
                     optional($o->cancelled_at ?? $o->updated_at)->format('Y-m-d H:i'),
                     $o->table?->table_number ? 'T-' . $o->table->table_number : '-',
                     $o->order_type,
                     $items,
+                    $made,
                     (int) round($o->total_amount),
                     $o->kot_sent_at ? 'YES' : 'no',
                     $o->creator?->name ?? '-',
@@ -2144,7 +2162,11 @@ class RestaurantPosController extends Controller
         if ($gate = $this->cancelledOrdersGate()) return $gate;
         $company = Company::find(app('currentCompanyId'));
         $orders = $this->cancelledOrdersQuery($request, $from, $to)->limit(2000)->get();
-        $summary = ['count' => $orders->count(), 'value' => (float) $orders->sum('total_amount')];
+        $summary = [
+            'count' => $orders->count(),
+            'value' => (float) $orders->sum('total_amount'),
+            'waste' => (float) $orders->flatMap->items->where('was_made', true)->sum('subtotal'),
+        ];
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.cancelled-orders-pdf', compact('company', 'orders', 'from', 'to', 'summary'));
         return $pdf->download("cancelled-orders-{$from}-to-{$to}.pdf");
     }

@@ -32,7 +32,7 @@
     </form>
 
     {{-- Summary --}}
-    <div class="grid grid-cols-2 gap-3 mb-5 max-w-md">
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5 max-w-2xl">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
             <p class="text-[10px] font-bold uppercase tracking-wide text-gray-400">{{ __('pos.total_cancelled') }}</p>
             <p class="text-2xl font-black text-red-600 mt-1">{{ number_format($summary['count']) }}</p>
@@ -40,6 +40,10 @@
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
             <p class="text-[10px] font-bold uppercase tracking-wide text-gray-400">{{ __('pos.cancelled_value') }}</p>
             <p class="text-2xl font-black text-gray-900 dark:text-white mt-1">Rs {{ number_format($summary['value']) }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+            <p class="text-[10px] font-bold uppercase tracking-wide text-gray-400">{{ __('pos.waste_value') }}</p>
+            <p class="text-2xl font-black text-orange-600 mt-1">Rs {{ number_format($summary['waste'] ?? 0) }}</p>
         </div>
     </div>
 
@@ -62,7 +66,7 @@
                     <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">{{ $o->order_number }}</td>
                     <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ optional($o->cancelled_at ?? $o->updated_at)->format('d M, h:i A') }}</td>
                     <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ $o->table?->table_number ? 'T-' . $o->table->table_number : '—' }}</td>
-                    <td class="px-4 py-3 text-xs text-gray-500 hidden lg:table-cell max-w-xs truncate">{{ $o->items->map(fn ($i) => $i->quantity . '× ' . $i->item_name)->implode(', ') }}</td>
+                    <td class="px-4 py-3 text-xs text-gray-500 hidden lg:table-cell max-w-xs truncate">{{ $o->items->map(fn ($i) => $i->quantity . '× ' . $i->item_name . ($i->was_made ? ' ✓' : ''))->implode(', ') }}</td>
                     <td class="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">{{ number_format($o->total_amount) }}</td>
                     <td class="px-4 py-3 hidden sm:table-cell">
                         @if ($o->kot_sent_at)

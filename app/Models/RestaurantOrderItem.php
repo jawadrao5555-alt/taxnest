@@ -21,6 +21,7 @@ class RestaurantOrderItem extends Model
         'item_discount_value' => 'decimal:2',
         'item_discount_amount' => 'decimal:2',
         'kot_printed_at' => 'datetime',
+        'was_made' => 'boolean',
     ];
 
     public function order()

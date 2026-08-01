@@ -1894,10 +1894,12 @@ window.addEventListener('popstate', function() {
                     <template x-if="boardCancelAsk.items === null"><p class="text-xs text-gray-400 text-center py-2">…</p></template>
                     <template x-if="Array.isArray(boardCancelAsk.items)">
                         <div class="space-y-1">
+                            <p x-show="boardCancelAsk.order.kot_sent_at && boardCancelAsk.items.length" class="text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.cancel_mark_made_hint') }}</p>
                             <template x-for="it in boardCancelAsk.items" :key="it.id">
-                                <div class="flex justify-between text-xs text-gray-700 dark:text-gray-300">
-                                    <span x-text="it.quantity + ' × ' + it.item_name"></span>
+                                <div class="flex items-center justify-between gap-2 text-xs text-gray-700 dark:text-gray-300">
+                                    <span class="flex-1" x-text="it.quantity + ' × ' + it.item_name"></span>
                                     <span class="text-gray-400" x-text="Math.round(it.subtotal).toLocaleString()"></span>
+                                    <button x-show="boardCancelAsk.order.kot_sent_at" type="button" @click="boardCancelMade[it.id] = !boardCancelMade[it.id]" class="px-2 py-1 rounded-lg text-[10px] font-bold border transition" :class="boardCancelMade[it.id] ? 'bg-orange-100 dark:bg-orange-900/30 border-orange-400 text-orange-700 dark:text-orange-300' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400'" x-text="boardCancelMade[it.id] ? '{{ __('pos.item_made_yes') }}' : '{{ __('pos.item_made_no') }}'"></button>
                                 </div>
                             </template>
                         </div>
@@ -3503,6 +3505,7 @@ function restaurantPos() {
         boardMenuItems: null,   // lazy-fetched items of the open table's order (null = loading)
         boardConfirm: null,     // { table } → Final CASH/CARD confirm modal
         boardCancelAsk: null,   // { table, order, items|null } → cancel-warning modal (ZFC, 2 Aug 2026)
+        boardCancelMade: {},    // item_id → true jab cashier ne "ban gaya" tick kiya (waste audit)
         boardShift: null,       // { table, order } → Table Shift modal (26 Jul 2026)
         boardBusy: false,
         heldMenu: null,         // held (bina-table) chip → action menu modal
@@ -6139,6 +6142,7 @@ function restaurantPos() {
                 // ki list + "KOT kitchen ja chuki hai" ka alert, taake bana hua
                 // khana anjane mein cancel na ho.
                 this.boardCancelAsk = { table: t, order: t.order, items: null };
+                this.boardCancelMade = {};
                 try {
                     const res = await fetch('/pos/restaurant/orders/by-table/' + t.id, { headers: { 'Accept': 'application/json' } });
                     const list = res.ok ? await res.json().catch(() => null) : null;
@@ -6161,9 +6165,12 @@ function restaurantPos() {
             const t = ask.table;
             this.boardBusy = true;
             try {
+                const madeIds = Object.keys(this.boardCancelMade).filter(k => this.boardCancelMade[k]).map(Number);
                 const res = await fetch('/pos/restaurant/orders/' + ask.order.id + '/delete', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    // made_item_ids sirf tab bhejo jab KOT gayi thi (warna sawal hi nahi banta)
+                    body: JSON.stringify(ask.order.kot_sent_at ? { made_item_ids: madeIds } : {}),
                 });
                 const data = res.ok ? await res.json().catch(() => null) : null;
                 if (data && data.success) {

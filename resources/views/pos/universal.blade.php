@@ -3537,6 +3537,7 @@ function restaurantPos() {
         // one-time toast nudge (per-session dedupe) and wait inside the Select-Table
         // picker as purple "Order Tayyar" cards until a cashier claims them.
         notifiedIncoming: [],
+        chimedIncoming: [], // Task 106: chime dedupe is separate — hidden-tab chime must not eat the toast
         // ── AUTO-SYNC ENGINE ──────────────────────────────────────────────
         // syncStatus: 'online' | 'syncing' | 'offline'
         // _syncTimer fires every 30 sec; pings count endpoint then silently
@@ -3917,7 +3918,13 @@ function restaurantPos() {
             // P7: incoming waiter orders — badge poll every 20s (restaurant mode only).
             if (this.isRestaurantMode) {
                 setTimeout(() => this.loadIncoming(), 1800);
-                setInterval(() => { if (!document.hidden && !this.showPayModal) this.loadIncoming(); }, 20000);
+                // Task 106: poll even when the tab is hidden — the whole point of the
+                // chime is alerting a cashier who is looking elsewhere. (Browsers
+                // throttle background intervals to ~1/min; that's still fine.)
+                setInterval(() => { if (!this.showPayModal) this.loadIncoming(); }, 20000);
+                // When the cashier comes back, fire the pending toasts immediately
+                // instead of waiting up to 20s for the next poll.
+                document.addEventListener('visibilitychange', () => { if (!document.hidden) this.maybeAutoLoadIncoming(); });
                 // Occupied-timer tick (table picker + held-orders elapsed labels).
                 setInterval(() => { this.nowTick = Date.now(); }, 30000);
                 // Table Board (Jul 2026): tiles live below the cart, so the status
@@ -7195,17 +7202,27 @@ function restaurantPos() {
         // The cashier now clicks the purple "Order Tayyar" table in the table picker / TABLE board.
         // This is just the one-time toast nudge per new order.
         maybeAutoLoadIncoming() {
-            if (!this.isRestaurantMode || !this.incomingOrders.length || document.hidden) return;
-            let fresh = 0;
+            if (!this.isRestaurantMode || !this.incomingOrders.length) return;
+            // Task 106: chime fires even when the tab is HIDDEN — that's the whole
+            // point of an audible alert. Separate dedupe list (chimedIncoming) so a
+            // hidden-tab chime doesn't swallow the toast shown on return.
+            // Order Sound (Aug 2026): ONE chime per poll batch, not per order —
+            // three orders at once must not turn the counter into an alarm clock.
+            let freshChime = 0;
+            this.incomingOrders.forEach(o => {
+                if (this.chimedIncoming.includes(o.id)) return;
+                this.chimedIncoming.push(o.id);
+                freshChime++;
+            });
+            if (freshChime > 0 && this.orderSound) this.playOrderChime();
+            // Toast only when visible (unchanged behavior); pending toasts fire on
+            // the visibilitychange hook / next poll once the cashier returns.
+            if (document.hidden) return;
             this.incomingOrders.forEach(o => {
                 if (this.notifiedIncoming.includes(o.id)) return;
                 this.notifiedIncoming.push(o.id);
-                fresh++;
                 this.showToast(window.TXT.new_waiter_order_prefix + o.order_number + (o.table ? ' (T-' + o.table + ')' : '') + ' — TABLE board (Alt+B) se kholein', 'success');
             });
-            // Order Sound (Aug 2026): ONE chime per poll batch, not per order —
-            // three orders at once must not turn the counter into an alarm clock.
-            if (fresh > 0 && this.orderSound) this.playOrderChime();
         },
         // Two-tone WebAudio chime — no audio file, works offline, ~0.35s. Browsers
         // block audio before the first user gesture; the try/catch swallows that

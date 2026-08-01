@@ -45,9 +45,12 @@
             $submitAction = route('payment-proof.store');
         }
         $rejectedProof = null;
+        $everRejected = false;
         if ($companyId && \Illuminate\Support\Facades\Schema::hasTable('payment_proofs')) {
             $pendingProof = \App\Models\PaymentProof::where('company_id', $companyId)
                 ->where('status', 'pending')->exists();
+            $everRejected = \App\Models\PaymentProof::where('company_id', $companyId)
+                ->where('status', 'rejected')->exists();
             // No pending proof + the LATEST proof was rejected → show the
             // reason right where the company resubmits.
             if (!$pendingProof) {
@@ -234,14 +237,29 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <input type="number" step="0.01" min="0" name="amount" value="{{ old('amount') }}" placeholder="Amount paid (PKR)"
                                class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-100">
-                        <input type="text" name="reference" value="{{ old('reference') }}" maxlength="120" placeholder="Bank ref / TID (optional)"
-                               class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-100">
+                        <select name="payment_method"
+                                class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-100">
+                            <option value="">Payment method</option>
+                            <option value="bank" @selected(old('payment_method') === 'bank')>Bank Transfer</option>
+                            <option value="jazzcash" @selected(old('payment_method') === 'jazzcash')>JazzCash</option>
+                            <option value="easypaisa" @selected(old('payment_method') === 'easypaisa')>EasyPaisa</option>
+                            <option value="other" @selected(old('payment_method') === 'other')>Other</option>
+                        </select>
                     </div>
+                    <input type="text" name="reference" value="{{ old('reference') }}" maxlength="120" placeholder="Transaction ID / bank reference (optional)"
+                           class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-100">
                     <input type="file" name="proof" accept=".jpg,.jpeg,.png,.pdf" required
                            class="w-full text-sm text-gray-600 dark:text-gray-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-amber-500 file:text-white hover:file:bg-amber-400">
                     @error('proof')<p class="text-xs text-red-500">{{ $message }}</p>@enderror
                     @error('amount')<p class="text-xs text-red-500">{{ $message }}</p>@enderror
                     <p class="text-[11px] text-gray-400">Accepted: JPG, PNG, PDF — max 5 MB.</p>
+                    @if($everRejected)
+                    <p class="text-[11px] text-amber-600 dark:text-amber-400">Your new proof will be activated after our team verifies it.</p>
+                    @else
+                    <div class="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
+                        Upload your proof and get <strong>instant access for 10 days</strong> while our team verifies your payment.
+                    </div>
+                    @endif
                     <button type="submit"
                             class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-white text-sm font-semibold transition">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>

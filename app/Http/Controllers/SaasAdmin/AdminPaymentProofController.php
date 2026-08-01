@@ -86,6 +86,18 @@ class AdminPaymentProofController extends Controller
             return back()->with('error', 'This payment proof was already processed.');
         }
 
+        // A verified payment must also unlock the company itself: mirror the
+        // admin grant flow (BOTH status columns), never reversing a deliberate
+        // suspension/rejection. Covers companies demoted to pending by the
+        // expired-grant reconciler before the admin got to this proof.
+        $company = Company::find($proof->company_id);
+        if ($company
+            && !in_array($company->status, ['suspended', 'rejected'], true)
+            && !in_array($company->company_status, ['suspended', 'rejected'], true)
+            && ($company->status !== 'approved' || $company->company_status !== 'active')) {
+            $company->update(['status' => 'approved', 'company_status' => 'active']);
+        }
+
         AdminAuditLog::log(auth('admin')->id(), 'Payment proof approved', 'PaymentProof', $proof->id, [
             'company_id' => $proof->company_id,
             'subscription_id' => $subscription->id,
@@ -117,14 +129,73 @@ class AdminPaymentProofController extends Controller
             return back()->with('error', 'This payment proof was already processed.');
         }
 
+        // Reject = the auto-granted 10-day bridge access ends immediately.
+        $revokedAccess = $this->revokeAutoAccess($proof->fresh());
+
         AdminAuditLog::log(auth('admin')->id(), 'Payment proof rejected', 'PaymentProof', $proof->id, [
             'company_id' => $proof->company_id,
             'reason' => $request->reject_reason,
+            'auto_access_revoked' => $revokedAccess,
         ]);
 
         $this->notifyCompany($proof->fresh(['company', 'pricingPlan']), 'rejected');
 
         return back()->with('success', 'Payment proof rejected. The company can submit a new one.');
+    }
+
+    /**
+     * Revoke the 10-day temporary override that this proof's upload
+     * auto-granted (identified by override_by NULL + the proof id in the
+     * reason — an ADMIN-granted override is never touched). If the company is
+     * left without access, it demotes back to pending (BOTH status columns),
+     * mirroring the expired-grant reconciler; deliberate suspensions/rejections
+     * and companies with other valid access are left alone.
+     */
+    private function revokeAutoAccess(?PaymentProof $proof): bool
+    {
+        try {
+            if (!$proof || !$proof->auto_access_until) {
+                return false;
+            }
+
+            $sub = \App\Models\Subscription::where('company_id', $proof->company_id)
+                ->where('active', true)
+                ->orderByDesc('id')
+                ->first();
+            if (!$sub
+                || $sub->override_type !== 'temporary'
+                || $sub->override_by !== null
+                || !str_contains((string) $sub->override_reason, 'payment proof #' . $proof->id)) {
+                return false;
+            }
+
+            $sub->update([
+                'override_type' => 'none',
+                'override_until' => null,
+                'override_granted_at' => null,
+                'free_invoice_limit' => null,
+                'override_reason' => null,
+                'override_by' => null,
+            ]);
+
+            $company = Company::find($proof->company_id);
+            if ($company
+                && !in_array($company->status, ['suspended', 'rejected'], true)
+                && !in_array($company->company_status, ['suspended', 'rejected'], true)
+                && !(\App\Services\SubscriptionAccessService::hasAccess($company)['allowed'] ?? false)
+                && ($company->status !== 'pending' || $company->company_status !== 'pending')) {
+                $company->update(['status' => 'pending', 'company_status' => 'pending']);
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::warning('Auto access revoke on reject failed', [
+                'payment_proof_id' => $proof->id ?? null,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     public function download($id)
@@ -204,7 +275,9 @@ class AdminPaymentProofController extends Controller
                     $reasonLine .= '.';
                 }
                 $title = 'Payment proof rejected';
-                $message = 'Payment rejected: ' . $reasonLine . ' Please submit a new payment proof.';
+                $message = 'Payment rejected: ' . $reasonLine
+                    . ($proof->auto_access_until ? ' Your temporary access has ended.' : '')
+                    . ' Please submit a new payment proof.';
                 $subject = 'Payment proof rejected — action required';
                 $headline = 'Your payment proof could not be verified.';
                 $paragraphs = array_values(array_filter([

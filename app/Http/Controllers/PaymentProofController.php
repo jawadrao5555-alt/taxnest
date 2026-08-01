@@ -40,6 +40,7 @@ class PaymentProofController extends Controller
             'pricing_plan_id' => 'required|exists:pricing_plans,id',
             'billing_cycle' => 'required|in:' . implode(',', $allowedCycles),
             'amount' => 'nullable|numeric|min:0',
+            'payment_method' => 'nullable|in:bank,jazzcash,easypaisa,other',
             'reference' => 'nullable|string|max:120',
             'payment_date' => 'nullable|date',
             'notes' => 'nullable|string|max:500',
@@ -73,6 +74,7 @@ class PaymentProofController extends Controller
             'pricing_plan_id' => $plan->id,
             'billing_cycle' => \App\Services\SubscriptionAssignmentService::normalizeCycle($validated['billing_cycle']),
             'amount' => $validated['amount'] ?? null,
+            'payment_method' => Schema::hasColumn('payment_proofs', 'payment_method') ? ($validated['payment_method'] ?? null) : null,
             'reference' => $validated['reference'] ?? null,
             'payment_date' => $validated['payment_date'] ?? null,
             'notes' => $validated['notes'] ?? null,
@@ -83,10 +85,122 @@ class PaymentProofController extends Controller
         // Alert admins right away — the company is blocked from billing until an
         // admin verifies, so review speed matters. Best-effort: a mail failure
         // must NEVER break the company's submission (mirrors trial-reminder pattern).
+        // Instant temporary access (owner approved, Aug 2026): the moment a
+        // locked company submits a proof it gets 10 days of temporary access
+        // while an admin verifies. Safeguard: a company with ANY previously
+        // rejected proof gets NO auto access on re-upload (admin must decide).
+        $granted = $this->grantInstantAccess($company, $proof);
+
         $this->alertAdmins($company, $plan, $proof);
+
+        if ($granted) {
+            return back()->with('success', 'Payment proof submitted! Temporary access has been enabled for 10 days while our team verifies your payment.')
+                ->with('payment_proof', 'submitted');
+        }
 
         return back()->with('success', 'Payment proof submitted! Your account will be unlocked once our team verifies it.')
             ->with('payment_proof', 'submitted');
+    }
+
+    /**
+     * Auto-grant a 10-day temporary override on proof upload.
+     *
+     * Granted ONLY when ALL hold:
+     *  - the company exists and is not internal / suspended / rejected;
+     *  - the company has NO previously rejected proof (owner safeguard: after
+     *    a rejection, re-uploads wait for manual admin review);
+     *  - the current subscription has no other active override (never stomp an
+     *    admin-granted lifetime/temporary/usage-free grant);
+     *  - the company is currently locked (hasAccess false) — a still-active
+     *    company needs no bridge access.
+     *
+     * The grant rides on the subscription row exactly like an admin temporary
+     * grant, so the existing reconciler expires+demotes it automatically if the
+     * admin does nothing within 10 days. override_by stays NULL and the reason
+     * carries the proof id so reject() can find and revoke exactly this grant.
+     */
+    private function grantInstantAccess(?\App\Models\Company $company, PaymentProof $proof): bool
+    {
+        try {
+            if (!$company || $company->is_internal_account) {
+                return false;
+            }
+            if (in_array($company->status, ['suspended', 'rejected'], true)
+                || in_array($company->company_status, ['suspended', 'rejected'], true)) {
+                return false;
+            }
+            if (!Schema::hasColumn('payment_proofs', 'auto_access_until')) {
+                return false;
+            }
+
+            // Owner safeguard: any prior rejection disables instant access.
+            $wasRejected = PaymentProof::where('company_id', $company->id)
+                ->where('status', 'rejected')
+                ->where('id', '!=', $proof->id)
+                ->exists();
+            if ($wasRejected) {
+                return false;
+            }
+
+            $sub = \Illuminate\Support\Facades\DB::transaction(function () use ($company) {
+                $sub = \App\Models\Subscription::where('company_id', $company->id)
+                    ->orderByDesc('active')
+                    ->orderByDesc('id')
+                    ->lockForUpdate()
+                    ->first();
+                if (!$sub) {
+                    return \App\Models\Subscription::create([
+                        'company_id' => $company->id,
+                        'pricing_plan_id' => null,
+                        'billing_cycle' => 'monthly',
+                        'discount_percent' => 0,
+                        'final_price' => 0,
+                        'start_date' => now()->toDateString(),
+                        'end_date' => null,
+                        'active' => true,
+                    ]);
+                }
+                if (!$sub->active) {
+                    $sub->update(['active' => true]);
+                }
+                return $sub;
+            });
+
+            // Never stomp an existing valid grant (lifetime / admin temporary / usage-free).
+            if ($sub->hasActiveOverride()) {
+                return false;
+            }
+
+            // Only bridge companies that are actually locked right now.
+            if (\App\Services\SubscriptionAccessService::hasAccess($company)['allowed'] ?? false) {
+                return false;
+            }
+
+            $until = now()->addDays(10);
+            $sub->update([
+                'override_type' => 'temporary',
+                'override_until' => $until,
+                'override_granted_at' => now(),
+                'free_invoice_limit' => null,
+                'override_reason' => 'Auto access: payment proof #' . $proof->id . ' pending verification',
+                'override_by' => null,
+            ]);
+            $proof->update(['auto_access_until' => $until]);
+
+            // Mirror the admin grant flow: a grant unlocks a pending company
+            // (both status columns), never a suspended/rejected one (checked above).
+            if ($company->status !== 'approved' || $company->company_status !== 'active') {
+                $company->update(['status' => 'approved', 'company_status' => 'active']);
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::warning('Payment proof instant access grant failed', [
+                'proof_id' => $proof->id,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
     }
 
     /**
@@ -108,6 +222,8 @@ class PaymentProofController extends Controller
             $panel = strtoupper($plan->product_type ?? 'di');
             $cycle = ucwords(str_replace('_', ' ', (string) $proof->billing_cycle));
             $amount = $proof->amount !== null ? 'PKR ' . number_format((float) $proof->amount) : 'Not specified';
+            $methodLabels = ['bank' => 'Bank Transfer', 'jazzcash' => 'JazzCash', 'easypaisa' => 'EasyPaisa', 'other' => 'Other'];
+            $method = $methodLabels[$proof->payment_method] ?? null;
 
             $body = "A new payment receipt is waiting for review.\n\n"
                 . "Company: {$companyName}\n"
@@ -115,9 +231,12 @@ class PaymentProofController extends Controller
                 . "Package: {$plan->name}\n"
                 . "Billing cycle: {$cycle}\n"
                 . "Amount: {$amount}\n"
+                . ($method ? "Payment method: {$method}\n" : '')
                 . ($proof->reference ? "Reference: {$proof->reference}\n" : '')
                 . ($proof->payment_date ? 'Payment date: ' . $proof->payment_date->format('Y-m-d') . "\n" : '')
-                . "\nThe company stays locked until this is verified.\n"
+                . ($proof->auto_access_until
+                    ? "\nTemporary access was AUTO-GRANTED until " . $proof->auto_access_until->format('Y-m-d') . " — please verify before it expires.\n"
+                    : "\nThe company stays locked until this is verified.\n")
                 . 'Review: ' . route('saas.admin.payment-proofs') . "\n\n"
                 . 'TaxNest';
 

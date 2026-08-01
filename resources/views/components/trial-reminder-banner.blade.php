@@ -25,8 +25,14 @@
                 if ($ov['invoices_left'] !== null) {
                     $parts[] = $ov['invoices_left'] <= 0 ? 'no invoices left' : ($ov['invoices_left'] . ' invoice' . ($ov['invoices_left'] == 1 ? '' : 's') . ' left');
                 }
+                // Auto-granted bridge access (payment proof upload) reads differently
+                // from a manual admin grant — the customer is waiting on verification.
+                $ovSub = \App\Models\Subscription::where('company_id', $rCompany->id)->where('active', true)->orderByDesc('id')->first();
+                $isAutoGrant = $ovSub && $ovSub->override_by === null && str_contains((string) $ovSub->override_reason, 'payment proof #');
                 $reminder = [
-                    'text' => 'Free access granted by admin — ' . implode(' · ', $parts) . '.',
+                    'text' => ($isAutoGrant
+                        ? 'Temporary access while we verify your payment — '
+                        : 'Free access granted by admin — ') . implode(' · ', $parts) . '.',
                     'key' => 'override_reminder_' . now()->toDateString() . '_' . $ov['days_left'] . '_' . ($ov['invoices_left'] ?? 'x'),
                 ];
             }

@@ -60,7 +60,13 @@
                                     <span class="text-gray-500 dark:text-gray-400">—</span>
                                 @endif
                             </td>
-                            <td class="px-4 py-3 text-gray-300">{{ $proof->amount !== null ? 'PKR ' . number_format((float) $proof->amount) : '—' }}</td>
+                            <td class="px-4 py-3 text-gray-300">
+                                {{ $proof->amount !== null ? 'PKR ' . number_format((float) $proof->amount) : '—' }}
+                                @php $pmLabels = ['bank' => 'Bank Transfer', 'jazzcash' => 'JazzCash', 'easypaisa' => 'EasyPaisa', 'other' => 'Other']; @endphp
+                                @if($proof->payment_method)
+                                    <span class="block text-[11px] text-gray-500 dark:text-gray-400">{{ $pmLabels[$proof->payment_method] ?? ucfirst($proof->payment_method) }}</span>
+                                @endif
+                            </td>
                             <td class="px-4 py-3 text-gray-400 hidden md:table-cell">{{ $proof->reference ?: '—' }}</td>
                             <td class="px-4 py-3 text-gray-400 text-xs hidden lg:table-cell">{{ optional($proof->payment_date)->format('d M Y') ?? '—' }}</td>
                             <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ $proof->created_at->format('d M Y, H:i') }}</td>
@@ -84,6 +90,12 @@
                                     ][$proof->status] ?? 'bg-gray-800 text-gray-400';
                                 @endphp
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $badge }}">{{ ucfirst($proof->status) }}</span>
+                                @if($proof->status === 'pending' && $proof->auto_access_until)
+                                    <p class="text-[11px] mt-1 {{ $proof->auto_access_until->isFuture() ? 'text-emerald-400' : 'text-red-400' }}"
+                                       title="10-day access auto-granted on upload — expires if not verified">
+                                        Temp access {{ $proof->auto_access_until->isFuture() ? 'until ' . $proof->auto_access_until->format('d M Y') : 'EXPIRED ' . $proof->auto_access_until->format('d M Y') }}
+                                    </p>
+                                @endif
                                 @if($proof->status === 'rejected' && $proof->reject_reason)
                                     <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1 max-w-[180px] mx-auto">{{ $proof->reject_reason }}</p>
                                 @endif

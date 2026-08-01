@@ -9,6 +9,8 @@ class PaymentProof extends Model
     protected $fillable = [
         'company_id',
         'amount',
+        'payment_method',
+        'auto_access_until',
         'reference',
         'payment_date',
         'proof_path',
@@ -26,6 +28,7 @@ class PaymentProof extends Model
     protected $casts = [
         'amount' => 'decimal:2',
         'payment_date' => 'date',
+        'auto_access_until' => 'datetime',
         'verified_at' => 'datetime',
         'file_pruned_at' => 'datetime',
     ];

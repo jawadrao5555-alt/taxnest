@@ -357,3 +357,6 @@ Sale screen ki mazeed cheezein:
 
 ## Waiter tablet se bhi Table Shift (Aug 2026)
 - Waiter tablet ke 'Choose Table' mein occupied (surkh) table par tap karein — us table ka order kisi KHALI table par shift ho jata hai, chahe order cashier (desktop) ne lagaya ho ya kisi aur waiter ne. Timer sath chalta hai, KOT dobara print nahi hota. Apne orders 'My Orders' se pehle ki tarah bhi shift ho sakte hain.
+
+## Waiter tablet: occupied table par Add Items / Shift (Aug 2026)
+- Choose Table mein surkh (occupied) table par tap karein to do options aate hain: 'Add Items +' (us order mein naye items — cashier/desktop ke lagaye orders mein bhi; sirf naye items ki delta KOT print hoti hai) aur 'Shift ⇄' (khali table par muntaqil). My Orders wala purana Add Items rasta bhi qaim hai.

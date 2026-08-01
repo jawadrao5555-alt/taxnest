@@ -14,3 +14,6 @@ description: cPanel PROD MySQL PDO gives non-cast int columns back as STRINGS; d
 - In Blade/JS, never strict-compare ids that crossed a fetch boundary — use `Number(a) === Number(b)` with a null guard.
 - When a feature "works on dev but not live" with no errors, dump the LIVE JSON and check value TYPES, not just values.
 - Debug trick: puppeteer-login to live and `fetch()` the API in-page to see the real payload types.
+
+## DB::raw vs model int casts
+`$model->update(['col' => DB::raw(...)])` on a column with an 'integer' cast throws "Object of class Illuminate\Database\Query\Expression could not be converted to int" (cast runs on the Expression). **How to apply:** any raw/atomic increment must go through the QUERY builder (`Model::whereKey($id)->update([...])` + manual `updated_at`), never a model-instance update.

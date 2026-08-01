@@ -184,7 +184,7 @@
                         {{-- Occupied tiles (ZFC, 1 Aug 2026): ab tap-able — tap par us
                              table ka order KHALI table par SHIFT hota hai (cashier ke
                              lagaye orders bhi). Compose ke liye ab bhi sirf khali/reserved. --}}
-                        <button @click="t.status === 'occupied' ? startShiftFromTable(t) : pickTable(t)" :disabled="t.status === 'occupied' && !t.order_id"
+                        <button @click="t.status === 'occupied' ? (tableActionFor = t) : pickTable(t)" :disabled="t.status === 'occupied' && !t.order_id"
                                 :class="t.status === 'occupied' ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-500 dark:text-red-300' : (t.status === 'reserved' ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300' : 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:border-emerald-500')"
                                 class="rounded-xl border-2 p-3 text-center transition">
                             <span class="block text-base font-black" x-text="'T-' + t.table_number"></span>
@@ -195,6 +195,21 @@
                     </template>
                 </div>
                 <div x-show="!tablesLoading && tables.length === 0" class="text-center py-8 text-sm text-gray-400">{{ __('pos.no_tables_configured_dot') }}</div>
+            </div>
+        </div>
+    </div>
+
+    {{-- ── Occupied-table action chooser (ZFC, 1 Aug 2026): Add Items ya Shift ── --}}
+    <div x-show="tableActionFor" x-cloak class="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/60" @click="tableActionFor = null"></div>
+        <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden">
+            <div class="px-5 py-4 bg-teal-600 flex items-center justify-between">
+                <h3 class="text-white font-bold" x-text="tableActionFor ? ('T-' + tableActionFor.table_number + ' — ' + (tableActionFor.order_number || '')) : ''"></h3>
+                <button @click="tableActionFor = null" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/25 text-white font-black">×</button>
+            </div>
+            <div class="p-4 space-y-2.5">
+                <button @click="startAppendFromTable(tableActionFor)" class="w-full py-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-sm">{{ __('pos.add_items') }} +</button>
+                <button @click="startShiftFromTable(tableActionFor); tableActionFor = null" class="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm">{{ __('pos.shift_word') }} ⇄</button>
             </div>
         </div>
     </div>
@@ -296,6 +311,7 @@ function waiterApp() {
         myOrdersLoading: false,
         appendOrderId: null,
         appendOrderNumber: '',
+        tableActionFor: null,    // occupied-tile chooser (Add Items / Shift)
         shiftFor: null,          // Table Shift (26 Jul 2026): order being shifted
         shiftBusy: false,
         shiftTablesLoading: false,
@@ -492,6 +508,16 @@ function waiterApp() {
             this.cart = [];
         },
 
+        // Add Items to ANY held order from the table picker (ZFC, 1 Aug 2026):
+        // desktop/cashier ke lagaye orders bhi — reuses the append flow.
+        startAppendFromTable(t) {
+            if (!t || !t.order_id) return;
+            this.appendOrderId = t.order_id;
+            this.appendOrderNumber = t.order_number || ('T-' + t.table_number);
+            this.tableActionFor = null;
+            this.showTables = false;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        },
         // Shift from the table picker (ZFC, 1 Aug 2026): occupied tile tap —
         // shift that table's ACTIVE order (any creator) to an empty table.
         startShiftFromTable(t) {

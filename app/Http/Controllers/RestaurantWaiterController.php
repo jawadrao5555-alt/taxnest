@@ -304,20 +304,16 @@ class RestaurantWaiterController extends Controller
         ]);
 
         return DB::transaction(function () use ($companyId, $validated, $user, $id) {
+            // ZFC (1 Aug 2026): waiter DESKTOP (cashier) ke lagaye held orders mein
+            // bhi items add kar sakta hai — source/creator restriction hata di
+            // (table-shift jaisi company-wide authority, owner-approved).
             $order = RestaurantOrder::where('company_id', $companyId)
                 ->where('id', $id)
-                ->where('source', 'waiter')
                 ->where('status', 'held')
                 ->lockForUpdate()
                 ->first();
             if (!$order) {
                 return response()->json(['success' => false, 'message' => 'Order not found or already settled.'], 404);
-            }
-            // Only the sending waiter (or an admin/manager) may append.
-            // Int-cast both sides — some live PDO setups return int columns as strings,
-            // which made strict !== flag the waiter's OWN order as "Not your order."
-            if ((int) $order->created_by !== (int) $user->id && !$user->isPosAdmin()) {
-                return response()->json(['success' => false, 'message' => 'Not your order.'], 403);
             }
 
             $added = 0;

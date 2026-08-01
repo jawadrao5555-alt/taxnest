@@ -348,3 +348,6 @@ Sale screen ki mazeed cheezein:
 
 ## POS Customers page tez (Aug 2026)
 - Bahut zyada customers (hazaron) wale shops par POS Customers page ab 100 customers fi page dikhata hai (pagination) — pehle saray ek sath load hote thay aur page atak jata tha. Search ab database se hoti hai: number ya naam likh kar Talash dabayen, kisi bhi page ka customer mil jayega.
+
+## Waiter orders sab se naya oopar (Aug 2026)
+- Cashier ki Incoming/Counter orders list mein ab sab se naya waiter order sab se OOPAR dikhta hai. Naye order ki itla (green message + Dine In par ginti ka badge) pehle se aati hai — screen har 20 second mein khud check karti hai.

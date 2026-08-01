@@ -394,7 +394,10 @@ class RestaurantWaiterController extends Controller
             });
         }
 
-        $orders = $q->orderBy('id')->get()->map(fn($o) => $this->orderJson($o));
+        // Newest FIRST (ZFC voice note, 1 Aug 2026): "jo bhi order waiter lagayega
+        // woh OOPAR show hoga" — the cashier wants the latest incoming order at
+        // the top of the Incoming/Counter lists, not buried under older ones.
+        $orders = $q->orderByDesc('id')->get()->map(fn($o) => $this->orderJson($o));
 
         // KDS liveness flag (Jul 2026): sale screens poll this endpoint every 20s.
         // Header (not body) so the response stays a plain array — existing clients

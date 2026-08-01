@@ -90,6 +90,16 @@
         </form>
     </div>
 
+    {{-- Customer search (owner request, 1 Aug 2026 — ZFC): filter by name / phone / city / CNIC / NTN --}}
+    <div class="mb-3">
+        <div class="relative max-w-md">
+            <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg>
+            <input type="text" id="custSearchInput" placeholder="{{ __('pos.search_customer_placeholder') }}" autocomplete="off" name="pos_cust_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                   class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white pl-9 pr-3 py-2 focus:ring-2 focus:ring-purple-500">
+        </div>
+        <p id="custSearchCount" class="text-xs text-gray-400 mt-1 hidden"></p>
+    </div>
+
     <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-md overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-sm table-cards">
@@ -108,7 +118,8 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                     @forelse($customers as $customer)
-                    <tr class="{{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }} {{ !$customer->is_active ? 'opacity-50' : '' }}" x-data="{ editing: false }">
+                    <tr class="cust-row {{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }} {{ !$customer->is_active ? 'opacity-50' : '' }}" x-data="{ editing: false }"
+                        data-search="{{ Str::lower(trim(($customer->name ?? '') . ' ' . ($customer->phone ?? '') . ' ' . ($customer->email ?? '') . ' ' . ($customer->city ?? '') . ' ' . ($customer->cnic ?? '') . ' ' . ($customer->ntn ?? ''))) }}">
                         <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ $customer->name }}</td>
                         <td class="px-4 py-3 text-gray-500 hidden sm:table-cell">{{ $customer->phone ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell">{{ $customer->email ?? '—' }}</td>
@@ -177,5 +188,31 @@
     <div class="mt-4 text-xs text-gray-400 text-center">
         {{ __('pos.customers_exclusive_note') }}
     </div>
+
+    <script>
+    // Customer search (owner request, 1 Aug 2026): client-side filter over the
+    // rendered rows — matches name/phone/email/city/CNIC/NTN via data-search.
+    (function () {
+        var input = document.getElementById('custSearchInput');
+        var count = document.getElementById('custSearchCount');
+        if (!input) return;
+        var label = @json(__('pos.search_customers_found'));
+        input.addEventListener('input', function () {
+            var q = input.value.trim().toLowerCase();
+            var rows = document.querySelectorAll('tr.cust-row');
+            var shown = 0;
+            rows.forEach(function (row) {
+                var hit = !q || (row.getAttribute('data-search') || '').indexOf(q) !== -1;
+                row.style.display = hit ? '' : 'none';
+                if (hit) shown++;
+                // Keep the inline edit row in sync with its parent row.
+                var next = row.nextElementSibling;
+                if (next && !next.classList.contains('cust-row')) next.style.display = hit ? '' : 'none';
+            });
+            if (q) { count.textContent = shown + ' ' + label; count.classList.remove('hidden'); }
+            else { count.classList.add('hidden'); }
+        });
+    })();
+    </script>
 </div>
 </x-pos-layout>

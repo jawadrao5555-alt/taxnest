@@ -1198,7 +1198,8 @@ window.addEventListener('popstate', function() {
                         </template>
                         <template x-if="customerStats">
                             <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
-                                <span class="text-[10px] font-semibold text-blue-700 dark:text-blue-300" x-text="(customerStats.total_orders || 0) + window.TXT.sfx_orders"></span>
+                                {{-- Clickable (owner request, 1 Aug 2026 — ZFC): opens the customer history modal --}}
+                                <button type="button" @click="if (selectedCustomer?.id) loadCustomerHistory(selectedCustomer.id)" class="text-[10px] font-semibold text-blue-700 dark:text-blue-300 underline decoration-dotted underline-offset-2 hover:text-blue-900 dark:hover:text-blue-100" x-text="(customerStats.total_orders || 0) + window.TXT.sfx_orders" title="{{ __('pos.ti_view_history') }}"></button>
                                 <span class="text-[10px] text-gray-400">•</span>
                                 <span class="text-[10px] font-semibold text-blue-700 dark:text-blue-300" x-text="'Rs. ' + Number(customerStats.total_spent || 0).toLocaleString() + window.TXT.sfx_spent"></span>
                                 <template x-if="customerStats.last_order_date">

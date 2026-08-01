@@ -430,6 +430,8 @@ return [
     'ti_tax_rate_pct' => 'Tax rate %',
     'ti_uom' => 'Unit of measure',
     'ti_view_history' => 'View history',
+    'search_customer_placeholder' => 'Search customer — name, phone, city, CNIC...',
+    'search_customers_found' => 'customers found',
     'ti_view_print_kot' => 'View / print kitchen ticket',
     'ti_auto_kot_hint' => 'When ON, the kitchen ticket auto-prints right after payment of a held order — counter prints receipt, kitchen prints KOT.',
     'ti_auto_print_hint' => 'When ON, the receipt print dialog opens automatically right after a successful payment.',

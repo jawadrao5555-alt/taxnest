@@ -430,8 +430,8 @@
             <div class="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg border border-teal-100 dark:border-teal-900/40">
                 <div class="flex items-center justify-between">
                     <p class="text-xs font-bold uppercase text-teal-700 dark:text-teal-300">{{ __('pos.provisional_bills_l_series') }}</p>
-                    @php $provPolicy = in_array($company->pos_dayclose_provisional_action ?? 'save', ['save','delete','carry'], true) ? ($company->pos_dayclose_provisional_action ?? 'save') : 'save'; @endphp
-                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ $provPolicy === 'delete' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : ($provPolicy === 'carry' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' : 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300') }}">{{ $provPolicy === 'delete' ? __('pos.badge_delete') : ($provPolicy === 'carry' ? __('pos.badge_carry') : __('pos.badge_archive')) }}</span>
+                    @php $provPolicy = in_array($company->pos_dayclose_provisional_action ?? 'save', ['save','delete','carry','finalize'], true) ? ($company->pos_dayclose_provisional_action ?? 'save') : 'save'; @endphp
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ $provPolicy === 'delete' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : ($provPolicy === 'carry' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' : ($provPolicy === 'finalize' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300')) }}">{{ $provPolicy === 'delete' ? __('pos.badge_delete') : ($provPolicy === 'carry' ? __('pos.badge_carry') : ($provPolicy === 'finalize' ? __('pos.badge_finalize') : __('pos.badge_archive'))) }}</span>
                 </div>
                 <p class="text-xl font-bold text-gray-900 dark:text-white mt-1">{{ $localWash->prov_count }} <span class="text-sm font-semibold text-gray-500">{{ __('pos.bills_word') }} — PKR {{ number_format($localWash->prov_amount) }}</span></p>
                 @if($localWash->prov_backlog > 0)
@@ -442,6 +442,8 @@
                      unless the policy is Carry Forward. --}}
                 @if($provPolicy === 'carry')
                 <p class="text-xs text-indigo-700 dark:text-indigo-300 font-semibold mt-1">{{ __('pos.prov_carry_note') }}</p>
+                @elseif($provPolicy === 'finalize')
+                <p class="text-xs text-emerald-700 dark:text-emerald-300 font-semibold mt-1">{{ __('pos.prov_finalize_note') }}</p>
                 @else
                 <p class="text-xs text-red-700 dark:text-red-400 font-bold mt-1">⚠ {{ __('pos.prov_pending_final_warning') }}</p>
                 @endif
@@ -519,19 +521,19 @@
             </div>
             @php
                 $lbFinal = in_array($company->pos_dayclose_final_local_action ?? 'save', ['save','delete'], true) ? ($company->pos_dayclose_final_local_action ?? 'save') : 'save';
-                $lbProv  = in_array($company->pos_dayclose_provisional_action ?? 'save', ['save','delete','carry'], true) ? ($company->pos_dayclose_provisional_action ?? 'save') : 'save';
+                $lbProv  = in_array($company->pos_dayclose_provisional_action ?? 'save', ['save','delete','carry','finalize'], true) ? ($company->pos_dayclose_provisional_action ?? 'save') : 'save';
             @endphp
             <div class="mb-4 p-3 rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800">
                 <div class="text-sm">
                     <span class="font-bold text-teal-800 dark:text-teal-300">{{ __('pos.local_bills_policy') }}</span>
                     <p class="text-xs text-teal-700 dark:text-teal-400 mt-0.5">
-                        {!! __('pos.local_bills_policy_line', ['final' => '<b>' . ($lbFinal === 'delete' ? e(__('pos.badge_delete')) : e(__('pos.badge_archive_save'))) . '</b>', 'prov' => '<b>' . ($lbProv === 'delete' ? e(__('pos.badge_delete')) : ($lbProv === 'carry' ? e(__('pos.badge_carry')) : e(__('pos.badge_archive_save')))) . '</b>']) !!}
+                        {!! __('pos.local_bills_policy_line', ['final' => '<b>' . ($lbFinal === 'delete' ? e(__('pos.badge_delete')) : e(__('pos.badge_archive_save'))) . '</b>', 'prov' => '<b>' . ($lbProv === 'delete' ? e(__('pos.badge_delete')) : ($lbProv === 'carry' ? e(__('pos.badge_carry')) : ($lbProv === 'finalize' ? e(__('pos.badge_finalize')) : e(__('pos.badge_archive_save'))))) . '</b>']) !!}
                         {{ __('pos.pra_bills_untouched_policy') }}
                         <a href="{{ route('pos.customize') }}" class="underline font-semibold">{{ __('pos.customize_pos_local_billing') }}</a>.
                     </p>
                 </div>
             </div>
-            @if(($localWash->prov_count ?? 0) > 0 && $lbProv !== 'carry')
+            @if(($localWash->prov_count ?? 0) > 0 && $lbProv !== 'carry' && $lbProv !== 'finalize')
             {{-- Aug 2026: pending provisionals warning at the CLOSE button too. --}}
             <div class="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border-2 border-red-400 dark:border-red-700">
                 <span class="text-sm font-bold text-red-800 dark:text-red-300">⚠ {{ __('pos.prov_pending_close_warning', ['count' => $localWash->prov_count]) }}</span>
@@ -568,21 +570,25 @@
     {{-- After close: what the wash actually did (stored on the report). OUTSIDE the
          sales gate above — a day closed with ONLY backlog local bills has zero PRA
          sales, yet its wash summary must still show. --}}
-    @if($existingReport && is_array($existingReport->local_summary) && collect($existingReport->local_summary)->sum('count') > 0)
+    @if($existingReport && is_array($existingReport->local_summary) && (collect($existingReport->local_summary)->sum('count') > 0 || collect($existingReport->local_summary)->sum('finalized') > 0))
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <h3 class="font-semibold text-gray-900 dark:text-white mb-4">{{ __('pos.local_bills_closed_with_day') }}</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             @foreach(['provisional' => __('pos.provisional_bills_l_series'), 'final_local' => __('pos.final_bills_reporting_off')] as $kind => $label)
                 @php $ls = $existingReport->local_summary[$kind] ?? null; @endphp
-                @if($ls && ($ls['count'] ?? 0) > 0)
+                @if($ls && (($ls['count'] ?? 0) > 0 || ($ls['finalized'] ?? 0) > 0))
                 <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                     <div class="flex items-center justify-between">
                         <p class="text-xs font-bold uppercase text-gray-600 dark:text-gray-300">{{ $label }}</p>
-                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ ($ls['action'] ?? 'save') === 'delete' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : (($ls['action'] ?? 'save') === 'carry' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' : 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300') }}">{{ ($ls['action'] ?? 'save') === 'delete' ? __('pos.badge_deleted') : (($ls['action'] ?? 'save') === 'carry' ? __('pos.badge_carried') : __('pos.badge_archived')) }}</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ ($ls['action'] ?? 'save') === 'delete' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : (($ls['action'] ?? 'save') === 'carry' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' : (($ls['action'] ?? 'save') === 'finalize' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300')) }}">{{ ($ls['action'] ?? 'save') === 'delete' ? __('pos.badge_deleted') : (($ls['action'] ?? 'save') === 'carry' ? __('pos.badge_carried') : (($ls['action'] ?? 'save') === 'finalize' ? __('pos.badge_finalized') : __('pos.badge_archived'))) }}</span>
                     </div>
                     <p class="text-xl font-bold text-gray-900 dark:text-white mt-1">{{ $ls['count'] }} <span class="text-sm font-semibold text-gray-500">{{ __('pos.bills_word') }} — PKR {{ number_format($ls['amount'] ?? 0) }}</span></p>
                     @if(($ls['backlog'] ?? 0) > 0)
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.n_older_dates_included', ['count' => $ls['backlog']]) }}</p>
+                    @endif
+                    @if(($ls['action'] ?? 'save') === 'finalize')
+                    {{-- Auto-finalize detail (Aug 2026): what the sweep actually did. --}}
+                    <p class="text-xs text-emerald-700 dark:text-emerald-300 font-semibold mt-1">{{ __('pos.wash_finalized_detail', ['count' => $ls['finalized'] ?? 0, 'amount' => number_format($ls['finalized_amount'] ?? 0), 'submitted' => $ls['submitted'] ?? 0, 'queued' => $ls['queued'] ?? 0, 'offline' => $ls['offline'] ?? 0, 'left' => $ls['count'] ?? 0]) }}</p>
                     @endif
                 </div>
                 @endif

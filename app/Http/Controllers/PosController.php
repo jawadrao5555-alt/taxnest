@@ -2825,69 +2825,22 @@ class PosController extends Controller
      * the existing retryPra() flow but returns JSON for the inline modal.
      * Flips pra_status='local' → 'pending' + invoice_mode='pra' before submit.
      */
-    public function apiPromoteProvisional(Request $request, $id)
+    /**
+     * Shared provisional→final promote CORE — the single math/state path used by
+     * BOTH apiPromoteProvisional (F10 Make Final) and the day-close auto-finalize
+     * sweep ('finalize' policy, Aug 2026). Runs inside its own DB transaction:
+     * race-safe lock + re-verify, month gate, re-tax for the (stored) payment
+     * method, whole-rupee rounding / tax-inclusive snapshot math, serial split
+     * (POS fiscal serial only when reporting ON), payment-record sync.
+     * Throws RuntimeException: NOT_FOUND | NOT_PROVISIONAL:* | ARCHIVED_ADMIN_ONLY | MONTH_CLOSED.
+     *
+     * @return array{number:string,total:float}
+     */
+    private function promoteProvisionalCore(int $companyId, Company $company, int $id, ?string $method, bool $reportingOn): array
     {
-        $companyId = app('currentCompanyId');
-        $company = Company::find($companyId);
-
-        if (!$company) {
-            return response()->json(['success' => false, 'message' => __('pos.company_not_found')], 404);
-        }
-
-        // ── LOCAL FINAL (owner request Jul 2026): finalize WITHOUT sending to PRA ──
-        // The bill keeps its local invoice number, amounts and payment method exactly
-        // as saved, and is archived immediately — it leaves the F10 provisional list
-        // but stays visible in the Local Bills Portal (which reads archived bills).
-        // pra_status stays 'local' + invoice_mode stays 'local' (deliberate local bill,
-        // consistent with the Reporting-OFF Finals Invariant).
-        if (!$request->boolean('send_to_pra', true)) {
-            $tx = PosTransaction::withoutGlobalScope('hide_archived')
-                ->where('company_id', $companyId)
-                ->where('id', $id)
-                ->where('status', 'completed')
-                ->where('invoice_mode', 'local')
-                ->where('pra_status', 'local')
-                ->first();
-            if (!$tx) {
-                return response()->json(['success' => false, 'message' => __('pos.bill_not_found')], 404);
-            }
-            $tx->update(['is_archived' => true, 'archived_at' => now()]);
-            return response()->json([
-                'success'        => true,
-                'submitted'      => false,
-                'local_final'    => true,
-                'invoice_number' => $tx->invoice_number,
-                'total_amount'   => (float) $tx->total_amount,
-                'message'        => __('pos.bill_finalized_local_not_pra', ['number' => $tx->invoice_number, 'amount' => number_format((float) $tx->total_amount)]),
-                'id'             => $tx->id,
-            ]);
-        }
-
-        // Cashier picks the settlement method AT promote time — cash vs card carry
-        // different PRA tax rates (e.g. 16% vs 8%), so the bill is RE-TAXED for the
-        // chosen method. Falls back to the stored method when none is supplied.
-        $method = $request->input('payment_method');
-        if ($method === 'card') {
-            $method = 'debit_card';
-        }
-        if (!in_array($method, ['cash', 'debit_card', 'credit_card', 'qr_payment'], true)) {
-            $method = null; // resolve from the stored value inside the transaction
-        }
-
-        // Promoting a provisional to a FINAL bill consumes monthly quota — same
-        // gate as storeInvoice finals (paid-plan package limits, Jul 2026).
-        $quota = \App\Services\PlanLimitService::canCreatePosBill($companyId);
-        if (!($quota['allowed'] ?? true)) {
-            return response()->json(['success' => false, 'message' => $quota['reason']], 403);
-        }
-
-        // Per-cashier toggle (owner rule Jul 2026): the promoting user's own switch decides.
-        $reportingOn = (bool) auth('pos')->user()?->praReportingEnabled($company);
         $newNumber = null;
         $newTotal  = null;
-
-        try {
-            DB::transaction(function () use ($companyId, $company, $id, $method, $reportingOn, &$newNumber, &$newTotal) {
+        DB::transaction(function () use ($companyId, $company, $id, $method, $reportingOn, &$newNumber, &$newTotal) {
                 // Race-safe: lock the row and re-verify it is still a genuine provisional.
                 // The F10 modal fires promote on Enter, so double-Enter is a real
                 // double-promote path — the lock + re-check closes it.
@@ -3019,7 +2972,76 @@ class PosController extends Controller
 
                 $newNumber = $newInvoiceNumber;
                 $newTotal  = $totalAmount;
-            });
+        });
+
+        return ['number' => $newNumber, 'total' => (float) $newTotal];
+    }
+
+    public function apiPromoteProvisional(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        if (!$company) {
+            return response()->json(['success' => false, 'message' => __('pos.company_not_found')], 404);
+        }
+
+        // ── LOCAL FINAL (owner request Jul 2026): finalize WITHOUT sending to PRA ──
+        // The bill keeps its local invoice number, amounts and payment method exactly
+        // as saved, and is archived immediately — it leaves the F10 provisional list
+        // but stays visible in the Local Bills Portal (which reads archived bills).
+        // pra_status stays 'local' + invoice_mode stays 'local' (deliberate local bill,
+        // consistent with the Reporting-OFF Finals Invariant).
+        if (!$request->boolean('send_to_pra', true)) {
+            $tx = PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->where('id', $id)
+                ->where('status', 'completed')
+                ->where('invoice_mode', 'local')
+                ->where('pra_status', 'local')
+                ->first();
+            if (!$tx) {
+                return response()->json(['success' => false, 'message' => __('pos.bill_not_found')], 404);
+            }
+            $tx->update(['is_archived' => true, 'archived_at' => now()]);
+            return response()->json([
+                'success'        => true,
+                'submitted'      => false,
+                'local_final'    => true,
+                'invoice_number' => $tx->invoice_number,
+                'total_amount'   => (float) $tx->total_amount,
+                'message'        => __('pos.bill_finalized_local_not_pra', ['number' => $tx->invoice_number, 'amount' => number_format((float) $tx->total_amount)]),
+                'id'             => $tx->id,
+            ]);
+        }
+
+        // Cashier picks the settlement method AT promote time — cash vs card carry
+        // different PRA tax rates (e.g. 16% vs 8%), so the bill is RE-TAXED for the
+        // chosen method. Falls back to the stored method when none is supplied.
+        $method = $request->input('payment_method');
+        if ($method === 'card') {
+            $method = 'debit_card';
+        }
+        if (!in_array($method, ['cash', 'debit_card', 'credit_card', 'qr_payment'], true)) {
+            $method = null; // resolve from the stored value inside the transaction
+        }
+
+        // Promoting a provisional to a FINAL bill consumes monthly quota — same
+        // gate as storeInvoice finals (paid-plan package limits, Jul 2026).
+        $quota = \App\Services\PlanLimitService::canCreatePosBill($companyId);
+        if (!($quota['allowed'] ?? true)) {
+            return response()->json(['success' => false, 'message' => $quota['reason']], 403);
+        }
+
+        // Per-cashier toggle (owner rule Jul 2026): the promoting user's own switch decides.
+        $reportingOn = (bool) auth('pos')->user()?->praReportingEnabled($company);
+        $newNumber = null;
+        $newTotal  = null;
+
+        try {
+            $res = $this->promoteProvisionalCore($companyId, $company, (int) $id, $method, $reportingOn);
+            $newNumber = $res['number'];
+            $newTotal  = $res['total'];
         } catch (\RuntimeException $e) {
             $msg = $e->getMessage();
             if ($msg === 'NOT_FOUND') {
@@ -4499,7 +4521,7 @@ class PosController extends Controller
 
         $validated = $request->validate([
             'final_action' => 'required|in:save,delete',
-            'provisional_action' => 'required|in:save,delete,carry',
+            'provisional_action' => 'required|in:save,delete,carry,finalize',
             'spend_persist' => 'required|boolean',
         ]);
 
@@ -7860,6 +7882,100 @@ class PosController extends Controller
         }
     }
 
+    /**
+     * AUTO-FINALIZE SWEEP ('finalize' provisional policy, owner option Aug 2026).
+     * Promotes every pending provisional (completed/local/local triple, no fiscal
+     * number, un-archived, business_date <= close date) through promoteProvisionalCore —
+     * the EXACT path F10 Make Final uses: quota gate per bill, current-month gate,
+     * re-tax for the STORED payment method, whole-rupee rounding / tax-inclusive
+     * snapshot math, serial split. Reporting decision is company-level
+     * (praReportingActive) — the 6 AM auto close runs user-less.
+     * PRA submit happens here, OUTSIDE performDayClose's report transaction:
+     *   - Agent-Sync companies: bill stays 'pending', agent picks it up (queued).
+     *   - Cloud: sendInvoice; connection failure → pra_status='offline' (retryable).
+     * NO receipt print — customer is not present (promoteNoPrint semantics; printing
+     * is client-side anyway). Bills that cannot be finalized (quota exhausted, older
+     * month, drafts, races) are left untouched — the wash carries them forward.
+     *
+     * @return array{finalized:int,finalized_amount:float,submitted:int,queued:int,offline:int,quota_blocked:int,skipped:int}
+     */
+    private function finalizeProvisionalsAtDayClose(int $companyId, Company $company, string $date): array
+    {
+        $sweep = ['finalized' => 0, 'finalized_amount' => 0.0, 'submitted' => 0, 'queued' => 0, 'offline' => 0, 'quota_blocked' => 0, 'skipped' => 0];
+
+        $reportingOn = $company->praReportingActive();
+        $agentMode = $company->agentHandlesPra();
+        $praService = null;
+
+        // Same selector as the provisional wash set, restricted to COMPLETED bills —
+        // a draft is a live/abandoned cart, never something to send to the tax record.
+        $rows = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->where('business_date', '<=', $date)
+            ->whereNull('pra_invoice_number')
+            ->where('is_archived', false)
+            ->where('invoice_mode', 'local')
+            ->where('pra_status', 'local')
+            ->where('status', 'completed')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($rows as $row) {
+            // MONTH GATE mirror (owner rule Jul 2026): previous-month locals are
+            // closed — never submitted late. Sweep skips them; wash carries them.
+            if ($row->created_at && $row->created_at->lt(now()->startOfMonth())) {
+                $sweep['skipped']++;
+                continue;
+            }
+            // Quota gate PER BILL — each finalize consumes monthly quota exactly
+            // like an F10 promote. Once exhausted, the rest stay provisional.
+            $quota = \App\Services\PlanLimitService::canCreatePosBill($companyId);
+            if (!($quota['allowed'] ?? true)) {
+                $sweep['quota_blocked'] = $rows->count() - $sweep['finalized'] - $sweep['skipped'];
+                break;
+            }
+            try {
+                // null method = keep the STORED payment method (no cashier present).
+                $res = $this->promoteProvisionalCore($companyId, $company, (int) $row->id, null, $reportingOn);
+            } catch (\Throwable $e) {
+                // Race / no-longer-provisional / month-closed — carry it, never fail the close.
+                $sweep['skipped']++;
+                continue;
+            }
+            $sweep['finalized']++;
+            $sweep['finalized_amount'] += (float) ($res['total'] ?? 0);
+
+            if (!$reportingOn) {
+                continue; // reporting-OFF: regulator-mode final ('pra' + NULL status), nothing to send
+            }
+            if ($agentMode) {
+                $sweep['queued']++; // stays 'pending' — desktop agent polls within 10s
+                continue;
+            }
+            $tx = PosTransaction::where('company_id', $companyId)->find($row->id);
+            if (!$tx) {
+                continue;
+            }
+            try {
+                $praService = $praService ?: new PraIntegrationService($company);
+                $result = $praService->sendInvoice($tx);
+                if (!empty($result['success'])) {
+                    $sweep['submitted']++;
+                } else {
+                    // PRA rejected — service already stamped 'failed'; retryable from Transactions.
+                    $sweep['offline']++;
+                }
+            } catch (\Throwable $e) {
+                // Internet/PRA down at 6 AM — standard offline fallback, retryable.
+                $tx->update(['pra_status' => 'offline']);
+                $sweep['offline']++;
+            }
+        }
+
+        $sweep['finalized_amount'] = round($sweep['finalized_amount'], 2);
+        return $sweep;
+    }
+
     public function performDayClose(int $companyId, string $date, ?int $closedBy, ?string $notes = null, ?array $cashRecon = null): array
     {
         $existing = PosDayCloseReport::where('company_id', $companyId)
@@ -7868,6 +7984,27 @@ class PosController extends Controller
 
         if ($existing) {
             return ['status' => 'exists', 'report' => $existing, 'archived' => 0, 'deleted' => 0, 'report_number' => $existing->report_number];
+        }
+
+        // Policy resolved UP FRONT (Aug 2026): the 'finalize' sweep must run BEFORE
+        // the day's PRA-set figures are queried, so freshly-finalized bills count in
+        // this very Z-report (and leave the provisional wash selector).
+        $company = Company::find($companyId);
+        $provAction = in_array($company->pos_dayclose_provisional_action ?? 'save', ['save', 'delete', 'carry', 'finalize'], true)
+            ? ($company->pos_dayclose_provisional_action ?? 'save') : 'save';
+        $finalAction = in_array($company->pos_dayclose_final_local_action ?? 'save', ['save', 'delete'], true)
+            ? ($company->pos_dayclose_final_local_action ?? 'save') : 'save';
+        $spendPersist = (bool) ($company->pos_customer_spend_persist ?? true);
+
+        // ── AUTO-FINALIZE SWEEP (owner option, Aug 2026): promote every pending
+        // provisional through the SAME core path F10 Make Final uses (quota gate,
+        // month gate, re-tax + whole-rupee rounding, PRA submit with offline
+        // fallback). NO receipt print (customer not present). Leftovers that could
+        // not be finalized (quota out, older month, drafts, PRA-failed) are
+        // CARRIED — never archived/deleted, they stay finalizable tomorrow.
+        $finalizeSweep = null;
+        if ($provAction === 'finalize') {
+            $finalizeSweep = $this->finalizeProvisionalsAtDayClose($companyId, $company, $date);
         }
 
         // Local (non-PRA) bills stay OUT of the stored day-close figures — they are
@@ -7990,15 +8127,11 @@ class PosController extends Controller
         // 'delete'→ permanent delete; with spend-persist ON a pos_customer_spend_snapshots
         //           ledger row is written FIRST for bills linked to a customer.
         // Wrapped in one DB transaction so report + wash succeed/fail atomically.
-        $company = Company::find($companyId);
         // 'carry' (Aug 2026, customer q: "6 baje auto-close par Make Final bhool
         // gaye to?"): pending provisionals are LEFT UNTOUCHED — they stay in F10
         // and can be made final the next day. Day close itself still happens.
-        $provAction = in_array($company->pos_dayclose_provisional_action ?? 'save', ['save', 'delete', 'carry'], true)
-            ? ($company->pos_dayclose_provisional_action ?? 'save') : 'save';
-        $finalAction = in_array($company->pos_dayclose_final_local_action ?? 'save', ['save', 'delete'], true)
-            ? ($company->pos_dayclose_final_local_action ?? 'save') : 'save';
-        $spendPersist = (bool) ($company->pos_customer_spend_persist ?? true);
+        // 'finalize' (Aug 2026): sweep already ran above; leftovers behave like carry.
+        // ($company / $provAction / $finalAction / $spendPersist resolved up top.)
 
         // Rider wash DELETE-guard (Jul 2026): a cash delivery bill whose rider has
         // NOT settled yet is a live khata entry — permanent delete would erase the
@@ -8010,7 +8143,7 @@ class PosController extends Controller
         $deletedCount = 0;
         $report = null;
         $localSummary = [];
-        \DB::transaction(function () use ($data, $companyId, $date, $provAction, $finalAction, $spendPersist, $riderGuardReady, $riderFigures, &$archivedCount, &$deletedCount, &$report, &$localSummary) {
+        \DB::transaction(function () use ($data, $companyId, $date, $provAction, $finalAction, $spendPersist, $riderGuardReady, $riderFigures, $finalizeSweep, &$archivedCount, &$deletedCount, &$report, &$localSummary) {
             $report = PosDayCloseReport::create($data);
 
             // BACKLOG SWEEP (owner rule Jul 2026): wash covers bills up to AND
@@ -8073,6 +8206,14 @@ class PosController extends Controller
                     'amount' => round((float) $rows->sum('total_amount'), 2),
                     'backlog' => $rows->filter(fn ($t) => $t->business_date && $t->business_date < $date)->count(),
                 ];
+                // AUTO-FINALIZE (Aug 2026): sweep already promoted what it could —
+                // merge its numbers into the Z-report detail. Remaining rows here
+                // are the leftovers (quota out / older month / drafts / races);
+                // they are CARRIED, never archived or deleted.
+                if ($billKind === 'provisional' && $set['action'] === 'finalize') {
+                    $localSummary[$billKind] = array_merge($localSummary[$billKind], $finalizeSweep ?? []);
+                    continue;
+                }
                 if ($rows->isEmpty()) {
                     continue;
                 }

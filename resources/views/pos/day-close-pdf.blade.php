@@ -129,7 +129,7 @@
 
     {{-- Local-bill wash detail (comprehensive Z-report, Jul 2026): what the close
          did with non-PRA local bills, incl. backlog swept from earlier dates. --}}
-    @if(is_array($report->local_summary) && collect($report->local_summary)->sum('count') > 0)
+    @if(is_array($report->local_summary) && (collect($report->local_summary)->sum('count') > 0 || collect($report->local_summary)->sum('finalized') > 0))
     <div class="section-title">{{ __('pos.dcp_local_bills_closed') }}</div>
     <table class="data">
         <thead>
@@ -144,14 +144,20 @@
         <tbody>
             @foreach(['provisional' => __('pos.dcp_provisional_lseries'), 'final_local' => __('pos.dcp_final_reporting_off')] as $kind => $label)
                 @php $ls = $report->local_summary[$kind] ?? null; @endphp
-                @if($ls && ($ls['count'] ?? 0) > 0)
+                @if($ls && (($ls['count'] ?? 0) > 0 || ($ls['finalized'] ?? 0) > 0))
                 <tr>
                     <td>{{ $label }}</td>
-                    <td class="c">{{ ($ls['action'] ?? 'save') === 'delete' ? __('pos.dcp_deleted_per_policy') : (($ls['action'] ?? 'save') === 'carry' ? __('pos.dcp_carried') : __('pos.dcp_archived')) }}</td>
+                    <td class="c">{{ ($ls['action'] ?? 'save') === 'delete' ? __('pos.dcp_deleted_per_policy') : (($ls['action'] ?? 'save') === 'carry' ? __('pos.dcp_carried') : (($ls['action'] ?? 'save') === 'finalize' ? __('pos.dcp_finalized') : __('pos.dcp_archived'))) }}</td>
                     <td class="c">{{ $ls['count'] }}</td>
                     <td class="c">{{ $ls['backlog'] ?? 0 }}</td>
                     <td class="r">{{ number_format($ls['amount'] ?? 0, 2) }}</td>
                 </tr>
+                @if(($ls['action'] ?? 'save') === 'finalize')
+                {{-- Auto-finalize sweep detail (Aug 2026) --}}
+                <tr>
+                    <td colspan="5" style="font-size:9px;">{{ __('pos.wash_finalized_detail', ['count' => $ls['finalized'] ?? 0, 'amount' => number_format($ls['finalized_amount'] ?? 0), 'submitted' => $ls['submitted'] ?? 0, 'queued' => $ls['queued'] ?? 0, 'offline' => $ls['offline'] ?? 0, 'left' => $ls['count'] ?? 0]) }}</td>
+                </tr>
+                @endif
                 @endif
             @endforeach
         </tbody>

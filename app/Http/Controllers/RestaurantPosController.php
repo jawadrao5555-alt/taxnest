@@ -1513,7 +1513,10 @@ class RestaurantPosController extends Controller
         $order->created_at = $transaction->created_at;
         $order->kot_print_count = 1; // never a "REPRINT" banner
         $order->priority = false;
-        $order->kitchen_notes = null;
+        // Aug 2026 (review catch): txn bills DO carry the cashier's bill note
+        // (PosTransaction.notes) — map it onto the KOT so promoted delivery
+        // tickets print the (multi-line, numbered) notes like order KOTs do.
+        $order->kitchen_notes = $transaction->notes ?: null;
         $order->setRelation('table', null);
         $order->setRelation('creator', $transaction->creator);
 

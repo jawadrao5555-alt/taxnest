@@ -20,3 +20,6 @@ description: Why new PRA POS IDs fail with Code 112 on cloud PostData and how th
 **Grandfathered cloud confirmation (Jul 2026):** live company "PIZZA MASTER" (company_id 23, POS ID 195994, cloud mode, production env) still succeeds on cloud PostData — a real fiscal bill submitted from live returned fiscal number + status 'submitted' instantly. Owner explicitly approved that one test bill (Rs 10 item, POS-2026-00017 / 195994FGKP18253160). Old POS IDs on cloud are fine; only NEW registrations hit 112.
 
 **Go-live checklist for a fiscal-device company:** PRAL IMS Fiscal Device installed & responding on shop PC → TaxNest Agent installed with API key → PRA Settings: Connection Mode = Fiscal Device → prod migration run BEFORE saving settings (new column).
+
+## FBR POS portal tokens ≠ cloud gateway tokens (tested 1 Aug 2026)
+Owner's theory tested live: flipping a POS ID's Client Type to "Digital Invoicing" on e.fbr.gov.pk does NOT unlock direct cloud posting. Both X-WAY SHOES tokens (pos2/196354 after DI flip, and NEST1/196339 activated) return 900901 Invalid Credentials on BOTH gw.fbr.gov.pk/imsp/v1 PostData and /di_data/v1 postinvoicedata. These POS-registration tokens only work with the LOCAL IMS service (Desktop Agent, localhost:8524). Cloud DI needs a separate PRAL-issued gateway token (IRIS DI section). Don't retest; the answer is no.

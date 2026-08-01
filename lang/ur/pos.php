@@ -3172,4 +3172,18 @@ Bills stay with the cashier — this only clears the kitchen display.',
     'table_status_available' => 'Available',
     'table_status_occupied' => 'Occupied',
     'table_status_reserved' => 'Reserved',
+
+    // Public QR menu page (customer-facing, locale = company default_language)
+    'qr_title_suffix' => 'Menu & Maloomat',
+    'qr_phone' => 'Phone',
+    'qr_mobile' => 'Mobile',
+    'qr_email' => 'Email',
+    'qr_address' => 'Pata',
+    'qr_ntn' => 'NTN',
+    'qr_website' => 'Website',
+    'qr_hours' => 'Auqat',
+    'qr_menu' => 'Menu',
+    'qr_items_count' => ':count items',
+    'qr_default_category' => 'Items',
+    'qr_powered_by' => 'Powered by',
 ];

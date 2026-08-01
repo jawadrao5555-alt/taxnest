@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ app()->getLocale() }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="robots" content="noindex, nofollow">
-    <title>{{ $company->name }} — Menu &amp; Info</title>
+    <title>{{ $company->name }} — {{ __('pos.qr_title_suffix') }}</title>
     @vite(['resources/css/app.css'])
     <style>
         :root { --brand: #0A4D5C; --brand-dark: #073844; --gold: #E7BF3B; }
@@ -38,15 +38,15 @@
         <!-- Contact / details card -->
         @php
             $rows = [];
-            if (($settings['show_phone'] ?? false) && $company->phone) $rows[] = ['Phone', $company->phone, 'tel:' . preg_replace('/\s+/', '', $company->phone)];
-            if (($settings['show_mobile'] ?? false) && $company->mobile) $rows[] = ['Mobile', $company->mobile, 'tel:' . preg_replace('/\s+/', '', $company->mobile)];
-            if (($settings['show_email'] ?? false) && $company->email) $rows[] = ['Email', $company->email, 'mailto:' . $company->email];
-            if (($settings['show_address'] ?? false) && $company->address) $rows[] = ['Address', $company->address . ($company->city ? ', ' . $company->city : ''), null];
-            if (($settings['show_ntn'] ?? false) && $company->ntn) $rows[] = ['NTN', $company->ntn, null];
+            if (($settings['show_phone'] ?? false) && $company->phone) $rows[] = [__('pos.qr_phone'), $company->phone, 'tel:' . preg_replace('/\s+/', '', $company->phone)];
+            if (($settings['show_mobile'] ?? false) && $company->mobile) $rows[] = [__('pos.qr_mobile'), $company->mobile, 'tel:' . preg_replace('/\s+/', '', $company->mobile)];
+            if (($settings['show_email'] ?? false) && $company->email) $rows[] = [__('pos.qr_email'), $company->email, 'mailto:' . $company->email];
+            if (($settings['show_address'] ?? false) && $company->address) $rows[] = [__('pos.qr_address'), $company->address . ($company->city ? ', ' . $company->city : ''), null];
+            if (($settings['show_ntn'] ?? false) && $company->ntn) $rows[] = [__('pos.qr_ntn'), $company->ntn, null];
             // Only http(s) URLs may become clickable links — anything else (javascript:,
             // scheme-less, etc.) renders as plain text so tenant input can't inject a link.
-            if (($settings['show_website'] ?? false) && $company->website) $rows[] = ['Website', $company->website, preg_match('/^https?:\/\//i', $company->website) ? $company->website : null];
-            if (($settings['show_hours'] ?? false) && $settings['hours_text'] !== '') $rows[] = ['Hours', $settings['hours_text'], null];
+            if (($settings['show_website'] ?? false) && $company->website) $rows[] = [__('pos.qr_website'), $company->website, preg_match('/^https?:\/\//i', $company->website) ? $company->website : null];
+            if (($settings['show_hours'] ?? false) && $settings['hours_text'] !== '') $rows[] = [__('pos.qr_hours'), $settings['hours_text'], null];
         @endphp
         @if(count($rows))
         <section class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -69,11 +69,11 @@
         @if(($settings['show_menu'] ?? true) && $menuItems->count())
         <section class="mt-6">
             <div class="flex items-center gap-2 mb-3 px-1">
-                <h2 class="text-lg font-extrabold text-gray-900">Menu</h2>
-                <span class="text-[11px] font-bold text-white rounded-full px-2 py-0.5" style="background: var(--brand);">{{ $menuItems->count() }} items</span>
+                <h2 class="text-lg font-extrabold text-gray-900">{{ __('pos.qr_menu') }}</h2>
+                <span class="text-[11px] font-bold text-white rounded-full px-2 py-0.5" style="background: var(--brand);">{{ __('pos.qr_items_count', ['count' => $menuItems->count()]) }}</span>
             </div>
             @php
-                $grouped = $menuItems->groupBy(fn ($mi) => trim((string) ($mi->product->category ?? '')) !== '' ? $mi->product->category : 'Items');
+                $grouped = $menuItems->groupBy(fn ($mi) => trim((string) ($mi->product->category ?? '')) !== '' ? $mi->product->category : __('pos.qr_default_category'));
             @endphp
             <div class="space-y-5">
                 @foreach($grouped as $category => $items)
@@ -101,7 +101,7 @@
         @endif
 
         <footer class="mt-10 text-center">
-            <p class="text-[11px] text-gray-400 font-medium">Powered by <span class="font-bold" style="color: var(--brand);">NestPOS</span></p>
+            <p class="text-[11px] text-gray-400 font-medium">{{ __('pos.qr_powered_by') }} <span class="font-bold" style="color: var(--brand);">NestPOS</span></p>
         </footer>
     </main>
 </body>

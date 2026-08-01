@@ -360,3 +360,7 @@ Sale screen ki mazeed cheezein:
 
 ## Waiter tablet: occupied table par Add Items / Shift (Aug 2026)
 - Choose Table mein surkh (occupied) table par tap karein to do options aate hain: 'Add Items +' (us order mein naye items — cashier/desktop ke lagaye orders mein bhi; sirf naye items ki delta KOT print hoti hai) aur 'Shift ⇄' (khali table par muntaqil). My Orders wala purana Add Items rasta bhi qaim hai.
+
+## Order Cancel warning + Cancelled Orders report (2 Aug 2026)
+- Table board par "Cancel Order + Free Table" ab seedha cancel nahi karta — pehle warning popup aata hai jis mein order ke items ki list hoti hai, aur agar KOT kitchen ja chuki ho to surkh warning: "KOT kitchen ja chuki hai — khana ban raha ho sakta hai". Confirm karne par hi cancel hota hai.
+- Cancel hue orders ab delete NAHI hote — record mehfooz rehta hai. Reports menu mein naya page "Cancelled Orders" (sirf admin/manager): tareekh ka filter (aaj / 7 din / 30 din / apni marzi), kul ginti aur maliyat, aur CSV ya PDF download.

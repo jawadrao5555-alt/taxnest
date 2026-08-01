@@ -20,6 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use App\Services\ProductImageService;
 use App\Services\AuditLogService;
 
@@ -525,8 +526,18 @@ class RestaurantPosController extends Controller
         try {
             $orderData = ['order_number' => $order->order_number, 'total_amount' => $order->total_amount, 'status' => $order->status];
             $tableId = $order->table_id;
-            $order->items()->delete();
-            $order->delete();
+            // ZFC (2 Aug 2026): cancel = SOFT cancel. Order + items mehfooz rehte
+            // hain (status='cancelled') taake Cancelled Orders report ban sake.
+            // Har active-order query pehle se held/preparing/ready ya completed
+            // par filter karti hai, is liye cancelled kahin leak nahi hota.
+            $order->status = 'cancelled';
+            if (Schema::hasColumn('restaurant_orders', 'cancelled_at')) {
+                $order->cancelled_at = now();
+            }
+            if (Schema::hasColumn('restaurant_orders', 'cancelled_by')) {
+                $order->cancelled_by = Auth::guard('pos')->id();
+            }
+            $order->save();
             // F3 (Jul 2026): deleting a held order frees its table — unless another
             // active order is still parked on the same table.
             if ($tableId) {
@@ -1769,6 +1780,7 @@ class RestaurantPosController extends Controller
 
         $todayOrders = RestaurantOrder::where('company_id', $companyId)
             ->where('created_at', '>=', $today)
+            ->where('status', '!=', 'cancelled')
             ->count();
 
         $heldCount = RestaurantOrder::where('company_id', $companyId)
@@ -1811,6 +1823,7 @@ class RestaurantPosController extends Controller
 
         $recentOrders = RestaurantOrder::where('company_id', $companyId)
             ->with(['items', 'table'])
+            ->where('status', '!=', 'cancelled')
             ->where('created_at', '>=', $today)
             ->orderBy('created_at', 'desc')
             ->limit(15)
@@ -2054,5 +2067,85 @@ class RestaurantPosController extends Controller
             }
         }
         return response()->json(['success' => true, 'message' => 'Settings saved']);
+    }
+
+    // ── Cancelled Orders report (ZFC, 2 Aug 2026) ──────────────────────────
+    // Cancel ab soft hai (status='cancelled'), is liye report ban sakti hai.
+    // Filters: from/to date (default: aakhri 7 din). Admin/manager only.
+
+    /** Shared query builder + gate for the report page/CSV/PDF. */
+    private function cancelledOrdersQuery(Request $request, ?string &$from = null, ?string &$to = null)
+    {
+        $companyId = app('currentCompanyId');
+        $from = $request->query('from') ?: now()->subDays(6)->toDateString();
+        $to = $request->query('to') ?: now()->toDateString();
+        // Guard: swapped/garbage dates → sane defaults
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) $from = now()->subDays(6)->toDateString();
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) $to = now()->toDateString();
+        if ($from > $to) { [$from, $to] = [$to, $from]; }
+
+        return RestaurantOrder::where('company_id', $companyId)
+            ->where('status', 'cancelled')
+            // cancelled_at NULL fallback (column abhi nayi hai) → updated_at
+            ->whereRaw('DATE(COALESCE(cancelled_at, updated_at)) BETWEEN ? AND ?', [$from, $to])
+            ->with(['items', 'table', 'creator'])
+            ->orderByDesc(DB::raw('COALESCE(cancelled_at, updated_at)'));
+    }
+
+    private function cancelledOrdersGate()
+    {
+        $user = auth('pos')->user();
+        if ($user && !in_array($user->pos_role, ['pos_admin', 'pos_manager'], true) && $user->role !== 'company_admin') {
+            return redirect('/pos/invoice/create');
+        }
+        return null;
+    }
+
+    public function cancelledOrders(Request $request)
+    {
+        if ($gate = $this->cancelledOrdersGate()) return $gate;
+        $company = Company::find(app('currentCompanyId'));
+        $orders = $this->cancelledOrdersQuery($request, $from, $to)->paginate(50)->withQueryString();
+        $summary = [
+            'count' => $orders->total(),
+            'value' => (float) $this->cancelledOrdersQuery($request)->sum('total_amount'),
+        ];
+        return view('pos.cancelled-orders', compact('company', 'orders', 'from', 'to', 'summary'));
+    }
+
+    public function cancelledOrdersCsv(Request $request)
+    {
+        if ($gate = $this->cancelledOrdersGate()) return $gate;
+        $orders = $this->cancelledOrdersQuery($request, $from, $to)->limit(5000)->get();
+        $filename = "cancelled-orders-{$from}-to-{$to}.csv";
+        return response()->streamDownload(function () use ($orders) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM (Excel)
+            fputcsv($out, ['Order #', 'Date/Time Cancelled', 'Table', 'Order Type', 'Items', 'Amount (Rs)', 'KOT Sent', 'Punched By']);
+            foreach ($orders as $o) {
+                $items = $o->items->map(fn ($i) => $i->quantity . 'x ' . $i->item_name)->implode('; ');
+                fputcsv($out, [
+                    $o->order_number,
+                    optional($o->cancelled_at ?? $o->updated_at)->format('Y-m-d H:i'),
+                    $o->table?->table_number ? 'T-' . $o->table->table_number : '-',
+                    $o->order_type,
+                    $items,
+                    (int) round($o->total_amount),
+                    $o->kot_sent_at ? 'YES' : 'no',
+                    $o->creator?->name ?? '-',
+                ]);
+            }
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    public function cancelledOrdersPdf(Request $request)
+    {
+        if ($gate = $this->cancelledOrdersGate()) return $gate;
+        $company = Company::find(app('currentCompanyId'));
+        $orders = $this->cancelledOrdersQuery($request, $from, $to)->limit(2000)->get();
+        $summary = ['count' => $orders->count(), 'value' => (float) $orders->sum('total_amount')];
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.cancelled-orders-pdf', compact('company', 'orders', 'from', 'to', 'summary'));
+        return $pdf->download("cancelled-orders-{$from}-to-{$to}.pdf");
     }
 }

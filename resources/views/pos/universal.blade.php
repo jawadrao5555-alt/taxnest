@@ -1877,6 +1877,44 @@ window.addEventListener('popstate', function() {
         </template>
     </div>
 
+    {{-- ═══ CANCEL-ORDER WARNING MODAL (ZFC, 2 Aug 2026) ═══
+         Bare confirm() ki jagah: items ki list + KOT-kitchen warning, taake
+         bana hua khana anjane mein cancel na ho. --}}
+    <div x-show="boardCancelAsk" x-cloak x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="if (!boardBusy) boardCancelAsk = null" @keydown.escape.window="if (boardCancelAsk && !boardBusy) boardCancelAsk = null">
+        <template x-if="boardCancelAsk">
+            <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
+                <div class="p-5 text-center border-b border-gray-100 dark:border-gray-800">
+                    <div class="w-12 h-12 mx-auto rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-2">
+                        <svg class="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.947-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"/></svg>
+                    </div>
+                    <p class="text-base font-black text-gray-900 dark:text-white">{{ __('pos.cancel_order_title') }}</p>
+                    <p class="text-xl font-black text-gray-900 dark:text-white mt-0.5" x-text="'T-' + boardCancelAsk.table.table_number + ' • Rs ' + Math.round(boardCancelAsk.order.total_amount).toLocaleString()"></p>
+                </div>
+                <div class="px-5 py-3 max-h-48 overflow-y-auto">
+                    <template x-if="boardCancelAsk.items === null"><p class="text-xs text-gray-400 text-center py-2">…</p></template>
+                    <template x-if="Array.isArray(boardCancelAsk.items)">
+                        <div class="space-y-1">
+                            <template x-for="it in boardCancelAsk.items" :key="it.id">
+                                <div class="flex justify-between text-xs text-gray-700 dark:text-gray-300">
+                                    <span x-text="it.quantity + ' × ' + it.item_name"></span>
+                                    <span class="text-gray-400" x-text="Math.round(it.subtotal).toLocaleString()"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                    <div x-show="boardCancelAsk.order.kot_sent_at" class="mt-3 px-3 py-2 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-300 dark:border-orange-700">
+                        <p class="text-[11px] font-bold text-orange-700 dark:text-orange-300">&#9888;&#65039; {{ __('pos.cancel_kot_warning') }}</p>
+                    </div>
+                    <p x-show="!boardCancelAsk.order.kot_sent_at" class="mt-3 text-[11px] text-gray-400 text-center">{{ __('pos.cancel_no_kot_note') }}</p>
+                </div>
+                <div class="p-4 grid grid-cols-1 gap-2">
+                    <button @click="boardCancelAsk = null" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition">{{ __('pos.cancel_keep_order') }}</button>
+                    <button @click="boardCancelConfirm()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-extrabold text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 transition"><span x-show="!boardBusy">{{ __('pos.cancel_yes_free') }}</span><span x-show="boardBusy">…</span></button>
+                </div>
+            </div>
+        </template>
+    </div>
+
     {{-- ═══ TABLE SHIFT MODAL (owner batch, 26 Jul 2026) ═══
          Board menu "Table Badlein" → sirf KHALI (green) tables ki grid. Shift
          server-side race-safe hai (lockForUpdate); timer purana chalta rahta
@@ -3464,6 +3502,7 @@ function restaurantPos() {
         boardMenuTable: null,   // tile clicked → action menu modal
         boardMenuItems: null,   // lazy-fetched items of the open table's order (null = loading)
         boardConfirm: null,     // { table } → Final CASH/CARD confirm modal
+        boardCancelAsk: null,   // { table, order, items|null } → cancel-warning modal (ZFC, 2 Aug 2026)
         boardShift: null,       // { table, order } → Table Shift modal (26 Jul 2026)
         boardBusy: false,
         heldMenu: null,         // held (bina-table) chip → action menu modal
@@ -6096,27 +6135,47 @@ function restaurantPos() {
             if (!t || this.boardBusy) return;
             if (t.order) {
                 if (t.order.source === 'waiter') return;
-                if (!confirm('T-' + t.table_number + window.TXT.table_cancel_confirm_sfx)) return;
-                this.boardBusy = true;
+                // ZFC (2 Aug 2026): bare confirm() ki jagah warning modal — items
+                // ki list + "KOT kitchen ja chuki hai" ka alert, taake bana hua
+                // khana anjane mein cancel na ho.
+                this.boardCancelAsk = { table: t, order: t.order, items: null };
                 try {
-                    const res = await fetch('/pos/restaurant/orders/' + t.order.id + '/delete', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    });
-                    const data = res.ok ? await res.json().catch(() => null) : null;
-                    if (data && data.success) {
-                        this.heldOrders = this.heldOrders.filter(o => o.id !== t.order.id);
-                        this.showToast(window.TXT.order_cancel_t_prefix + t.table_number + window.TXT.table_freed_suffix, 'success');
-                    } else {
-                        this.showToast((data && data.message) || window.TXT.cancel_failed, 'error');
+                    const res = await fetch('/pos/restaurant/orders/by-table/' + t.id, { headers: { 'Accept': 'application/json' } });
+                    const list = res.ok ? await res.json().catch(() => null) : null;
+                    const full = Array.isArray(list) ? list.find(o => o.id === t.order.id) : null;
+                    if (this.boardCancelAsk && this.boardCancelAsk.order && this.boardCancelAsk.order.id === t.order.id) {
+                        this.boardCancelAsk.items = (full && Array.isArray(full.items)) ? full.items : [];
                     }
-                } catch (e) {
-                    this.showToast(window.TXT.cancel_failed_conn, 'error');
-                } finally { this.boardBusy = false; }
+                } catch (e) { if (this.boardCancelAsk) this.boardCancelAsk.items = []; }
+                return;
             } else if (t.status === 'reserved') {
                 this.releaseTable(t.id);
                 this.showToast('T-' + t.table_number + window.TXT.reserve_ended_suffix, 'success');
             }
+            this.boardMenuTable = null;
+            setTimeout(() => this.loadTableStatus(), 400);
+        },
+        async boardCancelConfirm() {
+            const ask = this.boardCancelAsk;
+            if (!ask || this.boardBusy) return;
+            const t = ask.table;
+            this.boardBusy = true;
+            try {
+                const res = await fetch('/pos/restaurant/orders/' + ask.order.id + '/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                });
+                const data = res.ok ? await res.json().catch(() => null) : null;
+                if (data && data.success) {
+                    this.heldOrders = this.heldOrders.filter(o => o.id !== ask.order.id);
+                    this.showToast(window.TXT.order_cancel_t_prefix + t.table_number + window.TXT.table_freed_suffix, 'success');
+                } else {
+                    this.showToast((data && data.message) || window.TXT.cancel_failed, 'error');
+                }
+            } catch (e) {
+                this.showToast(window.TXT.cancel_failed_conn, 'error');
+            } finally { this.boardBusy = false; }
+            this.boardCancelAsk = null;
             this.boardMenuTable = null;
             setTimeout(() => this.loadTableStatus(), 400);
         },

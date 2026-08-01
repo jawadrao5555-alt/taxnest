@@ -29,6 +29,8 @@ class RestaurantOrder extends Model
         'total_amount' => 'decimal:2',
         'priority' => 'boolean',
         'kot_sent_at' => 'datetime',
+        'cancelled_at' => 'datetime',
+        'cancelled_by' => 'integer',
         'kot_print_count' => 'integer',
         'kitchen_started_at' => 'datetime',
         'kitchen_ready_at' => 'datetime',

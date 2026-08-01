@@ -681,6 +681,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/restaurant/orders/{id}/delete', [RestaurantPosController::class, 'deleteOrder'])->name('pos.restaurant.orders.delete');
     Route::post('/restaurant/orders/{id}/shift-table', [RestaurantPosController::class, 'shiftTable'])->name('pos.restaurant.orders.shift-table');
     Route::get('/restaurant/orders/by-table/{tableId}', [RestaurantPosController::class, 'getOrdersByTable'])->name('pos.restaurant.orders.by-table');
+    // Cancelled Orders report (ZFC, 2 Aug 2026) — admin/manager only (in-method gate)
+    Route::get('/restaurant/cancelled-orders', [RestaurantPosController::class, 'cancelledOrders'])->name('pos.restaurant.cancelled-orders');
+    Route::get('/restaurant/cancelled-orders/csv', [RestaurantPosController::class, 'cancelledOrdersCsv'])->name('pos.restaurant.cancelled-orders.csv');
+    Route::get('/restaurant/cancelled-orders/pdf', [RestaurantPosController::class, 'cancelledOrdersPdf'])->name('pos.restaurant.cancelled-orders.pdf');
     Route::get('/restaurant/tables', [RestaurantTableController::class, 'index'])->name('pos.restaurant.tables');
     Route::post('/restaurant/tables/{id}/lock', [RestaurantTableController::class, 'lockTable'])->name('pos.restaurant.tables.lock');
     Route::post('/restaurant/tables/{id}/unlock', [RestaurantTableController::class, 'unlockTable'])->name('pos.restaurant.tables.unlock');

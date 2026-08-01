@@ -7240,8 +7240,8 @@ function restaurantPos() {
                 const data = await res.json();
                 if (data && data.success) {
                     this.localBills = data.bills || [];
-                    if (this.activeLocalIndex >= this.localBills.length) {
-                        this.activeLocalIndex = Math.max(0, this.localBills.length - 1);
+                    if (this.activeLocalIndex >= this.filteredLocalBills().length) {
+                        this.activeLocalIndex = Math.max(0, this.filteredLocalBills().length - 1);
                     }
                 }
             } catch (e) { console.warn('loadLocalBills error', e); }
@@ -7357,7 +7357,7 @@ function restaurantPos() {
                 const data = await res.json();
                 if (data && data.success) {
                     this.localBills = this.localBills.filter(b => b.id !== bill.id);
-                    if (this.activeLocalIndex >= this.localBills.length) this.activeLocalIndex = Math.max(0, this.localBills.length - 1);
+                    if (this.activeLocalIndex >= this.filteredLocalBills().length) this.activeLocalIndex = Math.max(0, this.filteredLocalBills().length - 1);
                     if (this.localBills.length === 0) { this.showLocalBills = false; this.activeLocalIndex = 0; }
                     this.showToast(window.TXT.provisional_bill_deleted, 'success');
                 } else {
@@ -7389,7 +7389,7 @@ function restaurantPos() {
                 if (data && data.success) {
                     // Remove from list (no longer provisional) regardless of submitted vs queued.
                     this.localBills = this.localBills.filter(b => b.id !== bill.id);
-                    if (this.activeLocalIndex >= this.localBills.length) this.activeLocalIndex = Math.max(0, this.localBills.length - 1);
+                    if (this.activeLocalIndex >= this.filteredLocalBills().length) this.activeLocalIndex = Math.max(0, this.filteredLocalBills().length - 1);
                     if (this.localBills.length === 0) { this.activeLocalIndex = 0; }
                     this.showPromoteMethod = false;
                     this.promoteTarget = null;

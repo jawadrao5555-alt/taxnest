@@ -393,6 +393,7 @@ return [
     'ti_delete_address' => 'Delete this saved address',
     'confirm_delete_address' => 'Delete this saved address?',
     'address_deleted' => 'Address deleted',
+    'address_already_saved' => 'This address is already saved for this customer',
     'badge_carried' => 'Carried Forward',
     'dcp_carried' => 'Carried forward (still pending)',
     'ti_carry_forward' => 'Pending provisional bills survive day close and stay in F10 for the next day',

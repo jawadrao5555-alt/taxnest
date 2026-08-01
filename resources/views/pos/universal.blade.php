@@ -5627,7 +5627,11 @@ function restaurantPos() {
         // one-off entries (id=null) are local-only, just dropped from the list.
         async deleteSelectedAddress() {
             const sel = this.selectedDeliveryAddress;
-            const a = this.customerAddresses.find(x => x.address === sel);
+            // Duplicate texts (review catch): if the same address text exists as
+            // both the Default and an extra row, delete the EXTRA row first —
+            // never silently clear the default when an equivalent copy exists.
+            const matches = this.customerAddresses.filter(x => x.address === sel);
+            const a = matches.find(x => x.id !== 0 && x.id !== null) || matches.find(x => x.id !== 0) || matches[0];
             if (!a) return;
             if (!confirm(window.TXT.confirm_delete_address + '\n' + (a.label ? a.label + ': ' : '') + a.address)) return;
             const drop = () => {

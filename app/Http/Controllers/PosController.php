@@ -5018,6 +5018,20 @@ class PosController extends Controller
             return response()->json(['success' => true, 'address' => ['id' => 0, 'label' => 'Default', 'address' => $customer->address]]);
         }
 
+        // Duplicate guard (Aug 2026): same text saved twice makes the delete
+        // button ambiguous — reject repeats (case-insensitive) incl. the default.
+        $newText = mb_strtolower(trim($request->address));
+        if (mb_strtolower(trim((string) $customer->address)) === $newText) {
+            return response()->json(['success' => false, 'message' => __('pos.address_already_saved')], 422);
+        }
+        $dup = \App\Models\PosCustomerAddress::where('company_id', $companyId)
+            ->where('customer_id', $customer->id)
+            ->get(['address'])
+            ->contains(fn ($r) => mb_strtolower(trim((string) $r->address)) === $newText);
+        if ($dup) {
+            return response()->json(['success' => false, 'message' => __('pos.address_already_saved')], 422);
+        }
+
         // Sanity cap — a walk-in POS customer never needs 15+ saved addresses.
         $count = \App\Models\PosCustomerAddress::where('company_id', $companyId)
             ->where('customer_id', $customer->id)->count();

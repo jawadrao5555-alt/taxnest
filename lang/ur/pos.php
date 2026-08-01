@@ -393,6 +393,7 @@ return [
     'ti_delete_address' => 'Yeh saved address delete karein',
     'confirm_delete_address' => 'Yeh saved address delete kar dein?',
     'address_deleted' => 'Address delete ho gaya',
+    'address_already_saved' => 'Yeh address is customer ke liye pehle se saved hai',
     'badge_carried' => 'Agle Din Gaye',
     'dcp_carried' => 'Agle din carry (abhi pending)',
     'ti_carry_forward' => 'Pending provisional bills day close ke baad bhi F10 mein rahenge — agle din final kar sakenge',

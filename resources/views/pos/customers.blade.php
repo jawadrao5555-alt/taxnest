@@ -207,6 +207,13 @@
                                     </template>
                                 </ul>
                                 <p x-show="addrError" x-text="addrError" class="text-xs text-red-500 mt-1"></p>
+                                {{-- Task 103: add a NEW delivery address right from the Customers page
+                                     (POST /pos/api/customer-addresses — duplicate + 15-limit guards server-side). --}}
+                                <div class="flex items-center gap-1.5 mt-2">
+                                    <input type="text" x-model="newAddrLabel" maxlength="50" placeholder="{{ __('pos.ph_addr_label') }}" autocomplete="off" name="pos_cust_addr_label_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-28 shrink-0 text-xs rounded-md border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-purple-500 focus:border-purple-400">
+                                    <input type="text" x-model="newAddrText" maxlength="500" @keydown.enter.prevent="saveAddress()" placeholder="{{ __('pos.ph_full_delivery_address') }}" autocomplete="off" name="pos_cust_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="flex-1 min-w-0 text-xs rounded-md border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-purple-500 focus:border-purple-400">
+                                    <button type="button" @click="saveAddress()" :disabled="addrSaving || !newAddrText.trim()" class="text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed px-2.5 py-1.5 rounded-md shrink-0" x-text="addrSaving ? @json(__('pos.saving_dots')) : @json(__('pos.save_btn'))"></button>
+                                </div>
                             </div>
                         </td>
                     </tr>
@@ -233,6 +240,9 @@
             addrLoading: false,
             addrLoaded: false,
             addrError: '',
+            newAddrLabel: '',
+            newAddrText: '',
+            addrSaving: false,
             init() {
                 this.$watch('editing', (open) => {
                     if (open && !this.addrLoaded) this.loadAddresses();
@@ -249,6 +259,30 @@
                     this.addrError = @json(__('pos.network_error'));
                 }
                 this.addrLoading = false;
+            },
+            // Task 103: add a new address from this page too. Server enforces the
+            // duplicate + 15-address guards; surface its message on 422.
+            async saveAddress() {
+                const text = this.newAddrText.trim();
+                if (!text || this.addrSaving) return;
+                this.addrSaving = true; this.addrError = '';
+                try {
+                    const res = await fetch('/pos/api/customer-addresses', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                        body: JSON.stringify({ customer_id: customerId, address: text, label: this.newAddrLabel.trim() || null }),
+                    });
+                    const data = await res.json().catch(() => null);
+                    if (data && data.success && data.address) {
+                        this.addresses.push(data.address);
+                        this.newAddrLabel = ''; this.newAddrText = '';
+                    } else {
+                        this.addrError = (data && data.message) || @json(__('pos.could_not_save_address'));
+                    }
+                } catch (e) {
+                    this.addrError = @json(__('pos.network_error'));
+                }
+                this.addrSaving = false;
             },
             async deleteAddress(a) {
                 if (!confirm(@json(__('pos.confirm_delete_address')) + '\n' + (a.label ? a.label + ': ' : '') + a.address)) return;

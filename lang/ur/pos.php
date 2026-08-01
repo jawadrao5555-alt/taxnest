@@ -405,6 +405,7 @@ return [
     'customers_found_of_total' => ':total mein se :found customers milay',
     'customers_total_line' => 'Kul :total customers — 100 fi page',
     'address_already_saved' => 'Yeh address is customer ke liye pehle se saved hai',
+    'ph_addr_label' => 'Label (optional)',
     'badge_carried' => 'Agle Din Gaye',
     'dcp_carried' => 'Agle din carry (abhi pending)',
     'ti_carry_forward' => 'Pending provisional bills day close ke baad bhi F10 mein rahenge — agle din final kar sakenge',

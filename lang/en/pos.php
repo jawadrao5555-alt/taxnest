@@ -405,6 +405,7 @@ return [
     'customers_found_of_total' => ':found of :total customers matched',
     'customers_total_line' => ':total customers — 100 per page',
     'address_already_saved' => 'This address is already saved for this customer',
+    'ph_addr_label' => 'Label (optional)',
     'badge_carried' => 'Carried Forward',
     'dcp_carried' => 'Carried forward (still pending)',
     'ti_carry_forward' => 'Pending provisional bills survive day close and stay in F10 for the next day',

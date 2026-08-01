@@ -69,3 +69,7 @@ Move an open (status 'held') order to another table: POST /pos/restaurant/orders
 ## KDS Auto Print liveness fallback (30 Jul 2026, Pizza Master incident)
 - KDS closed + "KDS Auto Print" ON used to swallow ALL auto-KOTs (nothing printed anywhere). Now: KDS board heartbeats via Cache `kds_seen_{companyId}` (index + liveOrders, ttl 300); sale screen gets alive-flag baked in kitchenSettings.kds_alive AND refreshed every 20s from `X-KDS-Alive` header on /pos/api/incoming-orders (header, not body — response stays a plain array). `kdsHandlesKot()` requires kds_alive, else cashier auto-KOT resumes.
 - KDS side never re-blasts a FULL ticket for an id missing from its localStorage: unprinted_count==0 → adopt silently; partially printed → delta only (checkAutoPrint).
+
+## Delivery "Payment First, Then KOT" (1 Aug 2026)
+- Company toggle `delivery_kot_after_payment` (kitchen-settings): ON = PROVISIONAL delivery bills (pra_status 'local') suppress the save-time txn-KOT; KOT fires at promote (payment confirm).
+- **Rule:** the promote-time KOT release must call `printTxnKitchenTicket` DIRECTLY — never through `runAutoPrintChain` (its autoPrintEnabled/autoKotEnabled master gates would silently eat the held KOT). Recovery: `lastTxnKotId` powers the receipt-popup K button for order-less promoted bills.

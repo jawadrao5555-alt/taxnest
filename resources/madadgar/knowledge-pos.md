@@ -330,3 +330,7 @@ Sale screen ki mazeed cheezein:
 - "Discount nahi lag raha / limit ka error": cashier ki discount limit lagi hai — manager PIN se override karein ya admin limit badhaye.
 - "Bill edit nahi ho raha": PRA number lag chuke bills edit/delete NAHI ho sakte (qanooni pabandi). Sirf local/provisional bills edit hote hain.
 - Kisi bhi aur masle ke liye WhatsApp support ya Madadgar se escalation bhej dein.
+
+## Multi-line kitchen notes & bina-receipt promote (Aug 2026)
+- Bill/kitchen note ab MULTI-LINE hai: note ke khane mein Enter dabane se nayi line banti hai — har item ka alag note alag line par likhein. KOT par yeh notes number-war (1. 2. 3.) alag alag lines mein chhapte hain; receipt par bhi lines barqarar rehti hain. Note band karne ke liye Esc.
+- Provisional bill ko Make Final karte waqt method picker mein neeche checkbox hai: "Receipt print na karein (customer maujood nahi)" — R key se bhi toggle hota hai. Tick karne par receipt AUTO-print nahi hoti (kaghaz bachta hai — delivery ke bills raat ko ikathay final karne walon ke liye); KOT (payment-first walay orders ki) phir bhi nikalti hai, aur receipt popup se manual print ab bhi ho sakta hai. Yeh choice usi computer par yaad rehti hai.

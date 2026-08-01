@@ -277,8 +277,21 @@
 
     @if($order->kitchen_notes)
     <div class="separator"></div>
+    {{-- Aug 2026 (restaurant feedback): multi-item notes come as separate lines from
+         the textarea — print each on its OWN line, numbered, so the kitchen can match
+         note 1 to item 1. Single-line notes keep the old compact format. --}}
+    @php
+        $kotNoteLines = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', (string) $order->kitchen_notes)), fn ($l) => $l !== ''));
+    @endphp
     <div class="kitchen-notes">
-        {{ __('pos.kot_notes') }} {{ $order->kitchen_notes }}
+        @if(count($kotNoteLines) > 1)
+            <div>{{ __('pos.kot_notes') }}</div>
+            @foreach($kotNoteLines as $kni => $knl)
+                <div>{{ $kni + 1 }}. {{ $knl }}</div>
+            @endforeach
+        @else
+            {{ __('pos.kot_notes') }} {{ $kotNoteLines[0] ?? '' }}
+        @endif
     </div>
     @endif
 

@@ -372,7 +372,7 @@
 
     @if(!empty($transaction->notes))
     <div class="separator"></div>
-    <div style="font-size:9px; font-weight:normal; color:#000; padding:1px 0;">{{ __('pos.receipt_note') }}: {{ $transaction->notes }}</div>
+    <div style="font-size:9px; font-weight:normal; color:#000; padding:1px 0;">{{ __('pos.receipt_note') }}: {!! nl2br(e($transaction->notes)) !!}</div>
     @endif
 
     <div class="separator"></div>

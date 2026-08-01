@@ -387,6 +387,8 @@ return [
     'ph_search_name_phone' => 'Search by name or phone...',
     'ph_reprint_search' => 'Serial, customer ya raqam se dhoondein...',
     'ph_provisional_search' => 'Customer ka naam, phone ya bill number se dhoondein...',
+    'ph_bill_note_multi' => 'Kitchen/bill ke liye note... (har item ki alag line — Enter dabayen)',
+    'promote_no_print' => 'Receipt print na karein (customer maujood nahi)',
     'provisional_search_no_match' => 'Search se koi bill nahi mila.',
     'ph_customer_name_mobile' => 'Customer name or mobile...',
     'ph_ntn_eg' => 'e.g. 1234567-8',

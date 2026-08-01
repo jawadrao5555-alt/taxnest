@@ -1351,11 +1351,13 @@ window.addEventListener('popstate', function() {
                     </button>
                 </div>
                 <div class="px-3 pb-1.5" x-show="showCartNote" x-transition x-cloak>
-                    <input type="text" x-model="kitchenNotes" x-ref="cartNoteInput" data-pay-note
+                    {{-- Aug 2026 (restaurant feedback): multiple items need SEPARATE note lines —
+                         textarea so Enter makes a new line (each line prints numbered on the KOT). Esc = close. --}}
+                    <textarea x-model="kitchenNotes" x-ref="cartNoteInput" data-pay-note rows="2"
                         autocomplete="off" name="pos_cart_note_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
-                        placeholder="{{ __('pos.ph_bill_note') }}"
-                        @keydown.enter.prevent="showCartNote = false"
-                        class="w-full text-xs bg-amber-50/60 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-lg px-2.5 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-amber-400 placeholder-gray-400">
+                        placeholder="{{ __('pos.ph_bill_note_multi') }}"
+                        @keydown.escape.prevent="showCartNote = false"
+                        class="w-full text-xs bg-amber-50/60 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-lg px-2.5 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-amber-400 placeholder-gray-400 resize-y"></textarea>
                 </div>
                 <div class="px-3 pb-1.5" x-show="showDiscount" x-transition>
                     <div class="p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl space-y-1.5">
@@ -1663,10 +1665,10 @@ window.addEventListener('popstate', function() {
                  which already rides every payload (sale/hold/update/offline). data-pay-note
                  keyboard guard in the modal handler stops 1/2/Enter shortcuts while typing. --}}
             <div class="px-4 pb-2" @click.stop>
-                <input type="text" x-model="kitchenNotes" data-pay-note
+                <textarea x-model="kitchenNotes" data-pay-note rows="2"
                     autocomplete="off" name="pos_bill_note_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
-                    placeholder="{{ __('pos.ph_bill_note') }}"
-                    class="w-full text-xs bg-amber-50/60 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-lg px-2.5 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-amber-400 placeholder-gray-400">
+                    placeholder="{{ __('pos.ph_bill_note_multi') }}"
+                    class="w-full text-xs bg-amber-50/60 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-lg px-2.5 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-amber-400 placeholder-gray-400 resize-y"></textarea>
             </div>
             <div class="px-4 pb-0.5">
                 <p class="text-center text-[10px] text-gray-400 dark:text-gray-500 font-medium">{{ __('pos.use_word') }} <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&larr;</kbd> <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&rarr;</kbd> to choose &middot; <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">Enter</kbd> to confirm</p>
@@ -2333,6 +2335,16 @@ window.addEventListener('popstate', function() {
                     <span class="block text-sm font-black text-amber-700 dark:text-amber-400">{{ __('pos.finalize_local_dont_send') }}</span>
                     <span class="block text-[10px] font-semibold mt-0.5 text-amber-600/70">{{ __('pos.amounts_stay_local_only') }}</span>
                 </button>
+            </div>
+            {{-- Aug 2026 (delivery feedback): night bulk-finalizing — customer is not present,
+                 receipt would be wasted paper. Checkbox skips the receipt AUTO-print for this
+                 promote (KOT release + manual print from the popup still available). Remembered
+                 per device. R key toggles. --}}
+            <div class="px-5 pb-3">
+                <label class="flex items-center gap-2 cursor-pointer select-none py-1">
+                    <input type="checkbox" x-model="promoteNoPrint" @change="try{localStorage.setItem('pos_promote_no_print', promoteNoPrint ? '1' : '0')}catch(e){}" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                    <span class="text-xs font-semibold text-gray-600 dark:text-gray-300">{{ __('pos.promote_no_print') }} <kbd class="ml-1 px-1 text-[9px] font-mono text-gray-400 border border-gray-300 dark:border-gray-600 rounded">R</kbd></span>
+                </label>
             </div>
             <div class="px-5 pb-5">
                 <button @click="if(!promoteSubmitting){ showPromoteMethod = false; promoteTarget = null; }" :disabled="promoteSubmitting" class="w-full py-2.5 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition disabled:opacity-50">{{ __('pos.cancel_esc') }}</button>
@@ -3406,6 +3418,8 @@ function restaurantPos() {
         // settlement method (cash vs card carry different PRA tax rates), so the
         // bill is re-taxed + given a real POS serial server-side. 0=Cash, 1=Card.
         showPromoteMethod: false,
+        // Skip receipt auto-print on promote (delivery night-batch) — per-device sticky.
+        promoteNoPrint: (function(){ try { return localStorage.getItem('pos_promote_no_print') === '1'; } catch(e) { return false; } })(),
         promoteTarget: null,
         promoteMethodIndex: 0,
         promoteSubmitting: false,
@@ -5269,7 +5283,9 @@ function restaurantPos() {
                 // ALL modal shortcuts (1/2/arrows/Enter) must type, not fire payments.
                 // Enter/Escape blur the field so shortcuts resume after.
                 if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-pay-note')) {
-                    if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); e.target.blur(); }
+                    // Aug 2026: note is a TEXTAREA now — Enter makes a new line (multi-item
+                    // notes print numbered on the KOT). Only Esc exits back to shortcuts.
+                    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); e.target.blur(); }
                     return;
                 }
                 // Cash-received input guard: digits must TYPE (not fire 1/2 payments).
@@ -5350,6 +5366,7 @@ function restaurantPos() {
                 if (e.key === '1') { e.preventDefault(); e.stopPropagation(); this.promoteMethodIndex = 0; this.promoteProvisional(this.promoteTarget, 'cash'); return; }
                 if (e.key === '2') { e.preventDefault(); e.stopPropagation(); this.promoteMethodIndex = 1; this.promoteProvisional(this.promoteTarget, 'card'); return; }
                 if (e.key === '3' || e.key === 'l' || e.key === 'L') { e.preventDefault(); e.stopPropagation(); this.promoteProvisional(this.promoteTarget, null, false); return; }
+                if (e.key === 'r' || e.key === 'R') { e.preventDefault(); e.stopPropagation(); this.promoteNoPrint = !this.promoteNoPrint; try{localStorage.setItem('pos_promote_no_print', this.promoteNoPrint ? '1' : '0')}catch(err){} return; }
                 if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); e.stopPropagation(); this.promoteProvisional(this.promoteTarget, this.promoteMethodIndex === 1 ? 'card' : 'cash'); return; }
                 if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (!this.promoteSubmitting) { this.showPromoteMethod = false; this.promoteTarget = null; } return; }
                 return;
@@ -7418,7 +7435,10 @@ function restaurantPos() {
                         ? (data.id || bill.id) : null;
                     this.lastTxnKotId = promoKotId; // receipt popup ka K button bhi isi se chalega
                     if (promoKotId && !this.kdsHandlesKot()) this.printTxnKitchenTicket(promoKotId);
-                    this.runAutoPrintChain(null);
+                    // "No receipt print" (Aug 2026): skip the receipt auto-print chain when the
+                    // cashier ticked the box — delivery customer isn't present, paper saved.
+                    // KOT release above is NEVER skipped (kitchen must still cook).
+                    if (!this.promoteNoPrint) this.runAutoPrintChain(null);
                 } else {
                     // Failed — refresh list so cashier sees current state.
                     this.showToast((data && data.message) || window.TXT.submit_failed, 'error');

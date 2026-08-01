@@ -387,6 +387,8 @@ return [
     'ph_search_name_phone' => 'Search by name or phone...',
     'ph_reprint_search' => 'Search by serial, customer or amount...',
     'ph_provisional_search' => 'Search by customer name, phone or bill no...',
+    'ph_bill_note_multi' => 'Note for kitchen/bill... (Enter = new line per item)',
+    'promote_no_print' => 'Don\'t print receipt (customer not present)',
     'provisional_search_no_match' => 'No bill matches your search.',
     'ph_customer_name_mobile' => 'Customer name or mobile...',
     'ph_ntn_eg' => 'e.g. 1234567-8',

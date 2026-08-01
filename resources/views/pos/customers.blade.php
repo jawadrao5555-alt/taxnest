@@ -133,7 +133,7 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                     @forelse($customers as $customer)
-                    <tr class="cust-row {{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }} {{ !$customer->is_active ? 'opacity-50' : '' }}" x-data="{ editing: false }"
+                    <tr class="cust-row {{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }} {{ !$customer->is_active ? 'opacity-50' : '' }}" x-data="custRow({{ (int) $customer->id }})"
                         data-search="{{ Str::lower(trim(($customer->name ?? '') . ' ' . ($customer->phone ?? '') . ' ' . ($customer->email ?? '') . ' ' . ($customer->city ?? '') . ' ' . ($customer->cnic ?? '') . ' ' . ($customer->ntn ?? ''))) }}">
                         <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">{{ $customer->name }}</td>
                         <td class="px-4 py-3 text-gray-500 hidden sm:table-cell">{{ $customer->phone ?? '—' }}</td>
@@ -189,6 +189,25 @@
                                     <button type="button" @click="editing = false" class="text-xs text-gray-500 px-3 py-1.5">{{ __('pos.cancel') }}</button>
                                 </div>
                             </form>
+                            {{-- Task: saved delivery addresses (pos_customer_addresses) — view/delete
+                                 from the Customers page too, via the same company-scoped endpoints
+                                 the sale screen uses. Loaded lazily when the edit row opens. --}}
+                            <div class="mt-3 pt-3 border-t border-purple-100 dark:border-purple-900/30">
+                                <p class="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5">{{ __('pos.saved_delivery_addresses') }}</p>
+                                <template x-if="addrLoading"><p class="text-xs text-gray-400">...</p></template>
+                                <template x-if="!addrLoading && addresses.length === 0"><p class="text-xs text-gray-400">{{ __('pos.no_saved_addresses') }}</p></template>
+                                <ul class="space-y-1">
+                                    <template x-for="a in addresses" :key="a.id">
+                                        <li class="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                                            <span x-show="a.id === 0" class="inline-flex px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 font-medium shrink-0">{{ __('pos.default_addr_label') }}</span>
+                                            <span x-show="a.id !== 0 && a.label" class="inline-flex px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 font-medium shrink-0" x-text="a.label"></span>
+                                            <span x-text="a.address" class="truncate"></span>
+                                            <button type="button" @click="deleteAddress(a)" title="{{ __('pos.ti_delete_address') }}" class="text-red-500 hover:text-red-600 font-bold px-1.5 shrink-0">&times;</button>
+                                        </li>
+                                    </template>
+                                </ul>
+                                <p x-show="addrError" x-text="addrError" class="text-xs text-red-500 mt-1"></p>
+                            </div>
                         </td>
                     </tr>
                     @endif
@@ -205,6 +224,53 @@
     </div>
 
     <script>
+    // Per-row Alpine component: inline edit toggle + saved delivery addresses
+    // (pos_customer_addresses) — same company-scoped endpoints as the sale screen.
+    function custRow(customerId) {
+        return {
+            editing: false,
+            addresses: [],
+            addrLoading: false,
+            addrLoaded: false,
+            addrError: '',
+            init() {
+                this.$watch('editing', (open) => {
+                    if (open && !this.addrLoaded) this.loadAddresses();
+                });
+            },
+            async loadAddresses() {
+                this.addrLoading = true; this.addrError = '';
+                try {
+                    const res = await fetch('/pos/api/customer-addresses?customer_id=' + customerId, { headers: { 'Accept': 'application/json' } });
+                    const data = await res.json();
+                    this.addresses = Array.isArray(data.addresses) ? data.addresses : [];
+                    this.addrLoaded = true;
+                } catch (e) {
+                    this.addrError = @json(__('pos.network_error'));
+                }
+                this.addrLoading = false;
+            },
+            async deleteAddress(a) {
+                if (!confirm(@json(__('pos.confirm_delete_address')) + '\n' + (a.label ? a.label + ': ' : '') + a.address)) return;
+                this.addrError = '';
+                try {
+                    const res = await fetch('/pos/api/customer-addresses/delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                        body: JSON.stringify({ customer_id: customerId, id: a.id }),
+                    });
+                    const data = await res.json().catch(() => null);
+                    if (data && data.success) {
+                        this.addresses = this.addresses.filter(x => x.id !== a.id);
+                    } else {
+                        this.addrError = (data && data.message) || @json(__('pos.failed_word'));
+                    }
+                } catch (e) {
+                    this.addrError = @json(__('pos.network_error'));
+                }
+            },
+        };
+    }
     // Customer search (owner request, 1 Aug 2026): client-side filter over the
     // rendered rows — matches name/phone/email/city/CNIC/NTN via data-search.
     (function () {

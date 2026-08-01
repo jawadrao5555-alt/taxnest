@@ -144,7 +144,10 @@
 }
 @media (min-width: 768px) {
     .tn-widecart { flex-direction: column; }
-    .tn-widecart .tn-left-col { flex: 0 0 auto; }
+    /* Widecart: left col shrinks to the bars' height — its overflow:hidden would
+       clip the search dropdown to a 1px sliver (owner report, 1 Aug 2026). Let it
+       overflow (grid is display:none anyway) and lift it above the cart panes. */
+    .tn-widecart .tn-left-col { flex: 0 0 auto; overflow: visible !important; position: relative; z-index: 30; }
     .tn-widecart .tn-left-col [x-ref="gridContainer"] { display: none; }
     .tn-widecart .tn-cart-col { width: 100% !important; flex: 1 1 0%; min-height: 0; flex-direction: row; border-left: 0; border-top: 1px solid rgba(148,163,184,.28); }
     .tn-widecart .tn-cart-main { display: flex; flex-direction: column; flex: 1 1 0%; min-width: 0; min-height: 0; }

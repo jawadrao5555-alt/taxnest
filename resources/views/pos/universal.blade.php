@@ -194,7 +194,10 @@
 }
 @media (min-width: 768px) {
     .tn-widecart { flex-direction: column; }
-    .tn-widecart .tn-left-col { flex: 0 0 auto; }
+    /* Widecart: left col shrinks to the bars' height — its overflow:hidden would
+       clip the search dropdown to a 1px sliver (owner report, 1 Aug 2026). Let it
+       overflow (grid is display:none anyway) and lift it above the cart panes. */
+    .tn-widecart .tn-left-col { flex: 0 0 auto; overflow: visible; position: relative; z-index: 30; }
     /* Products area shrinks to just the category strip + Akhri Bills (toggle wapas ON karne ka raasta wahin hai) */
     .tn-widecart .tn-left-col > div.flex-1 { flex: 0 0 auto; }
     .tn-widecart [x-ref="gridContainer"] { display: none; }

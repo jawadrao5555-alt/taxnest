@@ -105,7 +105,16 @@
                         <td class="px-4 py-3 font-medium text-emerald-600">
                             <a href="{{ route('pos.transaction.show', $txn->id) }}" class="hover:underline">{{ $txn->invoice_number }}</a>
                         </td>
-                        <td class="px-4 py-3 text-gray-700 dark:text-gray-300 hidden md:table-cell">{{ $txn->customer_name ?? __("pos.walk_in") }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-gray-300 hidden md:table-cell">
+                            {{ $txn->customer_name ?? __("pos.walk_in") }}
+                            {{-- Order type badge (ZFC, 2 Aug 2026): Dine In / Takeaway / Delivery ka pata list se hi chale --}}
+                            @if($txn->order_type && in_array($txn->order_type, ['dine_in', 'takeaway', 'delivery'], true))
+                                <span class="block mt-0.5 text-[10px] font-bold uppercase tracking-wide
+                                    {{ $txn->order_type === 'dine_in' ? 'text-teal-600 dark:text-teal-400' : ($txn->order_type === 'delivery' ? 'text-orange-600 dark:text-orange-400' : 'text-blue-600 dark:text-blue-400') }}">
+                                    {{ __('pos.ot_' . $txn->order_type) }}
+                                </span>
+                            @endif
+                        </td>
                         <td class="px-4 py-3 hidden sm:table-cell">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
                                 {{ $txn->payment_method === 'cash' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' }}">

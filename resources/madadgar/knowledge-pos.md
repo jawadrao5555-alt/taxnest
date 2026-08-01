@@ -338,3 +338,7 @@ Sale screen ki mazeed cheezein:
 ## Payment First, Then KOT — v2: F10 se KOT bhejein (Aug 2026)
 - Setting ON ho (Kitchen & KOT Settings) to delivery ke provisional bill par KOT rukti hai. Jaise hi payment confirm ho, cashier F10 (Provisional Bills) kholay — delivery bill par narangi "KOT" button hota hai (ya bill select kar ke K dabayen) — KOT usi waqt kitchen mein chali jati hai. Raat ko Make Final karne ka intezar nahi karna parta.
 - Agar F10 se KOT pehle bhej di ho to Make Final par dobara nahi chhapti; agar nahi bheji thi to Make Final par khud nikal jati hai (pehle jaisa).
+
+## Day close aur pending provisional bills — Carry Forward (Aug 2026)
+- Sawal: "Auto day-close (misal 6 baje) par jo bills Make Final karna bhool gaye unka kya?" — Customize POS → Local Billing mein provisional bills ki policy ab 3 options: Archive (mehfooz magar F10 se ghayab), Delete (urh jate hain), ya naya **Carry (Agle Din)** — bills F10 mein rahte hain aur agle din Make Final ho sakte hain. Raat-batch delivery walon ke liye Carry best hai.
+- Day-close page ab pending provisional bills par surkh warning dikhata hai (agar policy Carry nahi) — pehle F10 se final karein.

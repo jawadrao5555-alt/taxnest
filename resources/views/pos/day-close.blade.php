@@ -430,11 +430,20 @@
             <div class="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg border border-teal-100 dark:border-teal-900/40">
                 <div class="flex items-center justify-between">
                     <p class="text-xs font-bold uppercase text-teal-700 dark:text-teal-300">{{ __('pos.provisional_bills_l_series') }}</p>
-                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ ($company->pos_dayclose_provisional_action ?? 'save') === 'delete' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300' }}">{{ ($company->pos_dayclose_provisional_action ?? 'save') === 'delete' ? __('pos.badge_delete') : __('pos.badge_archive') }}</span>
+                    @php $provPolicy = in_array($company->pos_dayclose_provisional_action ?? 'save', ['save','delete','carry'], true) ? ($company->pos_dayclose_provisional_action ?? 'save') : 'save'; @endphp
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ $provPolicy === 'delete' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : ($provPolicy === 'carry' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' : 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300') }}">{{ $provPolicy === 'delete' ? __('pos.badge_delete') : ($provPolicy === 'carry' ? __('pos.badge_carry') : __('pos.badge_archive')) }}</span>
                 </div>
                 <p class="text-xl font-bold text-gray-900 dark:text-white mt-1">{{ $localWash->prov_count }} <span class="text-sm font-semibold text-gray-500">{{ __('pos.bills_word') }} — PKR {{ number_format($localWash->prov_amount) }}</span></p>
                 @if($localWash->prov_backlog > 0)
                 <p class="text-xs text-amber-700 dark:text-amber-400 font-semibold mt-1">{{ __('pos.n_older_dates_pending', ['count' => $localWash->prov_backlog]) }}</p>
+                @endif
+                {{-- Aug 2026 (customer q: auto-close par Make Final bhool gaye to?) —
+                     loud warning: after close these can no longer be finalized,
+                     unless the policy is Carry Forward. --}}
+                @if($provPolicy === 'carry')
+                <p class="text-xs text-indigo-700 dark:text-indigo-300 font-semibold mt-1">{{ __('pos.prov_carry_note') }}</p>
+                @else
+                <p class="text-xs text-red-700 dark:text-red-400 font-bold mt-1">⚠ {{ __('pos.prov_pending_final_warning') }}</p>
                 @endif
             </div>
             @endif
@@ -510,18 +519,24 @@
             </div>
             @php
                 $lbFinal = in_array($company->pos_dayclose_final_local_action ?? 'save', ['save','delete'], true) ? ($company->pos_dayclose_final_local_action ?? 'save') : 'save';
-                $lbProv  = in_array($company->pos_dayclose_provisional_action ?? 'save', ['save','delete'], true) ? ($company->pos_dayclose_provisional_action ?? 'save') : 'save';
+                $lbProv  = in_array($company->pos_dayclose_provisional_action ?? 'save', ['save','delete','carry'], true) ? ($company->pos_dayclose_provisional_action ?? 'save') : 'save';
             @endphp
             <div class="mb-4 p-3 rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800">
                 <div class="text-sm">
                     <span class="font-bold text-teal-800 dark:text-teal-300">{{ __('pos.local_bills_policy') }}</span>
                     <p class="text-xs text-teal-700 dark:text-teal-400 mt-0.5">
-                        {!! __('pos.local_bills_policy_line', ['final' => '<b>' . ($lbFinal === 'delete' ? e(__('pos.badge_delete')) : e(__('pos.badge_archive_save'))) . '</b>', 'prov' => '<b>' . ($lbProv === 'delete' ? e(__('pos.badge_delete')) : e(__('pos.badge_archive_save'))) . '</b>']) !!}
+                        {!! __('pos.local_bills_policy_line', ['final' => '<b>' . ($lbFinal === 'delete' ? e(__('pos.badge_delete')) : e(__('pos.badge_archive_save'))) . '</b>', 'prov' => '<b>' . ($lbProv === 'delete' ? e(__('pos.badge_delete')) : ($lbProv === 'carry' ? e(__('pos.badge_carry')) : e(__('pos.badge_archive_save')))) . '</b>']) !!}
                         {{ __('pos.pra_bills_untouched_policy') }}
                         <a href="{{ route('pos.customize') }}" class="underline font-semibold">{{ __('pos.customize_pos_local_billing') }}</a>.
                     </p>
                 </div>
             </div>
+            @if(($localWash->prov_count ?? 0) > 0 && $lbProv !== 'carry')
+            {{-- Aug 2026: pending provisionals warning at the CLOSE button too. --}}
+            <div class="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border-2 border-red-400 dark:border-red-700">
+                <span class="text-sm font-bold text-red-800 dark:text-red-300">⚠ {{ __('pos.prov_pending_close_warning', ['count' => $localWash->prov_count]) }}</span>
+            </div>
+            @endif
             @if(($openOrders ?? 0) > 0)
             {{-- ZFC 28 Jul 2026: warn BEFORE closing when held orders / occupied
                  tables are still open — they dangle into tomorrow otherwise. --}}

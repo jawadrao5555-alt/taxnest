@@ -4473,7 +4473,7 @@ class PosController extends Controller
 
         $validated = $request->validate([
             'final_action' => 'required|in:save,delete',
-            'provisional_action' => 'required|in:save,delete',
+            'provisional_action' => 'required|in:save,delete,carry',
             'spend_persist' => 'required|boolean',
         ]);
 
@@ -7899,7 +7899,10 @@ class PosController extends Controller
         //           ledger row is written FIRST for bills linked to a customer.
         // Wrapped in one DB transaction so report + wash succeed/fail atomically.
         $company = Company::find($companyId);
-        $provAction = in_array($company->pos_dayclose_provisional_action ?? 'save', ['save', 'delete'], true)
+        // 'carry' (Aug 2026, customer q: "6 baje auto-close par Make Final bhool
+        // gaye to?"): pending provisionals are LEFT UNTOUCHED — they stay in F10
+        // and can be made final the next day. Day close itself still happens.
+        $provAction = in_array($company->pos_dayclose_provisional_action ?? 'save', ['save', 'delete', 'carry'], true)
             ? ($company->pos_dayclose_provisional_action ?? 'save') : 'save';
         $finalAction = in_array($company->pos_dayclose_final_local_action ?? 'save', ['save', 'delete'], true)
             ? ($company->pos_dayclose_final_local_action ?? 'save') : 'save';
@@ -7979,6 +7982,12 @@ class PosController extends Controller
                     'backlog' => $rows->filter(fn ($t) => $t->business_date && $t->business_date < $date)->count(),
                 ];
                 if ($rows->isEmpty()) {
+                    continue;
+                }
+                // CARRY FORWARD: bills survive the wash exactly as they are —
+                // still un-archived, still in F10, finalizable tomorrow. Summary
+                // above already recorded the pending count for the Z-report.
+                if ($set['action'] === 'carry') {
                     continue;
                 }
                 // Rider DELETE-guard: unsettled cash delivery bills are ARCHIVED

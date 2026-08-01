@@ -1537,6 +1537,13 @@ class RestaurantPosController extends Controller
         // one full ticket; multi-station splitting stays an order-KOT feature).
         $prep = \App\Models\PosStation::prepareTicket($companyId, $ticketItems, null);
 
+        // "Payment First, Then KOT" v2 (Aug 2026): stamp the txn the first time its
+        // kitchen ticket is rendered — the F10 "Send KOT" button and the promote-time
+        // auto-KOT both check this so the kitchen never gets the same ticket twice.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'kot_sent_at') && !$transaction->kot_sent_at) {
+            PosTransaction::where('id', $transaction->id)->update(['kot_sent_at' => now()]);
+        }
+
         return view('pos.restaurant.kitchen-ticket', [
             'order' => $order,
             'company' => $company,

@@ -334,3 +334,7 @@ Sale screen ki mazeed cheezein:
 ## Multi-line kitchen notes & bina-receipt promote (Aug 2026)
 - Bill/kitchen note ab MULTI-LINE hai: note ke khane mein Enter dabane se nayi line banti hai — har item ka alag note alag line par likhein. KOT par yeh notes number-war (1. 2. 3.) alag alag lines mein chhapte hain; receipt par bhi lines barqarar rehti hain. Note band karne ke liye Esc.
 - Provisional bill ko Make Final karte waqt method picker mein neeche checkbox hai: "Receipt print na karein (customer maujood nahi)" — R key se bhi toggle hota hai. Tick karne par receipt AUTO-print nahi hoti (kaghaz bachta hai — delivery ke bills raat ko ikathay final karne walon ke liye); KOT (payment-first walay orders ki) phir bhi nikalti hai, aur receipt popup se manual print ab bhi ho sakta hai. Yeh choice usi computer par yaad rehti hai.
+
+## Payment First, Then KOT — v2: F10 se KOT bhejein (Aug 2026)
+- Setting ON ho (Kitchen & KOT Settings) to delivery ke provisional bill par KOT rukti hai. Jaise hi payment confirm ho, cashier F10 (Provisional Bills) kholay — delivery bill par narangi "KOT" button hota hai (ya bill select kar ke K dabayen) — KOT usi waqt kitchen mein chali jati hai. Raat ko Make Final karne ka intezar nahi karna parta.
+- Agar F10 se KOT pehle bhej di ho to Make Final par dobara nahi chhapti; agar nahi bheji thi to Make Final par khud nikal jati hai (pehle jaisa).

@@ -2075,6 +2075,10 @@ window.addEventListener('popstate', function() {
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V3a1 1 0 011-1h4a1 1 0 011 1v4"/></svg>
                                 {{ __('pos.delete') }}
                             </button>
+                            <button x-show="bill.kot_pending" @click="sendProvisionalKot(bill)" title="{{ __('pos.ti_send_kot_now') }}" class="py-2 px-3 text-xs font-bold text-orange-700 border border-orange-300 rounded-xl hover:bg-orange-50 transition flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"/></svg>
+                                {{ __('pos.send_kot') }} <kbd class="px-1 text-[9px] font-mono text-orange-400 border border-orange-200 rounded">K</kbd>
+                            </button>
                             <button @click="askPromoteMethod(bill)" :title="praEnabled ? window.TXT.ti_pay_submit_pra : window.TXT.ti_pay_finalize_local" class="flex-1 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                                 {{ __('pos.make_final') }}
@@ -5380,6 +5384,7 @@ function restaurantPos() {
                 else if (e.key === 'Enter') { e.preventDefault(); if (flb[this.activeLocalIndex]) this.askPromoteMethod(flb[this.activeLocalIndex]); }
                 else if ((e.key === 'e' || e.key === 'E') && flb[this.activeLocalIndex]) { e.preventDefault(); window.location.href = '{{ route('pos.invoice.create') }}?edit_bill=' + flb[this.activeLocalIndex].id; }
                 else if ((e.key === 'd' || e.key === 'D') && this.posRole !== 'pos_cashier' && flb[this.activeLocalIndex]) { e.preventDefault(); this.deleteProvisional(flb[this.activeLocalIndex]); }
+                else if ((e.key === 'k' || e.key === 'K') && flb[this.activeLocalIndex]?.kot_pending) { e.preventDefault(); this.sendProvisionalKot(flb[this.activeLocalIndex]); }
                 else if (e.key === 'Escape') { e.preventDefault(); this.showLocalBills = false; }
                 return;
             }
@@ -7274,6 +7279,14 @@ function restaurantPos() {
         // Filtered view of localBills — matches invoice number, customer name,
         // phone, or delivery address. ALL list rendering + keyboard nav MUST go
         // through this (never raw localBills) or index-based actions hit the wrong bill.
+        // "Payment First, Then KOT" v2 (Aug 2026): payment confirm hote hi cashier
+        // F10 se KOT bhej deta hai — raat ke Make Final ka intezar nahi. Server
+        // render par kot_sent_at stamp karta hai, is liye promote dobara nahi bhejta.
+        sendProvisionalKot(bill) {
+            if (!bill || !bill.kot_pending) return;
+            bill.kot_pending = false; // optimistic — server stamps kot_sent_at on render
+            this.printTxnKitchenTicket(bill.id);
+        },
         filteredLocalBills() {
             const q = (this.localSearch || '').toLowerCase().trim();
             if (!q) return this.localBills;
@@ -7431,7 +7444,9 @@ function restaurantPos() {
                     // DIRECT fire (review catch): auto-print/auto-KOT master switches se
                     // AZAAD — warna un shops par KOT kabhi na nikalti jahan auto-print OFF hai.
                     // printTxnKitchenTicket silent-first hai, warna print popup fallback.
-                    const promoKotId = (!!this.kitchenSettings.delivery_kot_after_payment && bill.order_type === 'delivery')
+                    // v2: agar cashier ne F10 se pehle hi KOT bhej di thi (kot_pending=false),
+                    // promote par dobara NA bheji jaye — kitchen ke paas ticket already hai.
+                    const promoKotId = (!!this.kitchenSettings.delivery_kot_after_payment && bill.order_type === 'delivery' && bill.kot_pending !== false)
                         ? (data.id || bill.id) : null;
                     this.lastTxnKotId = promoKotId; // receipt popup ka K button bhi isi se chalega
                     if (promoKotId && !this.kdsHandlesKot()) this.printTxnKitchenTicket(promoKotId);

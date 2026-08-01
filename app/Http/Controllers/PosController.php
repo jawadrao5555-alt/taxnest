@@ -2620,9 +2620,16 @@ class PosController extends Controller
             ->where('pra_status', 'local')
             ->orderBy('id', 'desc')
             ->limit(100)
-            ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'order_type', 'delivery_address', 'total_amount', 'payment_method', 'created_at']);
+            ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'order_type', 'delivery_address', 'total_amount', 'payment_method', 'created_at',
+                   ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'kot_sent_at') ? ['kot_sent_at'] : [])]);
 
-        $data = $bills->map(function ($b) {
+        // "Payment First, Then KOT" v2 (Aug 2026): with the company toggle ON, a
+        // delivery provisional whose kitchen ticket hasn't fired yet shows a
+        // "Send KOT" button in F10 — cashier fires it the moment payment confirms,
+        // hours before the bill is made final at night.
+        $kotAfterPayment = (bool) (Company::find($companyId)?->delivery_kot_after_payment ?? false);
+
+        $data = $bills->map(function ($b) use ($kotAfterPayment) {
             return [
                 'id'               => $b->id,
                 'invoice_number'   => $b->invoice_number,
@@ -2635,6 +2642,7 @@ class PosController extends Controller
                 'items_count'      => PosTransactionItem::where('transaction_id', $b->id)->count(),
                 'created_human'    => $b->created_at?->diffForHumans(),
                 'created_at'       => $b->created_at?->toDateTimeString(),
+                'kot_pending'      => $kotAfterPayment && $b->order_type === 'delivery' && empty($b->kot_sent_at),
             ];
         });
 

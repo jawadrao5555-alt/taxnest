@@ -985,7 +985,7 @@ window.addEventListener('popstate', function() {
                 </button>
                 {{-- PER-USER grid edit chip (owner, 25 Jul 2026): ALL roles — each user
                      hides/shows items on their OWN grid only. Search never affected. --}}
-                <button type="button" @click="gridEditMode = !gridEditMode; filterProducts()"
+                <button type="button" @click="gridEditMode = !gridEditMode; filterProducts(); if (!gridEditMode) syncAutoWidecart()"
                         class="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-bold border transition"
                         :class="gridEditMode ? 'bg-purple-600 border-purple-600 text-white' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'"
                         :title="gridEditMode ? window.TXT.ti_grid_edit_done : window.TXT.ti_grid_edit_start">
@@ -3162,9 +3162,42 @@ function restaurantPos() {
                 });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 this.filterProducts();
+                this.syncAutoWidecart();
             } catch (e) {
                 if (prev === undefined) delete this.userGridPrefs[key]; else this.userGridPrefs[key] = prev;
                 this.showToast(window.TXT.save_failed_try_again, 'error');
+            }
+        },
+        // Owner request (1 Aug 2026): jab user saare grid items hide kar de to
+        // split (widecart) layout KHUD on ho jaye — alag toggle dhoondhne ki
+        // zaroorat na pade. Auto-off is tracked so unhiding items restores the
+        // grid automatically; a MANUAL toggle press always wins (clears flag).
+        visibleGridCount() {
+            try {
+                return this.allProducts.filter(p => this.isItemVisible(p)).length
+                    + this.allServices.filter(s => this.isItemVisible(s)).length
+                    + this.allDeals.filter(d => this.isItemVisible(d)).length;
+            } catch (e) { return 1; /* never auto-hide on error */ }
+        },
+        syncAutoWidecart() {
+            if (this.gridEditMode) return; // editing needs the grid visible
+            const count = this.visibleGridCount();
+            let autoFlag = false;
+            try { autoFlag = localStorage.getItem('pos_show_products_auto') === '1'; } catch (e) {}
+            if (count === 0 && this.showProducts) {
+                this.showProducts = false;
+                this.filterProducts();
+                try {
+                    localStorage.setItem('pos_show_products', '0');
+                    localStorage.setItem('pos_show_products_auto', '1');
+                } catch (e) {}
+            } else if (count > 0 && !this.showProducts && autoFlag) {
+                this.showProducts = true;
+                this.filterProducts();
+                try {
+                    localStorage.setItem('pos_show_products', '1');
+                    localStorage.removeItem('pos_show_products_auto');
+                } catch (e) {}
             }
         },
         async resetGridPrefs() {
@@ -3178,6 +3211,7 @@ function restaurantPos() {
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 this.userGridPrefs = {};
                 this.filterProducts();
+                this.syncAutoWidecart();
                 this.showToast(window.TXT.all_items_visible_again, 'success');
             } catch (e) {
                 this.showToast(window.TXT.reset_failed_try_again, 'error');
@@ -3754,6 +3788,7 @@ function restaurantPos() {
             // Honor the saved "hide products" preference ONLY in inventory-OFF mode.
             // Inventory mode must always show the catalog (no manual on-the-fly create).
             try { if (localStorage.getItem('pos_show_products') === '0') this.showProducts = false; } catch (e) {}
+            this.syncAutoWidecart(); // all items hidden => auto split layout
             this.filterProducts();
             setTimeout(() => { this.loading = false; }, 300);
             this.$watch('activeCategory', () => { this.filterProducts(); this.gridFocusIndex = 0; if (this.searchQuery.trim().length > 0) this.onSearchInput(); });
@@ -4402,7 +4437,10 @@ function restaurantPos() {
         toggleShowProducts() {
             // Inventory mode requires the catalog — toggle is a no-op (force ON) there.
             this.showProducts = !this.showProducts;
-            try { localStorage.setItem('pos_show_products', this.showProducts ? '1' : '0'); } catch (e) {}
+            try {
+                localStorage.setItem('pos_show_products', this.showProducts ? '1' : '0');
+                localStorage.removeItem('pos_show_products_auto'); // manual choice wins over auto
+            } catch (e) {}
             // Grid OFF hides the pills — and on <sm screens the category dropdown is hidden too,
             // so a previously-picked category would become an INVISIBLE search filter. Reset to
             // 'all' (desktop can simply re-pick from the always-visible dropdown).

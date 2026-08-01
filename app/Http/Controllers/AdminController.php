@@ -217,6 +217,10 @@ class AdminController extends Controller
                 'trial_ends_at' => now()->addDays(14),
                 'active' => true,
             ]);
+        } else {
+            // No pricing plans seeded at all — still never leave the company
+            // without a subscription row (bounded 14-day trial window).
+            \App\Services\TrialSubscriptionService::ensureTrial($company->id, $company->product_type ?? 'di', 14);
         }
 
         if ($request->filled('admin_name') && $request->filled('admin_email') && $request->filled('admin_password')) {

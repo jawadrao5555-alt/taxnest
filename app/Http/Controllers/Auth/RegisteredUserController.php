@@ -60,22 +60,9 @@ class RegisteredUserController extends Controller
                 'status' => 'pending',
             ]);
 
-            $trialPlan = PricingPlan::where('is_trial', true)
-                ->where('product_type', 'di')
-                ->first();
-            if ($trialPlan) {
-                Subscription::create([
-                    'company_id' => $company->id,
-                    'pricing_plan_id' => $trialPlan->id,
-                    'billing_cycle' => 'monthly',
-                    'discount_percent' => 0,
-                    'final_price' => 0,
-                    'start_date' => now(),
-                    'end_date' => now()->addDays(3),
-                    'trial_ends_at' => now()->addDays(3),
-                    'active' => true,
-                ]);
-            }
+            // Always attaches a trial subscription (even if the trial plan
+            // seed row is missing) — no signup may leave a company bare.
+            \App\Services\TrialSubscriptionService::ensureTrial($company->id, 'di');
 
             $user = User::create([
                 'name' => $request->name,

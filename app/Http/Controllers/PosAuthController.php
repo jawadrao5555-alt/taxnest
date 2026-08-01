@@ -246,25 +246,9 @@ class PosAuthController extends Controller
      */
     private function startTrial(int $companyId, string $productType): void
     {
-        $trialPlan = \App\Models\PricingPlan::where('product_type', $productType)
-            ->where('is_trial', true)
-            ->first();
-
-        if (!$trialPlan) {
-            return;
-        }
-
-        \App\Models\Subscription::create([
-            'company_id' => $companyId,
-            'pricing_plan_id' => $trialPlan->id,
-            'billing_cycle' => 'monthly',
-            'discount_percent' => 0,
-            'final_price' => 0,
-            'start_date' => now(),
-            'end_date' => now()->addDays(3),
-            'trial_ends_at' => now()->addDays(3),
-            'active' => true,
-        ]);
+        // Always attaches a subscription row, even if the trial plan seed is
+        // missing (plan-less row still carries trial_ends_at).
+        \App\Services\TrialSubscriptionService::ensureTrial($companyId, $productType);
     }
 
     public function logout(Request $request)

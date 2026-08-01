@@ -89,6 +89,10 @@ class AdminCompanyController extends Controller
             'pos_role' => in_array($request->product_type, ['pos', 'fbrpos']) ? 'pos_admin' : null,
         ]);
 
+        // Every company must start with a subscription row — admin-created ones
+        // get the standard 14-day trial (admin can assign a real plan after).
+        \App\Services\TrialSubscriptionService::ensureTrial($company->id, $request->product_type, 14);
+
         // Record credentials in the anti-reuse ledger (admin creation is never blocked).
         CredentialLedgerService::record([
             'email' => $request->admin_email,

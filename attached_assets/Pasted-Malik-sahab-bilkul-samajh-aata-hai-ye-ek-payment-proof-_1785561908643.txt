@@ -1,0 +1,21 @@
+Malik sahab, bilkul samajh aata hai — ye ek "payment proof upload + auto temporary access" ka system hai. Mera suggested procedure ye hoga:
+
+Customer ki taraf (jab subscription khatam ho ya pending ho):
+
+Jab company ki access khatam hoti hai to abhi jo banner/page dikhta hai, wahan ek naya button hoga: "Payment ki hai? Proof upload karein".
+Customer screenshot/rasid ki photo upload karega, sath amount aur bank/JazzCash/EasyPaisa ka naam, aur transaction ID (optional).
+Upload hotay hi system us company ko foran temporary access de dega — maslan 3 din — aur usay message dikhega: "Aapko 3 din ke liye temporary allow kar diya gaya hai. Permanent access ke liye admin verify kar ke confirm karega." Yani raat ko bhi customer ka kaam nahi rukta, aap so rahe hon tab bhi.
+Aap ki taraf (admin panel): 4. Admin panel mein ek naya page: "Payment Proofs (Pending)" — jahan har upload ki photo, company ka naam, amount, aur waqt nazar aayega. Dashboard par pending count ka badge bhi. 5. Aap ke paas do button honge:
+
+Approve → company ki subscription poore period ke liye renew ho jayegi (jitna plan hai), temporary wala khatam.
+Reject → temporary access foran khatam, customer ko wajah ke sath message ("proof theek nahi tha, admin se rabta karein").
+Aap ko email bhi jayegi jab koi proof upload kare, taake subah uth kar pata chal jaye.
+Hifazati baatein (taake koi dhoka na de):
+
+Ek company sirf ek pending proof rakh sakti hai — bar bar upload kar ke muft din nahi le sakti.
+Agar proof reject ho jaye to wohi company dobara temporary access auto nahi legi — sirf naya proof upload hoga jo aap ki manzoori ka intezar karega.
+3 din mein agar aap ne kuch na kiya to temporary access khud khatam ho jayega (system yaad-dihani email bhi bhej dega).
+Har approve/reject ka record rahega ke kis admin ne kab kiya.
+Ye humari maujooda override system (temporary/grace access) ke upar hi banega, is liye koi nayi complexity nahi — bas upload form, admin review page, aur auto-temporary ka rule.
+
+Aap batayein: temporary access kitne din ka rakhein (main 3 din tajweez karta hoon), aur ye sab panels (DI, POS, FBR POS) ke liye banayein ya pehle sirf POS? Aap haan karein to main bana deta hoon.

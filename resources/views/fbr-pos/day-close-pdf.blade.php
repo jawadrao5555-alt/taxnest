@@ -51,13 +51,13 @@
     <div class="header">
         <h1>{{ $company->name }}</h1>
         @if($company->address)<p>{{ $company->address }}</p>@endif
-        @if($company->phone)<p>Tel: {{ $company->phone }}</p>@endif
+        @if($company->phone)<p>{{ __('pos.rcpt_tel') }} {{ $company->phone }}</p>@endif
         @if($company->ntn)<p>NTN: {{ $company->ntn }}</p>@endif
     </div>
 
     <div class="report-title">
-        <h2>Day Close Report (Z-Report)</h2>
-        <p>FBR Rule 150R-4(f) — End-of-Day Summary</p>
+        <h2>{{ __('pos.dcp_report_title') }}</h2>
+        <p>{{ __('pos.dcp_fbr_eod_summary') }}</p>
         <p style="font-weight:bold; margin-top:4px;">{{ $report->report_date->format('l, d F Y') }}</p>
     </div>
 
@@ -72,7 +72,7 @@
         </div>
         @if($company->fbr_pos_id)
         <div class="info-row">
-            <div class="lbl">POS Registration #:</div>
+            <div class="lbl">{{ __('pos.rcpt_pos_registration_hash') }}:</div>
             <div class="val">{{ $company->fbr_pos_id }}</div>
         </div>
         @endif
@@ -82,29 +82,29 @@
         </div>
     </div>
 
-    <div class="section-title">Invoice Summary</div>
+    <div class="section-title">{{ __('pos.dcp_invoice_summary') }}</div>
     <table class="data">
         <thead>
             <tr>
-                <th>Category</th>
-                <th class="c">Count</th>
-                <th class="r">Amount (PKR)</th>
+                <th>{{ __('pos.dc_th_category') }}</th>
+                <th class="c">{{ __('pos.dc_th_count') }}</th>
+                <th class="r">{{ __('pos.dc_th_amount_pkr') }}</th>
             </tr>
         </thead>
         <tbody>
             <tr>
-                <td>FBR Submitted Invoices</td>
+                <td>{{ __('pos.dcp_fbr_submitted_invoices') }}</td>
                 <td class="c">{{ $report->fbr_invoices }}</td>
                 <td class="r">-</td>
             </tr>
             <tr>
-                <td>Local Invoices</td>
+                <td>{{ __('pos.dcp_local_invoices') }}</td>
                 <td class="c">{{ $report->local_invoices }}</td>
                 <td class="r">-</td>
             </tr>
             @if($report->failed_invoices > 0)
             <tr>
-                <td>Failed/Pending Invoices</td>
+                <td>{{ __('pos.dcp_failed_pending_invoices') }}</td>
                 <td class="c">{{ $report->failed_invoices }}</td>
                 <td class="r">-</td>
             </tr>
@@ -119,12 +119,12 @@
         </tfoot>
     </table>
 
-    <div class="section-title">Financial Summary</div>
+    <div class="section-title">{{ __('pos.dcp_financial_summary') }}</div>
     <table class="data">
         <thead>
             <tr>
-                <th style="width:60%;">Description</th>
-                <th class="r" style="width:40%;">Amount (PKR)</th>
+                <th style="width:60%;">{{ __('pos.dcp_description') }}</th>
+                <th class="r" style="width:40%;">{{ __('pos.dc_th_amount_pkr') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -143,12 +143,12 @@
                 <td class="r">{{ number_format($report->net_sales, 2) }}</td>
             </tr>
             <tr>
-                <td>Sales Tax Collected</td>
+                <td>{{ __('pos.dcp_sales_tax_collected') }}</td>
                 <td class="r">{{ number_format($report->total_tax, 2) }}</td>
             </tr>
             @if($report->total_fbr_fee > 0)
             <tr>
-                <td>FBR POS Fee (SRO 1279/2021)</td>
+                <td>{{ __('pos.dcp_fbr_pos_fee_sro') }}</td>
                 <td class="r">{{ number_format($report->total_fbr_fee, 2) }}</td>
             </tr>
             @endif
@@ -160,12 +160,12 @@
         <div class="val">PKR {{ number_format($report->total_amount, 2) }}</div>
     </div>
 
-    <div class="section-title">Payment Method Breakdown</div>
+    <div class="section-title">{{ __('pos.dcp_payment_method_breakdown') }}</div>
     <table class="data">
         <thead>
             <tr>
-                <th style="width:60%;">Payment Method</th>
-                <th class="r" style="width:40%;">Amount (PKR)</th>
+                <th style="width:60%;">{{ __('pos.dcp_payment_method') }}</th>
+                <th class="r" style="width:40%;">{{ __('pos.dc_th_amount_pkr') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -205,21 +205,21 @@
                 <td class="r">{{ number_format($report->cash_amount, 2) }}</td>
                 <td class="r">{{ number_format($report->expected_cash ?? 0, 2) }}</td>
                 <td class="r">{{ number_format($report->counted_cash, 2) }}</td>
-                <td class="r" style="{{ abs($pdfVariance) < 0.01 ? 'color:#059669;' : ($pdfVariance < 0 ? 'color:#dc2626;' : 'color:#d97706;') }}">{{ $pdfVariance > 0 ? '+' : '' }}{{ number_format($pdfVariance, 2) }} {{ abs($pdfVariance) < 0.01 ? '(BALANCED)' : ($pdfVariance < 0 ? '(SHORT)' : '(OVER)') }}</td>
+                <td class="r" style="{{ abs($pdfVariance) < 0.01 ? 'color:#059669;' : ($pdfVariance < 0 ? 'color:#dc2626;' : 'color:#d97706;') }}">{{ $pdfVariance > 0 ? '+' : '' }}{{ number_format($pdfVariance, 2) }} {{ abs($pdfVariance) < 0.01 ? __('pos.dc_balanced') : ($pdfVariance < 0 ? __('pos.dc_short') : __('pos.dc_over')) }}</td>
             </tr>
         </tbody>
     </table>
     @endif
 
     @if($cashierBreakdown->isNotEmpty())
-    <div class="section-title">Cashier Performance</div>
+    <div class="section-title">{{ __('pos.dcp_cashier_performance') }}</div>
     <table class="data">
         <thead>
             <tr>
-                <th>Cashier</th>
-                <th class="c">Sales</th>
-                <th class="r">Revenue (PKR)</th>
-                <th class="r">Tax (PKR)</th>
+                <th>{{ __('pos.dcp_cashier') }}</th>
+                <th class="c">{{ __('pos.dcp_sales') }}</th>
+                <th class="r">{{ __('pos.dc_th_revenue_pkr') }}</th>
+                <th class="r">{{ __('pos.dc_th_tax_pkr') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -241,10 +241,10 @@
         <thead>
             <tr>
                 <th class="c" style="width:8%;">#</th>
-                <th>Product</th>
-                <th class="c">Qty</th>
-                <th class="r">Revenue (PKR)</th>
-                <th class="c">Share</th>
+                <th>{{ __('pos.receipt_item') }}</th>
+                <th class="c">{{ __('pos.receipt_qty') }}</th>
+                <th class="r">{{ __('pos.dc_th_revenue_pkr') }}</th>
+                <th class="c">{{ __('pos.dc_th_share') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -261,14 +261,14 @@
     </table>
     @endif
 
-    <div class="section-title">FBR Submission Health</div>
+    <div class="section-title">{{ __('pos.dcp_fbr_submission_health') }}</div>
     <table class="data">
         <thead>
             <tr>
                 <th class="c">{{ __('pos.dc_submitted') }}</th>
                 <th class="c">{{ __('pos.dc_pending') }}</th>
                 <th class="c">{{ __('pos.dc_failed') }}</th>
-                <th class="c">Local</th>
+                <th class="c">{{ __('pos.dc_local') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -282,14 +282,14 @@
     </table>
 
     @if($analytics->discounts->total > 0)
-    <div class="section-title">Discount Summary</div>
+    <div class="section-title">{{ __('pos.dcp_discount_summary') }}</div>
     <table class="data">
         <thead>
             <tr>
-                <th class="c">Bills With Discount</th>
-                <th class="r">Bill-Level (PKR)</th>
-                <th class="r">Item-Level (PKR)</th>
-                <th class="r">Total Discount (PKR)</th>
+                <th class="c">{{ __('pos.dcp_bills_with_discount') }}</th>
+                <th class="r">{{ __('pos.dcp_bill_level_pkr') }}</th>
+                <th class="r">{{ __('pos.dcp_item_level_pkr') }}</th>
+                <th class="r">{{ __('pos.dcp_total_discount_pkr') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -303,23 +303,23 @@
     </table>
     @endif
 
-    <div class="section-title">Day Statistics &amp; Comparison</div>
+    <div class="section-title">{{ __('pos.dcp_day_stats_comparison') }}</div>
     <div class="info-box">
         <div class="info-row">
             <div class="lbl">{{ __('pos.dc_avg_bill') }}:</div>
             <div class="val">PKR {{ number_format($analytics->avg_bill, 2) }}</div>
         </div>
         <div class="info-row">
-            <div class="lbl">{{ __('pos.dc_unique_customers') }} (named):</div>
+            <div class="lbl">{{ __('pos.dc_unique_customers') }} {{ __('pos.dcp_named') }}:</div>
             <div class="val">{{ $analytics->unique_customers }}</div>
         </div>
         <div class="info-row">
             <div class="lbl">{{ __('pos.dc_vs_yesterday') }} ({{ \Carbon\Carbon::parse($analytics->comparison->yesterday->date)->format('d M') }}):</div>
-            <div class="val">PKR {{ number_format($analytics->comparison->yesterday->revenue, 2) }} ({{ $analytics->comparison->yesterday->invoices }} bills){{ $analytics->comparison->vs_yesterday_revenue_pct !== null ? ' — ' . ($analytics->comparison->vs_yesterday_revenue_pct >= 0 ? '+' : '') . $analytics->comparison->vs_yesterday_revenue_pct . '% today' : '' }}</div>
+            <div class="val">PKR {{ number_format($analytics->comparison->yesterday->revenue, 2) }} ({{ $analytics->comparison->yesterday->invoices }} {{ __('pos.dcp_bills_word') }}){{ $analytics->comparison->vs_yesterday_revenue_pct !== null ? ' — ' . ($analytics->comparison->vs_yesterday_revenue_pct >= 0 ? '+' : '') . $analytics->comparison->vs_yesterday_revenue_pct . '% ' . __('pos.dcp_today_word') : '' }}</div>
         </div>
         <div class="info-row">
             <div class="lbl">{{ __('pos.dc_vs_last_week') }} ({{ \Carbon\Carbon::parse($analytics->comparison->last_week->date)->format('d M') }}):</div>
-            <div class="val">PKR {{ number_format($analytics->comparison->last_week->revenue, 2) }} ({{ $analytics->comparison->last_week->invoices }} bills){{ $analytics->comparison->vs_last_week_revenue_pct !== null ? ' — ' . ($analytics->comparison->vs_last_week_revenue_pct >= 0 ? '+' : '') . $analytics->comparison->vs_last_week_revenue_pct . '% today' : '' }}</div>
+            <div class="val">PKR {{ number_format($analytics->comparison->last_week->revenue, 2) }} ({{ $analytics->comparison->last_week->invoices }} {{ __('pos.dcp_bills_word') }}){{ $analytics->comparison->vs_last_week_revenue_pct !== null ? ' — ' . ($analytics->comparison->vs_last_week_revenue_pct >= 0 ? '+' : '') . $analytics->comparison->vs_last_week_revenue_pct . '% ' . __('pos.dcp_today_word') : '' }}</div>
         </div>
     </div>
 
@@ -341,13 +341,13 @@
     @endif
 
     <div class="hash-box">
-        <div class="label">INTEGRITY HASH (SHA-256)</div>
+        <div class="label">{{ __('pos.dcp_integrity_hash') }}</div>
         <p>{{ $report->hash }}</p>
     </div>
 
     <div class="footer">
-        <p>This is a system-generated Day Close Report as required under FBR Rule 150R-4(f)</p>
-        <div class="brand">Powered by TaxNest FBR POS</div>
+        <p>{{ __('pos.dcp_sys_report_fbr') }}</p>
+        <div class="brand">{{ __('pos.dcp_powered_taxnest_fbr') }}</div>
         <p>{{ __('pos.dc_generated') }}: {{ $report->created_at->format('d/m/Y h:i:s A') }}</p>
     </div>
 </body>

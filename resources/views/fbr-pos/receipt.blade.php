@@ -151,7 +151,7 @@
         @endif
         <h1>{{ $company->name }}</h1>
         @if($rd['show_address'] && $company->address)<p>{{ $company->address }}</p>@endif
-        @if($rd['show_mobile'] && $company->phone)<p>Tel: {{ $company->phone }}</p>@endif
+        @if($rd['show_mobile'] && $company->phone)<p>{{ __('pos.rcpt_tel') }} {{ $company->phone }}</p>@endif
         @if($rd['show_ntn'] && $company->ntn)<p>NTN: {{ $company->ntn }}</p>@endif
     </div>
 
@@ -199,13 +199,13 @@
         @if($transaction->customer_ntn)
         <tr><td class="info-label">NTN:</td><td class="info-value">{{ $transaction->customer_ntn }}</td></tr>
         @endif
-        <tr><td class="info-label">Tax Period:</td><td class="info-value">{{ $transaction->created_at->format('M Y') }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.tax_period') }}:</td><td class="info-value">{{ $transaction->created_at->format('M Y') }}</td></tr>
         <tr><td class="info-label">{{ __('pos.receipt_payment_mode') }}:</td><td class="info-value">{{ ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</td></tr>
         @if($rd['show_cashier'] && $transaction->creator)
         <tr><td class="info-label">{{ __('pos.receipt_cashier') }}:</td><td class="info-value">{{ $transaction->creator->name }}</td></tr>
         @endif
         @if($company->fbr_pos_id)
-        <tr><td class="info-label">POS Reg #:</td><td class="info-value">{{ $company->fbr_pos_id }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.rcpt_pos_reg_hash') }}:</td><td class="info-value">{{ $company->fbr_pos_id }}</td></tr>
         @endif
     </table>
 
@@ -215,7 +215,7 @@
         <thead>
             <tr>
                 <th class="col-item">{{ __('pos.receipt_item') }}</th>
-                <th class="col-uom">UoM</th>
+                <th class="col-uom">{{ __('pos.rcpt_uom') }}</th>
                 <th class="col-qty">{{ __('pos.receipt_qty') }}</th>
                 <th class="col-price">{{ __('pos.receipt_price') }}</th>
                 <th class="col-total">{{ __('pos.receipt_total') }}</th>
@@ -265,7 +265,7 @@
         </tr>
         @if($transaction->fbr_service_charge > 0)
         <tr>
-            <td class="tot-label">FBR POS Fee:</td>
+            <td class="tot-label">{{ __('pos.dcp_fbr_pos_fee') }}:</td>
             <td class="tot-value">PKR {{ number_format($transaction->fbr_service_charge, 2) }}</td>
         </tr>
         @endif
@@ -305,27 +305,27 @@
 
     @if($transaction->fbr_status === 'submitted' && $transaction->fbr_invoice_number)
     <div class="fbr-badge">
-        <div class="fbr-title">✓ INTEGRATED WITH FBR</div>
-        <div style="font-size:11px; font-weight:bold; margin:3px 0;">FBR VERIFIED INVOICE</div>
+        <div class="fbr-title">✓ {{ __('pos.rcpt_fbr_integrated') }}</div>
+        <div style="font-size:11px; font-weight:bold; margin:3px 0;">{{ __('pos.rcpt_fbr_verified_invoice') }}</div>
         <div style="margin: 6px 0;">
             <img src="{{ $qrUrl }}" alt="FBR QR Code" style="width:100px; height:100px; margin:0 auto; display:block;">
         </div>
         <div>POS: {{ $transaction->invoice_number }}</div>
         <div class="fbr-number">FBR: {{ $transaction->fbr_invoice_number }}</div>
         @if($company->fbr_pos_id)
-        <div style="font-size:9px; margin-top:3px;">POS Reg #: {{ $company->fbr_pos_id }}</div>
+        <div style="font-size:9px; margin-top:3px;">{{ __('pos.rcpt_pos_reg_hash') }}: {{ $company->fbr_pos_id }}</div>
         @endif
     </div>
     @elseif(!$fbrRcptTopBadge)
     <div class="fbr-badge" style="border-style: dashed;">
-        <div class="fbr-title">⏳ FBR PENDING</div>
+        <div class="fbr-title">⏳ {{ __('pos.rcpt_fbr_pending') }}</div>
         <div style="margin: 6px 0;">
             <img src="{{ $qrUrl }}" alt="QR Code" style="width:100px; height:100px; margin:0 auto; display:block;">
         </div>
         <div>POS: {{ $transaction->invoice_number }}</div>
-        <div style="font-size:10px; margin-top:3px;">Will retry automatically</div>
+        <div style="font-size:10px; margin-top:3px;">{{ __('pos.rcpt_will_retry') }}</div>
         @if($company->fbr_pos_id)
-        <div style="font-size:9px; margin-top:3px;">POS Reg #: {{ $company->fbr_pos_id }}</div>
+        <div style="font-size:9px; margin-top:3px;">{{ __('pos.rcpt_pos_reg_hash') }}: {{ $company->fbr_pos_id }}</div>
         @endif
     </div>
     @else
@@ -345,9 +345,9 @@
         @endif
         @endif
         @if($company->fbr_pos_id)
-        <p style="font-weight:bold;">Integrated with FBR | Reg #: {{ $company->fbr_pos_id }}</p>
+        <p style="font-weight:bold;">{{ __('pos.rcpt_fbr_integrated') }} | {{ __('pos.rcpt_reg_hash') }}: {{ $company->fbr_pos_id }}</p>
         @endif
-        <p>Powered by TaxNest FBR POS</p>
+        <p>{{ __('pos.dcp_powered_taxnest_fbr') }}</p>
         <p>{{ now()->format('d/m/Y h:i:s A') }}</p>
     </div>
     </div>{{-- /.receipt-wrap --}}

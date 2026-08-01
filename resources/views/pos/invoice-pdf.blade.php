@@ -91,10 +91,10 @@
             @endif
             <h1>{{ $company->name }}</h1>
             @if($company->address)<p>{{ $company->address }}</p>@endif
-            @if($company->phone)<p>Tel: {{ $company->phone }}</p>@endif
+            @if($company->phone)<p>{{ __('pos.rcpt_tel') }} {{ $company->phone }}</p>@endif
             @if($company->email)<p>{{ $company->email }}</p>@endif
             @if($company->ntn)<p>NTN: {{ $company->ntn }}</p>@endif
-            @if($company->pra_pos_id)<p>POS Reg: {{ $company->pra_pos_id }}</p>@endif
+            @if($company->pra_pos_id)<p>{{ __('pos.rcpt_pos_reg') }} {{ $company->pra_pos_id }}</p>@endif
         </div>
 
         <div class="invoice-box">
@@ -162,7 +162,7 @@
                     <th style="width:{{ $showTaxLines ? '40%' : '50%' }};">{{ __('pos.receipt_item') }}</th>
                     <th class="c" style="width:10%;">{{ __('pos.receipt_qty') }}</th>
                     @if($showTaxLines)
-                    <th class="r" style="width:10%;">Tax%</th>
+                    <th class="r" style="width:10%;">{{ __('pos.rcpt_tax_pct') }}</th>
                     @endif
                     <th class="r" style="width:20%;">{{ __('pos.receipt_price') }}</th>
                     <th class="r" style="width:20%;">{{ __('pos.receipt_total') }}</th>
@@ -178,7 +178,7 @@
                     <td>
                         {{ $item->item_name }}
                         @if($showTaxLines && $item->is_tax_exempt)
-                        <span class="exempt-tag">EXEMPT</span>
+                        <span class="exempt-tag">{{ __('pos.rcpt_exempt') }}</span>
                         @endif
                     </td>
                     <td class="c">{{ $item->quantity }}</td>
@@ -258,7 +258,7 @@
 
         @if($transaction->pra_status === 'submitted' && $transaction->pra_invoice_number)
         <div class="pra-box">
-            <div class="title">✓ PRA Fiscal Invoice</div>
+            <div class="title">✓ {{ __('pos.rcpt_pra_fiscal_invoice') }}</div>
             <div>POS: {{ $transaction->invoice_number }}</div>
             <div class="num">PRA: {{ $transaction->pra_invoice_number }}</div>
         </div>
@@ -316,7 +316,7 @@
 
         <div class="footer">
             <p>{{ __('pos.receipt_thank_purchase') }}</p>
-            <div class="brand">Developed by: taxnest.com.pk</div>
+            <div class="brand">{{ __('pos.brand_developed_by') }}</div>
             <p>{{ now()->format('d/m/Y h:i:s A') }}</p>
         </div>
     </div>

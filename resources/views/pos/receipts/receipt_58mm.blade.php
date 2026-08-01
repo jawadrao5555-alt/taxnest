@@ -236,7 +236,7 @@
         @endif
         @if($company->business_activity)<p>{{ $company->business_activity }}</p>@endif
         @if(!empty($addressLine) && $rp['show_address'])<p>{{ $addressLine }}</p>@endif
-        @if($phoneLine && $rp['show_mobile'])<p>Tel: {{ $phoneLine }}</p>@endif
+        @if($phoneLine && $rp['show_mobile'])<p>{{ __('pos.rcpt_tel') }} {{ $phoneLine }}</p>@endif
         @if($company->email && $rp['show_email'])<p>{{ $company->email }}</p>@endif
         @if($company->ntn && $rp['show_ntn'])<p><strong>NTN:</strong> {{ $company->ntn }}</p>@endif
         @if(!empty($company->fbr_registration_no))<p><strong>STRN:</strong> {{ $company->fbr_registration_no }}</p>@endif
@@ -432,7 +432,7 @@
             : (in_array($rcptPayRaw, ['card', 'debit_card', 'credit_card'], true) ? 'CARD'
             : ($rcptPayRaw === 'qr_payment' ? 'ONLINE / QR' : strtoupper(str_replace('_', ' ', $rcptPayRaw))));
     @endphp
-    <div style="border: 2px solid #000; text-align: center; font-weight: bold; font-size: 12px; letter-spacing: 1px; padding: 3px 2px; margin: 3px 0; color: #000;">PAYMENT: {{ $rcptPayLabel }}</div>
+    <div style="border: 2px solid #000; text-align: center; font-weight: bold; font-size: 12px; letter-spacing: 1px; padding: 3px 2px; margin: 3px 0; color: #000;">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>
     @endif
 
     <div class="separator"></div>
@@ -497,7 +497,7 @@
 
     <div class="footer text-center">
         @if($rp['show_footer'])<p>{{ $rp['footer_text'] ?? __('pos.receipt_thank_you') }}</p>@endif
-        @if($rp['show_developed_by'] ?? true)<p>Developed by: taxnest.com.pk</p>@endif
+        @if($rp['show_developed_by'] ?? true)<p>{{ __('pos.brand_developed_by') }}</p>@endif
         <p>{{ now()->format('d/m/Y h:i A') }}</p>
     </div>
 </body>

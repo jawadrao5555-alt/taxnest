@@ -62,7 +62,7 @@
     <div class="c b xl">{{ __('pos.dc_zreport') }}</div>
     <div class="c">{{ $report->report_number }}</div>
     <div class="c">{{ $report->report_date->format('l, d M Y') }}</div>
-    <div class="c sm">{{ __('pos.dc_closed') }}: {{ $report->created_at->format('d/m/Y h:i A') }}@if($report->closedByUser) by {{ $report->closedByUser->name }}@endif</div>
+    <div class="c sm">{{ __('pos.dc_closed') }}: {{ $report->created_at->format('d/m/Y h:i A') }}@if($report->closedByUser) {{ __('pos.dcp_by_word') }} {{ $report->closedByUser->name }}@endif</div>
     <div class="hr2"></div>
 
     <div class="sec">{{ __('pos.dc_sales_summary') }}</div>
@@ -75,7 +75,7 @@
         <tr><td>{{ __('pos.dc_net_sales') }}</td><td class="r">{{ number_format($report->net_sales, 2) }}</td></tr>
         <tr><td>{{ __('pos.dc_sales_tax') }}</td><td class="r">{{ number_format($report->total_tax, 2) }}</td></tr>
         @if($report->total_fbr_fee > 0)
-        <tr><td>FBR POS Fee</td><td class="r">{{ number_format($report->total_fbr_fee, 2) }}</td></tr>
+        <tr><td>{{ __('pos.dcp_fbr_pos_fee') }}</td><td class="r">{{ number_format($report->total_fbr_fee, 2) }}</td></tr>
         @endif
         <tr><td class="b lg">{{ __('pos.dc_total_revenue') }}</td><td class="r b lg">{{ number_format($report->total_amount, 2) }}</td></tr>
     </table>
@@ -99,19 +99,19 @@
         <tr><td>{{ __('pos.dc_expected_drawer') }}</td><td class="r">{{ number_format($report->expected_cash ?? 0, 2) }}</td></tr>
         <tr><td>{{ __('pos.dc_counted_cash') }}</td><td class="r">{{ number_format($report->counted_cash, 2) }}</td></tr>
         <tr>
-            <td class="b">{{ __('pos.dc_variance') }} {{ abs((float) $report->cash_variance) < 0.01 ? '(BALANCED)' : ((float) $report->cash_variance < 0 ? '(SHORT)' : '(OVER)') }}</td>
+            <td class="b">{{ __('pos.dc_variance') }} {{ abs((float) $report->cash_variance) < 0.01 ? __('pos.dc_balanced') : ((float) $report->cash_variance < 0 ? __('pos.dc_short') : __('pos.dc_over')) }}</td>
             <td class="r b">{{ (float) $report->cash_variance > 0 ? '+' : '' }}{{ number_format($report->cash_variance, 2) }}</td>
         </tr>
     </table>
     <div class="hr"></div>
     @endif
 
-    <div class="sec">FBR Status</div>
+    <div class="sec">{{ __('pos.dc_fbr_status') }}</div>
     <table>
         <tr><td>{{ __('pos.dc_submitted') }}</td><td class="r">{{ $analytics->fbr_health->submitted }}</td></tr>
         @if($analytics->fbr_health->pending > 0)<tr><td>{{ __('pos.dc_pending') }}</td><td class="r">{{ $analytics->fbr_health->pending }}</td></tr>@endif
         @if($analytics->fbr_health->failed > 0)<tr><td>{{ __('pos.dc_failed') }}</td><td class="r">{{ $analytics->fbr_health->failed }}</td></tr>@endif
-        @if($analytics->fbr_health->local > 0)<tr><td>Local</td><td class="r">{{ $analytics->fbr_health->local }}</td></tr>@endif
+        @if($analytics->fbr_health->local > 0)<tr><td>{{ __('pos.dc_local') }}</td><td class="r">{{ $analytics->fbr_health->local }}</td></tr>@endif
     </table>
     <div class="hr"></div>
 
@@ -150,11 +150,11 @@
         <tr><td>{{ __('pos.dc_last_inv') }}</td><td class="r">{{ $report->last_invoice_number ?? '-' }}</td></tr>
     </table>
     <div class="hr2"></div>
-    <div class="c sm">SHA-256 Integrity Hash</div>
+    <div class="c sm">{{ __('pos.dcp_sha256_hash') }}</div>
     <div class="c sm wrap">{{ $report->hash }}</div>
     <div class="hr"></div>
-    <div class="c sm">System-generated Z-Report — FBR Rule 150R-4(f)</div>
-    <div class="c sm b">Powered by NestPOS Enterprise</div>
+    <div class="c sm">{{ __('pos.dcp_sys_zreport_fbr') }}</div>
+    <div class="c sm b">{{ __('pos.dcp_powered_nestpos') }}</div>
 </div>
 </body>
 </html>

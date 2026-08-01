@@ -97,7 +97,7 @@
             @endphp
             <h1>{{ $company->name }}</h1>
             @if($rd['show_address'] && $company->address)<p>{{ $company->address }}</p>@endif
-            @if($rd['show_mobile'] && $company->phone)<p>Tel: {{ $company->phone }}</p>@endif
+            @if($rd['show_mobile'] && $company->phone)<p>{{ __('pos.rcpt_tel') }} {{ $company->phone }}</p>@endif
             @if($rd['show_email'] && $company->email)<p>{{ $company->email }}</p>@endif
             @if($rd['show_ntn'] && $company->ntn)<p>NTN: {{ $company->ntn }}</p>@endif
         </div>
@@ -115,7 +115,7 @@
             @endif
             @if($company->fbr_pos_id)
             <div class="invoice-row">
-                <div class="lbl">POS Registration #:</div>
+                <div class="lbl">{{ __('pos.rcpt_pos_registration_hash') }}:</div>
                 <div class="val">{{ $company->fbr_pos_id }}</div>
             </div>
             @endif
@@ -127,7 +127,7 @@
                 <div class="val">{{ $transaction->created_at->format('d/m/Y h:i A') }}</div>
             </div>
             <div class="info-row">
-                <div class="lbl">Tax Period</div>
+                <div class="lbl">{{ __('pos.tax_period') }}</div>
                 <div class="val">{{ $transaction->created_at->format('F Y') }}</div>
             </div>
             <div class="info-row">
@@ -163,9 +163,9 @@
             <thead>
                 <tr>
                     <th style="width:36%;">{{ __('pos.receipt_item') }}</th>
-                    <th class="c" style="width:10%;">UoM</th>
+                    <th class="c" style="width:10%;">{{ __('pos.rcpt_uom') }}</th>
                     <th class="c" style="width:8%;">{{ __('pos.receipt_qty') }}</th>
-                    <th class="r" style="width:10%;">Tax%</th>
+                    <th class="r" style="width:10%;">{{ __('pos.rcpt_tax_pct') }}</th>
                     <th class="r" style="width:18%;">{{ __('pos.receipt_price') }}</th>
                     <th class="r" style="width:18%;">{{ __('pos.receipt_total') }}</th>
                 </tr>
@@ -212,7 +212,7 @@
             </div>
             @if($transaction->fbr_service_charge > 0)
             <div class="total-row">
-                <div class="lbl">FBR POS Fee (SRO 1279/2021)</div>
+                <div class="lbl">{{ __('pos.dcp_fbr_pos_fee_sro') }}</div>
                 <div class="val">PKR {{ number_format($transaction->fbr_service_charge, 2) }}</div>
             </div>
             @endif
@@ -225,11 +225,11 @@
 
         @if($transaction->fbr_status === 'submitted' && $transaction->fbr_invoice_number)
         <div class="fbr-box">
-            <div class="title">✓ FBR Verified Invoice</div>
+            <div class="title">✓ {{ __('pos.rcpt_fbr_verified_invoice') }}</div>
             <div>POS: {{ $transaction->invoice_number }}</div>
             <div class="num">FBR: {{ $transaction->fbr_invoice_number }}</div>
             @if($company->fbr_pos_id)
-            <div style="font-size:9px; margin-top:3px;">POS Reg #: {{ $company->fbr_pos_id }}</div>
+            <div style="font-size:9px; margin-top:3px;">{{ __('pos.rcpt_pos_reg_hash') }}: {{ $company->fbr_pos_id }}</div>
             @endif
         </div>
         @elseif($transaction->fbr_status === null || $transaction->fbr_status === 'local')
@@ -267,7 +267,7 @@
         @endif
         @else
         <div class="local-box">
-            FBR PENDING — Will retry automatically<br>
+            {{ __('pos.rcpt_fbr_pending_retry') }}<br>
             {{ $transaction->invoice_number }}
         </div>
         @endif
@@ -280,9 +280,9 @@
             @endif
             @endif
             @if($company->fbr_pos_id)
-            <p style="font-weight:bold; color:#1e3a5f;">Integrated with FBR | Reg #: {{ $company->fbr_pos_id }}</p>
+            <p style="font-weight:bold; color:#1e3a5f;">{{ __('pos.rcpt_fbr_integrated') }} | {{ __('pos.rcpt_reg_hash') }}: {{ $company->fbr_pos_id }}</p>
             @endif
-            <div class="brand">Powered by TaxNest FBR POS</div>
+            <div class="brand">{{ __('pos.dcp_powered_taxnest_fbr') }}</div>
             <p>{{ now()->format('d/m/Y h:i:s A') }}</p>
         </div>
     </div>

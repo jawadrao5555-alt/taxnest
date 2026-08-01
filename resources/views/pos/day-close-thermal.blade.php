@@ -47,7 +47,7 @@
     <div class="c b xl">{{ __('pos.dc_zreport') }}</div>
     <div class="c">{{ $report->report_number }}</div>
     <div class="c">{{ $report->report_date->format('l, d M Y') }}</div>
-    <div class="c sm">{{ __('pos.dc_closed') }}: {{ $report->created_at->format('d/m/Y h:i A') }}@if($report->closedByUser) by {{ $report->closedByUser->name }}@endif</div>
+    <div class="c sm">{{ __('pos.dc_closed') }}: {{ $report->created_at->format('d/m/Y h:i A') }}@if($report->closedByUser) {{ __('pos.dcp_by_word') }} {{ $report->closedByUser->name }}@endif</div>
     <div class="hr2"></div>
 
     <div class="sec">{{ __('pos.dc_sales_summary') }}</div>
@@ -88,7 +88,7 @@
         <tr><td>{{ __('pos.dc_counted_cash') }}</td><td class="r">{{ $report->counted_cash !== null ? number_format($report->counted_cash, 2) : '-' }}</td></tr>
         @if($report->counted_cash !== null)
         <tr>
-            <td class="b">{{ __('pos.dc_variance') }} {{ abs((float) $report->cash_variance) < 0.01 ? '(BALANCED)' : ((float) $report->cash_variance < 0 ? '(SHORT)' : '(OVER)') }}</td>
+            <td class="b">{{ __('pos.dc_variance') }} {{ abs((float) $report->cash_variance) < 0.01 ? __('pos.dc_balanced') : ((float) $report->cash_variance < 0 ? __('pos.dc_short') : __('pos.dc_over')) }}</td>
             <td class="r b">{{ (float) $report->cash_variance > 0 ? '+' : '' }}{{ number_format($report->cash_variance, 2) }}</td>
         </tr>
         @endif
@@ -101,8 +101,8 @@
     <table>
         @foreach($report->rider_summary['riders'] as $rr)
         <tr>
-            <td>{{ $rr['name'] ?? '-' }} ({{ $rr['deliveries'] ?? 0 }} del)</td>
-            <td class="r">{{ ($rr['cash_pending'] ?? 0) > 0 ? 'Owes ' . number_format($rr['cash_pending'], 2) : 'Clear' }}</td>
+            <td>{{ $rr['name'] ?? '-' }} ({{ $rr['deliveries'] ?? 0 }} {{ __('pos.dcp_del_word') }})</td>
+            <td class="r">{{ ($rr['cash_pending'] ?? 0) > 0 ? __('pos.dcp_owes') . ' ' . number_format($rr['cash_pending'], 2) : __('pos.dcp_clear') }}</td>
         </tr>
         @endforeach
     </table>
@@ -167,7 +167,7 @@
         @foreach($hazri as $h)
         <tr>
             <td>{{ \Illuminate\Support\Str::limit($h->name, 14) }}</td>
-            <td class="r">{{ $h->first_in ? \Carbon\Carbon::parse($h->first_in)->format('h:iA') : '-' }} &rarr; {{ $h->last_out ? \Carbon\Carbon::parse($h->last_out)->format('h:iA') : ($h->last_seen ? \Carbon\Carbon::parse($h->last_seen)->format('h:iA') . '*' : '-') }} &middot; {{ $h->bill_count }} bills</td>
+            <td class="r">{{ $h->first_in ? \Carbon\Carbon::parse($h->first_in)->format('h:iA') : '-' }} &rarr; {{ $h->last_out ? \Carbon\Carbon::parse($h->last_out)->format('h:iA') : ($h->last_seen ? \Carbon\Carbon::parse($h->last_seen)->format('h:iA') . '*' : '-') }} &middot; {{ $h->bill_count }} {{ __('pos.dcp_bills_word') }}</td>
         </tr>
         @endforeach
     </table>
@@ -189,11 +189,11 @@
         <tr><td>{{ __('pos.dc_last_inv') }}</td><td class="r">{{ $report->last_invoice_number ?? '-' }}</td></tr>
     </table>
     <div class="hr2"></div>
-    <div class="c sm">SHA-256 Integrity Hash</div>
+    <div class="c sm">{{ __('pos.dcp_sha256_hash') }}</div>
     <div class="c sm wrap">{{ $report->hash }}</div>
     <div class="hr"></div>
-    <div class="c sm">System-generated Z-Report — PRA Compliance</div>
-    <div class="c sm b">Powered by NestPOS Enterprise</div>
+    <div class="c sm">{{ __('pos.dcp_sys_zreport_pra') }}</div>
+    <div class="c sm b">{{ __('pos.dcp_powered_nestpos') }}</div>
 </div>
 </body>
 </html>

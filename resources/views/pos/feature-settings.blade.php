@@ -339,9 +339,9 @@
             return {
                 step: 1,
                 steps: [
-                    { n: 1, label: (__('pos.step_business')) },
-                    { n: 2, label: (__('pos.step_features')) },
-                    { n: 3, label: (__('pos.step_review')) },
+                    { n: 1, label: @js(__('pos.step_business')) },
+                    { n: 2, label: @js(__('pos.step_features')) },
+                    { n: 3, label: @js(__('pos.step_review')) },
                 ],
                 selectedPreset: @json($currentCategory),
                 flags: @json($flagState),
@@ -359,7 +359,7 @@
                 restaurantFlags: @json(\App\Services\PosFeatureService::RESTAURANT_FLAGS),
 
                 get selectedPresetMeta() {
-                    return this.presetMeta[this.selectedPreset] || { label: (__('pos.custom_word')), icon: '⚙️', description: '' };
+                    return this.presetMeta[this.selectedPreset] || { label: @js(__('pos.custom_word')), icon: '⚙️', description: '' };
                 },
                 get recommendedFlags() {
                     const d = this.categoryDefaults[this.selectedPreset] || {};

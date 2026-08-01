@@ -16,3 +16,8 @@ description: What actually gates plan features vs what the features JSON does; h
 - Editing feature lists (marketing copy) = safe, data-only idempotent migration matching `product_type` + plan `name` (prod runs `migrate --force`, never seeds). Name-match means a renamed plan silently keeps old copy.
 - Feature JSON must NOT duplicate limit columns — POS plan cards (pos/landing, pos/billing) render limits from columns via `get*LimitDisplay()` and print cumulative "Everything in <prev>, plus:" (`$plans[$loop->index - 1]`, price-ordered collection) above tiers 2+.
 - Never re-add hardcoded plan-name feature branches in views (old 'Retail'/'Industrial'/'Enterprise' checks rotted silently when plans were renamed).
+
+## UPDATE Aug 2026: real plan gates now exist (matrix)
+`pricing_plans.features` JSON is STILL display-only, but premium features are now HARD-gated via boolean plan columns (PLAN_GATES in PosFeatureService + planAllows()): deals, riders, hazri, analytics, reports(exports). Matrix: Starter=none, Business=deals+exports, Pro/Unlimited=all, Trial row=0s (active-trial rule grants everything, expired trial locks).
+**Why:** owner (2 Aug 2026) wanted packages to actually control features, not just display.
+**How to apply:** any NEW premium feature must (1) get a plan column via idempotent migration, (2) join PLAN_GATES, (3) gate EVERY entry point — page + JSON + write paths (storeInvoice deal lines rejected 422; rider_id silently dropped so offline replays never lose bills) + nav/buttons. planAllows fails OPEN if the column is missing (lagging PROD migrate). Same source order as restaurant: internal → override → plan → active trial.

@@ -67,7 +67,7 @@
 - [POS Screen Fit zoom](pos-screen-fit-zoom.md) — sale screens scale via CSS zoom + px-height compensation (vh unreliable in zoomed subtree); CSS.supports guard mandatory; auto shrinks 1280–1366w shops to 90%.
 - [PRA POS Deals rules](pos-deals-feature.md) — server-enforced price, snapshot-driven stock, billing-only (no hold/KOT); cart→payload builder flattens item_type — new cart types MUST be added to the type mapping + UI-payload tested.
 - [mobile.css global overrides](mobile-css-global-overrides.md) — mobile.css beats Tailwind on phones: forced table-cell vs .hidden, touch-target blobs on toggle pills, grid collapse needs grid-cols-keep; bump ?v= on edit.
-- [pricing_plans.features = display-only](pos-plan-features-display-only.md) — no code reads the JSON; restaurant gate = restaurant_enabled column; plan cards render limits from columns + cumulative lists.
+- [Plan feature gates & display JSON](pos-plan-features-display-only.md) — features JSON display-only, but deals/riders/hazri/analytics/exports now HARD plan gates via PLAN_GATES+planAllows; every entry point must gate.
 - [Silent printer routing](silent-printer-routing.md) — KOT stamping at result-time not render; Electron listener leak = double print; no pageSize for thermal; MySQL NOW() looks offline to Laravel.
 - [Desktop Agent release distribution](agent-release-distribution.md) — GitHub Releases latest = only channel; agents ≥v1.3.0 self-update via heartbeat agent_update (zip swap); tag must be agent-semver major≤99.
 - [NestPOS Desktop shell](pos-desktop-shell.md) — opt-in POS window inside the agent (v1.4.0+); exe frozen; v1.5.0 Offline Mode: passthrough-first https interception + disk snapshot, capture MUST bypass own handler; beta zips = real file, never symlink/GitHub.

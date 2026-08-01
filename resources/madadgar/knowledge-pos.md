@@ -367,3 +367,10 @@ Sale screen ki mazeed cheezein:
 - Table board par "Cancel Order + Free Table" ab seedha cancel nahi karta — pehle warning popup aata hai jis mein order ke items ki list hoti hai, aur agar KOT kitchen ja chuki ho to surkh warning: "KOT kitchen ja chuki hai — khana ban raha ho sakta hai". Confirm karne par hi cancel hota hai.
 - Cancel hue orders ab delete NAHI hote — record mehfooz rehta hai. Reports menu mein naya page "Cancelled Orders" (sirf admin/manager): tareekh ka filter (aaj / 7 din / 30 din / apni marzi), kul ginti aur maliyat, aur CSV ya PDF download.
 - Cancel modal mein (jab KOT ja chuki ho) har item ke aage "Ban gaya ✓ / Nahi bana" ka tick hota hai — poora order nahi, item-wise batayein. Cancelled Orders report mein bane hue items par ✓ aur "zaya (bane hue) ki maliyat" ka alag khana aata hai.
+
+## Subscription packages — kis package mein kya hai (2 Aug 2026)
+- Starter: bunyadi billing — PRA receipts, barcode, thermal print, customers/khata, inventory, basic reports + day close. (Deals, riders, hazri, analytics, CSV/PDF export ismein NAHI.)
+- Business: Starter + offline billing/desktop app, 3 terminals, Deals & combos, advanced reports CSV/PDF export, Excel import/export.
+- Pro: Business + poora Restaurant module (tables/KOT/kitchen/waiter/QR menu), Delivery Riders + khata, Staff Hazri, cancelled/waste report, day-close auto-final, analytics dashboard.
+- Unlimited: Pro ke sab features, har limit UNLIMITED (bills/team/branches), priority support + training.
+- Trial ke dauran SAB features milte hain. Agar koi feature package mein na ho to us ka page Billing par le jata hai — upgrade kar ke khul jata hai.

@@ -17,3 +17,7 @@ Real shop (11k+ saved customers, weak PC) saw the "NestPOS load ho raha hai" spl
 **How to verify:** Playwright with CDP CPU throttling (`Emulation.setCPUThrottlingRate`) + count `pageerror` events and `alpine:init` firings; measure DOM size. Slow-PC races only reproduce at rate ~6.
 
 **Deploy note:** sale-screen HTML is fingerprinted with `filemtime(universal.blade.php)`, so offline-first cached clients self-refresh after a view-only deploy — no SW CACHE_VERSION bump needed for blade-only changes.
+
+## Baked customer list is CAPPED (Aug 2026, Task-100 era)
+Both universal sale screens (PRA + FBR) bake at most ~500 customers — the most-recently-active subset, name-sorted — with a `customersBakedPartial` flag in x-data. Server customer-search endpoints are the source of truth (picker modal server-searches when partial); the baked subset is only the instant/OFFLINE fallback. **Deliberately NOT in the boot fingerprint** — new customers must never force a cached-screen reload; blade mtime covers code changes.
+**How to apply:** never restore a full `PosCustomer::...->get()` bake; any new customer UI on the sale screen must work from server search + treat allCustomers as partial. Offline: search fetch failures fall back to filtering the baked subset (never blank the dropdown).

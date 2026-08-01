@@ -472,15 +472,26 @@ class FbrPosController extends Controller
             : 'fbr-pos.create';
 
         // Universal screen needs the customer list for its phone-lookup bar.
-        $customers = $viewName === 'fbr-pos.universal'
-            ? \App\Models\PosCustomer::where('company_id', $companyId)
-                ->where('is_active', true)->orderBy('name')->get(['id', 'name', 'phone'])
-            : collect();
+        // Task 100 (Aug 2026): never bake thousands of customers — over the cap
+        // bake only the most-recently-active subset (instant/OFFLINE fallback);
+        // /fbr-pos/api/customer-search is the source of truth for lookups.
+        $custBakeCap = 500;
+        $customersTruncated = false;
+        $customers = collect();
+        if ($viewName === 'fbr-pos.universal') {
+            $custBase = \App\Models\PosCustomer::where('company_id', $companyId)->where('is_active', true);
+            $customersTruncated = (clone $custBase)->count() > $custBakeCap;
+            $customers = $customersTruncated
+                ? (clone $custBase)->orderByDesc('updated_at')->limit($custBakeCap)
+                    ->get(['id', 'name', 'phone'])
+                    ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values()
+                : $custBase->orderBy('name')->get(['id', 'name', 'phone']);
+        }
 
         return view($viewName, compact(
             'company', 'products', 'fbrReportingEnabled', 'frequentProducts',
             'terminals', 'currentShift', 'loyaltySettings', 'heldCount', 'activePromos',
-            'pendingDayCloses', 'customers'
+            'pendingDayCloses', 'customers', 'customersTruncated'
         ));
     }
 

@@ -2127,6 +2127,12 @@ function restaurantPos() {
         allProducts: {!! $jsEnc($productsJson) !!},
         allServices: {!! $jsEnc($servicesJson) !!},
         allCustomers: {!! $jsEnc($customersJson) !!},
+        // Task 100: TRUE when the shop has more customers than the bake cap —
+        // allCustomers is only the most-recently-active subset. Server search is
+        // the source of truth; the baked subset is the OFFLINE fallback.
+        customersBakedPartial: {{ !empty($customersTruncated) ? 'true' : 'false' }},
+        pickerServerResults: null,
+        pickerSearchTimer: null,
         kitchenSettings: @json($kitchenSettings),
         // Inventory master switch — single source of truth.
         // When false, ALL stock UI/logic is suppressed (badges, popup, blocking).
@@ -2333,9 +2339,14 @@ function restaurantPos() {
         discountAmount: 0,
 
         get filteredCustomers() {
+            // PERF: cap rendered rows — an uncapped x-for over thousands of
+            // customers renders them ALL into the DOM (boot freeze on weak PCs).
             const q = this.customerSearch.toLowerCase();
-            if (!q) return this.allCustomers;
-            return this.allCustomers.filter(c => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q)));
+            // Task 100: server results (full DB) win when available; the baked
+            // subset is only the instant/offline fallback on huge shops.
+            if (q && this.pickerServerResults) return this.pickerServerResults.slice(0, 50);
+            if (!q) return this.allCustomers.slice(0, 50);
+            return this.allCustomers.filter(c => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q))).slice(0, 50);
         },
 
         r2(v) { return Math.round((v + Number.EPSILON) * 100) / 100; },
@@ -3777,12 +3788,30 @@ function restaurantPos() {
 
         onCustomerPhoneSearch() {
             if (this.customerLookupTimer) clearTimeout(this.customerLookupTimer);
+            if (this.pickerSearchTimer) clearTimeout(this.pickerSearchTimer);
             const phone = this.customerSearch.trim();
             if (phone.length >= 4 && /^\d+$/.test(phone)) {
                 this.customerLookupTimer = setTimeout(() => this.lookupCustomerByPhone(phone), 400);
             } else {
                 this.customerLookupResult = null;
             }
+            // Task 100: baked list is PARTIAL on huge shops — picker search must
+            // hit the server so EVERY customer is findable, not just the baked
+            // recent subset. Offline → falls back to the baked subset.
+            if (this.customersBakedPartial && phone.length >= 2) {
+                this.pickerSearchTimer = setTimeout(() => this.pickerServerSearch(phone), 300);
+            } else {
+                this.pickerServerResults = null;
+            }
+        },
+
+        async pickerServerSearch(q) {
+            try {
+                const res = await fetch('/fbr-pos/api/customer-search?q=' + encodeURIComponent(q));
+                const data = await res.json();
+                if (q !== this.customerSearch.trim()) return; // stale-response guard
+                this.pickerServerResults = data.customers || [];
+            } catch (e) { this.pickerServerResults = null; } // OFFLINE → local baked subset
         },
 
         async lookupCustomerByPhone(phone) {
@@ -3862,7 +3891,16 @@ function restaurantPos() {
                     this.custHiIndex = 0;
                     // Always show dropdown so the inline "add new" hint can appear when results === 0
                     this.customerPhoneDropdown = true;
-                } catch(e) { this.customerPhoneResults = []; this.customerPhoneDropdown = false; }
+                } catch(e) {
+                    // OFFLINE fallback (Task 100): server unreachable → keep local
+                    // matches from the baked (possibly partial) list instead of
+                    // blanking the dropdown the local pre-filter already opened.
+                    const lq = q.toLowerCase();
+                    this.customerPhoneResults = (this.allCustomers || [])
+                        .filter(c => (c.name && c.name.toLowerCase().includes(lq)) || (c.phone && String(c.phone).includes(q)))
+                        .slice(0, 8);
+                    this.customerPhoneDropdown = this.customerPhoneResults.length > 0;
+                }
                 finally { this.customerSearching = false; }
             })();
             return this._custSearchPromise;

@@ -1129,7 +1129,21 @@ class PosController extends Controller
                 ->with(['table', 'items'])->orderBy('created_at', 'desc')->get();
         }
 
-        $customers = PosCustomer::where('company_id', $companyId)->orderBy('name')->get();
+        // Task 100 (Aug 2026): LIVE customer search for huge shops — never bake
+        // thousands of customers into the page (11k rows froze boot on weak POS
+        // PCs; see pos-boot-splash-perf). Over the cap we bake only the most-
+        // recently-active subset as the instant/OFFLINE fallback; the server
+        // search endpoint (/pos/restaurant/api/customer-search) is the source of
+        // truth and finds EVERY customer. Deliberately NOT in the boot
+        // fingerprint — new customers must never force a cached-screen reload.
+        $custBakeCap = 500;
+        $customersTruncated = PosCustomer::where('company_id', $companyId)->count() > $custBakeCap;
+        $customers = $customersTruncated
+            ? PosCustomer::where('company_id', $companyId)
+                ->orderByDesc('updated_at')->limit($custBakeCap)
+                ->get(['id', 'name', 'phone'])
+                ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values()
+            : PosCustomer::where('company_id', $companyId)->orderBy('name')->get(['id', 'name', 'phone']);
         $taxRate = PosTaxRule::getRateForMethod('cash', $company);
         $taxRules = PosTaxRule::effectiveRules($company);
 
@@ -1251,7 +1265,7 @@ class PosController extends Controller
             'customers', 'taxRate', 'taxRules', 'stockStatus', 'blockOutOfStock',
             'posRole', 'discountLimit', 'hasManagerPin', 'ingredientCosts',
             'lowStockAlerts', 'inventoryEnabled', 'dealsForJs',
-            'editBillForJs', 'userGridPrefs', 'bootFp'
+            'editBillForJs', 'userGridPrefs', 'bootFp', 'customersTruncated'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         ->header('Pragma', 'no-cache')

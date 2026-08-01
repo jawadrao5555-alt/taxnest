@@ -128,10 +128,11 @@ class RestaurantWaiterController extends Controller
                 'seats' => $t->seats,
                 'status' => $t->status,
                 'active_orders' => $t->activeOrders->count(),
-                // Table Shift from picker (Aug 2026): first active order on the
-                // table — lets the waiter shift ANY occupied table, not just his own.
-                'order_id' => optional($t->activeOrders->first())->id,
-                'order_number' => optional($t->activeOrders->first())->order_number,
+                // Table Shift from picker (Aug 2026): the shiftable order = a HELD
+                // one (shiftTable rejects preparing/ready). No held order → tile
+                // stays un-tappable instead of advertising a shift that would fail.
+                'order_id' => optional($t->activeOrders->firstWhere('status', 'held'))->id,
+                'order_number' => optional($t->activeOrders->firstWhere('status', 'held'))->order_number,
             ]);
 
         return response()->json($tables);

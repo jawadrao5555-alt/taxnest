@@ -49,51 +49,51 @@
     </div>
 
     <div class="report-title">
-        <h2>Sales Analytics Report</h2>
-        <p>FBR POS — {{ \Carbon\Carbon::parse($analytics->from)->format('d M Y') }} to {{ \Carbon\Carbon::parse($analytics->to)->format('d M Y') }}</p>
-        <p>Generated: {{ now()->format('d M Y h:i A') }}</p>
+        <h2>{{ __('pos.ra_report_title') }}</h2>
+        <p>FBR POS — {{ \Carbon\Carbon::parse($analytics->from)->format('d M Y') }} {{ __('pos.ra_to_word') }} {{ \Carbon\Carbon::parse($analytics->to)->format('d M Y') }}</p>
+        <p>{{ __('pos.dcp_generated') }} {{ now()->format('d M Y h:i A') }}</p>
     </div>
 
-    <div class="section-title">Summary &amp; Previous-Period Comparison</div>
+    <div class="section-title">{{ __('pos.ra_summary_comparison') }}</div>
     <div class="info-box">
         <div class="info-row">
-            <div class="lbl">Total Revenue:</div>
-            <div class="val">PKR {{ number_format($analytics->summary->revenue, 2) }}{{ $analytics->previous->revenue_pct !== null ? ' (' . ($analytics->previous->revenue_pct >= 0 ? '+' : '') . $analytics->previous->revenue_pct . '% vs prev period)' : '' }}</div>
+            <div class="lbl">{{ __('pos.ra_total_revenue') }}</div>
+            <div class="val">PKR {{ number_format($analytics->summary->revenue, 2) }}{{ $analytics->previous->revenue_pct !== null ? ' (' . ($analytics->previous->revenue_pct >= 0 ? '+' : '') . $analytics->previous->revenue_pct . __('pos.ra_vs_prev_period') . ')' : '' }}</div>
         </div>
         <div class="info-row">
-            <div class="lbl">Total Bills:</div>
+            <div class="lbl">{{ __('pos.ra_total_bills') }}</div>
             <div class="val">{{ number_format($analytics->summary->bills) }}{{ $analytics->previous->bills_pct !== null ? ' (' . ($analytics->previous->bills_pct >= 0 ? '+' : '') . $analytics->previous->bills_pct . '%)' : '' }}</div>
         </div>
         <div class="info-row">
-            <div class="lbl">Sales Tax:</div>
+            <div class="lbl">{{ __('pos.ra_sales_tax') }}</div>
             <div class="val">PKR {{ number_format($analytics->summary->tax, 2) }}{{ $analytics->previous->tax_pct !== null ? ' (' . ($analytics->previous->tax_pct >= 0 ? '+' : '') . $analytics->previous->tax_pct . '%)' : '' }}</div>
         </div>
         <div class="info-row">
-            <div class="lbl">Average Bill:</div>
+            <div class="lbl">{{ __('pos.ra_average_bill') }}</div>
             <div class="val">PKR {{ number_format($analytics->summary->avg_bill, 2) }}</div>
         </div>
         <div class="info-row">
-            <div class="lbl">Total Discounts:</div>
+            <div class="lbl">{{ __('pos.ra_total_discounts') }}</div>
             <div class="val">PKR {{ number_format($analytics->summary->discount, 2) }}</div>
         </div>
         <div class="info-row">
-            <div class="lbl">Unique Customers (named):</div>
+            <div class="lbl">{{ __('pos.dcp_unique_customers') }}</div>
             <div class="val">{{ $analytics->summary->unique_customers }}</div>
         </div>
         <div class="info-row">
-            <div class="lbl">Previous Period ({{ \Carbon\Carbon::parse($analytics->previous->from)->format('d M') }} — {{ \Carbon\Carbon::parse($analytics->previous->to)->format('d M Y') }}):</div>
-            <div class="val">PKR {{ number_format($analytics->previous->revenue, 2) }} ({{ $analytics->previous->bills }} bills)</div>
+            <div class="lbl">{{ __('pos.ra_previous_period') }} ({{ \Carbon\Carbon::parse($analytics->previous->from)->format('d M') }} — {{ \Carbon\Carbon::parse($analytics->previous->to)->format('d M Y') }}):</div>
+            <div class="val">PKR {{ number_format($analytics->previous->revenue, 2) }} ({{ $analytics->previous->bills }} {{ __('pos.dc_bills_sfx') }})</div>
         </div>
     </div>
 
-    <div class="section-title">FBR Submission Health</div>
+    <div class="section-title">{{ __('pos.dcp_fbr_submission_health') }}</div>
     <table class="data">
         <thead>
             <tr>
-                <th class="c">Submitted</th>
-                <th class="c">Pending</th>
-                <th class="c">Failed</th>
-                <th class="c">Local</th>
+                <th class="c">{{ __('pos.dc_submitted') }}</th>
+                <th class="c">{{ __('pos.dc_pending') }}</th>
+                <th class="c">{{ __('pos.dc_failed') }}</th>
+                <th class="c">{{ __('pos.dc_local') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -107,14 +107,14 @@
     </table>
 
     @if($analytics->profit !== null && ($analytics->profit->cost > 0 || $analytics->profit->revenue > 0))
-    <div class="section-title">Profit Estimate (Cost-Price Based — {{ $analytics->profit->coverage_pct }}% Items Covered)</div>
+    <div class="section-title">{{ __('pos.ra_profit_estimate', ['pct' => $analytics->profit->coverage_pct]) }}</div>
     <table class="data">
         <thead>
             <tr>
-                <th class="r">Sales (Costed Items)</th>
-                <th class="r">Cost</th>
-                <th class="r">Gross Profit</th>
-                <th class="c">Margin</th>
+                <th class="r">{{ __('pos.ra_sales_costed_items') }}</th>
+                <th class="r">{{ __('pos.ra_cost') }}</th>
+                <th class="r">{{ __('pos.ra_gross_profit') }}</th>
+                <th class="c">{{ __('pos.ra_margin') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -129,17 +129,17 @@
     @endif
 
     @if($analytics->products->isNotEmpty())
-    <div class="section-title">Product Breakdown (Top 25 by Revenue)</div>
+    <div class="section-title">{{ __('pos.ra_product_breakdown') }}</div>
     <table class="data">
         <thead>
             <tr>
                 <th class="c" style="width:6%;">#</th>
-                <th>Product</th>
-                <th class="c">Qty</th>
-                <th class="r">Revenue (PKR)</th>
-                <th class="r">Tax (PKR)</th>
-                @if($analytics->is_admin_view)<th class="r">Profit (PKR)</th>@endif
-                <th class="c">Share</th>
+                <th>{{ __('pos.product_col') }}</th>
+                <th class="c">{{ __('pos.receipt_qty') }}</th>
+                <th class="r">{{ __('pos.dc_th_revenue_pkr') }}</th>
+                <th class="r">{{ __('pos.dc_th_tax_pkr') }}</th>
+                @if($analytics->is_admin_view)<th class="r">{{ __('pos.ra_profit_pkr') }}</th>@endif
+                <th class="c">{{ __('pos.dc_th_share') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -159,15 +159,15 @@
     @endif
 
     @if($analytics->cashiers->isNotEmpty())
-    <div class="section-title">Cashier Performance</div>
+    <div class="section-title">{{ __('pos.dcp_cashier_performance') }}</div>
     <table class="data">
         <thead>
             <tr>
-                <th>Cashier</th>
-                <th class="c">Bills</th>
-                <th class="r">Revenue (PKR)</th>
-                <th class="r">Tax (PKR)</th>
-                <th class="r">Avg Bill (PKR)</th>
+                <th>{{ __('pos.dcp_cashier') }}</th>
+                <th class="c">{{ __('pos.dcp_bills') }}</th>
+                <th class="r">{{ __('pos.dc_th_revenue_pkr') }}</th>
+                <th class="r">{{ __('pos.dc_th_tax_pkr') }}</th>
+                <th class="r">{{ __('pos.ra_avg_bill_pkr') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -185,14 +185,14 @@
     @endif
 
     @if($analytics->top_customers->isNotEmpty())
-    <div class="section-title">Top Customers</div>
+    <div class="section-title">{{ __('pos.ra_top_customers') }}</div>
     <table class="data">
         <thead>
             <tr>
                 <th class="c" style="width:8%;">#</th>
-                <th>Customer</th>
-                <th class="c">Visits</th>
-                <th class="r">Spent (PKR)</th>
+                <th>{{ __('pos.receipt_customer') }}</th>
+                <th class="c">{{ __('pos.ra_visits') }}</th>
+                <th class="r">{{ __('pos.ra_spent_pkr') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -209,13 +209,13 @@
     @endif
 
     @if($analytics->payments->isNotEmpty())
-    <div class="section-title">Payment Method Split</div>
+    <div class="section-title">{{ __('pos.ra_payment_split') }}</div>
     <table class="data">
         <thead>
             <tr>
-                <th>Method</th>
-                <th class="c">Bills</th>
-                <th class="r">Revenue (PKR)</th>
+                <th>{{ __('pos.dcp_payment_method') }}</th>
+                <th class="c">{{ __('pos.dcp_bills') }}</th>
+                <th class="r">{{ __('pos.dc_th_revenue_pkr') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -231,13 +231,13 @@
     @endif
 
     <div class="summary-box">
-        <div class="lbl">TOTAL REVENUE (FBR POS)</div>
+        <div class="lbl">{{ __('pos.ra_total_revenue_fbr') }}</div>
         <div class="val">PKR {{ number_format($analytics->summary->revenue, 2) }}</div>
     </div>
 
     <div class="footer">
-        <p>System-generated Sales Analytics Report</p>
-        <div class="brand">Powered by TaxNest FBR POS</div>
+        <p>{{ __('pos.ra_system_generated') }}</p>
+        <div class="brand">{{ __('pos.dcp_powered_taxnest_fbr') }}</div>
     </div>
 </body>
 </html>

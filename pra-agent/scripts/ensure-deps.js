@@ -7,12 +7,15 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
+const { prodDepPaths } = require('./dep-tree');
+
 const root = path.join(__dirname, '..');
-const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-const deps = Object.keys(pkg.dependencies || {});
+// FULL transitive production tree from the lockfile — direct deps alone are
+// not enough (axios present but form-data missing shipped a broken exe).
+const deps = prodDepPaths(root);
 
 function missing() {
-  return deps.filter((d) => !fs.existsSync(path.join(root, 'node_modules', d, 'package.json')));
+  return deps.filter((d) => !fs.existsSync(path.join(root, d, 'package.json')));
 }
 
 function attempt(label, cmd) {
@@ -35,8 +38,8 @@ if (bad.length) {
   console.log('[ensure-deps] missing runtime deps: ' + bad.join(', '));
   const ok =
     attempt('prod-only install', 'npm install --omit=dev --ignore-scripts --no-audit --no-fund') ||
-    attempt('targeted install', 'npm install ' + bad.join(' ') + ' --no-save --ignore-scripts --no-audit --no-fund') ||
-    attempt('full npm ci', 'npm ci --no-audit --no-fund');
+    attempt('full npm ci', 'npm ci --no-audit --no-fund') ||
+    attempt('clean reinstall', (process.platform === 'win32' ? 'rmdir /s /q node_modules & ' : 'rm -rf node_modules && ') + 'npm install --omit=dev --ignore-scripts --no-audit --no-fund');
   if (!ok) {
     console.error('[ensure-deps] FATAL: runtime deps still missing after all attempts: ' + missing().join(', '));
     process.exit(1);

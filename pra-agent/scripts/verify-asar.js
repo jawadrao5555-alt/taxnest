@@ -5,9 +5,12 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
+const { prodDepPaths } = require('./dep-tree');
+
 const root = path.join(__dirname, '..');
-const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-const deps = Object.keys(pkg.dependencies || {});
+// FULL transitive production tree — axios alone passed while form-data was
+// missing, shipping a second broken exe on 1 Aug 2026.
+const deps = prodDepPaths(root);
 const asar = path.join(root, 'dist', 'win-unpacked', 'resources', 'app.asar');
 
 if (!fs.existsSync(asar)) {
@@ -22,7 +25,8 @@ const listing = execSync('npx --yes @electron/asar@3 list "' + asar + '"', {
 });
 const lines = new Set(listing.split(/\r?\n/));
 
-const bad = deps.filter((d) => !lines.has('/node_modules/' + d + '/package.json') && !lines.has('\\node_modules\\' + d + '\\package.json'));
+const norm = new Set([...lines].map((l) => l.replace(/\\/g, '/')));
+const bad = deps.filter((d) => !norm.has('/' + d + '/package.json'));
 if (bad.length) {
   console.error('[verify-asar] FATAL: app.asar is missing runtime deps: ' + bad.join(', '));
   console.error('[verify-asar] Do NOT ship this build.');

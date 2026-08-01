@@ -74,10 +74,13 @@
             font-weight: bold; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;
             color: #000; background: #fff;
         }
+        /* Aug 2026 (customer photo): the reversed white-on-black RUSH block printed
+           as a faint dotted box on thermal printers — same lesson as station headers:
+           solid black text on white + heavy border prints crisp everywhere. */
         .priority-badge {
-            display: inline-block; padding: 3px 12px; border: 3px solid #000;
-            font-weight: bold; font-size: 16px; text-transform: uppercase; letter-spacing: 2px;
-            background: #000; color: #fff;
+            display: inline-block; padding: 4px 12px; border: 3px solid #000;
+            font-weight: 900; font-size: 18px; text-transform: uppercase; letter-spacing: 2px;
+            background: #fff; color: #000; -webkit-text-stroke: 0.6px #000;
         }
         /* ZFC feedback Jul 2026: reversed (white-on-black) blocks print blurry on
            cheap thermal printers — station headers now solid black text on white. */

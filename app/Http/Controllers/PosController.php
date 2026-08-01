@@ -1163,8 +1163,11 @@ class PosController extends Controller
         // weekday/date-range filter is server-side so the client never sees
         // (or bills) an off-day deal. Component names resolved company-scoped.
         $dealsForJs = [];
-        $activeDeals = PosDeal::where('company_id', $companyId)->where('is_active', true)->with('items')->get()
-            ->filter(fn ($d) => $d->isActiveOn());
+        // Plan gate: Starter shops par deals bake hi nahi hote (buttons na dikhen).
+        $activeDeals = PosFeatureService::planAllows($company, 'deals_enabled')
+            ? PosDeal::where('company_id', $companyId)->where('is_active', true)->with('items')->get()
+                ->filter(fn ($d) => $d->isActiveOn())
+            : collect();
         if ($activeDeals->isNotEmpty()) {
             $dealProductIds = $activeDeals->flatMap(fn ($d) => $d->items->pluck('pos_product_id'))->unique();
             $dealProductNames = PosProduct::where('company_id', $companyId)
@@ -1487,6 +1490,17 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
+        // Plan gate (Aug 2026 matrix): deal LINES are server-priced, so a
+        // crafted payload could bill deals even when the sale screen hides
+        // them. Reject explicitly — cashier re-rings the items individually.
+        if (!PosFeatureService::planAllows($company, 'deals_enabled')) {
+            foreach ((array) $request->input('items', []) as $line) {
+                if (($line['type'] ?? 'product') === 'deal') {
+                    return response()->json(['success' => false, 'message' => __('pos.plan_locked_feature')], 422);
+                }
+            }
+        }
+
         $request->validate([
             'items' => 'required|array|min:1|max:200',
             'items.*.name' => 'required|string|max:255',
@@ -1700,7 +1714,10 @@ class PosController extends Controller
             ? substr((string) $request->input('order_type'), 0, 20)
             : null;
         $riderId = null;
-        if ($riderColumnsExist && $orderTypeSnapshot === 'delivery' && $request->filled('rider_id')) {
+        // Plan gate: riders is Pro+ — silently drop rider_id (NEVER reject the
+        // bill itself: offline replays from a downgraded shop must still land).
+        if ($riderColumnsExist && $orderTypeSnapshot === 'delivery' && $request->filled('rider_id')
+            && PosFeatureService::planAllows($company, 'riders_enabled')) {
             $riderId = \App\Models\PosRider::where('company_id', $companyId)
                 ->where('id', (int) $request->input('rider_id'))
                 ->where('is_active', true)
@@ -3677,6 +3694,9 @@ class PosController extends Controller
      */
     public function reportsAnalyticsPdf(Request $request)
     {
+        if ($r = $this->planGate('analytics_enabled')) {
+            return $r;
+        }
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
@@ -3699,6 +3719,9 @@ class PosController extends Controller
 
     public function exportReportCsv(Request $request)
     {
+        if ($r = $this->planGate('reports_enabled')) {
+            return $r;
+        }
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
@@ -4015,6 +4038,9 @@ class PosController extends Controller
 
     public function exportTaxReportCsv(Request $request)
     {
+        if ($r = $this->planGate('reports_enabled')) {
+            return $r;
+        }
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         // Local export is ADMIN-ONLY — cashiers always export PRA data.
@@ -4152,6 +4178,9 @@ class PosController extends Controller
 
     public function exportTaxReportPdf(Request $request)
     {
+        if ($r = $this->planGate('reports_enabled')) {
+            return $r;
+        }
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         // Local export is ADMIN-ONLY — cashiers always export PRA data.
@@ -4257,8 +4286,27 @@ class PosController extends Controller
 
     // ── Deals (Jul 2026) — fast-food combo promos at one promo price ──────────
 
+    /**
+     * Plan gate (Aug 2026 package matrix). Returns a redirect (pages) or
+     * aborts 403 (JSON) when the company's plan lacks the premium column.
+     */
+    private function planGate(string $planColumn)
+    {
+        $company = Company::find(app('currentCompanyId'));
+        if (!PosFeatureService::planAllows($company, $planColumn)) {
+            if (request()->expectsJson()) {
+                abort(403, __('pos.plan_locked_feature'));
+            }
+            return redirect()->route('pos.billing')->with('error', __('pos.plan_locked_feature'));
+        }
+        return null;
+    }
+
     public function deals()
     {
+        if ($r = $this->planGate('deals_enabled')) {
+            return $r;
+        }
         $companyId = app('currentCompanyId');
         $deals = PosDeal::where('company_id', $companyId)
             ->with('items')
@@ -4324,6 +4372,9 @@ class PosController extends Controller
 
     public function storeDeal(Request $request)
     {
+        if ($r = $this->planGate('deals_enabled')) {
+            return $r;
+        }
         $companyId = app('currentCompanyId');
         [$attrs, $components] = $this->validateDealRequest($request, $companyId);
 
@@ -4342,6 +4393,9 @@ class PosController extends Controller
 
     public function updateDeal(Request $request, $id)
     {
+        if ($r = $this->planGate('deals_enabled')) {
+            return $r;
+        }
         $companyId = app('currentCompanyId');
         $deal = PosDeal::where('company_id', $companyId)->findOrFail($id);
         [$attrs, $components] = $this->validateDealRequest($request, $companyId);
@@ -4360,6 +4414,9 @@ class PosController extends Controller
 
     public function deleteDeal($id)
     {
+        if ($r = $this->planGate('deals_enabled')) {
+            return $r;
+        }
         $companyId = app('currentCompanyId');
         $deal = PosDeal::where('company_id', $companyId)->findOrFail($id);
         DB::transaction(function () use ($deal) {
@@ -8364,7 +8421,10 @@ class PosController extends Controller
         });
 
         $analytics = $this->buildDayCloseAnalytics($companyId, $report->report_date->toDateString(), $transactions, $company);
-        $hazri = $this->buildHazriRows($companyId, $report->report_date->toDateString());
+        // Plan gate: hazri section is Pro+ (views already @if(!empty($hazri))).
+        $hazri = PosFeatureService::planAllows($company, 'hazri_enabled')
+            ? $this->buildHazriRows($companyId, $report->report_date->toDateString())
+            : [];
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.day-close-pdf', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri'));
         $pdf->setPaper('a4', 'portrait');
@@ -8402,7 +8462,9 @@ class PosController extends Controller
         });
 
         $analytics = $this->buildDayCloseAnalytics($companyId, $report->report_date->toDateString(), $transactions, $company);
-        $hazri = $this->buildHazriRows($companyId, $report->report_date->toDateString());
+        $hazri = PosFeatureService::planAllows($company, 'hazri_enabled')
+            ? $this->buildHazriRows($companyId, $report->report_date->toDateString())
+            : [];
 
         return view('pos.day-close-thermal', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri'));
     }
@@ -8415,6 +8477,9 @@ class PosController extends Controller
      */
     public function hazriReport(Request $request)
     {
+        if ($r = $this->planGate('hazri_enabled')) {
+            return $r;
+        }
         $companyId = app('currentCompanyId');
         $user = auth('pos')->user();
         if (!$user->isPosAdmin()) {

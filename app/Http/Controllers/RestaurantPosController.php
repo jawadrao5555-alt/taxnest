@@ -890,7 +890,9 @@ class RestaurantPosController extends Controller
             // dropped (never block a payment). invoice_mode three-branch untouched.
             if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id')) {
                 $payRiderId = null;
-                if ($order->order_type === 'delivery' && $request->filled('rider_id')) {
+                // Plan gate (Aug 2026): riders is Pro+ — silently drop (never block payment).
+                if ($order->order_type === 'delivery' && $request->filled('rider_id')
+                    && \App\Services\PosFeatureService::planAllows($company, 'riders_enabled')) {
                     $payRiderId = \App\Models\PosRider::where('company_id', $companyId)
                         ->where('id', (int) $request->input('rider_id'))
                         ->where('is_active', true)

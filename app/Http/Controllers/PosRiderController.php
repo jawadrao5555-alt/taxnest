@@ -33,6 +33,14 @@ class PosRiderController extends Controller
     private function deliveryGate()
     {
         $company = Company::find(app('currentCompanyId'));
+        // Plan gate (Aug 2026 package matrix): Riders is a Pro+ feature.
+        if (!PosFeatureService::planAllows($company, 'riders_enabled')) {
+            if (request()->expectsJson()) {
+                abort(403, __('pos.plan_locked_feature'));
+            }
+            return redirect()->route('pos.billing')
+                ->with('error', __('pos.plan_locked_feature'));
+        }
         $features = PosFeatureService::forCompany($company);
         if (empty($features->delivery)) {
             return redirect()->route('pos.features')
@@ -444,6 +452,11 @@ class PosRiderController extends Controller
         $user = auth('pos')->user();
         $companyId = app('currentCompanyId');
 
+        // Plan gate: downgraded shop → rider logins see a clear message, not data.
+        if (!PosFeatureService::planAllows(Company::find($companyId), 'riders_enabled')) {
+            abort(403, __('pos.plan_locked_feature'));
+        }
+
         $rider = PosRider::where('company_id', $companyId)->where('user_id', $user->id)->first();
         if (!$rider) {
             // Login exists but the rider record was deleted — nothing to show.
@@ -467,6 +480,10 @@ class PosRiderController extends Controller
     {
         $user = auth('pos')->user();
         $companyId = app('currentCompanyId');
+
+        if (!PosFeatureService::planAllows(Company::find($companyId), 'riders_enabled')) {
+            abort(403, __('pos.plan_locked_feature'));
+        }
 
         $rider = PosRider::where('company_id', $companyId)->where('user_id', $user->id)->firstOrFail();
 

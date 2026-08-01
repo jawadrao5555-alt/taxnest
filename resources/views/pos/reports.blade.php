@@ -5,18 +5,27 @@
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
             {{ ($tab ?? 'pra') === 'local' ? __('pos.local_reports') : __('pos.pos_reports') }}
         </h1>
+        @php
+            // Plan gates (Aug 2026 package matrix) — service caches per request.
+            $planCoReports = \App\Models\Company::find(app('currentCompanyId'));
+            $canHazriPlan = \App\Services\PosFeatureService::planAllows($planCoReports, 'hazri_enabled');
+            $canExportsPlan = \App\Services\PosFeatureService::planAllows($planCoReports, 'reports_enabled');
+            $canAnalyticsPlan = \App\Services\PosFeatureService::planAllows($planCoReports, 'analytics_enabled');
+        @endphp
         <div class="flex items-center gap-2 flex-wrap">
-            @if(auth('pos')->user()?->isPosAdmin())
+            @if(auth('pos')->user()?->isPosAdmin() && $canHazriPlan)
             {{-- Staff Hazri (owner batch, 26 Jul 2026) — ADMIN/MANAGER-ONLY --}}
             <a href="{{ route('pos.reports.hazri') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 transition">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 {{ __('pos.staff_hazri') }}
             </a>
             @endif
+            @if($canExportsPlan)
             <a href="{{ route('pos.reports.csv', array_filter(['tab' => $tab, 'cashier' => $selectedCashier, 'from' => request('from'), 'to' => request('to')])) }}" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                 {{ __('pos.download_csv') }}
             </a>
+            @endif
         </div>
     </div>
 
@@ -85,7 +94,9 @@
                     <input type="date" name="to" value="{{ $ra->to }}" max="{{ today()->toDateString() }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
                 </div>
                 <button type="submit" class="px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition">{{ __('pos.apply_btn') }}</button>
+                @if($canAnalyticsPlan ?? true)
                 <a href="{{ route('pos.reports.analytics-pdf', ['tab' => $tab, 'cashier' => $selectedCashier, 'from' => $ra->from, 'to' => $ra->to]) }}" class="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition">PDF</a>
+                @endif
             </form>
         </div>
         <div class="flex flex-wrap gap-2 mb-5">

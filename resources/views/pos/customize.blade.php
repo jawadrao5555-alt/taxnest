@@ -40,7 +40,10 @@
                 'desc'  => __('pos.sec_operations_desc'),
                 'items' => [
                     ['label' => __('pos.card_services'), 'desc' => __('pos.card_services_desc'), 'url' => route('pos.services'), 'tone' => 'purple', 'badge' => __('pos.badge_manage'), 'icon' => 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10'],
-                    ['label' => __('pos.card_deals'), 'desc' => __('pos.card_deals_desc'), 'url' => route('pos.deals'), 'tone' => 'purple', 'badge' => __('pos.badge_manage'), 'icon' => 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z'],
+                    // Plan gate (Aug 2026 matrix): Deals card sirf jab package mein ho
+                    ...(\App\Services\PosFeatureService::planAllows(\App\Models\Company::find(app('currentCompanyId')), 'deals_enabled')
+                        ? [['label' => __('pos.card_deals'), 'desc' => __('pos.card_deals_desc'), 'url' => route('pos.deals'), 'tone' => 'purple', 'badge' => __('pos.badge_manage'), 'icon' => 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z']]
+                        : []),
                     ['label' => __('pos.card_terminals'), 'desc' => __('pos.card_terminals_desc'), 'url' => route('pos.terminals'), 'tone' => 'purple', 'badge' => __('pos.badge_manage'), 'icon' => 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'],
                     ['label' => __('pos.card_team'), 'desc' => __('pos.card_team_desc'), 'url' => route('pos.team'), 'tone' => 'purple', 'badge' => __('pos.badge_manage'), 'icon' => 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z'],
                 ],

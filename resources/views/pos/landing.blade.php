@@ -258,7 +258,21 @@
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">4</div>
                     <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Restaurant ready</h3>
-                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Full support for kitchen order tickets (KOT), dine-in table management, delivery orders, and item-specific tax toggles built right in.</p>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Kitchen order tickets (KOT), dine-in table board, kitchen display screen, waiter tablets and a scan-to-order QR menu — with cancel protection that records exactly which items were already made, so kitchen waste never hides.</p>
+                </div>
+
+                <!-- Feature 5 -->
+                <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
+                    <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">5</div>
+                    <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Delivery riders &amp; khata</h3>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Assign every delivery to a rider, track the cash each rider owes, settle bills the moment they return — and a live pending-bills tile on the dashboard so nothing is forgotten at closing time.</p>
+                </div>
+
+                <!-- Feature 6 -->
+                <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
+                    <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">6</div>
+                    <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">The manager's cockpit</h3>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Staff attendance (hazri), cancelled-orders and waste reports, analytics dashboards with PDF export, and a day-close that can auto-finalize leftover bills — the whole day reconciled in one screen.</p>
                 </div>
             </div>
         </div>

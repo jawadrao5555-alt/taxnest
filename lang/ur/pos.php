@@ -3433,4 +3433,5 @@ Bills stay with the cashier — this only clears the kitchen display.',
     'item_made_no' => 'نہیں بنا',
     'made_items_word' => 'بنے ہوئے آئٹم',
     'waste_value' => 'ضائع (بنے ہوئے) کی مالیت',
+    'plan_locked_feature' => 'یہ فیچر آپ کے موجودہ پیکج میں شامل نہیں — اپ گریڈ کر کے حاصل کریں۔',
 ];

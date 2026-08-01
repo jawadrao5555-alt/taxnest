@@ -3433,4 +3433,5 @@ Bills stay with the cashier — this only clears the kitchen display.',
     'item_made_no' => 'Not made',
     'made_items_word' => 'Made items',
     'waste_value' => 'Wasted (made) value',
+    'plan_locked_feature' => 'This feature is not included in your current package — upgrade your plan to unlock it.',
 ];

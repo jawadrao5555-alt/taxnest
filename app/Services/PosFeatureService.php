@@ -25,6 +25,18 @@ class PosFeatureService
     /** Per-request cache: company_id => bool */
     protected static array $restaurantAllowedCache = [];
 
+    /** company_id => [plan_column => bool] cache for plan feature gates. */
+    protected static array $planGateCache = [];
+
+    /**
+     * Plan-gated premium features (Aug 2026 package matrix). Each key is a
+     * boolean column on pricing_plans. Access logic mirrors the Restaurant
+     * module: internal accounts and active admin overrides always pass, an
+     * active trial passes (evaluate-before-buying), otherwise the active
+     * plan's column decides.
+     */
+    public const PLAN_GATES = ['deals_enabled', 'riders_enabled', 'hazri_enabled', 'analytics_enabled', 'reports_enabled'];
+
     public const FLAG_META = [
         'kot' => [
             'label' => 'KOT (Kitchen Order Tickets)',
@@ -335,6 +347,55 @@ class PosFeatureService
             }
         }
         return null;
+    }
+
+    /** Clear per-request gate caches (tests / admin plan flips mid-request). */
+    public static function flushGateCaches(): void
+    {
+        self::$planGateCache = [];
+        self::$restaurantAllowedCache = [];
+    }
+
+    /**
+     * Does this company's plan include the given premium feature column?
+     * Same source hierarchy as the Restaurant module: internal → override →
+     * plan column → active trial. Missing column (pre-migration PROD window)
+     * fails OPEN so a lagging migrate never locks paying users out.
+     */
+    public static function planAllows(?Company $company, string $planColumn): bool
+    {
+        if (!in_array($planColumn, self::PLAN_GATES, true)) {
+            return true;
+        }
+        if (!$company) {
+            return false;
+        }
+        if (isset(self::$planGateCache[$company->id][$planColumn])) {
+            return self::$planGateCache[$company->id][$planColumn];
+        }
+
+        $allowed = false;
+        if ($company->is_internal_account) {
+            $allowed = true;
+        } else {
+            $sub = \App\Services\PlanLimitService::getActiveSubscription($company->id);
+            if ($sub) {
+                if ($sub->hasActiveOverride()) {
+                    $allowed = true;
+                } elseif ($sub->pricingPlan) {
+                    if (!\Illuminate\Support\Facades\Schema::hasColumn('pricing_plans', $planColumn)) {
+                        $allowed = true; // fail open until migration lands
+                    } elseif (!empty($sub->pricingPlan->{$planColumn})) {
+                        $allowed = true;
+                    }
+                }
+                if (!$allowed && $sub->isTrialActive()) {
+                    $allowed = true; // trial companies evaluate everything
+                }
+            }
+        }
+
+        return self::$planGateCache[$company->id][$planColumn] = $allowed;
     }
 
     /**

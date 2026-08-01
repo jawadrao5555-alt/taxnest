@@ -166,6 +166,7 @@ Sale screen ki mazeed cheezein:
 - Select Table window ab BARI hai (28 Jul 2026): saari tables ek chart ki tarah zyada columns mein nazar aati hain. Dine-In KOT bhejne ke baad screen khud TABLE chart par wapas aa jati hai — agla order seedha agli table se shuru karein.
 - Tables Overview page (/pos/restaurant/tables) ke timers ab LIVE chalte hain (28 Jul 2026) — kitni der se table laga hai, bina refresh ke khud update hota rehta hai.
 - Kitchen Settings (/pos/restaurant/kitchen-settings) ke toggles: Kitchen Display System (KDS), Kitchen Printer, Print KOT on Hold, Dine-In Auto KOT on Table Select, Print Receipt on Pay. "Save Kitchen Settings" se save.
+- KOT PRINT par kya dikhe — isi page par alag switches hain: "Customer dikhayein", "Order By (staff naam)", "Barcode dikhayein" (SCAN BARCODE TO CLEAR wala — jo dukan KDS use nahi karti wo isay OFF kar de), aur "Footer dikhayein" (KOT ke neeche business ka naam). Har switch alag hai — sirf naam hatana ho to sirf Footer OFF karein, barcode apni jagah rahega.
 - Counters/Stations (KOT routing): kitchen-settings par "+ Add Counter" → Counter Name (jaise "Grill") → Printer chunein (Desktop Agent ki list) → Product Categories tick karein — un categories ke items ka KOT usi counter par jayega.
 - KDS (/pos/restaurant/kds): kitchen account login karta hai; order cards par order number, table, RUSH tag aur timer; buttons: "Start Preparing" → "Mark Ready" → "Clear"; upar Refresh, Clear All, Camera Scan aur List/Aggregate view switcher. KOT ka barcode scan karne se order khud clear ho jata hai (scanner active rehta hai).
 - Kitchen account: /pos/team se Kitchen role ka login — sirf KDS dekhta hai, team limit mein nahi ginta.
@@ -213,7 +214,9 @@ Sale screen ki mazeed cheezein:
 
 ## Customers (/pos/customers)
 - Fields: Name, Phone, Email, Type (Registered/Unregistered), CNIC, NTN, City, Address. "+ Add Customer" se banayen; phone/naam se search; Active/Inactive toggle; inline Edit; Delete.
+- Customers page par UPAR search box hai (1 Aug 2026) — naam, phone, city, CNIC ya NTN likhte hi list filter ho jati hai.
 - Har customer ki poori history: customer ke saamne "History" → us ke saray bills (export/PDF bhi).
+- Sale screen par bhi (1 Aug 2026): customer select karne par jo "X orders" likha aata hai us par CLICK karein — wahin popup mein us customer ke pichhle orders ki poori history khul jati hai (kab order gaya, kya manga, kitne ka bill) — bill banate hue hi dekh lein, page badalne ki zaroorat nahi.
 - Customers ka import/export bhi hai (Export/Import buttons; template download kar ke import karein).
 - Sale screen se bhi naya customer foran ban jata hai (phone box mein number likhein → "Add as New").
 

@@ -28,6 +28,11 @@
                     ['label' => __('pos.card_receipt_display'), 'desc' => __('pos.card_receipt_display_desc'), 'url' => route('pos.receipt-settings'), 'tone' => 'purple', 'badge' => __('pos.badge_receipt'), 'icon' => 'M9 17v-2a2 2 0 012-2h2a2 2 0 012 2v2m-6 4h6a2 2 0 002-2V7a2 2 0 00-2-2H9a2 2 0 00-2 2v12a2 2 0 002 2z'],
                     ['label' => __('pos.printer_settings'), 'desc' => __('pos.card_printer_settings_desc'), 'url' => route('pos.printer-settings'), 'tone' => ($company->printerSettings()['silent_print_enabled'] ?? false) ? 'emerald' : 'purple', 'badge' => ($company->printerSettings()['silent_print_enabled'] ?? false) ? __('pos.badge_silent_on') : __('pos.badge_popup'), 'icon' => 'M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z'],
                     ['label' => __('pos.card_pra_compliance'), 'desc' => __('pos.card_pra_compliance_desc'), 'url' => route('pos.pra-settings'), 'tone' => $praOn ? 'emerald' : 'amber', 'badge' => $praOn ? __('pos.badge_pra_on') : __('pos.badge_pra_off'), 'icon' => 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'],
+                    // ZFC request (1 Aug 2026): Kitchen/KOT settings were buried under
+                    // Restaurant — surface a direct card here for restaurant-mode shops.
+                    ...(((bool) ($company->restaurant_mode ?? false)) ? [
+                        ['label' => __('pos.card_kitchen_kot'), 'desc' => __('pos.card_kitchen_kot_desc'), 'url' => route('pos.restaurant.kitchen-settings'), 'tone' => 'purple', 'badge' => __('pos.badge_kot'), 'icon' => 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6'],
+                    ] : []),
                 ],
             ],
             [

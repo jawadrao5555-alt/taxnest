@@ -386,6 +386,8 @@ return [
     'ph_price' => 'price',
     'ph_search_name_phone' => 'Search by name or phone...',
     'ph_reprint_search' => 'Search by serial, customer or amount...',
+    'ph_provisional_search' => 'Search by customer name, phone or bill no...',
+    'provisional_search_no_match' => 'No bill matches your search.',
     'ph_customer_name_mobile' => 'Customer name or mobile...',
     'ph_ntn_eg' => 'e.g. 1234567-8',
     'ph_hs_code' => 'HS code',

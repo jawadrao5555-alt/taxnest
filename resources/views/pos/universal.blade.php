@@ -1987,7 +1987,7 @@ window.addEventListener('popstate', function() {
                 <div>
                     <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                         <svg class="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-                        {{ __('pos.provisional_bills') }} <span class="text-xs font-medium text-purple-600 ml-1" x-text="'(' + localBills.length + ')'"></span>
+                        {{ __('pos.provisional_bills') }} <span class="text-xs font-medium text-purple-600 ml-1" x-text="'(' + filteredLocalBills().length + (localSearch.trim() ? '/' + localBills.length : '') + ')'"></span>
                     </h3>
                     <p class="text-[10px] text-gray-500 mt-0.5">{{ __('pos.provisional_nav_hint') }}</p>
                 </div>
@@ -1998,7 +1998,22 @@ window.addEventListener('popstate', function() {
                     <button @click="showLocalBills = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                 </div>
             </div>
-            <div class="max-h-[65vh] overflow-y-auto">
+            {{-- SEARCH (owner 1 Aug 2026): find a bill by customer name / phone / bill no.
+                 Element-level keydown handlers REQUIRED (same reason as reprint search):
+                 the global handleKey input-field gate swallows window-level keys while
+                 this input has focus — which is the default (openLocalBills auto-focuses). --}}
+            <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 relative">
+                <svg class="w-4 h-4 text-gray-400 absolute left-7 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <input type="text" x-model="localSearch" @input="activeLocalIndex = 0" x-ref="localSearchInput"
+                       @keydown.down.prevent="activeLocalIndex = Math.min(activeLocalIndex + 1, Math.max(0, filteredLocalBills().length - 1))"
+                       @keydown.up.prevent="activeLocalIndex = Math.max(activeLocalIndex - 1, 0)"
+                       @keydown.enter.prevent="const b = filteredLocalBills()[activeLocalIndex]; if (b) { $el.blur(); askPromoteMethod(b); }"
+                       @keydown.escape.prevent="showLocalBills = false"
+                       autocomplete="off" name="local_bills_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                       placeholder="{{ __('pos.ph_provisional_search') }}"
+                       class="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 placeholder-gray-400">
+            </div>
+            <div class="max-h-[58vh] overflow-y-auto">
                 <template x-if="localBillsLoading && localBills.length === 0">
                     <div class="p-12 text-center text-gray-400">
                         <svg class="w-8 h-8 mx-auto mb-2 animate-spin text-purple-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
@@ -2012,7 +2027,13 @@ window.addEventListener('popstate', function() {
                         <p class="text-[11px] text-gray-400 mt-1">{{ __('pos.provisional_saved_here_hint') }}</p>
                     </div>
                 </template>
-                <template x-for="(bill, bi) in localBills" :key="bill.id">
+                <template x-if="!localBillsLoading && localBills.length > 0 && filteredLocalBills().length === 0">
+                    <div class="p-10 text-center text-gray-400">
+                        <svg class="w-10 h-10 mx-auto mb-2 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <p class="text-sm font-medium">{{ __('pos.provisional_search_no_match') }}</p>
+                    </div>
+                </template>
+                <template x-for="(bill, bi) in filteredLocalBills()" :key="bill.id">
                     <div class="p-4 border-b border-gray-100 dark:border-gray-800 transition-all" :class="activeLocalIndex === bi ? 'bg-purple-50 dark:bg-purple-900/15 ring-2 ring-purple-400 ring-inset' : ''">
                         <div class="flex items-center justify-between mb-2">
                             <div class="flex items-center gap-2 flex-wrap">
@@ -3435,6 +3456,9 @@ function restaurantPos() {
         showLocalBills: false,
         activeLocalIndex: 0,
         localBillsLoading: false,
+        // Search box inside the Provisional Bills modal — owner request (1 Aug 2026):
+        // night-time bulk finalizers need to find one customer's bill by name/phone.
+        localSearch: '',
         // ── FAILED BILLS (header shortcut, F11) ───────────────────────────────
         // Lazy-loaded list of all bills with pra_status IN (failed,offline,pending)
         // that have NOT received a pra_invoice_number yet. Auto-refresh on mount.
@@ -5331,12 +5355,14 @@ function restaurantPos() {
                 return;
             }
             // PROVISIONAL BILLS modal — keyboard navigation (mirror of held-orders shortcuts)
-            if (this.showLocalBills && this.localBills.length > 0) {
-                if (e.key === 'ArrowDown') { e.preventDefault(); this.activeLocalIndex = Math.min(this.activeLocalIndex + 1, this.localBills.length - 1); }
+            // NOTE: always index into filteredLocalBills() (search may be active), never raw localBills.
+            if (this.showLocalBills && this.filteredLocalBills().length > 0) {
+                const flb = this.filteredLocalBills();
+                if (e.key === 'ArrowDown') { e.preventDefault(); this.activeLocalIndex = Math.min(this.activeLocalIndex + 1, flb.length - 1); }
                 else if (e.key === 'ArrowUp') { e.preventDefault(); this.activeLocalIndex = Math.max(this.activeLocalIndex - 1, 0); }
-                else if (e.key === 'Enter') { e.preventDefault(); this.askPromoteMethod(this.localBills[this.activeLocalIndex]); }
-                else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); window.location.href = '{{ route('pos.invoice.create') }}?edit_bill=' + this.localBills[this.activeLocalIndex].id; }
-                else if ((e.key === 'd' || e.key === 'D') && this.posRole !== 'pos_cashier') { e.preventDefault(); this.deleteProvisional(this.localBills[this.activeLocalIndex]); }
+                else if (e.key === 'Enter') { e.preventDefault(); if (flb[this.activeLocalIndex]) this.askPromoteMethod(flb[this.activeLocalIndex]); }
+                else if ((e.key === 'e' || e.key === 'E') && flb[this.activeLocalIndex]) { e.preventDefault(); window.location.href = '{{ route('pos.invoice.create') }}?edit_bill=' + flb[this.activeLocalIndex].id; }
+                else if ((e.key === 'd' || e.key === 'D') && this.posRole !== 'pos_cashier' && flb[this.activeLocalIndex]) { e.preventDefault(); this.deleteProvisional(flb[this.activeLocalIndex]); }
                 else if (e.key === 'Escape') { e.preventDefault(); this.showLocalBills = false; }
                 return;
             }
@@ -7223,8 +7249,23 @@ function restaurantPos() {
         },
         openLocalBills() {
             this.activeLocalIndex = 0;
+            this.localSearch = '';
             this.showLocalBills = true;
             this.loadLocalBills();
+            this.$nextTick(() => { const el = this.$refs.localSearchInput; if (el) el.focus(); });
+        },
+        // Filtered view of localBills — matches invoice number, customer name,
+        // phone, or delivery address. ALL list rendering + keyboard nav MUST go
+        // through this (never raw localBills) or index-based actions hit the wrong bill.
+        filteredLocalBills() {
+            const q = (this.localSearch || '').toLowerCase().trim();
+            if (!q) return this.localBills;
+            return this.localBills.filter(b =>
+                (b.invoice_number || '').toLowerCase().includes(q) ||
+                (b.customer_name || '').toLowerCase().includes(q) ||
+                (b.customer_phone || '').toLowerCase().includes(q) ||
+                (b.delivery_address || '').toLowerCase().includes(q)
+            );
         },
         // ─── REPRINT (Alt+R) — today's bills, read-only, click = print ─────────
         openReprint() {

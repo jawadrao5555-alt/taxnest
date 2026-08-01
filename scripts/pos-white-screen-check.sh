@@ -141,6 +141,7 @@ PRA_PAGES=(
   "/pos/receipt-settings|receipt-settings\""
   "/pos/restaurant/kitchen-settings|name=\"kot_compact\"|name=\"print_on_pay\""
   "/pos/reports|pos/reports/csv|raDailyTrend"
+  "/pos/invoice/create|restaurantPos\(|manualItemNameInput"
 )
 FBR_PAGES=(
   "/fbr-pos/dashboard|fbr-pos/day-close|fbr-pos/create"

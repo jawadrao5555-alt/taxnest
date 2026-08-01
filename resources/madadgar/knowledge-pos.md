@@ -113,6 +113,7 @@ Sale screen ki mazeed cheezein:
 - Banane ka tareeqa: sale screen par "Save Provisional" button ya F9 (ya pay modal mein P — guided flow ON ho to).
 - Dekhne ke tareeqay: sale screen par F10 modal, ya /pos/local-bills portal (export bhi ho sakta hai).
 - F10 modal ke andar har local bill par actions: Enter = Make Final (promote), E = Edit, D = Delete (cashier delete nahi kar sakta).
+- F10 modal mein upar SEARCH box hai (1 Aug 2026): customer ka naam, phone number ya bill number likhein to list foran filter ho jati hai — raat ko bohat se provisional bills ikathay final karne walon ke liye. Modal khulte hi cursor search mein hota hai; ↑↓ se select, Enter = Make Final. FBR POS ke F10 modal mein bhi yehi search hai.
 - Promote karne par method picker khulta hai — 3 options: Cash (1), Card (2), ya "Finalize LOCAL — don't send to PRA" (3 ya L) = bill final ho jata hai lekin PRA ko NAHI jata, L-series par hi rehta hai. Esc = cancel.
 - Cash/Card se promote = PRA final: naya POS fiscal serial milta hai aur monthly quota use hota hai. Promote sirf USI mahine ke andar ho sakta hai.
 - /pos/transactions par bhi local bill ke saamne "Submit to PRA" button hota hai (current month ke bills par).

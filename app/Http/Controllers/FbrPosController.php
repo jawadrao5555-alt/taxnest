@@ -41,13 +41,14 @@ class FbrPosController extends Controller
             ->withCount('items')
             ->orderByDesc('id')
             ->limit(50)
-            ->get(['id', 'invoice_number', 'total_amount', 'created_at', 'customer_name'])
+            ->get(['id', 'invoice_number', 'total_amount', 'created_at', 'customer_name', 'customer_phone'])
             ->map(function ($b) {
                 return [
                     'id' => $b->id,
                     'invoice_number' => $b->invoice_number,
                     'total_amount' => (float) $b->total_amount,
                     'customer_name' => $b->customer_name ?? 'Walk-in',
+                    'customer_phone' => $b->customer_phone,
                     'items_count' => (int) ($b->items_count ?? 0),
                     'created_human' => $b->created_at?->diffForHumans(),
                     'created_at' => optional($b->created_at)->format('d M, h:i A'),

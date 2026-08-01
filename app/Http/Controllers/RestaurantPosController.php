@@ -1748,8 +1748,14 @@ class RestaurantPosController extends Controller
             return redirect('/pos/invoice/create');
         }
 
-        $today = now()->startOfDay();
-        $yesterday = now()->subDay()->startOfDay();
+        // Business-day window (ZFC, 2 Aug 2026: dashboard sab Rs 0 dikhata tha
+        // aadhi raat ke baad): "aaj" = current BUSINESS day — cutoff (default
+        // 06:00) se ab tak. restaurant_orders ka business_date column nahi,
+        // is liye time-window se wahi grouping banti hai jo day-close ki hai.
+        $bizDate = \App\Services\PosBusinessDay::current($companyId);
+        $cutoff = \App\Services\PosBusinessDay::cutoffFor($companyId);
+        $today = \Carbon\Carbon::parse($bizDate . ' ' . $cutoff, config('app.timezone'));
+        $yesterday = $today->copy()->subDay();
 
         $todaySales = RestaurantOrder::where('company_id', $companyId)
             ->where('status', 'completed')

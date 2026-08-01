@@ -736,6 +736,17 @@ class PosController extends Controller
             ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue, COALESCE(AVG(total_amount),0) as avg_ticket')
             ->first();
 
+        // Task 109 (ZFC, 2 Aug 2026): Pending Bills — provisional bills of the
+        // current BUSINESS day that are still not FINAL. Triple-filter per
+        // pos-provisional rules (completed + invoice_mode='local' +
+        // pra_status='local'); hide_archived global scope excludes archived.
+        $pendingProvisional = PosTransaction::where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->where('invoice_mode', 'local')
+            ->where('pra_status', 'local')
+            ->where('business_date', $bizToday)
+            ->count();
+
         $monthStats = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
             ->where('business_date', '>=', now()->startOfMonth()->toDateString())
@@ -922,7 +933,8 @@ class PosController extends Controller
             'company', 'todayStats', 'monthStats', 'recentTransactions', 'paymentBreakdown', 'praStatus', 'drafts', 'isCashier',
             'dashboardStyle', 'isRestaurant', 'isAdmin', 'notifications',
             'profitStats', 'topSold', 'topProfit', 'lowMargin', 'costCoverage',
-            'dayOpening', 'todayClosed', 'yesterdayRevenue', 'praSyncedToday'
+            'dayOpening', 'todayClosed', 'yesterdayRevenue', 'praSyncedToday',
+            'pendingProvisional'
         ));
     }
 

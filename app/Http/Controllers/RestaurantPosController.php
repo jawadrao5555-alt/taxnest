@@ -1803,6 +1803,23 @@ class RestaurantPosController extends Controller
             ->where('status', 'completed')
             ->count();
 
+        // Task 109 (ZFC, 2 Aug 2026): Pending Bills tile — dashboard se hi pata
+        // chal jaye ke kitne bills abhi FINAL nahi hue.
+        // (a) Provisional delivery bills: pos_transactions triple-filter
+        //     (completed + invoice_mode='local' + pra_status='local'), current
+        //     BUSINESS day; hide_archived global scope already excludes archived.
+        $pendingProvisional = PosTransaction::where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->where('invoice_mode', 'local')
+            ->where('pra_status', 'local')
+            ->where('business_date', $bizDate)
+            ->count();
+        // (b) Open dine-in/held orders: still un-settled regardless of when they
+        //     were opened — a table left open from before the cutoff is still pending.
+        $openOrdersCount = RestaurantOrder::where('company_id', $companyId)
+            ->whereIn('status', ['held', 'preparing', 'ready'])
+            ->count();
+
         $totalTables = RestaurantTable::where('company_id', $companyId)->count();
         $occupiedTables = RestaurantTable::where('company_id', $companyId)->where('status', 'occupied')->count();
 
@@ -1934,7 +1951,8 @@ class RestaurantPosController extends Controller
             'salesChartLabels', 'salesChartData', 'orderTypeCounts',
             'peakHour', 'todayTax', 'todayDiscount',
             'todayCost', 'todayProfit', 'kitchenStats',
-            'dashboardStyle', 'isRestaurant', 'isAdmin', 'praStatus', 'isCashier'
+            'dashboardStyle', 'isRestaurant', 'isAdmin', 'praStatus', 'isCashier',
+            'pendingProvisional', 'openOrdersCount'
         ));
     }
 

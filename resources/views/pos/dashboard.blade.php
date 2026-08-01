@@ -250,6 +250,7 @@
         @endif
         {{-- ─── /PROFIT + BI WIDGETS ─── --}}
 
+        @include('pos.partials.pending-bills-tile')
         @include('pos.dashboard-styles.' . ($dashboardStyle ?? 'default'))
         @include('pos.dashboard-styles._drafts-section')
     </div>

@@ -13,6 +13,7 @@ Yeh NestPOS ka mukammal guide hai. Sirf is guide ki maloomat se jawab do. Jawab 
 ## Dashboard (/pos/dashboard)
 - "Aaj" ke figures Business Day ke hisaab se hain: raat 12 ke baad (subah 6 tak, jab tak din close na ho) ki sales pichle din mein ginti hain — dukan raat der tak khuli ho to raat ki sales usi din ke totals mein rehti hain.
 - Dashboard par KPI cards (aaj ki sales, bills, tax, net sales), hourly chart, 30 din ka trend, payment method ka breakdown aur aaj ke recent bills hote hain.
+- "Pending Bills" ka tile (2 Aug 2026): dashboard par upar dikhta hai ke kitne bills abhi FINAL nahi hue — (a) aaj ke provisional bills jo Make Final nahi hue (click → Local Bills portal / F10 wali list) aur (b) restaurant mein khule dine-in orders jo settle nahi hue (click → Table board). Sab clear ho to green "Sab clear" dikhta hai. Sirf admin/manager ko nazar aata hai; retail (non-restaurant) dashboard par sirf tab dikhta hai jab koi provisional bill pending ho.
 - Cashier ko sirf apne stats nazar aate hain; admin/manager ko poori company ke.
 - Din ke shuru mein "Opening Cash" card par drawer ka cash + note enter kar ke Save karein (tafseel Day Close section mein).
 - Dashboard ka style: /pos/customize ke "POS Ka Style" section se — "Full — Poora Dashboard" (default) ya "Saaf — Simple" (seedha saada, Roman Urdu); "Mazeed styles" ke neeche 5 purane fancy designs bhi hain. Sirf admin/manager badal sakta hai.

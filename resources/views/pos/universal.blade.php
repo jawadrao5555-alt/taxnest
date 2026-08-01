@@ -885,18 +885,17 @@ window.addEventListener('popstate', function() {
                             <img :src="s.image" class="w-7 h-7 rounded-lg object-cover flex-shrink-0" :style="i === highlightIndex ? 'outline:2px solid white; outline-offset:1px;' : ''">
                         </template>
                         <template x-if="!s.image">
-                            <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                                :style="i === highlightIndex ? 'background:white; color:#7c3aed;' : 'background:linear-gradient(135deg,#f3e8ff,#ede9fe); color:#7c3aed;'">
+                            <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-300" :style="i === highlightIndex ? 'background:white; color:#7c3aed;' : ''">
                                 <span class="text-xs font-bold" x-text="s.name.charAt(0)"></span>
                             </div>
                         </template>
                         <div class="flex-1 min-w-0 flex items-center gap-1.5">
-                            <span class="text-sm font-semibold truncate leading-snug" :style="i === highlightIndex ? 'color:white;' : 'color:#1f2937;'" x-text="s.name"></span>
+                            <span class="text-sm font-semibold truncate leading-snug text-gray-800 dark:text-gray-100" :style="i === highlightIndex ? 'color:white;' : ''" x-text="s.name"></span>
                             @if($company->inventory_enabled)
                             <template x-if="s.stockStatus && s.stockStatus !== 'available'"><span class="stock-dot flex-shrink-0" :class="'stock-' + s.stockStatus"></span></template>
                             @endif
                         </div>
-                        <span class="text-sm font-extrabold flex-shrink-0" :style="i === highlightIndex ? 'color:white;' : 'color:#9333ea;'" x-text="'Rs. ' + Number(s.price).toLocaleString()"></span>
+                        <span class="text-sm font-extrabold flex-shrink-0 text-purple-600 dark:text-purple-300" :style="i === highlightIndex ? 'color:white;' : ''" x-text="'Rs. ' + Number(s.price).toLocaleString()"></span>
                     </button>
                 </template>
             </div>

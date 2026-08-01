@@ -938,7 +938,12 @@ class RestaurantPosController extends Controller
 
             DB::commit();
 
+            // Slow-bill diagnosis (ZFC video, 1 Aug 2026: "30 sec Creating bill"):
+            // time the PRA leg + whole request; warn when a settle is slow so we
+            // can tell PRA/network delay apart from server work in live logs.
+            $praMs = null;
             if ($praEnabled) {
+                $praT0 = microtime(true);
                 try {
                     $praService = new \App\Services\PraIntegrationService($company);
                     $praResult = $praService->sendInvoice($transaction);

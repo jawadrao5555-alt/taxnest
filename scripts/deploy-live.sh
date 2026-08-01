@@ -40,6 +40,19 @@ if [ -n "$(git status --porcelain 2>/dev/null | grep -v '^??' || true)" ]; then
   echo "         (Checkpoint commits happen at turn end; deploy again after commit.)" >&2
 fi
 
+step "Preflight: POS white-screen check (key pages render + inline JS parses)"
+if [ "${SKIP_WHITE_SCREEN_CHECK:-0}" = "1" ]; then
+  echo "SKIPPED (SKIP_WHITE_SCREEN_CHECK=1) — only skip for emergency hotfixes." >&2
+else
+  bash scripts/pos-white-screen-check.sh
+  WS_RC=$?
+  if [ $WS_RC -eq 2 ]; then
+    fail "white-screen check could not run (dev server/MySQL down?) — start the Laravel Server + MySQL Staging workflows, or SKIP_WHITE_SCREEN_CHECK=1 to bypass"
+  elif [ $WS_RC -ne 0 ]; then
+    fail "white-screen check FAILED — a key POS page is broken; fix before deploying"
+  fi
+fi
+
 step "Preflight: SSH connectivity + live HEAD"
 LIVE_HEAD_BEFORE=$(run_ssh "cd $LIVE_DIR && git rev-parse HEAD" 2>/dev/null) \
   || fail "cannot reach live server over SSH (or live git repo broken)"

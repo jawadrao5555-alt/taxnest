@@ -90,4 +90,5 @@
 - [Site performance conventions](site-perf-conventions.md) — ONE font CDN (bunny only, no Google Fonts), Chart.js self-hosted /vendor, landing stats cached 10min; extra HTTPS domains cost 300-500ms from PK.
 - [POS sale-screen boot perf](pos-boot-splash-perf.md) — cap EVERY x-for over baked lists (11k customers froze boot); Alpine CDN fallback must arm on DOMContentLoaded, never blind head setTimeout.
 - [Live PDO string ints](live-pdo-string-ints.md) — cPanel PROD PDO returns non-cast int columns as STRINGS (dev = ints); JS strict === on ids breaks only on live — cast in serializer + Number() both sides.
+- [POS white-screen deploy guard](pos-white-screen-check.md) — deploy-live preflight: bare-__()-in-script scan + login/fetch key pages + node --check inline JS; markers must be language-independent.
 - [POS language system](pos-language-system.md) — SetPosLocale guard-by-URL-prefix (never pos??fbrpos); lang/ur+en/pos.php key-synced; conversion phases pending; receipts need render-time locale.

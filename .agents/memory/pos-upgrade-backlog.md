@@ -37,3 +37,7 @@ PRA constraint: tax rate depends on payment method (cash 16% / card 8%) and PRA 
 - Option 2: dominant method decides whole-bill rate (loophole: 51% card halves tax).
 - Option 3: auto-split into two bills (cash bill 16% + card bill 8%), each reported separately; 2 receipts, items can't be half-split.
 Owner deferred the choice — re-present these options when he returns to split payment.
+
+## FBR POS parity backlog — ek-saath mashwara (owner rule, 2 Aug 2026)
+Owner: FBR POS tasks ab individually propose NAHI karne. Jab FBR POS working session shuru ho, tab yeh SAB ek hi baar pesh karo (har item par haan/na lega). Nayi FBR parity ideas isi list mein jorte jao, propose mat karo.
+Queued FBR task refs (already in project queue, untouched): #65 day-close post-midnight, #98 restaurant What's New elaan, #112 Pending Bills tile, #115 day-close auto-final option, #118 package feature-gating matrix, #119 Custom Access tick-boxes.

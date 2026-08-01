@@ -74,3 +74,6 @@ Isolated POS (own auth/layouts/models); PRA integration with offline billing + a
 - **FBR (Pakistan)** — DI + FBR POS tax compliance APIs. **PRA / PRAL IMS API v1.2** — POS fiscal integration (cloud + local fiscal-device).
 - **Laravel Breeze**, **Tailwind CSS**, **Alpine.js**, **Chart.js**. **Unsplash / Picsum** — `ProductImageService` fallback.
 - **cPanel SMTP (noreply@taxnest.com.pk)** — ALL outgoing email; admin SMTP override + MailHealth banner. → memory `mail-noreply-smtp.md`
+
+## User preferences
+- FBR POS ke parity/improvement tasks ek-ek kar ke propose NA karein. Jab owner FBR POS par working shuru kare, tab SAB jama-shuda FBR tajaweez ek hi baar mashware ke liye pesh karein (owner har aik par haan/na kahega). (Owner, 2 Aug 2026)

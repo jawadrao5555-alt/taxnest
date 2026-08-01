@@ -128,6 +128,10 @@ class RestaurantWaiterController extends Controller
                 'seats' => $t->seats,
                 'status' => $t->status,
                 'active_orders' => $t->activeOrders->count(),
+                // Table Shift from picker (Aug 2026): first active order on the
+                // table — lets the waiter shift ANY occupied table, not just his own.
+                'order_id' => optional($t->activeOrders->first())->id,
+                'order_number' => optional($t->activeOrders->first())->order_number,
             ]);
 
         return response()->json($tables);
@@ -364,12 +368,15 @@ class RestaurantWaiterController extends Controller
         $companyId = app('currentCompanyId');
         $user = auth('pos')->user();
 
-        $owns = RestaurantOrder::where('company_id', $companyId)
-            ->where('source', 'waiter')
-            ->where('created_by', $user->id)
+        // ZFC voice note (1 Aug 2026): waiter ko HAR occupied table shift karne
+        // ka ikhtiyar chahiye — cashier (desktop) ke lagaye orders bhi. Ownership
+        // restriction hata di: ab company ka koi bhi ACTIVE order shift ho sakta
+        // hai (source/creator koi bhi ho). Race-safety wahi ek source of truth.
+        $exists = RestaurantOrder::where('company_id', $companyId)
+            ->whereIn('status', ['held', 'preparing', 'ready'])
             ->where('id', $id)
             ->exists();
-        if (!$owns) {
+        if (!$exists) {
             return response()->json(['success' => false, 'message' => 'Order nahi mila'], 404);
         }
 

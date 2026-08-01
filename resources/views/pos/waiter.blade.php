@@ -181,12 +181,16 @@
                 <div x-show="tablesLoading" class="text-center py-8 text-sm text-gray-400">{{ __('pos.loading_ellipsis') }}</div>
                 <div class="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
                     <template x-for="t in tables" :key="t.id">
-                        <button @click="pickTable(t)" :disabled="t.status === 'occupied'"
-                                :class="t.status === 'occupied' ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-400 cursor-not-allowed' : (t.status === 'reserved' ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300' : 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:border-emerald-500')"
+                        {{-- Occupied tiles (ZFC, 1 Aug 2026): ab tap-able — tap par us
+                             table ka order KHALI table par SHIFT hota hai (cashier ke
+                             lagaye orders bhi). Compose ke liye ab bhi sirf khali/reserved. --}}
+                        <button @click="t.status === 'occupied' ? startShiftFromTable(t) : pickTable(t)" :disabled="t.status === 'occupied' && !t.order_id"
+                                :class="t.status === 'occupied' ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-500 dark:text-red-300' : (t.status === 'reserved' ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300' : 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:border-emerald-500')"
                                 class="rounded-xl border-2 p-3 text-center transition">
                             <span class="block text-base font-black" x-text="'T-' + t.table_number"></span>
                             <span class="block text-[10px] font-bold mt-0.5" x-text="t.floor + ' · ' + t.seats + {{ Js::from(__('pos.sfx_seats')) }}"></span>
                             <span class="block text-[10px] font-bold uppercase mt-0.5" x-text="t.status"></span>
+                            <span x-show="t.status === 'occupied' && t.order_id" class="block text-[10px] font-black uppercase mt-1 px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300">{{ __('pos.shift_word') }} ⇄</span>
                         </button>
                     </template>
                 </div>
@@ -482,6 +486,13 @@ function waiterApp() {
             this.cart = [];
         },
 
+        // Shift from the table picker (ZFC, 1 Aug 2026): occupied tile tap —
+        // shift that table's ACTIVE order (any creator) to an empty table.
+        startShiftFromTable(t) {
+            if (!t.order_id) return;
+            this.showTables = false;
+            this.startShift({ id: t.order_id, order_number: t.order_number || ('T-' + t.table_number), table_id: t.id });
+        },
         // ── Table Shift (owner batch, 26 Jul 2026) ──────────────────────────
         async startShift(o) {
             this.shiftFor = o;

@@ -354,3 +354,6 @@ Sale screen ki mazeed cheezein:
 
 ## Order Sound — naye waiter order par awaz (Aug 2026)
 - Restaurant mode mein cashier screen ke Switches menu mein "Order Awaz" ka switch hai (default ON). Naya waiter order aate hi chhoti si ghanti bajti hai (green message aur badge ke sath). Har counter/device apni awaz alag on/off kar sakta hai — yeh setting sirf usi computer par lagoo hoti hai.
+
+## Waiter tablet se bhi Table Shift (Aug 2026)
+- Waiter tablet ke 'Choose Table' mein occupied (surkh) table par tap karein — us table ka order kisi KHALI table par shift ho jata hai, chahe order cashier (desktop) ne lagaya ho ya kisi aur waiter ne. Timer sath chalta hai, KOT dobara print nahi hota. Apne orders 'My Orders' se pehle ki tarah bhi shift ho sakte hain.

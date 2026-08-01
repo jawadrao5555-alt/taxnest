@@ -373,9 +373,15 @@ function waiterApp() {
             // category whose items are all hidden — matches pre-feature output).
             this.categories = [...new Set(pool.map(p => p.category))].sort();
             if (this.activeCategory !== 'all' && !this.categories.includes(this.activeCategory)) this.activeCategory = 'all';
+            // STRICT PREFIX (ZFC, 1 Aug 2026 — same rule as the cashier sale
+            // screen, owner 24 Jul 2026): NAME matches only from the very START
+            // of the name ("f" = Fries…, NOT "Beef Loaded Fries"). Barcode
+            // matching only when the query has a digit/symbol.
+            const codeSearch = /[^a-z\s]/.test(q);
             this.filtered = pool.filter(p =>
                 (this.activeCategory === 'all' || p.category === this.activeCategory) &&
-                (!q || p.name.toLowerCase().includes(q) || (p.barcode && p.barcode.toLowerCase() === q))
+                (!q || p.name.toLowerCase().startsWith(q)
+                    || (codeSearch && p.barcode && String(p.barcode).toLowerCase().includes(q)))
             );
         },
 

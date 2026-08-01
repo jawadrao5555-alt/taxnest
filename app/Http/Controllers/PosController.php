@@ -5035,6 +5035,40 @@ class PosController extends Controller
         return response()->json(['success' => true, 'address' => ['id' => $addr->id, 'label' => $addr->label, 'address' => $addr->address]]);
     }
 
+    /**
+     * Delete a saved delivery address (ZFC customer request, Aug 2026): "customer
+     * shifted — the OLD saved address must go, right from the sale screen." id=0
+     * clears the customer's default address (pos_customers.address); any other id
+     * deletes the pos_customer_addresses row. Company-scoped; all POS roles allowed
+     * (same as add — this is day-to-day sales work, not admin work).
+     */
+    public function apiDeleteCustomerAddress(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $request->validate([
+            'customer_id' => 'required|integer',
+            'id' => 'required|integer|min:0',
+        ]);
+
+        $customer = \App\Models\PosCustomer::where('company_id', $companyId)
+            ->find((int) $request->customer_id);
+        if (!$customer) {
+            return response()->json(['success' => false, 'message' => __('pos.customer_not_found')], 404);
+        }
+
+        if ((int) $request->id === 0) {
+            $customer->update(['address' => null]);
+            return response()->json(['success' => true]);
+        }
+
+        $deleted = \App\Models\PosCustomerAddress::where('company_id', $companyId)
+            ->where('customer_id', $customer->id)
+            ->where('id', (int) $request->id)
+            ->delete();
+
+        return response()->json(['success' => (bool) $deleted]);
+    }
+
     public function toggleCashier($id)
     {
         $companyId = app('currentCompanyId');

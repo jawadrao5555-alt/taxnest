@@ -342,3 +342,6 @@ Sale screen ki mazeed cheezein:
 ## Day close aur pending provisional bills — Carry Forward (Aug 2026)
 - Sawal: "Auto day-close (misal 6 baje) par jo bills Make Final karna bhool gaye unka kya?" — Customize POS → Local Billing mein provisional bills ki policy ab 3 options: Archive (mehfooz magar F10 se ghayab), Delete (urh jate hain), ya naya **Carry (Agle Din)** — bills F10 mein rahte hain aur agle din Make Final ho sakte hain. Raat-batch delivery walon ke liye Carry best hai.
 - Day-close page ab pending provisional bills par surkh warning dikhata hai (agar policy Carry nahi) — pehle F10 se final karein.
+
+## Customer ka purana delivery address delete (Aug 2026)
+- Sale screen par delivery customer chun kar address dropdown se koi address select karein — sath surkh ✕ button aata hai, dabane par (confirm ke baad) woh saved address delete ho jata hai. Default address bhi isi tarah hat sakta hai. Customers page ka chakkar nahi lagana parta. Naya address "+ New" se pehle jaisa save hota hai.

@@ -1191,6 +1191,9 @@ window.addEventListener('popstate', function() {
                                             <option :value="a.address" x-text="(a.label ? a.label + ': ' : '') + a.address"></option>
                                         </template>
                                     </select>
+                                    {{-- ZFC (Aug 2026): purana address wahin se DELETE bhi ho sake —
+                                         selected address ka ✕. Customers page ka chakkar khatam. --}}
+                                    <button x-show="selectedDeliveryAddress && customerAddresses.some(a => a.address === selectedDeliveryAddress)" @click="deleteSelectedAddress()" title="{{ __('pos.ti_delete_address') }}" class="text-xs font-bold text-red-500 dark:text-red-400 px-2 py-1.5 rounded-md border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/30 whitespace-nowrap">✕</button>
                                     <button @click="showAddrNew = !showAddrNew; if (showAddrNew) $nextTick(() => document.getElementById('tnNewAddrInput')?.focus())" class="text-xs font-bold text-blue-600 dark:text-blue-300 px-2 py-1.5 rounded-md border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 whitespace-nowrap">{{ __('pos.new_short') }}</button>
                                 </div>
                                 <div x-show="showAddrNew" x-cloak class="flex items-center gap-1">
@@ -5618,6 +5621,36 @@ function restaurantPos() {
                     this.showToast((data && data.message) || window.TXT.could_not_save_address, 'error');
                 }
             } catch (e) { this.showToast(window.TXT.could_not_save_address_conn, 'error'); }
+        },
+        // ZFC (Aug 2026): delete the SELECTED saved address from the sale screen.
+        // id=0 = customer's default address (cleared, not row-deleted); walk-in
+        // one-off entries (id=null) are local-only, just dropped from the list.
+        async deleteSelectedAddress() {
+            const sel = this.selectedDeliveryAddress;
+            const a = this.customerAddresses.find(x => x.address === sel);
+            if (!a) return;
+            if (!confirm(window.TXT.confirm_delete_address + '\n' + (a.label ? a.label + ': ' : '') + a.address)) return;
+            const drop = () => {
+                this.customerAddresses = this.customerAddresses.filter(x => x !== a);
+                this.selectedDeliveryAddress = '';
+            };
+            const c = this.selectedCustomer;
+            if (a.id === null || !c || !c.id) { drop(); return; }
+            try {
+                const res = await fetch('/pos/api/customer-addresses/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ customer_id: c.id, id: a.id }),
+                });
+                const data = await res.json().catch(() => null);
+                if (data && data.success) {
+                    drop();
+                    if (a.id === 0 && this.selectedCustomer) this.selectedCustomer.address = '';
+                    this.showToast(window.TXT.address_deleted, 'success');
+                } else {
+                    this.showToast((data && data.message) || window.TXT.failed_word, 'error');
+                }
+            } catch (e) { this.showToast(window.TXT.network_error, 'error'); }
         },
         openTablePicker() {
             this.showTablePicker = true;

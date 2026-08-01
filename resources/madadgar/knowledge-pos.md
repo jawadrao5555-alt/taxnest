@@ -364,3 +364,4 @@ Sale screen ki mazeed cheezein:
 ## Order Cancel warning + Cancelled Orders report (2 Aug 2026)
 - Table board par "Cancel Order + Free Table" ab seedha cancel nahi karta — pehle warning popup aata hai jis mein order ke items ki list hoti hai, aur agar KOT kitchen ja chuki ho to surkh warning: "KOT kitchen ja chuki hai — khana ban raha ho sakta hai". Confirm karne par hi cancel hota hai.
 - Cancel hue orders ab delete NAHI hote — record mehfooz rehta hai. Reports menu mein naya page "Cancelled Orders" (sirf admin/manager): tareekh ka filter (aaj / 7 din / 30 din / apni marzi), kul ginti aur maliyat, aur CSV ya PDF download.
+- Cancel modal mein (jab KOT ja chuki ho) har item ke aage "Ban gaya ✓ / Nahi bana" ka tick hota hai — poora order nahi, item-wise batayein. Cancelled Orders report mein bane hue items par ✓ aur "zaya (bane hue) ki maliyat" ka alag khana aata hai.

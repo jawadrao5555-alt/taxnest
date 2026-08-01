@@ -31,6 +31,15 @@ class AdminDashboardController extends Controller
             'pending_companies' => Company::where('status', 'pending')->count(),
             'pending_payment_proofs' => Schema::hasTable('payment_proofs')
                 ? \App\Models\PaymentProof::where('status', 'pending')->count() : 0,
+            // Pending proofs whose auto-granted temporary access ends within
+            // 2 days — the dashboard tile flags these in red so the admin
+            // verifies before the reconciler locks a paying customer out.
+            'expiring_payment_proofs' => (Schema::hasTable('payment_proofs') && Schema::hasColumn('payment_proofs', 'auto_access_until'))
+                ? \App\Models\PaymentProof::where('status', 'pending')
+                    ->whereNotNull('auto_access_until')
+                    ->where('auto_access_until', '<=', now()->addDays(2)->endOfDay())
+                    ->count()
+                : 0,
             'suspended_companies' => Company::where('status', 'suspended')->count(),
             'binned_companies' => Company::onlyTrashed()->count(),
             'active_subscriptions' => Subscription::where('active', true)->count(),

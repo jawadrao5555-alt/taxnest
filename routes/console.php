@@ -35,6 +35,9 @@ Schedule::job(new SyncFbrPosOfflineInvoicesJob)->everyTwoMinutes();
 Schedule::command('pos:clean-zombie-tables')->everyFifteenMinutes();
 Schedule::job(new CheckTrialExpiryJob)->dailyAt('03:00');
 Schedule::command('trial:reminders')->dailyAt('08:00');
+// Admin nudge: pending payment proofs whose auto-granted 10-day access ends
+// within 2 days — verify before the reconciler locks a paying customer out.
+Schedule::command('payment-proofs:expiry-reminders')->dailyAt('08:10');
 // Storage hygiene: delete receipt FILES of proofs verified/rejected >12 months
 // ago (DB rows kept for audit, file_pruned_at flagged). Rows stay reviewable.
 Schedule::command('payment-proofs:prune')->dailyAt('04:30');

@@ -116,12 +116,22 @@
                 @php
                     $pendingProofCount = \Illuminate\Support\Facades\Schema::hasTable('payment_proofs')
                         ? \App\Models\PaymentProof::where('status', 'pending')->count() : 0;
+                    // Red (not amber) badge when any pending proof's auto-granted
+                    // temporary access runs out within 2 days — verify before the
+                    // reconciler locks the customer out.
+                    $expiringProofCount = ($pendingProofCount > 0 && \Illuminate\Support\Facades\Schema::hasColumn('payment_proofs', 'auto_access_until'))
+                        ? \App\Models\PaymentProof::where('status', 'pending')
+                            ->whereNotNull('auto_access_until')
+                            ->where('auto_access_until', '<=', now()->addDays(2)->endOfDay())
+                            ->count()
+                        : 0;
                 @endphp
                 <a href="{{ route('saas.admin.payment-proofs') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm {{ str_starts_with($current, 'saas.admin.payment-proofs') ? 'admin-active-link font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200' }} transition">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21l-7-3-7 3V5a2 2 0 012-2h10a2 2 0 012 2v16z"/></svg>
                     Payment Proofs
                     @if($pendingProofCount > 0)
-                        <span class="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-amber-500 text-white text-[11px] font-bold">{{ $pendingProofCount }}</span>
+                        <span class="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full {{ $expiringProofCount > 0 ? 'bg-red-600' : 'bg-amber-500' }} text-white text-[11px] font-bold"
+                              @if($expiringProofCount > 0) title="{{ $expiringProofCount }} pending proof(s) with temporary access ending within 2 days" @endif>{{ $pendingProofCount }}</span>
                     @endif
                 </a>
 

@@ -25,8 +25,10 @@
         </div>
         <div class="bg-gray-900 border border-amber-900/50 rounded-xl p-4">
             <p class="text-[10px] text-amber-500 uppercase tracking-wide mb-1">Pending Payments</p>
-            <p class="text-xl font-bold {{ ($stats['pending_payment_proofs'] ?? 0) > 0 ? 'text-amber-400' : 'text-gray-500 dark:text-gray-400' }}">{{ $stats['pending_payment_proofs'] ?? 0 }}</p>
-            @if(($stats['pending_payment_proofs'] ?? 0) > 0)
+            <p class="text-xl font-bold {{ ($stats['expiring_payment_proofs'] ?? 0) > 0 ? 'text-red-400' : (($stats['pending_payment_proofs'] ?? 0) > 0 ? 'text-amber-400' : 'text-gray-500 dark:text-gray-400') }}">{{ $stats['pending_payment_proofs'] ?? 0 }}</p>
+            @if(($stats['expiring_payment_proofs'] ?? 0) > 0)
+            <a href="{{ route('saas.admin.payment-proofs') }}" class="text-[10px] text-red-400 font-semibold hover:underline" title="Temporary access ending within 2 days — verify before the customer is locked out">{{ $stats['expiring_payment_proofs'] }} expiring soon!</a>
+            @elseif(($stats['pending_payment_proofs'] ?? 0) > 0)
             <a href="{{ route('saas.admin.payment-proofs') }}" class="text-[10px] text-indigo-400 hover:underline">Review now</a>
             @endif
         </div>

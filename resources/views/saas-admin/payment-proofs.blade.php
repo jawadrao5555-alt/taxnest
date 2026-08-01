@@ -91,10 +91,19 @@
                                 @endphp
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $badge }}">{{ ucfirst($proof->status) }}</span>
                                 @if($proof->status === 'pending' && $proof->auto_access_until)
-                                    <p class="text-[11px] mt-1 {{ $proof->auto_access_until->isFuture() ? 'text-emerald-400' : 'text-red-400' }}"
-                                       title="10-day access auto-granted on upload — expires if not verified">
-                                        Temp access {{ $proof->auto_access_until->isFuture() ? 'until ' . $proof->auto_access_until->format('d M Y') : 'EXPIRED ' . $proof->auto_access_until->format('d M Y') }}
-                                    </p>
+                                    @php $expSoon = $proof->auto_access_until->isFuture() && $proof->auto_access_until->lte(now()->addDays(2)->endOfDay()); @endphp
+                                    @if($expSoon)
+                                        <span class="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-red-900/40 text-red-300 border border-red-700/60"
+                                              title="Temporary access ends {{ $proof->auto_access_until->format('d M Y') }} — verify NOW or the customer gets locked out automatically">
+                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M12 3l9.196 15.9A1 1 0 0120.33 20H3.67a1 1 0 01-.866-1.5L12 3z"/></svg>
+                                            Access ends {{ $proof->auto_access_until->isToday() ? 'TODAY' : $proof->auto_access_until->format('d M') }}
+                                        </span>
+                                    @else
+                                        <p class="text-[11px] mt-1 {{ $proof->auto_access_until->isFuture() ? 'text-emerald-400' : 'text-red-400' }}"
+                                           title="10-day access auto-granted on upload — expires if not verified">
+                                            Temp access {{ $proof->auto_access_until->isFuture() ? 'until ' . $proof->auto_access_until->format('d M Y') : 'EXPIRED ' . $proof->auto_access_until->format('d M Y') }}
+                                        </p>
+                                    @endif
                                 @endif
                                 @if($proof->status === 'rejected' && $proof->reject_reason)
                                     <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1 max-w-[180px] mx-auto">{{ $proof->reject_reason }}</p>

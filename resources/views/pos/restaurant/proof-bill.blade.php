@@ -74,20 +74,20 @@
     @if($pp['show_business_name'] ?? true)
     <div class="text-center bold text-lg">{{ $company->business_name ?? $company->name }}</div>
     @endif
-    <div class="proof-line">*** PROOF BILL ***</div>
+    <div class="proof-line">{{ __('pos.proof_bill_banner') }}</div>
     <div class="separator"></div>
     <div class="text-center bold" style="font-size:18px; letter-spacing:1px;">
-        BILL NO: {{ $order->order_number }}
+        {{ __('pos.proof_bill_no') }} {{ $order->order_number }}
     </div>
     <div class="text-center bold" style="font-size:20px; margin-top:2px;">
-        @if($order->table)TABLE NO: T-{{ $order->table->table_number }}@else{{ strtoupper(str_replace('_',' ',$order->order_type)) }}@endif
+        @if($order->table){{ __('pos.proof_table_no') }} T-{{ $order->table->table_number }}@else{{ \Illuminate\Support\Facades\Lang::has('pos.ot_' . $order->order_type) ? __('pos.ot_' . $order->order_type) : strtoupper(str_replace('_',' ',$order->order_type)) }}@endif
     </div>
     <div class="flex text-sm mt-1">
         <span>{{ $order->created_at->format('d-M-Y') }}</span>
         <span>{{ $order->created_at->format('g:i A') }}</span>
     </div>
     <table class="items-table">
-        <tr class="head"><td>Item</td><td class="qty" style="text-align:center;">Qty</td><td class="amt">Price</td><td class="amt amt-last">Amount</td></tr>
+        <tr class="head"><td>{{ __('pos.receipt_item') }}</td><td class="qty" style="text-align:center;">{{ __('pos.receipt_qty') }}</td><td class="amt">{{ __('pos.receipt_price') }}</td><td class="amt amt-last">{{ __('pos.proof_amount') }}</td></tr>
         @foreach($order->items as $item)
         <tr class="item-row">
             <td>{{ $item->item_name }}</td>
@@ -98,22 +98,22 @@
         @endforeach
     </table>
     <table class="totals" style="width:100%">
-        <tr><td>Total</td><td style="text-align:right">Rs {{ number_format((float)$order->subtotal, 0) }}</td></tr>
+        <tr><td>{{ __('pos.receipt_total') }}</td><td style="text-align:right">Rs {{ number_format((float)$order->subtotal, 0) }}</td></tr>
         @if((float)$order->discount_amount > 0)
-        <tr><td>Discount</td><td style="text-align:right">- Rs {{ number_format((float)$order->discount_amount, 0) }}</td></tr>
+        <tr><td>{{ __('pos.receipt_discount') }}</td><td style="text-align:right">- Rs {{ number_format((float)$order->discount_amount, 0) }}</td></tr>
         @endif
         @if((float)$order->tax_amount > 0)
-        <tr><td>Tax</td><td style="text-align:right">Rs {{ number_format((float)$order->tax_amount, 0) }}</td></tr>
+        <tr><td>{{ __('pos.receipt_tax') }}</td><td style="text-align:right">Rs {{ number_format((float)$order->tax_amount, 0) }}</td></tr>
         @endif
-        <tr class="grand"><td>GRAND TOTAL</td><td style="text-align:right">Rs {{ number_format((float)$order->total_amount, 0) }}</td></tr>
+        <tr class="grand"><td style="text-transform:uppercase;">{{ __('pos.receipt_grand_total') }}</td><td style="text-align:right">Rs {{ number_format((float)$order->total_amount, 0) }}</td></tr>
     </table>
     <div class="separator"></div>
     <div class="flex text-sm">
-        @if($order->creator)<span>User: <span class="bold">{{ \Illuminate\Support\Str::of($order->creator->name)->before(' ') }}</span></span>@endif
-        <span>{{ strtoupper(str_replace('_',' ',$order->order_type)) }}</span>
+        @if($order->creator)<span>{{ __('pos.proof_user') }} <span class="bold">{{ \Illuminate\Support\Str::of($order->creator->name)->before(' ') }}</span></span>@endif
+        <span>{{ \Illuminate\Support\Facades\Lang::has('pos.ot_' . $order->order_type) ? __('pos.ot_' . $order->order_type) : strtoupper(str_replace('_',' ',$order->order_type)) }}</span>
     </div>
-    <div class="proof-line">*** NOT PAID ***</div>
-    <div class="text-center text-sm bold">Thank You For Visiting Us</div>
+    <div class="proof-line">{{ __('pos.proof_not_paid') }}</div>
+    <div class="text-center text-sm bold">{{ __('pos.proof_thank_you') }}</div>
 
     <script>
         // Same auto-print contract as the KOT ticket: iframe → postMessage the

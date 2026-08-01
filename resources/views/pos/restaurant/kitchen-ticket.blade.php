@@ -185,12 +185,12 @@
                  Jul 28 2026 (ZFC feedback): delta tickets carry ONLY new items,
                  so they must print CLEAN — no reprint/updated wording at all.
                  Banner kept for manual full re-sends (non-delta) only. --}}
-            <p class="text-sm bold" style="color:#000; font-weight:900;">*** REPRINT #{{ $order->kot_print_count }} &mdash; IGNORE PRIOR TICKET ***</p>
+            <p class="text-sm bold" style="color:#000; font-weight:900;">{{ __('pos.kot_reprint_banner', ['n' => $order->kot_print_count]) }}</p>
         @endif
         @if($order->priority ?? false)
-            <p class="priority-badge mt-1">!!! RUSH !!!</p>
+            <p class="priority-badge mt-1">{{ __('pos.kot_rush') }}</p>
         @endif
-        <p class="text-xl bold mt-1">*** {{ strtoupper($stationLabel ?? 'KITCHEN') }} ***</p>
+        <p class="text-xl bold mt-1">*** {{ strtoupper($stationLabel ?? __('pos.kot_kitchen')) }} ***</p>
         <p class="text-lg bold mt-1">{{ $order->order_number }}</p>
         {{-- Item #6: stable per-print-batch number — delta tickets get their own KOT #
              so the kitchen can reference "KOT #2 of table 5" (stamped, not counted). --}}
@@ -207,7 +207,7 @@
     </div>
 
     <div class="flex mt-1">
-        <span class="order-type-badge">{{ str_replace('_', ' ', $order->order_type) }}</span>
+        <span class="order-type-badge">{{ \Illuminate\Support\Facades\Lang::has('pos.ot_' . $order->order_type) ? __('pos.ot_' . $order->order_type) : strtoupper(str_replace('_', ' ', $order->order_type)) }}</span>
         @if($order->table)
             <span class="bold text-lg">T-{{ $order->table->table_number }}</span>
         @endif
@@ -215,7 +215,7 @@
 
     @if($kotShowCustomer && $order->customer_name)
     <div class="mt-1">
-        <span class="bold text-sm">Customer: {{ $order->customer_name }}</span>
+        <span class="bold text-sm">{{ __('pos.receipt_customer') }}: {{ $order->customer_name }}</span>
     </div>
     @endif
 
@@ -239,7 +239,7 @@
 
     @if(($ticketItems ?? collect())->isEmpty())
     <div class="mt-1" style="border: 2px dashed #000; padding: 6px; text-align: center;">
-        <span class="bold text-sm">NO ITEMS FOR THIS COUNTER</span>
+        <span class="bold text-sm">{{ __('pos.kot_no_items_counter') }}</span>
     </div>
     @endif
 
@@ -247,19 +247,19 @@
         <div class="station-section" data-station="{{ $station }}">
             @if($grouped->count() > 1)
                 <div class="station-header">{{ $station }}</div>
-                <div class="station-item-count">{{ $items->count() }} item(s)</div>
+                <div class="station-item-count">{{ __('pos.kot_items_count', ['count' => $items->count()]) }}</div>
             @endif
             <table class="items-table">
                 <tr class="items-head">
-                    <td class="name">Item</td>
-                    <td class="qty">Qty</td>
+                    <td class="name">{{ __('pos.receipt_item') }}</td>
+                    <td class="qty">{{ __('pos.receipt_qty') }}</td>
                 </tr>
                 @foreach($items as $item)
                 <tr>
                     <td class="name">
                         <span class="bold">{{ $item->item_name }}</span>
                         @if($item->special_notes)
-                            <br><span class="note">&raquo; NOTE: {{ $item->special_notes }}</span>
+                            <br><span class="note">&raquo; {{ __('pos.kot_note') }} {{ $item->special_notes }}</span>
                         @endif
                     </td>
                     <td class="qty">{{ number_format($item->quantity, $item->quantity == intval($item->quantity) ? 0 : 2) }}</td>
@@ -275,7 +275,7 @@
     @if($order->kitchen_notes)
     <div class="separator"></div>
     <div class="kitchen-notes">
-        NOTES: {{ $order->kitchen_notes }}
+        {{ __('pos.kot_notes') }} {{ $order->kitchen_notes }}
     </div>
     @endif
 
@@ -294,8 +294,8 @@
             $kotRows = ($ticketItems ?? $order->items);
             $kotQty  = $kotRows->sum('quantity');
         @endphp
-        <p>Order by: {{ $order->creator->name ?? 'Staff' }}</p>
-        <p class="mt-1">{{ $kotRows->count() }} item(s) &mdash; Total Qty: {{ $kotQty == intval($kotQty) ? intval($kotQty) : number_format($kotQty, 2) }}</p>
+        <p>{{ __('pos.kot_order_by') }} {{ $order->creator->name ?? __('pos.kot_staff') }}</p>
+        <p class="mt-1">{{ __('pos.kot_items_count', ['count' => $kotRows->count()]) }} &mdash; {{ __('pos.kot_total_qty') }} {{ $kotQty == intval($kotQty) ? intval($kotQty) : number_format($kotQty, 2) }}</p>
     </div>
     @endif
 
@@ -303,7 +303,7 @@
     <div class="separator"></div>
     <div class="kot-barcode-box">
         <svg id="kotBarcode"></svg>
-        <div class="kot-barcode-hint">SCAN BARCODE TO CLEAR</div>
+        <div class="kot-barcode-hint">{{ __('pos.kot_scan_to_clear') }}</div>
     </div>
     @endif
     @if($kotShowFooter)
@@ -314,13 +314,13 @@
     @endif
 
     <div class="no-print print-btn-row">
-        <button class="print-btn" onclick="printAll()">Print Full KOT</button>
-        <button class="btn-reprint" onclick="printAll()">Reprint</button>
+        <button class="print-btn" onclick="printAll()">{{ __('pos.kot_print_full') }}</button>
+        <button class="btn-reprint" onclick="printAll()">{{ __('pos.kot_reprint_btn') }}</button>
     </div>
 
     @if($grouped->count() > 1)
     <div class="no-print" style="margin-top: 8px;">
-        <p style="font-size: 11px; font-weight: bold; color: #1f2937; text-align: center; margin-bottom: 6px;">Print by Station:</p>
+        <p style="font-size: 11px; font-weight: bold; color: #1f2937; text-align: center; margin-bottom: 6px;">{{ __('pos.kot_print_by_station') }}</p>
         <div class="print-btn-row">
             @foreach($stationNames as $sName)
             <button class="btn-station" onclick="printStation('{{ $sName }}')">{{ $sName }}</button>

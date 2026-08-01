@@ -653,16 +653,9 @@ class AgentController extends Controller
             // web session, so SetPosLocale never runs here — resolve the locale
             // from the BILL's creator (per-user override), falling back to the
             // print-job presser, then the company default. Reprints by another
-            // user must match the language the bill was made in. KOT/proof stay
-            // English by design (kitchen tickets carry no Roman Urdu).
-            try {
-                $presser = $job->created_by ? \App\Models\User::find($job->created_by) : null;
-                $lang = $transaction->creator?->language
-                    ?? $presser?->language
-                    ?? $company->default_language
-                    ?? 'ur';
-                app()->setLocale(in_array($lang, ['ur', 'en'], true) ? $lang : 'ur');
-            } catch (\Throwable $e) { /* never block a print over locale */ }
+            // user must match the language the bill was made in. Owner decision
+            // 1 Aug 2026: KOT + proof-bill now follow the language too.
+            $this->setPrintLocale($transaction->creator?->language, $job, $company);
             $printerSize = $company->receipt_printer_size ?? '80mm';
             $receiptView = $printerSize === '58mm' ? 'pos.receipts.receipt_58mm' : 'pos.receipts.receipt_80mm';
             return response(view($receiptView, compact('transaction', 'company'))->render())
@@ -677,11 +670,16 @@ class AgentController extends Controller
             if (!$order) {
                 return response()->json(['error' => 'Order not found'], 404);
             }
+            // Owner decision 1 Aug 2026: proof-bill follows chosen language.
+            $this->setPrintLocale($order->creator?->language, $job, $company);
             return response(view('pos.restaurant.proof-bill', ['order' => $order, 'company' => $company])->render())
                 ->header('Content-Type', 'text/html; charset=UTF-8');
         }
 
         if ($job->type === 'kot') {
+            // Owner decision 1 Aug 2026: KOT follows chosen language. For the
+            // order-less path (below) the presser/company default decides.
+            $this->setPrintLocale(null, $job, $company);
             // Order-less delivery bills: KOT rendered from the transaction itself.
             if (!$job->restaurant_order_id && $job->transaction_id) {
                 $html = \App\Http\Controllers\RestaurantPosController::renderTransactionKot($company->id, (int) $job->transaction_id);
@@ -696,6 +694,8 @@ class AgentController extends Controller
             if (!$order) {
                 return response()->json(['error' => 'Order not found'], 404);
             }
+            // Refine with the order creator's language now that we have it.
+            $this->setPrintLocale($order->creator?->language, $job, $company);
             parse_str($job->render_query ?? '', $q);
             $delta = ($q['delta'] ?? null) == '1';
             // KOT Full Mode (ZFC feedback, Jul 2026): mirror of the kitchenTicket
@@ -746,6 +746,23 @@ class AgentController extends Controller
         }
 
         return response()->json(['error' => 'Unknown job type'], 422);
+    }
+
+    /**
+     * Silent-print locale (Task #61 + #68): agent requests carry no web session,
+     * so SetPosLocale never runs — resolve from the document creator's language,
+     * then the print-job presser, then the company default. Never blocks a print.
+     */
+    private function setPrintLocale(?string $creatorLang, $job, $company): void
+    {
+        try {
+            $presser = $job->created_by ? \App\Models\User::find($job->created_by) : null;
+            $lang = $creatorLang
+                ?? $presser?->language
+                ?? $company->default_language
+                ?? 'ur';
+            app()->setLocale(in_array($lang, ['ur', 'en'], true) ? $lang : 'ur');
+        } catch (\Throwable $e) { /* never block a print over locale */ }
     }
 
     /**

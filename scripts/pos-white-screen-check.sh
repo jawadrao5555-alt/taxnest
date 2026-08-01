@@ -20,6 +20,10 @@
 #   bash scripts/pos-white-screen-check.sh                # static + runtime vs local dev server
 #   bash scripts/pos-white-screen-check.sh --static-only  # grep scan only (no server needed)
 #   BASE_URL=http://127.0.0.1:5000 POS_CHECK_LOGIN=... POS_CHECK_PASSWORD=... bash scripts/pos-white-screen-check.sh
+#   FBR_CHECK_LOGIN=... FBR_CHECK_PASSWORD=... override the FBR POS test company.
+#
+# Panels covered: PRA POS (/pos/*) and FBR POS (/fbr-pos/*) — both are the
+# same Alpine/x-cloak pattern, so both get the identical three checks.
 #
 # Exit codes: 0 = all good, 1 = FAILURE found, 2 = could not run runtime check (server down / login failed)
 set -uo pipefail
@@ -28,6 +32,8 @@ cd "$(dirname "$0")/.."
 BASE_URL="${BASE_URL:-http://127.0.0.1:5000}"
 LOGIN="${POS_CHECK_LOGIN:-posadmin@taxnest.com}"
 PASSWORD="${POS_CHECK_PASSWORD:-Admin@12345}"
+FBR_LOGIN="${FBR_CHECK_LOGIN:-fbrpostest@taxnest.com}"
+FBR_PASSWORD="${FBR_CHECK_PASSWORD:-Admin@12345}"
 STATIC_ONLY=0
 [ "${1:-}" = "--static-only" ] && STATIC_ONLY=1
 
@@ -87,7 +93,7 @@ if [ $STATIC_ONLY -eq 1 ]; then
 fi
 
 # ------------------------------------------------------------------
-# 2. RUNTIME: login + fetch key POS pages
+# 2. RUNTIME: login + fetch key pages (multi-panel: PRA POS + FBR POS)
 # ------------------------------------------------------------------
 say "Runtime check against $BASE_URL"
 if ! curl -s -o /dev/null --max-time 10 "$BASE_URL/pos/login"; then
@@ -95,33 +101,39 @@ if ! curl -s -o /dev/null --max-time 10 "$BASE_URL/pos/login"; then
   exit 2
 fi
 
-JAR=$(mktemp /tmp/pos-check-jar.XXXXXX)
 TMPD=$(mktemp -d /tmp/pos-check.XXXXXX)
-trap 'rm -rf "$JAR" "$TMPD"' EXIT
-CURL=(curl -s --max-time 30 -H "X-Forwarded-Proto: https" -b "$JAR" -c "$JAR")
+trap 'rm -rf "$TMPD"' EXIT
+CURL=()  # (re)built per panel by do_login with a fresh cookie jar
 
-LOGIN_PAGE=$("${CURL[@]}" "$BASE_URL/pos/login")
-TOKEN=$(echo "$LOGIN_PAGE" | grep -oE 'name="_token" value="[^"]+"' | head -1 | sed 's/.*value="//; s/"$//')
-[ -n "$TOKEN" ] || { echo "    Could not extract CSRF token from /pos/login." >&2; exit 2; }
-
-LOGIN_CODE=$("${CURL[@]}" -o /dev/null -w '%{http_code}' -X POST \
-  --data-urlencode "_token=$TOKEN" \
-  --data-urlencode "login=$LOGIN" \
-  --data-urlencode "password=$PASSWORD" \
-  "$BASE_URL/pos/login")
-if [ "$LOGIN_CODE" != "302" ]; then
-  echo "    Login POST returned $LOGIN_CODE (expected 302) for $LOGIN." >&2
-  exit 2
-fi
-DASH=$("${CURL[@]}" -o /dev/null -w '%{http_code}' "$BASE_URL/pos/dashboard")
-if [ "$DASH" != "200" ]; then
-  echo "    Post-login /pos/dashboard returned $DASH — login likely failed." >&2
-  exit 2
-fi
-echo "    Logged in as $LOGIN."
+# do_login <login_path> <post_login_path> <login> <password>
+# Rebuilds CURL[] with a fresh cookie jar and logs in; exits 2 on failure.
+do_login() {
+  local login_path="$1" post_path="$2" login="$3" password="$4"
+  local jar; jar=$(mktemp "$TMPD/jar.XXXXXX")
+  CURL=(curl -s --max-time 30 -H "X-Forwarded-Proto: https" -b "$jar" -c "$jar")
+  local page token code
+  page=$("${CURL[@]}" "$BASE_URL$login_path")
+  token=$(echo "$page" | grep -oE 'name="_token" value="[^"]+"' | head -1 | sed 's/.*value="//; s/"$//')
+  [ -n "$token" ] || { echo "    Could not extract CSRF token from $login_path." >&2; exit 2; }
+  code=$("${CURL[@]}" -o /dev/null -w '%{http_code}' -X POST \
+    --data-urlencode "_token=$token" \
+    --data-urlencode "login=$login" \
+    --data-urlencode "password=$password" \
+    "$BASE_URL$login_path")
+  if [ "$code" != "302" ]; then
+    echo "    Login POST $login_path returned $code (expected 302) for $login." >&2
+    exit 2
+  fi
+  code=$("${CURL[@]}" -o /dev/null -w '%{http_code}' "$BASE_URL$post_path")
+  if [ "$code" != "200" ]; then
+    echo "    Post-login $post_path returned $code — login likely failed." >&2
+    exit 2
+  fi
+  echo "    Logged in as $login."
+}
 
 # page path | language-independent marker regex (grep -E) proving real content
-PAGES=(
+PRA_PAGES=(
   "/pos/dashboard|pos/invoice/create|day-opening|pos/reports"
   "/pos/customize|id=\"style\""
   "/pos/features|posWizard\("
@@ -129,6 +141,13 @@ PAGES=(
   "/pos/receipt-settings|receipt-settings\""
   "/pos/restaurant/kitchen-settings|name=\"kot_compact\"|name=\"print_on_pay\""
   "/pos/reports|pos/reports/csv|raDailyTrend"
+)
+FBR_PAGES=(
+  "/fbr-pos/dashboard|fbr-pos/day-close|fbr-pos/create"
+  "/fbr-pos/customize|dashboard-style"
+  "/fbr-pos/reports|fbr-pos/reports/analytics-pdf|raDailyTrend"
+  "/fbr-pos/settings|name=\"fbr_pos_token\"|name=\"fbr_pos_id\""
+  "/fbr-pos/create|manualItemNameInput|restaurantPos\("
 )
 
 check_page() {
@@ -184,7 +203,17 @@ PYEOF
   echo "    OK: $path (200, marker present, all inline JS parses)"
 }
 
-for entry in "${PAGES[@]}"; do
+say "PRA POS panel (/pos/*)"
+do_login "/pos/login" "/pos/dashboard" "$LOGIN" "$PASSWORD"
+for entry in "${PRA_PAGES[@]}"; do
+  path="${entry%%|*}"
+  markers="${entry#*|}"
+  check_page "$path" "$markers"
+done
+
+say "FBR POS panel (/fbr-pos/*)"
+do_login "/fbr-pos/login" "/fbr-pos/dashboard" "$FBR_LOGIN" "$FBR_PASSWORD"
+for entry in "${FBR_PAGES[@]}"; do
   path="${entry%%|*}"
   markers="${entry#*|}"
   check_page "$path" "$markers"

@@ -108,6 +108,14 @@ class SubscriptionAccessService
             return ['allowed' => false, 'reason' => 'Your free trial has expired. Please subscribe to a plan.', 'override' => null];
         }
 
+        // Fail closed on a bare subscription row: no plan, no end date, no trial.
+        // Such rows exist only as carriers for overrides (e.g. the payment-proof
+        // instant-access grant). Without an active override they grant NOTHING —
+        // otherwise a plan-less row would mean unlimited free access forever.
+        if (!$subscription->pricing_plan_id && !$subscription->end_date && !$subscription->trial_ends_at) {
+            return ['allowed' => false, 'reason' => 'No active subscription. Please subscribe to a plan.', 'override' => null];
+        }
+
         // Free-trial invoice cap (3-day OR 20-invoice — whichever comes first).
         // Applies to DI / PRA POS / FBR POS trial subscriptions uniformly.
         $plan = $subscription->pricingPlan ?? $subscription->loadMissing('pricingPlan')->pricingPlan;

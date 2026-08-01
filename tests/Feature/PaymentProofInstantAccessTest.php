@@ -241,17 +241,31 @@ class PaymentProofInstantAccessTest extends TestCase
      * that matters here: the auto-grant signature (override + auto_access_until)
      * must never appear without an actual grant.
      */
-    public function test_no_subscription_company_gets_row_but_no_grant_signature(): void
+    public function test_no_subscription_company_gets_bare_row_with_ten_day_grant_only(): void
     {
         $company = Company::create(['name' => 'No Sub Co', 'status' => 'approved', 'company_status' => 'active']);
         $proof = $this->makeProof($company);
 
-        $this->assertFalse($this->grant($company, $proof));
+        $this->assertTrue($this->grant($company, $proof));
 
         $sub = $this->activeSub($company);
-        $this->assertNotNull($sub, 'A subscription row is created for future access checks');
-        $this->assertNotSame('temporary', $sub->override_type);
-        $this->assertNull($proof->fresh()->auto_access_until, 'No grant signature without a real grant');
+        $this->assertNotNull($sub, 'A subscription row is created to carry the grant');
+        $this->assertNull($sub->pricing_plan_id, 'Bare carrier row has no plan');
+        $this->assertSame('temporary', $sub->override_type, 'Grant rides on the bare row');
+        $this->assertNull($sub->override_by);
+        $this->assertNotNull($proof->fresh()->auto_access_until);
+
+        // Access flows ONLY from the 10-day override — once it lapses, the
+        // bare plan-less row must grant nothing (no unlimited free access).
+        $access = \App\Services\SubscriptionAccessService::hasAccess($company->fresh());
+        $this->assertTrue($access['allowed']);
+        $this->assertSame('temporary', $access['override']);
+
+        $sub->update(['override_until' => now()->subMinute()]);
+        $this->assertFalse(
+            \App\Services\SubscriptionAccessService::hasAccess($company->fresh())['allowed'],
+            'Bare row without an active override must fail closed'
+        );
     }
 
     // ─── 2. no grant when it must not fire ───────────────────────────────

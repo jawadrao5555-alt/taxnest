@@ -166,8 +166,10 @@ class SubscriptionAccessService
 
         $daysLeft = null;
         if ($subscription->trial_ends_at) {
+            // Calendar-day diff (same formula as paidEndingReminder):
+            // expiring later TODAY = 0 days left → banner says "ends today".
             $daysLeft = $subscription->trial_ends_at->isFuture()
-                ? (int) ceil(abs(now()->diffInDays($subscription->trial_ends_at)))
+                ? (int) now()->startOfDay()->diffInDays($subscription->trial_ends_at->copy()->startOfDay())
                 : 0;
         }
 
@@ -248,7 +250,9 @@ class SubscriptionAccessService
             return null;
         }
 
-        $daysLeft = (int) ceil(abs(now()->diffInDays($until)));
+        // Calendar-day diff (same formula as paidEndingReminder):
+        // expiring later TODAY = 0 days left → banner says "ends today".
+        $daysLeft = (int) now()->startOfDay()->diffInDays($until->copy()->startOfDay());
 
         $invoicesLeft = null;
         if ($subscription->free_invoice_limit !== null) {

@@ -237,8 +237,8 @@ class ExpiryReminderBoundaryTest extends TestCase
         $r = SubscriptionAccessService::overrideReminder($c);
         $this->assertNotNull($r);
         $this->assertSame('2026-08-01', $r['until']);
-        // ceil() of a part-day remainder — "ends today" surfaces as 1 day max.
-        $this->assertLessThanOrEqual(1, $r['days_left']);
+        // Calendar-day diff: expiring later today = 0 → banner shows "ends today".
+        $this->assertSame(0, $r['days_left']);
     }
 
     public function test_override_reminder_plus_one_two_three_days(): void
@@ -272,13 +272,13 @@ class ExpiryReminderBoundaryTest extends TestCase
 
     public function test_trial_status_boundaries(): void
     {
-        // Ends later today → days_left 0..1 band, still on trial.
+        // Ends later today → days_left exactly 0 ("expires today"), still on trial.
         $c0 = $this->company();
         $this->trialSub($c0, now()->endOfDay());
         $s0 = SubscriptionAccessService::trialStatus($c0);
         $this->assertNotNull($s0);
         $this->assertTrue($s0['on_trial']);
-        $this->assertLessThanOrEqual(1, $s0['days_left']);
+        $this->assertSame(0, $s0['days_left']);
 
         foreach ([1, 2, 3] as $days) {
             $c = $this->company();

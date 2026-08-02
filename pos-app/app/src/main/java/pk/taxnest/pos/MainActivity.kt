@@ -148,11 +148,30 @@ class MainActivity : Activity() {
 
         web.setDownloadListener(DownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
             try {
-                val request = DownloadManager.Request(Uri.parse(url)).apply {
-                    // Session cookie is REQUIRED — exports/receipts are behind login.
-                    CookieManager.getInstance().getCookie(url)?.let { addRequestHeader("Cookie", it) }
+                // SECURITY: DownloadManager re-sends custom headers on redirects,
+                // so the session cookie must (a) only ever be attached for
+                // first-party URLs and (b) NEVER for the desktop-agent installer
+                // routes — those 302 to GitHub release assets and would carry the
+                // cookie off-site. Agent links are rewritten to the public,
+                // cookie-less /download/agent endpoint instead.
+                val srcUri = Uri.parse(url)
+                val host = srcUri.host ?: ""
+                val firstParty = host == BASE_HOST || host.endsWith(".$BASE_HOST")
+                val path = srcUri.path ?: ""
+                val agentInstaller = path.startsWith("/download/agent") ||
+                    path.startsWith("/pos/agent/download") ||
+                    path.startsWith("/fbr-pos/agent/download")
+                val dlUrl = if (firstParty && agentInstaller) {
+                    "https://$BASE_HOST/download/agent" + (srcUri.query?.let { "?$it" } ?: "")
+                } else url
+                val request = DownloadManager.Request(Uri.parse(dlUrl)).apply {
+                    // Session cookie is REQUIRED for exports/receipts behind login —
+                    // but strictly first-party, and never on installer redirects.
+                    if (firstParty && !agentInstaller) {
+                        CookieManager.getInstance().getCookie(url)?.let { addRequestHeader("Cookie", it) }
+                    }
                     addRequestHeader("User-Agent", userAgent)
-                    val fileName = URLUtil.guessFileName(url, contentDisposition, mimeType)
+                    val fileName = URLUtil.guessFileName(dlUrl, contentDisposition, mimeType)
                     setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                     if (Build.VERSION.SDK_INT >= 29) {
                         setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)

@@ -2678,6 +2678,7 @@ class PosController extends Controller
         // warning: "bill Asgar ke khaate mein hai"). Riders NEVER touch
         // invoice_mode/serials; this is display-only context.
         $riderNames = [];
+        $riderOpen = []; // rider_id => ['count' => n, 'amount' => rs] — WHOLE khata
         if ($hasRiderCols && \Illuminate\Support\Facades\Schema::hasTable('pos_riders')) {
             $riderIds = $bills->pluck('rider_id')->filter()->unique();
             if ($riderIds->isNotEmpty()) {
@@ -2685,6 +2686,23 @@ class PosController extends Controller
                     ->where('company_id', $companyId)
                     ->whereIn('id', $riderIds)
                     ->pluck('name', 'id')
+                    ->all();
+                // Open khata per rider (Task 123): the panel's Settle button settles
+                // the rider's ENTIRE khata (all dates, archived included) — same
+                // scope as PosRiderController::settle with settle_all. Show the
+                // cashier the real count+amount so "poore rider ka settle" is clear.
+                $riderOpen = PosTransaction::withoutGlobalScope('hide_archived')
+                    ->where('company_id', $companyId)
+                    ->whereIn('rider_id', $riderIds)
+                    ->where('payment_method', 'cash')
+                    ->whereNull('rider_settlement_id')
+                    ->where(function ($q) {
+                        $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
+                    })
+                    ->selectRaw('rider_id, COUNT(*) as c, COALESCE(SUM(total_amount),0) as amt')
+                    ->groupBy('rider_id')
+                    ->get()
+                    ->mapWithKeys(fn ($r) => [$r->rider_id => ['count' => (int) $r->c, 'amount' => (float) $r->amt]])
                     ->all();
             }
         }
@@ -2695,7 +2713,7 @@ class PosController extends Controller
         // hours before the bill is made final at night.
         $kotAfterPayment = (bool) (Company::find($companyId)?->delivery_kot_after_payment ?? false);
 
-        $data = $bills->map(function ($b) use ($kotAfterPayment, $hasRiderCols, $hasBizDate, $riderNames) {
+        $data = $bills->map(function ($b) use ($kotAfterPayment, $hasRiderCols, $hasBizDate, $riderNames, $riderOpen) {
             return [
                 'id'               => $b->id,
                 'invoice_number'   => $b->invoice_number,
@@ -2716,6 +2734,10 @@ class PosController extends Controller
                 'rider_name'       => ($hasRiderCols && $b->rider_id) ? ($riderNames[$b->rider_id] ?? null) : null,
                 // Unsettled = still on the rider's khata (cash not handed in yet).
                 'rider_unsettled'  => $hasRiderCols && $b->rider_id && empty($b->rider_settlement_id),
+                // Task 123: whole-khata scope for the panel's Settle button.
+                'rider_id'         => $hasRiderCols ? ($b->rider_id ? (int) $b->rider_id : null) : null,
+                'rider_open_count' => ($hasRiderCols && $b->rider_id) ? ($riderOpen[$b->rider_id]['count'] ?? 0) : 0,
+                'rider_open_amount'=> ($hasRiderCols && $b->rider_id) ? ($riderOpen[$b->rider_id]['amount'] ?? 0) : 0,
             ];
         });
 

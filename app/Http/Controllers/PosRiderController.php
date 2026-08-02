@@ -395,34 +395,43 @@ class PosRiderController extends Controller
         return back()->with('success', $count . ' ' . ($count === 1 ? 'delivery' : 'deliveries') . ' marked ' . $newStatus . ' for ' . $rider->name . '.');
     }
 
-    /** Settle selected open CASH bills for one rider (partial = per-bill selection). */
+    /** Settle selected open CASH bills for one rider (partial = per-bill selection).
+     *  settle_all=1 (Pending Deliveries panel, Task 123): settle EVERY open cash
+     *  bill on the rider's khata in one click — no bill_ids needed. JSON clients
+     *  (the sale-screen panel) get JSON back instead of a redirect. */
     public function settle(Request $request, $riderId)
     {
         $companyId = app('currentCompanyId');
         $rider = PosRider::where('company_id', $companyId)->findOrFail($riderId);
 
+        $settleAll = $request->boolean('settle_all');
         $request->validate([
-            'bill_ids' => 'required|array|min:1',
+            'bill_ids' => ($settleAll ? 'nullable' : 'required') . '|array|min:1',
             'bill_ids.*' => 'integer',
             'notes' => 'nullable|string|max:500',
         ]);
 
-        return DB::transaction(function () use ($request, $rider, $companyId) {
+        return DB::transaction(function () use ($request, $rider, $companyId, $settleAll) {
             // Lock + re-verify each bill is genuinely open rider-cash for THIS rider.
-            $bills = PosTransaction::withoutGlobalScope('hide_archived')
+            $query = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->where('rider_id', $rider->id)
                 ->where('payment_method', 'cash')
                 ->whereNull('rider_settlement_id')
                 ->where(function ($q) {
                     $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
-                })
-                ->whereIn('id', array_map('intval', $request->input('bill_ids')))
-                ->lockForUpdate()
-                ->get();
+                });
+            if (!$settleAll) {
+                $query->whereIn('id', array_map('intval', $request->input('bill_ids')));
+            }
+            $bills = $query->lockForUpdate()->get();
 
             if ($bills->isEmpty()) {
-                return back()->with('error', 'No open cash bills matched the selection.');
+                $msg = $settleAll ? 'No open cash bills on this rider\'s khata.' : 'No open cash bills matched the selection.';
+                if ($request->wantsJson()) {
+                    return response()->json(['success' => false, 'message' => $msg], 422);
+                }
+                return back()->with('error', $msg);
             }
 
             $settlement = PosRiderSettlement::create([
@@ -441,7 +450,16 @@ class PosRiderController extends Controller
                     'rider_settled_at' => now(),
                 ]);
 
-            return back()->with('success', 'Settled Rs. ' . number_format((float) $settlement->total_amount) . ' (' . $settlement->bill_count . ' bills) from ' . $rider->name . '.');
+            $msg = 'Settled Rs. ' . number_format((float) $settlement->total_amount) . ' (' . $settlement->bill_count . ' bills) from ' . $rider->name . '.';
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => $msg,
+                    'total_amount' => (float) $settlement->total_amount,
+                    'bill_count' => (int) $settlement->bill_count,
+                ]);
+            }
+            return back()->with('success', $msg);
         });
     }
 

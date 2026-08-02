@@ -2266,7 +2266,17 @@ window.addEventListener('popstate', function() {
                         <template x-if="bill.rider_unsettled">
                             <div class="mb-2 px-3 py-2 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 text-[11px] font-semibold text-orange-700 dark:text-orange-300 flex items-start gap-1.5">
                                 <svg class="w-3.5 h-3.5 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                                <span><span x-text="bill.rider_name || '{{ __('pos.rider_word') }}'"></span> {{ __('pos.rider_unsettled_warn') }}</span>
+                                <div class="flex-1 min-w-0">
+                                    <span><span x-text="bill.rider_name || '{{ __('pos.rider_word') }}'"></span> {{ __('pos.rider_unsettled_warn') }}</span>
+                                    {{-- Scope line: settle covers the rider's WHOLE khata, not just this bill --}}
+                                    <p class="mt-1 font-normal text-orange-600 dark:text-orange-400" x-text="txtRiderSettleScope(bill)"></p>
+                                </div>
+                                {{-- Task 123: one-click WHOLE-khata settle (reuses POST /pos/riders/{id}/settle) --}}
+                                <button @click="settleRider(bill)" :disabled="riderSettleBusyId || deliveryFinalBusyId || promoteSubmitting"
+                                        class="shrink-0 self-center px-3 py-1.5 text-[11px] font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition shadow-sm flex items-center gap-1 disabled:opacity-50">
+                                    <template x-if="riderSettleBusyId === bill.rider_id"><svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg></template>
+                                    {{ __('pos.rider_settle_btn') }}
+                                </button>
                             </div>
                         </template>
                         <div class="flex gap-2">
@@ -3695,6 +3705,7 @@ function restaurantPos() {
         showPendingDeliveries: false,
         bizToday: '',
         deliveryFinalBusyId: null,
+        riderSettleBusyId: null,
         // Receipt print default = NO (delivery customer isn't at the counter).
         // Opt-in checkbox persisted per device.
         deliveryPrintReceipt: (function(){ try { return localStorage.getItem('pos_delivery_final_print') === '1'; } catch(e) { return false; } })(),
@@ -7692,6 +7703,46 @@ function restaurantPos() {
                 this.deliveryFinalBusyId = null;
             }
             if (this.pendingDeliveryBills().length === 0) this.showPendingDeliveries = false;
+        },
+        // ─── Rider WHOLE-khata settle from the panel (Task 123) ─────────────
+        // Reuses POST /pos/riders/{id}/settle with settle_all — settles EVERY
+        // unsettled cash bill on the rider's khata (all dates), not just this
+        // bill. Riders never touch invoice_mode/serials; Final stays separate.
+        txtRiderSettleScope(bill) {
+            if (!bill || !bill.rider_open_count) return '';
+            return @json(__('pos.rider_settle_scope'))
+                .replace(':count', bill.rider_open_count)
+                .replace(':amount', Number(bill.rider_open_amount || 0).toLocaleString());
+        },
+        async settleRider(bill) {
+            if (!bill || !bill.rider_id || this.riderSettleBusyId) return;
+            const confirmMsg = @json(__('pos.rider_settle_confirm'))
+                .replace(':name', bill.rider_name || @json(__('pos.rider_word')))
+                .replace(':count', bill.rider_open_count || '?')
+                .replace(':amount', Number(bill.rider_open_amount || 0).toLocaleString());
+            if (!window.confirm(confirmMsg)) return;
+            this.riderSettleBusyId = bill.rider_id;
+            try {
+                const res = await fetch('{{ url('/pos/riders') }}/' + bill.rider_id + '/settle', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    },
+                    body: JSON.stringify({ settle_all: 1 }),
+                });
+                const data = await res.json().catch(() => null);
+                if (res.ok && data && data.success) {
+                    this.showToast(data.message || @json(__('pos.rider_settled_ok')), 'success');
+                    this.loadLocalBills(); // warning disappears on refresh
+                } else {
+                    this.showToast((data && data.message) || @json(__('pos.rider_settle_failed')), 'error');
+                }
+            } catch (e) {
+                this.showToast(@json(__('pos.rider_settle_failed')), 'error');
+            }
+            this.riderSettleBusyId = null;
         },
         filteredLocalBills() {
             const q = (this.localSearch || '').toLowerCase().trim();

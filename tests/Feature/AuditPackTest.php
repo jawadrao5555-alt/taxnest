@@ -268,6 +268,7 @@ class AuditPackTest extends TestCase
     public function test_builder_assembles_complete_zip_in_chunks(): void
     {
         Storage::fake('local');
+        \Illuminate\Support\Facades\Mail::fake();
 
         $companyId = $this->makeCompany();
         $user = $this->makeUser($companyId);
@@ -361,6 +362,15 @@ class AuditPackTest extends TestCase
         // Completion side-effects: notification + immutable audit trail entry.
         $this->assertSame(1, DB::table('notifications')->where('company_id', $companyId)->where('type', 'audit_pack')->where('title', 'FBR Audit Pack ready')->count());
         $this->assertSame(1, DB::table('audit_logs')->where('company_id', $companyId)->where('action', 'audit_pack_generated')->count());
+
+        // "Pack ready" email queued to the requester with period + expiry + count.
+        \Illuminate\Support\Facades\Mail::assertQueued(\App\Mail\AuditPackMail::class, function ($mail) use ($user, $pack) {
+            return $mail->hasTo($user->email)
+                && str_contains($mail->subjectLine, 'ready')
+                && str_contains(implode(' ', $mail->paragraphs), '2 invoice PDF(s)')
+                && str_contains(implode(' ', $mail->paragraphs), $pack->expiresAt()->format('d M Y'))
+                && $mail->ctaUrl === route('compliance.index');
+        });
     }
 
     // ---------------------------------------------------------------

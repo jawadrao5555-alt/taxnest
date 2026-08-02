@@ -538,6 +538,53 @@ class AuditPackBuilderService
         } catch (\Throwable $e) {
             Log::warning('AuditPack notification failed', ['pack_id' => $pack->id, 'error' => $e->getMessage()]);
         }
+
+        // Email the requester too (queued: only inserts a jobs row, so a broken
+        // SMTP setup can never affect pack generation). Non-fatal like the
+        // in-app notification above.
+        try {
+            $user = $pack->user;
+            if ($user && $user->email) {
+                $company = Company::find($pack->company_id);
+                $period = $pack->date_from->format('d M Y') . ' – ' . $pack->date_to->format('d M Y');
+                $ctaUrl = route('compliance.index');
+
+                if ($success) {
+                    $expires = optional($pack->expiresAt())->format('d M Y');
+                    $paragraphs = [
+                        'Your FBR Audit Pack for the period ' . $period . ' is ready to download.',
+                        'It contains ' . number_format((int) $pack->total_invoices) . ' invoice PDF(s) plus the invoice register, audit trail and FBR submission log.',
+                        'The download link is available on your Compliance page' . ($expires ? ' until ' . $expires : '') . ' — after that the file is automatically deleted (' . self::RETENTION_DAYS . '-day retention).',
+                    ];
+                    $mail = new \App\Mail\AuditPackMail(
+                        subjectLine: 'Your FBR Audit Pack is ready (' . $period . ')',
+                        companyName: $company->name ?? 'your company',
+                        headline: 'FBR Audit Pack ready',
+                        paragraphs: $paragraphs,
+                        ctaUrl: $ctaUrl,
+                        ctaLabel: 'Download Audit Pack',
+                        panelName: 'Digital Invoicing',
+                    );
+                } else {
+                    $mail = new \App\Mail\AuditPackMail(
+                        subjectLine: 'FBR Audit Pack could not be generated (' . $period . ')',
+                        companyName: $company->name ?? 'your company',
+                        headline: 'FBR Audit Pack failed',
+                        paragraphs: [
+                            'Unfortunately your FBR Audit Pack for the period ' . $period . ' could not be generated.',
+                            'Please open the Compliance page and try again. If the problem keeps happening, contact support.',
+                        ],
+                        ctaUrl: $ctaUrl,
+                        ctaLabel: 'Open Compliance Page',
+                        panelName: 'Digital Invoicing',
+                    );
+                }
+
+                \Illuminate\Support\Facades\Mail::to($user->email)->queue($mail);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('AuditPack email failed', ['pack_id' => $pack->id, 'error' => $e->getMessage()]);
+        }
     }
 
     /**

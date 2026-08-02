@@ -197,4 +197,14 @@ class PosQuarterlyPricingTest extends TestCase
         $this->assertSame('quarterly', SubscriptionAssignmentService::normalizeCycle('quarterly'));
         $this->assertSame('monthly', SubscriptionAssignmentService::normalizeCycle(null));
     }
+
+    public function test_standalone_quarterly_forces_annual_even_with_quarterly_price(): void
+    {
+        $plan = $this->makePosPlan(['product_type' => 'standalone', 'price' => 20000, 'price_quarterly' => 6000]);
+
+        $priced = SubscriptionAssignmentService::computePrice($plan, 'quarterly');
+
+        $this->assertSame('annual', $priced['cycle']);
+        $this->assertSame(20000.0, $priced['final_price']);
+    }
 }

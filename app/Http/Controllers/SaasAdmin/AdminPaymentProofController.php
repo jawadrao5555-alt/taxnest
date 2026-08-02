@@ -54,10 +54,40 @@ class AdminPaymentProofController extends Controller
             'billing_cycle' => 'required|in:monthly,quarterly,semi_annual,annual,yearly',
         ]);
 
-        $proof = PaymentProof::findOrFail($id);
+        $proof = PaymentProof::with('pricingPlan')->findOrFail($id);
+
+        $plan = PricingPlan::findOrFail((int) $request->pricing_plan_id);
+        if ($plan->is_trial) {
+            return back()->with('error', 'Trial plans cannot be assigned from payment approval.');
+        }
+
+        // Product-line guard: the approved plan must stay on the same product
+        // line the customer submitted for (operator-error protection).
+        $proofPlanType = $proof->pricingPlan->product_type ?? null;
+        if ($proofPlanType && ($plan->product_type ?? 'di') !== $proofPlanType) {
+            return back()->with('error', 'Selected package belongs to a different product line than this payment proof.');
+        }
+
+        // Cycle guard: same per-product rules as customer submission
+        // (di = 4 cycles, pos = annual+quarterly, others annual-only).
+        $allowedCycles = match ($plan->product_type ?? 'di') {
+            'di' => ['monthly', 'quarterly', 'semi_annual', 'annual'],
+            'pos' => ['annual', 'quarterly'],
+            default => ['annual'],
+        };
+        $requestedCycle = SubscriptionAssignmentService::normalizeCycle($request->billing_cycle);
+        if (!in_array($requestedCycle, $allowedCycles, true)) {
+            return back()->with('error', 'That billing cycle is not available for the selected package.');
+        }
+
+        // Single source of truth: the cycle actually enforced by pricing
+        // (e.g. quarterly requested on a plan without a quarterly price
+        // silently becomes annual) — the proof row, the subscription and the
+        // customer notification must all carry THIS cycle, never raw input.
+        $enforcedCycle = SubscriptionAssignmentService::computePrice($plan, $requestedCycle)['cycle'];
 
         // Race-safe: lock the row, bail out if another admin already processed it.
-        $subscription = DB::transaction(function () use ($proof, $request) {
+        $subscription = DB::transaction(function () use ($proof, $plan, $enforcedCycle) {
             $locked = PaymentProof::where('id', $proof->id)->lockForUpdate()->first();
             if (!$locked || $locked->status !== 'pending') {
                 return null;
@@ -65,14 +95,14 @@ class AdminPaymentProofController extends Controller
 
             $sub = SubscriptionAssignmentService::assign(
                 $locked->company_id,
-                (int) $request->pricing_plan_id,
-                $request->billing_cycle
+                $plan->id,
+                $enforcedCycle
             );
 
             $locked->update([
                 'status' => 'verified',
-                'pricing_plan_id' => $request->pricing_plan_id,
-                'billing_cycle' => SubscriptionAssignmentService::normalizeCycle($request->billing_cycle),
+                'pricing_plan_id' => $plan->id,
+                'billing_cycle' => $enforcedCycle,
                 'subscription_id' => $sub->id,
                 'verified_by' => auth('admin')->id(),
                 'verified_at' => now(),

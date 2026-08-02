@@ -88,6 +88,7 @@ class PaymentProofInstantAccessTest extends TestCase
             $table->boolean('is_trial')->default(false);
             $table->decimal('price', 10, 2)->default(0);
             $table->decimal('price_monthly', 10, 2)->nullable();
+            $table->decimal('price_quarterly', 10, 2)->nullable();
             $table->integer('invoice_limit')->nullable();
             $table->timestamps();
         });
@@ -130,6 +131,17 @@ class PaymentProofInstantAccessTest extends TestCase
             $table->string('reject_reason')->nullable();
             $table->timestamp('auto_access_until')->nullable();
             $table->timestamp('file_pruned_at')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('sale_campaigns', function (Blueprint $table) {
+            $table->id();
+            $table->string('product_type')->nullable();
+            $table->decimal('percent', 5, 2)->default(0);
+            $table->string('badge')->nullable();
+            $table->date('starts_on')->nullable();
+            $table->date('ends_on')->nullable();
+            $table->boolean('active')->default(false);
             $table->timestamps();
         });
 
@@ -480,5 +492,84 @@ class PaymentProofInstantAccessTest extends TestCase
         $company->refresh();
         $this->assertSame('suspended', $company->status, 'Approve must never reverse a deliberate suspension');
         $this->assertSame('suspended', $company->company_status);
+    }
+
+    // --- approve(): enforced-cycle & product-line guards (Aug 2026) ---
+
+    private function makeAdmin(): AdminUser
+    {
+        return AdminUser::create([
+            'name' => 'Approver',
+            'email' => 'approver' . uniqid() . '@test.pk',
+            'password' => Hash::make('secret-123'),
+            'role' => 'super_admin',
+        ]);
+    }
+
+    public function test_approve_quarterly_without_quarterly_price_enforces_annual_everywhere(): void
+    {
+        $company = $this->makeLockedCompany();
+        $plan = \App\Models\PricingPlan::create([
+            'name' => 'Starter', 'product_type' => 'pos', 'price' => 14999, 'is_trial' => false,
+        ]);
+        $proof = $this->makeProof($company, ['pricing_plan_id' => $plan->id, 'billing_cycle' => 'annual']);
+
+        $this->actingAs($this->makeAdmin(), 'admin')
+            ->post(route('saas.admin.payment-proofs.approve', $proof->id), [
+                'pricing_plan_id' => $plan->id,
+                'billing_cycle' => 'quarterly',
+            ]);
+
+        $proof->refresh();
+        $this->assertSame('verified', $proof->status);
+        $this->assertSame('annual', $proof->billing_cycle, 'Proof must store the ENFORCED cycle, not raw admin input');
+        $sub = Subscription::find($proof->subscription_id);
+        $this->assertNotNull($sub);
+        $this->assertSame('annual', $sub->billing_cycle);
+    }
+
+    public function test_approve_quarterly_with_quarterly_price_stays_quarterly(): void
+    {
+        $company = $this->makeLockedCompany();
+        $plan = \App\Models\PricingPlan::create([
+            'name' => 'Business', 'product_type' => 'pos', 'price' => 24999, 'price_quarterly' => 7199, 'is_trial' => false,
+        ]);
+        $proof = $this->makeProof($company, ['pricing_plan_id' => $plan->id, 'billing_cycle' => 'quarterly']);
+
+        $this->actingAs($this->makeAdmin(), 'admin')
+            ->post(route('saas.admin.payment-proofs.approve', $proof->id), [
+                'pricing_plan_id' => $plan->id,
+                'billing_cycle' => 'quarterly',
+            ]);
+
+        $proof->refresh();
+        $this->assertSame('verified', $proof->status);
+        $this->assertSame('quarterly', $proof->billing_cycle);
+        $sub = Subscription::find($proof->subscription_id);
+        $this->assertNotNull($sub);
+        $this->assertSame('quarterly', $sub->billing_cycle);
+        $this->assertSame(7199.0, (float) $sub->final_price);
+    }
+
+    public function test_approve_rejects_plan_from_different_product_line(): void
+    {
+        $company = $this->makeLockedCompany();
+        $posPlan = \App\Models\PricingPlan::create([
+            'name' => 'Starter', 'product_type' => 'pos', 'price' => 14999, 'is_trial' => false,
+        ]);
+        $diPlan = \App\Models\PricingPlan::create([
+            'name' => 'DI Basic', 'product_type' => 'di', 'price' => 1500, 'is_trial' => false,
+        ]);
+        $proof = $this->makeProof($company, ['pricing_plan_id' => $posPlan->id, 'billing_cycle' => 'annual']);
+
+        $this->actingAs($this->makeAdmin(), 'admin')
+            ->post(route('saas.admin.payment-proofs.approve', $proof->id), [
+                'pricing_plan_id' => $diPlan->id,
+                'billing_cycle' => 'annual',
+            ]);
+
+        $proof->refresh();
+        $this->assertSame('pending', $proof->status, 'Cross-product-line approval must be refused');
+        $this->assertNull($proof->subscription_id);
     }
 }

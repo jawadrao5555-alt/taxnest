@@ -46,11 +46,12 @@ class SubscriptionAssignmentService
         $cycle = self::normalizeCycle($cycle);
 
         if ($type === 'pos' || $type === 'standalone') {
-            // Quarterly (Aug 2026, owner-approved): honored ONLY when the plan
-            // carries an explicit quarterly price (pricing_plans.price_quarterly).
-            // Everything else stays forced-annual. Sale campaigns intentionally
+            // Quarterly (Aug 2026, owner-approved): PRA POS ('pos') ONLY, and only
+            // when the plan carries an explicit quarterly price (price_quarterly).
+            // 'standalone' stays forced-annual even if a quarterly price is ever
+            // set on such a plan by mistake. Sale campaigns intentionally
             // discount the ANNUAL price only — quarterly is already the premium path.
-            if ($cycle === 'quarterly' && (float) ($plan->price_quarterly ?? 0) > 0) {
+            if ($type === 'pos' && $cycle === 'quarterly' && (float) ($plan->price_quarterly ?? 0) > 0) {
                 return [
                     'cycle' => 'quarterly',
                     'final_price' => round((float) $plan->price_quarterly),

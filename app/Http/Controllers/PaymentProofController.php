@@ -291,7 +291,9 @@ class PaymentProofController extends Controller
     private function resolveProductType(?\App\Models\Company $company): string
     {
         if (auth('pos')->check()) {
-            return 'pos';
+            // Mirror the trial-lock modal: standalone-mode POS companies are a
+            // separate (annual-only) product line, never 'pos'.
+            return (($company?->pos_integration_mode ?? 'pra') === 'standalone') ? 'standalone' : 'pos';
         }
         if (auth('fbrpos')->check()) {
             return 'fbrpos';

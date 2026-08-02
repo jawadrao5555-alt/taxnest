@@ -46,6 +46,17 @@ class SubscriptionAssignmentService
         $cycle = self::normalizeCycle($cycle);
 
         if ($type === 'pos' || $type === 'standalone') {
+            // Quarterly (Aug 2026, owner-approved): honored ONLY when the plan
+            // carries an explicit quarterly price (pricing_plans.price_quarterly).
+            // Everything else stays forced-annual. Sale campaigns intentionally
+            // discount the ANNUAL price only — quarterly is already the premium path.
+            if ($cycle === 'quarterly' && (float) ($plan->price_quarterly ?? 0) > 0) {
+                return [
+                    'cycle' => 'quarterly',
+                    'final_price' => round((float) $plan->price_quarterly),
+                    'discount_percent' => 0.0,
+                ];
+            }
             return [
                 'cycle' => 'annual',
                 'final_price' => round((float) $plan->sale_price),

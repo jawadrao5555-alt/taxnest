@@ -7,7 +7,7 @@
             </a>
             <div class="text-center mb-8">
                 <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">NestPOS Plans</h2>
-                <p class="text-gray-500 dark:text-gray-400 mt-2">Simple annual billing — pick a plan, start selling</p>
+                <p class="text-gray-500 dark:text-gray-400 mt-2">Annual or quarterly billing — pick a plan, start selling</p>
             </div>
 
             @if($currentSubscription && $currentSubscription->pricingPlan)
@@ -58,6 +58,9 @@
                             <span class="text-gray-400 text-sm">/year</span>
                         </div>
                         <p class="text-xs text-gray-400">PKR {{ number_format($perMonth) }}/mo effective</p>
+                        @if((float) ($plan->price_quarterly ?? 0) > 0)
+                        <p class="text-xs text-gray-500 mt-0.5 font-medium">or PKR {{ number_format($plan->price_quarterly) }} / 3 months</p>
+                        @endif
                         @if($hasOffer)<p class="text-xs text-purple-600 font-medium mt-0.5">Save PKR {{ number_format($compareYearly - $yearlyTotal) }}</p>@endif
 
                         @php
@@ -118,7 +121,7 @@
                     </span>
                     <span class="flex items-center gap-1.5">
                         <span class="text-xs font-bold text-purple-400">PKR</span>
-                        6% annual savings
+                        Annual or quarterly billing
                     </span>
                     <span class="flex items-center gap-1.5">
                         <svg class="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>

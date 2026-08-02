@@ -32,9 +32,11 @@ class PaymentProofController extends Controller
 
         $company = \App\Models\Company::find($companyId);
         $productType = $this->resolveProductType($company);
-        $allowedCycles = $productType === 'di'
-            ? ['monthly', 'quarterly', 'semi_annual', 'annual']
-            : ['annual'];
+        $allowedCycles = match ($productType) {
+            'di' => ['monthly', 'quarterly', 'semi_annual', 'annual'],
+            'pos' => ['annual', 'quarterly'], // PRA POS: Annual + Quarterly (Aug 2026)
+            default => ['annual'],            // standalone / fbrpos stay annual-only
+        };
 
         $validated = $request->validate([
             'pricing_plan_id' => 'required|exists:pricing_plans,id',
@@ -72,7 +74,10 @@ class PaymentProofController extends Controller
         $proof = PaymentProof::create([
             'company_id' => $companyId,
             'pricing_plan_id' => $plan->id,
-            'billing_cycle' => \App\Services\SubscriptionAssignmentService::normalizeCycle($validated['billing_cycle']),
+            // Store the cycle the APPROVAL will actually assign (computePrice
+            // forces annual when a plan has no quarterly price) so the proof row
+            // and the resulting subscription can never disagree.
+            'billing_cycle' => \App\Services\SubscriptionAssignmentService::computePrice($plan, $validated['billing_cycle'])['cycle'],
             'amount' => $validated['amount'] ?? null,
             'payment_method' => Schema::hasColumn('payment_proofs', 'payment_method') ? ($validated['payment_method'] ?? null) : null,
             'reference' => $validated['reference'] ?? null,

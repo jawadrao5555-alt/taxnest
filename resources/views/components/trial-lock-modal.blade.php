@@ -74,10 +74,13 @@
             $lockProductType = 'di';
         }
 
-        // DI = full toggle; POS / standalone / FBR POS = annual-only.
+        // DI = full toggle; PRA POS = Annual + Quarterly (Aug 2026);
+        // standalone / FBR POS = annual-only.
         $lockCycles = $lockProductType === 'di'
             ? [['key' => 'monthly', 'label' => 'Monthly'], ['key' => 'quarterly', 'label' => 'Quarterly'], ['key' => 'semi_annual', 'label' => 'Semi-Annual'], ['key' => 'annual', 'label' => 'Annual']]
-            : [['key' => 'annual', 'label' => 'Annual']];
+            : ($lockProductType === 'pos'
+                ? [['key' => 'annual', 'label' => 'Annual'], ['key' => 'quarterly', 'label' => 'Quarterly']]
+                : [['key' => 'annual', 'label' => 'Annual']]);
 
         $lockPlans = [];
         foreach (\App\Models\PricingPlan::where('is_trial', false)->where('product_type', $lockProductType)->orderBy('price')->get() as $lp) {

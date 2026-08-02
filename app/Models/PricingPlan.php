@@ -14,6 +14,7 @@ class PricingPlan extends Model
         'is_trial',
         'price',
         'price_monthly',
+        'price_quarterly',
         'compare_at_price',
         'features',
         'product_type',

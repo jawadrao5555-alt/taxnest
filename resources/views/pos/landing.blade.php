@@ -333,6 +333,9 @@
                                                 <div class="text-[10px] text-gray-400 line-through mb-0.5">PKR {{ number_format($plan->price) }}</div>
                                             @endif
                                             <div class="font-semibold text-xl text-[#0A4D5C]">PKR {{ number_format($plan->sale_price) }}<span class="text-sm text-gray-500 font-normal">/yr</span></div>
+                                            @if((float) ($plan->price_quarterly ?? 0) > 0)
+                                                <div class="text-[10px] text-gray-500 mt-0.5">or PKR {{ number_format($plan->price_quarterly) }} / 3 months</div>
+                                            @endif
                                         </div>
                                     </div>
                                     <p class="text-xs text-gray-500 mb-3">Effective: PKR {{ number_format($perMonth) }}/mo</p>

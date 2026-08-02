@@ -3412,6 +3412,11 @@ Bills stay with the cashier — this only clears the kitchen display.',
     'ra_payment_split' => 'Payment Tareeqay ki Taqseem',
     'ra_total_revenue_fbr' => 'KUL AAMDANI (FBR POS)',
     'ra_system_generated' => 'System ki banayi hui Sales Analytics Report',
+    'ra_mode_prefix' => 'Mode:',
+    'ra_category_breakdown' => 'Category Tafseel (Product Drill-down ke saath)',
+    'ra_category_product' => 'Category / Product',
+    'ra_sales_by_waiter' => 'Waiter ke lihaz se Sales',
+    'ra_total_revenue_tab' => 'KUL AAMDANI (:tab)',
 
     // KOT + proof-bill localization (owner decision 1 Aug 2026)
     'ot_dine_in' => 'DINE IN',

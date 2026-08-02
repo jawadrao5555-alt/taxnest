@@ -3412,6 +3412,11 @@ Bills stay with the cashier — this only clears the kitchen display.',
     'ra_payment_split' => 'Payment Method Split',
     'ra_total_revenue_fbr' => 'TOTAL REVENUE (FBR POS)',
     'ra_system_generated' => 'System-generated Sales Analytics Report',
+    'ra_mode_prefix' => 'Mode:',
+    'ra_category_breakdown' => 'Category Breakdown (With Product Drill-down)',
+    'ra_category_product' => 'Category / Product',
+    'ra_sales_by_waiter' => 'Sales by Waiter',
+    'ra_total_revenue_tab' => 'TOTAL REVENUE (:tab)',
 
     // KOT + proof-bill localization (owner decision 1 Aug 2026)
     'ot_dine_in' => 'DINE IN',

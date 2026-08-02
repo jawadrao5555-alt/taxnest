@@ -6702,7 +6702,7 @@ function restaurantPos() {
             try {
                 const res = await fetch('{{ route("pos.restaurant.orders.hold") }}', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount }),
+                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount, delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || null) : null }),
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -6953,7 +6953,7 @@ function restaurantPos() {
                     // action. Backend skips the dine_in-only flow gate when this flag is set;
                     // the explicit Hold button / F5 (holdOrder fn above) sends no flag and
                     // stays gated client + server.
-                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount, billing_flow: true }),
+                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount, billing_flow: true, delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || null) : null }),
                 });
                 if (!holdRes.ok) {
                     const bodyText = await holdRes.text().catch(() => '');
@@ -8046,7 +8046,7 @@ function restaurantPos() {
                 // PROVISIONAL BILL FLOW — when true, RestaurantPosController::payOrder
                 // forces pra_status='local' and skips PRA submission. Bill remains
                 // editable / deletable until promoted via "Submit to PRA — Make Final".
-                const res = await fetch(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method, save_as_provisional: !!provisional, cash_received: (method === 'cash' && parseFloat(this.cashReceived) > 0) ? parseFloat(this.cashReceived) : null, delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || null) : null }) });
+                const res = await fetch(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method, save_as_provisional: !!provisional, cash_received: (method === 'cash' && parseFloat(this.cashReceived) > 0) ? parseFloat(this.cashReceived) : null, delivery_address: payOrderType === 'delivery' ? (((heldOrd && (heldOrd.delivery_address || '').trim()) || (this.selectedDeliveryAddress || '').trim()) || null) : null }) });
                 if (!res.ok) {
                     const bodyText = await res.text().catch(() => '');
                     console.error('[payOrder] HTTP', res.status, res.statusText, bodyText.slice(0, 500));
@@ -8132,8 +8132,32 @@ function restaurantPos() {
             this.priorityOrder = order.priority || false;
             if (order.discount_type && parseFloat(order.discount_value) > 0) { this.discountType = order.discount_type; this.discountValue = parseFloat(order.discount_value) || 0; this.showDiscount = true; } else { this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; }
             if (order.table) { this.selectedTable = { id: order.table.id, table_number: order.table.table_number }; this.orderType = 'dine_in'; }
+            // Task 183 (FBR Task 170 parity): restore the held order's type too —
+            // a held DELIVERY order must not recall as the default 'takeaway'.
+            else if (order.order_type) { this.orderType = order.order_type; }
             this.selectedCustomer = order.customer_id ? { id: order.customer_id, name: order.customer_name || window.TXT.customer_word, phone: order.customer_phone || '' } : null;
             this.customerPhoneQuery = this.selectedCustomer ? (this.selectedCustomer.phone || this.selectedCustomer.name) : '';
+            // Task 183: restore the delivery-address snapshot. Same pin-then-merge
+            // pattern as enterEditMode: the snapshot shows instantly; the saved
+            // address book merges in behind it (loadCustomerAddresses resets the
+            // list + auto-selects the default, so re-pin after it finishes).
+            if (this.orderType === 'delivery') {
+                const snap = (order.delivery_address || '').trim();
+                if (snap) {
+                    this.customerAddresses = [{ id: null, label: null, address: snap }];
+                    this.selectedDeliveryAddress = snap;
+                }
+                if (order.customer_id) {
+                    this.loadCustomerAddresses().then(() => {
+                        if (snap) {
+                            if (!this.customerAddresses.some(a => (a.address || '') === snap)) {
+                                this.customerAddresses.unshift({ id: null, label: null, address: snap });
+                            }
+                            this.selectedDeliveryAddress = snap;
+                        }
+                    });
+                }
+            }
             this.heldOrders = this.heldOrders.filter(o => o.id !== order.id); this.showHeldOrders = false; this.showToast(window.TXT.order_recalled_for_editing, 'success');
         },
 

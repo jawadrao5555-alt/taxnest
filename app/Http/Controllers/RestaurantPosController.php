@@ -420,6 +420,12 @@ class RestaurantPosController extends Controller
                 'customer_id' => $request->customer_id,
                 'customer_name' => $request->customer_name,
                 'customer_phone' => $request->customer_phone,
+                // Task 183: delivery-address snapshot on the HELD row (FBR Task 170
+                // parity) — recall restores it; pay falls back to it when the screen
+                // doesn't resend one.
+                'delivery_address' => ($request->input('order_type') === 'delivery' && $request->filled('delivery_address'))
+                    ? substr((string) $request->input('delivery_address'), 0, 500)
+                    : null,
                 'subtotal' => $subtotal,
                 'discount_type' => $discountType,
                 'discount_value' => $discountValue,
@@ -855,11 +861,15 @@ class RestaurantPosController extends Controller
                 'customer_id' => $order->customer_id ? (int) $order->customer_id : null,
                 'customer_name' => $order->customer_name,
                 'customer_phone' => $order->customer_phone,
-                // Item #1 (Jul 2026): delivery-address SNAPSHOT — sent with the PAY
-                // request (not stored on restaurant_orders); frozen on the bill.
+                // Item #1 (Jul 2026): delivery-address SNAPSHOT sent with the PAY
+                // request; frozen on the bill. Task 183: the held row now stores its
+                // own snapshot too — fall back to it when a held DELIVERY order is
+                // paid directly (no recall), so the address isn't silently dropped.
                 'delivery_address' => $request->filled('delivery_address')
                     ? substr((string) $request->input('delivery_address'), 0, 500)
-                    : null,
+                    : (($order->order_type === 'delivery' && !empty($order->delivery_address))
+                        ? substr((string) $order->delivery_address, 0, 500)
+                        : null),
                 'subtotal' => $taxInclusive ? $inc['subtotal_col'] : (float) $subtotal,
                 'discount_type' => $order->discount_type ?? 'amount',
                 'discount_value' => (float)($order->discount_value ?? 0),

@@ -129,7 +129,7 @@ class TrackingService : Service(), LocationListener {
         val batch = PointQueue.peekBatch(this, 100)
         if (batch.length() == 0) return
 
-        val (code, body) = ApiClient.post("/locations", JSONObject().put("points", batch), token)
+        val (code, _) = ApiClient.post("/locations", JSONObject().put("points", batch), token)
         when {
             code in 200..299 -> {
                 PointQueue.removeFirst(this, batch.length())

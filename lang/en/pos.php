@@ -1065,6 +1065,7 @@ return [
     'rt_trail' => "Today's route",
     'rt_clear_trail' => 'Clear',
     'rt_no_riders' => 'No active riders yet — add riders from the Riders page, then they sign in on the TaxNest Rider app.',
+    'rt_app_download' => 'Rider app (APK)',
     'rt_locked_title' => 'Rider Live Tracking — Unlimited package',
     'rt_locked_body' => 'See every rider live on the map, with full day routes — riders simply keep the TaxNest Rider app on duty. Upgrade to Unlimited to unlock.',
     'rt_upgrade_btn' => 'View packages',

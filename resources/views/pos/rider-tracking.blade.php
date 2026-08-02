@@ -44,9 +44,15 @@
                 <h1 class="text-base sm:text-lg font-bold text-gray-900 dark:text-white">{{ __('pos.rt_title') }}</h1>
                 <p class="text-[11px] text-gray-500 dark:text-gray-400" x-text="statusLine"></p>
             </div>
-            <button type="button" @click="load()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200">
-                ⟳ {{ __('pos.refresh') }}
-            </button>
+            <div class="flex items-center gap-2">
+                <a href="{{ url('/downloads/taxnest-rider.apk') }}"
+                   class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200">
+                    ⬇ {{ __('pos.rt_app_download') }}
+                </a>
+                <button type="button" @click="load()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200">
+                    ⟳ {{ __('pos.refresh') }}
+                </button>
+            </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-4 gap-3">

@@ -1065,6 +1065,7 @@ return [
     'rt_trail' => 'آج کا راستہ',
     'rt_clear_trail' => 'ہٹائیں',
     'rt_no_riders' => 'ابھی کوئی رائیڈر نہیں — پہلے Riders پیج سے رائیڈر شامل کریں، پھر وہ TaxNest Rider ایپ میں لاگ ان کریں۔',
+    'rt_app_download' => 'رائیڈر ایپ (APK)',
     'rt_locked_title' => 'رائیڈر لائیو ٹریکنگ — Unlimited پیکج',
     'rt_locked_body' => 'ہر رائیڈر کو نقشے پر لائیو دیکھیں، پورے دن کے راستوں کے ساتھ — رائیڈر بس TaxNest Rider ایپ میں ڈیوٹی آن رکھے۔ حاصل کرنے کے لیے Unlimited پر اپ گریڈ کریں۔',
     'rt_upgrade_btn' => 'پیکجز دیکھیں',

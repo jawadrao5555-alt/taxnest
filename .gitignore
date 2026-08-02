@@ -26,3 +26,4 @@ Thumbs.db
 .local/mysql_log/
 
 pra-agent/dist/
+.local/rider-signing/

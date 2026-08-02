@@ -1,0 +1,52 @@
+name: Build Rider App (Android)
+# IMPORTANT: this workflow uploads the APK as a workflow ARTIFACT only.
+# NEVER publish it as a GitHub release — desktop agents self-update from this
+# repo's releases/latest and would try to install the APK as an agent update.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'rider-app/**'
+      - '.github/workflows/build-rider-app.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.7'
+
+      # Beta signing: throwaway key per build (repo is PUBLIC — no committed
+      # keystore). Updates over an older install need uninstall/reinstall
+      # during beta; switch to a repo-secret keystore before GA.
+      - name: Generate signing key
+        run: |
+          PASS=$(openssl rand -hex 16)
+          echo "RIDER_KS_PASS=$PASS" >> "$GITHUB_ENV"
+          keytool -genkeypair -v -keystore /tmp/rider-ci.p12 -storetype PKCS12 \
+            -storepass "$PASS" -keypass "$PASS" -alias rider \
+            -keyalg RSA -keysize 2048 -validity 3650 \
+            -dname "CN=TaxNest Rider,O=TaxNest,C=PK"
+          echo "RIDER_KS=/tmp/rider-ci.p12" >> "$GITHUB_ENV"
+
+      - name: Build release APK
+        run: gradle -p rider-app assembleRelease --no-daemon
+
+      - name: Stage artifact
+        run: cp rider-app/app/build/outputs/apk/release/app-release.apk /tmp/taxnest-rider.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: taxnest-rider-apk
+          path: /tmp/taxnest-rider.apk
+          retention-days: 30

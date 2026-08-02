@@ -22,6 +22,7 @@ use App\Models\ProductRecipe;
 use App\Models\Ingredient;
 use App\Services\PraIntegrationService;
 use App\Services\PosFeatureService;
+use App\Support\PosPaymentBuckets;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -7386,6 +7387,11 @@ class PosController extends Controller
             ->orderBy('created_at')
             ->get();
 
+        // Cash/card/other via the ONE shared alias set (PosPaymentBuckets):
+        // universal-screen 'card' is stored as 'debit_card', so matching only
+        // 'card' would report Rs 0 card sales (and dump them into "Other").
+        $payBuckets = PosPaymentBuckets::split($transactions);
+
         $stats = (object) [
             'total_invoices' => $transactions->count(),
             'pra_invoices' => $transactions->where('pra_status', 'submitted')->count(),
@@ -7396,12 +7402,9 @@ class PosController extends Controller
             'net_sales' => $transactions->sum('subtotal') - $transactions->sum('discount_amount'),
             'total_tax' => $transactions->sum('tax_amount'),
             'total_amount' => $transactions->sum('total_amount'),
-            'cash_amount' => $transactions->where('payment_method', 'cash')->sum('total_amount'),
-            // Card bucket must include the stored aliases: universal-screen 'card'
-            // is normalized to 'debit_card' before saving, so matching only 'card'
-            // would always report Rs 0 card sales (and dump them into "Other").
-            'card_amount' => $transactions->whereIn('payment_method', ['card', 'debit_card', 'credit_card'])->sum('total_amount'),
-            'other_amount' => $transactions->whereNotIn('payment_method', ['cash', 'card', 'debit_card', 'credit_card'])->sum('total_amount'),
+            'cash_amount' => $payBuckets['cash'],
+            'card_amount' => $payBuckets['card'],
+            'other_amount' => $payBuckets['other'],
             'first_invoice' => $transactions->first(),
             'last_invoice' => $transactions->last(),
         ];
@@ -8037,7 +8040,7 @@ class PosController extends Controller
             $cashIn = (float) PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->whereNotNull('rider_id')
-                ->where('payment_method', 'cash')
+                ->where('payment_method', PosPaymentBuckets::CASH)
                 ->whereNotNull('rider_settlement_id')
                 ->whereDate('rider_settled_at', $date)
                 ->where('business_date', '<', $date)
@@ -8050,7 +8053,7 @@ class PosController extends Controller
                 return $empty;
             }
 
-            $isOpenCash = fn ($t) => $t->payment_method === 'cash'
+            $isOpenCash = fn ($t) => $t->payment_method === PosPaymentBuckets::CASH
                 && !$t->rider_settlement_id
                 && $t->delivery_status !== 'returned';
 
@@ -8068,7 +8071,7 @@ class PosController extends Controller
                     'deliveries' => $rows->count(),
                     'delivered' => $rows->where('delivery_status', 'delivered')->count(),
                     'returned' => $rows->where('delivery_status', 'returned')->count(),
-                    'cash_total' => round((float) $rows->filter(fn ($t) => $t->payment_method === 'cash' && $t->delivery_status !== 'returned')->sum('total_amount'), 2),
+                    'cash_total' => round((float) $rows->filter(fn ($t) => $t->payment_method === PosPaymentBuckets::CASH && $t->delivery_status !== 'returned')->sum('total_amount'), 2),
                     'cash_pending' => round((float) $rows->filter($isOpenCash)->sum('total_amount'), 2),
                 ];
             }
@@ -8253,6 +8256,11 @@ class PosController extends Controller
         $reportCount = PosDayCloseReport::where('company_id', $companyId)->count();
         $reportNumber = 'ZRPT-POS-' . str_pad($reportCount + 1, 5, '0', STR_PAD_LEFT);
 
+        // Cash/card/other via the ONE shared alias set (PosPaymentBuckets) —
+        // 'card' is stored as 'debit_card'; ='card' matching reported Rs 0 card
+        // sales on the Z-report (live incident, Jul 2026).
+        $payBuckets = PosPaymentBuckets::split($transactions);
+
         $data = [
             'company_id' => $companyId,
             'report_date' => $date,
@@ -8266,11 +8274,9 @@ class PosController extends Controller
             'net_sales' => $transactions->sum('subtotal') - $transactions->sum('discount_amount'),
             'total_tax' => $transactions->sum('tax_amount'),
             'total_amount' => $transactions->sum('total_amount'),
-            'cash_amount' => $transactions->where('payment_method', 'cash')->sum('total_amount'),
-            // Card bucket includes stored aliases ('card' → 'debit_card' normalization)
-            // — matching only 'card' reported Rs 0 card sales on the Z-report.
-            'card_amount' => $transactions->whereIn('payment_method', ['card', 'debit_card', 'credit_card'])->sum('total_amount'),
-            'other_amount' => $transactions->whereNotIn('payment_method', ['cash', 'card', 'debit_card', 'credit_card'])->sum('total_amount'),
+            'cash_amount' => $payBuckets['cash'],
+            'card_amount' => $payBuckets['card'],
+            'other_amount' => $payBuckets['other'],
             'first_invoice_number' => $transactions->first()->invoice_number ?? null,
             'last_invoice_number' => $transactions->last()->invoice_number ?? null,
             'first_invoice_time' => $transactions->first()->created_at ?? null,

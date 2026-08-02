@@ -31,6 +31,60 @@
                 <p class="text-xs text-gray-400 mt-2">Code: <span class="font-mono font-semibold">{{ $profile->referral_code }}</span> — clients can also type it manually on the signup form.</p>
             </div>
 
+            {{-- Payout details --}}
+            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-6" x-data="{ method: '{{ old('payout_method', $profile->payout_method ?? 'bank') }}' }">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+                    <h3 class="text-sm font-bold text-gray-900 dark:text-gray-100">Payout details</h3>
+                    @if($profile->hasPayoutDetails())
+                        <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">Saved — {{ $profile->payoutMethodLabel() }}</span>
+                    @else
+                        <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">Not set — payouts may be delayed</span>
+                    @endif
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                    Tell us where to send your commission. Details are stored encrypted and only visible to TaxNest admin.
+                    @if(($minPayout ?? 0) > 0) Minimum payout: <strong>Rs {{ number_format($minPayout) }}</strong> — pending balance below this carries over. @endif
+                </p>
+                @if($errors->any())
+                <div class="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs">
+                    <ul class="list-disc list-inside">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
+                </div>
+                @endif
+                <form method="POST" action="{{ route('consultant.payout-details') }}" class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    @csrf
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Method</label>
+                        <select name="payout_method" x-model="method" required
+                                class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                            @foreach(\App\Models\ConsultantProfile::PAYOUT_METHODS as $val => $label)
+                                <option value="{{ $val }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div x-show="method === 'bank'">
+                        <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Bank name</label>
+                        <input type="text" name="payout_bank_name" value="{{ old('payout_bank_name', $profile->payout_bank_name) }}" maxlength="100"
+                               placeholder="e.g. Meezan Bank" autocomplete="off"
+                               class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Account title</label>
+                        <input type="text" name="payout_account_title" value="{{ old('payout_account_title', $profile->payout_account_title) }}" maxlength="100" required
+                               placeholder="Account holder name" autocomplete="off"
+                               class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1"><span x-text="method === 'bank' ? 'IBAN / Account number' : 'Mobile number'"></span></label>
+                        <input type="text" name="payout_account_number" value="{{ old('payout_account_number', $profile->payout_account_number) }}" maxlength="50" required
+                               autocomplete="off" :placeholder="method === 'bank' ? 'PK00XXXX0000000000000000' : '03XXXXXXXXX'"
+                               class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm font-mono">
+                    </div>
+                    <div class="sm:col-span-2 lg:col-span-4">
+                        <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition">Save payout details</button>
+                    </div>
+                </form>
+            </div>
+
             {{-- Totals --}}
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
                 <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">

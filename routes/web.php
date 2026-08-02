@@ -199,6 +199,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
     Route::prefix('consultant')->group(function () {
         Route::get('/', [ConsultantConsoleController::class, 'index'])->name('consultant.console');
         Route::get('/earnings', [ConsultantConsoleController::class, 'earnings'])->name('consultant.earnings');
+        Route::post('/payout-details', [ConsultantConsoleController::class, 'savePayoutDetails'])->name('consultant.payout-details');
         Route::post('/join', [ConsultantConsoleController::class, 'join'])->name('consultant.join');
         Route::post('/redeem', [ConsultantConsoleController::class, 'redeem'])->middleware('throttle:10,1')->name('consultant.redeem');
         Route::post('/request', [ConsultantConsoleController::class, 'requestLink'])->middleware('throttle:10,1')->name('consultant.request');
@@ -980,6 +981,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/consultants/{id}/rate', [\App\Http\Controllers\SaasAdmin\AdminConsultantController::class, 'updateRate'])->name('saas.admin.consultants.rate');
     Route::post('/consultant-links/{id}/revoke', [\App\Http\Controllers\SaasAdmin\AdminConsultantController::class, 'revokeLink'])->name('saas.admin.consultants.revoke-link');
     Route::post('/consultant-commissions/{id}/paid', [\App\Http\Controllers\SaasAdmin\AdminConsultantController::class, 'markPaid'])->name('saas.admin.consultants.mark-paid');
+    Route::post('/consultants/min-payout', [\App\Http\Controllers\SaasAdmin\AdminConsultantController::class, 'updateMinPayout'])->name('saas.admin.consultants.min-payout');
     Route::post('/subscriptions/{id}/toggle', [AdminSubscriptionController::class, 'toggle'])->name('saas.admin.subscriptions.toggle');
     Route::get('/franchises', [AdminFranchiseController::class, 'index'])->name('saas.admin.franchises');
     Route::post('/franchises', [AdminFranchiseController::class, 'store'])->name('saas.admin.franchises.store');

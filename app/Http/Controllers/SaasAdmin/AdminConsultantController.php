@@ -60,6 +60,8 @@ class AdminConsultantController extends Controller
 
         return view('saas-admin.consultants', [
             'profiles' => $profiles,
+            'profilesByUser' => $profiles->keyBy('user_id'),
+            'minPayout' => (float) \App\Models\SystemSetting::get('consultant_min_payout', 0),
             'activeLinks' => $activeLinks,
             'sums' => $sums,
             'referred' => $referred,
@@ -117,6 +119,20 @@ class AdminConsultantController extends Controller
         ]);
 
         return back()->with('success', 'Link revoked.');
+    }
+
+    /** Optional minimum payout threshold (Rs) — 0 disables it. */
+    public function updateMinPayout(Request $request)
+    {
+        $request->validate(['min_payout' => 'required|numeric|min:0|max:10000000']);
+
+        \App\Models\SystemSetting::set('consultant_min_payout', (string) (float) $request->min_payout, 'Minimum consultant payout threshold (Rs); 0 = no minimum');
+
+        AdminAuditLog::log(auth('admin')->id(), 'Consultant min payout updated', 'SystemSetting', null, [
+            'min_payout' => (float) $request->min_payout,
+        ]);
+
+        return back()->with('success', 'Minimum payout threshold saved.');
     }
 
     /** Mark a pending commission as paid (manual payout already made outside). */

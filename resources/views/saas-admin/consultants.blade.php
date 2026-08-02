@@ -61,9 +61,18 @@
 
     {{-- Pending payouts --}}
     <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-6">
-        <div class="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
+        <div class="px-5 py-4 border-b border-gray-800 flex flex-wrap items-center justify-between gap-3">
             <h3 class="text-sm font-semibold text-white">Pending commissions</h3>
-            <span class="text-xs text-gray-500">Rs {{ number_format((float) $pendingCommissions->sum('amount')) }} total</span>
+            <div class="flex items-center gap-4">
+                <form method="POST" action="{{ route('saas.admin.consultants.min-payout') }}" class="inline-flex items-center gap-1" title="Pending balance below this carries over; 0 = no minimum">
+                    @csrf
+                    <label class="text-xs text-gray-500">Min payout Rs</label>
+                    <input type="number" name="min_payout" value="{{ (float) ($minPayout ?? 0) }}" min="0" step="100"
+                           class="w-24 bg-gray-800 border border-gray-700 rounded text-white text-xs px-2 py-1 text-right">
+                    <button class="text-xs text-indigo-400 hover:underline">Save</button>
+                </form>
+                <span class="text-xs text-gray-500">Rs {{ number_format((float) $pendingCommissions->sum('amount')) }} total</span>
+            </div>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm table-cards">
@@ -73,6 +82,7 @@
                         <th class="px-4 py-3">Consultant</th>
                         <th class="px-4 py-3">Client</th>
                         <th class="px-4 py-3">Payment</th>
+                        <th class="px-4 py-3">Payout details</th>
                         <th class="px-4 py-3 text-right">Amount (Rs)</th>
                         <th class="px-4 py-3 text-right">Mark paid</th>
                     </tr>
@@ -84,6 +94,16 @@
                         <td class="px-4 py-3 text-white">{{ $c->consultant->name ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-300">{{ $c->company_name ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-400 text-xs">{{ $c->description }} · base {{ number_format((float) $c->base_amount) }} @ {{ rtrim(rtrim(number_format((float) $c->rate_percent, 2), '0'), '.') }}%</td>
+                        <td class="px-4 py-3 text-xs">
+                            @php($pp = $profilesByUser->get($c->consultant_user_id))
+                            @if($pp && $pp->hasPayoutDetails())
+                                <p class="text-gray-300 font-medium">{{ $pp->payoutMethodLabel() }}@if($pp->payout_method === 'bank' && $pp->payout_bank_name) · {{ $pp->payout_bank_name }}@endif</p>
+                                <p class="text-gray-500">{{ $pp->payout_account_title }}</p>
+                                <p class="text-gray-400 font-mono">{{ $pp->payout_account_number }}</p>
+                            @else
+                                <span class="text-gray-600">Not provided</span>
+                            @endif
+                        </td>
                         <td class="px-4 py-3 text-right text-amber-400 font-semibold">{{ number_format((float) $c->amount) }}</td>
                         <td class="px-4 py-3 text-right">
                             <form method="POST" action="{{ route('saas.admin.consultants.mark-paid', $c->id) }}" class="inline-flex items-center gap-1 justify-end">
@@ -95,7 +115,7 @@
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="6" class="px-4 py-10 text-center text-gray-500">Nothing pending — all settled.</td></tr>
+                    <tr><td colspan="7" class="px-4 py-10 text-center text-gray-500">Nothing pending — all settled.</td></tr>
                     @endforelse
                 </tbody>
             </table>

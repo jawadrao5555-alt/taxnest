@@ -265,6 +265,37 @@ class ConsultantConsoleController extends Controller
             'profile' => $profile,
             'commissions' => $commissions,
             'totals' => $totals,
+            'minPayout' => (float) \App\Models\SystemSetting::get('consultant_min_payout', 0),
         ]);
+    }
+
+    /** Save/update payout details (bank / JazzCash / EasyPaisa) — encrypted at rest. */
+    public function savePayoutDetails(Request $request)
+    {
+        $user = auth()->user();
+        $profile = ConsultantService::profileFor($user->id);
+
+        if (!$profile) {
+            return redirect('/consultant')->with('error', 'Activate your consultant profile first.');
+        }
+
+        $data = $request->validate([
+            'payout_method' => 'required|in:bank,jazzcash,easypaisa',
+            'payout_account_title' => 'required|string|max:100',
+            'payout_account_number' => 'required|string|max:50',
+            'payout_bank_name' => 'nullable|string|max:100|required_if:payout_method,bank',
+        ]);
+
+        if ($data['payout_method'] !== 'bank') {
+            $data['payout_bank_name'] = null;
+        }
+
+        $profile->update($data);
+
+        AuditLogService::log('consultant_payout_details_updated', 'ConsultantProfile', $profile->id, null, [
+            'payout_method' => $data['payout_method'],
+        ], $user->company_id, $user->id);
+
+        return redirect('/consultant/earnings')->with('success', 'Payout details saved. TaxNest will use these for your next payout.');
     }
 }

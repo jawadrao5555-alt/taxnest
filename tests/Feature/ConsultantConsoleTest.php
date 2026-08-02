@@ -172,6 +172,18 @@ class ConsultantConsoleTest extends TestCase
             $table->string('status', 20)->default('active');
             $table->decimal('commission_rate', 5, 2)->default(10.00);
             $table->string('payout_notes', 500)->nullable();
+            $table->string('payout_method', 30)->nullable();
+            $table->text('payout_account_title')->nullable();
+            $table->text('payout_account_number')->nullable();
+            $table->text('payout_bank_name')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('system_settings', function (Blueprint $table) {
+            $table->id();
+            $table->string('key')->unique();
+            $table->text('value')->nullable();
+            $table->string('description')->nullable();
             $table->timestamps();
         });
 
@@ -260,6 +272,83 @@ class ConsultantConsoleTest extends TestCase
         $user = $this->makeAdmin($company);
         $profile = ConsultantService::activateProfile($user);
         return [$user, $profile, $company];
+    }
+
+    // ── 0. Payout details: save, encrypt, validate ──────────────────────
+
+    public function test_consultant_can_save_payout_details_and_they_are_encrypted_at_rest(): void
+    {
+        [$consultant, $profile] = $this->makeConsultant();
+
+        $resp = $this->actingAs($consultant)->post('/consultant/payout-details', [
+            'payout_method' => 'jazzcash',
+            'payout_account_title' => 'Ali Raza',
+            'payout_account_number' => '03001234567',
+        ]);
+
+        $resp->assertRedirect('/consultant/earnings')->assertSessionHas('success');
+
+        $profile->refresh();
+        $this->assertSame('jazzcash', $profile->payout_method);
+        $this->assertSame('Ali Raza', $profile->payout_account_title);
+        $this->assertSame('03001234567', $profile->payout_account_number);
+        $this->assertTrue($profile->hasPayoutDetails());
+
+        // Encrypted at rest — raw column must NOT contain the plaintext.
+        $raw = \DB::table('consultant_profiles')->where('id', $profile->id)->first();
+        $this->assertNotSame('03001234567', $raw->payout_account_number);
+        $this->assertStringNotContainsString('03001234567', (string) $raw->payout_account_number);
+    }
+
+    public function test_bank_method_requires_bank_name_and_non_bank_clears_it(): void
+    {
+        [$consultant, $profile] = $this->makeConsultant();
+
+        // bank without bank name → validation error
+        $this->actingAs($consultant)->from('/consultant/earnings')->post('/consultant/payout-details', [
+            'payout_method' => 'bank',
+            'payout_account_title' => 'Ali Raza',
+            'payout_account_number' => 'PK36MEZN0000000000000001',
+        ])->assertSessionHasErrors('payout_bank_name');
+
+        // valid bank save
+        $this->actingAs($consultant)->post('/consultant/payout-details', [
+            'payout_method' => 'bank',
+            'payout_account_title' => 'Ali Raza',
+            'payout_account_number' => 'PK36MEZN0000000000000001',
+            'payout_bank_name' => 'Meezan Bank',
+        ])->assertSessionHas('success');
+        $this->assertSame('Meezan Bank', $profile->fresh()->payout_bank_name);
+
+        // switch to easypaisa → bank name cleared
+        $this->actingAs($consultant)->post('/consultant/payout-details', [
+            'payout_method' => 'easypaisa',
+            'payout_account_title' => 'Ali Raza',
+            'payout_account_number' => '03007654321',
+            'payout_bank_name' => 'Meezan Bank',
+        ])->assertSessionHas('success');
+        $this->assertNull($profile->fresh()->payout_bank_name);
+
+        // invalid method rejected
+        $this->actingAs($consultant)->from('/consultant/earnings')->post('/consultant/payout-details', [
+            'payout_method' => 'paypal',
+            'payout_account_title' => 'Ali Raza',
+            'payout_account_number' => 'x',
+        ])->assertSessionHasErrors('payout_method');
+    }
+
+    public function test_payout_details_save_requires_a_consultant_profile(): void
+    {
+        $company = $this->makeCompany();
+        $user = $this->makeAdmin($company); // no consultant profile
+
+        $this->actingAs($user)->post('/consultant/payout-details', [
+            'payout_method' => 'jazzcash',
+            'payout_account_title' => 'X',
+            'payout_account_number' => '03000000000',
+        ])->assertRedirect('/consultant')->assertSessionHas('error');
+
+        $this->assertSame(0, ConsultantProfile::count());
     }
 
     // ── 1. Consent: switch is unreachable without an ACTIVE link ────────

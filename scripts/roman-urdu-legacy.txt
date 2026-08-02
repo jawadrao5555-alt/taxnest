@@ -1,0 +1,31 @@
+# Roman Urdu legacy allowlist — files SKIPPED by the Roman-Urdu static scan
+# in scripts/pos-white-screen-check.sh (section 1c).
+#
+# These views still carry hardcoded Roman Urdu from before the language
+# system (pending the full string-conversion backlog). Every view NOT in
+# this list — including all NEW files — is enforced: hardcoded Roman Urdu
+# in user-visible text blocks the deploy.
+#
+# When you clean a file (move its strings into lang keys), REMOVE its line
+# here so it stays clean. NEVER add a new file to this list — new code must
+# use __() translation keys from day one.
+resources/views/admin/app-updates.blade.php
+resources/views/admin/madadgar-chats.blade.php
+resources/views/company/agent.blade.php
+resources/views/company/whatsapp-settings.blade.php
+resources/views/components/trial-lock-modal.blade.php
+resources/views/downloads.blade.php
+resources/views/emails/trial-reminder.blade.php
+resources/views/emails/trial-reminder-text.blade.php
+resources/views/fbr-reference/demo.blade.php
+resources/views/invoice/index.blade.php
+resources/views/invoice/partials/send-modal.blade.php
+resources/views/invoice/show.blade.php
+resources/views/layouts/app.blade.php
+resources/views/pos/billing.blade.php
+resources/views/pos/landing.blade.php
+resources/views/pos/restaurant/pos.blade.php
+resources/views/products/create.blade.php
+resources/views/products/edit.blade.php
+resources/views/saas-admin/companies/show.blade.php
+resources/views/sro-reference.blade.php

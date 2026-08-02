@@ -116,6 +116,198 @@ else
   bad "view:cache itself failed - a view has a broken @-directive structure (unclosed @if/@foreach)"
 fi
 
+# ------------------------------------------------------------------
+# 1c. STATIC: hardcoded Roman Urdu in USER-VISIBLE text (Task 238).
+#     English mode must never show Roman Urdu again — Task 237 cleaned the
+#     live screens; this scan blocks any regression. Checks HTML text nodes,
+#     placeholder/title/aria-label/alt attributes, and JS string literals in
+#     inline <script>; ignores Blade/HTML/JS comments and @php blocks.
+#     Legacy pre-conversion files are skipped via scripts/roman-urdu-legacy.txt
+#     (shrink-only list — NEVER add new files; new code uses __() keys).
+# ------------------------------------------------------------------
+say "Static scan: hardcoded Roman Urdu in user-visible Blade text"
+RU_OUT=$(python3 - <<'PYEOF'
+import os, re, sys
+
+ROOT = "resources/views"
+LEGACY_FILE = "scripts/roman-urdu-legacy.txt"
+
+# Strong Roman Urdu words only — each is essentially never valid English.
+WORDS = r"""
+hai hain hoga hogi honge hogaya hogayi
+karein karain kariye kijiye krein karke
+nahi nahin nahee
+apna apni apne
+kholein dekhein chunein likhein dabayen dabayein banayen banayein bhejein
+dobara zaroori zaruri mehrbani meharbani shukriya
+sakte sakta sakti chahiye chahiyay
+gaya gayi gaye
+raha rahi rahe
+wala wali walay walon
+sirf lekin magar taake taakay
+paisay paise rupay
+hojaye hojayen hojata hojati
+milega milegi jayega jayegi
+karna karni karne hona hone honi
+"""
+WORD_RE = re.compile(r"\b(" + "|".join(WORDS.split()) + r")\b", re.I)
+# Two-word phrases that are strong even when the single words are too weak.
+PHRASE_RE = re.compile(
+    r"\b(ke liye|se pehle|ho gaya|ho gayi|kar diya|kar dein|ki gayi|kya aap)\b",
+    re.I,
+)
+
+BLADE_COMMENT_RE = re.compile(r"\{\{--.*?--\}\}", re.S)
+HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
+SCRIPT_RE = re.compile(r"<script\b([^>]*)>(.*?)</script>", re.S | re.I)
+ATTR_RE = re.compile(
+    r"""\b(?:placeholder|title|aria-label|alt|data-tip|data-tooltip)\s*=\s*("([^"]*)"|'([^']*)')""",
+    re.I,
+)
+JS_STR_RE = re.compile(
+    r"'((?:[^'\\\n]|\\.)*)'|\"((?:[^\"\\\n]|\\.)*)\"|`((?:[^`\\]|\\.)*)`", re.S
+)
+
+
+def blank_keep_lines(m):
+    """Replace a match with same-length blanks, preserving newlines/line numbers."""
+    return re.sub(r"[^\n]", " ", m.group(0))
+
+
+def strip_js_comments(js):
+    """State machine: blank // and /* */ comments, respecting string literals."""
+    out = list(js)
+    i, n = 0, len(js)
+    while i < n:
+        c = js[i]
+        if c in "'\"`":
+            q = c
+            i += 1
+            while i < n:
+                if js[i] == "\\":
+                    i += 2
+                    continue
+                if js[i] == q:
+                    i += 1
+                    break
+                if q != "`" and js[i] == "\n":  # unterminated line string — bail
+                    break
+                i += 1
+        elif c == "/" and i + 1 < n and js[i + 1] == "/":
+            while i < n and js[i] != "\n":
+                out[i] = " "
+                i += 1
+        elif c == "/" and i + 1 < n and js[i + 1] == "*":
+            while i < n:
+                if js[i] == "*" and i + 1 < n and js[i + 1] == "/":
+                    out[i] = out[i + 1] = " "
+                    i += 2
+                    break
+                if js[i] != "\n":
+                    out[i] = " "
+                i += 1
+        else:
+            i += 1
+    return "".join(out)
+
+
+def check_segment(text, base_line, path, kind, hits):
+    for m in list(WORD_RE.finditer(text)) + list(PHRASE_RE.finditer(text)):
+        line = base_line + text[: m.start()].count("\n")
+        ctx = text[max(0, m.start() - 40): m.start() + 50].replace("\n", " ").strip()
+        hits.append((path, line, kind, m.group(0), ctx))
+
+
+def scan_file(path, hits):
+    try:
+        src = open(path, encoding="utf-8", errors="replace").read()
+    except OSError:
+        return
+    src = BLADE_COMMENT_RE.sub(blank_keep_lines, src)
+    src = HTML_COMMENT_RE.sub(blank_keep_lines, src)
+    # @php ... @endphp blocks are server-side code, never user-visible.
+    src = re.sub(r"@php\b.*?@endphp", blank_keep_lines, src, flags=re.S)
+    # Blank {{ ... }} / {!! ... !!} echoes — translation keys etc. are fine.
+    src = re.sub(r"\{\{.*?\}\}|\{!!.*?!!\}", blank_keep_lines, src, flags=re.S)
+
+    # Pull out inline script bodies; blank them from the HTML copy.
+    scripts = []
+    for m in SCRIPT_RE.finditer(src):
+        attrs, body = m.group(1), m.group(2)
+        line = src[: m.start(2)].count("\n") + 1
+        t = re.search(r'type\s*=\s*["\']([^"\']+)', attrs)
+        if "src=" not in attrs and (not t or "javascript" in t.group(1) or t.group(1) == "module"):
+            scripts.append((line, body))
+    html = SCRIPT_RE.sub(blank_keep_lines, src)
+    html = re.sub(r"<style\b[^>]*>.*?</style>", blank_keep_lines, html, flags=re.S | re.I)
+
+    # 1. user-visible attribute values (before tags are blanked)
+    for m in ATTR_RE.finditer(html):
+        val = m.group(2) if m.group(2) is not None else m.group(3)
+        line = html[: m.start()].count("\n") + 1
+        check_segment(val, line, path, "attr", hits)
+
+    # 2. HTML text nodes: blank all tags, keep text
+    text_only = re.sub(r"<[^>]*>", blank_keep_lines, html)
+    check_segment(text_only, 1, path, "text", hits)
+
+    # 3. JS string literals inside inline scripts (comments stripped)
+    for base_line, body in scripts:
+        body = strip_js_comments(body)
+        for m in JS_STR_RE.finditer(body):
+            s = next(g for g in m.groups() if g is not None)
+            line = base_line + body[: m.start()].count("\n")
+            check_segment(s, line, path, "js-string", hits)
+
+
+def main():
+    legacy = set()
+    if os.path.exists(LEGACY_FILE):
+        for ln in open(LEGACY_FILE, encoding="utf-8"):
+            ln = ln.strip()
+            if ln and not ln.startswith("#"):
+                legacy.add(ln)
+
+    stale = sorted(p for p in legacy if not os.path.exists(p))
+    hits = []
+    for dirpath, _dirs, files in os.walk(ROOT):
+        for fn in sorted(files):
+            if not fn.endswith(".blade.php"):
+                continue
+            path = os.path.join(dirpath, fn)
+            if path in legacy:
+                continue
+            scan_file(path, hits)
+
+    for p in stale:
+        print(f"STALE legacy entry (file gone — remove line from {LEGACY_FILE}): {p}")
+
+    if hits:
+        seen = set()
+        for path, line, kind, word, ctx in hits:
+            key = (path, line, word.lower())
+            if key in seen:
+                continue
+            seen.add(key)
+            print(f"{path}:{line}: [{kind}] '{word}' in: {ctx}")
+        sys.exit(1)
+    if stale:
+        sys.exit(1)
+
+
+main()
+PYEOF
+)
+RU_RC=$?
+if [ $RU_RC -ne 0 ] && [ -z "$RU_OUT" ]; then
+  bad "Roman Urdu scan itself failed to run (python3 exit $RU_RC) — fix the environment, do not deploy blind"
+elif [ -n "$RU_OUT" ]; then
+  echo "$RU_OUT" >&2
+  bad "hardcoded Roman Urdu in user-visible text — move the string into lang/en+lang/ur pos.php keys and render via __()/@js() (English mode must stay pure English)"
+else
+  echo "    OK: no hardcoded Roman Urdu in enforced Blade views."
+fi
+
 if [ $STATIC_ONLY -eq 1 ]; then
   [ $FAIL -eq 0 ] && echo "WHITE-SCREEN CHECK (static-only): PASS"
   exit $FAIL

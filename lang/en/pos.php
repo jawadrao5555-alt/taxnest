@@ -3484,4 +3484,15 @@ Bills stay with the cashier — this only clears the kitchen display.',
     'feat_inventory' => 'Stock / Inventory',
     'feat_customize' => 'Customize / Settings',
     'feat_team' => 'Team',
+
+    // Pending Deliveries quick-final panel (Task 114, Aug 2026)
+    'pending_deliveries' => 'Deliveries',
+    'pending_deliveries_title' => 'Pending Deliveries',
+    'pending_deliveries_hint' => "Today's delivery provisional bills — one click Final when payment arrives",
+    'no_pending_deliveries' => 'No pending deliveries — all clear!',
+    'final_cash' => 'Final (Cash)',
+    'final_card' => 'Final (Card)',
+    'rider_word' => 'Rider',
+    'rider_unsettled_warn' => 'has this bill on their khata — cash is with the rider, settle before day close',
+    'delivery_print_receipt' => 'Also print receipt (default: no — customer is not at the counter)',
 ];

@@ -3484,4 +3484,15 @@ Bills stay with the cashier — this only clears the kitchen display.',
     'feat_inventory' => 'اسٹاک / انوینٹری',
     'feat_customize' => 'کسٹمائز / سیٹنگز',
     'feat_team' => 'ٹیم',
+
+    // Pending Deliveries quick-final panel (Task 114, Aug 2026)
+    'pending_deliveries' => 'ڈیلیوریز',
+    'pending_deliveries_title' => 'پینڈنگ ڈیلیوریز',
+    'pending_deliveries_hint' => 'آج کے ڈیلیوری کچے بل — پیمنٹ آتے ہی ایک کلک میں فائنل',
+    'no_pending_deliveries' => 'کوئی پینڈنگ ڈیلیوری نہیں — سب کلیئر!',
+    'final_cash' => 'فائنل (کیش)',
+    'final_card' => 'فائنل (کارڈ)',
+    'rider_word' => 'رائیڈر',
+    'rider_unsettled_warn' => 'کے کھاتے میں ہے — کیش ابھی رائیڈر کے پاس ہے، ڈے کلوز سے پہلے سیٹل کریں',
+    'delivery_print_receipt' => 'رسید بھی پرنٹ کریں (ڈیفالٹ: نہیں — کسٹمر کاؤنٹر پر نہیں)',
 ];

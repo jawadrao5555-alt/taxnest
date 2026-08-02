@@ -2657,6 +2657,9 @@ class PosController extends Controller
         // a deliberately-saved provisional bill is a COMPLETED sale in local mode.
         // Filtering on all three keeps drafts (status='draft', invoice_mode='pra')
         // out of this list — those were polluting the F10 modal before.
+        $hasRiderCols = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id')
+            && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_settlement_id');
+        $hasBizDate = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'business_date');
         $bills = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
             ->where('invoice_mode', 'local')
@@ -2664,7 +2667,24 @@ class PosController extends Controller
             ->orderBy('id', 'desc')
             ->limit(100)
             ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'order_type', 'delivery_address', 'total_amount', 'payment_method', 'created_at',
-                   ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'kot_sent_at') ? ['kot_sent_at'] : [])]);
+                   ...(\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'kot_sent_at') ? ['kot_sent_at'] : []),
+                   ...($hasRiderCols ? ['rider_id', 'rider_settlement_id'] : []),
+                   ...($hasBizDate ? ['business_date'] : [])]);
+
+        // Rider names — one batch lookup for the Pending Deliveries panel (rider
+        // warning: "bill Asgar ke khaate mein hai"). Riders NEVER touch
+        // invoice_mode/serials; this is display-only context.
+        $riderNames = [];
+        if ($hasRiderCols && \Illuminate\Support\Facades\Schema::hasTable('pos_riders')) {
+            $riderIds = $bills->pluck('rider_id')->filter()->unique();
+            if ($riderIds->isNotEmpty()) {
+                $riderNames = \DB::table('pos_riders')
+                    ->where('company_id', $companyId)
+                    ->whereIn('id', $riderIds)
+                    ->pluck('name', 'id')
+                    ->all();
+            }
+        }
 
         // "Payment First, Then KOT" v2 (Aug 2026): with the company toggle ON, a
         // delivery provisional whose kitchen ticket hasn't fired yet shows a
@@ -2672,7 +2692,7 @@ class PosController extends Controller
         // hours before the bill is made final at night.
         $kotAfterPayment = (bool) (Company::find($companyId)?->delivery_kot_after_payment ?? false);
 
-        $data = $bills->map(function ($b) use ($kotAfterPayment) {
+        $data = $bills->map(function ($b) use ($kotAfterPayment, $hasRiderCols, $hasBizDate, $riderNames) {
             return [
                 'id'               => $b->id,
                 'invoice_number'   => $b->invoice_number,
@@ -2685,7 +2705,14 @@ class PosController extends Controller
                 'items_count'      => PosTransactionItem::where('transaction_id', $b->id)->count(),
                 'created_human'    => $b->created_at?->diffForHumans(),
                 'created_at'       => $b->created_at?->toDateTimeString(),
+                'created_time'     => $b->created_at?->format('h:i A'),
                 'kot_pending'      => $kotAfterPayment && $b->order_type === 'delivery' && empty($b->kot_sent_at),
+                // Pending Deliveries panel (Task 114): business_date so the badge
+                // counts only TODAY's business day; rider context for the warning.
+                'business_date'    => $hasBizDate ? ($b->business_date ? (string) $b->business_date : null) : null,
+                'rider_name'       => ($hasRiderCols && $b->rider_id) ? ($riderNames[$b->rider_id] ?? null) : null,
+                // Unsettled = still on the rider's khata (cash not handed in yet).
+                'rider_unsettled'  => $hasRiderCols && $b->rider_id && empty($b->rider_settlement_id),
             ];
         });
 
@@ -2693,6 +2720,9 @@ class PosController extends Controller
             'success' => true,
             'count'   => $data->count(),
             'bills'   => $data,
+            // Current business day (00:00–05:59 counts in yesterday) — the
+            // Pending Deliveries badge filters bills to THIS date client-side.
+            'business_today' => $hasBizDate ? \App\Services\PosBusinessDay::current($companyId) : null,
         ]);
     }
 

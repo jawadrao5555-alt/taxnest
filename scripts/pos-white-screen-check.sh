@@ -94,6 +94,28 @@ else
   echo "    OK: no bare __() inside <script> blocks."
 fi
 
+# ------------------------------------------------------------------
+# 1b. STATIC: compile EVERY Blade view, then php -l the compiled output.
+#     view:cache alone only WRITES compiled files (it never parses them);
+#     php -l is what catches an unmatched endif from a GLUED directive:
+#     "months@if(...)" - Blade's \B@ regex skips the glued @if but still
+#     compiles the closing @endif -> ParseError 500 on the whole page.
+#     Real incident (Aug 2026): Task #220 merge 500'd /pos landing + /pos/billing.
+# ------------------------------------------------------------------
+say "Static scan: compile all Blade views + php -l compiled output"
+ARTISAN="env -u DATABASE_URL -u DB_CONNECTION -u PGHOST -u PGPORT -u PGUSER -u PGPASSWORD -u PGDATABASE php artisan"
+if $ARTISAN view:clear -q && $ARTISAN view:cache -q; then
+  LINT_ERRS=$(find storage/framework/views -name '*.php' -exec php -l {} \; 2>&1 | grep -v 'No syntax errors' || true)
+  if [ -n "$LINT_ERRS" ]; then
+    echo "$LINT_ERRS" >&2
+    bad "compiled Blade view fails php -l - usually a glued directive (word@if / @endifword) or a use-statement inside @php"
+  else
+    echo "    OK: every compiled view parses."
+  fi
+else
+  bad "view:cache itself failed - a view has a broken @-directive structure (unclosed @if/@foreach)"
+fi
+
 if [ $STATIC_ONLY -eq 1 ]; then
   [ $FAIL -eq 0 ] && echo "WHITE-SCREEN CHECK (static-only): PASS"
   exit $FAIL
@@ -150,6 +172,7 @@ PRA_PAGES=(
   "/pos/reports|pos/reports/csv|raDailyTrend"
   "/pos/invoice/create|restaurantPos\(|manualItemNameInput"
   "/pos/riders/tracking|rt-page|rt-map|riderTracking\("
+  "/pos/billing|or PKR|3 months"
 )
 FBR_PAGES=(
   "/fbr-pos/dashboard|fbr-pos/day-close|fbr-pos/create"
@@ -211,6 +234,30 @@ PYEOF
   fi
   echo "    OK: $path (200, marker present, all inline JS parses)"
 }
+
+# ------------------------------------------------------------------
+# 2a. PUBLIC pages (no auth): landings must render - a Blade ParseError
+#     here takes the marketing page down for EVERY visitor and no login
+#     is needed to see it. Markers are language-independent hrefs/text.
+# ------------------------------------------------------------------
+say "Public landing pages"
+PUBLIC_PAGES=(
+  "/pos|pos/login"
+  "/fbr-pos|fbr-pos/login"
+  "/|login"
+)
+for entry in "${PUBLIC_PAGES[@]}"; do
+  path="${entry%%|*}"
+  markers="${entry#*|}"
+  pcode=$(curl -sL --max-time 30 -H "X-Forwarded-Proto: https" -o "$TMPD/pub.html" -w '%{http_code}' "$BASE_URL$path")
+  if [ "$pcode" != "200" ]; then
+    bad "PUBLIC $path returned HTTP $pcode (expected 200)"
+  elif ! grep -qE "$markers" "$TMPD/pub.html"; then
+    bad "PUBLIC $path missing expected marker (regex: $markers)"
+  else
+    echo "    OK: PUBLIC $path (200, marker present)"
+  fi
+done
 
 say "PRA POS panel (/pos/*)"
 do_login "/pos/login" "/pos/dashboard" "$LOGIN" "$PASSWORD"

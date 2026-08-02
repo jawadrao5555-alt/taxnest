@@ -60,7 +60,7 @@ class PosController extends Controller
     public function updateGuidedFlow(Request $request)
     {
         $user = auth('pos')->user();
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
         $enabled = $request->boolean('enabled');
@@ -77,7 +77,7 @@ class PosController extends Controller
     public function updateQuickType(Request $request)
     {
         $user = auth('pos')->user();
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
         $enabled = $request->boolean('enabled');
@@ -95,7 +95,7 @@ class PosController extends Controller
     public function updateReceiptAutoclose(Request $request)
     {
         $user = auth('pos')->user();
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
         // Prod schema drift guard — never pretend to save into a missing column.
@@ -119,7 +119,7 @@ class PosController extends Controller
     public function updateTaxPricingMode(Request $request)
     {
         $user = auth('pos')->user();
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
         // Prod schema drift guard: never accept the switch if the column is
@@ -153,7 +153,7 @@ class PosController extends Controller
     public function updateRestockToggle(Request $request)
     {
         $user = auth('pos')->user();
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
         $enabled = $request->boolean('enabled');
@@ -165,7 +165,7 @@ class PosController extends Controller
     public function updateInventoryToggle(Request $request)
     {
         $user = auth('pos')->user();
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
         $enabled = $request->boolean('enabled');
@@ -191,7 +191,7 @@ class PosController extends Controller
     public function receiptSettings(Request $request)
     {
         $user = auth('pos')->user();
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || $user->posCashierBlocked()) {
             abort(403, 'Only POS administrators can change receipt settings.');
         }
         $companyId = app('currentCompanyId');
@@ -269,7 +269,7 @@ class PosController extends Controller
     public function printerSettings(Request $request)
     {
         $user = auth('pos')->user();
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || $user->posCashierBlocked()) {
             abort(403, 'Only POS administrators can change printer settings.');
         }
         $companyId = app('currentCompanyId');
@@ -331,7 +331,7 @@ class PosController extends Controller
     public function apiPrinterPrompt(Request $request)
     {
         $user = auth('pos')->user();
-        if (!$user || $user->isPosCashier()) { abort(403); }
+        if (!$user || $user->posCashierBlocked()) { abort(403); }
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         if (!$company) { abort(404); }
@@ -695,7 +695,7 @@ class PosController extends Controller
     public function customize(Request $request)
     {
         $user = auth('pos')->user();
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || $user->posCashierBlocked()) {
             abort(403, 'Only POS administrators can customize POS.');
         }
         $companyId = app('currentCompanyId');
@@ -1362,7 +1362,7 @@ class PosController extends Controller
     private function needsPosSetup(?Company $company): bool
     {
         $user = auth('pos')->user();
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || $user->posCashierBlocked()) {
             return false;
         }
         if (!$company) {
@@ -1374,7 +1374,7 @@ class PosController extends Controller
     public function featureSettings(Request $request)
     {
         $user = auth('pos')->user();
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || $user->posCashierBlocked()) {
             abort(403, 'Only POS administrators can customize POS features.');
         }
         $companyId = app('currentCompanyId');
@@ -1401,7 +1401,7 @@ class PosController extends Controller
     public function updateFeatureSettings(Request $request)
     {
         $user = auth('pos')->user();
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || $user->posCashierBlocked()) {
             abort(403, 'Only POS administrators can customize POS features.');
         }
         $companyId = app('currentCompanyId');
@@ -1465,7 +1465,7 @@ class PosController extends Controller
     public function resetFeaturesToCategory(Request $request)
     {
         $user = auth('pos')->user();
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || $user->posCashierBlocked()) {
             abort(403, 'Only POS administrators can reset POS features.');
         }
         $companyId = app('currentCompanyId');
@@ -4524,7 +4524,7 @@ class PosController extends Controller
     public function toggleAutoPurgeLocal(Request $request)
     {
         $user = auth('pos')->user();
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
         $company = Company::find(app('currentCompanyId'));
@@ -4552,7 +4552,7 @@ class PosController extends Controller
     public function toggleKdsAutoPrint(Request $request)
     {
         $user = auth('pos')->user();
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
 
@@ -4572,7 +4572,7 @@ class PosController extends Controller
     public function updateLocalBillingSettings(Request $request)
     {
         $user = auth('pos')->user();
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
 
@@ -4606,7 +4606,7 @@ class PosController extends Controller
     public function toggleAutoDayclose(Request $request)
     {
         $user = auth('pos')->user();
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
         $company = Company::find(app('currentCompanyId'));
@@ -4631,7 +4631,7 @@ class PosController extends Controller
     public function updateDaycloseCutoff(Request $request)
     {
         $user = auth('pos')->user();
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
 
@@ -4770,7 +4770,7 @@ class PosController extends Controller
         $user = auth('pos')->user();
 
         if ($request->isMethod('post')) {
-            if ($user->isPosCashier()) {
+            if ($user->posCashierBlocked()) {
                 return back()->with('error', __('pos.only_company_admin_change_settings'));
             }
 
@@ -4902,7 +4902,8 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $user = auth('pos')->user();
 
-        if ($user->isPosCashier()) {
+        // Custom Access (Task #111): an explicit 'team' grant lets a cashier in.
+        if ($user->isPosCashier() && $user->posCustomAllows('team') !== true) {
             return redirect()->route('pos.dashboard')->with('error', __('pos.access_denied'));
         }
 
@@ -4942,7 +4943,7 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $user = auth('pos')->user();
 
-        if ($user->isPosCashier()) {
+        if ($user->isPosCashier() && $user->posCustomAllows('team') !== true) {
             return back()->with('error', __('pos.access_denied'));
         }
 
@@ -5003,7 +5004,7 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $user = auth('pos')->user();
 
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || ($user->isPosCashier() && $user->posCustomAllows('team') !== true)) {
             return back()->with('error', __('pos.access_denied'));
         }
 
@@ -5033,12 +5034,60 @@ class PosController extends Controller
             : __('pos.cashier_offline_now', ['name' => $cashier->name]));
     }
 
+    /**
+     * Team page — Custom Access (Task #111, owner-approved 2 Aug 2026):
+     * per-member feature tick-boxes overlaying the role defaults. Saved as a
+     * JSON array of feature keys in users.pos_custom_access; custom_enabled=0
+     * clears the set (member reverts to plain role behavior). Only cashier +
+     * manager rows accept a set — confined roles stay confined (PosAuth).
+     */
+    public function setCashierAccess(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $user = auth('pos')->user();
+
+        if (!$user || ($user->isPosCashier() && $user->posCustomAllows('team') !== true)) {
+            return back()->with('error', __('pos.access_denied'));
+        }
+
+        // PROD schema-drift guard: migration not landed yet → clear message.
+        if (!\App\Services\PosAccessService::columnReady()) {
+            return back()->with('error', __('pos.custom_access_unavailable'));
+        }
+
+        $request->validate([
+            'custom_enabled' => 'required|boolean',
+            'features' => 'nullable|array',
+            'features.*' => 'string|in:' . implode(',', \App\Services\PosAccessService::FEATURES),
+        ]);
+
+        $member = User::where('company_id', $companyId)
+            ->whereIn('pos_role', \App\Services\PosAccessService::CUSTOMIZABLE_ROLES)
+            ->findOrFail($id);
+
+        if (!$request->boolean('custom_enabled')) {
+            $member->pos_custom_access = null;
+            $member->save();
+            return back()->with('success', __('pos.custom_access_cleared', ['name' => $member->name]));
+        }
+
+        $features = array_values(array_intersect(
+            \App\Services\PosAccessService::FEATURES,
+            (array) $request->input('features', [])
+        ));
+
+        $member->pos_custom_access = json_encode($features);
+        $member->save();
+
+        return back()->with('success', __('pos.custom_access_saved', ['name' => $member->name]));
+    }
+
     public function updateCashier(Request $request, $id)
     {
         $companyId = app('currentCompanyId');
         $user = auth('pos')->user();
 
-        if ($user->isPosCashier()) {
+        if ($user->isPosCashier() && $user->posCustomAllows('team') !== true) {
             return back()->with('error', __('pos.access_denied'));
         }
 
@@ -5193,7 +5242,7 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $user = auth('pos')->user();
 
-        if ($user->isPosCashier()) {
+        if ($user->isPosCashier() && $user->posCustomAllows('team') !== true) {
             return back()->with('error', __('pos.access_denied'));
         }
 
@@ -6085,7 +6134,7 @@ class PosController extends Controller
         $user = auth('pos')->user();
         // pos_role wins over the base role column: a user assigned pos_cashier is a
         // cashier inside the POS panel even if their base role is company_admin.
-        if (!$user || $user->isPosCashier() || !$user->isPosAdmin()) {
+        if (!$user || ($user->isPosCashier() ? $user->posCashierBlocked() : !$user->isPosAdmin())) {
             abort(403, 'Only POS administrators can bulk-change sale screen visibility.');
         }
         $request->validate([

@@ -150,6 +150,27 @@ class PosAuth
             }
         }
 
+        // ═══ POS Team Custom Access (Task #111, owner-approved 2 Aug 2026) ═══
+        // Optional per-member feature grants set on /pos/team. Applies ONLY to
+        // pos_cashier / pos_manager — the confined roles above keep their
+        // path-prefix confinement (it SUPERSEDES custom grants), and the owner
+        // (company_admin) can never be restricted. Paths that map to no feature
+        // key (sale screen, invoice APIs, prefs, logout) are always reachable.
+        $customAccess = \App\Services\PosAccessService::customSet($user);
+        if ($customAccess !== null) {
+            $path = ltrim($request->path(), '/');
+            $feature = \App\Services\PosAccessService::featureForPath($path);
+            if ($feature !== null && !in_array($feature, $customAccess, true)) {
+                if ($request->expectsJson()) {
+                    abort(403, __('pos.custom_access_denied'));
+                }
+                // Dashboard blocked too → land on the sale screen (unmapped path,
+                // always allowed) so the redirect can never loop.
+                $home = in_array('dashboard', $customAccess, true) ? '/pos/dashboard' : '/pos/invoice/create';
+                return redirect($home)->with('error', __('pos.custom_access_denied'));
+            }
+        }
+
         // ═══ Staff Hazri heartbeat (owner batch, 26 Jul 2026) ═══
         // Throttled "last seen" stamp on the user's latest OPEN session row —
         // max ONE UPDATE per user per 5 minutes (cache flag), kabhi request

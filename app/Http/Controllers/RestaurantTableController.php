@@ -19,7 +19,7 @@ class RestaurantTableController extends Controller
     private function denyCashier(): void
     {
         $user = auth('pos')->user();
-        if ($user && $user->isPosCashier()) {
+        if ($user && $user->posCashierBlocked()) {
             abort(403, 'Only POS administrators can manage floors and tables.');
         }
     }

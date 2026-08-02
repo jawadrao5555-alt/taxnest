@@ -1381,7 +1381,7 @@ class RestaurantPosController extends Controller
     public function storeStation(Request $request)
     {
         $user = auth('pos')->user();
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || $user->posCashierBlocked()) {
             abort(403, 'Only POS administrators can manage counters.');
         }
         $companyId = app('currentCompanyId');
@@ -1397,7 +1397,7 @@ class RestaurantPosController extends Controller
     public function updateStation(Request $request, $id)
     {
         $user = auth('pos')->user();
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || $user->posCashierBlocked()) {
             abort(403, 'Only POS administrators can manage counters.');
         }
         $companyId = app('currentCompanyId');
@@ -1411,7 +1411,7 @@ class RestaurantPosController extends Controller
     public function deleteStation(Request $request, $id)
     {
         $user = auth('pos')->user();
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || $user->posCashierBlocked()) {
             abort(403, 'Only POS administrators can manage counters.');
         }
         $companyId = app('currentCompanyId');

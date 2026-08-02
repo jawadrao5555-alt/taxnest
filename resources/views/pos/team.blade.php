@@ -81,7 +81,7 @@
                 </thead>
                 <tbody>
                     @forelse($team as $member)
-                    <tr class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50" x-data="{ editing: false, showPw: false }">
+                    <tr class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50" x-data="{ editing: false, showPw: false, accessOpen: false }">
                         <td class="px-4 py-3">
                             <span x-show="!editing" class="font-medium text-gray-900 dark:text-white">{{ $member->name }}</span>
                             <template x-if="editing">
@@ -197,6 +197,61 @@
                                         {{ $member->is_active ? __('pos.deactivate') : __('pos.activate') }}
                                     </button>
                                 </form>
+                                {{-- Custom Access (Task #111): cashier + manager only — confined
+                                     roles (kitchen/waiter/delivery) keep their fixed confinement. --}}
+                                @if(in_array($member->pos_role, \App\Services\PosAccessService::CUSTOMIZABLE_ROLES, true))
+                                @php $memberAccess = \App\Services\PosAccessService::customSet($member); @endphp
+                                <button x-show="!editing" @click="accessOpen = true" class="inline-flex items-center gap-1 text-purple-600 hover:text-purple-700 text-xs font-medium" title="{{ __('pos.custom_access') }}">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                                    {{ __('pos.custom_access') }}
+                                    @if($memberAccess !== null)
+                                    <span class="px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-[9px] font-bold uppercase">{{ __('pos.custom_badge') }}</span>
+                                    @endif
+                                </button>
+                                {{-- Modal --}}
+                                <template x-teleport="body">
+                                <div x-show="accessOpen" x-cloak class="fixed inset-0 z-[120] flex items-center justify-center p-4" style="background: rgba(15,10,40,0.55); backdrop-filter: blur(3px);" @keydown.escape.window="accessOpen = false">
+                                    <div class="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden" @click.outside="accessOpen = false"
+                                         x-data="{ customOn: {{ $memberAccess !== null ? 'true' : 'false' }} }"
+                                         x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100">
+                                        <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                                            <div>
+                                                <h3 class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.custom_access_title', ['name' => $member->name]) }}</h3>
+                                                <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.custom_access_sale_note') }}</p>
+                                            </div>
+                                            <button @click="accessOpen = false" class="text-gray-400 hover:text-gray-600 p-1">
+                                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                            </button>
+                                        </div>
+                                        <form method="POST" action="{{ route('pos.team.set-access', $member->id) }}">
+                                            @csrf
+                                            <div class="px-5 py-4 max-h-[60vh] overflow-y-auto">
+                                                <p class="text-[11px] text-gray-500 dark:text-gray-400 mb-3">{{ __('pos.custom_access_hint') }}</p>
+                                                <label class="flex items-center gap-2.5 mb-3 cursor-pointer">
+                                                    <input type="hidden" name="custom_enabled" :value="customOn ? 1 : 0">
+                                                    <input type="checkbox" x-model="customOn" class="rounded border-gray-300 dark:border-gray-600 text-purple-600 focus:ring-purple-500">
+                                                    <span class="text-xs font-semibold text-gray-800 dark:text-gray-200">{{ __('pos.custom_access_enable_label') }}</span>
+                                                </label>
+                                                <div class="grid grid-cols-2 gap-2" :class="!customOn && 'opacity-40 pointer-events-none'">
+                                                    @foreach(\App\Services\PosAccessService::FEATURES as $featKey)
+                                                    <label class="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
+                                                        <input type="checkbox" name="features[]" value="{{ $featKey }}"
+                                                               @checked($memberAccess !== null && in_array($featKey, $memberAccess, true))
+                                                               class="rounded border-gray-300 dark:border-gray-600 text-purple-600 focus:ring-purple-500">
+                                                        <span class="text-[11px] font-medium text-gray-700 dark:text-gray-300">{{ __('pos.feat_' . $featKey) }}</span>
+                                                    </label>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                            <div class="px-5 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-end gap-2">
+                                                <button type="button" @click="accessOpen = false" class="px-4 py-2 rounded-lg text-xs font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800">{{ __('pos.cancel') }}</button>
+                                                <button type="submit" class="px-5 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold">{{ __('pos.save_btn') }}</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                                </template>
+                                @endif
                             </div>
                             @else
                             <span class="text-xs text-gray-400">{{ __('pos.owner_word') }}</span>

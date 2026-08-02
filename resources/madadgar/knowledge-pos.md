@@ -197,6 +197,14 @@ Sale screen ki mazeed cheezein:
 - Har cashier ke liye PRA reporting alag ON/OFF karne ka toggle bhi yahin hai.
 - Company admin team members ke passwords /pos/team par dekh sakta hai (sirf admin ko nazar aate hain).
 
+
+### Custom Access — member-wise features chunein (2 Aug 2026)
+- /pos/team par Cashier ya Manager ki row mein "Custom Access" button hai — popup mein tick-boxes se chunein ke us member ko kaunse features milen: Dashboard, Orders/Bills, Products, Customers, Tables, Kitchen Display, Deliveries, Riders, Sales Reports, Tax Reports, Day Close, Stock/Inventory, Customize/Settings, Team.
+- Jo features tick hon SIRF wohi navigation mein nazar aate hain; baqi pages par jane ki koshish par member wapas bhej diya jata hai. Sale screen (billing) HAMESHA khuli rehti hai — bili kabhi nahi rukti.
+- Custom Access OFF (default) = role ka aam rawaiya, bilkul pehle jaisa. Kisi member par set na karein to kuch nahi badalta.
+- Cashier ko aam tor par band cheez (misal Customize ya Team) tick karne se woh us page tak pahunch jata hai; Manager ki koi cheez untick karne se woh us se chhin jati hai.
+- Kitchen, Waiter, Rider, Delivery Manager par Custom Access LAGOO NAHI hota — yeh roles apne mehdood ilaqe mein hi rehte hain (custom grant se admin pages nahi milte; zaroorat ho to role badlein). Company admin (owner) kabhi mehdood nahi ho sakta.
+
 ## Packages aur Billing (/pos/billing)
 - Starter Rs 9,999/saal: 1 team account, 500 final bills/mahina.
 - Business Rs 14,999/saal: 5 accounts, 2,000 bills/mahina.

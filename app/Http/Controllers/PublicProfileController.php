@@ -108,7 +108,7 @@ class PublicProfileController extends Controller
     private function adminGate(Request $request): array
     {
         $user = $request->user('pos');
-        if (!$user || $user->isPosCashier()) {
+        if (!$user || $user->posCashierBlocked()) {
             abort(403, 'Only POS administrators can manage the public profile.');
         }
         $companyId = app('currentCompanyId');

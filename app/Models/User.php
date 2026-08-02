@@ -100,6 +100,32 @@ class User extends Authenticatable
         return $this->pos_role === 'pos_delivery';
     }
 
+    /**
+     * POS Team Custom Access (Task #111): NULL = no custom set (role default
+     * behavior); true/false = the custom set's verdict for this feature.
+     * Confined roles + company_admin always return NULL (PosAccessService).
+     */
+    public function posCustomAllows(string $feature): ?bool
+    {
+        return \App\Services\PosAccessService::customAllows($this, $feature);
+    }
+
+    /**
+     * Drop-in replacement for `isPosCashier()` in page/POST access guards:
+     * still blocks cashiers by default, but lets one through when a Custom
+     * Access grant covers the CURRENT request's feature (Task #111).
+     * Unmapped paths keep the old cashier block unchanged.
+     */
+    public function posCashierBlocked(): bool
+    {
+        if (!$this->isPosCashier()) {
+            return false;
+        }
+        $feature = \App\Services\PosAccessService::featureForPath(request()->path());
+
+        return $feature === null || $this->posCustomAllows($feature) !== true;
+    }
+
     public function company()
     {
         return $this->belongsTo(Company::class);

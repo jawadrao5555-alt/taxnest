@@ -57,6 +57,7 @@
 - [Unicode heredoc writes truncate files](unicode-heredoc-write.md) — \ud-escape emoji in heredoc/python writes can truncate the target file mid-write; use \U0001F5A8 + atomic write; restore via git show HEAD:path.
 - [SaaS admin flash banners](admin-panel-flash-banners.md) — admin layout renders success/error/$errors centrally; pages add none; "form does nothing" = suspect silent validation fail.
 - [PRA POS package limits](pos-package-limits.md) — monthly FINAL-bill quota + team-account quota; four gated final paths (incl. retryPra local-only + toggleCashier reactivation); provisionals free until promoted.
+- [POS Team Custom Access](pos-custom-access.md) — PosAccessService = single truth (nav+gate+guards); cashier guards must use posCashierBlocked(), not isPosCashier(); confined roles & owner exempt.
 - [POS team password visibility](pos-team-password-visibility.md) — admin-viewable encrypted copy on /pos/team; EVERY team-password write path must sync pos_team_password_enc (4 paths, role+hasColumn guards).
 - [Live POS test company](live-pos-test-company.md) — STANDING live QA company id 35 (retained); all other live POS companies are REAL customers; "Pro restaurant drift" was a FALSE alarm; pos/* CSRF-exempt.
 - [POS restaurant module invariants](pos-restaurant-module.md) — gating column rule, Table Shift (empty-target-only, timer carries, no KOT reprint), station-KOT single resolver, KDS kitchen_status isolation, waiter settle path, deal snapshot stock, QR menu.

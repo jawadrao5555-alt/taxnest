@@ -12,6 +12,13 @@
     // matches what the restaurant.only middleware actually allows, regardless of
     // the restaurant_mode toggle. Dashboard routing above stays on restaurant_mode.
     $posFeaturesLayout = \App\Services\PosFeatureService::forCompany($companyLayout);
+    // POS Team Custom Access (Task #111): optional per-member feature grants.
+    // $posNavCan('feature', $roleDefault) — no custom set → role default
+    // (existing behavior, zero change for existing shops); custom set →
+    // ONLY ticked features render in the nav (route gate lives in PosAuth).
+    $posNavCan = function (string $f, bool $default = true) use ($posUserLayout) {
+        return ($posUserLayout ? $posUserLayout->posCustomAllows($f) : null) ?? $default;
+    };
     // POS UNIFICATION: every company (restaurant or retail) now bills on the single
     // universal sale screen (pos.universal). The legacy restaurant sale screen and its
     // per-company opt-out were retired — restaurant behavior is driven by feature flags.
@@ -344,15 +351,23 @@
                             @endunless
                             @if(($companyLayout->pos_dashboard_style ?? 'default') === 'saaf')
                             {{-- Saaf dashboard (Jul 2026): simplified always-visible nav — 5 core links; everything else stays in the profile menu. --}}
+                            @if($posNavCan('dashboard'))
                             <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}"
                                class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.dashboard') || request()->routeIs('pos.restaurant.dashboard') ? 'active text-white' : 'text-white' }}">{{ __('pos.nav_home') }}</a>
+                            @endif
+                            @if($posNavCan('orders'))
                             <a href="{{ route('pos.transactions') }}"
                                class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.transactions') ? 'active text-white' : 'text-white' }}">{{ __('pos.nav_bills') }}</a>
+                            @endif
+                            @if($posNavCan('products'))
                             <a href="{{ route('pos.products') }}"
                                class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.products') ? 'active text-white' : 'text-white' }}">{{ __('pos.products_word') }}</a>
+                            @endif
+                            @if($posNavCan('reports'))
                             <a href="{{ route('pos.reports') }}"
                                class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.reports') ? 'active text-white' : 'text-white' }}">{{ __('pos.reports') }}</a>
-                            @if(!$isCashierLayout)
+                            @endif
+                            @if($posNavCan('customize', !$isCashierLayout))
                             <a href="{{ route('pos.customize') }}"
                                class="nav-pill px-2.5 py-1.5 rounded-lg text-[11px] font-medium {{ request()->routeIs('pos.customize') ? 'active text-white' : 'text-white' }}">{{ __('pos.settings') }}</a>
                             @endif
@@ -429,6 +444,8 @@
                                 $agentOnline = $agentOn && $companyLayout->agent_last_seen
                                     && \Carbon\Carbon::parse($companyLayout->agent_last_seen)->gt(now()->subMinutes(2));
                             @endphp
+                            {{-- Agent page = customize feature; members denied customize see no link (nav stays in sync with the route gate). --}}
+                            @if($posNavCan('customize'))
                             <a href="{{ route('pos.agent') }}"
                                title="{{ $agentOn ? ($agentOnline ? __('pos.ti_agent_sync_online') : __('pos.ti_agent_sync_offline')) : __('pos.ti_direct_production') }}"
                                class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition border
@@ -442,6 +459,7 @@
                                     {{ __('pos.direct_badge') }}
                                 @endif
                             </a>
+                            @endif
                         @endif
 
                         @php
@@ -553,73 +571,89 @@
                                     <div class="px-3 pt-2 pb-1">
                                         <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">{{ __('pos.nav_quick_access') }}</p>
                                     </div>
+                                    @if($posNavCan('dashboard'))
                                     <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
                                         {{ __('pos.dashboard') }}
                                     </a>
+                                    @endif
+                                    @if($posNavCan('orders'))
                                     <a href="{{ route('pos.transactions') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                                         {{ __('pos.nav_orders') }}
                                     </a>
+                                    @endif
+                                    @if($posNavCan('products'))
                                     <a href="{{ route('pos.products') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                                         {{ __('pos.products_word') }}
                                     </a>
+                                    @endif
+                                    @if($posNavCan('customers'))
                                     <a href="{{ route('pos.customers') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                         {{ __('pos.nav_customers') }}
                                     </a>
-                                    @if($posFeaturesLayout->tables && !$isCashierLayout)
+                                    @endif
+                                    @if($posFeaturesLayout->tables && $posNavCan('tables', !$isCashierLayout))
                                     <a href="{{ route('pos.restaurant.tables') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"/></svg>
                                         {{ __('pos.nav_tables') }}
                                     </a>
                                     @endif
-                                    @if($posFeaturesLayout->kitchen && !$isCashierLayout)
+                                    @if($posFeaturesLayout->kitchen && $posNavCan('kitchen', !$isCashierLayout))
                                     <a href="{{ route('pos.restaurant.kds') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                                         {{ __('pos.nav_kitchen_display') }}
                                     </a>
                                     @endif
                                     {{-- Delivery Riders (Jul 2026): board visible to cashiers too (they receive rider cash); Riders CRUD admin-only. Plan gate: Pro+ (Aug 2026 matrix). --}}
-                                    @if(!empty($posFeaturesLayout->delivery) && \App\Services\PosFeatureService::planAllows($companyLayout, 'riders_enabled'))
+                                    @if(!empty($posFeaturesLayout->delivery) && \App\Services\PosFeatureService::planAllows($companyLayout, 'riders_enabled') && $posNavCan('deliveries'))
                                     <a href="{{ route('pos.deliveries') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 11-4 0m10 0a2 2 0 104 0"/></svg>
                                         {{ __('pos.nav_deliveries') }}
                                     </a>
-                                    @if(!$isCashierLayout)
+                                    @endif
+                                    @if(!empty($posFeaturesLayout->delivery) && \App\Services\PosFeatureService::planAllows($companyLayout, 'riders_enabled') && $posNavCan('riders', !$isCashierLayout))
                                     <a href="{{ route('pos.riders') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                                         {{ __('pos.nav_riders') }}
                                     </a>
                                     @endif
-                                    @endif
 
+                                    @if($posNavCan('reports') || $posNavCan('tax_reports') || $posNavCan('day_close') || ($isRestaurantLayout && $posNavCan('reports')))
                                     <div class="px-3 pt-3 pb-1">
                                         <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">{{ __('pos.reports') }}</p>
                                     </div>
+                                    @endif
+                                    @if($posNavCan('reports'))
                                     <a href="{{ route('pos.reports') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                                         {{ __('pos.nav_sales_reports') }}
                                     </a>
+                                    @endif
+                                    @if($posNavCan('tax_reports'))
                                     <a href="{{ route('pos.tax-reports') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                                         {{ __('pos.nav_tax_reports') }}
                                     </a>
-                                    @if ($isRestaurantLayout)
+                                    @endif
+                                    @if ($isRestaurantLayout && $posNavCan('reports'))
                                     <a href="{{ route('pos.restaurant.cancelled-orders') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                         {{ __('pos.cancelled_orders') }}
                                     </a>
                                     @endif
+                                    @if($posNavCan('day_close'))
                                     <a href="{{ route('pos.day-close') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                         {{ __('pos.nav_day_close') }}
                                     </a>
+                                    @endif
 
                                     {{-- Company admin ALWAYS sees Inventory links (full visibility);
                                          pages redirect to POS Features with a prompt when the module is OFF. --}}
-                                    @if(!$isCashierLayout)
+                                    @if($posNavCan('inventory', !$isCashierLayout))
                                     <div class="px-3 pt-3 pb-1">
                                         <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">{{ __('pos.nav_inventory') }}
                                             @if(!$inventoryEnabledLayout)<span class="ml-1 normal-case font-medium text-[8px] px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400">{{ __('pos.off_badge') }}</span>@endif
@@ -643,7 +677,7 @@
                                     </a>
                                     @endif
 
-                                    @if($isRestaurantLayout && !$isCashierLayout)
+                                    @if($isRestaurantLayout && $posNavCan('inventory', !$isCashierLayout))
                                     <div class="px-3 pt-3 pb-1">
                                         <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">{{ __('pos.nav_restaurant') }}</p>
                                     </div>
@@ -657,7 +691,7 @@
                                     </a>
                                     @endif
 
-                                    @if(!$isCashierLayout)
+                                    @if($posNavCan('customize', !$isCashierLayout))
                                     <div class="px-3 pt-3 pb-1">
                                         <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">{{ __('pos.settings') }}</p>
                                     </div>
@@ -724,11 +758,19 @@
                      class="md:hidden border-t border-white/10 px-3 py-2 flex flex-wrap gap-1.5" style="background: hsla(var(--accent-h), var(--accent-s), 10%, 0.9)">
                     <a href="{{ route('pos.invoice.create') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.new_sale') }}</a>
                     @if(($companyLayout->pos_dashboard_style ?? 'default') === 'saaf')
+                    @if($posNavCan('dashboard'))
                     <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.nav_home') }}</a>
+                    @endif
+                    @if($posNavCan('orders'))
                     <a href="{{ route('pos.transactions') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.nav_bills') }}</a>
+                    @endif
+                    @if($posNavCan('products'))
                     <a href="{{ route('pos.products') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.products_word') }}</a>
+                    @endif
+                    @if($posNavCan('reports'))
                     <a href="{{ route('pos.reports') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.reports') }}</a>
-                    @if(!$isCashierLayout)
+                    @endif
+                    @if($posNavCan('customize', !$isCashierLayout))
                     <a href="{{ route('pos.customize') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.settings') }}</a>
                     @endif
                     @endif
@@ -773,19 +815,19 @@
                 open: false,
                 q: '',
                 idx: 0,
-                items: @js([
+                items: @js(array_values(array_filter([
                     ['label' => __('pos.new_sale'), 'url' => route('pos.invoice.create'), 'icon' => '+', 'kbd' => ''],
-                    ['label' => __('pos.dashboard'), 'url' => $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard'), 'icon' => '◧', 'kbd' => ''],
-                    ['label' => __('pos.nav_orders_transactions'), 'url' => route('pos.transactions'), 'icon' => '☰', 'kbd' => ''],
-                    ['label' => __('pos.products_word'), 'url' => route('pos.products'), 'icon' => '◫', 'kbd' => ''],
-                    ['label' => __('pos.nav_customers'), 'url' => route('pos.customers'), 'icon' => '◉', 'kbd' => ''],
-                    ['label' => __('pos.reports'), 'url' => route('pos.reports'), 'icon' => '▤', 'kbd' => ''],
-                    ['label' => __('pos.nav_day_close'), 'url' => route('pos.day-close'), 'icon' => '◆', 'kbd' => ''],
-                    ['label' => __('pos.nav_billing_plan'), 'url' => route('pos.billing'), 'icon' => '₨', 'kbd' => ''],
-                    ['label' => __('pos.nav_business_profile'), 'url' => route('pos.business-profile'), 'icon' => '◎', 'kbd' => ''],
+                    $posNavCan('dashboard') ? ['label' => __('pos.dashboard'), 'url' => $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard'), 'icon' => '◧', 'kbd' => ''] : null,
+                    $posNavCan('orders') ? ['label' => __('pos.nav_orders_transactions'), 'url' => route('pos.transactions'), 'icon' => '☰', 'kbd' => ''] : null,
+                    $posNavCan('products') ? ['label' => __('pos.products_word'), 'url' => route('pos.products'), 'icon' => '◫', 'kbd' => ''] : null,
+                    $posNavCan('customers') ? ['label' => __('pos.nav_customers'), 'url' => route('pos.customers'), 'icon' => '◉', 'kbd' => ''] : null,
+                    $posNavCan('reports') ? ['label' => __('pos.reports'), 'url' => route('pos.reports'), 'icon' => '▤', 'kbd' => ''] : null,
+                    $posNavCan('day_close') ? ['label' => __('pos.nav_day_close'), 'url' => route('pos.day-close'), 'icon' => '◆', 'kbd' => ''] : null,
+                    $posNavCan('customize') ? ['label' => __('pos.nav_billing_plan'), 'url' => route('pos.billing'), 'icon' => '₨', 'kbd' => ''] : null,
+                    $posNavCan('customize') ? ['label' => __('pos.nav_business_profile'), 'url' => route('pos.business-profile'), 'icon' => '◎', 'kbd' => ''] : null,
                     ['label' => __('pos.cmd_toggle_fullscreen'), 'action' => 'fullscreen', 'icon' => '⛶', 'kbd' => 'F11'],
                     ['label' => __('pos.cmd_toggle_dark_mode'), 'action' => 'darkmode', 'icon' => '☾', 'kbd' => ''],
-                ]),
+                ]))),
                 get filtered() { return this.q.trim() === '' ? this.items : this.items.filter(i => i.label.toLowerCase().includes(this.q.toLowerCase())); },
                 run(item) {
                     this.open = false; this.q = ''; this.idx = 0;

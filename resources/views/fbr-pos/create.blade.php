@@ -346,7 +346,7 @@ kbd {
                     <div>
                         <h2 class="text-lg font-extrabold tracking-tight">Pending Day Close</h2>
                         <p class="text-xs text-amber-50/95 mt-0.5">
-                            <span x-text="pending.length"></span> din(s) ka day-close pending hai —
+                            <span x-text="pending.length"></span>{{ __('pos.dayclose_pending_days_suffix') }}
                             <span x-text="totalBills()"></span> bills ·
                             <span x-text="fmt(totalAmount())"></span>
                         </p>
@@ -361,7 +361,7 @@ kbd {
             <div class="px-5 py-4 overflow-y-auto flex-1">
                 <div class="rounded-lg bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 p-3 mb-4 text-sm text-amber-900 dark:text-amber-100">
                     <p class="font-semibold mb-0.5">📌 Smart Recovery</p>
-                    <p class="text-xs opacity-90">Rush ya holiday mein day-close miss ho gaya? Koi baat nahi — yahan se ek click mein pichlay din(s) close karke nayi sale shuru karein. Each Z-Report ko bilkul waisay hi generate kiya jata hai jaise manual close.</p>
+                    <p class="text-xs opacity-90">{{ __('pos.dayclose_smart_recovery_body') }}</p>
                 </div>
 
                 <div x-show="errorMsg" x-cloak class="mb-3 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-sm text-red-700 dark:text-red-200 font-semibold" x-text="errorMsg"></div>

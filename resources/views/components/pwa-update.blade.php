@@ -24,7 +24,7 @@ Usage: <x-pwa-update color="emerald" />
             </div>
             <div style="display:flex; flex-direction:column; gap:1px; line-height:1.25; color:#fff;">
                 <div style="font-size:13px; font-weight:800; letter-spacing:0.2px;">New update available</div>
-                <div style="font-size:11px; opacity:0.92; font-weight:500;">Apply karein behtareen experience ke liye <span id="tnPwaUpdateCountdown" style="font-weight:700;"></span></div>
+                <div style="font-size:11px; opacity:0.92; font-weight:500;">{{ __('pos.pwa_apply_hint') }} <span id="tnPwaUpdateCountdown" style="font-weight:700;"></span></div>
             </div>
             <button id="tnPwaUpdateBtn" style="flex-shrink:0; margin-left:6px; padding:7px 14px; border-radius:10px; background:#fff; color:{{ $c['to'] }}; border:none; font-size:12px; font-weight:800; cursor:pointer; transition: all .15s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.18);">
                 Refresh

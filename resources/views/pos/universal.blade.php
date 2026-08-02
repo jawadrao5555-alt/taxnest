@@ -1156,7 +1156,7 @@ window.addEventListener('popstate', function() {
                         </button>
                     </template>
                 </div>
-                <button type="button" @click="openReprint()" class="text-[10px] font-bold text-purple-600 dark:text-purple-400 hover:text-purple-800 flex-shrink-0 px-1.5" title="Saray aaj ke bills (Alt+R)">{{ __('pos.all_arrow') }}</button>
+                <button type="button" @click="openReprint()" class="text-[10px] font-bold text-purple-600 dark:text-purple-400 hover:text-purple-800 flex-shrink-0 px-1.5" title="{{ __('pos.ti_all_todays_bills') }}">{{ __('pos.all_arrow') }}</button>
             </div>
 
             <div class="md:hidden flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
@@ -1554,7 +1554,7 @@ window.addEventListener('popstate', function() {
                  the "anjaane mein bill final" accidents. Same table-status feed
                  as the Select-Table picker (single source, no duplicate system). --}}
             <div class="border-t-2 border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 flex-shrink-0">
-                <button type="button" @click="tableBoardOpen = true" class="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-900 transition" title="Table board kholein — har table ka live haal (Alt+B)">
+                <button type="button" @click="tableBoardOpen = true" class="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-900 transition" title="{{ __('pos.ti_open_table_board') }}">
                     <svg class="w-3.5 h-3.5 text-teal-700 dark:text-teal-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M5 10v9m14-9v9M4 5h16a1 1 0 011 1v3H3V6a1 1 0 011-1z"/></svg>
                     <span class="text-[11px] font-black text-gray-700 dark:text-gray-300 tracking-wide">TABLE</span>
                     <span x-show="boardCounts().occupied > 0" class="min-w-[16px] px-1 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-[9px] rounded-full font-black" x-text="boardCounts().occupied"></span>
@@ -4118,7 +4118,7 @@ function restaurantPos() {
                 const up = new URLSearchParams(window.location.search).get('updated');
                 if (up) {
                     history.replaceState({}, '', '{{ route('pos.invoice.create') }}');
-                    setTimeout(() => this.showToast(window.TXT.bill_word + up + ' updated — F10 se Make Final kar sakte hain', 'success'), 400);
+                    setTimeout(() => this.showToast(window.TXT.bill_word + up + window.TXT.sfx_updated_f10_final, 'success'), 400);
                 }
             } catch (e) {}
             // Lazy-load provisional bill list on mount (for header badge count).
@@ -7517,7 +7517,7 @@ function restaurantPos() {
             this.incomingOrders.forEach(o => {
                 if (this.notifiedIncoming.includes(o.id)) return;
                 this.notifiedIncoming.push(o.id);
-                this.showToast(window.TXT.new_waiter_order_prefix + o.order_number + (o.table ? ' (T-' + o.table + ')' : '') + ' — TABLE board (Alt+B) se kholein', 'success');
+                this.showToast(window.TXT.new_waiter_order_prefix + o.order_number + (o.table ? ' (T-' + o.table + ')' : '') + window.TXT.sfx_open_table_board, 'success');
             });
         },
         // Two-tone WebAudio chime — no audio file, works offline, ~0.35s. Browsers

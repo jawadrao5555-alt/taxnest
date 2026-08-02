@@ -23,12 +23,21 @@ class InvoiceImportBatch extends Model
         'error_message',
         'started_at',
         'finished_at',
+        'pruned_at',
     ];
 
     protected $casts = [
         'started_at' => 'datetime',
         'finished_at' => 'datetime',
+        'pruned_at' => 'datetime',
     ];
+
+    /** True once the retention pruner has cleared the heavy JSON columns. */
+    public function isPruned(): bool
+    {
+        return $this->pruned_at !== null
+            || ($this->rows_json === null && $this->result_json === null && (int) $this->total_rows > 0);
+    }
 
     public function company()
     {

@@ -154,6 +154,16 @@ class InvoiceImportController extends Controller
             abort(404);
         }
 
+        // Retention pruning cleared the row details — report the expiry
+        // instead of streaming an empty spreadsheet.
+        if ($batch->isPruned()) {
+            return response(
+                'This error report has expired. Row details of old import batches are cleared after the retention period — only summary counts are kept. Please re-upload the file to see errors again.',
+                410,
+                ['Content-Type' => 'text/plain; charset=UTF-8']
+            );
+        }
+
         return $this->service->errorReportResponse($batch);
     }
 

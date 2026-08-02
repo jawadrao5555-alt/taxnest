@@ -41,6 +41,9 @@ Schedule::command('payment-proofs:expiry-reminders')->dailyAt('08:10');
 // Storage hygiene: delete receipt FILES of proofs verified/rejected >12 months
 // ago (DB rows kept for audit, file_pruned_at flagged). Rows stay reviewable.
 Schedule::command('payment-proofs:prune')->dailyAt('04:30');
+// DB hygiene: NULL the heavy rows_json/result_json of invoice import batches
+// older than 30 days (summary counts stay for the import-history page).
+Schedule::command('import-batches:prune')->dailyAt('04:45');
 // Auto-close prior POS trading days for companies that opted into auto day-close
 // (6 AM next-morning rule, owner 23 Jul 2026 — a day closes at 6:00 AM the next
 // morning if nobody closed it manually; before 6 AM yesterday stays open).

@@ -345,6 +345,38 @@
                     </div>
                 </div>
 
+                <!-- NestPOS Promo Video -->
+                <div class="fade-in-up" x-data="{ playing: false }">
+                    <div class="max-w-3xl mx-auto text-center mb-8">
+                        <div class="inline-block px-3 py-1 mb-4 bg-purple-50 border border-purple-100 rounded-full text-xs font-semibold uppercase tracking-widest accent-purple">
+                            60-Second Overview
+                        </div>
+                        <h4 class="text-2xl sm:text-3xl font-serif text-[#052730]">See NestPOS in action</h4>
+                    </div>
+                    <div class="max-w-4xl mx-auto">
+                        <div class="rounded-xl bg-white p-2 border border-gray-200 shadow-xl">
+                            <div class="relative rounded overflow-hidden border border-gray-300" style="aspect-ratio: 16/9; background: #052730;">
+                                <video x-ref="promoVideo" class="w-full h-full" controls playsinline preload="none"
+                                       poster="{{ asset('images/promo-poster.jpg') }}"
+                                       x-show="playing" x-cloak>
+                                    <source src="{{ asset('videos/nestpos-promo.mp4') }}?v=1" type="video/mp4">
+                                </video>
+                                <button x-show="!playing" type="button" aria-label="Play video"
+                                        @click="playing = true; $nextTick(() => { $refs.promoVideo.play(); })"
+                                        class="absolute inset-0 w-full h-full group cursor-pointer">
+                                    <img src="{{ asset('images/promo-poster.jpg') }}" alt="NestPOS promo video" loading="lazy" class="absolute inset-0 w-full h-full object-cover">
+                                    <span class="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors"></span>
+                                    <span class="absolute inset-0 flex items-center justify-center">
+                                        <span class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/95 shadow-xl flex items-center justify-center group-hover:scale-105 transition-transform">
+                                            <svg class="w-7 h-7 sm:w-8 sm:h-8 text-[#052730] ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                                        </span>
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
 
                 <!-- FBR POS -->

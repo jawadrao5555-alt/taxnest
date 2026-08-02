@@ -34,6 +34,14 @@ class PosBootFingerprintStabilityTest extends TestCase
     {
         parent::setUp();
 
+        // Task 117 baked planAllows('offline_enabled') into the fingerprint,
+        // and planAllows caches per company id STATICALLY. Ids restart at 1
+        // after dropAllTables, so without this flush the test only passes
+        // when an EARLIER test class happens to have warmed the cache for
+        // id 1 (order-dependent) — and crashes standalone on the missing
+        // subscriptions table. Flush + real tables = deterministic.
+        \App\Services\PosFeatureService::flushGateCaches();
+
         Schema::dropAllTables();
 
         Schema::create('companies', function (Blueprint $table) {
@@ -90,6 +98,33 @@ class PosBootFingerprintStabilityTest extends TestCase
             $table->string('payment_method');
             $table->decimal('tax_rate', 8, 2)->default(0);
             $table->boolean('is_active')->default(true);
+            $table->timestamps();
+        });
+
+        // planAllows (fingerprint 'set' hash, Task 117) resolves the active
+        // subscription + plan. Left EMPTY: no subscription → gate false —
+        // the fingerprint just needs the lookup to work, not to pass.
+        Schema::create('subscriptions', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->unsignedBigInteger('pricing_plan_id')->nullable();
+            $table->boolean('active')->default(true);
+            $table->date('start_date')->nullable();
+            $table->date('end_date')->nullable();
+            $table->timestamp('trial_ends_at')->nullable();
+            $table->string('override_type')->default('none');
+            $table->timestamp('override_until')->nullable();
+            $table->timestamp('override_granted_at')->nullable();
+            $table->integer('free_invoice_limit')->nullable();
+            $table->timestamps();
+        });
+        Schema::create('pricing_plans', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('product_type')->default('pos');
+            $table->boolean('is_trial')->default(false);
+            $table->boolean('offline_enabled')->default(true);
+            $table->integer('invoice_limit')->nullable();
             $table->timestamps();
         });
 

@@ -20,7 +20,7 @@ class NewPasswordController extends Controller
         $email = $request->query('email');
 
         if (!$token || !$email || session('password_reset_token') !== $token || session('password_reset_email') !== $email) {
-            return redirect()->route('password.request')->withErrors(['email' => 'Invalid or expired reset session. Please start again.']);
+            return redirect()->route('password.request')->withErrors(['email' => __('pos.auth_session_invalid')]);
         }
 
         return view('auth.reset-password', ['email' => $email, 'token' => $token]);
@@ -32,15 +32,20 @@ class NewPasswordController extends Controller
             'token' => ['required'],
             'email' => ['required', 'email'],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
+        ], [
+            'email.required' => __('pos.auth_val_email_required'),
+            'email.email' => __('pos.auth_val_email_email'),
+            'password.required' => __('pos.auth_val_password_required'),
+            'password.confirmed' => __('pos.auth_val_password_confirmed'),
         ]);
 
         if (session('password_reset_token') !== $request->token || session('password_reset_email') !== $request->email) {
-            return redirect()->route('password.request')->withErrors(['email' => 'Invalid or expired reset session. Please start again.']);
+            return redirect()->route('password.request')->withErrors(['email' => __('pos.auth_session_invalid')]);
         }
 
         $user = User::where('email', $request->email)->first();
         if (!$user) {
-            return back()->withErrors(['email' => 'User not found.']);
+            return back()->withErrors(['email' => __('pos.auth_user_not_found')]);
         }
 
         $fill = [
@@ -60,6 +65,6 @@ class NewPasswordController extends Controller
 
         session()->forget(['password_reset_token', 'password_reset_email']);
 
-        return redirect()->route('login')->with('status', 'Your password has been reset successfully. Please login with your new password.');
+        return redirect()->route('login')->with('status', __('pos.auth_password_reset_success'));
     }
 }

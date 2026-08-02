@@ -21,9 +21,12 @@ class PasswordResetLinkController extends Controller
     {
         $request->validate([
             'email' => ['required', 'email'],
+        ], [
+            'email.required' => __('pos.auth_val_email_required'),
+            'email.email' => __('pos.auth_val_email_email'),
         ]);
 
-        $neutralStatus = 'If that email has an account, a 6-digit code and reset link have been sent.';
+        $neutralStatus = __('pos.auth_fp_status_sent');
 
         $user = User::where('email', $request->email)->first();
         if (!$user) {
@@ -76,7 +79,7 @@ class PasswordResetLinkController extends Controller
         } catch (\Exception $e) {
             \Log::error('Mail send failed: ' . $e->getMessage());
             \App\Services\MailHealth::recordFailure('Password reset email', $e);
-            return back()->withErrors(['email' => 'Failed to send email. Please try again later.']);
+            return back()->withErrors(['email' => __('pos.auth_fp_send_failed')]);
         }
 
         return redirect()->route('password.verify.otp', ['email' => $request->email])
@@ -93,6 +96,11 @@ class PasswordResetLinkController extends Controller
         $request->validate([
             'email' => ['required', 'email'],
             'otp' => ['required', 'string', 'size:6'],
+        ], [
+            'email.required' => __('pos.auth_val_email_required'),
+            'email.email' => __('pos.auth_val_email_email'),
+            'otp.required' => __('pos.auth_val_otp_required'),
+            'otp.size' => __('pos.auth_val_otp_size'),
         ]);
 
         $record = DB::table('password_reset_otps')
@@ -103,7 +111,7 @@ class PasswordResetLinkController extends Controller
             ->first();
 
         if (!$record) {
-            return back()->withInput()->withErrors(['otp' => 'Invalid or expired code. Please try again.']);
+            return back()->withInput()->withErrors(['otp' => __('pos.auth_otp_invalid')]);
         }
 
         $tempToken = bin2hex(random_bytes(32));
@@ -123,7 +131,7 @@ class PasswordResetLinkController extends Controller
         $email = $request->query('email');
 
         if (!$token || !$email) {
-            return redirect()->route('password.request')->withErrors(['email' => 'Invalid reset link.']);
+            return redirect()->route('password.request')->withErrors(['email' => __('pos.auth_link_invalid')]);
         }
 
         $record = DB::table('password_reset_otps')
@@ -134,7 +142,7 @@ class PasswordResetLinkController extends Controller
             ->first();
 
         if (!$record) {
-            return redirect()->route('password.request')->withErrors(['email' => 'This reset link has expired or already been used. Please request a new one.']);
+            return redirect()->route('password.request')->withErrors(['email' => __('pos.auth_link_expired')]);
         }
 
         DB::table('password_reset_otps')

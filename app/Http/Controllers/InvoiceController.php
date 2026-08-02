@@ -380,7 +380,7 @@ class InvoiceController extends Controller
         if ($invoice->company_id !== $companyId && auth()->user()->role !== 'super_admin') {
             abort(403);
         }
-        $invoice->load('items', 'company', 'activityLogs.user', 'branch');
+        $invoice->load('items', 'company', 'activityLogs.user', 'branch', 'deliveries.user');
 
         $complianceReport = ComplianceReport::where('invoice_id', $invoice->id)
             ->orderBy('created_at', 'desc')
@@ -1375,62 +1375,10 @@ class InvoiceController extends Controller
 
     private function buildPdfData(Invoice $invoice): array
     {
-        $invoice->load('items', 'company');
-
-        $showWatermark = false;
-        $isDraft = $invoice->status === 'draft';
-
-        $company = $invoice->company ?? \App\Models\Company::find($invoice->company_id);
-        if ($company && ($company->force_watermark ?? false)) {
-            $showWatermark = true;
-        }
-
-        $subtotal = $invoice->items->sum(fn($item) => $item->price * $item->quantity);
-        $totalTax = $invoice->items->sum('tax');
-
-        if ($invoice->status === 'locked' && $invoice->fbr_status === 'production') {
-            $whtRate = $invoice->wht_rate ?? 0;
-            $whtAmount = $invoice->wht_amount ?? 0;
-            $netReceivable = $invoice->net_receivable ?? $invoice->total_amount;
-        } else {
-            $whtRate = floatval($invoice->wht_rate ?? request()->query('wht_rate', 0));
-            $whtAmount = round($subtotal * ($whtRate / 100), 2);
-            $netReceivable = round(($subtotal + $totalTax) + $whtAmount, 2);
-        }
-
-        $qrBase64 = '';
-        $fbrLogoBase64 = '';
-        if ($invoice->fbr_invoice_number) {
-            $qrData = json_encode([
-                'sellerNTNCNIC' => preg_replace('/[^0-9]/', '', $invoice->company->fbr_registration_no ?: ($invoice->company->ntn ?? '')),
-                'fbr_invoice_number' => $invoice->fbr_invoice_number,
-                'invoiceDate' => $invoice->invoice_date ?? $invoice->created_at->format('Y-m-d'),
-                'totalValues' => $invoice->total_amount,
-            ]);
-            $qrOptions = new \chillerlan\QRCode\QROptions([
-                'outputType' => \chillerlan\QRCode\Output\QROutputInterface::GDIMAGE_PNG,
-                'scale' => 10,
-            ]);
-            $qrBase64 = (new \chillerlan\QRCode\QRCode($qrOptions))->render($qrData);
-
-            $logoPath = public_path('images/fbr-digital-invoice-logo.png');
-            if (file_exists($logoPath)) {
-                $fbrLogoBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath));
-            }
-        }
-
-        return [
-            'invoice' => $invoice,
-            'showWatermark' => $showWatermark,
-            'isDraft' => $isDraft,
-            'subtotal' => $subtotal,
-            'totalTax' => $totalTax,
-            'wht_rate' => $whtRate,
-            'wht_amount' => $whtAmount,
-            'net_receivable' => $netReceivable,
-            'qrBase64' => $qrBase64,
-            'fbrLogoBase64' => $fbrLogoBase64,
-        ];
+        // Extracted to InvoicePdfService (shared with share links + buyer
+        // email attachments). The ?wht_rate= query fallback is preserved.
+        $q = request()->query('wht_rate');
+        return \App\Services\InvoicePdfService::buildData($invoice, is_numeric($q) ? floatval($q) : null);
     }
 
     public function pdf(Invoice $invoice)
@@ -2135,6 +2083,7 @@ class InvoiceController extends Controller
             ]);
 
             $invoice->items()->delete();
+            $invoice->deliveries()->delete();
             $invoice->delete();
 
             DB::commit();

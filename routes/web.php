@@ -239,6 +239,11 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         Route::post('/invoice/{invoice}/duplicate', [InvoiceController::class, 'duplicate'])->name('invoice.duplicate');
         Route::delete('/invoice/{invoice}', [InvoiceController::class, 'destroy'])->name('invoice.destroy');
 
+        // Buyer ko invoice bhejna (Email / WhatsApp wa.me) — sab plans, no premium gate.
+        Route::get('/invoice/{invoice}/send-info', [\App\Http\Controllers\InvoiceSendController::class, 'info'])->name('invoice.send-info');
+        Route::post('/invoice/{invoice}/send-email', [\App\Http\Controllers\InvoiceSendController::class, 'sendEmail'])->name('invoice.send-email')->middleware('throttle:12,1');
+        Route::post('/invoice/{invoice}/send-whatsapp', [\App\Http\Controllers\InvoiceSendController::class, 'sendWhatsApp'])->name('invoice.send-whatsapp')->middleware('throttle:30,1');
+
         Route::get('/invoices/csv-template', [CsvImportController::class, 'template'])->name('invoices.csv-template');
         Route::post('/invoices/csv-upload', [CsvImportController::class, 'upload'])->name('invoices.csv-upload');
         Route::post('/invoices/csv-process', [CsvImportController::class, 'process'])->name('invoices.csv-process');

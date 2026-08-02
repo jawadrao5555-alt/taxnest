@@ -114,6 +114,12 @@ class Invoice extends Model
         return $this->hasMany(InvoiceActivityLog::class)->orderBy('created_at', 'desc');
     }
 
+    /** Buyer send log (Email / WhatsApp) — newest first. */
+    public function deliveries()
+    {
+        return $this->hasMany(InvoiceDelivery::class)->orderBy('created_at', 'desc')->orderBy('id', 'desc');
+    }
+
     public function fbrLogs()
     {
         return $this->hasMany(FbrLog::class);

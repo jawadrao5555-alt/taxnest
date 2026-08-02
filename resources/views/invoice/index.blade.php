@@ -607,6 +607,17 @@
                                             <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                                             View
                                         </a>
+                                        {{-- Buyer ko bhejein — Email / WhatsApp (roles match the send routes; failed invoices excluded) --}}
+                                        @if($invoice->status !== 'failed' && in_array(auth()->user()->role, ['company_admin', 'employee']))
+                                        <button type="button" onclick="openSendModal({{ $invoice->id }}, 'email')" class="inline-flex items-center gap-0.5 px-2 py-1 rounded-lg text-[10px] font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 transition" title="Email karein">
+                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                                            Email
+                                        </button>
+                                        <button type="button" onclick="openSendModal({{ $invoice->id }}, 'whatsapp')" class="inline-flex items-center gap-0.5 px-2 py-1 rounded-lg text-[10px] font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 transition" title="WhatsApp karein">
+                                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.75.75 0 00.917.918l4.462-1.494A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.4 0-4.637-.734-6.482-1.988l-.452-.305-2.971.993.994-2.969-.316-.461A9.955 9.955 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
+                                            WA
+                                        </button>
+                                        @endif
                                     @if($tab === 'draft')
                                         @if($invoice->status === 'draft')
                                         <a href="/invoice/{{ $invoice->id }}/edit" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 transition">
@@ -1110,4 +1121,5 @@ function closeUniqueBuyersModal() {
 }
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeUniqueBuyersModal(); });
 </script>
+@include('invoice.partials.send-modal')
 </x-app-layout>

@@ -31,6 +31,7 @@ Deep module invariants live in `.agents/memory/` topic files — this file is th
 - Global HS Intelligence: `global_hs_master`, HS resolution + tax-schedule validation, admin-managed mapping engine with real-time suggestions.
 - Tax Consultant Console (`/consultant`, DI web guard only): consent-based client linking (invite code or NTN request + client approval), health dashboard, audited login-swap switch into clients, referral codes (`?ref=` at signup) + commission ledger from admin-recorded payments; admin oversight at `/admin/consultants` → memory `consultant-console.md`.
 - Bulk import: .xlsx template (TEXT code columns) + legacy CSV; shared row-level pre-validation (`InvoiceImportService`), .xlsx error report, queued background processing with polled progress; valid rows become drafts only.
+- Buyer send (Aug 2026, all plans): "Email karein" (sync `InvoiceShareMail` — B/W PDF attach + share link via `InvoicePdfService`, MailHealth-tracked) + "WhatsApp karein" (`PkPhone` → wa.me deep link) on invoice show/index + FBR-success modal; every send logged in `invoice_deliveries` (Delivery History card); missing contact captured inline → saved to `CustomerProfile`. Buyer-facing content ENGLISH only.
 
 ## PRA POS (NestPOS)
 Isolated POS (own auth/layouts/models); PRA integration with offline billing + auto-sync (transport failures queue 'offline' and auto-retry, never 'failed'); Restaurant module; unified top-nav (nav edits in `pos-app.blade.php`).

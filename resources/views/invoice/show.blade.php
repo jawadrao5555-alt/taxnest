@@ -350,9 +350,6 @@
                     </button>
                 </form>
                 @endif
-                @if($invoice->share_uuid)
-                <a href="https://wa.me/?text={{ urlencode('Invoice ' . $invoice->display_invoice_number . "\nDownload PDF: " . url('/share/invoice/' . $invoice->share_uuid . '/pdf')) }}" target="_blank" class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition">WhatsApp</a>
-                @endif
                 @elseif($invoice->status === 'failed')
                 {{-- FAILED: Edit & Fix, Retry Submit, Validate, Delete, Duplicate --}}
                 <a href="/invoice/{{ $invoice->id }}/edit" class="inline-flex items-center px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition">
@@ -522,6 +519,17 @@
                     };
                 }
                 </script>
+                @endif
+                {{-- Buyer ko bhejein — Email / WhatsApp (all statuses except failed; roles match the send routes) --}}
+                @if($invoice->status !== 'failed' && in_array(auth()->user()->role, ['company_admin', 'employee']))
+                <button type="button" onclick="openSendModal({{ $invoice->id }}, 'email')" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    Email karein
+                </button>
+                <button type="button" onclick="openSendModal({{ $invoice->id }}, 'whatsapp')" class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition">
+                    <svg class="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.75.75 0 00.917.918l4.462-1.494A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.4 0-4.637-.734-6.482-1.988l-.452-.305-2.971.993.994-2.969-.316-.461A9.955 9.955 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
+                    WhatsApp karein
+                </button>
                 @endif
             </div>
         </div>
@@ -1134,6 +1142,42 @@
             </div>
             @endif
 
+            {{-- Delivery History — buyer ko Email/WhatsApp se bheji gayi copies ka log --}}
+            @php $canSendInvoice = in_array(auth()->user()->role, ['company_admin', 'employee']); @endphp
+            @if($canSendInvoice || $invoice->deliveries->count() > 0)
+            <div class="premium-card overflow-hidden mb-6" id="deliveryHistoryCard">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h3 class="text-sm font-extrabold text-gray-900 dark:text-white uppercase tracking-wider">Delivery History</h3>
+                    <p class="text-xs text-gray-400 mt-0.5">Buyer ko bheji gayi copies — Email / WhatsApp</p>
+                </div>
+                <div class="px-6 py-4">
+                    <p id="deliveryHistoryEmpty" class="text-sm text-gray-400" @if($invoice->deliveries->count() > 0) style="display:none" @endif>
+                        Abhi buyer ko nahi bheji gayi{{ $canSendInvoice && $invoice->status !== 'failed' ? ' — upar "Email karein" ya "WhatsApp karein" istemal karein.' : '.' }}
+                    </p>
+                    <ul id="deliveryHistoryList" class="divide-y divide-gray-100 dark:divide-gray-800">
+                        @foreach($invoice->deliveries as $d)
+                        <li class="py-2.5 flex items-center gap-3">
+                            @if($d->channel === 'whatsapp')
+                            <span class="flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0 bg-green-500 text-white"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.75.75 0 00.917.918l4.462-1.494A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.4 0-4.637-.734-6.482-1.988l-.452-.305-2.971.993.994-2.969-.316-.461A9.955 9.955 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg></span>
+                            @else
+                            <span class="flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0 bg-blue-500 text-white"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg></span>
+                            @endif
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{{ $d->channel === 'whatsapp' ? '+' . $d->recipient : $d->recipient }}</p>
+                                <p class="text-xs text-gray-400">{{ $d->channel === 'whatsapp' ? 'WhatsApp' : 'Email' }} &middot; by {{ $d->user->name ?? 'System' }} &middot; {{ $d->created_at->format('d M Y, h:i A') }}</p>
+                            </div>
+                            @if($d->status === 'sent')
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Sent</span>
+                            @else
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800" @if($d->error) title="{{ $d->error }}" @endif>Failed</span>
+                            @endif
+                        </li>
+                        @endforeach
+                    </ul>
+                </div>
+            </div>
+            @endif
+
             @if($invoice->activityLogs && $invoice->activityLogs->count() > 0)
             <div class="premium-card overflow-hidden">
                 <div class="px-6 py-4 border-b border-gray-100">
@@ -1155,6 +1199,10 @@
                                     <span class="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500 text-white"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></span>
                                 @elseif($log->action === 'retry')
                                     <span class="flex items-center justify-center w-8 h-8 rounded-full bg-yellow-500 text-white"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></span>
+                                @elseif($log->action === 'sent_email')
+                                    <span class="flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg></span>
+                                @elseif($log->action === 'sent_whatsapp')
+                                    <span class="flex items-center justify-center w-8 h-8 rounded-full bg-green-500 text-white"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg></span>
                                 @else
                                     <span class="flex items-center justify-center w-8 h-8 rounded-full bg-red-500 text-white"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg></span>
                                 @endif
@@ -1239,10 +1287,14 @@
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                     Download
                 </button>
-                <a href="https://wa.me/?text={{ urlencode('Invoice ' . ($invoice->display_invoice_number ?? '') . "\nDownload: " . url('/share/invoice/' . ($invoice->share_uuid ?? '') . '/pdf')) }}" target="_blank" class="inline-flex items-center gap-2 px-4 py-2.5 bg-green-500 text-white rounded-lg text-sm font-bold hover:bg-green-600 transition shadow-md">
+                <button type="button" onclick="openSendModal({{ $invoice->id }}, 'whatsapp')" class="inline-flex items-center gap-2 px-4 py-2.5 bg-green-500 text-white rounded-lg text-sm font-bold hover:bg-green-600 transition shadow-md">
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.75.75 0 00.917.918l4.462-1.494A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.4 0-4.637-.734-6.482-1.988l-.452-.305-2.971.993.994-2.969-.316-.461A9.955 9.955 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
-                    WhatsApp
-                </a>
+                    WhatsApp karein
+                </button>
+                <button type="button" onclick="openSendModal({{ $invoice->id }}, 'email')" class="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition shadow-md">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    Email karein
+                </button>
             </div>
             <button onclick="closeFbrSuccessModal()" class="px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition">
                 Close
@@ -1848,4 +1900,5 @@ if (window.location.hash === '#submit') {
     }, 500);
 }
 </script>
+@include('invoice.partials.send-modal')
 </x-app-layout>

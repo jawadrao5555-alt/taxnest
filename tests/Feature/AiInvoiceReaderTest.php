@@ -493,6 +493,92 @@ class AiInvoiceReaderTest extends TestCase
         );
     }
 
+    // ----------------------------------------------- scanned PDF multi-page
+
+    /** Build an image-only (no extractable text) PDF with $pages pages. */
+    private function makeScannedPdf(int $pages): UploadedFile
+    {
+        $html = '';
+        for ($i = 1; $i <= $pages; $i++) {
+            $im = imagecreatetruecolor(300, 400);
+            $white = imagecolorallocate($im, 255, 255, 255);
+            imagefill($im, 0, 0, $white);
+            imagestring($im, 5, 40, 40, "PAGE {$i}", imagecolorallocate($im, 0, 0, 0));
+            ob_start();
+            imagejpeg($im);
+            $b64 = base64_encode((string) ob_get_clean());
+            imagedestroy($im);
+            $html .= '<div style="page-break-after:always"><img src="data:image/jpeg;base64,' . $b64 . '"></div>';
+        }
+
+        $dompdf = new \Dompdf\Dompdf();
+        $dompdf->loadHtml($html);
+        $dompdf->render();
+
+        $path = tempnam(sys_get_temp_dir(), 'aitest_') . '.pdf';
+        file_put_contents($path, $dompdf->output());
+
+        return new UploadedFile($path, 'scanned.pdf', 'application/pdf', null, true);
+    }
+
+    private function requireRasterizer(): void
+    {
+        if (trim((string) @shell_exec('command -v pdftoppm 2>/dev/null')) === ''
+            && trim((string) @shell_exec('command -v gs 2>/dev/null')) === '') {
+            $this->markTestSkipped('no PDF rasterizer (pdftoppm/gs) available');
+        }
+    }
+
+    public function test_scanned_pdf_sends_capped_pages_in_one_vision_request_and_warns(): void
+    {
+        $this->requireRasterizer();
+        $company = $this->makeCompany('Premium');
+        $this->seedHsMaster();
+        $this->fakeOpenAi($this->baseExtraction());
+
+        $file = $this->makeScannedPdf(AiInvoiceReaderService::MAX_SCAN_PAGES + 2);
+        $parse = AiInvoiceReaderService::parseUpload($file, $company, null);
+
+        // Exactly ONE API request carrying MAX_SCAN_PAGES images.
+        $recorded = Http::recorded();
+        $this->assertCount(1, $recorded);
+        $content = $recorded[0][0]->data()['messages'][1]['content'];
+        $images = array_values(array_filter($content, fn ($p) => ($p['type'] ?? '') === 'image_url'));
+        $this->assertCount(AiInvoiceReaderService::MAX_SCAN_PAGES, $images);
+        foreach ($images as $img) {
+            $this->assertStringStartsWith('data:image/jpeg;base64,', $img['image_url']['url']);
+        }
+        // Prompt tells the model these are consecutive pages of one document.
+        $this->assertStringContainsString('consecutive pages', $content[0]['text']);
+
+        // Page-cap warning surfaces in the stored payload.
+        $this->assertSame('success', $parse->status);
+        $this->assertTrue(
+            collect($parse->payload_json['warnings'])->contains(fn ($w) => str_contains($w, 'first ' . AiInvoiceReaderService::MAX_SCAN_PAGES . ' pages')),
+            'page-cap warning expected in payload'
+        );
+    }
+
+    public function test_scanned_pdf_within_cap_sends_all_pages_without_cap_warning(): void
+    {
+        $this->requireRasterizer();
+        $company = $this->makeCompany('Premium');
+        $this->seedHsMaster();
+        $this->fakeOpenAi($this->baseExtraction());
+
+        $file = $this->makeScannedPdf(2);
+        $parse = AiInvoiceReaderService::parseUpload($file, $company, null);
+
+        $content = Http::recorded()[0][0]->data()['messages'][1]['content'];
+        $images = array_values(array_filter($content, fn ($p) => ($p['type'] ?? '') === 'image_url'));
+        $this->assertCount(2, $images);
+
+        $this->assertFalse(
+            collect($parse->payload_json['warnings'])->contains(fn ($w) => str_contains($w, 'pages were read')),
+            'no page-cap warning expected when all pages fit'
+        );
+    }
+
     // ------------------------------------------------------------- linking
 
     public function test_parse_links_to_one_invoice_only_and_only_same_company(): void

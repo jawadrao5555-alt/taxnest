@@ -19,8 +19,9 @@ use Illuminate\Support\Facades\Log;
  *    create form; the user reviews and saves a DRAFT themselves.
  *  - Premium gate key 'ai_reader' (DiFeatureService) is enforced by the
  *    controller; this service owns the monthly parse quota.
- *  - Per-parse cost is bounded: 5MB file cap, first 4 PDF pages, 15k chars
- *    of text, 120 spreadsheet rows, 30 items, one image per parse.
+ *  - Per-parse cost is bounded: 5MB file cap, first 4 text-PDF pages
+ *    (first 3 pages for scanned PDFs — one vision request, multi-image),
+ *    15k chars of text, 120 spreadsheet rows, 30 items.
  *  - OpenAI key comes from the same source as Madadgar (admin-managed
  *    SystemSetting override, fallback env OPENAI_API_KEY — literal value
  *    in live .env, ${VAR} interpolation fails silently there).
@@ -36,6 +37,8 @@ class AiInvoiceReaderService
 
     public const MAX_FILE_BYTES = 5 * 1024 * 1024; // keep in sync with controller validation + view copy
     public const MAX_PDF_PAGES = 4;
+    /** Scanned-PDF vision cap: each rasterized page costs ~26-38k vision tokens. */
+    public const MAX_SCAN_PAGES = 3;
     public const MAX_TEXT_CHARS = 15000;
     public const MAX_SHEET_ROWS = 120;
     public const MAX_SHEET_COLS = 16;
@@ -121,6 +124,12 @@ class AiInvoiceReaderService
 
             $payload = self::mapExtraction($raw, $company, $sourceType, $filename);
 
+            // Extraction-stage warnings (e.g. scanned-PDF page cap) surface with the rest.
+            $extractWarnings = array_values(array_filter((array) ($content['extract_warnings'] ?? []), 'is_string'));
+            if (!empty($extractWarnings)) {
+                $payload['warnings'] = array_slice(array_values(array_unique(array_merge($extractWarnings, (array) ($payload['warnings'] ?? [])))), 0, 12);
+            }
+
             if (empty($payload['items'])) {
                 throw new AiReaderException('No line items could be read from this document. Try a clearer copy, or a photo of the itemized section.');
             }
@@ -197,12 +206,15 @@ class AiInvoiceReaderService
     {
         $path = (string) $file->getRealPath();
         $text = '';
+        $pageCount = null;
 
         try {
             $parser = new \Smalot\PdfParser\Parser();
             $pdf = $parser->parseFile($path);
+            $pages = $pdf->getPages();
+            $pageCount = count($pages);
             $chunks = [];
-            foreach (array_slice($pdf->getPages(), 0, self::MAX_PDF_PAGES) as $page) {
+            foreach (array_slice($pages, 0, self::MAX_PDF_PAGES) as $page) {
                 try {
                     $chunks[] = (string) $page->getText();
                 } catch (\Throwable $pageErr) {
@@ -218,38 +230,60 @@ class AiInvoiceReaderService
             return ['kind' => 'text', 'text' => mb_substr($text, 0, self::MAX_TEXT_CHARS)];
         }
 
-        // Scanned / image-only PDF -> rasterize first page if possible.
-        $jpeg = self::rasterizePdfFirstPage($path);
-        if ($jpeg !== null) {
-            return ['kind' => 'image', 'b64' => base64_encode($jpeg), 'mime' => 'image/jpeg'];
+        // Scanned / image-only PDF -> rasterize the first few pages if possible
+        // (all go into ONE vision request; cap bounds per-parse cost).
+        $jpegs = self::rasterizePdfPages($path, self::MAX_SCAN_PAGES);
+        if (!empty($jpegs)) {
+            $content = [
+                'kind' => 'image',
+                'images' => array_map('base64_encode', $jpegs),
+                'mime' => 'image/jpeg',
+            ];
+            if (($pageCount !== null && $pageCount > self::MAX_SCAN_PAGES)
+                || ($pageCount === null && count($jpegs) >= self::MAX_SCAN_PAGES)) {
+                $content['extract_warnings'] = ['Scanned PDF: only the first ' . count($jpegs) . ' page' . (count($jpegs) > 1 ? 's were' : ' was') . ' read — items on later pages may be missing.'];
+            }
+
+            return $content;
         }
 
         throw new AiReaderException('This PDF looks scanned (no readable text). Please upload a photo or screenshot of the invoice (JPG/PNG) instead.');
     }
 
-    /** Try pdftoppm (dev) then gs (live cPanel). Returns JPEG bytes or null. */
-    private static function rasterizePdfFirstPage(string $path): ?string
+    /**
+     * Rasterize the first $maxPages pages of a PDF to JPEGs.
+     * Tries pdftoppm (dev) then gs (live cPanel — only gs available).
+     *
+     * @return string[] JPEG bytes in page order (possibly empty)
+     */
+    private static function rasterizePdfPages(string $path, int $maxPages): array
     {
-        if (!function_exists('shell_exec')) {
-            return null;
+        if (!function_exists('shell_exec') || $maxPages < 1) {
+            return [];
         }
 
         $out = rtrim(sys_get_temp_dir(), '/') . '/aiparse_' . bin2hex(random_bytes(6));
+        $pages = [];
 
         try {
             $pdftoppm = trim((string) @shell_exec('command -v pdftoppm 2>/dev/null'));
             if ($pdftoppm !== '') {
-                @shell_exec(escapeshellarg($pdftoppm) . ' -f 1 -l 1 -jpeg -r 150 ' . escapeshellarg($path) . ' ' . escapeshellarg($out) . ' 2>/dev/null');
-                foreach ([$out . '-1.jpg', $out . '-01.jpg', $out . '-001.jpg'] as $f) {
-                    if (is_file($f)) {
-                        $bytes = (string) file_get_contents($f);
-                        @unlink($f);
-
-                        return $bytes !== '' ? $bytes : null;
+                @shell_exec(escapeshellarg($pdftoppm) . ' -f 1 -l ' . (int) $maxPages . ' -jpeg -r 150 ' . escapeshellarg($path) . ' ' . escapeshellarg($out) . ' 2>/dev/null');
+                for ($p = 1; $p <= $maxPages; $p++) {
+                    // pdftoppm zero-pads the page suffix depending on total page count
+                    foreach ([$out . '-' . $p . '.jpg', $out . '-' . sprintf('%02d', $p) . '.jpg', $out . '-' . sprintf('%03d', $p) . '.jpg'] as $f) {
+                        if (is_file($f)) {
+                            $bytes = (string) file_get_contents($f);
+                            @unlink($f);
+                            if ($bytes !== '') {
+                                $pages[] = $bytes;
+                            }
+                            break;
+                        }
                     }
                 }
 
-                return null;
+                return $pages;
             }
 
             $gs = trim((string) @shell_exec('command -v gs 2>/dev/null'));
@@ -257,20 +291,27 @@ class AiInvoiceReaderService
                 $gs = '/usr/bin/gs';
             }
             if ($gs !== '') {
-                $f = $out . '.jpg';
-                @shell_exec(escapeshellarg($gs) . ' -dSAFER -dNOPAUSE -dBATCH -sDEVICE=jpeg -dJPEGQ=85 -r150 -dFirstPage=1 -dLastPage=1 -sOutputFile=' . escapeshellarg($f) . ' ' . escapeshellarg($path) . ' 2>/dev/null');
-                if (is_file($f)) {
+                // %d in the output pattern makes gs emit one file per page.
+                @shell_exec(escapeshellarg($gs) . ' -dSAFER -dNOPAUSE -dBATCH -sDEVICE=jpeg -dJPEGQ=85 -r150 -dFirstPage=1 -dLastPage=' . (int) $maxPages . ' -sOutputFile=' . escapeshellarg($out . '-%d.jpg') . ' ' . escapeshellarg($path) . ' 2>/dev/null');
+                for ($p = 1; $p <= $maxPages; $p++) {
+                    $f = $out . '-' . $p . '.jpg';
+                    if (!is_file($f)) {
+                        break;
+                    }
                     $bytes = (string) file_get_contents($f);
                     @unlink($f);
-
-                    return $bytes !== '' ? $bytes : null;
+                    if ($bytes !== '') {
+                        $pages[] = $bytes;
+                    }
                 }
+
+                return $pages;
             }
         } catch (\Throwable $e) {
-            return null;
+            return $pages;
         }
 
-        return null;
+        return $pages;
     }
 
     private static function extractImage(UploadedFile $file): array
@@ -399,13 +440,20 @@ class AiInvoiceReaderService
             . "\nExtract the invoice data into the JSON schema.";
 
         if (($content['kind'] ?? '') === 'image') {
+            // Single photo OR multiple rasterized scanned-PDF pages — all in ONE request.
+            $b64s = isset($content['images']) && is_array($content['images'])
+                ? $content['images']
+                : [(string) ($content['b64'] ?? '')];
+            $mime = $content['mime'] ?? 'image/jpeg';
             $userContent = [
-                ['type' => 'text', 'text' => $intro],
-                ['type' => 'image_url', 'image_url' => [
-                    'url' => 'data:' . ($content['mime'] ?? 'image/jpeg') . ';base64,' . ($content['b64'] ?? ''),
-                    'detail' => 'high',
-                ]],
+                ['type' => 'text', 'text' => $intro . (count($b64s) > 1 ? "\nThe images are consecutive pages of ONE invoice document, in order." : '')],
             ];
+            foreach ($b64s as $b64) {
+                $userContent[] = ['type' => 'image_url', 'image_url' => [
+                    'url' => 'data:' . $mime . ';base64,' . $b64,
+                    'detail' => 'high',
+                ]];
+            }
         } else {
             $userContent = [
                 ['type' => 'text', 'text' => $intro . "\n\nDOCUMENT CONTENT:\n-----\n" . ($content['text'] ?? '') . "\n-----"],

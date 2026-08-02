@@ -1,0 +1,906 @@
+<?php
+
+namespace App\Services;
+
+use App\Exceptions\AiReaderException;
+use App\Models\AiInvoiceParse;
+use App\Models\Company;
+use App\Models\Product;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+
+/**
+ * Task 142: AI Invoice Reader — upload an old/supplier-format invoice
+ * (PDF / photo / Excel / CSV) and get back a reviewable DI draft prefill.
+ *
+ * Hard rules:
+ *  - NEVER auto-submits anything to FBR — output only prefills the normal
+ *    create form; the user reviews and saves a DRAFT themselves.
+ *  - Premium gate key 'ai_reader' (DiFeatureService) is enforced by the
+ *    controller; this service owns the monthly parse quota.
+ *  - Per-parse cost is bounded: 5MB file cap, first 4 PDF pages, 15k chars
+ *    of text, 120 spreadsheet rows, 30 items, one image per parse.
+ *  - OpenAI key comes from the same source as Madadgar (admin-managed
+ *    SystemSetting override, fallback env OPENAI_API_KEY — literal value
+ *    in live .env, ${VAR} interpolation fails silently there).
+ *  - HS codes are only taken from what is PRINTED on the document or
+ *    matched from the company's own products — the model must never guess.
+ *  - Live cPanel has no pdftotext/pdftoppm: text PDFs go through
+ *    smalot/pdfparser (pure PHP); scanned PDFs rasterize via gs when
+ *    available, otherwise a friendly "upload a photo instead" error.
+ */
+class AiInvoiceReaderService
+{
+    public const MODEL = 'gpt-4o-mini';
+
+    public const MAX_FILE_BYTES = 5 * 1024 * 1024; // keep in sync with controller validation + view copy
+    public const MAX_PDF_PAGES = 4;
+    public const MAX_TEXT_CHARS = 15000;
+    public const MAX_SHEET_ROWS = 120;
+    public const MAX_SHEET_COLS = 16;
+    public const MAX_ITEMS = 30;
+
+    /** Monthly successful-parse quotas (-1 = unlimited). */
+    public const QUOTA_PREMIUM = 200;
+    public const QUOTA_TRIAL = 5;
+    public const QUOTA_DEFAULT = 25;
+
+    private const SCHEDULE_TYPES = ['standard', 'reduced', '3rd_schedule', 'exempt', 'zero_rated'];
+
+    public static function enabled(): bool
+    {
+        return MadadgarService::apiKey() !== null;
+    }
+
+    // ------------------------------------------------------------------
+    // Quota
+    // ------------------------------------------------------------------
+
+    public static function monthlyQuota(Company $company): int
+    {
+        if ($company->is_internal_account) {
+            return -1;
+        }
+
+        $sub = DiFeatureService::effectiveSubscription($company);
+        if ($sub && $sub->pricingPlan && $sub->pricingPlan->name === 'Premium') {
+            return self::QUOTA_PREMIUM;
+        }
+        if ($sub && $sub->isTrialActive()) {
+            return self::QUOTA_TRIAL;
+        }
+
+        return self::QUOTA_DEFAULT;
+    }
+
+    /** Successful parses this calendar month (failed attempts are free). */
+    public static function usedThisMonth(int $companyId): int
+    {
+        return AiInvoiceParse::where('company_id', $companyId)
+            ->where('status', 'success')
+            ->where('created_at', '>=', now()->startOfMonth())
+            ->count();
+    }
+
+    public static function quotaState(Company $company): array
+    {
+        $quota = self::monthlyQuota($company);
+        $used = self::usedThisMonth($company->id);
+
+        return [
+            'quota' => $quota,
+            'used' => $used,
+            'unlimited' => $quota === -1,
+            'remaining' => $quota === -1 ? -1 : max(0, $quota - $used),
+        ];
+    }
+
+    // ------------------------------------------------------------------
+    // Parse pipeline
+    // ------------------------------------------------------------------
+
+    /**
+     * Full pipeline: extract -> AI -> normalize/map -> store parse row.
+     * Throws AiReaderException with a friendly message on any failure
+     * (a 'failed' row is stored for the recent-attempts list; failures
+     * never consume quota).
+     */
+    public static function parseUpload(UploadedFile $file, Company $company, ?int $userId): AiInvoiceParse
+    {
+        $sourceType = self::detectSourceType($file);
+        $filename = self::cleanString((string) $file->getClientOriginalName(), 200);
+
+        try {
+            $content = self::extractContent($file, $sourceType);
+            [$raw, $tokens] = self::callOpenAi($content, $company);
+
+            if (!is_array($raw) || empty($raw['is_invoice'])) {
+                throw new AiReaderException("This file doesn't look like an invoice. Please upload a clear invoice PDF, photo, or Excel file.");
+            }
+
+            $payload = self::mapExtraction($raw, $company, $sourceType, $filename);
+
+            if (empty($payload['items'])) {
+                throw new AiReaderException('No line items could be read from this document. Try a clearer copy, or a photo of the itemized section.');
+            }
+        } catch (AiReaderException $e) {
+            self::storeFailure($company->id, $userId, $sourceType, $filename, $e->getMessage());
+            throw $e;
+        } catch (\Throwable $e) {
+            Log::warning('AI invoice reader parse failed', [
+                'company_id' => $company->id,
+                'type' => $sourceType,
+                'err' => mb_substr($e->getMessage(), 0, 300),
+            ]);
+            $friendly = 'Could not read this file. Please upload a clear PDF, photo (JPG/PNG), or Excel file.';
+            self::storeFailure($company->id, $userId, $sourceType, $filename, $friendly);
+            throw new AiReaderException($friendly);
+        }
+
+        return AiInvoiceParse::create([
+            'company_id' => $company->id,
+            'user_id' => $userId,
+            'status' => 'success',
+            'source_type' => $sourceType,
+            'original_filename' => $filename,
+            'payload_json' => $payload,
+            'model' => self::MODEL,
+            'total_tokens' => $tokens,
+        ]);
+    }
+
+    private static function storeFailure(int $companyId, ?int $userId, string $sourceType, string $filename, string $error): void
+    {
+        try {
+            AiInvoiceParse::create([
+                'company_id' => $companyId,
+                'user_id' => $userId,
+                'status' => 'failed',
+                'source_type' => $sourceType,
+                'original_filename' => $filename,
+                'error' => mb_substr($error, 0, 500),
+            ]);
+        } catch (\Throwable $ignore) {
+            // never let bookkeeping break the user-facing error
+        }
+    }
+
+    public static function detectSourceType(UploadedFile $file): string
+    {
+        $ext = strtolower((string) $file->getClientOriginalExtension());
+
+        return match (true) {
+            $ext === 'pdf' => 'pdf',
+            in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true) => 'image',
+            in_array($ext, ['xlsx', 'xls'], true) => 'xlsx',
+            default => 'csv', // csv / txt
+        };
+    }
+
+    // ------------------------------------------------------------------
+    // Content extraction (bounded cost)
+    // ------------------------------------------------------------------
+
+    /** @return array{kind:string,text?:string,b64?:string,mime?:string} */
+    private static function extractContent(UploadedFile $file, string $sourceType): array
+    {
+        return match ($sourceType) {
+            'pdf' => self::extractPdf($file),
+            'image' => self::extractImage($file),
+            'xlsx' => self::extractSheet($file),
+            default => self::extractCsv($file),
+        };
+    }
+
+    private static function extractPdf(UploadedFile $file): array
+    {
+        $path = (string) $file->getRealPath();
+        $text = '';
+
+        try {
+            $parser = new \Smalot\PdfParser\Parser();
+            $pdf = $parser->parseFile($path);
+            $chunks = [];
+            foreach (array_slice($pdf->getPages(), 0, self::MAX_PDF_PAGES) as $page) {
+                try {
+                    $chunks[] = (string) $page->getText();
+                } catch (\Throwable $pageErr) {
+                    // skip unreadable page, keep the rest
+                }
+            }
+            $text = self::cleanText(implode("\n\n", $chunks));
+        } catch (\Throwable $e) {
+            $text = '';
+        }
+
+        if (mb_strlen($text) >= 80) {
+            return ['kind' => 'text', 'text' => mb_substr($text, 0, self::MAX_TEXT_CHARS)];
+        }
+
+        // Scanned / image-only PDF -> rasterize first page if possible.
+        $jpeg = self::rasterizePdfFirstPage($path);
+        if ($jpeg !== null) {
+            return ['kind' => 'image', 'b64' => base64_encode($jpeg), 'mime' => 'image/jpeg'];
+        }
+
+        throw new AiReaderException('This PDF looks scanned (no readable text). Please upload a photo or screenshot of the invoice (JPG/PNG) instead.');
+    }
+
+    /** Try pdftoppm (dev) then gs (live cPanel). Returns JPEG bytes or null. */
+    private static function rasterizePdfFirstPage(string $path): ?string
+    {
+        if (!function_exists('shell_exec')) {
+            return null;
+        }
+
+        $out = rtrim(sys_get_temp_dir(), '/') . '/aiparse_' . bin2hex(random_bytes(6));
+
+        try {
+            $pdftoppm = trim((string) @shell_exec('command -v pdftoppm 2>/dev/null'));
+            if ($pdftoppm !== '') {
+                @shell_exec(escapeshellarg($pdftoppm) . ' -f 1 -l 1 -jpeg -r 150 ' . escapeshellarg($path) . ' ' . escapeshellarg($out) . ' 2>/dev/null');
+                foreach ([$out . '-1.jpg', $out . '-01.jpg', $out . '-001.jpg'] as $f) {
+                    if (is_file($f)) {
+                        $bytes = (string) file_get_contents($f);
+                        @unlink($f);
+
+                        return $bytes !== '' ? $bytes : null;
+                    }
+                }
+
+                return null;
+            }
+
+            $gs = trim((string) @shell_exec('command -v gs 2>/dev/null'));
+            if ($gs === '' && is_executable('/usr/bin/gs')) {
+                $gs = '/usr/bin/gs';
+            }
+            if ($gs !== '') {
+                $f = $out . '.jpg';
+                @shell_exec(escapeshellarg($gs) . ' -dSAFER -dNOPAUSE -dBATCH -sDEVICE=jpeg -dJPEGQ=85 -r150 -dFirstPage=1 -dLastPage=1 -sOutputFile=' . escapeshellarg($f) . ' ' . escapeshellarg($path) . ' 2>/dev/null');
+                if (is_file($f)) {
+                    $bytes = (string) file_get_contents($f);
+                    @unlink($f);
+
+                    return $bytes !== '' ? $bytes : null;
+                }
+            }
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        return null;
+    }
+
+    private static function extractImage(UploadedFile $file): array
+    {
+        $bytes = (string) file_get_contents((string) $file->getRealPath());
+        if ($bytes === '') {
+            throw new AiReaderException('Could not read the image file. Please try another photo.');
+        }
+        $mime = $file->getMimeType() ?: 'image/jpeg';
+
+        // Downscale large photos (bounded vision cost). GD is web-only on
+        // live — parses run as web requests, but guard anyway.
+        if (function_exists('imagecreatefromstring')) {
+            try {
+                $img = @imagecreatefromstring($bytes);
+                if ($img !== false) {
+                    $w = imagesx($img);
+                    $h = imagesy($img);
+                    $max = 1600;
+                    if ($w > $max || $h > $max) {
+                        $scale = min($max / $w, $max / $h);
+                        $nw = max(1, (int) round($w * $scale));
+                        $nh = max(1, (int) round($h * $scale));
+                        $resized = imagecreatetruecolor($nw, $nh);
+                        $white = imagecolorallocate($resized, 255, 255, 255);
+                        imagefill($resized, 0, 0, $white); // PNG transparency -> white, not black
+                        imagecopyresampled($resized, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
+                        ob_start();
+                        imagejpeg($resized, null, 82);
+                        $jpeg = (string) ob_get_clean();
+                        imagedestroy($resized);
+                        if ($jpeg !== '') {
+                            $bytes = $jpeg;
+                            $mime = 'image/jpeg';
+                        }
+                    }
+                    imagedestroy($img);
+                }
+            } catch (\Throwable $e) {
+                // keep original bytes
+            }
+        }
+
+        return ['kind' => 'image', 'b64' => base64_encode($bytes), 'mime' => $mime];
+    }
+
+    private static function extractSheet(UploadedFile $file): array
+    {
+        try {
+            $path = (string) $file->getRealPath();
+            $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($path);
+
+            // Bound memory BEFORE load: only first sheet rows/cols we need.
+            $reader->setReadFilter(new class implements \PhpOffice\PhpSpreadsheet\Reader\IReadFilter
+            {
+                public function readCell(string $columnAddress, int $row, string $worksheetName = ''): bool
+                {
+                    return $row <= AiInvoiceReaderService::MAX_SHEET_ROWS
+                        && \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($columnAddress) <= AiInvoiceReaderService::MAX_SHEET_COLS;
+                }
+            });
+
+            $ss = $reader->load($path);
+            $sheet = $ss->getSheet(0);
+            $rows = min($sheet->getHighestDataRow(), self::MAX_SHEET_ROWS);
+            $cols = min(
+                \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($sheet->getHighestDataColumn()),
+                self::MAX_SHEET_COLS
+            );
+
+            $lines = [];
+            for ($r = 1; $r <= $rows; $r++) {
+                $cells = [];
+                for ($c = 1; $c <= $cols; $c++) {
+                    try {
+                        $cells[] = trim((string) $sheet->getCell([$c, $r])->getFormattedValue());
+                    } catch (\Throwable $cellErr) {
+                        $cells[] = '';
+                    }
+                }
+                if (implode('', $cells) === '') {
+                    continue;
+                }
+                $lines[] = implode("\t", $cells);
+            }
+            $ss->disconnectWorksheets();
+
+            $text = self::cleanText(implode("\n", $lines));
+            if (mb_strlen($text) < 20) {
+                throw new AiReaderException('The spreadsheet looks empty. Please make sure the first sheet contains the invoice data.');
+            }
+
+            return ['kind' => 'text', 'text' => mb_substr($text, 0, self::MAX_TEXT_CHARS)];
+        } catch (AiReaderException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            throw new AiReaderException('Could not read this Excel file. Please save it as .xlsx and try again.');
+        }
+    }
+
+    private static function extractCsv(UploadedFile $file): array
+    {
+        $text = (string) file_get_contents((string) $file->getRealPath(), false, null, 0, self::MAX_TEXT_CHARS * 2);
+        $text = self::cleanText($text);
+        if (mb_strlen($text) < 20) {
+            throw new AiReaderException('This file looks empty. Please upload the invoice as PDF, photo, or Excel.');
+        }
+
+        return ['kind' => 'text', 'text' => mb_substr($text, 0, self::MAX_TEXT_CHARS)];
+    }
+
+    // ------------------------------------------------------------------
+    // OpenAI call
+    // ------------------------------------------------------------------
+
+    /** @return array{0:array|null,1:int} [decoded JSON, total tokens] */
+    private static function callOpenAi(array $content, Company $company): array
+    {
+        $key = MadadgarService::apiKey();
+        if ($key === null) {
+            throw new AiReaderException('AI service is not configured yet. Please contact support.');
+        }
+
+        $intro = 'SELLER COMPANY (the uploader — never the buyer): ' . $company->name
+            . ($company->ntn ? ' | Seller NTN: ' . $company->ntn : '')
+            . "\nExtract the invoice data into the JSON schema.";
+
+        if (($content['kind'] ?? '') === 'image') {
+            $userContent = [
+                ['type' => 'text', 'text' => $intro],
+                ['type' => 'image_url', 'image_url' => [
+                    'url' => 'data:' . ($content['mime'] ?? 'image/jpeg') . ';base64,' . ($content['b64'] ?? ''),
+                    'detail' => 'high',
+                ]],
+            ];
+        } else {
+            $userContent = [
+                ['type' => 'text', 'text' => $intro . "\n\nDOCUMENT CONTENT:\n-----\n" . ($content['text'] ?? '') . "\n-----"],
+            ];
+        }
+
+        try {
+            $response = Http::timeout(90)->connectTimeout(10)
+                ->withToken($key)
+                ->post('https://api.openai.com/v1/chat/completions', [
+                    'model' => self::MODEL,
+                    'messages' => [
+                        ['role' => 'system', 'content' => self::systemPrompt()],
+                        ['role' => 'user', 'content' => $userContent],
+                    ],
+                    'response_format' => ['type' => 'json_object'],
+                    'temperature' => 0.1,
+                    'max_tokens' => 2500,
+                ]);
+        } catch (\Throwable $e) {
+            Log::warning('AI invoice reader OpenAI unreachable', ['err' => mb_substr($e->getMessage(), 0, 200)]);
+            throw new AiReaderException('The AI service could not be reached. Please try again in a minute.');
+        }
+
+        if (!$response->successful()) {
+            Log::warning('AI invoice reader OpenAI error', ['status' => $response->status()]);
+            throw new AiReaderException('The AI service is busy right now. Please try again in a minute.');
+        }
+
+        $contentStr = trim((string) $response->json('choices.0.message.content'));
+        $contentStr = preg_replace('/^```(?:json)?\s*|\s*```$/m', '', $contentStr);
+        $decoded = json_decode((string) $contentStr, true);
+
+        if (!is_array($decoded)) {
+            throw new AiReaderException('The AI could not produce a readable result for this file. Please try again, or use a clearer copy.');
+        }
+
+        return [$decoded, (int) ($response->json('usage.total_tokens') ?? 0)];
+    }
+
+    private static function systemPrompt(): string
+    {
+        return <<<'PROMPT'
+You extract structured data from Pakistani sales invoices (any format: supplier invoices, old invoices, handwritten bills, spreadsheets). Reply ONLY with a single JSON object, no prose.
+
+Schema:
+{
+  "is_invoice": true/false,           // false if the document is clearly not an invoice/bill
+  "buyer": {                          // the CUSTOMER receiving the goods — NOT the seller company given by the user
+    "name": string|null, "ntn": string|null, "cnic": string|null,
+    "address": string|null, "phone": string|null,
+    "confidence": "high"|"medium"|"low"
+  },
+  "document": {
+    "invoice_number": string|null,    // the number printed on the document
+    "invoice_date": "YYYY-MM-DD"|null,
+    "document_type": "Sale Invoice"|"Credit Note"|"Debit Note",
+    "destination_province": "Punjab"|"Sindh"|"Khyber Pakhtunkhwa"|"Balochistan"|"Islamabad"|"Azad Kashmir"|"Gilgit-Baltistan"|"FATA"|null
+  },
+  "items": [                          // every line item, max 30
+    {
+      "description": string,
+      "hs_code": string|null,         // ONLY if printed on the document. NEVER guess or invent HS codes.
+      "quantity": number,
+      "unit_price": number,           // price per unit EXCLUDING sales tax when the document separates tax
+      "line_total": number|null,
+      "tax_rate": number|null,        // percent, only if shown
+      "tax_amount": number|null,      // sales tax amount for this line, only if shown
+      "uom": string|null,
+      "confidence": "high"|"medium"|"low"
+    }
+  ],
+  "totals": { "subtotal": number|null, "tax": number|null, "grand_total": number|null },
+  "warnings": [string]                // short notes about anything unclear/ambiguous (max 5)
+}
+
+Rules:
+- The user message names the SELLER company. If the document shows that company as issuer, the OTHER party is the buyer. If the seller company appears as the CUSTOMER on a supplier's invoice, then buyer fields = that seller company's customer role does NOT apply — extract the party the document bills TO.
+- NTN is 7-8 digits (may have a dash), CNIC is 13 digits. Put values in the right field.
+- Numbers: plain digits, no thousand separators or currency symbols.
+- If quantity or price is unreadable, use your best reading and lower the confidence.
+- Do not invent items, HS codes, or tax rates that are not on the document.
+- destination_province: infer from the buyer address city if obvious, else null.
+PROMPT;
+    }
+
+    // ------------------------------------------------------------------
+    // Normalize + map to DI fields (HS / schedule / tax)
+    // ------------------------------------------------------------------
+
+    /**
+     * Convert raw AI output into the create-form prefill payload.
+     * Deterministic + DB-driven: printed HS codes resolve through
+     * GlobalHsService (companyId=null so parse-time lookups don't spam
+     * hs_unmapped_logs), descriptions match against the company's products.
+     */
+    public static function mapExtraction(array $raw, Company $company, string $sourceType = 'pdf', string $filename = ''): array
+    {
+        $standardRate = self::companyStandardRate($company);
+        $warnings = [];
+
+        foreach (array_slice((array) ($raw['warnings'] ?? []), 0, 5) as $w) {
+            if (is_string($w) && trim($w) !== '') {
+                $warnings[] = 'AI: ' . self::cleanString($w, 180);
+            }
+        }
+
+        // ---- Buyer ----
+        $buyerRaw = is_array($raw['buyer'] ?? null) ? $raw['buyer'] : [];
+        $buyer = [
+            'name' => self::cleanString($buyerRaw['name'] ?? '', 255),
+            'ntn' => self::cleanIdNumber($buyerRaw['ntn'] ?? '', 20),
+            'cnic' => self::cleanIdNumber($buyerRaw['cnic'] ?? '', 15),
+            'address' => self::cleanString($buyerRaw['address'] ?? '', 500),
+            'phone' => self::cleanString($buyerRaw['phone'] ?? '', 30),
+            'confidence' => self::confidence($buyerRaw['confidence'] ?? null),
+        ];
+        if ($buyer['name'] === '') {
+            $warnings[] = 'Buyer name could not be read — please enter it.';
+        }
+        if ($buyer['address'] === '') {
+            $fallback = self::cleanString((string) ($company->city ?: $company->address), 500);
+            if ($fallback !== '') {
+                $buyer['address'] = $fallback;
+                $warnings[] = 'Buyer address not found — filled with your city as a placeholder; please correct.';
+            } else {
+                $warnings[] = 'Buyer address could not be read — required before saving.';
+            }
+        }
+
+        // ---- Document ----
+        $docRaw = is_array($raw['document'] ?? null) ? $raw['document'] : [];
+        $docType = in_array($docRaw['document_type'] ?? '', ['Sale Invoice', 'Credit Note', 'Debit Note'], true)
+            ? $docRaw['document_type'] : 'Sale Invoice';
+        $origNumber = self::cleanString($docRaw['invoice_number'] ?? '', 100);
+        $reference = '';
+        if ($docType !== 'Sale Invoice') {
+            $reference = $origNumber;
+            $warnings[] = $docType . ' detected — check the reference invoice number before saving.';
+        }
+
+        $province = 'Punjab';
+        $provinces = \App\Http\Controllers\InvoiceController::getPakistanProvinces();
+        if (in_array($docRaw['destination_province'] ?? '', $provinces, true)) {
+            $province = $docRaw['destination_province'];
+        }
+
+        $origDate = '';
+        $dateRaw = (string) ($docRaw['invoice_date'] ?? '');
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $dateRaw, $m) && checkdate((int) $m[2], (int) $m[3], (int) $m[1])) {
+            $origDate = $dateRaw;
+        }
+
+        // ---- Items ----
+        $products = Product::withoutGlobalScope(\App\Models\Scopes\CompanyScope::class)
+            ->where('company_id', $company->id)
+            ->where('is_active', true)
+            ->limit(500)
+            ->get(['id', 'name', 'hs_code', 'pct_code', 'default_tax_rate', 'uom', 'schedule_type']);
+
+        $rawItems = is_array($raw['items'] ?? null) ? $raw['items'] : [];
+        if (count($rawItems) > self::MAX_ITEMS) {
+            $warnings[] = 'Only the first ' . self::MAX_ITEMS . ' items were read (per-parse cap).';
+        }
+
+        $items = [];
+        $needsHsIdx = [];
+        $amountMismatch = false;
+        $idx = 0;
+
+        foreach (array_slice($rawItems, 0, self::MAX_ITEMS) as $itRaw) {
+            if (!is_array($itRaw)) {
+                continue;
+            }
+            $idx++;
+
+            $desc = self::cleanString($itRaw['description'] ?? '', 255);
+            if ($desc === '') {
+                $warnings[] = 'Item ' . $idx . ': description missing — skipped.';
+                continue;
+            }
+
+            $qty = self::num($itRaw['quantity'] ?? null);
+            $price = self::num($itRaw['unit_price'] ?? null);
+            $shaky = false;
+            if ($qty === null || $qty <= 0) {
+                $qty = 1.0;
+                $shaky = true;
+                $warnings[] = 'Item ' . $idx . ': quantity unclear — set to 1, please verify.';
+            }
+            if ($price === null || $price < 0) {
+                $price = 0.0;
+                $shaky = true;
+                $warnings[] = 'Item ' . $idx . ': unit price unclear — set to 0, please enter it.';
+            }
+            $qty = round($qty, 2);
+            $price = round($price, 2);
+
+            $aiConf = self::confidence($itRaw['confidence'] ?? null);
+            $hs = self::cleanHs($itRaw['hs_code'] ?? '');
+            $hsSource = $hs !== '' ? 'document' : 'none';
+
+            $product = self::bestProductMatch($desc, $products);
+            if ($hs === '' && $product && $product->hs_code) {
+                $hs = self::cleanHs($product->hs_code);
+                if ($hs !== '') {
+                    $hsSource = 'product';
+                }
+            }
+
+            $scheduleType = 'standard';
+            $taxRate = null;
+            $pct = '';
+            $uom = self::cleanString($itRaw['uom'] ?? '', 100) ?: 'Numbers, pieces, units';
+            $sro = '';
+            $serial = '';
+            $hsFound = false;
+
+            if ($hs !== '') {
+                // companyId = null on purpose: review-time lookups must not spam hs_unmapped_logs
+                $resolved = GlobalHsService::resolveForInvoiceItem($hs, $standardRate, null, null);
+                if (!empty($resolved['found'])) {
+                    $hsFound = true;
+                    if (in_array($resolved['schedule_type'] ?? '', self::SCHEDULE_TYPES, true)) {
+                        $scheduleType = $resolved['schedule_type'];
+                    }
+                    if (is_numeric($resolved['tax_rate'] ?? null)) {
+                        $taxRate = (float) $resolved['tax_rate'];
+                    }
+                    $pct = self::cleanString($resolved['pct_code'] ?? '', 50);
+                    if (!empty($resolved['default_uom'])) {
+                        $uom = self::cleanString($resolved['default_uom'], 100);
+                    }
+                    if (!empty($resolved['sro_number'])) {
+                        $sro = self::cleanString($resolved['sro_number'], 100);
+                    }
+                    if (!empty($resolved['sro_item_serial_no'])) {
+                        $serial = self::cleanString($resolved['sro_item_serial_no'], 100);
+                    }
+                }
+            }
+
+            if (!$hsFound && $product) {
+                if (in_array((string) $product->schedule_type, self::SCHEDULE_TYPES, true)) {
+                    $scheduleType = (string) $product->schedule_type;
+                }
+                if ($taxRate === null && is_numeric($product->default_tax_rate)) {
+                    $taxRate = (float) $product->default_tax_rate;
+                }
+                if ($pct === '' && $product->pct_code) {
+                    $pct = self::cleanString($product->pct_code, 50);
+                }
+                if ($product->uom) {
+                    $uom = self::cleanString($product->uom, 100);
+                }
+            }
+
+            // Tax rate fallbacks: document rate -> derived from tax amount -> schedule default
+            $aiRate = self::num($itRaw['tax_rate'] ?? null);
+            $aiTax = self::num($itRaw['tax_amount'] ?? null);
+            if ($taxRate === null) {
+                if ($aiRate !== null && $aiRate >= 0 && $aiRate <= 100) {
+                    $taxRate = $aiRate;
+                } elseif ($aiTax !== null && $aiTax > 0 && $qty * $price > 0) {
+                    $taxRate = round($aiTax / ($qty * $price) * 100);
+                } else {
+                    $taxRate = $scheduleType === 'standard' ? $standardRate : ScheduleEngine::getTaxRate($scheduleType);
+                }
+            }
+            if (in_array($scheduleType, ['exempt', 'zero_rated'], true)) {
+                $taxRate = 0.0;
+            }
+            $taxRate = (int) round(max(0.0, min(100.0, (float) $taxRate)));
+
+            $computedTax = round($qty * $price * $taxRate / 100, 2);
+            $tax = ($aiTax !== null && $aiTax >= 0) ? round($aiTax, 2) : $computedTax;
+            if (in_array($scheduleType, ['exempt', 'zero_rated'], true)) {
+                $tax = 0.0;
+            }
+            if ($aiTax !== null && abs($aiTax - $computedTax) > max(5, 0.2 * max($computedTax, 1))) {
+                $amountMismatch = true;
+            }
+
+            $needsHs = ($hs === '');
+            if ($needsHs) {
+                $needsHsIdx[] = $idx;
+            }
+
+            // Confidence: AI's own rating, capped down when we had to guess
+            $rank = ['low' => 0, 'medium' => 1, 'high' => 2];
+            $conf = $rank[$aiConf];
+            if ($shaky || $needsHs) {
+                $conf = 0;
+            } elseif (!$hsFound && $hsSource === 'document') {
+                $conf = min($conf, 1); // printed HS unknown to our DB
+            }
+            $confStr = array_search($conf, $rank, true) ?: 'low';
+
+            $items[] = [
+                'description' => $desc,
+                'hs_code' => $hs,
+                'pct_code' => $pct,
+                'quantity' => $qty,
+                'price' => $price,
+                'tax_rate' => $taxRate,
+                'tax' => $tax,
+                'schedule_type' => $scheduleType,
+                'sro_schedule_no' => $sro,
+                'serial_no' => $serial,
+                'mrp' => '',
+                'default_uom' => $uom,
+                'ai_confidence' => $confStr,
+                'hs_source' => $hsSource, // document | product | none
+                'needs_hs' => $needsHs,
+            ];
+        }
+
+        // ---- Cross-item warnings ----
+        if (!empty($needsHsIdx)) {
+            $warnings[] = 'No HS code for item' . (count($needsHsIdx) > 1 ? 's' : '') . ' #'
+                . implode(', #', $needsHsIdx) . ' — select the HS code before saving.';
+        }
+        $scheduleTypes = array_values(array_unique(array_column($items, 'schedule_type')));
+        if (count($scheduleTypes) > 1) {
+            $warnings[] = 'Items map to different tax schedules (' . implode(', ', $scheduleTypes) . ') — FBR requires one schedule type per invoice; split into separate invoices if needed.';
+        }
+        if (in_array('3rd_schedule', $scheduleTypes, true)) {
+            $warnings[] = '3rd Schedule item(s) — enter the printed retail price (MRP) before saving.';
+        }
+        if ($amountMismatch) {
+            $warnings[] = "Some line tax amounts don't match their tax rates — document values kept, please verify.";
+        }
+
+        $computedSubtotal = round(array_sum(array_map(fn ($i) => $i['quantity'] * $i['price'], $items)), 2);
+        $computedTax = round(array_sum(array_column($items, 'tax')), 2);
+        $totalsRaw = is_array($raw['totals'] ?? null) ? $raw['totals'] : [];
+        $docTotal = self::num($totalsRaw['grand_total'] ?? null);
+        if ($docTotal !== null && $docTotal > 0) {
+            $computedGrand = $computedSubtotal + $computedTax;
+            if ($computedGrand > 0 && abs($computedGrand - $docTotal) / max($docTotal, 1) > 0.02) {
+                $warnings[] = 'Document total (' . number_format($docTotal, 2) . ') differs from the extracted items total ('
+                    . number_format($computedGrand, 2) . ') — some lines may be missing or misread.';
+            }
+        }
+
+        return [
+            'buyer' => $buyer,
+            'document' => [
+                'document_type' => $docType,
+                'reference_invoice_number' => $reference,
+                'destination_province' => $province,
+                'original_invoice_number' => $origNumber,
+                'original_date' => $origDate,
+            ],
+            'items' => $items,
+            'totals' => [
+                'computed_subtotal' => $computedSubtotal,
+                'computed_tax' => $computedTax,
+                'document_total' => $docTotal,
+            ],
+            'warnings' => array_slice(array_values(array_unique($warnings)), 0, 12),
+            'meta' => [
+                'source_type' => $sourceType,
+                'filename' => $filename,
+                'parsed_at' => now()->toDateTimeString(),
+            ],
+        ];
+    }
+
+    private static function companyStandardRate(Company $company): float
+    {
+        try {
+            if (method_exists($company, 'getStandardTaxRateValue')) {
+                return (float) $company->getStandardTaxRateValue();
+            }
+        } catch (\Throwable $e) {
+            // fall through
+        }
+
+        return 18.0;
+    }
+
+    // ------------------------------------------------------------------
+    // Product description matching (conservative: wrong HS is worse than none)
+    // ------------------------------------------------------------------
+
+    private static function tokenize(string $s): array
+    {
+        $s = mb_strtolower($s);
+        preg_match_all('/[\p{L}\p{N}]{3,}/u', $s, $m);
+        $stop = ['the', 'and', 'for', 'pcs', 'pack', 'box', 'ltr', 'kgs', 'nos', 'qty'];
+
+        return array_values(array_unique(array_filter($m[0], fn ($t) => !in_array($t, $stop, true))));
+    }
+
+    /** @param \Illuminate\Support\Collection $products */
+    public static function bestProductMatch(string $description, $products): ?object
+    {
+        $descTokens = self::tokenize($description);
+        if (empty($descTokens)) {
+            return null;
+        }
+        $descLower = mb_strtolower($description);
+
+        $best = null;
+        $bestScore = 0.0;
+        foreach ($products as $p) {
+            $name = (string) $p->name;
+            $pTokens = self::tokenize($name);
+            if (empty($pTokens)) {
+                continue;
+            }
+            $overlap = count(array_intersect($pTokens, $descTokens));
+            if ($overlap === 0) {
+                continue;
+            }
+            $score = $overlap / count($pTokens);
+            if ($overlap >= 2) {
+                $score += 0.25;
+            }
+            if ($name !== '' && str_contains($descLower, mb_strtolower($name))) {
+                $score += 0.5;
+            }
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $best = $p;
+            }
+        }
+
+        return $bestScore >= 0.75 ? $best : null;
+    }
+
+    // ------------------------------------------------------------------
+    // Sanitizers (payload feeds @json into Alpine — must be valid UTF-8)
+    // ------------------------------------------------------------------
+
+    private static function cleanText(string $s): string
+    {
+        $s = (string) mb_convert_encoding($s, 'UTF-8', 'UTF-8');
+        $s = (string) preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $s);
+        $s = (string) preg_replace("/\n{3,}/", "\n\n", $s);
+
+        return trim($s);
+    }
+
+    private static function cleanString($value, int $max): string
+    {
+        if (!is_scalar($value)) {
+            return '';
+        }
+        $s = self::cleanText((string) $value);
+        $s = (string) preg_replace('/\s+/u', ' ', $s);
+
+        return mb_substr($s, 0, $max);
+    }
+
+    private static function cleanIdNumber($value, int $max): string
+    {
+        if (!is_scalar($value)) {
+            return '';
+        }
+        $s = (string) preg_replace('/[^0-9\-]/', '', (string) $value);
+
+        return mb_substr(trim($s, '-'), 0, $max);
+    }
+
+    /** Digits + dots, requires at least 4 digits to count as an HS code. */
+    private static function cleanHs($value): string
+    {
+        if (!is_scalar($value)) {
+            return '';
+        }
+        $s = (string) preg_replace('/[^0-9.]/', '', (string) $value);
+        $digits = (string) preg_replace('/[^0-9]/', '', $s);
+
+        return strlen($digits) >= 4 ? mb_substr($s, 0, 20) : '';
+    }
+
+    private static function num($value): ?float
+    {
+        if (is_int($value) || is_float($value)) {
+            return is_finite((float) $value) ? (float) $value : null;
+        }
+        if (is_string($value)) {
+            $s = str_replace([',', ' ', 'Rs', 'rs', 'PKR', 'pkr'], '', trim($value));
+            if ($s !== '' && is_numeric($s)) {
+                return (float) $s;
+            }
+        }
+
+        return null;
+    }
+
+    private static function confidence($value): string
+    {
+        return in_array($value, ['high', 'medium', 'low'], true) ? $value : 'medium';
+    }
+}

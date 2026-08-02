@@ -129,7 +129,13 @@ class InvoiceController extends Controller
             ];
         }
 
-        return view('invoice.index', compact('invoices', 'tab', 'draftCount', 'failedCount', 'completedCount', 'completedStats'));
+        // Task 142: show/lock the AI Reader entry button
+        $aiReaderAllowed = \App\Services\DiFeatureService::planAllows(
+            \App\Models\Company::find($companyId),
+            'ai_reader'
+        );
+
+        return view('invoice.index', compact('invoices', 'tab', 'draftCount', 'failedCount', 'completedCount', 'completedStats', 'aiReaderAllowed'));
     }
 
     public function uniqueBuyers(Request $request)
@@ -148,7 +154,7 @@ class InvoiceController extends Controller
         return response()->json($buyers);
     }
 
-    public function create()
+    public function create(Request $request)
     {
         $companyId = app('currentCompanyId');
         $limitCheck = \App\Services\PlanLimitService::canCreateInvoice($companyId);
@@ -160,7 +166,34 @@ class InvoiceController extends Controller
         $standardTaxRate = $company ? $company->getStandardTaxRateValue() : 18.0;
         $nextInvoiceNumber = InvoiceNumberingService::peekNextNumber($companyId);
         $provinces = self::getPakistanProvinces();
-        return view('invoice.create', compact('branches', 'standardTaxRate', 'nextInvoiceNumber', 'provinces', 'company'));
+
+        // Task 142: AI Invoice Reader prefill — the review screen IS this form.
+        $aiPrefill = null;
+        $aiParseId = null;
+        $aiPrefillJson = null;
+        if ($request->query('ai_parse')) {
+            $parse = \App\Models\AiInvoiceParse::where('company_id', $companyId)
+                ->where('id', (int) $request->query('ai_parse'))
+                ->where('status', 'success')
+                ->first();
+            if (!$parse) {
+                return redirect('/invoices/ai-reader')->with('error', 'AI draft not found.');
+            }
+            if ($parse->invoice_id) {
+                return redirect('/invoices')->with('error', 'This AI draft has already been saved as an invoice.');
+            }
+            $aiPrefill = $parse->payload_json;
+            $aiParseId = $parse->id;
+            // UTF-8-safe encode for inline <script> (HEX_TAG blocks </script> breakout)
+            $aiPrefillJson = json_encode($aiPrefill, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+            if ($aiPrefillJson === false) {
+                $aiPrefill = null;
+                $aiParseId = null;
+                $aiPrefillJson = null;
+            }
+        }
+
+        return view('invoice.create', compact('branches', 'standardTaxRate', 'nextInvoiceNumber', 'provinces', 'company', 'aiPrefill', 'aiPrefillJson', 'aiParseId'));
     }
 
     public static function getPakistanProvinces(): array
@@ -352,6 +385,14 @@ class InvoiceController extends Controller
             ComplianceScoringJob::dispatch($invoice->id);
 
             \App\Services\HsUsagePatternService::recordFromInvoiceCreation($request->items);
+
+            // Task 142: link AI Reader parse -> saved draft (marks the parse consumed)
+            if ($request->filled('ai_parse_id')) {
+                \App\Models\AiInvoiceParse::where('company_id', $companyId)
+                    ->where('id', (int) $request->input('ai_parse_id'))
+                    ->whereNull('invoice_id')
+                    ->update(['invoice_id' => $invoice->id]);
+            }
 
             DB::commit();
             return redirect('/invoices')->with('success', 'Invoice created successfully.');

@@ -38,6 +38,7 @@ use App\Http\Controllers\CustomerProfileController;
 use App\Http\Controllers\WhtReportController;
 use App\Http\Controllers\CsvImportController;
 use App\Http\Controllers\InvoiceImportController;
+use App\Http\Controllers\AiInvoiceReaderController;
 use App\Http\Controllers\FbrPosController;
 use App\Http\Controllers\FbrPosAuthController;
 use App\Http\Controllers\InventoryController;
@@ -257,6 +258,13 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         Route::get('/invoices/import-history', [InvoiceImportController::class, 'history'])->name('invoices.import-history');
         Route::get('/invoices/import/{batchId}/status', [InvoiceImportController::class, 'status'])->name('invoices.import-status');
         Route::get('/invoices/import/{batchId}/error-report', [InvoiceImportController::class, 'errorReport'])->name('invoices.import-error-report');
+
+        // Task 142: AI Invoice Reader (Premium gate 'ai_reader') — upload old/supplier
+        // invoice (PDF/photo/Excel) -> AI extraction -> review -> save DRAFT only.
+        Route::get('/invoices/ai-reader', [AiInvoiceReaderController::class, 'show'])->name('invoices.ai-reader');
+        Route::post('/invoices/ai-reader/parse', [AiInvoiceReaderController::class, 'parse'])
+            ->middleware('throttle:6,1')
+            ->name('invoices.ai-reader.parse');
 
         Route::get('/customers', [CustomerLedgerController::class, 'index'])->name('customers.index');
         Route::get('/customers/{ntn}/ledger', [CustomerLedgerController::class, 'show']);

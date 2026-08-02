@@ -19,6 +19,9 @@
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <form method="POST" action="/invoice/store" x-data="invoiceForm()" @submit="if (submitting) { $event.preventDefault(); return; } submitting = true;" @keydown.enter.prevent="focusNext($event)" @keydown.ctrl.s.prevent="saveDraft()" @keydown.meta.s.prevent="saveDraft()" @keydown.ctrl.enter.prevent="submitInvoice()" @keydown.meta.enter.prevent="submitInvoice()" @keydown.escape="closeModals()" class="space-y-6 pb-28">
                 @csrf
+                @if(!empty($aiParseId))
+                <input type="hidden" name="ai_parse_id" value="{{ (int) $aiParseId }}">
+                @endif
 
                 @if(session('error'))
                 <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-xl p-4">
@@ -33,6 +36,39 @@
                         <li>{{ $error }}</li>
                         @endforeach
                     </ul>
+                </div>
+                @endif
+
+                {{-- Task 142: AI Invoice Reader review banner --}}
+                @if(!empty($aiPrefill))
+                <div class="rounded-2xl border border-violet-200 dark:border-violet-800 bg-gradient-to-r from-violet-50 to-indigo-50 dark:from-violet-900/20 dark:to-indigo-900/20 p-5">
+                    <div class="flex items-start gap-3">
+                        <div class="shrink-0 w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h3 class="text-sm font-extrabold text-violet-900 dark:text-violet-200 uppercase tracking-wider">AI Invoice Reader — Review Draft</h3>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-600 text-white">{{ count($aiPrefill['items'] ?? []) }} item(s) extracted</span>
+                            </div>
+                            <p class="text-xs text-violet-700 dark:text-violet-300 mt-1">
+                                Extracted from <span class="font-semibold">{{ $aiPrefill['meta']['filename'] ?? 'your file' }}</span>
+                                @if(!empty($aiPrefill['document']['original_invoice_number'])) &middot; Original #: {{ $aiPrefill['document']['original_invoice_number'] }} @endif
+                                @if(!empty($aiPrefill['document']['original_date'])) &middot; Original date: {{ $aiPrefill['document']['original_date'] }} <span class="opacity-75">(draft uses today's date)</span> @endif
+                            </p>
+                            @if(!empty($aiPrefill['warnings']))
+                            <ul class="mt-2 space-y-1">
+                                @foreach(array_slice($aiPrefill['warnings'], 0, 12) as $w)
+                                <li class="text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1.5">
+                                    <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                                    <span>{{ $w }}</span>
+                                </li>
+                                @endforeach
+                            </ul>
+                            @endif
+                            <p class="text-[11px] text-violet-500 dark:text-violet-400 mt-2 font-medium">Review every field below, then save — this only creates a DRAFT. Nothing is submitted to FBR automatically.</p>
+                        </div>
+                    </div>
                 </div>
                 @endif
 
@@ -176,6 +212,11 @@
                         <div class="border border-gray-200 dark:border-gray-600 rounded-xl p-4 mb-4" :data-item-index="index">
                             <div class="flex items-center justify-between mb-3">
                                 <span class="text-sm font-medium text-gray-600 dark:text-gray-400" x-text="'Item #' + (index + 1)"></span>
+                                {{-- Task 142: AI extraction confidence badge --}}
+                                <span x-show="item.ai_confidence" x-cloak
+                                      class="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                                      :class="item.ai_needs_hs ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' : (item.ai_confidence === 'high' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300')"
+                                      x-text="item.ai_needs_hs ? 'AI: HS code needed' : 'AI: ' + item.ai_confidence + ' confidence'"></span>
                                 <div class="flex items-center space-x-2">
                                     <button type="button" @click="openQuickProduct(index)" class="text-emerald-600 hover:text-emerald-700 text-xs font-medium">+ Quick Product</button>
                                     <button type="button" @click="removeItem(index)" x-show="items.length > 1" class="text-red-500 hover:text-red-700 text-sm">Remove</button>
@@ -570,6 +611,8 @@
     <script>
         function invoiceForm() {
             const companyStandardRate = {{ $standardTaxRate ?? 18 }};
+            // Task 142: AI Invoice Reader prefill (server-sanitized, UTF-8-safe JSON; null when not in AI review mode)
+            const aiPrefill = {!! $aiPrefillJson ?? 'null' !!};
             const defaultTaxRates = {
                 standard: companyStandardRate, reduced: 10, '3rd_schedule': 17, exempt: 0, zero_rated: 0
             };
@@ -671,6 +714,9 @@
                     // PHASE 4 — merged init: bridge to global (used by quickProduct modal lines 1421+) + post-render focus.
                     window.invoiceFormInstance = this;
                     this.submitting = false; // safety reset on (re)mount
+                    if (aiPrefill && Array.isArray(aiPrefill.items) && aiPrefill.items.length) {
+                        this.applyAiPrefill(aiPrefill); // Task 142: AI Invoice Reader review prefill
+                    }
                     this.$nextTick(() => {
                         const errorEl = document.querySelector('.bg-red-50');
                         if (errorEl) {
@@ -682,6 +728,52 @@
                             if (firstInput) firstInput.focus();
                         }
                     });
+                },
+
+                // Task 142: populate the form from an AI Invoice Reader parse.
+                // Items ride on newItem() defaults so every expected key exists;
+                // applyScheduleRules keeps SRO/MRP requirements consistent.
+                applyAiPrefill(p) {
+                    // On a validation bounce old() restores the user's buyer/document
+                    // corrections — don't clobber them; items aren't old()-restored,
+                    // so those always refill from the AI payload.
+                    const hasOldInput = {{ old('buyer_name') !== null ? 'true' : 'false' }};
+                    if (!hasOldInput) this.applyAiHeaderFields(p);
+                    this.items = p.items.map(it => {
+                        const item = Object.assign(newItem(), {
+                            description: it.description || '',
+                            hs_code: it.hs_code || '',
+                            pct_code: it.pct_code || '',
+                            quantity: it.quantity ?? 1,
+                            price: it.price ?? 0,
+                            tax_rate: (it.tax_rate ?? companyStandardRate),
+                            tax: it.tax ?? 0,
+                            schedule_type: it.schedule_type || 'standard',
+                            sro_schedule_no: it.sro_schedule_no || '',
+                            serial_no: it.serial_no || '',
+                            default_uom: it.default_uom || 'Numbers, pieces, units',
+                            ai_confidence: it.ai_confidence || null,
+                            ai_needs_hs: !!it.needs_hs,
+                            ai_hs_source: it.hs_source || null
+                        });
+                        this.applyScheduleRules(item);
+                        return item;
+                    });
+                    this.validateMixedSchedules();
+                },
+
+                applyAiHeaderFields(p) {
+                    if (p.buyer) {
+                        if (p.buyer.name) this.buyer_name = p.buyer.name;
+                        this.buyer_ntn = p.buyer.ntn || '';
+                        this.buyer_cnic = p.buyer.cnic || '';
+                        if (p.buyer.address) this.buyer_address = p.buyer.address;
+                    }
+                    if (p.document) {
+                        if (p.document.document_type) this.document_type = p.document.document_type;
+                        if (p.document.reference_invoice_number) this.reference_invoice_number = p.document.reference_invoice_number;
+                        if (p.document.destination_province) this.destination_province = p.document.destination_province;
+                    }
                 },
 
                 focusNext($event) {

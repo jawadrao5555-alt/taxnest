@@ -5,6 +5,15 @@
                 <h2 class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">Billing & Plans</h2>
             </div>
 
+            @php
+                // Task 135: the Premium top tier is featured on its own wide card
+                // below the grid. If it is ever renamed it simply falls back into
+                // the normal grid.
+                $premiumPlan = $plans->firstWhere('name', 'Premium');
+                $gridPlans = $premiumPlan ? $plans->reject(fn ($p) => $p->id === $premiumPlan->id) : $plans;
+                $isCurrentPremium = $premiumPlan && $currentSubscription && $currentSubscription->pricing_plan_id === $premiumPlan->id;
+            @endphp
+
             @if($currentSubscription && $usageData)
                 @if($usageData['trial'] && $usageData['trial']['is_trial'])
                 <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-xl p-6 mb-6">
@@ -52,7 +61,15 @@
                                 &middot; Active until {{ \Carbon\Carbon::parse($currentSubscription->end_date)->format('d M Y') }}
                             </p>
                         </div>
-                        <span class="inline-flex px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium">Active</span>
+                        <div class="flex flex-col items-end gap-2">
+                            <span class="inline-flex px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium">Active</span>
+                            @if($premiumPlan && !$isCurrentPremium)
+                            <a href="#premium-plan" class="inline-flex items-center gap-1 text-xs font-semibold text-amber-600 hover:text-amber-700">
+                                Upgrade to Premium
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+                            </a>
+                            @endif
+                        </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
@@ -117,7 +134,7 @@
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    @foreach($plans as $index => $plan)
+                    @foreach($gridPlans as $plan)
                     @php $hasOffer = $plan->sale_percent > 0; @endphp
                     <div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border-2 transition relative
                         {{ $plan->name === 'Business' ? 'border-emerald-500 ring-2 ring-emerald-500' : 'border-gray-200 dark:border-gray-800' }}
@@ -192,6 +209,68 @@
                     @endforeach
                 </div>
 
+                @if($premiumPlan)
+                @php
+                    $premiumFeatures = $premiumPlan->features;
+                    if (is_string($premiumFeatures)) $premiumFeatures = json_decode($premiumFeatures, true);
+                    if (is_string($premiumFeatures)) $premiumFeatures = json_decode($premiumFeatures, true);
+                    if (!is_array($premiumFeatures)) $premiumFeatures = [];
+                @endphp
+                <div id="premium-plan" class="mt-6 relative bg-gray-900 dark:bg-gray-950 rounded-xl shadow-lg overflow-hidden border {{ $isCurrentPremium ? 'border-emerald-500 ring-2 ring-emerald-500' : 'border-gray-800' }}">
+                    <div class="absolute top-0 left-0 right-0 h-1 bg-amber-400"></div>
+                    <div class="p-6 md:p-8 md:flex md:items-start md:justify-between md:gap-8">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-3 flex-wrap">
+                                <span class="bg-amber-400 text-gray-900 text-xs font-bold px-3 py-1 rounded-full tracking-wide">PREMIUM</span>
+                                @if($isCurrentPremium)
+                                <span class="inline-flex px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded text-xs font-medium">Current Plan</span>
+                                @endif
+                            </div>
+                            <h3 class="mt-3 text-2xl font-bold text-white">{{ $premiumPlan->name }}</h3>
+                            <p class="mt-1 text-sm text-gray-400">Everything unlimited, plus the premium toolkit — white-label branding, API access, AI-assisted invoicing and automated billing.</p>
+                            <ul class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5">
+                                @foreach($premiumFeatures as $feature)
+                                <li class="flex items-start text-sm text-gray-300">
+                                    <svg class="w-4 h-4 text-amber-400 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    <span>{{ $feature }}</span>
+                                </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                        <div class="mt-6 md:mt-0 md:w-64 flex-shrink-0 md:text-right">
+                            @if($premiumPlan->sale_percent > 0)
+                            <span class="inline-block mb-2 px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full text-[11px] font-bold">{{ $premiumPlan->sale_badge }}</span>
+                            @endif
+                            <div x-show="cycle === 'monthly'">
+                                @if($premiumPlan->sale_percent > 0)<span class="text-base text-gray-500 line-through mr-1">PKR {{ number_format($premiumPlan->price) }}</span>@endif
+                                <span class="text-4xl font-bold text-white">PKR {{ number_format($premiumPlan->sale_price) }}</span>
+                                <span class="text-gray-400 text-sm">/mo</span>
+                            </div>
+                            <div x-show="cycle !== 'monthly'">
+                                <span class="text-4xl font-bold text-white">PKR <span x-text="calcMonthly({{ $premiumPlan->sale_price }}).toLocaleString()"></span></span>
+                                <span class="text-gray-400 text-sm">/mo</span>
+                                <p class="text-xs text-gray-500 mt-1">PKR <span x-text="calcPrice({{ $premiumPlan->sale_price }}).toLocaleString()"></span> total</p>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-2">Unlimited invoices &middot; users &middot; branches</p>
+                            @if($isCurrentPremium)
+                            <div class="mt-5">
+                                <button disabled class="w-full py-2.5 px-6 rounded-lg font-semibold text-sm bg-gray-800 text-gray-500 cursor-not-allowed">Current Plan</button>
+                            </div>
+                            @else
+                            <form method="POST" action="/billing/subscribe" class="mt-5">
+                                @csrf
+                                <input type="hidden" name="plan_id" value="{{ $premiumPlan->id }}">
+                                <input type="hidden" name="billing_cycle" :value="cycle">
+                                <button type="submit" class="w-full py-2.5 px-6 rounded-lg font-semibold text-sm bg-amber-400 text-gray-900 hover:bg-amber-300 transition shadow-sm">
+                                    {{ $currentSubscription ? 'Upgrade to Premium' : 'Subscribe to Premium' }}
+                                </button>
+                            </form>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+                @endif
+
                 @if(in_array(auth()->user()->role, ['super_admin', 'company_admin']))
                 <div class="mt-8">
                     <a href="/billing/custom-plan" class="block bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-xl shadow-sm border-2 border-dashed border-emerald-300 dark:border-emerald-700 p-6 hover:border-emerald-500 dark:hover:border-emerald-500 transition group">
@@ -251,23 +330,31 @@
                                     @endforeach
                                 </tr>
                                 @php
+                                // Tier-ranked availability (keyed by plan name) so the
+                                // table stays aligned no matter how many DI plans exist.
+                                // Unknown/custom plan names show ✗ for everything.
+                                $tierRank = ['Retail' => 1, 'Business' => 2, 'Industrial' => 3, 'Enterprise' => 4, 'Premium' => 5];
                                 $features = [
-                                    'FBR Integration' => [true, true, true, true],
-                                    'PDF Generation' => [true, true, true, true],
-                                    'Compliance Scoring' => [true, true, true, true],
-                                    'MIS Reports' => [false, true, true, true],
-                                    'Customer Ledger' => [false, true, true, true],
-                                    'Audit Logs' => [false, false, true, true],
-                                    'Priority Support' => [false, false, true, true],
-                                    'Custom Integrations' => [false, false, false, true],
+                                    'FBR Integration' => 1,
+                                    'PDF Generation' => 1,
+                                    'Compliance Scoring' => 1,
+                                    'MIS Reports' => 2,
+                                    'Customer Ledger' => 2,
+                                    'Recurring Invoices' => 2,
+                                    'Audit Logs' => 3,
+                                    'Priority Support' => 3,
+                                    'Custom Integrations' => 4,
+                                    'White-label Branding' => 5,
+                                    'Public REST API & Webhooks' => 5,
+                                    'AI Invoice Reader' => 5,
                                 ];
                                 @endphp
-                                @foreach($features as $feature => $availability)
+                                @foreach($features as $feature => $minTier)
                                 <tr class="{{ $loop->even ? 'bg-gray-50 dark:bg-gray-800' : '' }} hover:bg-gray-50 dark:hover:bg-gray-800 dark:hover:bg-gray-800 transition">
                                     <td class="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">{{ $feature }}</td>
-                                    @foreach($availability as $avail)
+                                    @foreach($plans as $plan)
                                     <td class="py-3 px-4 text-center">
-                                        @if($avail)
+                                        @if(($tierRank[$plan->name] ?? 0) >= $minTier)
                                         <svg class="w-5 h-5 text-emerald-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                         @else
                                         <svg class="w-5 h-5 text-gray-300 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>

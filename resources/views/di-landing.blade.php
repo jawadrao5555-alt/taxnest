@@ -496,8 +496,14 @@
                 </div>
 
                 @if(isset($plans) && $plans->count())
+                @php
+                    // Task 135: Premium is featured on its own wide card below the
+                    // grid; if renamed it falls back into the normal grid.
+                    $premiumPlan = $plans->firstWhere('name', 'Premium');
+                    $gridPlans = $premiumPlan ? $plans->reject(fn ($p) => $p->id === $premiumPlan->id) : $plans;
+                @endphp
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-[1200px] mx-auto">
-                    @foreach($plans as $plan)
+                    @foreach($gridPlans as $plan)
                     @php
                         $isPopular = $plan->name === 'Business';
                         $hasOffer = $plan->sale_percent > 0;
@@ -562,6 +568,54 @@
                     </div>
                     @endforeach
                 </div>
+
+                @if($premiumPlan)
+                @php
+                    $premiumFeats = $premiumPlan->features;
+                    if (is_string($premiumFeats)) $premiumFeats = json_decode($premiumFeats, true);
+                    if (is_string($premiumFeats)) $premiumFeats = json_decode($premiumFeats, true);
+                    if (!is_array($premiumFeats)) $premiumFeats = [];
+                @endphp
+                <div class="mt-6 max-w-[1200px] mx-auto rounded-lg overflow-hidden bg-[#052730] relative">
+                    <div class="absolute top-0 left-0 right-0 h-1 bg-[#E7BF3B]"></div>
+                    <div class="p-8 md:p-10 md:flex md:items-start md:justify-between md:gap-10">
+                        <div class="flex-1">
+                            <div class="text-[#E7BF3B] text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2">
+                                <span class="w-1.5 h-1.5 rounded-full bg-[#E7BF3B]"></span> Premium
+                            </div>
+                            <h4 class="font-serif text-3xl text-white">{{ $premiumPlan->name }}</h4>
+                            <p class="mt-2 text-sm text-white/70 font-light max-w-xl">The complete toolkit for firms that bill at scale — white-label branding, API integration, AI-assisted invoicing and automated billing.</p>
+                            <ul class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
+                                @foreach($premiumFeats as $feature)
+                                <li class="flex items-start gap-3 text-sm text-white/80">
+                                    <span class="text-[#E7BF3B] flex-shrink-0 mt-0.5">—</span>
+                                    {{ $feature }}
+                                </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                        <div class="mt-8 md:mt-0 md:w-72 flex-shrink-0 md:text-right">
+                            <div x-show="cycle === 'monthly'">
+                                <div class="flex items-baseline gap-1 md:justify-end">
+                                    <span class="text-4xl font-bold text-white tracking-tight">PKR {{ number_format($premiumPlan->sale_price, 0) }}</span>
+                                    <span class="text-white/60 text-sm font-medium">/mo</span>
+                                </div>
+                            </div>
+                            <div x-show="cycle !== 'monthly'" style="display:none;">
+                                <div class="flex items-baseline gap-1 md:justify-end">
+                                    <span class="text-4xl font-bold text-white tracking-tight">PKR <span x-text="calcMonthly({{ $premiumPlan->sale_price }}).toLocaleString()"></span></span>
+                                    <span class="text-white/60 text-sm font-medium">/mo</span>
+                                </div>
+                                <div class="mt-2 text-xs text-white/60 font-medium">
+                                    Billed PKR <span x-text="calcPrice({{ $premiumPlan->sale_price }}).toLocaleString()"></span>
+                                </div>
+                            </div>
+                            <p class="text-xs text-white/60 mt-2">Unlimited invoices &middot; users &middot; branches</p>
+                            <a href="/register" class="btn-solid btn-gold w-full mt-6 font-bold">Start Free Trial</a>
+                        </div>
+                    </div>
+                </div>
+                @endif
                 @endif
             </div>
         </div>

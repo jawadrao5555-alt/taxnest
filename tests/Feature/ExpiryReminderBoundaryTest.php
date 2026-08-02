@@ -61,6 +61,9 @@ class ExpiryReminderBoundaryTest extends TestCase
             $t->string('name');
             $t->boolean('is_trial')->default(false);
             $t->integer('invoice_limit')->nullable();
+            $t->string('product_type')->default('di');
+            $t->decimal('price', 12, 2)->nullable();
+            $t->decimal('price_quarterly', 12, 2)->nullable();
             $t->timestamps();
         });
 
@@ -120,13 +123,13 @@ class ExpiryReminderBoundaryTest extends TestCase
         ], $attrs));
     }
 
-    private function plan(bool $trial = false, ?int $invoiceLimit = null): PricingPlan
+    private function plan(bool $trial = false, ?int $invoiceLimit = null, array $attrs = []): PricingPlan
     {
-        return PricingPlan::forceCreate([
+        return PricingPlan::forceCreate(array_merge([
             'name' => $trial ? 'Free Trial' : 'Paid Plan',
             'is_trial' => $trial,
             'invoice_limit' => $invoiceLimit,
-        ]);
+        ], $attrs));
     }
 
     private function paidSub(Company $c, ?string $endDate, ?PricingPlan $plan = null): Subscription
@@ -409,6 +412,71 @@ class ExpiryReminderBoundaryTest extends TestCase
         $this->assertSame(0, Notification::where('company_id', $plus3->id)->count());
         $this->assertSame(0, Notification::where('company_id', $past->id)->count());
         Mail::assertSent(\App\Mail\TrialReminderMail::class, 2);
+    }
+
+    public function test_pos_paid_email_quotes_current_plan_rates(): void
+    {
+        // Task 221: POS renewal reminder must quote the plan's CURRENT
+        // pricing_plans rate (annual + quarterly when set) so the repriced
+        // renewal is no surprise.
+        $c = $this->company(['product_type' => 'pos', 'email' => 'pos@example.test']);
+        $plan = $this->plan(false, null, [
+            'name' => 'Unlimited',
+            'product_type' => 'pos',
+            'price' => 69999,
+            'price_quarterly' => 19999,
+        ]);
+        $this->paidSub($c, now()->addDay()->toDateString(), $plan);
+
+        $this->runCommand();
+
+        Mail::assertSent(\App\Mail\TrialReminderMail::class, function ($mail) {
+            $joined = implode(' ', $mail->paragraphs);
+            return str_contains($joined, 'Unlimited')
+                && str_contains($joined, 'Rs 69,999')
+                && str_contains($joined, 'per year')
+                && str_contains($joined, 'Rs 19,999')
+                && str_contains($joined, 'per quarter');
+        });
+    }
+
+    public function test_pos_paid_email_omits_quarterly_when_not_set(): void
+    {
+        $c = $this->company(['product_type' => 'pos', 'email' => 'pos2@example.test']);
+        $plan = $this->plan(false, null, [
+            'name' => 'Starter',
+            'product_type' => 'pos',
+            'price' => 24999,
+            'price_quarterly' => null,
+        ]);
+        $this->paidSub($c, now()->addDay()->toDateString(), $plan);
+
+        $this->runCommand();
+
+        Mail::assertSent(\App\Mail\TrialReminderMail::class, function ($mail) {
+            $joined = implode(' ', $mail->paragraphs);
+            return str_contains($joined, 'Rs 24,999')
+                && !str_contains($joined, 'per quarter');
+        });
+    }
+
+    public function test_non_pos_paid_email_has_no_rate_line(): void
+    {
+        // DI/FBR POS rates unchanged — no rate quote for non-POS lines.
+        $c = $this->company(['product_type' => 'di', 'email' => 'di@example.test']);
+        $plan = $this->plan(false, null, [
+            'name' => 'DI Plan',
+            'product_type' => 'di',
+            'price' => 4999,
+        ]);
+        $this->paidSub($c, now()->addDay()->toDateString(), $plan);
+
+        $this->runCommand();
+
+        Mail::assertSent(\App\Mail\TrialReminderMail::class, function ($mail) {
+            $joined = implode(' ', $mail->paragraphs);
+            return !str_contains($joined, 'Renewal rate');
+        });
     }
 
     public function test_paid_email_requires_non_trial_plan_matching_banner(): void

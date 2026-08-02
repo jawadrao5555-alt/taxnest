@@ -130,7 +130,7 @@ class SendTrialReminders extends Command
             ->whereBetween('end_date', [now()->startOfDay(), now()->addDays(2)->endOfDay()])
             ->whereHas('pricingPlan', fn ($q) => $q->where('is_trial', false))
             ->whereHas('company', fn ($q) => $q->where('is_internal_account', false))
-            ->with('company')
+            ->with(['company', 'pricingPlan'])
             ->get();
 
         foreach ($paidSubs as $sub) {
@@ -140,6 +140,19 @@ class SendTrialReminders extends Command
                 continue;
             }
             $until = \Carbon\Carbon::parse($sub->end_date)->format('d M Y');
+
+            $paragraphs = [
+                'Please renew before that date to keep your billing running without interruption.',
+            ];
+            // POS packages were repriced on 02 Aug 2026: existing subscriptions
+            // stay on the old rate until end_date, renewals charge the NEW rate.
+            // Quote the plan's CURRENT rate so the renewal price is no surprise.
+            // POS product line only for now (DI/FBR POS rates unchanged).
+            foreach ($this->renewalRateLines($company, $sub->pricingPlan) as $line) {
+                $paragraphs[] = $line;
+            }
+            $paragraphs[] = 'Log in to your account and open the Billing page to renew your package.';
+
             // Dedup per end_date so each renewal period warns once.
             if ($this->fire(
                 $company,
@@ -148,10 +161,7 @@ class SendTrialReminders extends Command
                 'Your TaxNest subscription is ending soon',
                 'Subscription ending soon',
                 "The subscription for {$company->name} ends on {$until}.",
-                [
-                    'Please renew before that date to keep your billing running without interruption.',
-                    'Log in to your account and open the Billing page to renew your package.',
-                ]
+                $paragraphs
             )) {
                 $sent++;
             }
@@ -207,6 +217,38 @@ class SendTrialReminders extends Command
         ]);
 
         return true;
+    }
+
+    /**
+     * Renewal-rate notice lines for the subscription-ending email.
+     *
+     * POS packages were repriced on 02 Aug 2026 (existing subscriptions keep
+     * the old rate until end_date; renewals charge the NEW rate), so the
+     * reminder quotes the plan's CURRENT rate from pricing_plans — annual
+     * (sale-adjusted, like every charge path) plus quarterly when set.
+     * POS product line only; DI/FBR POS rates are unchanged.
+     *
+     * @return string[]
+     */
+    private function renewalRateLines(Company $company, ?\App\Models\PricingPlan $plan): array
+    {
+        if (($company->product_type ?? 'di') !== 'pos' || !$plan) {
+            return [];
+        }
+
+        $annual = (float) $plan->sale_price;
+        if ($annual <= 0) {
+            return [];
+        }
+
+        $line = "Renewal rate for your {$plan->name} plan: Rs " . number_format($annual) . ' per year';
+
+        $quarterly = (float) ($plan->price_quarterly ?? 0);
+        if ($quarterly > 0) {
+            $line .= ' (or Rs ' . number_format($quarterly) . ' per quarter)';
+        }
+
+        return [$line . '.'];
     }
 
     /**

@@ -6,7 +6,12 @@
  * (PosFeatureService::PLAN_GATES) against live code paths, plus the two
  * derived gates that ride on it:
  *   - PosAccessService::customSet()      (Team Custom Access — Unlimited only)
- *   - PublicProfileController::publicUrlFor() (QR Menu — Pro Max/Unlimited)
+ *   - PublicProfileController::publicUrlFor() (QR Menu — Pro and above)
+ *
+ * Ladder restructure (owner-approved Aug 2, 2026, see the
+ * pro_gains_riders_qr_ladder_restructure migration):
+ *   Pro = everything except Hazri + Rider Live Tracking; Pro Max = + Hazri;
+ *   Unlimited = everything + no limits.
  * and the cross-cutting rules: active trial unlocks everything, expired
  * trial locks the premium gates, admin override unlocks everything,
  * no-subscription locks everything, internal accounts bypass all gates.
@@ -60,13 +65,13 @@ $MATRIX = [
     // plan name => [deals, riders, hazri, analytics, reports, rider_tracking, custom_access, qr_menu, offline]
     'Starter'   => [false, false, false, false, false, false, false, false, false],
     'Business'  => [true,  false, false, false, true,  false, false, false, true ],
-    'Pro'       => [true,  false, false, true,  true,  false, false, false, true ],
+    'Pro'       => [true,  true,  false, true,  true,  false, false, true,  true ],
     'Pro Max'   => [true,  true,  true,  true,  true,  false, false, true,  true ],
     'Unlimited' => [true,  true,  true,  true,  true,  true,  true,  true,  true ],
 ];
 // Derived-surface expectations per plan:
-$CUSTOM_SET_PLANS = ['Unlimited'];            // customSet() honored only here
-$QR_URL_PLANS     = ['Pro Max', 'Unlimited']; // publicUrlFor() non-null only here
+$CUSTOM_SET_PLANS = ['Unlimited'];                   // customSet() honored only here
+$QR_URL_PLANS     = ['Pro', 'Pro Max', 'Unlimited']; // publicUrlFor() non-null only here
 
 $fail = 0;
 $pass = 0;

@@ -410,7 +410,7 @@
                         <span class="font-serif text-lg text-gray-900">What do the plans include?</span>
                         <span class="text-gray-400 font-mono text-xl" x-text="open === 4 ? '-' : '+'">+</span>
                     </button>
-                    <div x-show="open === 4" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Starter covers your owner account plus 1 team account with up to 500 PRA bills per month. Business adds up to 5 team accounts and 2,000 bills per month. Pro gives you the full restaurant module, analytics, 10 team accounts, 2 branches and 3,000 bills per month. Pro Max adds delivery riders & khata, staff attendance and a public QR menu with 15 team accounts, 3 branches and 5,000 bills per month. Unlimited is fully unrestricted — unlimited team accounts, unlimited branches, unlimited billing, every feature (including Team Custom Access) unlocked, with priority support.</div>
+                    <div x-show="open === 4" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Starter covers your owner account plus 1 team account with up to 500 PRA bills per month. Business adds up to 5 team accounts and 2,000 bills per month. Pro is the complete POS — full restaurant module, delivery riders & khata, public QR menu, analytics, 10 team accounts, 2 branches and 3,000 bills per month. Pro Max adds Staff Hazri (attendance) with 15 team accounts, 3 branches and 5,000 bills per month. Unlimited is fully unrestricted — Rider Live Tracking on a map, unlimited team accounts, unlimited branches, unlimited billing, every feature (including Team Custom Access) unlocked, with priority support.</div>
                 </div>
             </div>
         </div>

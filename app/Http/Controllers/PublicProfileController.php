@@ -43,7 +43,7 @@ class PublicProfileController extends Controller
 
     /**
      * Absolute public URL for a company, or null when the page is disabled
-     * or the plan lacks the QR Menu gate (Pro Max / Unlimited only, Aug
+     * or the plan lacks the QR Menu gate (Pro and above, Aug
      * 2026). Receipts (80mm/58mm) and the business-profile page all read
      * this ONE helper, so the QR block disappears everywhere at once.
      */
@@ -82,7 +82,7 @@ class PublicProfileController extends Controller
             abort(404);
         }
 
-        // Plan gate (Aug 2026): QR Menu is Pro Max / Unlimited only. Public
+        // Plan gate (Aug 2026): QR Menu is Pro and above. Public
         // page — plain 404, no upgrade pitch (customers aren't the buyer).
         if (!\App\Services\PosFeatureService::planAllows($company, 'qr_menu_enabled')) {
             abort(404);
@@ -127,7 +127,7 @@ class PublicProfileController extends Controller
         }
         $companyId = app('currentCompanyId');
         $company = Company::findOrFail($companyId);
-        // Plan gate (Aug 2026): QR Menu settings are Pro Max / Unlimited only.
+        // Plan gate (Aug 2026): QR Menu settings are Pro and above.
         if (!\App\Services\PosFeatureService::planAllows($company, 'qr_menu_enabled')) {
             throw new \Illuminate\Http\Exceptions\HttpResponseException(
                 back()->with('error', __('pos.qr_menu_plan_locked'))

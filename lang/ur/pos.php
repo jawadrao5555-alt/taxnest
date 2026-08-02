@@ -3528,6 +3528,10 @@ Bills stay with the cashier — this only clears the kitchen display.',
     'dayclose_bills_submitted' => ' :count بل FBR کو جمع ہو گئے۔',
     'dayclose_bills_queued' => ' :count بل فسکل ڈیوائس (ڈیسک ٹاپ ایجنٹ) کی قطار میں ہیں۔',
     'dayclose_bills_failed' => ' :count بل فیل ہوئے (فیل قطار میں ہیں — وہیں سے دوبارہ کوشش کریں)۔',
+    // PRA POS variants (Task 157): submitted/queued/offline meanings per PRA reporting.
+    'dayclose_bills_submitted_pra' => ' :count بل PRA کو جمع ہو گئے۔',
+    'dayclose_bills_queued_pra' => ' :count بل ڈیسک ٹاپ ایجنٹ (Agent Sync) کی قطار میں ہیں۔',
+    'dayclose_bills_offline_pra' => ' :count بل آف لائن محفوظ ہوئے (PRA تک رسائی نہیں ہو سکی — Transactions سے دوبارہ کوشش کریں)۔',
     // ---- Auth screens (login / register) — task: auth pages follow chosen language ----
     'auth_login_title' => 'Login',
     'auth_signup_title' => 'Sign Up',

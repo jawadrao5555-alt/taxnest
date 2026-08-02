@@ -39,6 +39,13 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         Schema::create('companies', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+            $table->string('product_type')->nullable();
+            $table->string('status')->nullable();
+            $table->string('default_language')->nullable();
+            $table->string('pos_dayclose_provisional_action')->nullable();
+            $table->string('pos_dayclose_final_local_action')->nullable();
+            $table->boolean('pos_customer_spend_persist')->default(true);
+            $table->string('pos_business_day_cutoff')->nullable();
             $table->boolean('is_internal_account')->default(false);
             $table->integer('invoice_limit_override')->nullable();
             $table->boolean('pra_reporting_enabled')->default(false);
@@ -59,8 +66,16 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         // company-level flag is OFF.
         Schema::create('users', function (Blueprint $table) {
             $table->id();
+            $table->string('name')->nullable();
+            $table->string('email')->nullable()->unique();
+            $table->string('password')->nullable();
             $table->unsignedBigInteger('company_id')->nullable();
+            $table->string('role')->nullable();
+            $table->string('pos_role')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->string('language')->nullable();
             $table->boolean('pra_reporting_enabled')->default(false);
+            $table->rememberToken();
             $table->timestamps();
         });
 
@@ -77,6 +92,8 @@ class PosDayCloseAutoFinalizeTest extends TestCase
             $table->text('pra_qr_code')->nullable();
             $table->boolean('is_archived')->default(false);
             $table->timestamp('archived_at')->nullable();
+            $table->unsignedBigInteger('archived_by_report_id')->nullable();
+            $table->unsignedBigInteger('created_by')->nullable();
             $table->decimal('subtotal', 12, 2)->default(0);
             $table->decimal('discount_amount', 12, 2)->default(0);
             $table->decimal('tax_rate', 8, 2)->nullable();
@@ -116,6 +133,16 @@ class PosDayCloseAutoFinalizeTest extends TestCase
             $table->timestamps();
         });
 
+        // Branch context resolution during HTTP requests (Task 157 flash tests).
+        Schema::create('branches', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->string('name');
+            $table->boolean('is_active')->default(true);
+            $table->boolean('is_head_office')->default(false);
+            $table->timestamps();
+        });
+
         // sendInvoice() writes a request log row before hitting the network.
         Schema::create('pra_logs', function (Blueprint $table) {
             $table->id();
@@ -129,12 +156,37 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         });
 
         // Monthly quota adds back finals hard-deleted by day-close DELETE policy.
+        // HTTP flash tests (Task 157) drive the FULL closeDayReport path, so the
+        // Z-report row needs its real data columns too.
         Schema::create('pos_day_close_reports', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('company_id');
-            $table->string('report_date');
+            $table->date('report_date');
             $table->string('report_number')->nullable();
             $table->integer('deleted_final_count')->default(0);
+            $table->integer('total_invoices')->default(0);
+            $table->integer('pra_invoices')->default(0);
+            $table->integer('local_invoices')->default(0);
+            $table->integer('offline_invoices')->default(0);
+            $table->decimal('gross_sales', 14, 2)->default(0);
+            $table->decimal('total_discount', 14, 2)->default(0);
+            $table->decimal('net_sales', 14, 2)->default(0);
+            $table->decimal('total_tax', 14, 2)->default(0);
+            $table->decimal('total_amount', 14, 2)->default(0);
+            $table->decimal('cash_amount', 14, 2)->default(0);
+            $table->decimal('card_amount', 14, 2)->default(0);
+            $table->decimal('other_amount', 14, 2)->default(0);
+            $table->string('first_invoice_number')->nullable();
+            $table->string('last_invoice_number')->nullable();
+            $table->timestamp('first_invoice_time')->nullable();
+            $table->timestamp('last_invoice_time')->nullable();
+            $table->unsignedBigInteger('closed_by')->nullable();
+            $table->text('notes')->nullable();
+            $table->string('hash')->nullable();
+            $table->decimal('opening_float', 14, 2)->nullable();
+            $table->decimal('counted_cash', 14, 2)->nullable();
+            $table->decimal('expected_cash', 14, 2)->nullable();
+            $table->decimal('cash_variance', 14, 2)->nullable();
             $table->timestamps();
         });
     }
@@ -390,5 +442,188 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         $this->assertSame('POS-' . now()->format('Y') . '-00001', $tx->invoice_number);
         // No server-side network attempt for Agent-Sync companies.
         $this->assertSame(0, DB::table('pra_logs')->count());
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // 6. HTTP FLASH LOCK (Task 157) — closeDayReport POST sweep summary
+    // ════════════════════════════════════════════════════════════════════════
+
+    /** Company attrs every HTTP test needs to survive PosAuth + company.approval. */
+    private function makeHttpCompany(array $attrs = []): int
+    {
+        return $this->makeCompany(array_merge([
+            'product_type' => 'pos',
+            'status' => 'active',
+            'pos_dayclose_provisional_action' => 'finalize',
+        ], $attrs));
+    }
+
+    private function makePosUser(int $companyId, string $language = 'en'): \App\Models\User
+    {
+        $id = DB::table('users')->insertGetId([
+            'name' => 'POS Cashier',
+            'email' => 'cashier' . $companyId . '@taxnest.test',
+            'password' => bcrypt('Secret@12345'),
+            'company_id' => $companyId,
+            'role' => 'company_admin',
+            'is_active' => true,
+            'language' => $language,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return \App\Models\User::find($id);
+    }
+
+    /** POST the real close-day route as the given user and return the response. */
+    private function closeDay(\App\Models\User $user)
+    {
+        return $this->actingAs($user, 'pos')
+            ->from('/pos/day-close')
+            ->post('/pos/day-close', []);
+    }
+
+    /** The base "report generated" message for today's freshly-created report. */
+    private function baseMessage(int $companyId): string
+    {
+        $report = DB::table('pos_day_close_reports')->where('company_id', $companyId)->first();
+        $this->assertNotNull($report, 'day-close report row must exist');
+
+        return __('pos.dayclose_report_generated', [
+            'number' => $report->report_number,
+            'date' => \Carbon\Carbon::parse($report->report_date)->format('d M Y'),
+        ]);
+    }
+
+    public function test_flash_shows_finalized_count_and_skips_zero_count_branches(): void
+    {
+        // Reporting OFF: sweep finalizes but nothing is submitted/queued/offline
+        // → flash must carry the finalized count and NO zero-count suffixes.
+        $companyId = $this->makeHttpCompany();
+        $this->makeProvisional($companyId, 'L-0001');
+        $this->makeProvisional($companyId, 'L-0002');
+
+        $response = $this->closeDay($this->makePosUser($companyId));
+
+        $response->assertSessionHas('success');
+        $msg = session('success');
+        $this->assertStringContainsString(__('pos.dayclose_bills_finalized', ['count' => 2]), $msg);
+        $this->assertStringNotContainsString(__('pos.dayclose_bills_submitted_pra', ['count' => 0]), $msg);
+        $this->assertStringNotContainsString(__('pos.dayclose_bills_queued_pra', ['count' => 0]), $msg);
+        $this->assertStringNotContainsString(__('pos.dayclose_bills_offline_pra', ['count' => 0]), $msg);
+    }
+
+    public function test_flash_shows_queued_count_for_agent_sync_company(): void
+    {
+        $companyId = $this->makeHttpCompany([
+            'pra_reporting_enabled' => true,
+            'agent_enabled' => true,
+            'agent_submits_pra' => true,
+        ]);
+        $this->makeProvisional($companyId, 'L-0001');
+
+        $response = $this->closeDay($this->makePosUser($companyId));
+
+        $response->assertSessionHas('success');
+        $msg = session('success');
+        $this->assertStringContainsString(__('pos.dayclose_bills_finalized', ['count' => 1]), $msg);
+        $this->assertStringContainsString(__('pos.dayclose_bills_queued_pra', ['count' => 1]), $msg);
+        $this->assertStringNotContainsString(__('pos.dayclose_bills_submitted_pra', ['count' => 0]), $msg);
+        $this->assertStringNotContainsString(__('pos.dayclose_bills_offline_pra', ['count' => 0]), $msg);
+    }
+
+    public function test_flash_shows_offline_count_on_pra_connection_failure(): void
+    {
+        // Cloud mode, relay at a dead local port → instant refusal, no network.
+        $companyId = $this->makeHttpCompany([
+            'pra_reporting_enabled' => true,
+            'pra_proxy_url' => 'http://127.0.0.1:9',
+        ]);
+        $this->makeProvisional($companyId, 'L-0001');
+
+        $response = $this->closeDay($this->makePosUser($companyId));
+
+        $response->assertSessionHas('success');
+        $msg = session('success');
+        $this->assertStringContainsString(__('pos.dayclose_bills_finalized', ['count' => 1]), $msg);
+        $this->assertStringContainsString(__('pos.dayclose_bills_offline_pra', ['count' => 1]), $msg);
+    }
+
+    public function test_no_sweep_summary_when_policy_is_not_finalize(): void
+    {
+        // Default 'save' policy: provisional gets ARCHIVED (not finalized) →
+        // base message + archived suffix, but NO finalized line.
+        $companyId = $this->makeHttpCompany(['pos_dayclose_provisional_action' => 'save']);
+        $this->makeProvisional($companyId, 'L-0001');
+        // A completed PRA bill so the report itself is never 'empty'.
+        $this->makeProvisional($companyId, 'P-0001', [
+            'invoice_mode' => 'pra',
+            'pra_status' => 'submitted',
+            'pra_invoice_number' => 'PRA-123',
+        ]);
+
+        $response = $this->closeDay($this->makePosUser($companyId));
+
+        $response->assertSessionHas('success');
+        $this->assertStringNotContainsString(
+            __('pos.dayclose_bills_finalized', ['count' => 1]),
+            session('success')
+        );
+    }
+
+    public function test_no_sweep_summary_when_nothing_finalized(): void
+    {
+        // Policy 'finalize' but no provisionals → finalized 0 → no sweep suffix.
+        $companyId = $this->makeHttpCompany();
+        $this->makeProvisional($companyId, 'P-0001', [
+            'invoice_mode' => 'pra',
+            'pra_status' => 'submitted',
+            'pra_invoice_number' => 'PRA-123',
+        ]);
+
+        $response = $this->closeDay($this->makePosUser($companyId));
+
+        $response->assertSessionHas('success');
+        $this->assertStringNotContainsString(
+            trans('pos.dayclose_bills_finalized', ['count' => 0]),
+            session('success')
+        );
+        $this->assertStringContainsString($this->baseMessage($companyId), session('success'));
+    }
+
+    public function test_urdu_user_gets_urdu_sweep_summary(): void
+    {
+        // Cashier language 'ur' → SetPosLocale flips the request locale, so the
+        // flash must be built from the ur keys (and differ from the en render).
+        $companyId = $this->makeHttpCompany();
+        $this->makeProvisional($companyId, 'L-0001');
+
+        $response = $this->closeDay($this->makePosUser($companyId, 'ur'));
+
+        $response->assertSessionHas('success');
+        $urSuffix = trans('pos.dayclose_bills_finalized', ['count' => 1], 'ur');
+        $this->assertStringContainsString($urSuffix, session('success'));
+        $this->assertNotSame(
+            trans('pos.dayclose_bills_finalized', ['count' => 1], 'en'),
+            $urSuffix,
+            'ur key must not silently fall back to English'
+        );
+    }
+
+    public function test_all_pra_sweep_summary_keys_exist_in_en_and_ur(): void
+    {
+        foreach (['dayclose_bills_finalized', 'dayclose_bills_submitted_pra', 'dayclose_bills_queued_pra', 'dayclose_bills_offline_pra'] as $key) {
+            foreach (['en', 'ur'] as $locale) {
+                $this->assertTrue(
+                    \Illuminate\Support\Facades\Lang::has("pos.$key", $locale),
+                    "pos.$key missing in $locale"
+                );
+                $this->assertStringContainsString(
+                    ':count',
+                    \Illuminate\Support\Facades\Lang::get("pos.$key", [], $locale, false),
+                    "pos.$key ($locale) must carry the :count placeholder"
+                );
+            }
+        }
     }
 }

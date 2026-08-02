@@ -7534,6 +7534,24 @@ class PosController extends Controller
         if ($backlogSwept > 0) {
             $msg .= __('pos.dayclose_backlog_included', ['count' => $backlogSwept]);
         }
+        // Sweep summary (Task 157, FBR pattern): only when the 'finalize' (Khud
+        // Final) policy actually ran and finalized something. Breaks down PRA
+        // outcomes so the cashier knows how many were submitted to PRA, how many
+        // are queued for the desktop agent (Agent Sync), and how many are saved
+        // Offline (retryable from Transactions — never lost). Zero-count branches skip.
+        $sweep = $result['finalize_sweep'] ?? null;
+        if (($sweep['finalized'] ?? 0) > 0) {
+            $msg .= __('pos.dayclose_bills_finalized', ['count' => $sweep['finalized']]);
+            if (($sweep['submitted'] ?? 0) > 0) {
+                $msg .= __('pos.dayclose_bills_submitted_pra', ['count' => $sweep['submitted']]);
+            }
+            if (($sweep['queued'] ?? 0) > 0) {
+                $msg .= __('pos.dayclose_bills_queued_pra', ['count' => $sweep['queued']]);
+            }
+            if (($sweep['offline'] ?? 0) > 0) {
+                $msg .= __('pos.dayclose_bills_offline_pra', ['count' => $sweep['offline']]);
+            }
+        }
         return back()->with('success', $msg);
     }
 
@@ -8506,7 +8524,7 @@ class PosController extends Controller
             }
         });
 
-        return ['status' => 'created', 'report' => $report, 'archived' => $archivedCount, 'deleted' => $deletedCount, 'report_number' => $reportNumber, 'summary' => $localSummary];
+        return ['status' => 'created', 'report' => $report, 'archived' => $archivedCount, 'deleted' => $deletedCount, 'report_number' => $reportNumber, 'summary' => $localSummary, 'finalize_sweep' => $finalizeSweep];
     }
 
     public function dayCloseReportPdf($id)

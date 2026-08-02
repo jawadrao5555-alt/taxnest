@@ -3528,6 +3528,10 @@ Bills stay with the cashier — this only clears the kitchen display.',
     'dayclose_bills_submitted' => ' :count submitted to FBR.',
     'dayclose_bills_queued' => ' :count queued for the fiscal device (desktop agent).',
     'dayclose_bills_failed' => ' :count failed (in the Fail Queue — retry from there).',
+    // PRA POS variants (Task 157): submitted/queued/offline meanings per PRA reporting.
+    'dayclose_bills_submitted_pra' => ' :count submitted to PRA.',
+    'dayclose_bills_queued_pra' => ' :count queued for the desktop agent (Agent Sync).',
+    'dayclose_bills_offline_pra' => ' :count saved as Offline (PRA unreachable/rejected — retry from Transactions).',
     // ---- Auth screens (login / register) — task: auth pages follow chosen language ----
     'auth_login_title' => 'Login',
     'auth_signup_title' => 'Sign Up',

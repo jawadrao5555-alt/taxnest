@@ -156,7 +156,9 @@ class RestaurantWaiterController extends Controller
             ->where('source', 'waiter')
             ->where('status', 'held')
             ->where('created_by', $user->id)
-            ->with(['items', 'table', 'assignedCashier'])
+            // 'creator' MUST be eager-loaded: orderJson() reads $o->creator?->name
+            // and production has lazy-loading disabled (62 live 500s, Jul-Aug 2026).
+            ->with(['items', 'table', 'creator', 'assignedCashier'])
             ->orderByDesc('id')
             ->get()
             ->map(fn($o) => $this->orderJson($o));

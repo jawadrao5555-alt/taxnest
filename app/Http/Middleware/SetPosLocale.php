@@ -19,6 +19,19 @@ class SetPosLocale
     public function handle(Request $request, Closure $next)
     {
         try {
+            // Forgot/reset-password flow lives at root paths (no /pos prefix)
+            // and is shared with DI users. Follow the last-known POS/FBR POS
+            // session language ONLY when one exists — never browser-hint or
+            // default to 'ur' here, or DI (English) visitors would flip.
+            if ($request->is('forgot-password') || $request->is('verify-otp')
+                || $request->is('reset-password') || $request->is('reset-password-link')) {
+                $lang = $request->hasSession() ? $request->session()->get('pos_locale') : null;
+                if (in_array($lang, ['ur', 'en'], true)) {
+                    App::setLocale($lang);
+                }
+                return $next($request);
+            }
+
             $guard = null;
             if ($request->is('fbr-pos') || $request->is('fbr-pos/*')) {
                 $guard = 'fbrpos';
@@ -49,7 +62,13 @@ class SetPosLocale
                     if (!in_array($lang, ['ur', 'en'], true)) {
                         $lang = $request->getPreferredLanguage(['ur', 'en']) ?: 'ur';
                     }
-                    App::setLocale(in_array($lang, ['ur', 'en'], true) ? $lang : 'ur');
+                    $lang = in_array($lang, ['ur', 'en'], true) ? $lang : 'ur';
+                    App::setLocale($lang);
+                    // Persist so the root-level forgot/reset-password pages
+                    // (linked from the login screen) follow the same language.
+                    if ($request->hasSession()) {
+                        $request->session()->put('pos_locale', $lang);
+                    }
                 }
             }
         } catch (\Throwable $e) {

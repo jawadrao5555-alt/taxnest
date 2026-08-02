@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forgot Password - TaxNest</title>
+    <title>{{ __('pos.auth_fp_title') }} - TaxNest</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen flex items-center justify-center" style="background: linear-gradient(135deg, #064e3b 0%, #065f46 30%, #047857 60%, #0d9488 100%);">
@@ -22,8 +22,8 @@
                 <div class="w-14 h-14 rounded-full mx-auto mb-4 flex items-center justify-center" style="background: rgba(52,211,153,0.15);">
                     <svg class="w-7 h-7 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
                 </div>
-                <h2 class="text-xl font-bold text-white">Forgot Password?</h2>
-                <p class="text-sm text-emerald-200/50 mt-2">Enter your email and we'll send you a reset link</p>
+                <h2 class="text-xl font-bold text-white">{{ __('pos.auth_fp_heading') }}</h2>
+                <p class="text-sm text-emerald-200/50 mt-2">{{ __('pos.auth_fp_sub') }}</p>
             </div>
 
             @if (session('status'))
@@ -35,7 +35,7 @@
             <form method="POST" action="{{ route('password.email') }}" class="space-y-4">
                 @csrf
                 <div>
-                    <label class="block text-sm font-medium text-emerald-100/70 mb-1.5">Email Address</label>
+                    <label class="block text-sm font-medium text-emerald-100/70 mb-1.5">{{ __('pos.auth_email_address') }}</label>
                     <input type="email" name="email" value="{{ old('email') }}" required autofocus class="w-full px-4 py-2.5 rounded-xl text-sm text-white placeholder-emerald-300/30 transition" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); outline: none;" placeholder="you@company.com" onfocus="this.style.borderColor='rgba(52,211,153,0.5)'; this.style.boxShadow='0 0 0 3px rgba(52,211,153,0.12)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
                     @error('email')
                     <p class="text-sm text-red-400 mt-1">{{ $message }}</p>
@@ -43,13 +43,13 @@
                 </div>
 
                 <button type="submit" class="w-full py-3 rounded-xl text-sm font-bold text-white transition-all duration-200" style="background: linear-gradient(135deg, #059669, #14b8a6); box-shadow: 0 4px 20px rgba(5, 150, 105, 0.35);" onmouseover="this.style.boxShadow='0 6px 28px rgba(5, 150, 105, 0.5)'; this.style.transform='translateY(-1px)';" onmouseout="this.style.boxShadow='0 4px 20px rgba(5, 150, 105, 0.35)'; this.style.transform='translateY(0)';">
-                    Send Reset Link
+                    {{ __('pos.auth_send_reset_link') }}
                 </button>
             </form>
 
             <div class="mt-6 text-center">
                 <a href="{{ route('login') }}" class="text-sm text-emerald-300/70 hover:text-emerald-200 transition">
-                    &larr; Back to Login
+                    &larr; {{ __('pos.auth_back_to_login') }}
                 </a>
             </div>
         </div>

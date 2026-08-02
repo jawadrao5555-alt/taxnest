@@ -52,11 +52,24 @@ class PasswordResetLinkController extends Controller
 
         $resetLink = url("/reset-password-link?token={$token}&email=" . urlencode($request->email));
 
+        // Render the email in the user's chosen language (session pos_locale, fallback en)
+        $sessionLocale = $request->hasSession() ? $request->session()->get('pos_locale') : null;
+        $mailLocale = in_array($sessionLocale, ['en', 'ur'], true) ? $sessionLocale : 'en';
+        $previousLocale = app()->getLocale();
+        app()->setLocale($mailLocale);
+
         try {
-            Mail::send([], [], function ($message) use ($request, $otp, $resetLink) {
+            $subject = __('pos.auth_mail_subject');
+            $html = $this->buildEmailHtml($otp, $resetLink, $request->email);
+        } finally {
+            app()->setLocale($previousLocale);
+        }
+
+        try {
+            Mail::send([], [], function ($message) use ($request, $subject, $html) {
                 $message->to($request->email)
-                    ->subject('TaxNest - Password Reset')
-                    ->html($this->buildEmailHtml($otp, $resetLink, $request->email));
+                    ->subject($subject)
+                    ->html($html);
             });
 
             \App\Services\MailHealth::recordSuccess();
@@ -151,44 +164,44 @@ class PasswordResetLinkController extends Controller
 <td style="background:linear-gradient(135deg,#059669,#14b8a6); width:40px; height:40px; border-radius:12px; text-align:center; vertical-align:middle; color:#fff; font-size:20px;">&#128737;</td>
 <td style="padding-left:12px; color:#ffffff; font-size:22px; font-weight:bold;">TaxNest</td>
 </tr></table>
-<p style="color:#a7f3d0; margin:12px 0 0; font-size:14px;">Password Reset Request</p>
+<p style="color:#a7f3d0; margin:12px 0 0; font-size:14px;">' . e(__('pos.auth_mail_header_sub')) . '</p>
 </td></tr>
 
 <!-- Body -->
 <tr><td style="padding:32px;">
-<p style="color:#374151; font-size:15px; margin:0 0 8px;">Hello,</p>
-<p style="color:#6b7280; font-size:14px; line-height:1.6; margin:0 0 24px;">You requested a password reset for your TaxNest account (<strong>' . htmlspecialchars($email) . '</strong>). You can reset your password using either method below:</p>
+<p style="color:#374151; font-size:15px; margin:0 0 8px;">' . e(__('pos.auth_mail_greeting')) . '</p>
+<p style="color:#6b7280; font-size:14px; line-height:1.6; margin:0 0 24px;">' . e(__('pos.auth_mail_intro', ['email' => $email])) . '</p>
 
 <!-- OTP Box -->
 <div style="background:#f0fdf4; border:2px solid #bbf7d0; border-radius:12px; padding:24px; text-align:center; margin-bottom:24px;">
-<p style="color:#6b7280; font-size:13px; margin:0 0 8px; text-transform:uppercase; letter-spacing:1px;">Method 1 — Enter Code on Website</p>
+<p style="color:#6b7280; font-size:13px; margin:0 0 8px; text-transform:uppercase; letter-spacing:1px;">' . e(__('pos.auth_mail_method1')) . '</p>
 <div style="font-size:36px; font-weight:bold; color:#059669; letter-spacing:12px; font-family:monospace; padding:8px 0;">' . $otp . '</div>
 </div>
 
 <!-- OR Divider -->
 <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;"><tr>
 <td style="border-bottom:1px solid #e5e7eb; width:45%;"></td>
-<td style="text-align:center; color:#9ca3af; font-size:13px; padding:0 12px; white-space:nowrap;">OR</td>
+<td style="text-align:center; color:#9ca3af; font-size:13px; padding:0 12px; white-space:nowrap;">' . e(__('pos.auth_mail_or')) . '</td>
 <td style="border-bottom:1px solid #e5e7eb; width:45%;"></td>
 </tr></table>
 
 <!-- Link Button -->
 <div style="text-align:center; margin-bottom:24px;">
-<p style="color:#6b7280; font-size:13px; margin:0 0 12px; text-transform:uppercase; letter-spacing:1px;">Method 2 — Click the Link</p>
-<a href="' . $resetLink . '" style="display:inline-block; background:linear-gradient(135deg,#059669,#14b8a6); color:#ffffff; text-decoration:none; padding:14px 40px; border-radius:10px; font-weight:bold; font-size:15px;">Reset Password</a>
+<p style="color:#6b7280; font-size:13px; margin:0 0 12px; text-transform:uppercase; letter-spacing:1px;">' . e(__('pos.auth_mail_method2')) . '</p>
+<a href="' . $resetLink . '" style="display:inline-block; background:linear-gradient(135deg,#059669,#14b8a6); color:#ffffff; text-decoration:none; padding:14px 40px; border-radius:10px; font-weight:bold; font-size:15px;">' . e(__('pos.auth_mail_reset_button')) . '</a>
 </div>
 
 <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:12px 16px; margin-bottom:16px;">
-<p style="color:#92400e; font-size:13px; margin:0;">&#9201; This code and link expire in <strong>15 minutes</strong>.</p>
+<p style="color:#92400e; font-size:13px; margin:0;">&#9201; ' . e(__('pos.auth_mail_expiry', ['minutes' => 15])) . '</p>
 </div>
 
-<p style="color:#9ca3af; font-size:13px; line-height:1.5; margin:0;">If you did not request this, please ignore this email. Your password will remain unchanged.</p>
+<p style="color:#9ca3af; font-size:13px; line-height:1.5; margin:0;">' . e(__('pos.auth_mail_ignore')) . '</p>
 </td></tr>
 
 <!-- Footer -->
 <tr><td style="background:#f9fafb; border-top:1px solid #f3f4f6; padding:20px 32px; text-align:center;">
-<p style="color:#9ca3af; font-size:12px; margin:0;">&copy; ' . date('Y') . ' TaxNest. All rights reserved.</p>
-<p style="color:#d1d5db; font-size:11px; margin:8px 0 0;">FBR Compliant Tax & Invoice Management</p>
+<p style="color:#9ca3af; font-size:12px; margin:0;">&copy; ' . date('Y') . ' ' . e(__('pos.auth_mail_rights')) . '</p>
+<p style="color:#d1d5db; font-size:11px; margin:8px 0 0;">' . e(__('pos.auth_mail_tagline')) . '</p>
 </td></tr>
 
 </table>

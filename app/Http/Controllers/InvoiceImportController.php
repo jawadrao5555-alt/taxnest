@@ -137,6 +137,16 @@ class InvoiceImportController extends Controller
         ]);
     }
 
+    /** Import History — past batches for the current company (support/debugging + error report re-download). */
+    public function history()
+    {
+        $batches = InvoiceImportBatch::where('company_id', app('currentCompanyId'))
+            ->orderByDesc('created_at')
+            ->paginate(25);
+
+        return view('invoice.import-history', ['batches' => $batches]);
+    }
+
     public function errorReport(int $batchId)
     {
         $batch = $this->findBatch($batchId);

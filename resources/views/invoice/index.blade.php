@@ -41,6 +41,12 @@
                         </button>
                         <span x-text="on ? 'ON' : 'OFF'" :class="on ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500'" class="text-[10px] font-bold w-8"></span>
                     </div>
+                    <a href="{{ route('invoices.import-history') }}"
+                       class="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-widest hover:border-blue-300 dark:hover:border-blue-700 transition"
+                       title="See past bulk imports and re-download error reports">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span>Import History</span>
+                    </a>
                     <div x-data="bulkImport()" x-cloak>
                         <button @click="openModal()" class="btn-premium inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 border border-transparent rounded-xl font-bold text-xs text-white uppercase tracking-widest hover:from-blue-700 hover:to-blue-800 transition">
                             <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>

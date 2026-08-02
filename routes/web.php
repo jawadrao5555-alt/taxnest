@@ -253,6 +253,7 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         Route::get('/invoices/import-template', [InvoiceImportController::class, 'template'])->name('invoices.import-template');
         Route::post('/invoices/import-upload', [InvoiceImportController::class, 'upload'])->name('invoices.import-upload');
         Route::post('/invoices/import/{batchId}/process', [InvoiceImportController::class, 'process'])->middleware('plan.limit:invoices')->name('invoices.import-process');
+        Route::get('/invoices/import-history', [InvoiceImportController::class, 'history'])->name('invoices.import-history');
         Route::get('/invoices/import/{batchId}/status', [InvoiceImportController::class, 'status'])->name('invoices.import-status');
         Route::get('/invoices/import/{batchId}/error-report', [InvoiceImportController::class, 'errorReport'])->name('invoices.import-error-report');
 

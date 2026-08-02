@@ -53,6 +53,20 @@ else
   fi
 fi
 
+step "Preflight: POS plan-gate matrix check (Starter/Business/Pro/Pro Max/Unlimited)"
+if [ "${SKIP_PLAN_GATE_CHECK:-0}" = "1" ]; then
+  echo "SKIPPED (SKIP_PLAN_GATE_CHECK=1) — only skip for emergency hotfixes." >&2
+else
+  env -u DATABASE_URL -u DB_CONNECTION -u PGHOST -u PGPORT -u PGUSER -u PGPASSWORD -u PGDATABASE \
+    php scripts/plan-gate-check.php
+  PG_RC=$?
+  if [ $PG_RC -eq 2 ]; then
+    fail "plan-gate check could not run (MySQL Staging down / plan rows missing?) — start the MySQL Staging workflow, or SKIP_PLAN_GATE_CHECK=1 to bypass"
+  elif [ $PG_RC -ne 0 ]; then
+    fail "plan-gate check FAILED — the package gate matrix regressed; fix before deploying"
+  fi
+fi
+
 step "Preflight: SSH connectivity + live HEAD"
 LIVE_HEAD_BEFORE=$(run_ssh "cd $LIVE_DIR && git rev-parse HEAD" 2>/dev/null) \
   || fail "cannot reach live server over SSH (or live git repo broken)"

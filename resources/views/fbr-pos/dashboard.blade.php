@@ -31,6 +31,15 @@
     </div>
     @endif
 
+    {{-- Task 112: Pending Bills tile (shared with PRA dashboards, Task 109) —
+         provisional (local) bills not yet FINAL. isRestaurant=false branch:
+         shows only to admin/manager and only when count > 0. Link goes to the
+         FBR local-bills surface (transactions?tab=local). --}}
+    @include('pos.partials.pending-bills-tile', [
+        'isRestaurant' => false,
+        'pendingBillsUrl' => route('fbrpos.transactions', ['tab' => 'local']),
+    ])
+
     @include('fbr-pos.dashboard-styles.' . ($dashboardStyle ?? 'default'))
 </div>
 </x-fbr-pos-layout>

@@ -188,6 +188,24 @@ class FbrPosController extends Controller
 
         $fbrReportingStatus = (bool) $company->fbr_reporting_enabled;
 
+        // Task 112: Pending Bills tile (mirrors PRA dashboard, Task 109) —
+        // provisional bills of the current day that are still not FINAL.
+        // Triple-filter per pos-provisional rules: completed + invoice_mode='local'
+        // + fbr_status='local'. FbrPosTransaction has no business_date/archive
+        // columns, so "current day" = whereDate(created_at) like the rest of
+        // this dashboard.
+        $pendingProvisional = FbrPosTransaction::where('company_id', $companyId)
+            ->tap($branchScope)
+            ->where('status', 'completed')
+            ->where('invoice_mode', 'local')
+            ->where('fbr_status', 'local')
+            ->whereDate('created_at', today())
+            ->count();
+
+        // Same admin/manager rule as PRA dashboard tile (admin-only surface).
+        $user = Auth::guard('fbrpos')->user();
+        $isAdmin = in_array($user->pos_role ?? $user->role ?? '', ['pos_admin', 'pos_manager', 'company_admin']);
+
         $allowedStyles = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify'];
         $dashboardStyle = in_array($company->pos_dashboard_style, $allowedStyles) ? $company->pos_dashboard_style : 'default';
 
@@ -202,7 +220,7 @@ class FbrPosController extends Controller
         return view('fbr-pos.dashboard', compact(
             'company', 'todayStats', 'monthStats',
             'fbrSubmitted', 'fbrPending', 'recentTransactions', 'fbrReportingStatus',
-            'dashboardStyle', 'notifications'
+            'dashboardStyle', 'notifications', 'pendingProvisional', 'isAdmin'
         ));
     }
 

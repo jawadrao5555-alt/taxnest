@@ -18,6 +18,9 @@
     // Non-restaurant PRA dashboard: show only when something is actually pending
     // (most retail shops never use provisional bills — avoid permanent clutter).
     $pbShow = ($isAdmin ?? false) && ($pbIsRestaurant || $pbProv > 0);
+    // Task 112: FBR POS dashboard reuses this tile — it passes its own
+    // local-bills URL (fbrpos.transactions?tab=local). PRA default unchanged.
+    $pbLocalUrl = $pendingBillsUrl ?? route('pos.local.index');
 @endphp
 @if($pbShow)
 <div class="mb-4 rounded-xl border p-4 {{ $pbTotal > 0 ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700' : 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-700' }}">
@@ -34,7 +37,7 @@
             </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-            <a href="{{ route('pos.local.index') }}"
+            <a href="{{ $pbLocalUrl }}"
                class="flex items-center gap-2.5 px-3.5 py-2 rounded-lg border bg-white dark:bg-gray-800 {{ $pbProv > 0 ? 'border-amber-200 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700' }} transition">
                 <span class="text-xl font-extrabold {{ $pbProv > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400' }}">{{ $pbProv }}</span>
                 <span class="text-left">

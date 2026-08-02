@@ -3655,4 +3655,11 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'madadgar_err_generic' => 'Maazrat, masla aa gaya — dobara koshish karein.',
     'madadgar_err_send' => 'Bhejne mein masla aa gaya — dobara koshish karein.',
     'madadgar_not_sent' => 'Theek hai, admin ko nahi bheja. Aur koi sawal ho to poochein!',
+
+    // Tutorial video library (owner request, 2 Aug 2026)
+    'nav_tutorials' => 'Video Tutorials',
+    'tutorials_title' => 'NestPOS chalana seekhein',
+    'tutorials_sub' => 'Chhoti chhoti Urdu videos — har feature aaram se dekh kar seekhein.',
+    'tutorials_more_soon' => 'Aur videos jald aa rahi hain.',
+    'tutorials_watch_public' => 'Yeh videos hamari website par bhi hain — apni team ko link bhejein.',
 ];

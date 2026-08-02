@@ -133,6 +133,7 @@
                     <a href="/fbr-pos-landing" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">FBR POS</a>
                     <a href="#compare" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Compare</a>
                     <a href="/download" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Downloads</a>
+                    <a href="/tutorials" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Tutorials</a>
                     <a href="/contact" class="text-sm font-medium transition-colors" :class="scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-200 hover:text-white'">Contact</a>
                 </div>
                 <div class="flex items-center space-x-4">
@@ -149,6 +150,7 @@
                 <a href="/pos" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">NestPOS (PRA POS)</a>
                 <a href="/fbr-pos-landing" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">FBR POS</a>
                 <a href="#compare" @click="mobileOpen = false" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Compare Products</a>
+                <a href="/tutorials" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Tutorials</a>
                 <a href="/download" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Downloads</a>
                 <a href="/contact" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Contact</a>
                 <a href="/login" class="block px-2 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded">Log In</a>

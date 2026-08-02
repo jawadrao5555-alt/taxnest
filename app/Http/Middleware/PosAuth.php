@@ -143,6 +143,8 @@ class PosAuth
                 // Per-user grid visibility prefs (owner, 25 Jul 2026) — waiters
                 // may hide/show items on their OWN tablet grid.
                 || str_starts_with($path, 'pos/grid-prefs')
+                // Tutorial videos (owner, 2 Aug 2026) — every role may learn.
+                || str_starts_with($path, 'pos/tutorials')
                 || $path === 'pos/logout'
                 || $path === 'pos/login';
             if (!$allowed) {

@@ -3656,4 +3656,11 @@ return [
     'madadgar_err_generic' => 'معذرت، مسئلہ آ گیا — دوبارہ کوشش کریں۔',
     'madadgar_err_send' => 'بھیجنے میں مسئلہ آ گیا — دوبارہ کوشش کریں۔',
     'madadgar_not_sent' => 'ٹھیک ہے، ایڈمن کو نہیں بھیجا۔ اور کوئی سوال ہو تو پوچھیں!',
+
+    // Tutorial video library (owner request, 2 Aug 2026)
+    'nav_tutorials' => 'ویڈیو ٹیوٹوریل',
+    'tutorials_title' => 'NestPOS چلانا سیکھیں',
+    'tutorials_sub' => 'چھوٹی چھوٹی اردو ویڈیوز — ہر فیچر آرام سے دیکھ کر سیکھیں۔',
+    'tutorials_more_soon' => 'مزید ویڈیوز جلد آ رہی ہیں۔',
+    'tutorials_watch_public' => 'یہ ویڈیوز ہماری ویب سائٹ پر بھی ہیں — اپنی ٹیم کو لنک بھیجیں۔',
 ];

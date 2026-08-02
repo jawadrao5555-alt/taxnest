@@ -155,6 +155,10 @@ Route::get('/contact', fn () => view('contact'))->name('contact');
 Route::get('/download', fn () => view('downloads'))->name('downloads.page');
 Route::get('/download/agent', [\App\Http\Controllers\AgentManagementController::class, 'downloadAgent'])->name('public.agent.download');
 
+// Urdu tutorial video library (owner request, 2 Aug 2026) — public page,
+// linked from the marketing top nav. In-app twin lives at /pos/tutorials.
+Route::get('/tutorials', [\App\Http\Controllers\TutorialController::class, 'publicIndex'])->name('tutorials.page');
+
 Route::get('/digital-invoice', function () {
     $plans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', 'di')->orderBy('price')->get();
     return view('di-landing', ['plans' => $plans]);
@@ -528,6 +532,12 @@ Route::middleware(['pos.auth'])->prefix('pos/madadgar')->group(function () {
     Route::post('/message', [\App\Http\Controllers\MadadgarController::class, 'message'])->name('pos.madadgar.message')->middleware('throttle:20,1');
     Route::post('/escalate', [\App\Http\Controllers\MadadgarController::class, 'escalate'])->name('pos.madadgar.escalate')->middleware('throttle:10,1');
 });
+
+// Tutorial videos inside the POS login (owner request, 2 Aug 2026) — pos.auth
+// ONLY, NO company.approval: pending companies may watch and learn while they
+// wait (same precedent as Madadgar). All roles allowed; path is unmapped in
+// PosAccessService so custom-access members can always reach it.
+Route::middleware(['pos.auth'])->get('/pos/tutorials', [\App\Http\Controllers\TutorialController::class, 'posIndex'])->name('pos.tutorials');
 
 // Per-user sale-grid visibility (owner, 25 Jul 2026) — pos.auth ONLY, NO
 // company.approval (personal display pref; same precedent as Madadgar).

@@ -767,6 +767,12 @@
                                         </form>
                                     </div>
 
+                                    {{-- Tutorial videos (owner request, 2 Aug 2026) — every role may learn --}}
+                                    <a href="{{ route('pos.tutorials') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        {{ __('pos.nav_tutorials') }}
+                                    </a>
+
                                     {{-- PWA install — always visible for every POS user --}}
                                     <div class="px-3 pt-3 pb-1">
                                         <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">{{ __('pos.nav_app') }}</p>

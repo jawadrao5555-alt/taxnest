@@ -742,6 +742,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::post('/riders', [\App\Http\Controllers\PosRiderController::class, 'store'])->name('pos.riders.store');
         Route::put('/riders/{id}', [\App\Http\Controllers\PosRiderController::class, 'update'])->name('pos.riders.update');
         Route::post('/riders/{id}/login', [\App\Http\Controllers\PosRiderController::class, 'saveLogin'])->name('pos.riders.login');
+        // Rider LIVE Tracking (Aug 2026) — Unlimited exclusive; map + poll + trail
+        Route::get('/riders/tracking', [\App\Http\Controllers\PosRiderTrackingController::class, 'trackingPage'])->name('pos.riders.tracking');
+        Route::get('/riders/tracking/data', [\App\Http\Controllers\PosRiderTrackingController::class, 'trackingData'])->name('pos.riders.tracking.data');
+        Route::get('/riders/tracking/trail/{rider}', [\App\Http\Controllers\PosRiderTrackingController::class, 'trail'])->name('pos.riders.tracking.trail');
     });
     // Rider portal — pos_rider role is confined to these routes by PosAuth
     // (exact 'pos/rider' + 'pos/rider/' prefix; /pos/riders stays admin-only).
@@ -1114,6 +1118,17 @@ Route::get('/setup-seed-xK9mP2', function () {
 // AGENT API (TaxNest Desktop Sync Agent)
 // Bearer token auth, no CSRF
 // =====================================================
+// ── TaxNest Rider app API (Aug 2026) — stateless bearer-token JSON.
+// Rider signs in with his portal login; token rotates per login (one device).
+// CSRF-exempt via bootstrap/app.php ('api/rider-app/*').
+Route::prefix('api/rider-app/v1')->middleware(['throttle:120,1'])->group(function () {
+    Route::post('/login', [\App\Http\Controllers\PosRiderTrackingController::class, 'appLogin'])->middleware('throttle:15,1')->name('riderapp.login');
+    Route::post('/duty', [\App\Http\Controllers\PosRiderTrackingController::class, 'appDuty'])->name('riderapp.duty');
+    Route::post('/locations', [\App\Http\Controllers\PosRiderTrackingController::class, 'appLocations'])->name('riderapp.locations');
+    Route::get('/me', [\App\Http\Controllers\PosRiderTrackingController::class, 'appMe'])->name('riderapp.me');
+    Route::post('/logout', [\App\Http\Controllers\PosRiderTrackingController::class, 'appLogout'])->name('riderapp.logout');
+});
+
 Route::prefix('api/agent')->middleware(['agent.auth'])->group(function () {
     Route::post('/heartbeat', [\App\Http\Controllers\AgentController::class, 'heartbeat']);
     Route::get('/pending-invoices', [\App\Http\Controllers\AgentController::class, 'pendingInvoices']);

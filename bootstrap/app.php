@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'pos/*',
             'api/agent/*',
+            'api/rider-app/*',
         ]);
         $middleware->alias([
             'company' => \App\Http\Middleware\CompanyIsolation::class,

@@ -620,6 +620,14 @@
                                         {{ __('pos.nav_riders') }}
                                     </a>
                                     @endif
+                                    {{-- Rider LIVE Tracking (Aug 2026): shown to admins whenever riders area exists;
+                                         plan-locked companies land on the Unlimited upgrade card (deliberate upsell). --}}
+                                    @if(!empty($posFeaturesLayout->delivery) && \App\Services\PosFeatureService::planAllows($companyLayout, 'riders_enabled') && $posNavCan('riders', !$isCashierLayout))
+                                    <a href="{{ route('pos.riders.tracking') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                        {{ __('pos.nav_rider_tracking') }}
+                                    </a>
+                                    @endif
 
                                     @if($posNavCan('reports') || $posNavCan('tax_reports') || $posNavCan('day_close') || ($isRestaurantLayout && $posNavCan('reports')))
                                     <div class="px-3 pt-3 pb-1">

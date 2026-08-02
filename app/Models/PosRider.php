@@ -14,10 +14,15 @@ class PosRider extends Model
 {
     protected $fillable = [
         'company_id', 'name', 'phone', 'cnic', 'vehicle_no', 'is_active', 'user_id',
+        // Live tracking (Aug 2026)
+        'on_duty', 'duty_started_at', 'last_lat', 'last_lng', 'last_located_at', 'app_token',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'on_duty' => 'boolean',
+        'duty_started_at' => 'datetime',
+        'last_located_at' => 'datetime',
     ];
 
     public function company()

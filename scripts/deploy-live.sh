@@ -73,8 +73,31 @@ LIVE_HEAD_BEFORE=$(run_ssh "cd $LIVE_DIR && git rev-parse HEAD" 2>/dev/null) \
 echo "live HEAD (before): $LIVE_HEAD_BEFORE"
 
 if [ "$LIVE_HEAD_BEFORE" = "$LOCAL_HEAD" ]; then
-  echo "Live is already at workspace HEAD. Running cache+opcache refresh anyway? No — nothing to deploy."
-  echo "DEPLOY OK (no-op): live already up to date."
+  # cPanel auto-deploy (.cpanel.yml, triggered by pushes to origin main — e.g. task
+  # merges) may have already pulled this HEAD. Racing auto-deploys can leave POISONED
+  # compiled views (mtime newer than blade => Laravel never recompiles), and its
+  # migrate step is '|| true' (silent failure). So: refresh everything anyway.
+  echo "Live is already at workspace HEAD (cPanel auto-deploy likely ran on push)."
+  echo "Refreshing migrate + caches + OPcache anyway — racing auto-deploys can leave stale/poisoned state."
+
+  step "Live (refresh): php artisan migrate --force (idempotent)"
+  run_ssh "cd $LIVE_DIR && /usr/local/bin/ea-php84 artisan migrate --force 2>&1" \
+    || fail "migrate --force failed on live"
+
+  step "Live (refresh): rebuild caches (config/route/view)"
+  run_ssh "cd $LIVE_DIR && /usr/local/bin/ea-php84 artisan config:clear && /usr/local/bin/ea-php84 artisan cache:clear && /usr/local/bin/ea-php84 artisan route:clear && /usr/local/bin/ea-php84 artisan view:clear && /usr/local/bin/ea-php84 artisan config:cache && /usr/local/bin/ea-php84 artisan route:cache && /usr/local/bin/ea-php84 artisan view:cache 2>&1" \
+    || fail "cache rebuild failed on live"
+
+  step "Live (refresh): reset WEB OPcache"
+  OPCACHE_OUT=$(run_ssh "cd $LIVE_DIR && echo '<?php opcache_reset(); echo \"OPCACHE_RESET_OK \".__DIR__; ?>' > public/r.php && curl -s $LIVE_URL/r.php ; RC=\$? ; rm -f public/r.php ; exit \$RC")
+  echo "$OPCACHE_OUT"
+  echo "$OPCACHE_OUT" | grep -q "OPCACHE_RESET_OK" || fail "web OPcache reset did not confirm"
+
+  HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$LIVE_URL/")
+  echo "GET $LIVE_URL/ -> $HTTP_CODE"
+  [ "$HTTP_CODE" = "200" ] || fail "homepage returned $HTTP_CODE after refresh"
+
+  echo "DEPLOY OK (refresh-only): live already at workspace HEAD; migrate + caches + OPcache refreshed."
   exit 0
 fi
 

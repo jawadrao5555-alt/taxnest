@@ -273,6 +273,103 @@ class FbrPosController extends Controller
     }
 
     /**
+     * Result of the last auto-finalize sweep run by performDayClose (this request
+     * only) — closeDayReport reads it to enrich the success flash.
+     * @var array{finalized:int,queued:int,submitted:int,failed:int,skipped:int}|null
+     */
+    private ?array $lastFinalizeSweep = null;
+
+    /**
+     * AUTO-FINALIZE SWEEP ('finalize' pending-bill policy — FBR mirror of the PRA
+     * 'Khud Final' option, Aug 2026). Promotes every pending provisional bill
+     * (invoice_mode='local' + fbr_status='local', created on or before the close
+     * date) through the EXACT race-safe atomic claim the F10 Make Final path
+     * (apiPromoteProvisional) uses:
+     *   - reporting-ON  → fbr/'pending' (queued for submission)
+     *   - reporting-OFF → fbr/NULL (FINAL, no submission — Reporting-OFF Finals
+     *     Invariant: NEVER leave 'pending' with reporting disabled)
+     * Submission after the flip mirrors the store() path:
+     *   - Fiscal Device (agent) mode: bill stays 'pending' — desktop agent polls it.
+     *   - Cloud mode: submitFbrPosTransaction; failure/offline leaves the bill
+     *     'pending'/'failed' — retryable from the Fail Queue, NEVER lost.
+     * QUOTA: FBR POS quota (billableCount / free_invoice_limit) counts rows at
+     * CREATION time regardless of mode, so promoting an existing provisional
+     * consumes no extra quota — same as a manual F10 promote.
+     * MONTH GATE (owner rule Jul 2026, mirrored from PRA): previous-month
+     * provisionals are closed — never submitted late; they are skipped/carried.
+     * NO receipt print — the sweep runs server-side without a customer present.
+     */
+    private function finalizeFbrProvisionalsAtDayClose(int $companyId, Company $company, string $date): array
+    {
+        $sweep = ['finalized' => 0, 'queued' => 0, 'submitted' => 0, 'failed' => 0, 'skipped' => 0];
+
+        $reportingOn = (bool) ($company->fbr_reporting_enabled ?? false);
+        $agentMode = $company->agentServesFbr() && $company->agent_enabled;
+        $fbrService = null;
+
+        $rows = FbrPosTransaction::where('company_id', $companyId)
+            ->whereDate('created_at', '<=', $date)
+            ->where('invoice_mode', 'local')
+            ->where('fbr_status', 'local')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($rows as $row) {
+            // MONTH GATE: previous-month locals stay provisional (carried forward).
+            if ($row->created_at && $row->created_at->lt(now()->startOfMonth())) {
+                $sweep['skipped']++;
+                continue;
+            }
+            // 🔒 Race-safe atomic claim — identical to apiPromoteProvisional: only
+            // flips if still local, so a concurrent F10 promote can never double-fire.
+            $affected = FbrPosTransaction::where('id', $row->id)
+                ->where('company_id', $companyId)
+                ->where('invoice_mode', 'local')
+                ->where('fbr_status', 'local')
+                ->update([
+                    'invoice_mode' => 'fbr',
+                    'fbr_status' => $reportingOn ? 'pending' : null,
+                    'updated_at' => now(),
+                ]);
+            if ($affected === 0) {
+                $sweep['skipped']++; // raced with a manual promote/delete — carry on
+                continue;
+            }
+            $sweep['finalized']++;
+
+            if (!$reportingOn) {
+                continue; // reporting-OFF: bill is FINAL (fbr + NULL), nothing to send
+            }
+            if ($agentMode) {
+                $sweep['queued']++; // Fiscal Device: desktop agent polls 'pending' bills
+                continue;
+            }
+            // Cloud mode: submit now, mirroring store(). Any failure leaves the bill
+            // retryable ('pending'/'failed' both surface in the Fail Queue) — never lost.
+            try {
+                $tx = FbrPosTransaction::where('company_id', $companyId)->find($row->id);
+                if (!$tx) {
+                    continue;
+                }
+                $tx->load(['items', 'company']);
+                $fbrService = $fbrService ?: new FbrService();
+                $result = $fbrService->submitFbrPosTransaction($tx);
+                if (($result['status'] ?? null) === 'success') {
+                    $sweep['submitted']++;
+                } else {
+                    $sweep['failed']++; // service stamped its own status; Fail Queue retryable
+                }
+            } catch (\Throwable $e) {
+                // Internet/FBR down at close time — bill stays 'pending' (Fail Queue retryable).
+                \Log::warning('FBR day-close auto-finalize submit failed', ['company' => $companyId, 'tx' => $row->id, 'err' => $e->getMessage()]);
+                $sweep['failed']++;
+            }
+        }
+
+        return $sweep;
+    }
+
+    /**
      * 🧾 Shared day-close writer — single source of truth used by:
      *   1. Manual close (closeDayReport)
      *   2. Auto-close on next-open (apiAutoCloseDay)
@@ -292,6 +389,17 @@ class FbrPosController extends Controller
             ->where('report_date', $date)->first();
         if ($existing) {
             return $existing;
+        }
+
+        // ── AUTO-FINALIZE SWEEP (FBR mirror of the PRA 'Khud Final' day-close policy,
+        // Aug 2026): when the company opted in, promote every pending provisional
+        // through the SAME atomic-claim path F10 Make Final uses, BEFORE the day's
+        // figures are queried so freshly-finalized bills count in this very Z-report.
+        // NO receipt print (customer not present; printing is client-side anyway).
+        // Bills that cannot be finalized are CARRIED — never deleted.
+        $company = Company::find($companyId);
+        if (($company?->pos_dayclose_provisional_action ?? null) === 'finalize') {
+            $this->lastFinalizeSweep = $this->finalizeFbrProvisionalsAtDayClose($companyId, $company, $date);
         }
 
         $transactions = FbrPosTransaction::where('company_id', $companyId)
@@ -1505,6 +1613,14 @@ class FbrPosController extends Controller
                 return back()->with('error', __('pos.enter_valid_pin'));
             }
 
+            // Pending-bill day-close policy (FBR mirror of PRA 'Khud Final', Aug 2026):
+            // 'carry' = leave provisionals untouched (default) | 'finalize' = auto-promote at day close.
+            if ($request->has('dayclose_pending_update')) {
+                $request->validate(['pending_policy' => 'required|in:carry,finalize']);
+                $company->update(['pos_dayclose_provisional_action' => $request->pending_policy]);
+                return back()->with('success', __('pos.fbr_dayclose_policy_saved'));
+            }
+
             // Regenerate the Desktop Sync Agent API key (Fiscal Device mode). Invalidates the old key,
             // so any agent using the previous key must be reconnected with the new one.
             if ($request->has('regenerate_agent_key')) {
@@ -2516,7 +2632,11 @@ class FbrPosController extends Controller
             return back()->with('error', __('pos.dayclose_no_transactions'));
         }
 
-        return back()->with('success', __('pos.dayclose_report_generated_for', ['number' => $report->report_number, 'date' => \Carbon\Carbon::parse($date)->format('d M Y')]));
+        $msg = __('pos.dayclose_report_generated_for', ['number' => $report->report_number, 'date' => \Carbon\Carbon::parse($date)->format('d M Y')]);
+        if (($this->lastFinalizeSweep['finalized'] ?? 0) > 0) {
+            $msg .= __('pos.dayclose_bills_finalized', ['count' => $this->lastFinalizeSweep['finalized']]);
+        }
+        return back()->with('success', $msg);
     }
 
     public function dayCloseReportPdf($id)

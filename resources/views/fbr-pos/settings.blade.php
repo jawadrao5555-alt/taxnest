@@ -298,6 +298,32 @@
                 </div>
             </div>
 
+            {{-- 📋 Pending Bills at Day Close — FBR mirror of the PRA 'Khud Final' policy (Aug 2026) --}}
+            @php $pendingPolicy = ($company->pos_dayclose_provisional_action === 'finalize') ? 'finalize' : 'carry'; @endphp
+            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">{{ __('pos.fbr_dayclose_pending_title') }}</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">{{ __('pos.fbr_dayclose_pending_desc') }}</p>
+                <form method="POST" action="{{ route('fbrpos.settings') }}" class="space-y-3">
+                    @csrf
+                    <input type="hidden" name="dayclose_pending_update" value="1">
+                    <label class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition {{ $pendingPolicy === 'carry' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700' }}">
+                        <input type="radio" name="pending_policy" value="carry" {{ $pendingPolicy === 'carry' ? 'checked' : '' }} class="mt-0.5 text-blue-600 focus:ring-blue-500">
+                        <span>
+                            <span class="block text-sm font-medium text-gray-900 dark:text-white">{{ __('pos.fbr_dayclose_carry') }}</span>
+                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ __('pos.fbr_dayclose_carry_sub') }}</span>
+                        </span>
+                    </label>
+                    <label class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition {{ $pendingPolicy === 'finalize' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700' }}">
+                        <input type="radio" name="pending_policy" value="finalize" {{ $pendingPolicy === 'finalize' ? 'checked' : '' }} class="mt-0.5 text-blue-600 focus:ring-blue-500">
+                        <span>
+                            <span class="block text-sm font-medium text-gray-900 dark:text-white">{{ __('pos.fbr_dayclose_finalize') }}</span>
+                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ __('pos.fbr_dayclose_finalize_sub') }}</span>
+                        </span>
+                    </label>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition">{{ __('pos.save_btn') }}</button>
+                </form>
+            </div>
+
             <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">{{ __('pos.fbr_registration_details') }}</h3>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">{{ __('pos.fbr_registration_details_desc') }}</p>

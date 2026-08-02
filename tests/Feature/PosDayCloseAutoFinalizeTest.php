@@ -46,6 +46,7 @@ class PosDayCloseAutoFinalizeTest extends TestCase
             $table->string('pos_dayclose_final_local_action')->nullable();
             $table->boolean('pos_customer_spend_persist')->default(true);
             $table->string('pos_business_day_cutoff')->nullable();
+            $table->boolean('pos_auto_dayclose_24h')->default(false);
             $table->boolean('is_internal_account')->default(false);
             $table->integer('invoice_limit_override')->nullable();
             $table->boolean('pra_reporting_enabled')->default(false);
@@ -164,6 +165,9 @@ class PosDayCloseAutoFinalizeTest extends TestCase
             $table->date('report_date');
             $table->string('report_number')->nullable();
             $table->integer('deleted_final_count')->default(0);
+            $table->integer('deleted_provisional_count')->default(0);
+            $table->text('local_summary')->nullable();
+            $table->text('rider_summary')->nullable();
             $table->integer('total_invoices')->default(0);
             $table->integer('pra_invoices')->default(0);
             $table->integer('local_invoices')->default(0);
@@ -680,6 +684,79 @@ class PosDayCloseAutoFinalizeTest extends TestCase
             $urSuffix,
             'ur key must not silently fall back to English'
         );
+    }
+
+    // ── Task 165: AUTO day-close sweep must surface durably ─────────────────
+
+    public function test_auto_dayclose_sweep_is_stored_on_report_and_logged(): void
+    {
+        // User-less 6 AM auto close: pos:auto-dayclose runs performDayClose,
+        // whose finalize sweep must land durably on the Z-report row
+        // (local_summary → day-close page + PDF) AND in the command output/log.
+        $companyId = $this->makeCompany([
+            'product_type' => 'pos',
+            'pos_auto_dayclose_24h' => true,
+            'pos_dayclose_provisional_action' => 'finalize',
+            'pos_dayclose_final_local_action' => 'save',
+        ]);
+        DB::table('users')->insert([
+            'name' => 'Owner', 'email' => 'auto-owner@test.pk', 'company_id' => $companyId,
+            'pos_role' => 'pos_admin', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $yesterday = now()->subDay()->toDateString();
+        $billId = $this->makeProvisional($companyId, 'L-0001', ['business_date' => $yesterday]);
+
+        \Illuminate\Support\Facades\Log::shouldReceive('info')
+            ->once()
+            ->withArgs(function ($message, $context = []) use ($companyId) {
+                return $message === 'pos:auto-dayclose finalize sweep'
+                    && ($context['company_id'] ?? null) === $companyId
+                    && ($context['finalized'] ?? 0) === 1;
+            });
+        \Illuminate\Support\Facades\Log::shouldReceive('error')->never();
+
+        $this->artisan('pos:auto-dayclose')
+            ->expectsOutputToContain('Khud Final sweep: finalized 1')
+            ->assertExitCode(0);
+
+        // Bill actually promoted — reporting-OFF final ('pra' + NULL status).
+        $bill = $this->tx($billId);
+        $this->assertSame('pra', $bill->invoice_mode);
+        $this->assertNull($bill->pra_status);
+
+        // Durable surface: sweep counts stored on the Z-report row.
+        $report = \App\Models\PosDayCloseReport::where('company_id', $companyId)
+            ->whereDate('report_date', $yesterday)->first();
+        $this->assertNotNull($report, 'auto close must create the Z-report row');
+        $summary = $report->local_summary;
+        $this->assertIsArray($summary);
+        $this->assertSame('finalize', $summary['provisional']['action'] ?? null);
+        $this->assertSame(1, $summary['provisional']['finalized'] ?? null);
+    }
+
+    public function test_auto_dayclose_zero_sweep_stays_quiet(): void
+    {
+        // No provisionals → no sweep noise: no sweep log row, no sweep line.
+        $companyId = $this->makeCompany([
+            'product_type' => 'pos',
+            'pos_auto_dayclose_24h' => true,
+            'pos_dayclose_provisional_action' => 'finalize',
+        ]);
+        // A plain PRA-mode completed bill yesterday so the day still closes.
+        DB::table('pos_transactions')->insert([
+            'company_id' => $companyId, 'invoice_number' => 'INV-1',
+            'business_date' => now()->subDay()->toDateString(), 'status' => 'completed',
+            'invoice_mode' => 'pra', 'pra_status' => 'submitted', 'pra_invoice_number' => 'PRA-1',
+            'subtotal' => 100, 'total_amount' => 100, 'payment_method' => 'cash',
+            'created_at' => now()->subDay(), 'updated_at' => now()->subDay(),
+        ]);
+
+        \Illuminate\Support\Facades\Log::shouldReceive('info')->never();
+        \Illuminate\Support\Facades\Log::shouldReceive('error')->never();
+
+        $this->artisan('pos:auto-dayclose')->assertExitCode(0);
+
+        $this->assertSame(1, \App\Models\PosDayCloseReport::where('company_id', $companyId)->count());
     }
 
     public function test_all_pra_sweep_summary_keys_exist_in_en_and_ur(): void

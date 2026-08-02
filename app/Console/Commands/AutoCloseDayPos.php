@@ -94,7 +94,22 @@ class AutoCloseDayPos extends Command
 
                     if ($result['status'] === 'created') {
                         $closedTotal++;
-                        $this->info("Company {$company->id}: closed {$date} → {$result['report_number']} (archived {$result['archived']}, deleted {$result['deleted']}).");
+                        $line = "Company {$company->id}: closed {$date} → {$result['report_number']} (archived {$result['archived']}, deleted {$result['deleted']}).";
+                        // Khud Final sweep surfacing (Task 165): the sweep result is
+                        // already stored durably on the Z-report row (local_summary →
+                        // day-close page + PDF), but the user-less auto close must
+                        // also LOG what it finalized so the trail exists even if the
+                        // report row is later purged. Zero-count sweeps stay quiet.
+                        $sweep = $result['finalize_sweep'] ?? null;
+                        if (is_array($sweep) && (($sweep['finalized'] ?? 0) > 0 || ($sweep['quota_blocked'] ?? 0) > 0 || ($sweep['offline'] ?? 0) > 0)) {
+                            $line .= " Khud Final sweep: finalized {$sweep['finalized']} (PKR {$sweep['finalized_amount']}) — submitted {$sweep['submitted']}, queued {$sweep['queued']}, offline {$sweep['offline']}, quota-blocked {$sweep['quota_blocked']}, skipped {$sweep['skipped']}.";
+                            Log::info('pos:auto-dayclose finalize sweep', [
+                                'company_id' => $company->id,
+                                'date' => $date,
+                                'report_number' => $result['report_number'],
+                            ] + $sweep);
+                        }
+                        $this->info($line);
                     }
                 }
             } catch (\Throwable $e) {

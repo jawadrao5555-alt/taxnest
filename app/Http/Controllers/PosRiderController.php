@@ -509,6 +509,7 @@ class PosRiderController extends Controller
             ->where('company_id', $companyId)
             ->where('rider_id', $rider->id)
             ->whereIn('delivery_status', ['assigned', 'dispatched'])
+            ->whereNull('rider_settlement_id')
             ->findOrFail($txnId);
 
         $txn->update(['delivery_status' => 'delivered']);

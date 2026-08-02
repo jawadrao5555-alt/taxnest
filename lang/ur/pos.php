@@ -89,6 +89,7 @@ return [
     'new_sale_started' => 'New sale started',
     'offline_bill_saved_will_sync' => 'No internet — bill saved on this device, will auto-sync',
     'offline_update_online_only' => 'No internet — bill update sirf online ho sakta hai',
+    'offline_plan_locked' => 'Internet nahi — offline billing aap ke package mein shamil nahi (Business+). Bill save nahi hoga; internet aane par dobara try karein.',
     'no_products_available' => 'No products available',
     'order_deleted' => 'Order deleted',
     'order_taken_by_other_cashier' => 'Order doosre cashier ne le liya',

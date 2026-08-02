@@ -21,6 +21,22 @@
             <div class="mb-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg text-red-700 dark:text-red-300 font-medium">{{ session('error') }}</div>
             @endif
 
+            {{-- Task 117: Offline billing + Desktop App = Business+ plan gate.
+                 Already-paired shops (agent_api_key set) are grandfathered — full page. --}}
+            @if(empty($offlineAllowed) && empty($company->agent_api_key))
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow border border-amber-200 dark:border-amber-700 p-8 text-center">
+                <div class="text-5xl mb-3">🔒</div>
+                <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">Desktop App aap ke package mein shamil nahi</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 max-w-xl mx-auto">
+                    Offline billing aur Desktop App (silent printing + PRA agent sync) <strong>Business</strong> aur us se upar ke packages ka feature hai.
+                    Upgrade karte hi yeh page khul jayega.
+                </p>
+                <a href="{{ route('pos.billing') }}" class="inline-flex items-center gap-2 mt-5 px-6 py-3 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-700 text-white font-bold text-sm hover:opacity-90 transition">
+                    Package Upgrade Karein
+                </a>
+            </div>
+            @else
+
             {{-- Status Card --}}
             <div class="bg-gradient-to-r from-indigo-600 to-purple-700 rounded-xl shadow-lg p-6 text-white mb-6">
                 <div class="flex items-center justify-between">
@@ -322,6 +338,7 @@
                     <strong>How it works:</strong> Your PC will check for pending invoices every 30 seconds, submit them to PRA using your local Pakistani IP, and report results back to TaxNest. No relay, no proxy, no PC dependency on TaxNest's servers.
                 </div>
             </div>
+            @endif
         </div>
     </div>
 

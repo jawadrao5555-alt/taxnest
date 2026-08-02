@@ -1326,6 +1326,9 @@ class PosController extends Controller
             PosTaxRule::effectiveRules($company),
             $user->pos_role ?? 'pos_cashier',
             \App\Models\PosUserItemPref::mapForUser($user->id),
+            // Task 117: offlineAllowed is BAKED into the sale screen — a plan
+            // change (upgrade/downgrade) must refresh the offline-cached copy.
+            (bool) \App\Services\PosFeatureService::planAllows($company, 'offline_enabled'),
         ]));
 
         $screenPath = resource_path('views/pos/universal.blade.php');
@@ -4824,6 +4827,13 @@ class PosController extends Controller
                 // Fiscal Device submissions only happen from the shop PC — the desktop agent is mandatory
                 // AND must be in Agent Sync submission mode (server never direct-submits, PRA Code 112).
                 if ($request->pra_connection_mode === 'fiscal_device') {
+                    // Task 117: fiscal_device mints an agent key = NEW Desktop App
+                    // pairing → plan-gated (Business+). Already-paired shops are
+                    // grandfathered (key exists — never break a live agent).
+                    if (empty($company->agent_api_key)
+                        && !\App\Services\PosFeatureService::planAllows($company, 'offline_enabled')) {
+                        return back()->with('error', 'Fiscal Device mode ke liye Desktop App zaroori hai, jo aap ke mojooda package mein shamil nahi — Business ya us se upar ke package par upgrade karein.');
+                    }
                     $updateData['agent_enabled'] = true;
                     $updateData['agent_submits_pra'] = true;
                     if (empty($company->agent_api_key)) {

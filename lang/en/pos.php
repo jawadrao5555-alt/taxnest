@@ -89,6 +89,7 @@ return [
     'new_sale_started' => 'New sale started',
     'offline_bill_saved_will_sync' => 'No internet — bill saved on this device, will auto-sync',
     'offline_update_online_only' => 'No internet — bill update works online only',
+    'offline_plan_locked' => 'No internet — offline billing is not included in your package (Business+). Bill will not be saved; retry when internet returns.',
     'no_products_available' => 'No products available',
     'order_deleted' => 'Order deleted',
     'order_taken_by_other_cashier' => 'Another cashier took this order',

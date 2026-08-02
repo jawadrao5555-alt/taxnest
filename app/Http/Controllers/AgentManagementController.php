@@ -13,6 +13,19 @@ class AgentManagementController extends Controller
         return auth('pos')->user();
     }
 
+    /**
+     * Task 117 (Aug 2026): Offline billing + Desktop App is a Business+
+     * feature (pricing_plans.offline_enabled plan gate). Starter shops must
+     * not START a new agent pairing — but shops that already paired are
+     * GRANDFATHERED (existing agent keeps auth/heartbeat so pending bills
+     * and silent printing are never stranded — offline-first rule: bills
+     * kabhi reject na hon).
+     */
+    private function offlineAllowed(Company $company): bool
+    {
+        return \App\Services\PosFeatureService::planAllows($company, 'offline_enabled');
+    }
+
     public function show(Request $request)
     {
         $user = $this->posUser();
@@ -41,8 +54,9 @@ class AgentManagementController extends Controller
             && \Carbon\Carbon::parse($company->agent_last_seen)->gt(now()->subMinutes(2));
 
         $release = $this->latestVersionInfo();
+        $offlineAllowed = $this->offlineAllowed($company);
 
-        return view('company.agent', compact('company', 'stats', 'isOnline', 'release'));
+        return view('company.agent', compact('company', 'stats', 'isOnline', 'release', 'offlineAllowed'));
     }
 
     /**
@@ -65,6 +79,16 @@ class AgentManagementController extends Controller
         $company = Company::findOrFail($user->company_id);
 
         $hasSubmitsCol = \Schema::hasColumn('companies', 'agent_submits_pra');
+
+        // Task 117: NEW pairing is plan-gated. Already-paired companies
+        // (existing key) are grandfathered below — never break a live agent.
+        if (empty($company->agent_api_key) && !$this->offlineAllowed($company)) {
+            return response()->json([
+                'success' => false,
+                'plan_locked' => true,
+                'message' => 'Desktop App aap ke mojooda package mein shamil nahi — Business ya us se upar ke package par upgrade karein.',
+            ], 403);
+        }
 
         if (empty($company->agent_api_key)) {
             // Race-safe key generation (architect, GA-prep): two simultaneous
@@ -107,6 +131,11 @@ class AgentManagementController extends Controller
         abort_unless($user, 403);
         $company = Company::findOrFail($user->company_id);
 
+        // Task 117: fresh pairing is plan-gated (Business+).
+        if (empty($company->agent_api_key) && !$this->offlineAllowed($company)) {
+            return back()->with('error', 'Desktop App aap ke mojooda package mein shamil nahi — Business ya us se upar ke package par upgrade karein.');
+        }
+
         $company->update([
             'agent_api_key' => 'tnk_' . Str::random(48),
             'agent_enabled' => true,
@@ -146,6 +175,12 @@ class AgentManagementController extends Controller
 
         if (!$toAgentSync && ($company->pra_connection_mode ?? 'cloud') === 'fiscal_device') {
             return back()->with('error', 'Fiscal Device mode mein Direct Production available nahi (PRA Code 112) — submission Desktop Agent ke zariye hi hoti hai. Pehle PRA Settings par Connection Mode change karein.');
+        }
+
+        // Task 117: switching TO Agent Sync mints a key = new pairing; plan-gated
+        // unless the company is already paired (grandfathered).
+        if ($toAgentSync && empty($company->agent_api_key) && !$this->offlineAllowed($company)) {
+            return back()->with('error', 'Desktop App / Agent Sync aap ke mojooda package mein shamil nahi — Business ya us se upar ke package par upgrade karein.');
         }
 
         if ($toAgentSync) {
@@ -193,6 +228,16 @@ class AgentManagementController extends Controller
 
     public function downloadAgent(\Illuminate\Http\Request $request)
     {
+        // Task 117: agent download is plan-gated for un-paired companies.
+        // Already-paired shops keep downloading (reinstall/update — grandfathered).
+        $user = $this->posUser();
+        if ($user) {
+            $company = Company::find($user->company_id);
+            if ($company && empty($company->agent_api_key) && !$this->offlineAllowed($company)) {
+                return back()->with('error', 'Desktop App aap ke mojooda package mein shamil nahi — Business ya us se upar ke package par upgrade karein.');
+            }
+        }
+
         $type = $request->query('type', 'exe');
 
         $assets = self::latestReleaseInfo();

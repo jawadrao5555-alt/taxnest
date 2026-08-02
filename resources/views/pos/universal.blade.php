@@ -3724,6 +3724,10 @@ function restaurantPos() {
         offlineQueueCount: 0,
         offlineSyncing: false,
         offlineNeedsLogin: false,
+        // Task 117: offline billing = Business+ plan gate (pricing_plans.offline_enabled).
+        // Gates NEW queueing only — syncOfflineBills (replay of already-queued bills)
+        // never checks this: queued bills kabhi reject nahi hote.
+        offlineAllowed: {{ \App\Services\PosFeatureService::planAllows($company, 'offline_enabled') ? 'true' : 'false' }},
         _idb: null,
         // Receipt-popup offline variant state: no server transaction yet, so the
         // popup renders a client-side summary + client-printed interim receipt.
@@ -7006,6 +7010,13 @@ function restaurantPos() {
                 };
                 // OFFLINE-FIRST (Jul 2026): no internet → queue the bill on this
                 // device (IndexedDB) and keep billing. Sync engine replays it.
+                // Task 117: NEW offline queueing is plan-gated (Business+). Cart
+                // stays intact so the cashier can retry when internet returns.
+                if (!navigator.onLine && !this.offlineAllowed) {
+                    this.showToast(window.TXT.offline_plan_locked, 'error');
+                    this.submitting = false;
+                    return;
+                }
                 if (!navigator.onLine) {
                     await this.queueOfflineBill(payload, method, savedTotal);
                     this.showPayModal = false;
@@ -7030,6 +7041,11 @@ function restaurantPos() {
                     // internet is dead). Same offline path — HTTP errors from a
                     // REACHABLE server never land here.
                     console.warn('[storeInvoice] network unreachable — queueing offline', netErr);
+                    if (!this.offlineAllowed) { // Task 117: plan-gated (cart intact for retry)
+                        this.showToast(window.TXT.offline_plan_locked, 'error');
+                        this.submitting = false;
+                        return;
+                    }
                     await this.queueOfflineBill(payload, method, savedTotal);
                     this.showPayModal = false;
                     this.submitting = false;

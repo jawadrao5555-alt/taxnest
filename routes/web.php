@@ -48,6 +48,10 @@ use App\Http\Controllers\AnnouncementController;
 Route::get('/share/invoice/{uuid}', [ShareController::class, 'show']);
 Route::get('/share/invoice/{uuid}/pdf', [ShareController::class, 'pdf'])->name('share.invoice.pdf');
 
+// Meta WhatsApp Cloud API status webhook (per-company; public + CSRF-exempt).
+Route::get('/webhooks/whatsapp/{company}', [\App\Http\Controllers\WhatsAppWebhookController::class, 'verify'])->whereNumber('company');
+Route::post('/webhooks/whatsapp/{company}', [\App\Http\Controllers\WhatsAppWebhookController::class, 'receive'])->whereNumber('company');
+
 Route::get('/demo-login/{role}', [\App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'demoLogin'])
     ->where('role', 'super_admin|company_admin|demo');
 
@@ -321,6 +325,9 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         Route::get('/company/branding', [CompanySettingsController::class, 'branding'])->name('company.branding');
         Route::put('/company/branding', [CompanySettingsController::class, 'updateBranding'])->name('company.branding.update');
         Route::post('/company/fbr-settings-ajax', [CompanySettingsController::class, 'updateFbrSettingsAjax']);
+        // WhatsApp Business API (Phase 2) — server-side invoice send credentials
+        Route::get('/company/whatsapp-settings', [CompanySettingsController::class, 'whatsappSettings']);
+        Route::put('/company/whatsapp-settings', [CompanySettingsController::class, 'updateWhatsappSettings']);
         Route::post('/company/test-connection', [CompanySettingsController::class, 'testConnection']);
         Route::post('/company/sandbox-test/{type}', [CompanySettingsController::class, 'sandboxTest']);
 

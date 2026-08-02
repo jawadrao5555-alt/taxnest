@@ -110,6 +110,7 @@ class InvoiceSendTest extends TestCase
             $table->string('recipient', 255);
             $table->string('status', 20)->default('sent');
             $table->text('error')->nullable();
+            $table->string('provider_message_id')->nullable(); // WA Business API wamid (Phase 2)
             $table->timestamps();
         });
 

@@ -35,6 +35,18 @@
                        onkeydown="if(event.key==='Enter'){event.preventDefault(); submitSendModal();}">
                 <p id="sendModalHint" style="display:none;" class="mt-2 text-xs text-amber-600 dark:text-amber-400"></p>
 
+                {{-- Phase 2: Business API direct-send choice (only when company configured it) --}}
+                <div id="sendModalWaMode" style="display:none;" class="mt-4 space-y-2">
+                    <label class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                        <input type="radio" name="sendModalWaModeRadio" value="api" checked class="mt-0.5 border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                        <span><span class="font-semibold">Seedha bhejein</span> — server khud WhatsApp message bhejta hai, aapka WhatsApp nahi khulta.</span>
+                    </label>
+                    <label class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                        <input type="radio" name="sendModalWaModeRadio" value="link" class="mt-0.5 border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                        <span><span class="font-semibold">WhatsApp app kholein</span> — message tayar milega, send aap dabayenge.</span>
+                    </label>
+                </div>
+
                 <label class="mt-4 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 cursor-pointer">
                     <input type="checkbox" id="sendModalSave" checked class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
                     Customer profile mein save karein
@@ -61,7 +73,7 @@
     var ICON_MAIL = '<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>';
     var ICON_WA = '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.75.75 0 00.917.918l4.462-1.494A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.4 0-4.637-.734-6.482-1.988l-.452-.305-2.971.993.994-2.969-.316-.461A9.955 9.955 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>';
 
-    window._sendModal = { invoiceId: null, channel: 'email', sending: false };
+    window._sendModal = { invoiceId: null, channel: 'email', sending: false, waApi: false };
 
     function el(id) { return document.getElementById(id); }
 
@@ -80,7 +92,8 @@
     };
 
     window.openSendModal = async function (invoiceId, channel) {
-        window._sendModal = { invoiceId: invoiceId, channel: channel, sending: false };
+        window._sendModal = { invoiceId: invoiceId, channel: channel, sending: false, waApi: false };
+        el('sendModalWaMode').style.display = 'none';
         var isWa = channel === 'whatsapp';
 
         el('sendModalTitle').textContent = isWa ? 'WhatsApp karein' : 'Email karein';
@@ -109,6 +122,10 @@
                 input.placeholder = '0300-1234567';
                 input.value = info.phone || '';
                 el('sendModalFieldLabel').textContent = 'Buyer ka WhatsApp number';
+                if (info.wa_api_configured) {
+                    window._sendModal.waApi = true;
+                    el('sendModalWaMode').style.display = 'block';
+                }
             } else {
                 input.type = 'email';
                 input.placeholder = 'buyer@example.com';
@@ -153,15 +170,24 @@
         btn.textContent = isWa ? 'Tayar ho raha hai...' : 'Bhej rahe hain...';
         setStatus('', '');
 
+        // Business API direct send (Phase 2): server bhejta hai — no wa.me tab.
+        var waMode = 'link';
+        if (isWa && ctx.waApi) {
+            var sel = document.querySelector('input[name="sendModalWaModeRadio"]:checked');
+            waMode = (sel && sel.value === 'link') ? 'link' : 'api';
+        }
+        if (waMode === 'api') { btn.textContent = 'Bhej rahe hain...'; }
+
         // Popup-blocker workaround: WhatsApp tab must be opened synchronously
         // inside the click handler, then pointed at the wa.me URL after the fetch.
         var waWin = null;
-        if (isWa) { try { waWin = window.open('', '_blank'); } catch (e) { waWin = null; } }
+        if (isWa && waMode !== 'api') { try { waWin = window.open('', '_blank'); } catch (e) { waWin = null; } }
 
         try {
             var fd = new FormData();
             fd.append('_token', (document.querySelector('meta[name="csrf-token"]') || {}).content || '');
             fd.append(isWa ? 'phone' : 'email', value);
+            if (isWa) fd.append('mode', waMode);
             fd.append('save_to_profile', el('sendModalSave').checked ? '1' : '0');
 
             var res = await fetch('/invoice/' + ctx.invoiceId + (isWa ? '/send-whatsapp' : '/send-email'), {
@@ -205,7 +231,8 @@
         var empty = document.getElementById('deliveryHistoryEmpty');
         if (empty) empty.style.display = 'none';
         var isWa = d.channel === 'whatsapp';
-        var ok = d.status === 'sent';
+        var ok = d.status !== 'failed';
+        var label = { sent: 'Sent', delivered: 'Delivered', read: 'Read' }[d.status] || 'Sent';
         var li = document.createElement('li');
         li.className = 'py-2.5 flex items-center gap-3';
         li.innerHTML =
@@ -215,7 +242,7 @@
                 '<p class="text-xs text-gray-400">' + (isWa ? 'WhatsApp' : 'Email') + ' &middot; by ' + window.escapeHtmlSend(d.user || '') + ' &middot; ' + window.escapeHtmlSend(d.at || '') + '</p>' +
             '</div>' +
             (ok
-                ? '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Sent</span>'
+                ? '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">' + label + '</span>'
                 : '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Failed</span>');
         list.insertBefore(li, list.firstChild);
     };

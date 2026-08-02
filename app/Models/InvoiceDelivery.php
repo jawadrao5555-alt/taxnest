@@ -18,8 +18,9 @@ class InvoiceDelivery extends Model
         'user_id',
         'channel',    // email | whatsapp
         'recipient',  // email address or normalized international phone digits
-        'status',     // sent | failed
+        'status',     // sent | delivered | read | failed (delivered/read via WA Business API webhook)
         'error',
+        'provider_message_id', // Meta wamid — set only on Business API direct sends
     ];
 
     public function invoice()

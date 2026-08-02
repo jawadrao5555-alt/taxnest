@@ -201,6 +201,77 @@ class CompanySettingsController extends Controller
         }
     }
 
+    /**
+     * WhatsApp Business API (Phase 2) — per-company Meta Cloud API credentials
+     * for server-side "seedha bhejein" invoice delivery. Token stored
+     * Crypt-encrypted in a TEXT column; wa.me fallback stays when unconfigured.
+     */
+    public function whatsappSettings()
+    {
+        $company = Company::find(auth()->user()->company_id);
+        if (!$company) {
+            return redirect('/dashboard')->with('error', 'Company not found.');
+        }
+
+        $hasToken = !empty($company->wa_api_token);
+
+        return view('company.whatsapp-settings', [
+            'company' => $company,
+            'hasToken' => $hasToken,
+            'webhookUrl' => url('/webhooks/whatsapp/' . $company->id),
+            'defaultTemplate' => \App\Services\WhatsAppBusinessApi::DEFAULT_TEMPLATE,
+        ]);
+    }
+
+    public function updateWhatsappSettings(Request $request)
+    {
+        $company = Company::find(auth()->user()->company_id);
+        if (!$company) {
+            return redirect('/dashboard')->with('error', 'Company not found.');
+        }
+
+        $request->validate([
+            'wa_api_enabled' => 'nullable|boolean',
+            'wa_phone_number_id' => 'nullable|string|max:100',
+            'wa_api_token' => 'nullable|string|max:1000',
+            'wa_template_name' => 'nullable|string|max:100',
+            'wa_attach_pdf' => 'nullable|boolean',
+            'wa_webhook_verify_token' => 'nullable|string|max:100',
+        ]);
+
+        $data = [
+            'wa_api_enabled' => $request->boolean('wa_api_enabled'),
+            'wa_phone_number_id' => trim((string) $request->input('wa_phone_number_id')) ?: null,
+            'wa_template_name' => trim((string) $request->input('wa_template_name')) ?: null,
+            'wa_attach_pdf' => $request->boolean('wa_attach_pdf'),
+            'wa_webhook_verify_token' => trim((string) $request->input('wa_webhook_verify_token')) ?: null,
+        ];
+
+        // Token field left blank = keep the existing stored token.
+        $token = trim((string) $request->input('wa_api_token'));
+        if ($token !== '') {
+            $data['wa_api_token'] = Crypt::encryptString($token);
+        }
+
+        // Enabling direct send without credentials would silently dead-end
+        // every "seedha bhejein" — block it loudly.
+        $effectiveToken = $token !== '' ? $token : ($company->wa_api_token ? 'set' : '');
+        if ($data['wa_api_enabled'] && ($data['wa_phone_number_id'] === null || $effectiveToken === '')) {
+            return redirect('/company/whatsapp-settings')
+                ->with('error', 'Direct send on karne ke liye Phone Number ID aur Access Token dono zaroori hain.')
+                ->withInput();
+        }
+
+        $company->forceFill($data)->save();
+
+        SecurityLogService::log('whatsapp_api_settings_updated', auth()->id(), [
+            'company_id' => $company->id,
+            'enabled' => $data['wa_api_enabled'],
+        ]);
+
+        return redirect('/company/whatsapp-settings')->with('success', 'WhatsApp Business API settings save ho gayi hain.');
+    }
+
     public function testConnection()
     {
         $company = Company::find(auth()->user()->company_id);

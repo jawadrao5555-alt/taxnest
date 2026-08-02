@@ -172,6 +172,11 @@
             Branding
         </a>
 
+        <a href="/company/whatsapp-settings" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->is('company/whatsapp*') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-200' }}">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+            WhatsApp Settings
+        </a>
+
         </div>
         @endif
         @endif

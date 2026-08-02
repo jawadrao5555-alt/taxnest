@@ -41,8 +41,10 @@ class InvoiceSendController extends Controller
         $this->ensureShareUuid($invoice);
 
         $profile = $this->matchProfile($invoice);
+        $invoice->loadMissing('company');
 
         return response()->json([
+            'wa_api_configured' => \App\Services\WhatsAppBusinessApi::configuredFor($invoice->company),
             'invoice_id' => $invoice->id,
             'invoice_number' => $invoice->display_invoice_number,
             'buyer_name' => $invoice->buyer_name,
@@ -111,6 +113,7 @@ class InvoiceSendController extends Controller
         $data = $request->validate([
             'phone' => 'required|string|max:30',
             'save_to_profile' => 'nullable|boolean',
+            'mode' => 'nullable|in:link,api', // api = Business API direct send (Phase 2)
         ], [
             'phone.required' => 'Buyer ka WhatsApp number likhein.',
         ]);
@@ -126,6 +129,40 @@ class InvoiceSendController extends Controller
         $invoice->loadMissing('company');
         $this->ensureShareUuid($invoice);
         $shareUrl = url('/share/invoice/' . $invoice->share_uuid);
+
+        // Phase 2: server-side send via Meta WhatsApp Business API — no wa.me
+        // hand-off. Only when the company has configured + enabled the API.
+        if (($data['mode'] ?? 'link') === 'api') {
+            if (!\App\Services\WhatsAppBusinessApi::configuredFor($invoice->company)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'WhatsApp Business API configure nahi hai — Company Settings → WhatsApp Settings mein credentials save karein.',
+                ], 422);
+            }
+
+            $result = \App\Services\WhatsAppBusinessApi::sendInvoice($invoice->company, $normalized, $invoice, $shareUrl);
+
+            if (!$result['ok']) {
+                $delivery = $this->logDelivery($invoice, 'whatsapp', $normalized, 'failed', $result['error']);
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'WhatsApp send nahi ho saka — ' . Str::limit($result['error'], 160),
+                    'delivery' => $this->deliveryJson($delivery),
+                ], 502);
+            }
+
+            $delivery = $this->logDelivery($invoice, 'whatsapp', $normalized, 'sent', null, $result['message_id']);
+            InvoiceActivityService::log($invoice->id, $invoice->company_id, 'sent_whatsapp', ['to' => $normalized, 'via' => 'business_api']);
+            $profileSaved = $this->maybeSaveContact($invoice, $request->boolean('save_to_profile'), 'phone', trim($data['phone']));
+
+            return response()->json([
+                'status' => 'ok',
+                'message' => 'WhatsApp bhej diya gaya: +' . $normalized,
+                'delivery' => $this->deliveryJson($delivery),
+                'profile_saved' => $profileSaved,
+            ]);
+        }
 
         // Buyer-facing message stays ENGLISH (owner rule).
         $message = 'Invoice ' . $invoice->display_invoice_number
@@ -230,7 +267,7 @@ class InvoiceSendController extends Controller
         }
     }
 
-    private function logDelivery(Invoice $invoice, string $channel, string $recipient, string $status, ?string $error = null): InvoiceDelivery
+    private function logDelivery(Invoice $invoice, string $channel, string $recipient, string $status, ?string $error = null, ?string $providerMessageId = null): InvoiceDelivery
     {
         return InvoiceDelivery::create([
             'invoice_id' => $invoice->id,
@@ -240,6 +277,7 @@ class InvoiceSendController extends Controller
             'recipient' => $recipient,
             'status' => $status,
             'error' => $error ? mb_substr($error, 0, 500) : null,
+            'provider_message_id' => $providerMessageId,
         ]);
     }
 

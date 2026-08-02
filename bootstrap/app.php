@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'pos/*',
             'api/agent/*',
             'api/rider-app/*',
+            'webhooks/whatsapp/*', // Meta WA Cloud API status callbacks
         ]);
         $middleware->alias([
             'company' => \App\Http\Middleware\CompanyIsolation::class,

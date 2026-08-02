@@ -321,4 +321,75 @@ class WhatsNewAudienceTargetingTest extends TestCase
         $resp->assertDontSee(self::T_ALL);
         $resp->assertDontSee(self::T_FBR);
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // 5. Pending companies — approval middleware blocks the seen POST, so
+    //    the popup/bell must be skipped entirely (dismiss-loop guard).
+    // ════════════════════════════════════════════════════════════════════
+
+    public function test_pending_company_never_gets_popup_on_pra_layout(): void
+    {
+        DB::table('companies')->where('id', $this->posCompanyId)
+            ->update(['status' => 'pending', 'company_status' => 'pending']);
+
+        $resp = $this->actingAs(User::find($this->posAdminId), 'pos')->get('/pos/my-profile');
+
+        $resp->assertStatus(200);
+        $resp->assertDontSee(self::T_POS);
+        $resp->assertDontSee(self::T_ALL);
+        $resp->assertDontSee(self::T_HIDDEN);
+    }
+
+    public function test_pending_company_never_gets_popup_on_fbr_layout(): void
+    {
+        DB::table('companies')->where('id', $this->fbrCompanyId)
+            ->update(['status' => 'pending', 'company_status' => 'pending']);
+
+        $resp = $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')->get('/fbr-pos/my-profile');
+
+        $resp->assertStatus(200);
+        $resp->assertDontSee(self::T_FBR);
+        $resp->assertDontSee(self::T_ALL);
+        $resp->assertDontSee(self::T_HIDDEN);
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // 6. Read-only impersonation (View as Company) — ReadOnlyImpersonation
+    //    blocks ALL POSTs incl. /whats-new/seen → skip popup/bell entirely.
+    // ════════════════════════════════════════════════════════════════════
+
+    public function test_readonly_impersonation_skips_popup_on_pra_layout(): void
+    {
+        $resp = $this->actingAs(User::find($this->posAdminId), 'pos')
+            ->withSession(['impersonation' => ['readonly' => true, 'admin_id' => 1, 'company_id' => $this->posCompanyId]])
+            ->get('/pos/my-profile');
+
+        $resp->assertStatus(200);
+        $resp->assertDontSee(self::T_POS);
+        $resp->assertDontSee(self::T_ALL);
+    }
+
+    public function test_readonly_impersonation_skips_popup_on_fbr_layout(): void
+    {
+        $resp = $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')
+            ->withSession(['impersonation' => ['readonly' => true, 'admin_id' => 1, 'company_id' => $this->fbrCompanyId]])
+            ->get('/fbr-pos/my-profile');
+
+        $resp->assertStatus(200);
+        $resp->assertDontSee(self::T_FBR);
+        $resp->assertDontSee(self::T_ALL);
+    }
+
+    public function test_full_access_impersonation_still_shows_popup(): void
+    {
+        // readonly=false (full "Manage as Company") — POSTs are allowed, so
+        // the popup must still show; only READ-ONLY mode is skipped.
+        $resp = $this->actingAs(User::find($this->posAdminId), 'pos')
+            ->withSession(['impersonation' => ['readonly' => false, 'admin_id' => 1, 'company_id' => $this->posCompanyId]])
+            ->get('/pos/my-profile');
+
+        $resp->assertStatus(200);
+        $resp->assertSee(self::T_POS);
+        $resp->assertSee(self::T_ALL);
+    }
 }

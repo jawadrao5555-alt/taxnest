@@ -82,6 +82,60 @@ class PasswordResetUrduLocaleTest extends TestCase
         $response->assertSessionHasErrors(['email' => $this->urduLine('auth_session_invalid')]);
     }
 
+    public function test_verify_otp_with_wrong_otp_flashes_urdu_invalid_otp_error(): void
+    {
+        $response = $this->withSession(['pos_locale' => 'ur'])
+            ->from('/verify-otp?email=someone@example.com')
+            ->post('/verify-otp', [
+                'email' => 'someone@example.com',
+                'otp' => '000000',
+            ]);
+
+        $response->assertRedirect('/verify-otp?email=someone@example.com');
+        $response->assertSessionHasErrors(['otp' => $this->urduLine('auth_otp_invalid')]);
+    }
+
+    public function test_verify_otp_validation_messages_are_urdu(): void
+    {
+        $response = $this->withSession(['pos_locale' => 'ur'])
+            ->post('/verify-otp', [
+                'email' => 'not-an-email',
+                'otp' => '123',
+            ]);
+
+        $response->assertSessionHasErrors([
+            'email' => $this->urduLine('auth_val_email_email'),
+            'otp' => $this->urduLine('auth_val_otp_size'),
+        ]);
+    }
+
+    public function test_verify_otp_missing_fields_flash_urdu_required_errors(): void
+    {
+        $response = $this->withSession(['pos_locale' => 'ur'])
+            ->post('/verify-otp', []);
+
+        $response->assertSessionHasErrors([
+            'email' => $this->urduLine('auth_val_email_required'),
+            'otp' => $this->urduLine('auth_val_otp_required'),
+        ]);
+    }
+
+    public function test_forgot_password_missing_email_flashes_urdu_required_error(): void
+    {
+        $response = $this->withSession(['pos_locale' => 'ur'])
+            ->post('/forgot-password', []);
+
+        $response->assertSessionHasErrors(['email' => $this->urduLine('auth_val_email_required')]);
+    }
+
+    public function test_forgot_password_invalid_email_flashes_urdu_email_error(): void
+    {
+        $response = $this->withSession(['pos_locale' => 'ur'])
+            ->post('/forgot-password', ['email' => 'not-an-email']);
+
+        $response->assertSessionHasErrors(['email' => $this->urduLine('auth_val_email_email')]);
+    }
+
     public function test_reset_flow_keys_exist_in_both_en_and_ur(): void
     {
         $en = require base_path('lang/en/pos.php');

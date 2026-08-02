@@ -61,6 +61,7 @@ class AdminPlanStorePostTest extends TestCase
             $table->string('product_type')->default('di');
             $table->decimal('price', 12, 2)->default(0);
             $table->decimal('price_monthly', 12, 2)->nullable();
+            $table->decimal('price_quarterly', 12, 2)->nullable();
             $table->decimal('compare_at', 12, 2)->nullable();
             $table->integer('invoice_limit')->default(0);
             $table->integer('user_limit')->nullable();

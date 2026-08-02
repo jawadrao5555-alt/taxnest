@@ -467,13 +467,13 @@
                         <tr class="border-b border-gray-100">
                             <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Billing</td>
                             <td class="p-5">Monthly, Quarterly, Semi-Annual or Annual</td>
-                            <td class="p-5">Simple annual billing</td>
+                            <td class="p-5">Annual or quarterly billing</td>
                             <td class="p-5">Simple annual billing</td>
                         </tr>
                         <tr class="border-b border-gray-100">
                             <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Starting at</td>
                             <td class="p-5 font-bold text-[#052730]">PKR 499 / month</td>
-                            <td class="p-5 font-bold text-[#052730]">PKR 9,999 / year</td>
+                            <td class="p-5 font-bold text-[#052730]">PKR 14,999 / year</td>
                             <td class="p-5 font-bold text-[#052730]">PKR 5,629 / year</td>
                         </tr>
                         <tr class="border-b border-gray-100">

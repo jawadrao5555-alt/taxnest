@@ -65,6 +65,10 @@
                 <input type="number" name="price" value="{{ intval($plan->price) }}" step="1" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
             </div>
             <div>
+                <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Quarterly Price (PKR / 3 mo — POS only; blank = annual-only)</label>
+                <input type="number" name="price_quarterly" value="{{ $plan->price_quarterly !== null ? intval($plan->price_quarterly) : '' }}" step="1" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
                 <label class="text-[10px] text-gray-500 dark:text-gray-400 uppercase">Invoice Limit</label>
                 <input type="number" name="invoice_limit" value="{{ $plan->invoice_limit }}" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500">
             </div>

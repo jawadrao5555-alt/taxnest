@@ -34,6 +34,7 @@ class AdminPlanController extends Controller
         $data = $request->validate([
             'name' => 'required|string|max:100',
             'price' => 'required|numeric|min:0',
+            'price_quarterly' => 'nullable|numeric|min:0',
             'invoice_limit' => 'required|integer|min:-1',
             'product_type' => 'required|in:di,pos,fbrpos',
             'max_terminals' => 'nullable|integer|min:-1',
@@ -53,6 +54,7 @@ class AdminPlanController extends Controller
             'product_type' => $data['product_type'],
             'price' => $data['price'],
             'price_monthly' => in_array($data['product_type'], ['di', 'fbrpos']) ? $data['price'] : null,
+            'price_quarterly' => $data['price_quarterly'] ?? null,
             'invoice_limit' => $data['invoice_limit'],
             'max_terminals' => $request->input('max_terminals'),
             'max_users' => $request->input('max_users'),
@@ -73,6 +75,7 @@ class AdminPlanController extends Controller
         $data = $request->validate([
             'name' => 'required|string|max:100',
             'price' => 'required|numeric|min:0',
+            'price_quarterly' => 'nullable|numeric|min:0',
             'invoice_limit' => 'required|integer|min:-1',
             'product_type' => 'required|in:di,pos,fbrpos',
             'max_terminals' => 'nullable|integer|min:-1',
@@ -90,6 +93,7 @@ class AdminPlanController extends Controller
             'product_type' => $data['product_type'],
             'price' => $data['price'],
             'price_monthly' => in_array($data['product_type'], ['di', 'fbrpos']) ? $data['price'] : null,
+            'price_quarterly' => $data['price_quarterly'] ?? null,
             'invoice_limit' => $data['invoice_limit'],
             'max_terminals' => $request->input('max_terminals'),
             'max_users' => $request->input('max_users'),

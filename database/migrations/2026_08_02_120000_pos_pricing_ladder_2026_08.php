@@ -109,12 +109,29 @@ return new class extends Migration
             ],
         ];
 
+        // Schema-tolerant: only write columns that actually exist. The sqlite
+        // migration chain used by RefreshDatabase tests (and, per past drift
+        // incidents, even prod) can miss later ensure-columns additions like
+        // rider_tracking_enabled — a missing column must skip, never crash.
+        $existingCols = array_flip(Schema::getColumnListing('pricing_plans'));
+
         foreach ($plans as $p) {
+            $update = array_intersect_key($p['update'], $existingCols);
+            $skipped = array_diff_key($p['update'], $update);
+
+            if ($skipped !== []) {
+                logger()->warning("POS pricing ladder migration: plan id {$p['id']} — missing columns skipped: " . implode(', ', array_keys($skipped)));
+            }
+
+            if ($update === []) {
+                continue;
+            }
+
             $updated = DB::table('pricing_plans')
                 ->where('id', $p['id'])
                 ->where('product_type', 'pos')
                 ->where('name', $p['name'])
-                ->update($p['update']);
+                ->update($update);
 
             if (!$updated) {
                 // Row drifted (renamed/deleted) — do NOT guess. Log loudly and skip.

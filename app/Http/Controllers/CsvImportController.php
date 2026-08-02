@@ -10,6 +10,7 @@ use App\Services\AuditLogService;
 use App\Services\InvoiceActivityService;
 use App\Services\ScheduleEngine;
 use App\Services\GlobalHsService;
+use App\Services\InvoiceImportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -89,15 +90,14 @@ class CsvImportController extends Controller
             ], 422);
         }
 
-        $rows = [];
+        $parsed = [];
         $rowNum = 1;
         while (($data = fgetcsv($handle)) !== false) {
             $rowNum++;
             if (count($data) !== count($header)) {
-                $rows[] = [
+                $parsed[] = [
                     'row' => $rowNum,
                     'data' => [],
-                    'valid' => false,
                     'errors' => ["Column count mismatch. Expected " . count($header) . ", got " . count($data)],
                 ];
                 continue;
@@ -109,30 +109,27 @@ class CsvImportController extends Controller
                 continue;
             }
 
-            $errors = $this->validateRow($mapped, $rowNum);
-
-            $rows[] = [
-                'row' => $rowNum,
-                'data' => $mapped,
-                'valid' => empty($errors),
-                'errors' => $errors,
-            ];
+            $parsed[] = ['row' => $rowNum, 'data' => $mapped];
         }
 
         fclose($handle);
 
-        if (empty($rows)) {
+        if (empty($parsed)) {
             return response()->json(['error' => 'No data rows found in CSV.'], 422);
         }
 
-        $validCount = count(array_filter($rows, fn($r) => $r['valid']));
-        $errorCount = count($rows) - $validCount;
+        // Same row-level FBR pre-validation as the .xlsx import path.
+        $company = Company::find(app('currentCompanyId'));
+        if (!$company) {
+            return response()->json(['error' => 'Company context missing.'], 403);
+        }
+        $result = (new InvoiceImportService())->validateRows($parsed, $company);
 
         return response()->json([
-            'rows' => $rows,
-            'total' => count($rows),
-            'valid_count' => $validCount,
-            'error_count' => $errorCount,
+            'rows' => $result['rows'],
+            'total' => $result['total'],
+            'valid_count' => $result['valid_count'],
+            'error_count' => $result['error_count'],
         ]);
     }
 
@@ -283,61 +280,6 @@ class CsvImportController extends Controller
                 'error' => 'Failed to create invoices: ' . $e->getMessage(),
             ], 500);
         }
-    }
-
-    private function validateRow(array $row, int $rowNum): array
-    {
-        $errors = [];
-
-        if (empty($row['buyer_name'])) {
-            $errors[] = "buyer_name is required";
-        }
-        if (empty($row['buyer_address'])) {
-            $errors[] = "buyer_address is required";
-        }
-        if (empty($row['destination_province'])) {
-            $errors[] = "destination_province is required";
-        }
-
-        $validProvinces = ['Punjab', 'Sindh', 'Khyber Pakhtunkhwa', 'Balochistan', 'Islamabad', 'Azad Kashmir', 'Gilgit-Baltistan', 'FATA'];
-        if (!empty($row['destination_province']) && !in_array($row['destination_province'], $validProvinces)) {
-            $errors[] = "Invalid destination_province. Must be one of: " . implode(', ', $validProvinces);
-        }
-
-        $validDocTypes = ['Sale Invoice', 'Credit Note', 'Debit Note'];
-        if (empty($row['document_type'])) {
-            $errors[] = "document_type is required";
-        } elseif (!in_array($row['document_type'], $validDocTypes)) {
-            $errors[] = "Invalid document_type. Must be one of: " . implode(', ', $validDocTypes);
-        }
-
-        if (empty($row['hs_code'])) {
-            $errors[] = "hs_code is required";
-        }
-        if (empty($row['description'])) {
-            $errors[] = "description is required";
-        }
-
-        if (!is_numeric($row['quantity'] ?? '') || floatval($row['quantity'] ?? 0) <= 0) {
-            $errors[] = "quantity must be a positive number";
-        }
-        if (!is_numeric($row['price'] ?? '')) {
-            $errors[] = "price must be a number";
-        }
-        if (!is_numeric($row['tax'] ?? '')) {
-            $errors[] = "tax must be a number";
-        }
-
-        $validScheduleTypes = ['standard', 'reduced', '3rd_schedule', 'exempt', 'zero_rated'];
-        if (!empty($row['schedule_type']) && !in_array($row['schedule_type'], $validScheduleTypes)) {
-            $errors[] = "Invalid schedule_type. Must be one of: " . implode(', ', $validScheduleTypes);
-        }
-
-        if (!empty($row['tax_rate']) && !is_numeric($row['tax_rate'])) {
-            $errors[] = "tax_rate must be a number";
-        }
-
-        return $errors;
     }
 
     private function computeTaxRate(array $item, string $scheduleType): float

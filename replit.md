@@ -30,6 +30,7 @@ Deep module invariants live in `.agents/memory/` topic files — this file is th
 - FBR compliance: `ScheduleEngine` validation, PRAL API, per-item FBR fields, sandbox pre-validation, submission idempotency, token health monitor. Simplified 4-state lifecycle; PDFs default pure B&W.
 - Global HS Intelligence: `global_hs_master`, HS resolution + tax-schedule validation, admin-managed mapping engine with real-time suggestions.
 - Tax Consultant Console (`/consultant`, DI web guard only): consent-based client linking (invite code or NTN request + client approval), health dashboard, audited login-swap switch into clients, referral codes (`?ref=` at signup) + commission ledger from admin-recorded payments; admin oversight at `/admin/consultants` → memory `consultant-console.md`.
+- Bulk import: .xlsx template (TEXT code columns) + legacy CSV; shared row-level pre-validation (`InvoiceImportService`), .xlsx error report, queued background processing with polled progress; valid rows become drafts only.
 
 ## PRA POS (NestPOS)
 Isolated POS (own auth/layouts/models); PRA integration with offline billing + auto-sync (transport failures queue 'offline' and auto-retry, never 'failed'); Restaurant module; unified top-nav (nav edits in `pos-app.blade.php`).

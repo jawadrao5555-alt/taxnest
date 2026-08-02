@@ -36,6 +36,7 @@ use App\Http\Controllers\TaxOverrideController;
 use App\Http\Controllers\CustomerProfileController;
 use App\Http\Controllers\WhtReportController;
 use App\Http\Controllers\CsvImportController;
+use App\Http\Controllers\InvoiceImportController;
 use App\Http\Controllers\FbrPosController;
 use App\Http\Controllers\FbrPosAuthController;
 use App\Http\Controllers\InventoryController;
@@ -241,6 +242,13 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         Route::get('/invoices/csv-template', [CsvImportController::class, 'template'])->name('invoices.csv-template');
         Route::post('/invoices/csv-upload', [CsvImportController::class, 'upload'])->name('invoices.csv-upload');
         Route::post('/invoices/csv-process', [CsvImportController::class, 'process'])->name('invoices.csv-process');
+
+        // Bulk import v2: .xlsx template + pre-validation + background processing.
+        Route::get('/invoices/import-template', [InvoiceImportController::class, 'template'])->name('invoices.import-template');
+        Route::post('/invoices/import-upload', [InvoiceImportController::class, 'upload'])->name('invoices.import-upload');
+        Route::post('/invoices/import/{batchId}/process', [InvoiceImportController::class, 'process'])->middleware('plan.limit:invoices')->name('invoices.import-process');
+        Route::get('/invoices/import/{batchId}/status', [InvoiceImportController::class, 'status'])->name('invoices.import-status');
+        Route::get('/invoices/import/{batchId}/error-report', [InvoiceImportController::class, 'errorReport'])->name('invoices.import-error-report');
 
         Route::get('/customers', [CustomerLedgerController::class, 'index'])->name('customers.index');
         Route::get('/customers/{ntn}/ledger', [CustomerLedgerController::class, 'show']);

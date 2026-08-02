@@ -824,7 +824,7 @@ class AdminCompanyController extends Controller
             'fbr_pos_loyalty_ledger', 'fbr_pos_loyalty_settings',
             'fbr_pos_promotions', 'fbr_pos_shifts', 'fbr_pos_terminals',
             'push_subscriptions', 'payment_proofs', 'feature_suggestions',
-            'madadgar_messages',
+            'madadgar_messages', 'invoice_import_batches',
             // Consultant console: operational rows die with the company (FK
             // cascade exists on MySQL, but prod drift makes belt+braces cheap).
             // consultant_commissions is deliberately EXCLUDED — money ledger
@@ -866,11 +866,11 @@ class AdminCompanyController extends Controller
         return back()->with('success', "Company type changed to " . strtoupper($request->product_type) . ".");
     }
 
-    // ========================================================================
+    // ------------------------------------------------------------------------
     // SUBSCRIPTION OVERRIDE + USAGE LIMIT — admin-only actions
     // Rule: only ONE override active at a time; override always supersedes
     // subscription expiry; never modifies expires_at / never deletes the subscription.
-    // ========================================================================
+    // ------------------------------------------------------------------------
 
     /**
      * Find the company's active subscription (or most-recent inactive one) and

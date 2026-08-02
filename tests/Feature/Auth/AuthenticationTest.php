@@ -21,8 +21,9 @@ class AuthenticationTest extends TestCase
     {
         $user = User::factory()->create();
 
+        // Custom login form posts a universal `login` identifier, not `email`
         $response = $this->post('/login', [
-            'email' => $user->email,
+            'login' => $user->email,
             'password' => 'password',
         ]);
 
@@ -35,7 +36,7 @@ class AuthenticationTest extends TestCase
         $user = User::factory()->create();
 
         $this->post('/login', [
-            'email' => $user->email,
+            'login' => $user->email,
             'password' => 'wrong-password',
         ]);
 

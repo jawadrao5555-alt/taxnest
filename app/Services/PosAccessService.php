@@ -114,19 +114,23 @@ class PosAccessService
         if (($user->role ?? null) === 'company_admin') {
             return null;
         }
+        $raw = $user->pos_custom_access ?? null; // missing column → null attribute
+        if ($raw === null || $raw === '') {
+            return null;
+        }
         // Plan gate (Aug 2026): Custom Access is Unlimited-only. When the
         // plan lacks it, stored sets go inert — member behaves as a plain
         // standard role (nobody gets locked OUT by a downgrade).
         // (Strict lazy-loading on live: never touch $user->company lazily.)
-        $company = $user->relationLoaded('company')
-            ? $user->company
-            : \App\Models\Company::find($user->company_id);
-        if (!PosFeatureService::planAllows($company, 'custom_access_enabled')) {
-            return null;
-        }
-        $raw = $user->pos_custom_access ?? null; // missing column → null attribute
-        if ($raw === null || $raw === '') {
-            return null;
+        // Checked only when a set exists AND a company can be resolved —
+        // orphan users (no company_id) keep pre-gate behavior.
+        if ($user->relationLoaded('company') || $user->company_id) {
+            $company = $user->relationLoaded('company')
+                ? $user->company
+                : \App\Models\Company::find($user->company_id);
+            if (!PosFeatureService::planAllows($company, 'custom_access_enabled')) {
+                return null;
+            }
         }
         $decoded = is_array($raw) ? $raw : json_decode((string) $raw, true);
         if (!is_array($decoded)) {

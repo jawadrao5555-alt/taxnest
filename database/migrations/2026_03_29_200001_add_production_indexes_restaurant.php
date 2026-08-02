@@ -87,6 +87,8 @@ return new class extends Migration
             $driver = Schema::getConnection()->getDriverName();
             if ($driver === 'pgsql') {
                 $r = DB::select("SELECT 1 FROM pg_indexes WHERE tablename = ? AND indexname = ?", [$table, $name]);
+            } elseif ($driver !== 'mysql' && $driver !== 'mariadb') {
+                return Schema::hasIndex($table, $name);
             } else {
                 $r = DB::select("SHOW INDEX FROM {$table} WHERE Key_name = ?", [$name]);
             }

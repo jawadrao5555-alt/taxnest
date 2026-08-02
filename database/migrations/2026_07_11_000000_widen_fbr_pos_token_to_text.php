@@ -21,9 +21,16 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasColumn('companies', 'fbr_pos_token')) {
-            DB::statement('ALTER TABLE `companies` MODIFY `fbr_pos_token` TEXT NULL');
+        if (!Schema::hasColumn('companies', 'fbr_pos_token')) {
+            return;
         }
+        $driver = DB::getDriverName();
+        if ($driver === 'mysql' || $driver === 'mariadb') {
+            DB::statement('ALTER TABLE `companies` MODIFY `fbr_pos_token` TEXT NULL');
+        } elseif ($driver === 'pgsql') {
+            DB::statement('ALTER TABLE companies ALTER COLUMN fbr_pos_token TYPE TEXT');
+        }
+        // sqlite (tests): column is already dynamically typed — nothing to do.
     }
 
     public function down(): void

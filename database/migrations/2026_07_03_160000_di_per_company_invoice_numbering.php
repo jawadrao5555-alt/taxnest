@@ -40,13 +40,25 @@ return new class extends Migration
 
         // 2. Initialize per-company sequence (idempotent — GREATEST keeps any
         //    counter that is already ahead).
-        DB::statement("
-            UPDATE companies c
-            SET next_invoice_number = GREATEST(
-                COALESCE(c.next_invoice_number, 1),
-                (SELECT COUNT(*) FROM invoices i WHERE i.company_id = c.id) + 1
-            )
-        ");
+        if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+            DB::statement("
+                UPDATE companies c
+                SET next_invoice_number = GREATEST(
+                    COALESCE(c.next_invoice_number, 1),
+                    (SELECT COUNT(*) FROM invoices i WHERE i.company_id = c.id) + 1
+                )
+            ");
+        } else {
+            // sqlite (tests) / pgsql: no table-alias UPDATE; sqlite spells GREATEST as MAX
+            $greatest = DB::connection()->getDriverName() === 'sqlite' ? 'MAX' : 'GREATEST';
+            DB::statement("
+                UPDATE companies
+                SET next_invoice_number = {$greatest}(
+                    COALESCE(next_invoice_number, 1),
+                    (SELECT COUNT(*) FROM invoices i WHERE i.company_id = companies.id) + 1
+                )
+            ");
+        }
 
         // 3. Composite unique (company_id, invoice_number) — only if absent
         //    and only if data allows it.

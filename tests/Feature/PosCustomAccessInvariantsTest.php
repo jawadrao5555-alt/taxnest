@@ -282,6 +282,7 @@ class PosCustomAccessInvariantsTest extends TestCase
             $table->unsignedBigInteger('pricing_plan_id')->nullable();
             $table->string('status')->default('active');
             $table->boolean('is_active')->default(true);
+            $table->boolean('active')->default(true);
             $table->date('start_date')->nullable();
             $table->date('end_date')->nullable();
             $table->timestamps();
@@ -303,6 +304,27 @@ class PosCustomAccessInvariantsTest extends TestCase
             'product_type' => 'pos',
             'status' => 'approved',
             'company_status' => 'approved',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Custom Access is plan-gated (Unlimited-only). The lightweight
+        // pricing_plans schema here has no custom_access_enabled column, so
+        // the gate fails open — but an ACTIVE subscription must exist.
+        $planId = DB::table('pricing_plans')->insertGetId([
+            'name' => 'Test Plan',
+            'product_type' => 'pos',
+            'price' => 0,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('subscriptions')->insert([
+            'company_id' => $companyId,
+            'pricing_plan_id' => $planId,
+            'status' => 'active',
+            'is_active' => true,
+            'active' => true,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

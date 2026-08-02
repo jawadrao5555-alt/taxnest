@@ -3,11 +3,16 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
-use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
+/**
+ * The app replaced Breeze's token-notification reset with a custom
+ * OTP + signed-link flow (password_reset_otps table, session-bound
+ * reset form). These tests exercise that real flow.
+ */
 class PasswordResetTest extends TestCase
 {
     use RefreshDatabase;
@@ -19,55 +24,92 @@ class PasswordResetTest extends TestCase
         $response->assertStatus(200);
     }
 
-    public function test_reset_password_link_can_be_requested(): void
+    public function test_reset_can_be_requested_and_creates_otp_record(): void
     {
-        Notification::fake();
-
         $user = User::factory()->create();
 
-        $this->post('/forgot-password', ['email' => $user->email]);
+        $response = $this->post('/forgot-password', ['email' => $user->email]);
 
-        Notification::assertSentTo($user, ResetPassword::class);
+        $response->assertRedirect(route('password.verify.otp', ['email' => $user->email]));
+
+        $this->assertDatabaseHas('password_reset_otps', [
+            'email' => $user->email,
+            'used' => false,
+        ]);
     }
 
-    public function test_reset_password_screen_can_be_rendered(): void
+    public function test_unknown_email_gets_neutral_response_without_otp_record(): void
     {
-        Notification::fake();
+        $response = $this->post('/forgot-password', ['email' => 'nobody@example.com']);
 
-        $user = User::factory()->create();
+        // Neutral redirect — must not reveal whether the email is registered.
+        $response->assertRedirect(route('password.verify.otp', ['email' => 'nobody@example.com']));
 
-        $this->post('/forgot-password', ['email' => $user->email]);
-
-        Notification::assertSentTo($user, ResetPassword::class, function ($notification) {
-            $response = $this->get('/reset-password/'.$notification->token);
-
-            $response->assertStatus(200);
-
-            return true;
-        });
+        $this->assertDatabaseMissing('password_reset_otps', [
+            'email' => 'nobody@example.com',
+        ]);
     }
 
-    public function test_password_can_be_reset_with_valid_token(): void
+    public function test_reset_link_opens_session_bound_reset_form(): void
     {
-        Notification::fake();
-
         $user = User::factory()->create();
-
         $this->post('/forgot-password', ['email' => $user->email]);
 
-        Notification::assertSentTo($user, ResetPassword::class, function ($notification) use ($user) {
-            $response = $this->post('/reset-password', [
-                'token' => $notification->token,
-                'email' => $user->email,
-                'password' => 'password',
-                'password_confirmation' => 'password',
-            ]);
+        $token = DB::table('password_reset_otps')->where('email', $user->email)->value('token');
 
-            $response
-                ->assertSessionHasNoErrors()
-                ->assertRedirect(route('login'));
+        $response = $this->get('/reset-password-link?token=' . $token . '&email=' . urlencode($user->email));
 
-            return true;
-        });
+        $response->assertRedirect();
+        $this->assertStringContainsString('/reset-password', $response->headers->get('Location'));
+
+        // The one-time link is consumed
+        $this->assertDatabaseHas('password_reset_otps', [
+            'email' => $user->email,
+            'used' => true,
+        ]);
+    }
+
+    public function test_password_can_be_reset_via_link_flow(): void
+    {
+        $user = User::factory()->create();
+        $this->post('/forgot-password', ['email' => $user->email]);
+
+        $token = DB::table('password_reset_otps')->where('email', $user->email)->value('token');
+        $this->get('/reset-password-link?token=' . $token . '&email=' . urlencode($user->email));
+
+        $sessionToken = session('password_reset_token');
+        $this->assertNotEmpty($sessionToken);
+
+        $response = $this->post('/reset-password', [
+            'token' => $sessionToken,
+            'email' => $user->email,
+            'password' => 'new-password-123',
+            'password_confirmation' => 'new-password-123',
+        ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('login'));
+
+        $this->assertTrue(Hash::check('new-password-123', $user->fresh()->password));
+    }
+
+    public function test_reset_with_wrong_session_token_is_rejected(): void
+    {
+        $user = User::factory()->create();
+        $this->post('/forgot-password', ['email' => $user->email]);
+
+        $token = DB::table('password_reset_otps')->where('email', $user->email)->value('token');
+        $this->get('/reset-password-link?token=' . $token . '&email=' . urlencode($user->email));
+
+        $response = $this->post('/reset-password', [
+            'token' => 'forged-token',
+            'email' => $user->email,
+            'password' => 'new-password-123',
+            'password_confirmation' => 'new-password-123',
+        ]);
+
+        $response->assertRedirect(route('password.request'));
+        $this->assertFalse(Hash::check('new-password-123', $user->fresh()->password));
     }
 }

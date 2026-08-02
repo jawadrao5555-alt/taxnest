@@ -70,11 +70,13 @@ class Phase4UiPolishTest extends TestCase
     public function test_di_submit_buttons_disabled_and_show_spinner(): void
     {
         $src = $this->di();
-        // Both Create Invoice + Save Invoice buttons present
+        // Both Create Invoice + Save Invoice buttons present.
+        // The sticky bottom-bar button lives outside the form's Alpine scope,
+        // so it binds via `form.submitting` instead of bare `submitting`.
         $this->assertEquals(
             2,
-            substr_count($src, ':disabled="submitting"'),
-            'DI must have :disabled="submitting" on both submit buttons'
+            substr_count($src, ':disabled="submitting"') + substr_count($src, ':disabled="form.submitting"'),
+            'DI must have a submitting-bound :disabled on both submit buttons'
         );
         $this->assertGreaterThanOrEqual(
             2,

@@ -59,6 +59,10 @@ return new class extends Migration
     private function hasIndex(string $table, string $indexName): bool
     {
         try {
+            $driver = Schema::getConnection()->getDriverName();
+            if ($driver !== 'mysql' && $driver !== 'mariadb') {
+                return Schema::hasIndex($table, $indexName);
+            }
             $results = \Illuminate\Support\Facades\DB::select("SHOW INDEX FROM {$table} WHERE Key_name = ?", [$indexName]);
             return count($results) > 0;
         } catch (\Exception $e) {

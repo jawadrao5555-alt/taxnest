@@ -2,9 +2,15 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
+/**
+ * Registration here is the custom DI signup: it also creates a Company
+ * (pending approval) + trial subscription and does NOT auto-login —
+ * it redirects to /login with a pending-approval notice.
+ */
 class RegistrationTest extends TestCase
 {
     use RefreshDatabase;
@@ -23,9 +29,25 @@ class RegistrationTest extends TestCase
             'email' => 'test@example.com',
             'password' => 'password',
             'password_confirmation' => 'password',
+            'company_name' => 'Test Company',
+            'company_ntn' => '1234567',
         ]);
 
-        $this->assertAuthenticated();
-        $response->assertRedirect(route('dashboard', absolute: false));
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect('/login');
+
+        // No auto-login: company is pending approval
+        $this->assertGuest();
+
+        $user = User::where('email', 'test@example.com')->first();
+        $this->assertNotNull($user);
+        $this->assertSame('company_admin', $user->role);
+        $this->assertNotNull($user->company_id);
+        $this->assertDatabaseHas('companies', [
+            'id' => $user->company_id,
+            'ntn' => '1234567',
+            'product_type' => 'di',
+            'status' => 'pending',
+        ]);
     }
 }

@@ -309,6 +309,9 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         Route::put('/company/profile', [CompanySettingsController::class, 'updateProfile']);
         Route::get('/company/fbr-settings', [CompanySettingsController::class, 'fbrSettings']);
         Route::put('/company/fbr-settings', [CompanySettingsController::class, 'updateFbrSettings']);
+        // Task 140: DI Premium white-label branding (white_label plan gate enforced in-controller)
+        Route::get('/company/branding', [CompanySettingsController::class, 'branding'])->name('company.branding');
+        Route::put('/company/branding', [CompanySettingsController::class, 'updateBranding'])->name('company.branding.update');
         Route::post('/company/fbr-settings-ajax', [CompanySettingsController::class, 'updateFbrSettingsAjax']);
         Route::post('/company/test-connection', [CompanySettingsController::class, 'testConnection']);
         Route::post('/company/sandbox-test/{type}', [CompanySettingsController::class, 'sandboxTest']);

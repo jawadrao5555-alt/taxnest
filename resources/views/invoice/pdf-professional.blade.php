@@ -1,3 +1,10 @@
+@php
+    // Task 140: DI Premium white-label branding — cosmetic zones ONLY
+    // (header logo, accent color, footer lines, platform credit).
+    // COMPLIANCE: the FBR section, FBR invoice number and tax breakdown
+    // below are never gated or altered by any branding choice.
+    $diBrand = $diBrand ?? \App\Services\DiBrandingService::forCompany($invoice->company ?? null);
+@endphp
 <!DOCTYPE html>
 <html>
 <head>
@@ -156,6 +163,15 @@
             pointer-events: none;
             white-space: nowrap;
         }
+
+        @if($diBrand['accent'])
+        /* Premium white-label accent — heading bars only. QR / FBR number /
+           tax rows keep their standard rendering (compliance guardrail). */
+        .info-heading { background: {{ $diBrand['accent'] }}; color: {{ $diBrand['accent_text'] }}; }
+        .items-table thead th { background: {{ $diBrand['accent'] }}; border-color: {{ $diBrand['accent'] }}; color: {{ $diBrand['accent_text'] }}; }
+        .totals-box tr.total-row { background: {{ $diBrand['accent'] }}; }
+        .totals-box tr.total-row .t-label, .totals-box tr.total-row .t-value { color: {{ $diBrand['accent_text'] }}; }
+        @endif
     </style>
 </head>
 <body>
@@ -179,6 +195,9 @@
                 </td>
                 <td style="width: 55%; text-align: right;">
                     @php $dp = $invoice->company?->displayPrefs('di') ?? \App\Models\Company::defaultDisplayPrefs(); @endphp
+                    @if($diBrand['logo_data_uri'])
+                    <div style="margin-bottom: 4px;"><img src="{{ $diBrand['logo_data_uri'] }}" alt="Logo" style="height: 44px; width: auto;"></div>
+                    @endif
                     <div class="company-name">{{ $invoice->company->name ?? 'TaxNest' }}</div>
                     <div class="company-info">
                         @if($invoice->company->address && $dp['show_address'])
@@ -401,8 +420,13 @@
         @if($dp['show_footer'] && !empty($dp['footer_text']))
         <div class="footer-text" style="font-weight: 700;">{{ $dp['footer_text'] }}</div>
         @endif
+        @foreach($diBrand['footer_lines'] as $brandLine)
+        <div class="footer-text" style="font-weight: 700;">{{ $brandLine }}</div>
+        @endforeach
         <div class="footer-text">This is a computer-generated invoice. | {{ now()->format('d M Y, h:i A') }}</div>
+        @unless($diBrand['hide_platform'])
         <div class="footer-brand">TaxNest — Tax &amp; Invoice Management System</div>
+        @endunless
     </div>
 
     {{-- ===== WATERMARKS ===== --}}

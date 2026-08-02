@@ -1,16 +1,28 @@
+@php
+    // Task 140: DI Premium white-label branding (cosmetic only — the FBR
+    // Verified block, QR code and tax rows below are never affected).
+    $diBrand = \App\Services\DiBrandingService::forCompany($invoice->company ?? null);
+@endphp
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.6') }}">
-    <title>Invoice {{ $invoice->invoice_number }} - TaxNest</title>
+    <title>Invoice {{ $invoice->invoice_number }}{{ $diBrand['hide_platform'] ? '' : ' - TaxNest' }}</title>
     @vite(['resources/css/app.css'])
 </head>
 <body class="bg-gray-100 min-h-screen">
     <div class="max-w-4xl mx-auto py-8 px-4">
         <div class="text-center mb-6">
-            <h1 class="text-2xl font-bold text-gray-900">TaxNest Invoice</h1>
+            @if($diBrand['active'])
+                @if($diBrand['logo_url'])
+                <img src="{{ $diBrand['logo_url'] }}" alt="{{ $invoice->company->name ?? 'Company' }} logo" class="mx-auto mb-3" style="max-height: 64px; width: auto;">
+                @endif
+                <h1 class="text-2xl font-bold text-gray-900" @if($diBrand['accent']) style="color: {{ $diBrand['accent'] }};" @endif>{{ $invoice->company->name ?? 'Invoice' }}</h1>
+            @else
+                <h1 class="text-2xl font-bold text-gray-900">TaxNest Invoice</h1>
+            @endif
             <p class="text-sm text-gray-500 dark:text-gray-400">Shared Invoice Document</p>
         </div>
 
@@ -79,7 +91,7 @@
                     @endif
                     <tr>
                         <td colspan="5" class="px-6 py-3 text-right text-sm font-bold text-gray-700 dark:text-gray-300">Grand Total</td>
-                        <td class="px-6 py-3 text-right text-lg font-bold text-emerald-600">PKR {{ number_format($invoice->total_amount, 2) }}</td>
+                        <td class="px-6 py-3 text-right text-lg font-bold text-emerald-600" @if($diBrand['accent']) style="color: {{ $diBrand['accent'] }};" @endif>PKR {{ number_format($invoice->total_amount, 2) }}</td>
                     </tr>
                 </tfoot>
             </table>
@@ -104,7 +116,7 @@
         @endif
 
         <div class="flex items-center justify-center space-x-4">
-            <a href="{{ url('/share/invoice/' . $invoice->share_uuid . '/pdf') }}" target="_blank" class="inline-flex items-center px-6 py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition">
+            <a href="{{ url('/share/invoice/' . $invoice->share_uuid . '/pdf') }}" target="_blank" class="inline-flex items-center px-6 py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition" @if($diBrand['accent']) style="background-color: {{ $diBrand['accent'] }}; color: {{ $diBrand['accent_text'] }};" @endif>
                 <svg class="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 Download PDF
             </a>
@@ -114,7 +126,16 @@
             </button>
         </div>
 
+        @if(count($diBrand['footer_lines']))
+        <div class="mt-6 space-y-1">
+            @foreach($diBrand['footer_lines'] as $brandLine)
+            <p class="text-center text-xs text-gray-500 font-medium">{{ $brandLine }}</p>
+            @endforeach
+        </div>
+        @endif
+        @unless($diBrand['hide_platform'])
         <p class="text-center text-xs text-gray-400 mt-6">Powered by TaxNest — Tax & Invoice Management System</p>
+        @endunless
     </div>
 </body>
 </html>

@@ -1,3 +1,10 @@
+@php
+    // Task 140: DI Premium white-label branding — cosmetic zones ONLY
+    // (header logo, accent color, footer lines, platform credit).
+    // COMPLIANCE: the FBR section, FBR invoice number and tax breakdown
+    // below are never gated or altered by any branding choice.
+    $diBrand = $diBrand ?? \App\Services\DiBrandingService::forCompany($invoice->company ?? null);
+@endphp
 <!DOCTYPE html>
 <html>
 <head>
@@ -158,6 +165,15 @@
             pointer-events: none;
             white-space: nowrap;
         }
+
+        @if($diBrand['accent'])
+        /* Premium white-label accent — cosmetic highlights only. QR / FBR
+           number / tax rows keep their standard rendering (compliance). */
+        .color-bar { background: {{ $diBrand['accent'] }}; }
+        .section-title { color: {{ $diBrand['accent'] }}; border-bottom-color: {{ $diBrand['accent'] }}; }
+        .inv-label { color: {{ $diBrand['accent'] }}; }
+        .totals-box tr.grand .tv { color: {{ $diBrand['accent'] }}; }
+        @endif
     </style>
 </head>
 <body>
@@ -168,6 +184,9 @@
             <tr>
                 <td style="width: 58%;">
                     @php $dp = $invoice->company?->displayPrefs('di') ?? \App\Models\Company::defaultDisplayPrefs(); @endphp
+                    @if($diBrand['logo_data_uri'])
+                    <div style="margin-bottom: 5px;"><img src="{{ $diBrand['logo_data_uri'] }}" alt="Logo" style="height: 40px; width: auto; background: #ffffff; padding: 3px;"></div>
+                    @endif
                     <div class="b-name">{{ $invoice->company->name ?? 'TaxNest' }}</div>
                     <div class="b-sub">
                         @if($invoice->company->address && $dp['show_address'])
@@ -336,7 +355,7 @@
                         </tr>
                         <tr>
                             <td class="dl" style="color: #0f172a; font-weight: 800;">Total</td>
-                            <td class="dv" style="color: #0ea5e9; font-weight: 800;">{{ number_format($invoice->total_amount, 0) }}</td>
+                            <td class="dv" style="color: {{ $diBrand['accent'] ?? '#0ea5e9' }}; font-weight: 800;">{{ number_format($invoice->total_amount, 0) }}</td>
                         </tr>
                     </table>
                 </div>
@@ -450,8 +469,13 @@
         @if($dp['show_footer'] && !empty($dp['footer_text']))
         <div class="foot-line" style="font-weight: 700; color: #111827;">{{ $dp['footer_text'] }}</div>
         @endif
+        @foreach($diBrand['footer_lines'] as $brandLine)
+        <div class="foot-line" style="font-weight: 700; color: #111827;">{{ $brandLine }}</div>
+        @endforeach
         <div class="foot-line">This is a computer-generated invoice. | {{ $invoice->created_at->format('d M Y, h:i A') }}</div>
+        @unless($diBrand['hide_platform'])
         <div class="foot-brand">TaxNest &mdash; Tax &amp; Invoice Management System</div>
+        @endunless
     </div>
 
     {{-- ===== WATERMARKS ===== --}}

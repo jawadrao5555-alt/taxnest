@@ -6,7 +6,10 @@ use Illuminate\Http\Request;
 use App\Models\Company;
 use App\Services\SecurityLogService;
 use App\Services\AuditLogService;
+use App\Services\DiBrandingService;
+use App\Services\DiFeatureService;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Storage;
 
 class CompanySettingsController extends Controller
 {
@@ -466,5 +469,93 @@ class CompanySettingsController extends Controller
                 : 'Company province not set. All 8 province codes are available for selection.',
             'details' => ['province_codes' => $provinces, 'company_province' => $companyProvince],
         ]);
+    }
+
+    // ==========================================================
+    // Task 140: DI White-Label Branding (Premium — `white_label`)
+    // ==========================================================
+
+    public function branding()
+    {
+        $company = Company::find(auth()->user()->company_id);
+        if (!$company) {
+            return redirect('/dashboard')->with('error', 'Company not found.');
+        }
+
+        $allowed = DiFeatureService::planAllows($company, 'white_label');
+        $settings = DiBrandingService::stored($company);
+
+        $logoUrl = null;
+        if ($settings['logo_path'] && Storage::disk('public')->exists($settings['logo_path'])) {
+            $logoUrl = Storage::disk('public')->url($settings['logo_path']);
+        }
+
+        return view('company.branding', compact('company', 'allowed', 'settings', 'logoUrl'));
+    }
+
+    public function updateBranding(Request $request)
+    {
+        $company = Company::find(auth()->user()->company_id);
+        if (!$company) {
+            return redirect('/dashboard')->with('error', 'Company not found.');
+        }
+
+        // Server-side plan gate — the form is hidden for non-premium plans,
+        // but the request must be independently rejected too (fail closed).
+        if (!DiFeatureService::planAllows($company, 'white_label')) {
+            return redirect('/company/branding')->with('error', 'White-label branding is available on the DI Premium plan. Upgrade to unlock it.');
+        }
+
+        $validated = $request->validate([
+            'branding_enabled' => 'nullable|in:1',
+            'accent_color' => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'footer_line1' => 'nullable|string|max:150',
+            'footer_line2' => 'nullable|string|max:150',
+            'hide_platform_branding' => 'nullable|in:1',
+            'logo' => 'nullable|image|mimes:png,jpg,jpeg|max:' . DiBrandingService::MAX_LOGO_KB . '|dimensions:min_width=32,min_height=32,max_width=2500,max_height=2500',
+            'remove_logo' => 'nullable|in:1',
+        ], [
+            'accent_color.regex' => 'Accent color must be a 6-digit hex value like #0A4D5C.',
+            'logo.max' => 'Logo must be 1 MB or smaller.',
+            'logo.dimensions' => 'Logo must be between 32x32 and 2500x2500 pixels.',
+        ]);
+
+        $stored = DiBrandingService::stored($company);
+        $logoPath = $stored['logo_path'];
+        $disk = Storage::disk('public');
+
+        if (!empty($validated['remove_logo']) && $logoPath) {
+            if ($disk->exists($logoPath)) {
+                $disk->delete($logoPath);
+            }
+            $logoPath = null;
+        }
+
+        if ($request->hasFile('logo')) {
+            if ($logoPath && $disk->exists($logoPath)) {
+                $disk->delete($logoPath);
+            }
+            $logoPath = $request->file('logo')->store(DiBrandingService::LOGO_DIR, 'public');
+        }
+
+        $company->di_branding = [
+            'enabled' => !empty($validated['branding_enabled']),
+            'logo_path' => $logoPath,
+            'accent' => DiBrandingService::sanitizeAccent($validated['accent_color'] ?? null),
+            'footer_line1' => trim((string) ($validated['footer_line1'] ?? '')),
+            'footer_line2' => trim((string) ($validated['footer_line2'] ?? '')),
+            'hide_platform' => !empty($validated['hide_platform_branding']),
+        ];
+        $company->save();
+
+        DiBrandingService::flushCache();
+
+        SecurityLogService::log('di_branding_updated', auth()->id(), [
+            'company_id' => $company->id,
+            'enabled' => !empty($validated['branding_enabled']),
+            'hide_platform' => !empty($validated['hide_platform_branding']),
+        ]);
+
+        return redirect('/company/branding')->with('success', 'Branding settings saved.');
     }
 }

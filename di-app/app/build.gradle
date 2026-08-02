@@ -1,0 +1,61 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+// Signing: keystore path/password from env (same stable key as the rider app —
+// .local/rider-signing/, gitignored; repo is PUBLIC, never commit a keystore).
+def ciKeystore = System.getenv("RIDER_KS")
+def ciKeystorePass = System.getenv("RIDER_KS_PASS")
+
+android {
+    namespace 'pk.taxnest.di'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "pk.taxnest.di"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    buildFeatures {
+        // MainActivity appends BuildConfig.VERSION_NAME to the UA (update banner
+        // detection) — AGP 8 disables BuildConfig generation by default.
+        buildConfig true
+    }
+
+    signingConfigs {
+        ciRelease {
+            if (ciKeystore != null) {
+                storeFile file(ciKeystore)
+                storePassword ciKeystorePass
+                keyAlias "rider"
+                keyPassword ciKeystorePass
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (ciKeystore != null) {
+                signingConfig signingConfigs.ciRelease
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    // Deliberately dependency-free (plain Activity + WebView + framework theme):
+    // smallest possible APK, nothing to keep updated.
+}

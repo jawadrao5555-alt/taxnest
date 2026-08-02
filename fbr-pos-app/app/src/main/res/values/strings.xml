@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TaxNest FBR POS</string>
+    <string name="offline_title">Internet nahi mil raha</string>
+    <string name="offline_body">Apna WiFi ya mobile data check karein, phir dobara koshish karein.</string>
+    <string name="offline_retry">Dobara Koshish</string>
+    <string name="download_started">Download shuru ho gaya — notification dekhein</string>
+</resources>

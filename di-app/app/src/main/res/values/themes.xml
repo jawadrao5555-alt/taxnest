@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Framework theme on purpose (no Material lib) — zero dependencies. -->
+    <style name="Theme.TaxNestPos" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">#0A4D5C</item>
+        <item name="android:statusBarColor">#0A4D5C</item>
+        <item name="android:windowBackground">#FFFFFF</item>
+    </style>
+</resources>

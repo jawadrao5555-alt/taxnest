@@ -1,0 +1,126 @@
+Internal Server Error
+
+Copy as Markdown
+ParseError
+resources/views/pos/landing.blade.php:338
+syntax error, unexpected token "endif"
+
+LARAVEL
+12.51.0
+PHP
+8.4.23
+UNHANDLED
+CODE 0
+500
+GET
+https://taxnest.com.pk/pos
+
+Exception trace
+resources/views/pos/landing.blade.php
+resources/views/pos/landing.blade.php:338
+
+333                                                <div class="text-[10px] text-gray-400 line-through mb-0.5">PKR {{ number_format($plan->price) }}</div>
+334                                            @endif
+335                                            <div class="font-semibold text-xl text-[#0A4D5C]">PKR {{ number_format($plan->sale_price) }}<span class="text-sm text-gray-500 font-normal">/yr</span></div>
+336                                            @if((float) ($plan->price_quarterly ?? 0) > 0)
+337                                                <div class="text-[10px] text-gray-500 mt-0.5">or PKR {{ number_format($plan->price_quarterly) }} / 3 months@if($hasOffer) &nbsp;<span class="text-amber-600 font-semibold">(sale sirf annual par)</span>@endif</div>
+338                                            @endif
+339                                        </div>
+340                                    </div>
+341                                    <p class="text-xs text-gray-500 mb-3">Effective: PKR {{ number_format($perMonth) }}/mo</p>
+342                                    <p class="text-xs font-semibold text-gray-800 mb-1">
+343                                        {{ $plan->getInvoiceLimitDisplay() }} bills/month
+344                                        · {{ $plan->getUserLimitDisplay() }} team account{{ $plan->user_limit === 1 ? '' : 's' }}
+345                                        · {{ $plan->getBranchLimitDisplay() }} branch{{ $plan->branch_limit === 1 ? '' : 'es' }}
+346                                    </p>
+347                                    @if(!empty($features))
+348                                        <div class="mt-4 border-t border-purple-700/10 pt-4">
+349                                            @if($prevPlan)
+350
+12 vendor frames
+
+app/Http/Middleware/SetPosLocale.php
+app/Http/Middleware/SetPosLocale.php:77
+
+1 vendor frame
+
+app/Http/Middleware/ConsultantSwitchGuard.php
+app/Http/Middleware/ConsultantSwitchGuard.php:37
+
+1 vendor frame
+
+app/Http/Middleware/LogImpersonatedWrites.php
+app/Http/Middleware/LogImpersonatedWrites.php:34
+
+1 vendor frame
+
+app/Http/Middleware/ReadOnlyImpersonation.php
+app/Http/Middleware/ReadOnlyImpersonation.php:36
+
+21 vendor frames
+
+App\Http\Middleware\SecurityHeaders->handle()
+app/Http/Middleware/SecurityHeaders.php:13
+
+23 vendor frames
+
+public/index.php
+public/index.php:30
+
+Queries
+1-3 of 3
+mysql
+select * from `system_settings` where `key` = 'smtp_settings' limit 1
+0.59ms
+mysql
+select * from `sessions` where `id` = '3cpE9ZSZkE3bScVxhUu6X754o4bAUrToowNUM2RV' limit 1
+0.09ms
+mysql
+select * from `pricing_plans` where `is_trial` = 0 and `product_type` = 'pos' order by `price` asc
+0.24ms
+Headers
+accept
+text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+accept-encoding
+gzip, deflate, br, zstd
+accept-language
+en-US,en;q=0.9
+cookie
+remember_fbrpos_59ba36addc2b2f9401580f014c7f58ea4e30989d=eyJpdiI6Ik5KbXJidllrTW0xd3phdkdPdVM0UFE9PSIsInZhbHVlIjoiZ3hJenVjTU1HYzY5Y1UrelN2NDhBLzFxSVpRNDVZWGg1T0puRVNxQ1N3VTJhWjBHZlBNL25KeGhuT0xPWHE1YUExNDRmZENGNC9OTzIrMEtDSWNNbGdhVmdhanB0VnFrSFZudDEzVi9iSllqVnp3NW5qMURGQ1cyQ0cxRHh0UnJENzNwemQ0bURydHZEdjFLSHo0TXVMUXNSWTkrdHhVS3ZaWXRrNVdMeU8wN29lOHB2VVdObldwOTZaWmNmQldZNTQ5a2lxQUtHUWszRnU2WmwraFRhNCttME5OV1BoVytJRVplMk85dnJ4dz0iLCJtYWMiOiIxZWIyNDhlZDIyMGI5YTRhMTQ3ZjFjZjY5Zjg3NmFlZDg5NWFiODE1YzY3OGRkOWVhOTNkNWIyMjlhMGMxY2M5IiwidGFnIjoiIn0%3D; XSRF-TOKEN=eyJpdiI6IldhbUFPQnFXeUR4a2tjZk5aSENnTkE9PSIsInZhbHVlIjoiSUwyeVBtUHhEanlZZ3BSTjhwSG1tc2RRM1lsMzdQSFhHMktNb0JQRHJtbXFIczJIeVF3Y0FBRkt1U2F6cyt3a2hvM0diZnYzcUdkSFpXSzJwcEJZUWFNcEZheEhZZURDa05zeTFXb01Uck1LM00zNC9RT20yQUE2QnU5T2VPWE0iLCJtYWMiOiJkYjA4ODg2NTIyZjQwODViNDQ3MTY1NWZhNWJlOTczNGM1YmU4MWM0MGYwZDkzYzlmZjhiODEzYzlhMzVjMmQzIiwidGFnIjoiIn0%3D; taxnest-session=eyJpdiI6Iit5ZWNtYWRZV0JrSStZYnhQQkNaQ0E9PSIsInZhbHVlIjoiVmhxY2dUTitYZUNVamxTQUpmbTFVaHpIVVB2K1hmZGZlM0tqNHFHMkxMdHNGZXVrR2tqUHNsMjh6ZjlXVmN1bkxjVXdrWlp0TktQc1o3cUVtNVZmYjcwTmR4RWlOcUNaaTZSUFZ2L2tuaWhBQzljQUllQVNIcjBFUzJFeWJIWWkiLCJtYWMiOiI0NTRkMzJjMzY2MTgwZTMwMWEyYzlhZTYwZTE0MWI5MjIzN2U0ZDBjZGQ2ZmJiYzQwYWI3ZDdmZGFkMzExZjc3IiwidGFnIjoiIn0%3D
+host
+taxnest.com.pk
+referer
+https://taxnest.com.pk/pos/customize
+user-agent
+Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36
+cache-control
+max-age=0
+sec-ch-ua-platform
+"Windows"
+sec-ch-ua
+"Not;A=Brand";v="8", "Chromium";v="150", "Google Chrome";v="150"
+upgrade-insecure-requests
+1
+sec-ch-ua-mobile
+?0
+sec-fetch-site
+same-origin
+sec-fetch-mode
+navigate
+sec-fetch-dest
+empty
+priority
+u=0, i
+x-https
+1
+Body
+// No request body
+Routing
+controller
+Closure
+route name
+pos.landing
+middleware
+web
+Routing parameters
+// No routing parameters

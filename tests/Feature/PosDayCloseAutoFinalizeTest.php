@@ -775,4 +775,69 @@ class PosDayCloseAutoFinalizeTest extends TestCase
             }
         }
     }
+
+    // -- rate follows the REAL payment mode (owner rule, Aug 2026) -----------
+    // Khud-final must tax every bill at ITS OWN stored payment method's rate:
+    // card/digital bills get the reduced card rate, cash stays at the cash rate,
+    // and the sweep NEVER relabels a bill's payment method.
+
+    public function test_sweep_taxes_each_bill_at_its_own_payment_method_rate(): void
+    {
+        $companyId = $this->makeCompany();
+        DB::table('companies')->where('id', $companyId)->update(['pos_tax_rate_card' => 8.00]);
+
+        $cash = $this->makeProvisional($companyId, 'L-0001'); // stored method: cash
+        $card = $this->makeProvisional($companyId, 'L-0002', ['payment_method' => 'debit_card']);
+
+        $sweep = $this->runSweep($companyId);
+        $this->assertSame(2, $sweep['finalized']);
+
+        $txCash = $this->tx($cash);
+        $this->assertSame('cash', $txCash->payment_method);
+        $this->assertSame(16.0, (float) $txCash->tax_rate);
+        $this->assertSame(16.0, (float) $txCash->tax_amount);
+        $this->assertSame(116.0, (float) $txCash->total_amount);
+
+        $txCard = $this->tx($card);
+        $this->assertSame('debit_card', $txCard->payment_method, 'Sweep must never relabel the stored payment method');
+        $this->assertSame(8.0, (float) $txCard->tax_rate);
+        $this->assertSame(8.0, (float) $txCard->tax_amount);
+        $this->assertSame(108.0, (float) $txCard->total_amount);
+        $this->assertNull($txCard->cash_received, 'cash_received is a cash-only field');
+        // Per-item rate re-stamped too (PRA payload reads item tax_rate).
+        $this->assertSame(8.0, (float) DB::table('pos_transaction_items')->where('transaction_id', $card)->value('tax_rate'));
+    }
+
+    public function test_global_tax_rules_supply_reduced_card_rate_when_no_company_override(): void
+    {
+        $companyId = $this->makeCompany();
+        DB::table('companies')->where('id', $companyId)->update(['pos_tax_rate_cash' => null, 'pos_tax_rate_card' => null]);
+
+        if (!Schema::hasTable('pos_tax_rules')) {
+            Schema::create('pos_tax_rules', function (Blueprint $table) {
+                $table->id();
+                $table->string('payment_method');
+                $table->decimal('tax_rate', 8, 2);
+                $table->boolean('is_active')->default(true);
+                $table->timestamps();
+            });
+        }
+        // Mirror the REAL production table exactly: every digital channel has its
+        // OWN row (getRateForMethod has no debit_card fallback for other methods —
+        // without its row, qr/credit would silently fall back to 16).
+        DB::table('pos_tax_rules')->delete();
+        DB::table('pos_tax_rules')->insert([
+            ['payment_method' => 'cash', 'tax_rate' => 16.00, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['payment_method' => 'debit_card', 'tax_rate' => 8.00, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['payment_method' => 'credit_card', 'tax_rate' => 8.00, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['payment_method' => 'qr_payment', 'tax_rate' => 8.00, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $company = Company::find($companyId);
+        $this->assertSame(16.0, \App\Models\PosTaxRule::getRateForMethod('cash', $company));
+        $this->assertSame(8.0, \App\Models\PosTaxRule::getRateForMethod('debit_card', $company));
+        $this->assertSame(8.0, \App\Models\PosTaxRule::getRateForMethod('card', $company), "'card' alias must map to the debit_card rule");
+        $this->assertSame(8.0, \App\Models\PosTaxRule::getRateForMethod('qr_payment', $company), 'every digital channel needs its own active rule row (no cross-method fallback)');
+        $this->assertSame(8.0, \App\Models\PosTaxRule::getRateForMethod('credit_card', $company));
+    }
 }

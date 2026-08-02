@@ -53,6 +53,11 @@ class AdminConsultantController extends Controller
             ->limit(30)
             ->get();
 
+        // Per-consultant pending totals to flag payout eligibility vs threshold.
+        $pendingTotals = $pendingCommissions
+            ->groupBy('consultant_user_id')
+            ->map(fn ($rows) => (float) $rows->sum('amount'));
+
         $links = ConsultantClientLink::with(['consultant', 'company'])
             ->orderByDesc('id')
             ->limit(50)
@@ -66,6 +71,7 @@ class AdminConsultantController extends Controller
             'sums' => $sums,
             'referred' => $referred,
             'pendingCommissions' => $pendingCommissions,
+            'pendingTotals' => $pendingTotals,
             'paidCommissions' => $paidCommissions,
             'links' => $links,
         ]);

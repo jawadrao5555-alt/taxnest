@@ -89,9 +89,23 @@
                 </thead>
                 <tbody class="divide-y divide-gray-800">
                     @forelse($pendingCommissions as $c)
+                    @php($consultantPending = (float) ($pendingTotals[$c->consultant_user_id] ?? 0))
+                    @php($belowMin = ($minPayout ?? 0) > 0 && $consultantPending < $minPayout)
                     <tr class="hover:bg-gray-800/50">
                         <td class="px-4 py-3 text-gray-400 text-xs">{{ $c->created_at->format('d M Y') }}</td>
-                        <td class="px-4 py-3 text-white">{{ $c->consultant->name ?? '—' }}</td>
+                        <td class="px-4 py-3">
+                            <p class="text-white">{{ $c->consultant->name ?? '—' }}</p>
+                            <p class="text-xs {{ $belowMin ? 'text-gray-500' : 'text-emerald-400' }}">
+                                Pending total Rs {{ number_format($consultantPending) }}
+                                @if(($minPayout ?? 0) > 0)
+                                    @if($belowMin)
+                                        <span class="inline-flex ml-1 px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-[11px] font-medium" title="Below Rs {{ number_format((float) $minPayout) }} minimum — balance carries over">below minimum — carries over</span>
+                                    @else
+                                        <span class="inline-flex ml-1 px-1.5 py-0.5 rounded bg-emerald-900/30 text-emerald-400 text-[11px] font-medium" title="Meets Rs {{ number_format((float) $minPayout) }} minimum">payout ready</span>
+                                    @endif
+                                @endif
+                            </p>
+                        </td>
                         <td class="px-4 py-3 text-gray-300">{{ $c->company_name ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-400 text-xs">{{ $c->description }} · base {{ number_format((float) $c->base_amount) }} @ {{ rtrim(rtrim(number_format((float) $c->rate_percent, 2), '0'), '.') }}%</td>
                         <td class="px-4 py-3 text-xs">

@@ -81,6 +81,7 @@
 - [POS card bucket normalization](pos-card-bucket-normalization.md) — card sales stored as 'debit_card'; every cash/card/other aggregation must whereIn the full card alias set, never ='card'.
 - [Company hard-delete purge](company-hard-delete-purge.md) — new company_id tables need FK cascade OR a forceDelete purge-list entry, else hard delete leaves orphan rows; audit_logs/credentials ledger exempt.
 - [PRA POS Delivery Riders](pos-delivery-riders.md) — khata = cash+unsettled+not-returned (bypass hide_archived); riders never touch invoice_mode/serials; day-close recon PRA-set-only; wash archives unsettled rider cash.
+- [Rider LIVE Tracking](pos-rider-live-tracking.md) — Unlimited-only gate (default FALSE); token rotates per login; epoch→app-TZ trap; APK: build LOCALLY (git token lacks workflow scope), host on own server, NEVER GitHub Releases.
 - [Outgoing mail / noreply SMTP](mail-noreply-smtp.md) — working cPanel SMTP block; Replit web SAPI misses mid-session secrets + ${VAR} in .env fails silently (CLI OK, web 535).
 - [Madadgar AI support bot](pos-madadgar-bot.md) — escalation row ONLY via Haan-confirm POST; routes pos.auth-only (no company.approval); artisan serve blanks env for web (secret must be literal in .env); ChatGPT Plus ≠ API credit.
 - [POS feature upgrade backlog](pos-upgrade-backlog.md) — owner-deferred upgrade list (22 Jul 2026) + split-payment tax options (PRA = ONE payModeCode per bill); build nothing until owner picks.

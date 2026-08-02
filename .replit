@@ -60,6 +60,10 @@ args = "Queue Worker"
 task = "workflow.run"
 args = "MySQL Staging"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "test"
+
 [[workflows.workflow]]
 name = "Laravel Server"
 author = "agent"
@@ -93,6 +97,17 @@ outputType = "console"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "mysqld --defaults-file=/home/runner/workspace/.local/mysql_run/my.cnf"
+
+[[workflows.workflow]]
+name = "test"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "env -u DATABASE_URL -u DB_CONNECTION -u PGHOST -u PGPORT -u PGUSER -u PGPASSWORD -u PGDATABASE APP_ENV=testing DB_CONNECTION=sqlite DB_DATABASE=':memory:' CACHE_STORE=array php vendor/bin/phpunit"
 
 [[ports]]
 localPort = 5000

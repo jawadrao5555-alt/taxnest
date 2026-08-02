@@ -59,7 +59,7 @@
                         </div>
                         <p class="text-xs text-gray-400">PKR {{ number_format($perMonth) }}/mo effective</p>
                         @if((float) ($plan->price_quarterly ?? 0) > 0)
-                        <p class="text-xs text-gray-500 mt-0.5 font-medium">or PKR {{ number_format($plan->price_quarterly) }} / 3 months</p>
+                        <p class="text-xs text-gray-500 mt-0.5 font-medium">or PKR {{ number_format($plan->price_quarterly) }} / 3 months@if($hasOffer) &nbsp;<span class="text-amber-600 font-semibold">(sale sirf annual par)</span>@endif</p>
                         @endif
                         @if($hasOffer)<p class="text-xs text-purple-600 font-medium mt-0.5">Save PKR {{ number_format($compareYearly - $yearlyTotal) }}</p>@endif
 

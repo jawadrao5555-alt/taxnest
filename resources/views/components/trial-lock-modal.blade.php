@@ -90,6 +90,9 @@
             }
             $lockPlans[] = ['id' => $lp->id, 'name' => $lp->name, 'prices' => $prices];
         }
+        // Sale note is only relevant for POS — quarterly is annual-only there.
+        // DI has quarterly as a real discounted cycle so we never show this warning there.
+        $lockSaleActive = $lockProductType === 'pos' && \App\Models\SaleCampaign::activeFor('pos') !== null;
     }
 @endphp
 
@@ -197,6 +200,7 @@
                         cycles: {{ \Illuminate\Support\Js::from($lockCycles) }},
                         planId: '{{ old('pricing_plan_id') }}',
                         cycle: '{{ old('billing_cycle', $lockProductType === 'di' ? 'monthly' : 'annual') }}',
+                        saleActive: {{ $lockSaleActive ? 'true' : 'false' }},
                         get price() {
                             const p = this.plans.find(x => String(x.id) === String(this.planId));
                             return p ? (p.prices[this.cycle] ?? null) : null;
@@ -235,6 +239,10 @@
                     <div x-show="price !== null" x-cloak class="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300">
                         <span x-text="cycleLabel"></span> package total:
                         <span class="font-bold">PKR <span x-text="price !== null ? Number(price).toLocaleString() : ''"></span></span>
+                    </div>
+                    <div x-show="saleActive && cycle === 'quarterly'" x-cloak
+                         class="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                        ⚡ Abhi sale chal rahi hai — lekin <strong>sale sirf annual plan par</strong> hai. Quarterly rate full hai.
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">

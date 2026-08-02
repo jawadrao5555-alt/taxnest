@@ -243,7 +243,7 @@ PYEOF
 say "Public landing pages"
 PUBLIC_PAGES=(
   "/pos|pos/login"
-  "/fbr-pos|fbr-pos/login"
+  "/fbr-pos-landing|fbr-pos/login"
   "/|login"
 )
 for entry in "${PUBLIC_PAGES[@]}"; do

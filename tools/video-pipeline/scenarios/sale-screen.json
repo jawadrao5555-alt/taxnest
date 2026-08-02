@@ -1,0 +1,195 @@
+{
+  "slug": "sale-screen",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Sale Screen — Bill, Payment, Receipt",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": {
+        "heading": "Sale Screen",
+        "sub": "Bill banana · Payment lena · Receipt print"
+      },
+      "narration": "السلام علیکم! نیسٹ پی او ایس میں خوش آمدید۔ آج ہم سیکھیں گے کہ سیل اسکرین پر بل کیسے بنتا ہے، payment کیسے لیتے ہیں، اور receipt کیسے print ہوتی ہے۔",
+      "minMs": 5000
+    },
+    {
+      "id": "s02_login",
+      "narration": "سب سے پہلے login کریں۔ اپنا email یا موبائل نمبر لکھیں، پھر password ڈال کر Login کا بٹن دبائیں۔",
+      "actions": [
+        {
+          "do": "goto",
+          "url": "/pos/login"
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "type",
+          "selector": "#login",
+          "text": "videodemo@nestpos.pk",
+          "delay": 55
+        },
+        {
+          "do": "type",
+          "selector": "#password",
+          "text": "NestPOS@Demo1",
+          "delay": 55
+        },
+        {
+          "do": "click",
+          "selector": "button[type=submit]",
+          "after": 1500
+        },
+        {
+          "do": "waitFor",
+          "selector": ".prod-card"
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        }
+      ]
+    },
+    {
+      "id": "s03_overview",
+      "narration": "یہ ہے آپ کی سیل اسکرین۔ بائیں طرف آپ کی تمام products نظر آ رہی ہیں، اور دائیں طرف cart ہے، جہاں گاہک کا بل بنتا ہے۔",
+      "actions": [
+        {
+          "do": "highlight",
+          "selector": "[x-ref=gridContainer]",
+          "after": 1500
+        },
+        {
+          "do": "highlight",
+          "selector": ".tn-cart-col",
+          "after": 1500
+        }
+      ]
+    },
+    {
+      "id": "s04_add_products",
+      "narration": "بل بنانا بہت آسان ہے۔ کسی بھی product پر click کریں، وہ سیدھی cart میں شامل ہو جاتی ہے۔ دیکھیں، ہم نے چاول اور چینی cart میں ڈال دیے۔",
+      "actions": [
+        {
+          "do": "click",
+          "selector": ".prod-card:has-text('Chawal Basmati 5kg')",
+          "after": 900
+        },
+        {
+          "do": "click",
+          "selector": ".prod-card:has-text('Cheeni 1kg')",
+          "after": 900
+        }
+      ]
+    },
+    {
+      "id": "s05_search",
+      "narration": "اگر کوئی product سامنے نظر نہ آئے تو اوپر search کے خانے میں اس کا نام لکھیں۔ جیسے ہم نے دودھ لکھا — فوراً مل گیا، اور Enter دبانے سے cart میں آ گیا۔",
+      "actions": [
+        {
+          "do": "type",
+          "selector": "[x-ref=searchInput]",
+          "text": "Doodh",
+          "delay": 120,
+          "after": 900
+        },
+        {
+          "do": "press",
+          "selector": "[x-ref=searchInput]",
+          "key": "Enter",
+          "after": 900
+        }
+      ]
+    },
+    {
+      "id": "s06_qty",
+      "narration": "تعداد بڑھانے کے لیے plus کا بٹن دبائیں، یا تعداد کے خانے میں سیدھا نمبر لکھ دیں۔ total خود بخود update ہو جاتا ہے۔",
+      "actions": [
+        {
+          "do": "click",
+          "selector": ".cart-item:has-text('Cheeni') input[data-qty-input] + button",
+          "after": 700
+        },
+        {
+          "do": "click",
+          "selector": ".cart-item:has-text('Cheeni') input[data-qty-input] + button",
+          "after": 900
+        },
+        {
+          "do": "highlight",
+          "selector": ".tn-total-band",
+          "after": 1200
+        }
+      ]
+    },
+    {
+      "id": "s07_discount",
+      "narration": "اگر گاہک کو رعایت دینی ہو تو Discount کا بٹن دبائیں اور رقم لکھ دیں۔ دیکھیں، total میں سے پچاس روپے کم ہو گئے۔",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "button:has-text('Discount')",
+          "after": 700
+        },
+        {
+          "do": "click",
+          "selector": "[x-show=\"showDiscount\"] button:has-text('Rs.')",
+          "after": 500
+        },
+        {
+          "do": "type",
+          "selector": "[x-ref=billDiscountInput]",
+          "text": "50",
+          "delay": 160,
+          "after": 900
+        },
+        {
+          "do": "highlight",
+          "selector": ".tn-total-band",
+          "after": 1000
+        }
+      ]
+    },
+    {
+      "id": "s08_payment",
+      "narration": "بل تیار ہے۔ اگر گاہک cash دے رہا ہے تو نیچے CASH کا بڑا بٹن دبائیں — بس، ایک click میں بل مکمل ہو گیا۔",
+      "actions": [
+        {
+          "do": "highlight",
+          "selector": "button.bg-purple-600:has-text('CASH')",
+          "after": 1000
+        },
+        {
+          "do": "click",
+          "selector": "button.bg-purple-600:has-text('CASH')",
+          "after": 2500
+        }
+      ]
+    },
+    {
+      "id": "s09_receipt",
+      "narration": "یہ رہی گاہک کی receipt۔ Print کا بٹن دبائیں تو یہ receipt printer سے نکل آئے گی۔ اور نیا بل شروع کرنے کے لیے بس New Sale دبا دیں۔",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 800
+        },
+        {
+          "do": "highlight",
+          "selector": "div.fixed button:has-text('Print'):not(:has-text('Reprint'))",
+          "after": 1200
+        }
+      ]
+    },
+    {
+      "id": "s10_outro",
+      "card": {
+        "heading": "Shukriya!",
+        "sub": "Agli video mein mazeed features seekhenge"
+      },
+      "narration": "تو یہ تھا سیل اسکرین کا مکمل طریقہ — product شامل کریں، payment لیں، اور receipt print کریں۔ اگلی ویڈیو میں ہم مزید features سیکھیں گے۔ شکریہ!",
+      "minMs": 5000
+    }
+  ]
+}

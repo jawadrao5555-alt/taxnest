@@ -97,13 +97,16 @@
                                         <span class="px-2 py-1 rounded-full text-xs font-medium {{ $upd->is_published ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' }}">
                                             {{ $upd->is_published ? 'Published' : 'Hidden' }}
                                         </span>
+                                        <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-semibold text-center {{ $upd->audience === 'fbr_pos' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : ($upd->audience === 'all' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300') }}">
+                                            {{ $upd->audience === 'fbr_pos' ? 'FBR POS' : ($upd->audience === 'all' ? 'PRA + FBR' : 'PRA POS') }}
+                                        </span>
                                     </td>
                                     <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ number_format($upd->seens_count) }} users</td>
                                     <td class="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">{{ $upd->created_at->format('d M Y, h:i A') }}</td>
                                     <td class="px-4 py-3">
                                         <div class="flex items-center gap-1.5 flex-wrap">
                                             <button type="button"
-                                                onclick='openEditModal(@json($upd->id), @json($upd->title), @json(implode("\n", $upd->points ?? [])), @json($upd->image_path ? asset("storage/" . $upd->image_path) : null))'
+                                                onclick='openEditModal(@json($upd->id), @json($upd->title), @json(implode("\n", $upd->points ?? [])), @json($upd->image_path ? asset("storage/" . $upd->image_path) : null), @json($upd->audience))'
                                                 class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200">Edit</button>
                                             <form method="POST" action="/admin/app-updates/{{ $upd->id }}/toggle" class="inline">
                                                 @csrf
@@ -162,6 +165,14 @@
                     <input type="file" name="image" accept="image/jpeg,image/png,image/webp" class="w-full text-sm text-gray-600 dark:text-gray-300 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-emerald-50 file:text-emerald-700 file:text-sm file:font-medium">
                     <p class="mt-1 text-[11px] text-gray-400">Popup mein points ke upar dikhegi. Landscape screenshot best rehta hai.</p>
                 </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Audience</label>
+                    <select name="audience" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                        <option value="pos">PRA POS users only</option>
+                        <option value="fbr_pos">FBR POS users only</option>
+                        <option value="all">Both (PRA + FBR POS)</option>
+                    </select>
+                </div>
                 <div class="flex items-center gap-2">
                     <input type="checkbox" name="is_published" value="1" checked id="pubNew" class="rounded border-gray-300 text-emerald-600">
                     <label for="pubNew" class="text-sm text-gray-700 dark:text-gray-300">Publish immediately (POS users will see popup + bell)</label>
@@ -192,6 +203,14 @@
                     <textarea name="points_text" id="editPoints" required rows="6" maxlength="3000" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm"></textarea>
                 </div>
                 <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Audience</label>
+                    <select name="audience" id="editAudience" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                        <option value="pos">PRA POS users only</option>
+                        <option value="fbr_pos">FBR POS users only</option>
+                        <option value="all">Both (PRA + FBR POS)</option>
+                    </select>
+                </div>
+                <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Image <span class="text-gray-400 font-normal">(optional — JPG/PNG/WebP, max 3MB)</span></label>
                     <div id="editCurrentImageWrap" class="hidden mb-2">
                         <img id="editCurrentImage" src="" alt="Current image" class="max-h-32 rounded-lg border border-gray-200 dark:border-gray-600">
@@ -211,10 +230,11 @@
     </div>
 
     <script>
-        function openEditModal(id, title, pointsText, imageUrl) {
+        function openEditModal(id, title, pointsText, imageUrl, audience) {
             document.getElementById('editUpdateForm').action = '/admin/app-updates/' + id + '/update';
             document.getElementById('editTitle').value = title;
             document.getElementById('editPoints').value = pointsText;
+            document.getElementById('editAudience').value = ['pos','fbr_pos','all'].includes(audience) ? audience : 'pos';
             var wrap = document.getElementById('editCurrentImageWrap');
             var img = document.getElementById('editCurrentImage');
             if (imageUrl) {

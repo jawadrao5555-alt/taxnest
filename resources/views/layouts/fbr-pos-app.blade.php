@@ -8,6 +8,30 @@
     $userInitial = strtoupper(substr($userName, 0, 1));
     $dashboardStyle = $fbrCompany->pos_dashboard_style ?? 'square-classic';
     $fbrTheme = $fbrCompany->pos_theme ?? 'blue';
+    // "What's New" app updates (popup + bell) — same conventions as PRA POS layout:
+    // admin/manager only, skip pending companies + read-only impersonation, fail
+    // silent if table missing on prod, master switch pos_whats_new_enabled.
+    $whatsNewList = collect(); $whatsNewUnseenCount = 0; $whatsNewPopup = null; $whatsNewSeenIds = []; $whatsNewPopupList = collect();
+    try {
+        $wnAllowed = $fbrUser && $fbrUser->isPosAdmin();
+        $wnPending = ($fbrCompany->status ?? null) === 'pending';
+        $wnImp = session('impersonation');
+        $wnReadonlyImp = is_array($wnImp) && !empty($wnImp['readonly']);
+        if ($wnAllowed && !$wnPending && !$wnReadonlyImp
+            && \Illuminate\Support\Facades\Schema::hasTable('app_updates')
+            && \App\Models\SystemSetting::get('pos_whats_new_enabled', '1') === '1') {
+            $whatsNewList = \App\Models\AppUpdate::whereIn('audience', ['fbr_pos', 'all'])->where('is_published', true)
+                ->orderByDesc('created_at')->limit(10)->get();
+            if ($whatsNewList->isNotEmpty()) {
+                $whatsNewSeenIds = \App\Models\AppUpdateSeen::where('user_id', $fbrUser->id)
+                    ->whereIn('app_update_id', $whatsNewList->pluck('id'))->pluck('app_update_id')->all();
+                $whatsNewUnseen = $whatsNewList->reject(fn ($u) => in_array($u->id, $whatsNewSeenIds));
+                $whatsNewUnseenCount = $whatsNewUnseen->count();
+                $whatsNewPopup = $whatsNewUnseen->first();
+                $whatsNewPopupList = $whatsNewUnseen->values();
+            }
+        }
+    } catch (\Throwable $e) { /* keep FBR POS pages alive */ }
 @endphp
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="{{ $isDarkMode ? 'dark' : '' }}">
     <head>
@@ -294,6 +318,65 @@
                             <span x-show="failedCount > 0" x-cloak x-text="failedCount" class="ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-white text-red-700 text-[10px] font-black animate-pulse"></span>
                             <span class="hidden md:inline text-[9px] opacity-70 ml-1">⇧F11</span>
                         </button>
+
+                        @if($whatsNewList->isNotEmpty())
+                        {{-- What's New bell — updates history (opening marks all as seen) --}}
+                        <div class="relative" x-data="{ bellOpen: false, unseen: {{ (int) $whatsNewUnseenCount }},
+                                toggleBell() {
+                                    this.bellOpen = !this.bellOpen;
+                                    if (this.bellOpen && this.unseen > 0) {
+                                        this.unseen = 0;
+                                        fetch('/fbr-pos/whats-new/seen', { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' } }).catch(() => {});
+                                    }
+                                } }">
+                            <button @click="toggleBell()" title="{{ __('pos.ti_app_updates') }}" class="relative p-2 rounded-lg text-white hover:bg-white/15 transition cursor-pointer">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                                <span x-show="unseen > 0" x-cloak x-text="unseen"
+                                      class="absolute rounded-full bg-red-500 text-white font-bold flex items-center justify-center"
+                                      style="top: 1px; right: 1px; min-width: 16px; height: 16px; padding: 0 4px; font-size: 9px;"></span>
+                            </button>
+
+                            <div x-show="bellOpen" x-cloak @click.outside="bellOpen = false"
+                                 x-transition:enter="transition ease-out duration-150"
+                                 x-transition:enter-start="opacity-0 -translate-y-2 scale-95"
+                                 x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                                 x-transition:leave="transition ease-in duration-100"
+                                 x-transition:leave-start="opacity-100"
+                                 x-transition:leave-end="opacity-0 scale-95"
+                                 class="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-gray-900 rounded-xl shadow-2xl shadow-black/20 border border-gray-200/80 dark:border-gray-700/80 overflow-hidden z-[100]">
+                                <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800" style="background: linear-gradient(to right, hsla(var(--accent-h), var(--accent-s), 95%, 1), hsla(var(--accent-h), var(--accent-s), 92%, 1))">
+                                    <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.app_updates_heading') }}</p>
+                                    <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.app_updates_subtitle') }}</p>
+                                </div>
+                                <div class="max-h-96 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
+                                    @foreach($whatsNewList as $wnu)
+                                        <div class="px-4 py-3">
+                                            <div class="flex items-center justify-between gap-2">
+                                                <p class="text-[13px] font-semibold text-gray-800 dark:text-gray-100">{{ $wnu->title }}</p>
+                                                @if(!in_array($wnu->id, $whatsNewSeenIds))
+                                                    <span class="flex-shrink-0 px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold uppercase">{{ __('pos.new_word') }}</span>
+                                                @endif
+                                            </div>
+                                            <p class="text-[10px] text-gray-400 mt-0.5">{{ $wnu->created_at->format('d M Y') }}</p>
+                                            @if($wnu->image_path ?? null)
+                                                <img src="{{ asset('storage/' . $wnu->image_path) }}" alt="{{ __('pos.update_image_alt') }}" loading="lazy"
+                                                     class="w-full rounded-lg border border-gray-200 dark:border-gray-700 mt-1.5 cursor-zoom-in"
+                                                     onclick="window.open(this.src, '_blank')">
+                                            @endif
+                                            <ul class="mt-1.5 space-y-1">
+                                                @foreach(($wnu->points ?? []) as $wnp)
+                                                    <li class="flex items-start gap-1.5 text-[12px] text-gray-600 dark:text-gray-300">
+                                                        <svg class="w-3 h-3 mt-0.5 flex-shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                                        <span>{{ $wnp }}</span>
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+                        @endif
 
                         {{-- 🎨 Theme Switcher (Customize) --}}
                         <div class="relative">
@@ -945,6 +1028,62 @@
                 };
             }
         </script>
+        @if($whatsNewPopup)
+        {{-- One-time "What's New" popup — dismiss marks ALL current updates seen (per user) --}}
+        <div x-data="{ wnOpen: true,
+                wnDismiss() {
+                    this.wnOpen = false;
+                    fetch('/fbr-pos/whats-new/seen', { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' } }).catch(() => {});
+                } }"
+             x-show="wnOpen" x-cloak
+             class="fixed inset-0 flex items-center justify-center p-4"
+             style="z-index: 130; background: rgba(5, 15, 40, 0.55); backdrop-filter: blur(4px);">
+            <div class="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 scale-90"
+                 x-transition:enter-end="opacity-100 scale-100">
+                <div class="px-6 py-5 text-center" style="background: linear-gradient(135deg, hsl(var(--accent-h), var(--accent-s), 42%), hsl(var(--accent-h), var(--accent-s), 28%));">
+                    <div class="text-4xl mb-1">🎉</div>
+                    <h2 class="text-xl font-extrabold text-white">{{ $whatsNewUnseenCount > 1 ? __('pos.whats_new_many', ['count' => $whatsNewUnseenCount]) : __('pos.whats_new_one') }}</h2>
+                    @if($whatsNewUnseenCount === 1)
+                        <p class="text-[12px] text-white/80 mt-1">{{ $whatsNewPopup->title }} · {{ $whatsNewPopup->created_at->format('d M Y') }}</p>
+                    @else
+                        <p class="text-[12px] text-white/80 mt-1">{{ __('pos.whats_new_scroll_hint') }}</p>
+                    @endif
+                </div>
+                <div class="px-6 py-5 overflow-y-auto" style="max-height: 62vh;">
+                    @foreach($whatsNewPopupList as $wnp)
+                    <div class="{{ $loop->first ? '' : 'mt-5 pt-4 border-t border-gray-200 dark:border-gray-700' }}">
+                        @if($whatsNewUnseenCount > 1)
+                            <p class="text-sm font-extrabold text-gray-900 dark:text-white mb-2">{{ $wnp->title }} <span class="font-normal text-[11px] text-gray-400">· {{ $wnp->created_at->format('d M Y') }}</span></p>
+                        @endif
+                        @if($wnp->image_path ?? null)
+                            <img src="{{ asset('storage/' . $wnp->image_path) }}" alt="{{ __('pos.update_image_alt') }}" loading="lazy"
+                                 class="w-full rounded-xl border border-gray-200 dark:border-gray-700 mb-4 cursor-zoom-in"
+                                 onclick="window.open(this.src, '_blank')">
+                        @endif
+                        <ul class="space-y-2.5">
+                            @foreach(($wnp->points ?? []) as $wnpt)
+                                <li class="flex items-start gap-2.5 text-sm text-gray-700 dark:text-gray-200">
+                                    <span class="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center mt-0.5">
+                                        <svg class="w-3 h-3 text-blue-600 dark:text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                    </span>
+                                    <span>{{ $wnpt }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                    @endforeach
+                </div>
+                <div class="px-6 pb-5">
+                    <button @click="wnDismiss()" x-ref="wnBtn" x-init="$nextTick(() => $refs.wnBtn.focus())"
+                            class="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-sm transition cursor-pointer">
+                        {{ __('pos.whats_new_got_it') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+        @endif
         <x-trial-lock-modal />
         <x-whatsapp-support />
         <script src="{{ asset('js/wheel-scroll.js?v=1') }}" defer></script>

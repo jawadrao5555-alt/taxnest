@@ -57,6 +57,8 @@ class AppUpdateController extends Controller
             'title' => 'required|string|max:150',
             'points_text' => 'required|string|max:3000',
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
+            // Audience (Aug 2026): 'pos' = PRA POS, 'fbr_pos' = FBR POS, 'all' = both panels.
+            'audience' => 'nullable|in:pos,fbr_pos,all',
         ]);
 
         $points = $this->parsePoints($request->points_text);
@@ -68,7 +70,7 @@ class AppUpdateController extends Controller
             'title' => $request->title,
             'points' => $points,
             'image_path' => $this->storeImage($request),
-            'audience' => 'pos',
+            'audience' => $request->input('audience') ?: 'pos',
             'is_published' => $request->boolean('is_published', true),
             'created_by' => auth()->id(),
         ]);
@@ -84,6 +86,7 @@ class AppUpdateController extends Controller
             'title' => 'required|string|max:150',
             'points_text' => 'required|string|max:3000',
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
+            'audience' => 'nullable|in:pos,fbr_pos,all',
         ]);
 
         $points = $this->parsePoints($request->points_text);
@@ -95,6 +98,9 @@ class AppUpdateController extends Controller
             'title' => $request->title,
             'points' => $points,
         ];
+        if ($request->filled('audience')) {
+            $data['audience'] = $request->input('audience');
+        }
 
         if ($request->boolean('remove_image')) {
             $this->deleteImage($appUpdate->image_path);
@@ -172,12 +178,19 @@ class AppUpdateController extends Controller
      */
     public function markSeen(Request $request)
     {
+        // Both panels share the 'users' provider, so AppUpdateSeen.user_id is safe
+        // for either guard. Audience 'all' targets both panels.
         $user = auth('pos')->user();
+        $audiences = ['pos', 'all'];
+        if (!$user) {
+            $user = auth('fbrpos')->user();
+            $audiences = ['fbr_pos', 'all'];
+        }
         if (!$user) {
             return response()->json(['ok' => false], 401);
         }
 
-        $ids = AppUpdate::where('audience', 'pos')->published()->pluck('id');
+        $ids = AppUpdate::whereIn('audience', $audiences)->published()->pluck('id');
         $already = AppUpdateSeen::where('user_id', $user->id)->whereIn('app_update_id', $ids)->pluck('app_update_id')->all();
 
         foreach ($ids as $id) {

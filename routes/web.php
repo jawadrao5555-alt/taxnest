@@ -970,6 +970,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/dashboard', [FbrPosController::class, 'dashboard'])->name('fbrpos.dashboard');
     Route::post('/notifications/{id}/dismiss', [FbrPosController::class, 'dismissNotification'])->name('fbrpos.notifications.dismiss');
     Route::post('/notifications/dismiss-all', [FbrPosController::class, 'dismissAllNotifications'])->name('fbrpos.notifications.dismiss-all');
+    Route::post('/whats-new/seen', [\App\Http\Controllers\AppUpdateController::class, 'markSeen'])->name('fbrpos.whats-new.seen');
     Route::post('/payment-proof', [\App\Http\Controllers\PaymentProofController::class, 'store'])
         ->name('fbrpos.payment-proof.store')->middleware('throttle:6,1');
     Route::get('/create', [FbrPosController::class, 'create'])->name('fbrpos.create');

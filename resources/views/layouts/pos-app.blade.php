@@ -52,7 +52,7 @@
         if ($wnAllowed && !$wnPending && !$wnReadonlyImp
             && \Illuminate\Support\Facades\Schema::hasTable('app_updates')
             && \App\Models\SystemSetting::get('pos_whats_new_enabled', '1') === '1') {
-            $whatsNewList = \App\Models\AppUpdate::where('audience', 'pos')->where('is_published', true)
+            $whatsNewList = \App\Models\AppUpdate::whereIn('audience', ['pos', 'all'])->where('is_published', true)
                 ->orderByDesc('created_at')->limit(10)->get();
             if ($whatsNewList->isNotEmpty()) {
                 $whatsNewSeenIds = \App\Models\AppUpdateSeen::where('user_id', $posUserLayout->id)

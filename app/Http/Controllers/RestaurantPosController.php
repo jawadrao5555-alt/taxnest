@@ -1867,14 +1867,20 @@ class RestaurantPosController extends Controller
             ->limit(15)
             ->get();
 
+        // 7-din chart: har bar ek BUSINESS day hai (cutoff→cutoff window), taa ke
+        // 00:00–cutoff ki sales pichle din ke bar mein aayen — day-close report
+        // ke figures se match karein. $bizDate/$cutoff upar set ho chuke hain.
         $salesChartLabels = [];
         $salesChartData = [];
         for ($i = 6; $i >= 0; $i--) {
-            $day = now()->subDays($i);
+            $day = \Carbon\Carbon::parse($bizDate, config('app.timezone'))->subDays($i);
+            $windowStart = \Carbon\Carbon::parse($day->toDateString() . ' ' . $cutoff, config('app.timezone'));
+            $windowEnd = $windowStart->copy()->addDay();
             $salesChartLabels[] = $day->format('D');
             $salesChartData[] = (float) RestaurantOrder::where('company_id', $companyId)
                 ->where('status', 'completed')
-                ->whereDate('created_at', $day->toDateString())
+                ->where('created_at', '>=', $windowStart)
+                ->where('created_at', '<', $windowEnd)
                 ->sum('total_amount');
         }
 

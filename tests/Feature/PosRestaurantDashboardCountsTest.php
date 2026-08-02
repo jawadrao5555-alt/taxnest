@@ -340,6 +340,57 @@ class PosRestaurantDashboardCountsTest extends TestCase
         $this->assertSame(0.0, (float) $data['todaySales']);
     }
 
+    // ── 7-din sales chart business-day bars (Task 168) ──────────────────────
+    //
+    // Each chart bar must be a BUSINESS-day window (cutoff→cutoff), matching
+    // the day-close report — never whereDate(created_at).
+
+    public function test_chart_pre_cutoff_sale_lands_in_previous_days_bar(): void
+    {
+        $this->actAs('pos_admin');
+        $now = $this->freezeAfternoon();
+
+        // Today 02:00 (pre-cutoff) → yesterday's bar, NOT today's.
+        $this->completedSale($now->copy()->setTime(2, 0, 0), ['total_amount' => 250]);
+        // Today 09:00 (post-cutoff) → today's bar.
+        $this->completedSale($now->copy()->setTime(9, 0, 0), ['total_amount' => 1000]);
+        // Yesterday 20:00 → yesterday's bar.
+        $this->completedSale($now->copy()->subDay()->setTime(20, 0, 0), ['total_amount' => 500]);
+
+        $data = $this->dashboardData();
+
+        $chart = $data['salesChartData'];
+        $this->assertCount(7, $chart);
+        // Last bar = today's business day, second-last = yesterday's.
+        $this->assertSame(1000.0, (float) $chart[6]);
+        $this->assertSame(750.0, (float) $chart[5]);
+        // Nothing leaked into older bars.
+        $this->assertSame(0.0, (float) array_sum(array_slice($chart, 0, 5)));
+    }
+
+    public function test_chart_bars_align_with_business_day_totals(): void
+    {
+        $this->actAs('pos_admin');
+        $now = $this->freezeAfternoon();
+
+        // Sales across the 7-bar window edges: 6 business days ago at 10:00
+        // (inside first bar) and 7 business days ago at 20:00 (outside).
+        $this->completedSale($now->copy()->subDays(6)->setTime(10, 0, 0), ['total_amount' => 300]);
+        $this->completedSale($now->copy()->subDays(7)->setTime(20, 0, 0), ['total_amount' => 900]);
+        // Non-completed order never appears in the chart.
+        $held = $this->order(['status' => 'held', 'total_amount' => 700]);
+        DB::table('restaurant_orders')->where('id', $held)
+            ->update(['created_at' => $now->copy()->setTime(10, 0, 0)]);
+
+        $data = $this->dashboardData();
+        $chart = $data['salesChartData'];
+
+        $this->assertSame(300.0, (float) $chart[0]);
+        $this->assertSame(300.0, (float) array_sum($chart));
+        // Chart's today bar equals the dashboard's todaySales figure.
+        $this->assertSame((float) $data['todaySales'], (float) $chart[6]);
+    }
+
     // ── tile render: links + include contract ───────────────────────────────
 
     public function test_tile_links_open_tables_and_cancelled_to_their_report_pages(): void

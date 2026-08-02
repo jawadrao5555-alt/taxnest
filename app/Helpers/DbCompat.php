@@ -85,7 +85,15 @@ class DbCompat
 
     public static function extractHour(string $column): string
     {
-        return self::isMySQL() ? "HOUR({$column})" : "EXTRACT(HOUR FROM {$column})";
+        if (self::isMySQL()) {
+            return "HOUR({$column})";
+        }
+        if (self::isSqlite()) {
+            // sqlite (test suite only) — EXTRACT() is not supported.
+            return "CAST(strftime('%H', {$column}) AS INTEGER)";
+        }
+
+        return "EXTRACT(HOUR FROM {$column})";
     }
 
     /** DATE(x) — works the same in both DBs, but exposed for symmetry. */

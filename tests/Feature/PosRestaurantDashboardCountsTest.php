@@ -1,0 +1,270 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Http\Controllers\RestaurantPosController;
+use App\Models\User;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Tests\TestCase;
+
+/**
+ * Restaurant dashboard — open-tables & cancelled counts (Task 161).
+ *
+ * Task 153 locked the Pending Bills tile for the PRA retail and FBR
+ * dashboards (PosPendingBillsTileTest). The restaurant dashboard shares the
+ * same tile partial, but its controller-side counts were unlocked. This test
+ * locks:
+ *
+ *   1. openOrdersCount counts ONLY un-settled orders (held/preparing/ready) —
+ *      settled (completed) and cancelled orders must NEVER be counted, and
+ *      the count is NOT limited to today (a table left open from before the
+ *      cutoff is still pending).
+ *   2. cancelledTodayCount counts ONLY the current business day's cancelled
+ *      orders (COALESCE(cancelled_at, updated_at) window) and is NEVER part
+ *      of the tile's pending total badge.
+ *   3. The rendered tile links open tables to pos.restaurant.tables and
+ *      cancelled orders to pos.restaurant.cancelled-orders.
+ *
+ * Pattern mirrors PosPendingBillsTileTest: sqlite :memory: + minimal
+ * Schema::create, RestaurantPosController::dashboard() invoked directly with
+ * the currentCompanyId container binding, view data combined with a real
+ * render of the shared tile partial.
+ */
+class PosRestaurantDashboardCountsTest extends TestCase
+{
+    protected int $companyId;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Schema::dropAllTables();
+
+        Schema::create('companies', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->boolean('pra_reporting_enabled')->default(false);
+            $table->boolean('inventory_enabled')->default(false);
+            $table->string('pos_dashboard_style')->nullable();
+            $table->string('pos_business_day_cutoff')->nullable();
+            $table->softDeletes();
+            $table->timestamps();
+        });
+
+        Schema::create('users', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id')->nullable();
+            $table->string('name')->nullable();
+            $table->string('role')->nullable();
+            $table->string('pos_role')->nullable();
+            $table->boolean('pra_reporting_enabled')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('restaurant_orders', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->string('order_number')->nullable();
+            $table->unsignedBigInteger('table_id')->nullable();
+            $table->string('order_type')->nullable();
+            $table->string('status');
+            $table->decimal('subtotal', 12, 2)->default(0);
+            $table->decimal('discount_amount', 12, 2)->default(0);
+            $table->decimal('tax_amount', 12, 2)->default(0);
+            $table->decimal('total_amount', 12, 2)->default(0);
+            $table->decimal('estimated_cost', 12, 2)->nullable();
+            $table->timestamp('cancelled_at')->nullable();
+            $table->timestamp('kot_sent_at')->nullable();
+            $table->timestamp('kitchen_started_at')->nullable();
+            $table->timestamp('kitchen_ready_at')->nullable();
+            $table->timestamp('kitchen_cleared_at')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('restaurant_order_items', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('restaurant_order_id')->nullable();
+            $table->unsignedBigInteger('order_id')->nullable();
+            $table->string('item_name')->nullable();
+            $table->decimal('quantity', 12, 3)->default(1);
+            $table->decimal('subtotal', 12, 2)->default(0);
+            $table->timestamps();
+        });
+
+        Schema::create('restaurant_tables', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->string('table_number')->nullable();
+            $table->string('status')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('ingredients', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->string('name')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->decimal('current_stock', 12, 3)->default(0);
+            $table->decimal('min_stock_level', 12, 3)->default(0);
+            $table->timestamps();
+        });
+
+        Schema::create('pos_transactions', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->string('invoice_number');
+            $table->string('business_date')->nullable();
+            $table->string('status');
+            $table->string('invoice_mode')->nullable();
+            $table->string('pra_status')->nullable();
+            $table->boolean('is_archived')->default(false);
+            $table->decimal('total_amount', 12, 2)->default(0);
+            $table->timestamps();
+        });
+
+        // PosBusinessDay consults day-close reports pre-cutoff.
+        Schema::create('pos_day_close_reports', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->string('report_date');
+            $table->timestamps();
+        });
+
+        $this->companyId = DB::table('companies')->insertGetId([
+            'name' => 'Karahi House',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        app()->bind('currentCompanyId', fn () => $this->companyId);
+    }
+
+    protected function tearDown(): void
+    {
+        Auth::guard('pos')->logout();
+        parent::tearDown();
+    }
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    protected function actAs(string $posRole): User
+    {
+        DB::table('users')->insert([
+            'company_id' => $this->companyId,
+            'name' => 'U-' . $posRole,
+            'role' => 'user',
+            'pos_role' => $posRole,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $user = User::orderByDesc('id')->first();
+        Auth::guard('pos')->setUser($user);
+
+        return $user;
+    }
+
+    protected function order(array $attrs = []): int
+    {
+        return DB::table('restaurant_orders')->insertGetId(array_merge([
+            'company_id' => $this->companyId,
+            'order_number' => 'R-' . uniqid(),
+            'status' => 'held',
+            'total_amount' => 500,
+            'created_at' => now(), 'updated_at' => now(),
+        ], $attrs));
+    }
+
+    protected function dashboardData(): array
+    {
+        return (new RestaurantPosController())->dashboard()->getData();
+    }
+
+    /** Render the shared tile partial exactly like the restaurant dashboard includes it. */
+    protected function renderTile(array $viewData): string
+    {
+        return view('pos.partials.pending-bills-tile', $viewData)->render();
+    }
+
+    // ── openOrdersCount ──────────────────────────────────────────────────────
+
+    public function test_open_orders_count_only_held_preparing_ready_never_settled_or_cancelled(): void
+    {
+        $this->actAs('pos_admin');
+
+        // Counted: one of each open status.
+        $this->order(['status' => 'held']);
+        $this->order(['status' => 'preparing']);
+        $this->order(['status' => 'ready']);
+        // Counted: an old table still open from BEFORE today's cutoff — a
+        // table left open yesterday is still pending.
+        $old = $this->order(['status' => 'held']);
+        DB::table('restaurant_orders')->where('id', $old)
+            ->update(['created_at' => now()->subDays(2)]);
+        // NEVER counted: settled order.
+        $this->order(['status' => 'completed']);
+        // NEVER counted: cancelled order.
+        $this->order(['status' => 'cancelled', 'cancelled_at' => now()]);
+
+        $data = $this->dashboardData();
+
+        $this->assertSame(4, $data['openOrdersCount']);
+        $this->assertTrue($data['isRestaurant']);
+        $this->assertTrue($data['isAdmin']);
+    }
+
+    // ── cancelledTodayCount ──────────────────────────────────────────────────
+
+    public function test_cancelled_count_is_business_day_only_and_never_in_pending_total(): void
+    {
+        $this->actAs('pos_admin');
+
+        // Counted: cancelled within the current business day.
+        $this->order(['status' => 'cancelled', 'cancelled_at' => now()]);
+        // Counted: cancelled_at NULL fallback → updated_at (column is new).
+        $this->order(['status' => 'cancelled', 'cancelled_at' => null]);
+        // NEVER counted: cancelled on a previous business day.
+        $oldCancel = $this->order(['status' => 'cancelled', 'cancelled_at' => now()->subDays(2)]);
+        DB::table('restaurant_orders')->where('id', $oldCancel)
+            ->update(['created_at' => now()->subDays(2), 'updated_at' => now()->subDays(2)]);
+        // One open order so the pending total is deterministic.
+        $this->order(['status' => 'held']);
+
+        $data = $this->dashboardData();
+
+        $this->assertSame(2, $data['cancelledTodayCount']);
+        $this->assertSame(1, $data['openOrdersCount']);
+        $this->assertSame(0, $data['pendingProvisional']);
+
+        // Tile badge total = provisional + open ONLY — cancelled is
+        // informational and must NEVER inflate the pending total.
+        $html = $this->renderTile($data);
+        $this->assertStringContainsString('>1</span>', $html);
+        $this->assertStringNotContainsString('>3</span>', $html);
+        // Cancelled count renders in its own card.
+        $this->assertStringContainsString('>2</span>', $html);
+    }
+
+    // ── tile render: links + include contract ───────────────────────────────
+
+    public function test_tile_links_open_tables_and_cancelled_to_their_report_pages(): void
+    {
+        $this->actAs('pos_admin');
+        $this->order(['status' => 'preparing']);
+        $this->order(['status' => 'cancelled', 'cancelled_at' => now()]);
+
+        $html = $this->renderTile($this->dashboardData());
+
+        $this->assertNotSame('', trim($html));
+        $this->assertStringContainsString(route('pos.restaurant.tables'), $html);
+        $this->assertStringContainsString(route('pos.restaurant.cancelled-orders'), $html);
+    }
+
+    public function test_restaurant_dashboard_blade_includes_shared_tile(): void
+    {
+        // Lock the include contract: the restaurant dashboard wrapper must
+        // keep including the shared tile (which reads the controller's
+        // isRestaurant/openOrdersCount/cancelledTodayCount view data).
+        $blade = file_get_contents(resource_path('views/pos/restaurant/dashboard.blade.php'));
+        $this->assertStringContainsString("pos.partials.pending-bills-tile", $blade);
+    }
+}

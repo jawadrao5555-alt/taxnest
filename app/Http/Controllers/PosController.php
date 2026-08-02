@@ -1682,7 +1682,20 @@ class PosController extends Controller
             $quota = \App\Services\PlanLimitService::canCreatePosBill($companyId);
             if (!($quota['allowed'] ?? true)) {
                 if ($request->expectsJson()) {
-                    return response()->json(['success' => false, 'error' => $quota['reason'], 'message' => $quota['reason']], 403);
+                    // Task 216: flag the quota gate + whether a provisional retry would pass
+                    // the flow rules (delivery-only on restaurant-ish companies — mirrors the
+                    // $saveAsProvisional gate above). The sale screen offers a one-click
+                    // "save as provisional" retry instead of a dead-end error.
+                    $flowFeatures = PosFeatureService::forCompany($company);
+                    $restaurantish = ($flowFeatures->tables ?? false) || ($flowFeatures->kot ?? false) || ($flowFeatures->kitchen ?? false) || ($flowFeatures->delivery ?? false);
+                    $provisionalAllowed = !$restaurantish || !$request->filled('order_type') || $request->input('order_type') === 'delivery';
+                    return response()->json([
+                        'success' => false,
+                        'error' => $quota['reason'],
+                        'message' => $quota['reason'],
+                        'quota_full' => true,
+                        'provisional_allowed' => $provisionalAllowed,
+                    ], 403);
                 }
                 return back()->withInput()->with('error', $quota['reason']);
             }

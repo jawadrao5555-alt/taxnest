@@ -495,8 +495,43 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
             'success' => false,
             'error' => self::OVERRIDE_FULL_1,
             'message' => self::OVERRIDE_FULL_1,
+            // Task 216: plain-retail quota 403 must advertise the provisional escape hatch.
+            'quota_full' => true,
+            'provisional_allowed' => true,
         ]);
         $this->assertSame(1, DB::table('pos_transactions')->where('company_id', $companyId)->count(), 'no bill row may be created when blocked');
+    }
+
+    public function test_store_invoice_quota_403_dine_in_restaurantish_disallows_provisional(): void
+    {
+        // Task 216: restaurant-ish company + non-delivery order_type → the quota 403
+        // must NOT offer a provisional retry (dine-in/takeaway settle as finals only).
+        $companyId = $this->makeRestaurantCompany(['invoice_limit_override' => 1]);
+        $this->makeFinal($companyId, 'L-050');
+
+        $response = $this->actingAs($this->makeUser($companyId), 'pos')
+            ->postJson('/pos/invoice/store', $this->storePayload(['order_type' => 'dine_in']));
+
+        $response->assertStatus(403)->assertJson([
+            'success' => false,
+            'quota_full' => true,
+            'provisional_allowed' => false,
+        ]);
+    }
+
+    public function test_store_invoice_quota_403_delivery_restaurantish_allows_provisional(): void
+    {
+        $companyId = $this->makeRestaurantCompany(['invoice_limit_override' => 1]);
+        $this->makeFinal($companyId, 'L-050');
+
+        $response = $this->actingAs($this->makeUser($companyId), 'pos')
+            ->postJson('/pos/invoice/store', $this->storePayload(['order_type' => 'delivery']));
+
+        $response->assertStatus(403)->assertJson([
+            'success' => false,
+            'quota_full' => true,
+            'provisional_allowed' => true,
+        ]);
     }
 
     public function test_store_invoice_blocked_at_plan_limit_names_the_plan(): void
@@ -576,10 +611,32 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
         $response->assertStatus(403)->assertJson([
             'success' => false,
             'message' => self::OVERRIDE_FULL_1,
+            // Task 216: dine-in on a restaurant-ish company → no provisional escape hatch.
+            'quota_full' => true,
+            'provisional_allowed' => false,
         ]);
 
         $this->assertSame('pending', DB::table('restaurant_orders')->where('id', $orderId)->value('status'), 'blocked order must stay open');
         $this->assertSame(1, DB::table('pos_transactions')->where('company_id', $companyId)->count(), 'no bill row may be created when blocked');
+    }
+
+    public function test_pay_order_quota_403_delivery_order_allows_provisional(): void
+    {
+        // Task 216: delivery held order at quota-full → 403 must advertise the
+        // provisional retry so the sale screen can offer the one-click save.
+        $companyId = $this->makeRestaurantCompany(['invoice_limit_override' => 1]);
+        $this->makeFinal($companyId, 'L-050');
+        $orderId = $this->makeOrder($companyId, ['order_type' => 'delivery']);
+
+        $response = $this->actingAs($this->makeUser($companyId), 'pos')
+            ->postJson("/pos/restaurant/orders/{$orderId}/pay", ['payment_method' => 'cash']);
+
+        $response->assertStatus(403)->assertJson([
+            'success' => false,
+            'quota_full' => true,
+            'provisional_allowed' => true,
+        ]);
+        $this->assertSame('pending', DB::table('restaurant_orders')->where('id', $orderId)->value('status'));
     }
 
     public function test_pay_order_allowed_within_quota_creates_final(): void

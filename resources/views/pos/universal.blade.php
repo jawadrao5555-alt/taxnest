@@ -7096,6 +7096,16 @@ function restaurantPos() {
                 if (!res.ok || !data || !data.success) {
                     console.error('[storeInvoice] HTTP', res.status, res.statusText, rawBody.slice(0, 500));
                     const msg = (data && (data.message || data.error)) || ('Failed (HTTP ' + res.status + ') — F12 console');
+                    // Task 216: quota-full 403 where the backend says a provisional retry
+                    // would pass the flow rules → offer a one-click provisional save
+                    // instead of a dead-end error. confirm() cancel = keep the plain error.
+                    if (res.status === 403 && data && data.quota_full && data.provisional_allowed && !provisional) {
+                        this.submitting = false;
+                        if (confirm(window.TXT.quota_provisional_prompt || msg)) {
+                            this.lastPayTime = 0; // bypass the 3s double-tap debounce for this deliberate retry
+                            return await this.processPaymentManual(method, true);
+                        }
+                    }
                     this.showToast(msg, 'error');
                     this.submitting = false;
                     return;
@@ -8058,6 +8068,14 @@ function restaurantPos() {
                     let errData = null;
                     try { errData = JSON.parse(bodyText); } catch (_) {}
                     if (errData && errData.stock_error) { this.stockError = errData.message; this.showPayModal = true; }
+                    // Task 216: quota-full 403 where the backend says a provisional retry
+                    // would pass the flow rules (delivery-only on restaurant-ish shops) →
+                    // offer a one-click provisional settle instead of a dead-end error.
+                    if (res.status === 403 && errData && errData.quota_full && errData.provisional_allowed && !provisional) {
+                        if (confirm(window.TXT.quota_provisional_prompt || errData.message)) {
+                            return await this.payHeldOrderDirect(orderId, method, savedTotal, true, orderTypeOverride);
+                        }
+                    }
                     this.showToast((errData && errData.message) || ('Payment failed (HTTP ' + res.status + ') — F12 console'), 'error');
                     return false;
                 }

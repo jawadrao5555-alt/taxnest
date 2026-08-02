@@ -174,7 +174,7 @@ class DashboardController extends Controller
             $trialInfo = [
                 'is_trial' => $subscription->isTrialActive(),
                 'is_expired' => $subscription->isTrialExpired(),
-                'days_left' => $subscription->trial_ends_at->isFuture() ? now()->diffInDays($subscription->trial_ends_at) : 0,
+                'days_left' => $subscription->trial_ends_at->isFuture() ? (int) now()->startOfDay()->diffInDays($subscription->trial_ends_at->copy()->startOfDay()) : 0,
                 'ends_at' => $subscription->trial_ends_at->format('M d, Y'),
             ];
         }

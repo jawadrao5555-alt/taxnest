@@ -32,7 +32,7 @@ class BillingController extends Controller
                 $limit = $currentSubscription->pricingPlan->invoice_limit;
                 $usagePercent = ($limit > 0 && $limit !== -1) ? round(($invoiceCount / $limit) * 100, 1) : ($limit === -1 ? 0 : 0);
                 $daysLeft = Carbon::parse($currentSubscription->end_date)->isFuture()
-                    ? Carbon::parse($currentSubscription->end_date)->diffInDays(now())
+                    ? (int) now()->startOfDay()->diffInDays(Carbon::parse($currentSubscription->end_date)->startOfDay())
                     : 0;
                 $totalDays = Carbon::parse($currentSubscription->start_date)->diffInDays(Carbon::parse($currentSubscription->end_date));
 
@@ -47,7 +47,7 @@ class BillingController extends Controller
                         'is_trial' => $currentSubscription->isTrialActive(),
                         'is_expired' => $currentSubscription->isTrialExpired(),
                         'days_left' => $currentSubscription->trial_ends_at->isFuture()
-                            ? now()->diffInDays($currentSubscription->trial_ends_at)
+                            ? (int) now()->startOfDay()->diffInDays($currentSubscription->trial_ends_at->copy()->startOfDay())
                             : 0,
                         'ends_at' => $currentSubscription->trial_ends_at->format('M d, Y'),
                     ];

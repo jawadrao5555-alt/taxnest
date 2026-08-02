@@ -84,7 +84,7 @@
                             <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         </div>
                         <div>
-                            <p class="text-sm font-bold text-blue-900 dark:text-blue-100">Free Trial &middot; {{ round($trialInfo['days_left']) }} days remaining</p>
+                            <p class="text-sm font-bold text-blue-900 dark:text-blue-100">Free Trial &middot; @if((int) $trialInfo['days_left'] === 0) expires today @elseif((int) $trialInfo['days_left'] === 1) 1 day remaining @else {{ (int) $trialInfo['days_left'] }} days remaining @endif</p>
                             <p class="text-xs text-blue-600 dark:text-blue-400">Upgrade anytime to unlock full features</p>
                         </div>
                     </div>

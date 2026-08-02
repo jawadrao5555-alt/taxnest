@@ -29,6 +29,12 @@ use Illuminate\Database\Schema\Blueprint;
  *      failure logged in fbr_pos_logs.
  *   5. Fiscal Device (agent) company → bill FINAL + stays 'pending' for the
  *      desktop agent; no server-side submit attempt, no log row.
+ *   6. HTTP flash lock (Task 150): closeDayReport POST must surface the sweep
+ *      counts in the session 'success' message (X FINAL / Y submitted /
+ *      Z queued / W failed) — and show ONLY the base "report generated"
+ *      message when the policy is off or the sweep did nothing. If a refactor
+ *      drops $this->lastFinalizeSweep on the floor or misreads a key, the
+ *      cashier gets a wrong/empty summary — these tests scream instead.
  *
  * Pattern: APP_ENV=testing + sqlite :memory: + minimal Schema::create.
  * The private sweep method is invoked via reflection — performDayClose drags
@@ -50,6 +56,9 @@ class FbrPosDayCloseAutoFinalizeTest extends TestCase
         Schema::create('companies', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+            $table->string('product_type')->nullable();
+            $table->string('status')->nullable();
+            $table->string('default_language')->nullable();
             $table->boolean('is_internal_account')->default(false);
             $table->integer('invoice_limit_override')->nullable();
             $table->boolean('fbr_reporting_enabled')->default(false);
@@ -119,6 +128,75 @@ class FbrPosDayCloseAutoFinalizeTest extends TestCase
             $table->string('status')->nullable();
             $table->text('error_message')->nullable();
             $table->timestamps();
+        });
+
+        // ── HTTP flash tests (Task 150) need the full closeDayReport path ──
+
+        // fbrpos guard authenticates against users.
+        Schema::create('users', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('email')->unique();
+            $table->string('password');
+            $table->unsignedBigInteger('company_id')->nullable();
+            $table->unsignedBigInteger('default_branch_id')->nullable();
+            $table->string('role')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->string('language')->nullable();
+            $table->rememberToken();
+            $table->timestamps();
+        });
+
+        // FbrPosAuth resolves the active branch via BranchContextService.
+        Schema::create('branches', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->string('name');
+            $table->boolean('is_active')->default(true);
+            $table->boolean('is_head_office')->default(false);
+            $table->timestamps();
+        });
+
+        // performDayClose persists the Z-report row.
+        Schema::create('fbr_day_close_reports', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->date('report_date');
+            $table->string('report_number');
+            $table->integer('total_invoices')->default(0);
+            $table->integer('fbr_invoices')->default(0);
+            $table->integer('local_invoices')->default(0);
+            $table->integer('failed_invoices')->default(0);
+            $table->decimal('gross_sales', 14, 2)->default(0);
+            $table->decimal('total_discount', 14, 2)->default(0);
+            $table->decimal('net_sales', 14, 2)->default(0);
+            $table->decimal('total_tax', 14, 2)->default(0);
+            $table->decimal('total_fbr_fee', 14, 2)->nullable();
+            $table->decimal('total_amount', 14, 2)->default(0);
+            $table->decimal('cash_amount', 14, 2)->default(0);
+            $table->decimal('card_amount', 14, 2)->default(0);
+            $table->decimal('other_amount', 14, 2)->default(0);
+            $table->string('first_invoice_number')->nullable();
+            $table->string('last_invoice_number')->nullable();
+            $table->timestamp('first_invoice_time')->nullable();
+            $table->timestamp('last_invoice_time')->nullable();
+            $table->unsignedBigInteger('closed_by')->nullable();
+            $table->text('notes')->nullable();
+            $table->string('hash')->nullable();
+            $table->decimal('opening_float', 14, 2)->nullable();
+            $table->decimal('counted_cash', 14, 2)->nullable();
+            $table->decimal('expected_cash', 14, 2)->nullable();
+            $table->decimal('cash_variance', 14, 2)->nullable();
+            $table->timestamps();
+        });
+
+        // Report numbering uses MySQL SUBSTRING_INDEX — polyfill it for sqlite
+        // so the atomic MAX+1 raw expression works in this suite.
+        DB::connection()->getPdo()->sqliteCreateFunction('SUBSTRING_INDEX', function ($str, $delim, $count) {
+            $parts = explode((string) $delim, (string) $str);
+            return $count < 0
+                ? implode($delim, array_slice($parts, (int) $count))
+                : implode($delim, array_slice($parts, 0, (int) $count));
         });
     }
 
@@ -367,5 +445,184 @@ class FbrPosDayCloseAutoFinalizeTest extends TestCase
         $this->assertSame('L-0001', $tx->invoice_number);
         // No server-side network attempt / no log row for Fiscal Device companies.
         $this->assertSame(0, DB::table('fbr_pos_logs')->count());
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // 6. HTTP FLASH LOCK (Task 150) — closeDayReport POST sweep summary
+    // ════════════════════════════════════════════════════════════════════════
+
+    /** Company attrs every HTTP test needs to survive FbrPosAuth + company.approval. */
+    private function makeHttpCompany(array $attrs = []): int
+    {
+        return $this->makeCompany(array_merge([
+            'product_type' => 'fbrpos',
+            'status' => 'active',
+            'fbr_pos_enabled' => true,
+        ], $attrs));
+    }
+
+    private function makeFbrUser(int $companyId, string $language = 'en'): \App\Models\User
+    {
+        $id = DB::table('users')->insertGetId([
+            'name' => 'FBR Cashier',
+            'email' => 'cashier' . $companyId . '@taxnest.test',
+            'password' => bcrypt('Secret@12345'),
+            'company_id' => $companyId,
+            'role' => 'company_admin',
+            'is_active' => true,
+            'language' => $language,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return \App\Models\User::find($id);
+    }
+
+    /** POST the real close-day route as the given user and return the response. */
+    private function closeDay(\App\Models\User $user)
+    {
+        return $this->actingAs($user, 'fbrpos')
+            ->from('/fbr-pos/day-close')
+            ->post('/fbr-pos/day-close', []);
+    }
+
+    /** The base "report generated" message for today's freshly-created report. */
+    private function baseMessage(int $companyId): string
+    {
+        $report = DB::table('fbr_day_close_reports')->where('company_id', $companyId)->first();
+        $this->assertNotNull($report, 'day-close report row must exist');
+
+        return __('pos.dayclose_report_generated_for', [
+            'number' => $report->report_number,
+            'date' => \Carbon\Carbon::parse($report->report_date)->format('d M Y'),
+        ]);
+    }
+
+    public function test_flash_shows_finalized_count_when_sweep_promotes_bills(): void
+    {
+        // Reporting OFF + policy 'finalize' + 2 provisionals → "2 FINAL", and
+        // no submitted/queued/failed suffixes (those counts are all zero).
+        $companyId = $this->makeHttpCompany();
+        $this->makeProvisional($companyId, 'L-0001');
+        $this->makeProvisional($companyId, 'L-0002');
+
+        $response = $this->closeDay($this->makeFbrUser($companyId));
+
+        $response->assertRedirect('/fbr-pos/day-close');
+        $response->assertSessionHas('success');
+
+        $msg = session('success');
+        $expected = $this->baseMessage($companyId)
+            . __('pos.dayclose_bills_finalized', ['count' => 2]);
+        $this->assertSame($expected, $msg, 'flash must be base message + finalized suffix ONLY');
+
+        // Zero-count branches must not leak into the message.
+        $this->assertStringNotContainsString(__('pos.dayclose_bills_submitted', ['count' => 0]), $msg);
+        $this->assertStringNotContainsString(__('pos.dayclose_bills_queued', ['count' => 0]), $msg);
+        $this->assertStringNotContainsString(__('pos.dayclose_bills_failed', ['count' => 0]), $msg);
+    }
+
+    public function test_flash_shows_queued_count_for_fiscal_device_company(): void
+    {
+        // Agent (Fiscal Device) company → finalized + queued suffixes.
+        $companyId = $this->makeHttpCompany([
+            'fbr_reporting_enabled' => true,
+            'agent_enabled' => true,
+            'fbr_connection_mode' => 'fiscal_device',
+        ]);
+        $this->makeProvisional($companyId, 'L-0001');
+
+        $response = $this->closeDay($this->makeFbrUser($companyId));
+
+        $response->assertSessionHas('success');
+        $expected = $this->baseMessage($companyId)
+            . __('pos.dayclose_bills_finalized', ['count' => 1])
+            . __('pos.dayclose_bills_queued', ['count' => 1]);
+        $this->assertSame($expected, session('success'));
+    }
+
+    public function test_flash_shows_failed_count_when_cloud_submit_fails(): void
+    {
+        // Cloud mode + reporting ON + no POSID → deterministic submit failure
+        // → finalized + failed suffixes (Fail Queue — retryable, never lost).
+        $companyId = $this->makeHttpCompany([
+            'fbr_reporting_enabled' => true,
+            'fbr_pos_id' => null,
+        ]);
+        $this->makeProvisional($companyId, 'L-0001');
+
+        $response = $this->closeDay($this->makeFbrUser($companyId));
+
+        $response->assertSessionHas('success');
+        $expected = $this->baseMessage($companyId)
+            . __('pos.dayclose_bills_finalized', ['count' => 1])
+            . __('pos.dayclose_bills_failed', ['count' => 1]);
+        $this->assertSame($expected, session('success'));
+    }
+
+    public function test_flash_is_base_message_only_when_policy_off(): void
+    {
+        // Policy NULL → sweep never runs; provisional stays local and the flash
+        // carries NO sweep suffix at all.
+        $companyId = $this->makeHttpCompany(['pos_dayclose_provisional_action' => null]);
+        $bill = $this->makeProvisional($companyId, 'L-0001');
+
+        $response = $this->closeDay($this->makeFbrUser($companyId));
+
+        $response->assertSessionHas('success');
+        $this->assertSame($this->baseMessage($companyId), session('success'));
+        $this->assertSame('local', $this->tx($bill)->fbr_status, 'policy off — bill untouched');
+    }
+
+    public function test_flash_is_base_message_only_when_sweep_finds_nothing(): void
+    {
+        // Policy 'finalize' but no provisionals (only an already-final bill so
+        // the report itself generates) → finalized 0 → base message only.
+        $companyId = $this->makeHttpCompany();
+        $this->makeProvisional($companyId, 'F-0001', [
+            'invoice_mode' => 'fbr',
+            'fbr_status' => null,
+        ]);
+
+        $response = $this->closeDay($this->makeFbrUser($companyId));
+
+        $response->assertSessionHas('success');
+        $this->assertSame($this->baseMessage($companyId), session('success'));
+    }
+
+    public function test_urdu_user_gets_urdu_sweep_summary(): void
+    {
+        // Cashier language 'ur' → SetPosLocale flips the request locale, so the
+        // flash must be built from the ur keys (and differ from the en render).
+        $companyId = $this->makeHttpCompany();
+        $this->makeProvisional($companyId, 'L-0001');
+
+        $response = $this->closeDay($this->makeFbrUser($companyId, 'ur'));
+
+        $response->assertSessionHas('success');
+        $urSuffix = trans('pos.dayclose_bills_finalized', ['count' => 1], 'ur');
+        $this->assertStringContainsString($urSuffix, session('success'));
+        $this->assertNotSame(
+            trans('pos.dayclose_bills_finalized', ['count' => 1], 'en'),
+            $urSuffix,
+            'ur key must not silently fall back to English'
+        );
+    }
+
+    public function test_all_sweep_summary_keys_exist_in_en_and_ur(): void
+    {
+        foreach (['dayclose_bills_finalized', 'dayclose_bills_submitted', 'dayclose_bills_queued', 'dayclose_bills_failed'] as $key) {
+            foreach (['en', 'ur'] as $locale) {
+                $this->assertTrue(
+                    \Illuminate\Support\Facades\Lang::has("pos.$key", $locale),
+                    "pos.$key missing in $locale"
+                );
+                $this->assertStringContainsString(
+                    ':count',
+                    trans("pos.$key", [], $locale) === "pos.$key" ? '' : \Illuminate\Support\Facades\Lang::get("pos.$key", [], $locale, false),
+                    "pos.$key ($locale) must carry the :count placeholder"
+                );
+            }
+        }
     }
 }

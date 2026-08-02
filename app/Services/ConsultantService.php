@@ -124,6 +124,8 @@ class ConsultantService
             'consultant_user_id' => $consultant->id,
             'consultant_name' => $consultant->name,
         ], $company->id, $consultant->id);
+
+        ConsultantMailer::linkRequested($link, $consultant, $company);
     }
 
     /**
@@ -150,6 +152,8 @@ class ConsultantService
             'consultant_user_id' => $link->consultant_user_id,
             'approved_by' => $approver->id,
         ], $link->company_id, $approver->id);
+
+        ConsultantMailer::linkApproved($link);
 
         return true;
     }
@@ -225,6 +229,12 @@ class ConsultantService
             $link->company_id,
             $actorUserId
         );
+
+        // Email the consultant when the client or SaaS admin ended the link —
+        // never when the consultant cancelled/revoked it themself.
+        if ($by !== 'consultant') {
+            ConsultantMailer::linkRejectedOrRevoked($link, $wasPending);
+        }
     }
 
     /** The active link for a consultant/company pair, or null. */
@@ -374,7 +384,7 @@ class ConsultantService
 
             $rate = (float) $profile->commission_rate;
 
-            return ConsultantCommission::create([
+            $commission = ConsultantCommission::create([
                 'consultant_user_id' => $profile->user_id,
                 'company_id' => $company->id,
                 'company_name' => $company->name,
@@ -386,6 +396,10 @@ class ConsultantService
                 'status' => 'pending',
                 'source' => 'subscription',
             ]);
+
+            ConsultantMailer::commissionRecorded($commission);
+
+            return $commission;
         } catch (\Throwable $e) {
             // A commission failure must NEVER block recording the payment itself
             // (e.g. deploy-before-migrate window where the table doesn't exist yet).

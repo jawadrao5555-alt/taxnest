@@ -601,4 +601,69 @@ class ConsultantConsoleTest extends TestCase
             ->assertRedirect('/consultant');
         $this->assertFalse(session()->has(ConsultantService::SESSION_KEY));
     }
+
+    // ── Email notifications (task: consultant email ittila) ─────────────
+
+    public function test_link_request_approve_reject_revoke_emails(): void
+    {
+        [$consultant] = $this->makeConsultant();
+        $client = $this->makeCompany();
+        $clientAdmin = $this->makeAdmin($client);
+
+        // Request → client admin gets an email.
+        ConsultantService::requestLink($consultant, $client->ntn);
+        Mail::assertQueued(\App\Mail\ConsultantNotificationMail::class, fn ($m) => $m->hasTo($clientAdmin->email));
+
+        // Approve → consultant gets an email.
+        $link = ConsultantClientLink::where('consultant_user_id', $consultant->id)->where('company_id', $client->id)->first();
+        ConsultantService::approveLink($link, $clientAdmin);
+        Mail::assertQueued(\App\Mail\ConsultantNotificationMail::class, fn ($m) => $m->hasTo($consultant->email));
+
+        // Client revoke → consultant gets an email (2nd one to consultant).
+        ConsultantService::revokeLink($link->fresh(), 'client', $clientAdmin->id);
+        $toConsultant = 0;
+        Mail::assertQueued(\App\Mail\ConsultantNotificationMail::class, function ($m) use ($consultant, &$toConsultant) {
+            if ($m->hasTo($consultant->email)) {
+                $toConsultant++;
+            }
+            return true;
+        });
+        $this->assertSame(2, $toConsultant);
+    }
+
+    public function test_consultant_self_cancel_sends_no_email_to_consultant(): void
+    {
+        [$consultant] = $this->makeConsultant();
+        $client = $this->makeCompany();
+        $this->makeAdmin($client);
+
+        $link = ConsultantClientLink::create([
+            'consultant_user_id' => $consultant->id,
+            'company_id' => $client->id,
+            'status' => 'pending',
+        ]);
+
+        ConsultantService::revokeLink($link, 'consultant', $consultant->id);
+
+        Mail::assertNotQueued(\App\Mail\ConsultantNotificationMail::class, fn ($m) => $m->hasTo($consultant->email));
+    }
+
+    public function test_commission_recorded_queues_email_to_consultant(): void
+    {
+        [$consultant, $profile] = $this->makeConsultant();
+        $client = $this->makeCompany(['referred_by_user_id' => $consultant->id]);
+        $plan = PricingPlan::create(['name' => 'DI Pro', 'product_type' => 'di', 'price' => 1000, 'is_trial' => false]);
+
+        $sub = \App\Models\Subscription::create([
+            'company_id' => $client->id,
+            'pricing_plan_id' => $plan->id,
+            'billing_cycle' => 'monthly',
+            'final_price' => 1000,
+            'active' => true,
+        ]);
+
+        $commission = ConsultantService::recordCommissionForSubscription($sub);
+        $this->assertNotNull($commission);
+        Mail::assertQueued(\App\Mail\ConsultantNotificationMail::class, fn ($m) => $m->hasTo($consultant->email));
+    }
 }

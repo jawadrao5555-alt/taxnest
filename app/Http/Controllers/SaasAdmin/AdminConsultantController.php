@@ -143,6 +143,8 @@ class AdminConsultantController extends Controller
             'reference' => $request->payout_reference,
         ]);
 
+        \App\Services\ConsultantMailer::commissionPaid($commission->fresh());
+
         return back()->with('success', 'Commission marked as paid.');
     }
 }

@@ -41,7 +41,12 @@ class PublicProfileController extends Controller
         return array_merge(self::DEFAULT_SETTINGS, $company->public_profile_settings ?? []);
     }
 
-    /** Absolute public URL for a company, or null when the page is disabled. */
+    /**
+     * Absolute public URL for a company, or null when the page is disabled
+     * or the plan lacks the QR Menu gate (Pro Max / Unlimited only, Aug
+     * 2026). Receipts (80mm/58mm) and the business-profile page all read
+     * this ONE helper, so the QR block disappears everywhere at once.
+     */
     public static function publicUrlFor(?Company $company): ?string
     {
         if (!$company || !$company->public_profile_slug) {
@@ -49,6 +54,9 @@ class PublicProfileController extends Controller
         }
         $settings = self::settingsFor($company);
         if (!($settings['enabled'] ?? false)) {
+            return null;
+        }
+        if (!\App\Services\PosFeatureService::planAllows($company, 'qr_menu_enabled')) {
             return null;
         }
         return url('/menu/' . $company->public_profile_slug);
@@ -71,6 +79,12 @@ class PublicProfileController extends Controller
 
         $settings = self::settingsFor($company);
         if (!($settings['enabled'] ?? false)) {
+            abort(404);
+        }
+
+        // Plan gate (Aug 2026): QR Menu is Pro Max / Unlimited only. Public
+        // page — plain 404, no upgrade pitch (customers aren't the buyer).
+        if (!\App\Services\PosFeatureService::planAllows($company, 'qr_menu_enabled')) {
             abort(404);
         }
 
@@ -113,6 +127,12 @@ class PublicProfileController extends Controller
         }
         $companyId = app('currentCompanyId');
         $company = Company::findOrFail($companyId);
+        // Plan gate (Aug 2026): QR Menu settings are Pro Max / Unlimited only.
+        if (!\App\Services\PosFeatureService::planAllows($company, 'qr_menu_enabled')) {
+            throw new \Illuminate\Http\Exceptions\HttpResponseException(
+                back()->with('error', __('pos.qr_menu_plan_locked'))
+            );
+        }
         return [$user, $company];
     }
 

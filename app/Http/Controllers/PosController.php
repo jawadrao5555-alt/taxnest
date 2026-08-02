@@ -5085,6 +5085,11 @@ class PosController extends Controller
             return back()->with('error', __('pos.custom_access_unavailable'));
         }
 
+        // Plan gate (Aug 2026): Custom Access is Unlimited-only.
+        if (!PosFeatureService::planAllows(Company::find($companyId), 'custom_access_enabled')) {
+            return back()->with('error', __('pos.custom_access_plan_locked'));
+        }
+
         $request->validate([
             'custom_enabled' => 'required|boolean',
             'features' => 'nullable|array',

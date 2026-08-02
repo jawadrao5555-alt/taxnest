@@ -1,4 +1,9 @@
 <x-pos-layout>
+@php
+    // Plan gate (Aug 2026): Custom Access is Unlimited-only.
+    $customAccessPlanAllowed = \App\Services\PosFeatureService::planAllows(
+        \App\Models\Company::find(app('currentCompanyId')), 'custom_access_enabled');
+@endphp
 <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     <a href="{{ route('pos.customize') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition mb-3">
         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
@@ -223,6 +228,16 @@
                                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                                             </button>
                                         </div>
+                                        @if(!($customAccessPlanAllowed ?? true))
+                                        {{-- Plan lock-card (Aug 2026): Custom Access is Unlimited-only --}}
+                                        <div class="px-5 py-6 flex flex-col items-center text-center gap-3">
+                                            <div class="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                                                <svg class="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                            </div>
+                                            <p class="text-xs text-gray-600 dark:text-gray-300 max-w-xs">{{ __('pos.custom_access_plan_locked') }}</p>
+                                            <a href="{{ route('pos.billing') }}" class="px-5 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold">{{ __('pos.upgrade_your_plan') }}</a>
+                                        </div>
+                                        @else
                                         <form method="POST" action="{{ route('pos.team.set-access', $member->id) }}">
                                             @csrf
                                             <div class="px-5 py-4 max-h-[60vh] overflow-y-auto">
@@ -248,6 +263,7 @@
                                                 <button type="submit" class="px-5 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold">{{ __('pos.save_btn') }}</button>
                                             </div>
                                         </form>
+                                        @endif
                                     </div>
                                 </div>
                                 </template>

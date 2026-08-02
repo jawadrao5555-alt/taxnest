@@ -204,12 +204,14 @@ Sale screen ki mazeed cheezein:
 - Custom Access OFF (default) = role ka aam rawaiya, bilkul pehle jaisa. Kisi member par set na karein to kuch nahi badalta.
 - Cashier ko aam tor par band cheez (misal Customize ya Team) tick karne se woh us page tak pahunch jata hai; Manager ki koi cheez untick karne se woh us se chhin jati hai.
 - Kitchen, Waiter, Rider, Delivery Manager par Custom Access LAGOO NAHI hota — yeh roles apne mehdood ilaqe mein hi rehte hain (custom grant se admin pages nahi milte; zaroorat ho to role badlein). Company admin (owner) kabhi mehdood nahi ho sakta.
+- Custom Access sirf Unlimited package mein hai (ya active trial). Package mein na ho to /pos/team par lock-card dikhta hai; pehle se saved sets ghair-moassar (inert) ho jate hain — member aam role ki tarah chalta hai, koi lock out nahi hota.
 
 ## Packages aur Billing (/pos/billing)
 - Starter Rs 9,999/saal: 1 team account, 500 final bills/mahina.
 - Business Rs 14,999/saal: 5 accounts, 2,000 bills/mahina.
-- Pro Rs 24,999/saal: 10 accounts, 3,000 bills/mahina, 2 branches, Restaurant module.
-- Unlimited Rs 39,999/saal: sab unlimited.
+- Pro Rs 24,999/saal: 10 accounts, 3,000 bills/mahina, 2 branches, Restaurant module + analytics.
+- Pro Max Rs 34,999/saal: 15 accounts, 5,000 bills/mahina, 3 branches — Pro + Delivery Riders & khata, Staff Hazri, public QR Menu.
+- Unlimited Rs 39,999/saal: sab unlimited + Team Custom Access + Priority Support.
 - Billing sirf saalana hai (6% discount pehle se shamil). Plans ki tafseel /pos/billing par.
 - Payment ka tareeqa: plan chunein → di gayi bank details (Bank, Title, IBAN) par raqam bhejein → payment proof form bharein: Package, Amount Paid (PKR), Reference/TID, aur proof upload (JPG/PNG/PDF) → admin verify kar ke package activate karta hai. Jaldi ho to "Send on WhatsApp" button se proof WhatsApp par bhi bhej sakte hain.
 - Sirf FINAL bills quota mein ginte hain — provisional FREE hain jab tak promote na hon; offline retry dobara nahi ginta. Quota har mahine reset hota hai.
@@ -379,6 +381,7 @@ Sale screen ki mazeed cheezein:
 ## Subscription packages — kis package mein kya hai (2 Aug 2026)
 - Starter: bunyadi billing — PRA receipts, barcode, thermal print, customers/khata, inventory, basic reports + day close. (Deals, riders, hazri, analytics, CSV/PDF export ismein NAHI.)
 - Business: Starter + offline billing/desktop app, 3 terminals, Deals & combos, advanced reports CSV/PDF export, Excel import/export.
-- Pro: Business + poora Restaurant module (tables/KOT/kitchen/waiter/QR menu), Delivery Riders + khata, Staff Hazri, cancelled/waste report, day-close auto-final, analytics dashboard.
-- Unlimited: Pro ke sab features, har limit UNLIMITED (bills/team/branches), priority support + training.
+- Pro: Business + poora Restaurant module (tables/KOT/kitchen/waiter), cancelled/waste report, day-close auto-final, analytics dashboard. (Riders, Hazri aur public QR Menu ismein NAHI.)
+- Pro Max (Rs 34,999/saal): Pro + Delivery Riders & khata, Staff Hazri report, public QR Menu page — 15 team accounts, 5,000 bills/mahina, 3 branches.
+- Unlimited: Pro Max ke sab features + Team Custom Access (sirf yahan), har limit UNLIMITED (bills/team/branches), Priority Support + training.
 - Trial ke dauran SAB features milte hain. Agar koi feature package mein na ho to us ka page Billing par le jata hai — upgrade kar ke khul jata hai.

@@ -118,6 +118,7 @@
                     <li>Open the app and sign in with the same login you use on the website.</li>
                 </ol>
                 <p class="text-xs text-gray-500 mt-4">The Desktop Agent pairs with your shop from inside your POS panel (Settings → Desktop App). Apps are free — features follow your TaxNest package.</p>
+                <p class="text-sm text-gray-600 mt-3 font-medium">Koi bhi issue aaye — install, login ya printing ka — to <a href="/contact" class="text-[#0A4D5C] underline hover:no-underline">support ko message bhejein</a>, hum foran madad karenge.</p>
             </div>
         </section>
     </main>

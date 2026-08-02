@@ -409,6 +409,30 @@ window.addEventListener('popstate', function() {
      per-device via localStorage 'tn_screen_fit'. Empty string = normal 100% layout. --}}
 <div x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="tn-sale-root flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950" :style="fitStyleStr">
 
+    {{-- Task 127: Starter offline-locked notice — persistent (while offline), dismissible.
+         Shows ONLY when the shop is offline AND the plan does not allow offline billing,
+         so cashiers know this is a package limit, not a bug. Admin/owner get an upgrade
+         link to billing; confined cashiers get "ask your admin" text instead.
+         Uses amber (warning) tones — not red — since nothing is broken. --}}
+    <div x-cloak x-show="syncStatus === 'offline' && !offlineAllowed && !offlineLockDismissed"
+         class="flex items-start gap-3 px-4 py-2.5 bg-amber-50 dark:bg-amber-900/30 border-b border-amber-300 dark:border-amber-700 flex-shrink-0">
+        <svg class="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+        <div class="flex-1 min-w-0">
+            <p class="text-[13px] font-bold text-amber-800 dark:text-amber-200">{{ __('pos.offline_locked_title') }}</p>
+            <p class="text-[12px] text-amber-700 dark:text-amber-300">{{ __('pos.offline_locked_body') }}
+                @if(auth('pos')->user()?->isPosCashier())
+                    <span class="font-semibold">{{ __('pos.offline_locked_ask_admin') }}</span>
+                @endif
+            </p>
+        </div>
+        @unless(auth('pos')->user()?->isPosCashier())
+        <a href="{{ route('pos.billing') }}" class="flex-shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-bold bg-amber-600 hover:bg-amber-700 text-white transition self-center">{{ __('pos.offline_locked_upgrade') }}</a>
+        @endunless
+        <button type="button" @click="offlineLockDismissed = true" class="flex-shrink-0 p-1 rounded-lg text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-800/40 transition self-center" title="{{ __('pos.dismiss') }}">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+    </div>
+
     {{-- ═══════════ NAV SALE TOOLS (Jul 2026 redesign, owner-approved mockup) ═══════════
          Desktop (md+): the utility pills (Local/Failed/Reprint/Held + sync), the "+ New Sale"
          action and a "Switches" dropdown (PRA / Auto-Print / Auto-KOT) live INSIDE the black
@@ -3728,6 +3752,9 @@ function restaurantPos() {
         // Gates NEW queueing only — syncOfflineBills (replay of already-queued bills)
         // never checks this: queued bills kabhi reject nahi hote.
         offlineAllowed: {{ \App\Services\PosFeatureService::planAllows($company, 'offline_enabled') ? 'true' : 'false' }},
+        // Task 127: offline-locked notice dismissal — resets whenever the shop
+        // comes back online so the next outage shows the banner again.
+        offlineLockDismissed: false,
         _idb: null,
         // Receipt-popup offline variant state: no server transaction yet, so the
         // popup renders a client-side summary + client-printed interim receipt.
@@ -4119,7 +4146,7 @@ function restaurantPos() {
         // and silently retry the OLDEST one. One bill per tick = no PRA flood.
         _startAutoSync() {
             if (this._syncTimer) return;
-            window.addEventListener('online', () => { this.syncStatus = 'online'; this.syncOfflineBills(); this._autoSyncTick(true); });
+            window.addEventListener('online', () => { this.syncStatus = 'online'; this.offlineLockDismissed = false; this.syncOfflineBills(); this._autoSyncTick(true); });
             window.addEventListener('offline', () => { this.syncStatus = 'offline'; });
             this.refreshOfflineCount();
             this.syncOfflineBills();

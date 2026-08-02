@@ -91,7 +91,7 @@ class PublicProfileController extends Controller
         // Customer-facing page (no login) — SetPosLocale user-pref resolution
         // doesn't apply, so render in the company's default language.
         $lang = $company->default_language;
-        app()->setLocale(in_array($lang, ['ur', 'en'], true) ? $lang : 'ur');
+        app()->setLocale(\App\Support\PosLocale::normalize($lang));
 
         $menuItems = collect();
         if ($settings['show_menu'] ?? true) {

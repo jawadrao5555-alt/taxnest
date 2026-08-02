@@ -64,7 +64,7 @@ class Company extends Model
         'use_universal_pos',
         'pos_ui_density',
         'pos_theme',
-        'default_language', // 'ur' Roman Urdu / 'en' English — company-wide default (30 Jul 2026)
+        'default_language', // PosLocale: 'en' / 'rur' Roman Urdu / 'ur' Urdu script — company-wide default
         'pos_dashboard_style',
         'kitchen_printer_enabled',
         'print_on_hold',

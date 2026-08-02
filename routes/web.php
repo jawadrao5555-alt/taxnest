@@ -559,10 +559,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/settings/theme', [PosController::class, 'updateTheme'])->name('pos.settings.theme');
     Route::post('/settings/dashboard-style', [PosController::class, 'updateDashboardStyle'])->name('pos.settings.dashboard-style');
     Route::post('/settings/guided-flow', [PosController::class, 'updateGuidedFlow'])->name('pos.settings.guided-flow');
-    // Language system (30 Jul 2026): per-user choice + company default. 'ur' Roman Urdu / 'en' English.
+    // Language system (2 Aug 2026): per-user choice + company default. PosLocale: 'en' / 'rur' Roman Urdu / 'ur' Urdu script.
     Route::post('/set-language', function (\Illuminate\Http\Request $request) {
         $lang = $request->input('language');
-        if (in_array($lang, ['ur', 'en'], true)) {
+        if (in_array($lang, \App\Support\PosLocale::ALL, true)) {
             $u = auth()->guard('pos')->user();
             $u->language = $lang;
             $u->save();
@@ -573,7 +573,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         $u = auth()->guard('pos')->user();
         abort_unless($u && $u->isPosAdmin(), 403);
         $lang = $request->input('default_language');
-        if (in_array($lang, ['ur', 'en'], true)) {
+        if (in_array($lang, \App\Support\PosLocale::ALL, true)) {
             $u->company->update(['default_language' => $lang]);
         }
         return back()->with('success', __('pos.language_saved'));
@@ -1080,10 +1080,10 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/settings/dashboard-style', [FbrPosController::class, 'updateDashboardStyle'])->name('fbrpos.settings.dashboard-style');
     Route::post('/settings/theme', [FbrPosController::class, 'updateTheme'])->name('fbrpos.settings.theme');
     Route::post('/settings/guided-flow', [FbrPosController::class, 'updateGuidedFlow'])->name('fbrpos.settings.guided-flow');
-    // Language system (30 Jul 2026): per-user choice + company default. 'ur' Roman Urdu / 'en' English.
+    // Language system (2 Aug 2026): per-user choice + company default. PosLocale: 'en' / 'rur' Roman Urdu / 'ur' Urdu script.
     Route::post('/set-language', function (\Illuminate\Http\Request $request) {
         $lang = $request->input('language');
-        if (in_array($lang, ['ur', 'en'], true)) {
+        if (in_array($lang, \App\Support\PosLocale::ALL, true)) {
             $u = auth()->guard('fbrpos')->user();
             $u->language = $lang;
             $u->save();
@@ -1094,7 +1094,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
         $u = auth()->guard('fbrpos')->user();
         abort_unless($u && $u->isPosAdmin(), 403);
         $lang = $request->input('default_language');
-        if (in_array($lang, ['ur', 'en'], true)) {
+        if (in_array($lang, \App\Support\PosLocale::ALL, true)) {
             $u->company->update(['default_language' => $lang]);
         }
         return back()->with('success', __('pos.language_saved'));

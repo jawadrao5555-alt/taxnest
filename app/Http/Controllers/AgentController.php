@@ -760,8 +760,8 @@ class AgentController extends Controller
             $lang = $creatorLang
                 ?? $presser?->language
                 ?? $company->default_language
-                ?? 'ur';
-            app()->setLocale(in_array($lang, ['ur', 'en'], true) ? $lang : 'ur');
+                ?? \App\Support\PosLocale::DEFAULT;
+            app()->setLocale(\App\Support\PosLocale::normalize($lang));
         } catch (\Throwable $e) { /* never block a print over locale */ }
     }
 

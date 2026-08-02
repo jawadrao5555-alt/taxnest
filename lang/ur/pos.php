@@ -1546,6 +1546,7 @@ return [
     'language' => 'زبان',
     'language_english' => 'انگریزی',
     'language_roman_urdu' => 'رومن اردو',
+    'language_urdu_script' => 'اردو',
     'language_saved' => 'زبان سیو کر لی گئی۔',
     'last_7_days' => 'پچھلے 7 دن',
     'last_colon' => 'آخری: ',

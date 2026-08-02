@@ -265,17 +265,22 @@
                         <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.company_default_language') }}</p>
                         <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.company_default_language_hint') }}</p>
                     </div>
-                    @php $tnCoLang = in_array($company->default_language ?? 'ur', ['ur','en'], true) ? ($company->default_language ?? 'ur') : 'ur'; @endphp
+                    @php $tnCoLang = \App\Support\PosLocale::normalize($company->default_language ?? null); @endphp
                     <div class="flex gap-2 shrink-0">
                         <form method="POST" action="{{ route('pos.settings.default-language') }}">
                             @csrf
-                            <input type="hidden" name="default_language" value="ur">
-                            <button type="submit" class="px-3 py-1.5 rounded-lg text-[11px] font-bold border transition {{ $tnCoLang === 'ur' ? 'bg-sky-600 text-white border-sky-600' : 'text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800' }}">{{ __('pos.language_roman_urdu') }}</button>
+                            <input type="hidden" name="default_language" value="rur">
+                            <button type="submit" class="px-3 py-1.5 rounded-lg text-[11px] font-bold border transition {{ $tnCoLang === 'rur' ? 'bg-sky-600 text-white border-sky-600' : 'text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800' }}">{{ __('pos.language_roman_urdu') }}</button>
                         </form>
                         <form method="POST" action="{{ route('pos.settings.default-language') }}">
                             @csrf
                             <input type="hidden" name="default_language" value="en">
                             <button type="submit" class="px-3 py-1.5 rounded-lg text-[11px] font-bold border transition {{ $tnCoLang === 'en' ? 'bg-sky-600 text-white border-sky-600' : 'text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800' }}">{{ __('pos.language_english') }}</button>
+                        </form>
+                        <form method="POST" action="{{ route('pos.settings.default-language') }}">
+                            @csrf
+                            <input type="hidden" name="default_language" value="ur">
+                            <button type="submit" class="px-3 py-1.5 rounded-lg text-[11px] font-bold border transition {{ $tnCoLang === 'ur' ? 'bg-sky-600 text-white border-sky-600' : 'text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800' }}">{{ __('pos.language_urdu_script') }}</button>
                         </form>
                     </div>
                 </div>

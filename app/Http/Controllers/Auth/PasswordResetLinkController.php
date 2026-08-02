@@ -56,8 +56,8 @@ class PasswordResetLinkController extends Controller
         $resetLink = url("/reset-password-link?token={$token}&email=" . urlencode($request->email));
 
         // Render the email in the user's chosen language (session pos_locale, fallback en)
-        $sessionLocale = $request->hasSession() ? $request->session()->get('pos_locale') : null;
-        $mailLocale = in_array($sessionLocale, ['en', 'ur'], true) ? $sessionLocale : 'en';
+        $sessionLocale = $request->hasSession() ? $request->session()->get(\App\Support\PosLocale::SESSION_KEY) : null;
+        $mailLocale = in_array($sessionLocale, \App\Support\PosLocale::ALL, true) ? $sessionLocale : 'en';
         $previousLocale = app()->getLocale();
         app()->setLocale($mailLocale);
 

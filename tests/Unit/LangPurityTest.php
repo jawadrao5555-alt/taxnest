@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
  * Language purity lint — locks Task 236 forever.
  *
  * - en/pos.php        : pure English (no Arabic script, no Roman Urdu words)
- * - ur_roman/pos.php  : Roman Urdu (no Arabic-script characters at all)
+ * - rur/pos.php  : Roman Urdu (no Arabic-script characters at all)
  * - ur/pos.php        : Urdu script (no Latin words of 3+ letters except the whitelist)
  * - All three files key-synced, and every :placeholder from en preserved in both Urdu files.
  *
@@ -65,23 +65,23 @@ class LangPurityTest extends TestCase
     {
         $en = $this->basePathSafeLoad('en');
         $ur = $this->basePathSafeLoad('ur');
-        $rm = $this->basePathSafeLoad('ur_roman');
+        $rm = $this->basePathSafeLoad('rur');
 
         $this->assertSame([], array_keys(array_diff_key($en, $ur)), 'Keys in en missing from ur');
         $this->assertSame([], array_keys(array_diff_key($ur, $en)), 'Keys in ur missing from en');
-        $this->assertSame([], array_keys(array_diff_key($en, $rm)), 'Keys in en missing from ur_roman');
-        $this->assertSame([], array_keys(array_diff_key($rm, $en)), 'Keys in ur_roman missing from en');
+        $this->assertSame([], array_keys(array_diff_key($en, $rm)), 'Keys in en missing from rur');
+        $this->assertSame([], array_keys(array_diff_key($rm, $en)), 'Keys in rur missing from en');
     }
 
-    public function test_ur_roman_has_no_arabic_script(): void
+    public function test_rur_has_no_arabic_script(): void
     {
         $bad = [];
-        foreach ($this->basePathSafeLoad('ur_roman') as $key => $value) {
+        foreach ($this->basePathSafeLoad('rur') as $key => $value) {
             if (is_string($value) && preg_match('/\p{Arabic}/u', $value)) {
                 $bad[] = $key;
             }
         }
-        $this->assertSame([], $bad, 'ur_roman/pos.php contains Arabic-script characters in: ' . implode(', ', array_slice($bad, 0, 20)));
+        $this->assertSame([], $bad, 'rur/pos.php contains Arabic-script characters in: ' . implode(', ', array_slice($bad, 0, 20)));
     }
 
     public function test_ur_script_has_no_unwhitelisted_latin_words(): void
@@ -154,7 +154,7 @@ class LangPurityTest extends TestCase
     {
         $en = $this->basePathSafeLoad('en');
         $bad = [];
-        foreach (['ur', 'ur_roman'] as $locale) {
+        foreach (['ur', 'rur'] as $locale) {
             $map = $this->basePathSafeLoad($locale);
             foreach ($en as $key => $value) {
                 if (! is_string($value) || ! isset($map[$key]) || ! is_string($map[$key])) {

@@ -8,7 +8,7 @@ use Tests\TestCase;
 /**
  * Locks the reset-flow user-facing messages to the __('pos.auth_*') keys so a
  * future refactor can never silently drop them back to hardcoded English.
- * With session pos_locale=ur, the flashed errors must be the exact Urdu
+ * With session pos_locale_v2=ur (PosLocale::SESSION_KEY), the flashed errors must be the exact Urdu
  * strings from lang/ur/pos.php.
  */
 class PasswordResetUrduLocaleTest extends TestCase
@@ -42,7 +42,7 @@ class PasswordResetUrduLocaleTest extends TestCase
 
     public function test_reset_link_without_token_flashes_urdu_invalid_link_error(): void
     {
-        $response = $this->withSession(['pos_locale' => 'ur'])
+        $response = $this->withSession([\App\Support\PosLocale::SESSION_KEY => 'ur'])
             ->get('/reset-password-link');
 
         $response->assertRedirect(route('password.request'));
@@ -51,7 +51,7 @@ class PasswordResetUrduLocaleTest extends TestCase
 
     public function test_reset_link_with_bad_token_flashes_urdu_expired_link_error(): void
     {
-        $response = $this->withSession(['pos_locale' => 'ur'])
+        $response = $this->withSession([\App\Support\PosLocale::SESSION_KEY => 'ur'])
             ->get('/reset-password-link?token=deadbeef&email=someone@example.com');
 
         $response->assertRedirect(route('password.request'));
@@ -61,7 +61,7 @@ class PasswordResetUrduLocaleTest extends TestCase
     public function test_reset_form_with_bad_session_flashes_urdu_invalid_session_error(): void
     {
         // No password_reset_token/email in session → invalid reset session.
-        $response = $this->withSession(['pos_locale' => 'ur'])
+        $response = $this->withSession([\App\Support\PosLocale::SESSION_KEY => 'ur'])
             ->get('/reset-password?token=deadbeef&email=someone@example.com');
 
         $response->assertRedirect(route('password.request'));
@@ -70,7 +70,7 @@ class PasswordResetUrduLocaleTest extends TestCase
 
     public function test_reset_submit_with_bad_session_flashes_urdu_invalid_session_error(): void
     {
-        $response = $this->withSession(['pos_locale' => 'ur'])
+        $response = $this->withSession([\App\Support\PosLocale::SESSION_KEY => 'ur'])
             ->post('/reset-password', [
                 'token' => 'deadbeef',
                 'email' => 'someone@example.com',
@@ -84,7 +84,7 @@ class PasswordResetUrduLocaleTest extends TestCase
 
     public function test_verify_otp_with_wrong_otp_flashes_urdu_invalid_otp_error(): void
     {
-        $response = $this->withSession(['pos_locale' => 'ur'])
+        $response = $this->withSession([\App\Support\PosLocale::SESSION_KEY => 'ur'])
             ->from('/verify-otp?email=someone@example.com')
             ->post('/verify-otp', [
                 'email' => 'someone@example.com',
@@ -97,7 +97,7 @@ class PasswordResetUrduLocaleTest extends TestCase
 
     public function test_verify_otp_validation_messages_are_urdu(): void
     {
-        $response = $this->withSession(['pos_locale' => 'ur'])
+        $response = $this->withSession([\App\Support\PosLocale::SESSION_KEY => 'ur'])
             ->post('/verify-otp', [
                 'email' => 'not-an-email',
                 'otp' => '123',
@@ -111,7 +111,7 @@ class PasswordResetUrduLocaleTest extends TestCase
 
     public function test_verify_otp_missing_fields_flash_urdu_required_errors(): void
     {
-        $response = $this->withSession(['pos_locale' => 'ur'])
+        $response = $this->withSession([\App\Support\PosLocale::SESSION_KEY => 'ur'])
             ->post('/verify-otp', []);
 
         $response->assertSessionHasErrors([
@@ -122,7 +122,7 @@ class PasswordResetUrduLocaleTest extends TestCase
 
     public function test_forgot_password_missing_email_flashes_urdu_required_error(): void
     {
-        $response = $this->withSession(['pos_locale' => 'ur'])
+        $response = $this->withSession([\App\Support\PosLocale::SESSION_KEY => 'ur'])
             ->post('/forgot-password', []);
 
         $response->assertSessionHasErrors(['email' => $this->urduLine('auth_val_email_required')]);
@@ -130,7 +130,7 @@ class PasswordResetUrduLocaleTest extends TestCase
 
     public function test_forgot_password_invalid_email_flashes_urdu_email_error(): void
     {
-        $response = $this->withSession(['pos_locale' => 'ur'])
+        $response = $this->withSession([\App\Support\PosLocale::SESSION_KEY => 'ur'])
             ->post('/forgot-password', ['email' => 'not-an-email']);
 
         $response->assertSessionHasErrors(['email' => $this->urduLine('auth_val_email_email')]);

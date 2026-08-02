@@ -1,6 +1,6 @@
 <?php
 
-// Pure English. Keys mirror lang/ur/pos.php and lang/ur_roman/pos.php — keep ALL THREE in sync.
+// Pure English. Keys mirror lang/ur/pos.php (Urdu script) and lang/rur/pos.php (Roman Urdu) — keep ALL THREE in sync.
 // Purity locked by tests/Unit/LangPurityTest.php — no Roman Urdu / Urdu script here.
 
 return [
@@ -1546,6 +1546,7 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'language' => 'Language',
     'language_english' => 'English',
     'language_roman_urdu' => 'Roman Urdu',
+    'language_urdu_script' => 'Urdu Script',
     'language_saved' => 'Language saved.',
     'last_7_days' => 'Last 7 days',
     'last_colon' => 'Last: ',

@@ -493,19 +493,24 @@
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                                         {{ __('pos.nav_my_profile') }}
                                     </a>
-                                    {{-- Language picker (30 Jul 2026) — per-user Roman Urdu / English --}}
+                                    {{-- Language picker (2 Aug 2026) — per-user Roman Urdu / English / Urdu script --}}
                                     <p class="px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ __('pos.language') }}</p>
                                     <div class="px-4 py-1.5 flex gap-2">
                                         @php $tnCurLang = app()->getLocale(); @endphp
                                         <form method="POST" action="{{ route('fbrpos.set-language') }}" class="flex-1">
                                             @csrf
-                                            <input type="hidden" name="language" value="ur">
-                                            <button type="submit" class="w-full px-2 py-1.5 rounded-lg text-[11px] font-bold border transition {{ $tnCurLang === 'ur' ? 'bg-blue-600 text-white border-blue-600' : 'text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800' }}">{{ __('pos.language_roman_urdu') }}</button>
+                                            <input type="hidden" name="language" value="rur">
+                                            <button type="submit" class="w-full px-2 py-1.5 rounded-lg text-[11px] font-bold border transition {{ $tnCurLang === 'rur' ? 'bg-blue-600 text-white border-blue-600' : 'text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800' }}">{{ __('pos.language_roman_urdu') }}</button>
                                         </form>
                                         <form method="POST" action="{{ route('fbrpos.set-language') }}" class="flex-1">
                                             @csrf
                                             <input type="hidden" name="language" value="en">
                                             <button type="submit" class="w-full px-2 py-1.5 rounded-lg text-[11px] font-bold border transition {{ $tnCurLang === 'en' ? 'bg-blue-600 text-white border-blue-600' : 'text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800' }}">{{ __('pos.language_english') }}</button>
+                                        </form>
+                                        <form method="POST" action="{{ route('fbrpos.set-language') }}" class="flex-1">
+                                            @csrf
+                                            <input type="hidden" name="language" value="ur">
+                                            <button type="submit" class="w-full px-2 py-1.5 rounded-lg text-[11px] font-bold border transition {{ $tnCurLang === 'ur' ? 'bg-blue-600 text-white border-blue-600' : 'text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800' }}">{{ __('pos.language_urdu_script') }}</button>
                                         </form>
                                     </div>
                                     {{-- PWA install — always visible --}}

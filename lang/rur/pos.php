@@ -1546,6 +1546,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'language' => 'Zuban / Language',
     'language_english' => 'English',
     'language_roman_urdu' => 'Roman Urdu',
+    'language_urdu_script' => 'Urdu Script',
     'language_saved' => 'Language save ho gayi.',
     'last_7_days' => 'Last 7 days',
     'last_colon' => 'Last: ',

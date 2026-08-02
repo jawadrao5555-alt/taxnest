@@ -188,6 +188,10 @@
                                     <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                     Compliance Scoring
                                 </li>
+                                <li class="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                                    <svg class="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    FBR Audit Pack &middot; 6-year archive
+                                </li>
                             </ul>
                             @if(!$currentSubscription || $currentSubscription->pricing_plan_id !== $plan->id)
                             <form method="POST" action="/billing/subscribe" class="mt-6">
@@ -338,6 +342,7 @@
                                     'FBR Integration' => 1,
                                     'PDF Generation' => 1,
                                     'Compliance Scoring' => 1,
+                                    'FBR Audit Pack (6-Year Archive)' => 1,
                                     'MIS Reports' => 2,
                                     'Customer Ledger' => 2,
                                     'Recurring Invoices' => 2,

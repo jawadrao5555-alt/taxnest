@@ -824,7 +824,7 @@ class AdminCompanyController extends Controller
             'fbr_pos_loyalty_ledger', 'fbr_pos_loyalty_settings',
             'fbr_pos_promotions', 'fbr_pos_shifts', 'fbr_pos_terminals',
             'push_subscriptions', 'payment_proofs', 'feature_suggestions',
-            'madadgar_messages', 'invoice_import_batches', 'invoice_deliveries',
+            'madadgar_messages', 'invoice_import_batches', 'invoice_deliveries', 'audit_packs',
             // Consultant console: operational rows die with the company (FK
             // cascade exists on MySQL, but prod drift makes belt+braces cheap).
             // consultant_commissions is deliberately EXCLUDED — money ledger
@@ -850,6 +850,12 @@ class AdminCompanyController extends Controller
 
             $company->forceDelete();
         });
+        // Remove generated Audit Pack ZIPs for this company from disk.
+        try {
+            \Illuminate\Support\Facades\Storage::disk('local')->deleteDirectory('audit-packs/company_' . $id);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Audit pack directory cleanup failed on company purge', ['company_id' => $id, 'error' => $e->getMessage()]);
+        }
         AdminAuditLog::log(auth('admin')->id(), 'Company permanently deleted', 'Company', $id, ['name' => $companyName]);
         return redirect()->route('saas.admin.companies.bin')->with('success', "Company '{$companyName}' has been permanently deleted.");
     }

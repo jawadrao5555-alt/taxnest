@@ -8,6 +8,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ComplianceCertificateController;
+use App\Http\Controllers\ComplianceController;
 use App\Http\Controllers\RiskReportController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\MISController;
@@ -289,6 +290,12 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
         Route::post('/company/consultants/links/{link}/approve', [CompanyConsultantController::class, 'approve'])->name('company.consultants.approve');
         Route::post('/company/consultants/links/{link}/reject', [CompanyConsultantController::class, 'reject'])->name('company.consultants.reject');
         Route::post('/company/consultants/links/{link}/revoke', [CompanyConsultantController::class, 'revokeLink'])->name('company.consultants.revoke');
+
+        Route::get('/compliance', [ComplianceController::class, 'index'])->name('compliance.index');
+        Route::post('/compliance/audit-packs', [ComplianceController::class, 'store'])->name('compliance.packs.store');
+        Route::get('/compliance/audit-packs/{pack}/status', [ComplianceController::class, 'status'])->name('compliance.packs.status');
+        Route::get('/compliance/audit-packs/{pack}/download', [ComplianceController::class, 'download'])->name('compliance.packs.download');
+        Route::delete('/compliance/audit-packs/{pack}', [ComplianceController::class, 'destroy'])->name('compliance.packs.destroy');
 
         Route::get('/company/users', [CompanyUserController::class, 'index']);
         Route::post('/company/users', [CompanyUserController::class, 'store'])->middleware('plan.limit:users');
@@ -1112,7 +1119,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/api/products/quick-create', [FbrPosController::class, 'apiQuickCreateProduct'])->name('fbrpos.api.products.quick-create');
     Route::post('/api/products/{id}/quick-price', [FbrPosController::class, 'apiQuickUpdatePrice'])->name('fbrpos.api.products.quick-price');
 
-    // ============ Phase 2: Mall-Grade Universal Features ============
+    // -------------------------------------------------------- Phase 2: Mall-Grade Universal Features --------------------------------------------------------
     // Terminals (multi-counter)
     Route::get('/terminals', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'terminals'])->name('fbrpos.phase2.terminals');
     Route::post('/terminals', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'storeTerminal'])->name('fbrpos.phase2.terminals.store');
@@ -1170,10 +1177,10 @@ Route::get('/setup-seed-xK9mP2', function () {
     }
 });
 
-// =====================================================
+// --------------------------------------------------------
 // AGENT API (TaxNest Desktop Sync Agent)
 // Bearer token auth, no CSRF
-// =====================================================
+// --------------------------------------------------------
 // ── TaxNest Rider app API (Aug 2026) — stateless bearer-token JSON.
 // Rider signs in with his portal login; token rotates per login (one device).
 // CSRF-exempt via bootstrap/app.php ('api/rider-app/*').

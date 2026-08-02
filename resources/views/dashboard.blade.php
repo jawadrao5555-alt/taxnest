@@ -364,6 +364,28 @@
                 </div>
             </div>
 
+            @if(auth()->user()->role === 'company_admin')
+            <a href="/compliance" class="premium-card p-5 mb-6 flex flex-col sm:flex-row sm:items-center gap-4 relative overflow-hidden group">
+                <div class="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-emerald-500 via-teal-500 to-cyan-500 rounded-full"></div>
+                <div class="flex items-center gap-4 flex-1 pl-3">
+                    <div class="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 flex items-center justify-center flex-shrink-0">
+                        <svg class="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.031 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    </div>
+                    <div>
+                        <p class="text-sm font-extrabold text-gray-900 dark:text-white flex items-center flex-wrap gap-2">
+                            <span>FBR Audit Pack</span>
+                            <span class="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-100 dark:border-emerald-800 rounded-full px-2 py-0.5 uppercase tracking-wider">6-year archive</span>
+                        </p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">One-click audit-ready export — invoice PDFs, register, audit trail &amp; FBR submission log in a single ZIP.</p>
+                    </div>
+                </div>
+                <span class="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-emerald-600 group-hover:bg-emerald-700 text-white text-xs font-bold transition flex-shrink-0">
+                    Open Compliance Center
+                    <svg class="w-3.5 h-3.5 ml-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                </span>
+            </a>
+            @endif
+
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <div class="premium-card p-5">
                     <div class="flex items-center justify-between">

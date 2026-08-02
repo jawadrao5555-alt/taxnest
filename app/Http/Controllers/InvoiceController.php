@@ -1375,8 +1375,9 @@ class InvoiceController extends Controller
 
     private function buildPdfData(Invoice $invoice): array
     {
-        // Extracted to InvoicePdfService (shared with share links + buyer
-        // email attachments). The ?wht_rate= query fallback is preserved.
+        // Extracted to InvoicePdfService (shared with share links, buyer
+        // email attachments and the FBR Audit Pack builder). The ?wht_rate=
+        // query fallback is preserved.
         $q = request()->query('wht_rate');
         return \App\Services\InvoicePdfService::buildData($invoice, is_numeric($q) ? floatval($q) : null);
     }

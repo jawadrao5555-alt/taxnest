@@ -291,6 +291,10 @@
                                 <span class="accent-emerald mr-3 text-lg leading-none">•</span>
                                 <span class="text-gray-700 text-sm">Customer ledgers & formal invoice PDFs</span>
                             </li>
+                            <li class="flex items-start">
+                                <span class="accent-emerald mr-3 text-lg leading-none">•</span>
+                                <span class="text-gray-700 text-sm">One-click FBR Audit Pack — 6-year audit-ready archive</span>
+                            </li>
                         </ul>
                         <div class="flex gap-4">
                             <a href="/digital-invoice" class="btn-solid btn-primary">Learn More</a>

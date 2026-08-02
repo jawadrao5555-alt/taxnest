@@ -2482,6 +2482,9 @@ function restaurantPos() {
         mobileView: 'menu',
         priorityOrder: false,
         recalledOrderId: null,
+        // Task 170: held-order delivery address awaiting restore after recall —
+        // survives the selectedCustomer watcher wipe + async address reload.
+        pendingAddrRestore: null,
         toast: { show: false, message: '', type: 'success' },
         lastHoldTime: 0,
         lastPayTime: 0,
@@ -2616,6 +2619,11 @@ function restaurantPos() {
             this.$watch('selectedCustomer', (c) => {
                 this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';
                 if (c && this.orderType === 'delivery') this.loadCustomerAddresses();
+                else if (this.pendingAddrRestore && this.orderType === 'delivery') {
+                    // Task 170: walk-in delivery recall — no address reload runs,
+                    // so re-apply the held one-off address here after the wipe above.
+                    this.selectedDeliveryAddress = this.pendingAddrRestore; this.pendingAddrRestore = null;
+                } else this.pendingAddrRestore = null;
             });
             this.$watch('orderType', (t) => {
                 if (t === 'delivery' && this.selectedCustomer && !this.customerAddresses.length) this.loadCustomerAddresses();
@@ -3914,7 +3922,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.customerNtn = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.fixCartIndex(); this.clearCartStorage(); },
+        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.customerNtn = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.pendingAddrRestore = null; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm(window.TXT.current_order_has + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast(window.TXT.new_sale_started, 'success');
@@ -4004,14 +4012,23 @@ function restaurantPos() {
         // so later address edits never rewrite old bills. Walk-in customers (no id)
         // can still type a one-off address — it snapshots without being saved.
         async loadCustomerAddresses() {
-            this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';
+            // Task 170: pendingAddrRestore = held-order address being restored on
+            // recall; it must beat the saved-default auto-select below.
+            const pending = this.pendingAddrRestore;
+            this.customerAddresses = []; this.selectedDeliveryAddress = pending || ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';
             const c = this.selectedCustomer;
             if (!c || !c.id) return;
             try {
                 const res = await fetch('/fbr-pos/api/customer-addresses?customer_id=' + c.id, { headers: { 'Accept': 'application/json' } });
                 const data = await res.json();
                 this.customerAddresses = Array.isArray(data.addresses) ? data.addresses : [];
-                if (this.customerAddresses.length) this.selectedDeliveryAddress = this.customerAddresses[0].address;
+                if (pending) {
+                    // One-off typed addresses aren't in the saved list — add so the
+                    // <select> can actually show them.
+                    if (!this.customerAddresses.some(a => a.address === pending)) this.customerAddresses.push({ id: null, label: null, address: pending });
+                    this.selectedDeliveryAddress = pending;
+                    this.pendingAddrRestore = null;
+                } else if (this.customerAddresses.length && !this.selectedDeliveryAddress) this.selectedDeliveryAddress = this.customerAddresses[0].address;
             } catch (e) { console.error('[addresses] load failed', e); }
         },
         async saveNewAddress() {
@@ -4300,6 +4317,11 @@ function restaurantPos() {
                     customer_id: this.selectedCustomer?.id || null,
                     customer_phone: this.selectedCustomer?.phone || null,
                     customer_ntn: this.customerNtn || null,
+                    // Task 170: snapshot order type + delivery address so a recalled
+                    // hold restores a typed/one-off address (same expression as the
+                    // final-bill payload builder — falls back to customer default).
+                    order_type: this.orderType || null,
+                    delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || (this.selectedCustomer?.address || '').trim() || null) : null,
                     // Snapshot of the FINAL payable total (discounts + per-item tax
                     // + Rs1 FBR charge) so the F3 held list shows the real figure.
                     total_amount: this.totalAmount,
@@ -5022,6 +5044,14 @@ function restaurantPos() {
                 this.recalledOrderId = null;
                 this.selectedCustomer = cd.customer_id ? { id: cd.customer_id, name: order.customer_name || window.TXT.customer_word, phone: cd.customer_phone || '' } : null;
                 this.customerPhoneQuery = this.selectedCustomer ? (this.selectedCustomer.phone || this.selectedCustomer.name) : '';
+                // Task 170: restore order type + delivery address. The
+                // selectedCustomer watcher fires on the NEXT tick and wipes
+                // selectedDeliveryAddress, then loadCustomerAddresses() would
+                // async-overwrite it with the saved default — pendingAddrRestore
+                // survives both and wins (see watcher + loadCustomerAddresses).
+                if (cd.order_type) this.orderType = cd.order_type;
+                const heldAddr = (cd.delivery_address || '').trim();
+                if (cd.order_type === 'delivery' && heldAddr) { this.pendingAddrRestore = heldAddr; this.selectedDeliveryAddress = heldAddr; }
                 this.heldOrders = this.heldOrders.filter(o => o.id !== order.id); this.showHeldOrders = false; this.showToast(window.TXT.order_recalled_for_editing, 'success');
                 return true;
             } catch (e) { console.error('recallOrder', e); this.showToast(window.TXT.network_error, 'error'); return false; }

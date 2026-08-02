@@ -832,6 +832,28 @@ window.addEventListener('popstate', function() {
                         <template x-if="selectedCustomer.address">
                             <p class="text-[10px] text-blue-500 dark:text-blue-400 truncate" x-text="'📍 ' + selectedCustomer.address"></p>
                         </template>
+                        {{-- Task 163 (PRA parity): delivery-address picker — Delivery orders only.
+                             Saved addresses (address #1 + extras) in a dropdown; "+ New" saves an
+                             extra address to the customer AND selects it for this bill. --}}
+                        <template x-if="orderType === 'delivery'">
+                            <div class="mt-1 space-y-1">
+                                <div class="flex items-center gap-1">
+                                    <select x-model="selectedDeliveryAddress" class="flex-1 min-w-0 text-sm font-medium rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
+                                        <option value="">{{ __('pos.delivery_address_divider') }}</option>
+                                        <template x-for="(a, ai) in customerAddresses" :key="a.id ?? ('t' + ai)">
+                                            <option :value="a.address" x-text="(a.label ? a.label + ': ' : '') + a.address"></option>
+                                        </template>
+                                    </select>
+                                    <button x-show="selectedDeliveryAddress && customerAddresses.some(a => a.address === selectedDeliveryAddress)" @click="deleteSelectedAddress()" title="{{ __('pos.ti_delete_address') }}" class="text-xs font-bold text-red-500 dark:text-red-400 px-2 py-1.5 rounded-md border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/30 whitespace-nowrap">✕</button>
+                                    <button @click="showAddrNew = !showAddrNew; if (showAddrNew) $nextTick(() => document.getElementById('tnNewAddrInput')?.focus())" class="text-xs font-bold text-blue-600 dark:text-blue-300 px-2 py-1.5 rounded-md border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 whitespace-nowrap">{{ __('pos.new_short') }}</button>
+                                </div>
+                                <div x-show="showAddrNew" x-cloak class="flex items-center gap-1">
+                                    <input id="tnNewAddrLabel" type="text" x-model="newAddrLabel" @keydown.enter.prevent="saveNewAddress()" @keydown.escape.prevent="showAddrNew = false" placeholder="{{ __('pos.ph_addr_label') }}" autocomplete="off" name="pos_new_addr_label_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-24 flex-none text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
+                                    <input id="tnNewAddrInput" type="text" x-model="newAddrText" @keydown.enter.prevent="saveNewAddress()" @keydown.escape.prevent="showAddrNew = false" placeholder="{{ __('pos.ph_full_delivery_address') }}" autocomplete="off" name="pos_new_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="flex-1 min-w-0 text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
+                                    <button @click="saveNewAddress()" class="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-2 py-1.5 rounded-md">{{ __('pos.save_btn') }}</button>
+                                </div>
+                            </div>
+                        </template>
                         <template x-if="customerStats">
                             <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
                                 {{-- Clickable (owner request, 1 Aug 2026 — matches PRA universal): opens the customer history modal --}}
@@ -847,6 +869,15 @@ window.addEventListener('popstate', function() {
                             </div>
                         </template>
                     </div>
+                </div>
+            </template>
+
+            {{-- Task 163: walk-in delivery (no selected customer) — plain one-off
+                 address input; snapshots on the bill without saving anywhere. --}}
+            <template x-if="orderType === 'delivery' && !selectedCustomer">
+                <div class="px-3 py-2 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/20 flex items-center gap-2">
+                    <span class="text-xs flex-shrink-0">📍</span>
+                    <input type="text" x-model="selectedDeliveryAddress" placeholder="{{ __('pos.ph_full_delivery_address') }}" autocomplete="off" name="pos_walkin_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="flex-1 min-w-0 text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
                 </div>
             </template>
 
@@ -2284,6 +2315,13 @@ function restaurantPos() {
         quickCustomerPhone: '',
         quickCustomerAddress: '',
         selectedCustomer: null,
+        // Task 163 (PRA parity): cashier-editable delivery address. The chosen text
+        // is a SNAPSHOT on the bill (fbr_pos_transactions.delivery_address).
+        customerAddresses: [],
+        selectedDeliveryAddress: '',
+        showAddrNew: false,
+        newAddrText: '',
+        newAddrLabel: '',
         customerPhoneQuery: '',
         customerPhoneResults: [],
         custHiIndex: 0,
@@ -2573,6 +2611,15 @@ function restaurantPos() {
             this.$watch('kitchenNotes', () => { this.saveCart(); });
             setTimeout(() => this.cacheProductData(), 800);
             document.addEventListener('keydown', (e) => this.handleKey(e));
+            // Task 163: keep the delivery-address picker in sync — covers EVERY
+            // customer select/clear path + order-type switch without patching each.
+            this.$watch('selectedCustomer', (c) => {
+                this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';
+                if (c && this.orderType === 'delivery') this.loadCustomerAddresses();
+            });
+            this.$watch('orderType', (t) => {
+                if (t === 'delivery' && this.selectedCustomer && !this.customerAddresses.length) this.loadCustomerAddresses();
+            });
             this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
             // Lazy-load provisional bill list on mount (for header badge count).
             // Failures are silent — badge just won't show until next refresh.
@@ -3867,7 +3914,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.customerNtn = ''; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.fixCartIndex(); this.clearCartStorage(); },
+        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.customerNtn = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm(window.TXT.current_order_has + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast(window.TXT.new_sale_started, 'success');
@@ -3949,6 +3996,86 @@ function restaurantPos() {
             this.showCustomerPicker = false;
             this.customerLookupResult = null;
             this.showToast(window.TXT.customer_prefix + c.name + (this.customerStats.is_frequent ? ' (VIP)' : ''), 'success');
+        },
+
+        // ── Task 163: customer delivery addresses (PRA universal parity) ──────
+        // pos_customers.address = "address #1"; extras live in pos_customer_addresses.
+        // The chosen text is a SNAPSHOT on the bill (fbr_pos_transactions.delivery_address)
+        // so later address edits never rewrite old bills. Walk-in customers (no id)
+        // can still type a one-off address — it snapshots without being saved.
+        async loadCustomerAddresses() {
+            this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';
+            const c = this.selectedCustomer;
+            if (!c || !c.id) return;
+            try {
+                const res = await fetch('/fbr-pos/api/customer-addresses?customer_id=' + c.id, { headers: { 'Accept': 'application/json' } });
+                const data = await res.json();
+                this.customerAddresses = Array.isArray(data.addresses) ? data.addresses : [];
+                if (this.customerAddresses.length) this.selectedDeliveryAddress = this.customerAddresses[0].address;
+            } catch (e) { console.error('[addresses] load failed', e); }
+        },
+        async saveNewAddress() {
+            const text = (this.newAddrText || '').trim();
+            if (!text) return;
+            const label = (this.newAddrLabel || '').trim();
+            const c = this.selectedCustomer;
+            if (!c || !c.id) {
+                // Walk-in: one-off snapshot only, nothing to persist against.
+                this.customerAddresses.push({ id: null, label: label || null, address: text });
+                this.selectedDeliveryAddress = text;
+                this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';
+                return;
+            }
+            try {
+                const res = await fetch('/fbr-pos/api/customer-addresses', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ customer_id: c.id, address: text, label: label || null }),
+                });
+                const data = await res.json().catch(() => null);
+                if (data && data.success && data.address) {
+                    this.customerAddresses.push(data.address);
+                    this.selectedDeliveryAddress = data.address.address;
+                    this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = '';
+                    this.showToast(window.TXT.address_saved, 'success');
+                } else {
+                    this.showToast((data && data.message) || window.TXT.could_not_save_address, 'error');
+                }
+            } catch (e) { this.showToast(window.TXT.could_not_save_address_conn, 'error'); }
+        },
+        // Delete the SELECTED saved address from the sale screen (PRA parity).
+        // id=0 = customer's default address (cleared, not row-deleted); walk-in
+        // one-off entries (id=null) are local-only, just dropped from the list.
+        async deleteSelectedAddress() {
+            const sel = this.selectedDeliveryAddress;
+            // Duplicate texts: if the same address text exists as both the Default
+            // and an extra row, delete the EXTRA row first — never silently clear
+            // the default when an equivalent copy exists.
+            const matches = this.customerAddresses.filter(x => x.address === sel);
+            const a = matches.find(x => x.id !== 0 && x.id !== null) || matches.find(x => x.id !== 0) || matches[0];
+            if (!a) return;
+            if (!confirm(window.TXT.confirm_delete_address + '\n' + (a.label ? a.label + ': ' : '') + a.address)) return;
+            const drop = () => {
+                this.customerAddresses = this.customerAddresses.filter(x => x !== a);
+                this.selectedDeliveryAddress = '';
+            };
+            const c = this.selectedCustomer;
+            if (a.id === null || !c || !c.id) { drop(); return; }
+            try {
+                const res = await fetch('/fbr-pos/api/customer-addresses/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ customer_id: c.id, id: a.id }),
+                });
+                const data = await res.json().catch(() => null);
+                if (data && data.success) {
+                    drop();
+                    if (a.id === 0 && this.selectedCustomer) this.selectedCustomer.address = null;
+                    this.showToast(window.TXT.address_deleted || 'Deleted', 'success');
+                } else {
+                    this.showToast((data && data.message) || window.TXT.could_not_save_address, 'error');
+                }
+            } catch (e) { this.showToast(window.TXT.could_not_save_address_conn, 'error'); }
         },
 
         async selectCustomerWithStats(c) {
@@ -4367,7 +4494,9 @@ function restaurantPos() {
                     // Address comes from the selected customer's saved address
                     // (frozen on the bill server-side; delivery orders only).
                     order_type: this.orderType || null,
-                    delivery_address: this.orderType === 'delivery' ? ((this.selectedCustomer?.address || '').trim() || null) : null,
+                    // Task 163: cashier-picked/typed address snapshot; falls back to the
+                    // customer's saved address if the picker was never touched/loaded.
+                    delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || (this.selectedCustomer?.address || '').trim() || null) : null,
                 };
                 const res = await fetch('{{ route("fbrpos.store") }}', {
                     method: 'POST',

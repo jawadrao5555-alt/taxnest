@@ -1054,6 +1054,12 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/api/customer-lookup', [FbrPosController::class, 'apiCustomerLookup'])->name('fbrpos.api.customer-lookup');
     Route::post('/api/customer-store', [FbrPosController::class, 'apiCustomerStore'])->name('fbrpos.api.customer-store');
     Route::get('/api/customer-history/{id}', [FbrPosController::class, 'apiCustomerHistory'])->name('fbrpos.api.customer-history');
+    // Task 163: cashier-editable delivery addresses — customers live in the shared
+    // pos_customers/pos_customer_addresses tables, so PosController handlers are
+    // reused as-is (they only depend on currentCompanyId, bound here too).
+    Route::get('/api/customer-addresses', [PosController::class, 'apiCustomerAddresses'])->name('fbrpos.api.customer-addresses');
+    Route::post('/api/customer-addresses', [PosController::class, 'apiStoreCustomerAddress'])->name('fbrpos.api.customer-addresses.store');
+    Route::post('/api/customer-addresses/delete', [PosController::class, 'apiDeleteCustomerAddress'])->name('fbrpos.api.customer-addresses.delete');
     Route::post('/api/products/quick-create', [FbrPosController::class, 'apiQuickCreateProduct'])->name('fbrpos.api.products.quick-create');
     Route::post('/api/products/{id}/quick-price', [FbrPosController::class, 'apiQuickUpdatePrice'])->name('fbrpos.api.products.quick-price');
 

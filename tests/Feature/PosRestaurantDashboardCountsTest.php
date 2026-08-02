@@ -142,6 +142,7 @@ class PosRestaurantDashboardCountsTest extends TestCase
 
     protected function tearDown(): void
     {
+        \Carbon\Carbon::setTestNow();
         Auth::guard('pos')->logout();
         parent::tearDown();
     }
@@ -242,6 +243,101 @@ class PosRestaurantDashboardCountsTest extends TestCase
         $this->assertStringNotContainsString('>3</span>', $html);
         // Cancelled count renders in its own card.
         $this->assertStringContainsString('>2</span>', $html);
+    }
+
+    // ── today-sales business-day window (Task 167) ──────────────────────────
+    //
+    // The dashboard's "aaj" metrics (todaySales/todayTax/todayDiscount/
+    // todayProfit/todayOrders/completedCount) must use the BUSINESS-day
+    // window ($today = bizDate + cutoff, default 06:00) — never
+    // whereDate(created_at). A 00:00–06:00 sale belongs to the PREVIOUS
+    // business day (this exact regression showed as "dashboard sab Rs 0").
+
+    /** Freeze time at a deterministic post-cutoff moment: today 14:00. */
+    protected function freezeAfternoon(): \Carbon\Carbon
+    {
+        $now = \Carbon\Carbon::now(config('app.timezone'))->setTime(14, 0, 0);
+        \Carbon\Carbon::setTestNow($now);
+
+        return $now;
+    }
+
+    protected function completedSale(\Carbon\Carbon $at, array $attrs = []): int
+    {
+        $id = $this->order(array_merge([
+            'status' => 'completed',
+            'total_amount' => 1000,
+            'tax_amount' => 160,
+            'discount_amount' => 50,
+            'estimated_cost' => 400,
+        ], $attrs));
+        DB::table('restaurant_orders')->where('id', $id)
+            ->update(['created_at' => $at, 'updated_at' => $at]);
+
+        return $id;
+    }
+
+    public function test_pre_cutoff_sale_counts_in_yesterday_not_today(): void
+    {
+        $this->actAs('pos_admin');
+        $now = $this->freezeAfternoon();
+
+        // 02:00 today (pre-cutoff) → previous business day.
+        $this->completedSale($now->copy()->setTime(2, 0, 0));
+
+        $data = $this->dashboardData();
+
+        $this->assertSame(0.0, (float) $data['todaySales']);
+        $this->assertSame(0.0, (float) $data['todayTax']);
+        $this->assertSame(0.0, (float) $data['todayDiscount']);
+        $this->assertSame(0.0, (float) $data['todayProfit']);
+        $this->assertSame(0, $data['todayOrders']);
+        $this->assertSame(0, $data['completedCount']);
+        // ...but it DOES belong to yesterday's business day.
+        $this->assertSame(1000.0, (float) $data['yesterdaySales']);
+    }
+
+    public function test_post_cutoff_sale_counts_in_today_totals(): void
+    {
+        $this->actAs('pos_admin');
+        $now = $this->freezeAfternoon();
+
+        // 09:30 today (after 06:00 cutoff) → today's business day.
+        $this->completedSale($now->copy()->setTime(9, 30, 0));
+        // Non-completed order after cutoff: in todayOrders, never in sales.
+        $held = $this->order(['status' => 'held', 'total_amount' => 700]);
+        DB::table('restaurant_orders')->where('id', $held)
+            ->update(['created_at' => $now->copy()->setTime(10, 0, 0)]);
+
+        $data = $this->dashboardData();
+
+        $this->assertSame(1000.0, (float) $data['todaySales']);
+        $this->assertSame(160.0, (float) $data['todayTax']);
+        $this->assertSame(50.0, (float) $data['todayDiscount']);
+        // Profit = sales − estimated_cost.
+        $this->assertSame(600.0, (float) $data['todayProfit']);
+        $this->assertSame(2, $data['todayOrders']);
+        $this->assertSame(1, $data['completedCount']);
+        $this->assertSame(0.0, (float) $data['yesterdaySales']);
+    }
+
+    public function test_yesterday_sales_window_is_cutoff_to_cutoff(): void
+    {
+        $this->actAs('pos_admin');
+        $now = $this->freezeAfternoon();
+
+        // Yesterday 02:00 = BEFORE yesterday's cutoff → day-before-yesterday's
+        // business day; must NOT count in yesterdaySales.
+        $this->completedSale($now->copy()->subDay()->setTime(2, 0, 0), ['total_amount' => 300]);
+        // Yesterday 20:00 = inside yesterday's business day.
+        $this->completedSale($now->copy()->subDay()->setTime(20, 0, 0), ['total_amount' => 800]);
+        // Today 02:00 (pre-cutoff) also lands in yesterday's business day.
+        $this->completedSale($now->copy()->setTime(2, 0, 0), ['total_amount' => 200]);
+
+        $data = $this->dashboardData();
+
+        $this->assertSame(1000.0, (float) $data['yesterdaySales']);
+        $this->assertSame(0.0, (float) $data['todaySales']);
     }
 
     // ── tile render: links + include contract ───────────────────────────────

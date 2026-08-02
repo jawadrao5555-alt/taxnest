@@ -30,7 +30,9 @@ class DbCompat
     /** Case-insensitive LIKE operator. */
     public static function like(): string
     {
-        return self::isMySQL() ? 'like' : 'ilike';
+        // MySQL LIKE is case-insensitive by collation; sqlite (test suite)
+        // LIKE is case-insensitive by default and does NOT support ILIKE.
+        return self::isPgSQL() ? 'ilike' : 'like';
     }
 
     /**

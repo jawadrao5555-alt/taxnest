@@ -285,6 +285,31 @@
                     </div>
                 </div>
                 @endif
+                @php($tnHeartbeatWarn = \App\Services\HeartbeatHealth::warning())
+                @if($tnHeartbeatWarn)
+                <div class="mx-4 mt-4 bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-sm">
+                    <div class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                        <div class="min-w-0">
+                            @if($tnHeartbeatWarn['scheduler_stale'])
+                            <p class="font-semibold text-red-300">
+                                Background scheduler (cron) has stopped — last heartbeat {{ $tnHeartbeatWarn['scheduler_at'] ? $tnHeartbeatWarn['scheduler_at']->diffForHumans() : 'never' }}. Trial reminders, FBR token checks and offline sync are NOT running.
+                            </p>
+                            @endif
+                            @if($tnHeartbeatWarn['queue_stale'])
+                            <p class="font-semibold text-red-300 {{ $tnHeartbeatWarn['scheduler_stale'] ? 'mt-1' : '' }}">
+                                Email queue worker has stopped — last heartbeat {{ $tnHeartbeatWarn['queue_at'] ? $tnHeartbeatWarn['queue_at']->diffForHumans() : 'never recorded' }}. Queued emails (consultant alerts etc.) are silently piling up in the jobs table.
+                            </p>
+                            @endif
+                            <p class="text-red-300 mt-2">
+                                Check the crontab on the live server (cPanel → Cron Jobs): both the every-minute <code class="text-red-200">schedule:run</code> and the queue-worker entries must exist.
+                                <a href="{{ route('saas.admin.system') }}" class="underline font-semibold hover:text-red-200">View system status</a>
+                                — this warning clears automatically once heartbeats resume.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                @endif
                 {{ $slot }}
             </main>
         </div>

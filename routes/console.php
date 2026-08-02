@@ -28,6 +28,43 @@ Schedule::call(function () {
 // admin System Control page can detect a dead worker even while cron is fine.
 Schedule::job(new \App\Jobs\QueueHeartbeatJob)->everyFiveMinutes()->name('queue-heartbeat');
 
+// Stale-heartbeat watchdog: if the queue worker dies while cron is still
+// alive, email every admin (synchronously — the dead queue can't deliver it).
+// Throttled to once per 12h; the admin-panel banner covers the rest.
+Schedule::call(function () {
+    try {
+        $warn = \App\Services\HeartbeatHealth::warning();
+        if (!$warn || !$warn['queue_stale'] || !\App\Services\HeartbeatHealth::shouldNotify()) {
+            return;
+        }
+
+        $emails = \App\Models\AdminUser::whereNotNull('email')
+            ->where('email', '!=', '')
+            ->pluck('email')->unique()->values();
+        if ($emails->isEmpty()) {
+            return;
+        }
+
+        $lastBeat = $warn['queue_at'] ? $warn['queue_at']->format('Y-m-d H:i') . ' (' . $warn['queue_at']->diffForHumans() . ')' : 'never recorded';
+        $body = "The queue worker on the live server appears to have stopped.\n\n"
+            . "Last queue heartbeat: {$lastBeat}\n"
+            . "Queued emails (consultant alerts, invoice shares) are silently piling up in the jobs table until the worker runs again.\n\n"
+            . "Check the crontab on the live server (cPanel -> Cron Jobs): the queue-worker entry must exist alongside the every-minute schedule:run entry.\n"
+            . 'System status: ' . route('saas.admin.system') . "\n\n"
+            . 'TaxNest';
+
+        \Illuminate\Support\Facades\Mail::raw($body, function ($m) use ($emails) {
+            $m->to($emails->all())->subject('WARNING: TaxNest queue worker has stopped');
+        });
+
+        \App\Services\MailHealth::recordSuccess();
+        \App\Services\HeartbeatHealth::markNotified();
+    } catch (\Throwable $e) {
+        \Illuminate\Support\Facades\Log::warning('Heartbeat watchdog email failed', ['error' => $e->getMessage()]);
+        \App\Services\MailHealth::recordFailure('Queue-worker stale-heartbeat alert', $e);
+    }
+})->everyFifteenMinutes()->name('heartbeat-watchdog');
+
 Schedule::job(new NightlyComplianceCronJob)->daily()->at('02:00');
 Schedule::job(new CheckFbrTokenExpiryJob)->daily()->at('06:00');
 Schedule::job(new SyncPosOfflineInvoicesJob)->everyTwoMinutes();

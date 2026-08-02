@@ -2647,8 +2647,22 @@ class FbrPosController extends Controller
         }
 
         $msg = __('pos.dayclose_report_generated_for', ['number' => $report->report_number, 'date' => \Carbon\Carbon::parse($date)->format('d M Y')]);
-        if (($this->lastFinalizeSweep['finalized'] ?? 0) > 0) {
-            $msg .= __('pos.dayclose_bills_finalized', ['count' => $this->lastFinalizeSweep['finalized']]);
+        // Sweep summary (task: cashier ko batayein) — only when the 'finalize' policy
+        // actually ran and did something. Breaks down FBR outcomes so the cashier knows
+        // how many were submitted, how many are queued for the desktop agent, and how
+        // many landed in the Fail Queue (retryable — never lost).
+        $sweep = $this->lastFinalizeSweep;
+        if (($sweep['finalized'] ?? 0) > 0) {
+            $msg .= __('pos.dayclose_bills_finalized', ['count' => $sweep['finalized']]);
+            if (($sweep['submitted'] ?? 0) > 0) {
+                $msg .= __('pos.dayclose_bills_submitted', ['count' => $sweep['submitted']]);
+            }
+            if (($sweep['queued'] ?? 0) > 0) {
+                $msg .= __('pos.dayclose_bills_queued', ['count' => $sweep['queued']]);
+            }
+            if (($sweep['failed'] ?? 0) > 0) {
+                $msg .= __('pos.dayclose_bills_failed', ['count' => $sweep['failed']]);
+            }
         }
         return back()->with('success', $msg);
     }

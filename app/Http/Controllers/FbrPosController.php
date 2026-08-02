@@ -740,6 +740,23 @@ class FbrPosController extends Controller
         // for a local bill (no FBR submission now). Same semantics as a local-mode
         // sale: invoice_mode='local' + fbr_status='local'. Promote later via F10.
         $saveAsProvisional = $request->boolean('save_as_provisional');
+
+        // Order-type flow rules (owner, Jul 2026 — PRA parity, Task 164): on restaurant-ish
+        // companies (order-type widget visible = any of tables/kot/kitchen/delivery on),
+        // provisional bills are DELIVERY-only — Dine-In uses the Hold/KOT/recall procedure,
+        // Takeaway is billed directly as final. Only enforced when the client sent
+        // order_type (older queued offline payloads lack it — never strand a replay).
+        if ($saveAsProvisional && $request->filled('order_type') && $request->input('order_type') !== 'delivery') {
+            $flowFeatures = \App\Services\PosFeatureService::forCompany($company);
+            if (($flowFeatures->tables ?? false) || ($flowFeatures->kot ?? false) || ($flowFeatures->kitchen ?? false) || ($flowFeatures->delivery ?? false)) {
+                $flowMsg = __('pos.provisional_delivery_only_flow');
+                if ($request->expectsJson()) {
+                    return response()->json(['success' => false, 'error' => $flowMsg, 'message' => $flowMsg], 422);
+                }
+                return back()->withInput()->with('error', $flowMsg);
+            }
+        }
+
         if ($saveAsProvisional) {
             // Deliberate provisional — editable/deletable via F10 Local modal until promoted.
             $invoiceMode = 'local';

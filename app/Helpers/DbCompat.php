@@ -21,6 +21,12 @@ class DbCompat
         return config('database.default') === 'pgsql';
     }
 
+    /** sqlite is only used by the automated test suite (:memory:). */
+    public static function isSqlite(): bool
+    {
+        return config('database.default') === 'sqlite';
+    }
+
     /** Case-insensitive LIKE operator. */
     public static function like(): string
     {
@@ -44,6 +50,20 @@ class DbCompat
             ];
             $mysqlFormat = $map[$pgFormat] ?? '%Y-%m-%d';
             return "DATE_FORMAT({$column}, '{$mysqlFormat}')";
+        }
+        if (self::isSqlite()) {
+            // Test-suite only (sqlite :memory:) — strftime shares MySQL's tokens
+            // for the formats we use, except %i (minutes) → %M.
+            $map = [
+                'YYYY-MM'    => '%Y-%m',
+                'YYYY'       => '%Y',
+                'YYYY-MM-DD' => '%Y-%m-%d',
+                'YYYY-MM-DD HH24:MI' => '%Y-%m-%d %H:%M',
+                'HH24'       => '%H',
+                'DD'         => '%d',
+            ];
+            $fmt = $map[$pgFormat] ?? '%Y-%m-%d';
+            return "strftime('{$fmt}', {$column})";
         }
         return "TO_CHAR({$column}::date, '{$pgFormat}')";
     }

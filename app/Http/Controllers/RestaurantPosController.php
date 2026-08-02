@@ -1822,6 +1822,15 @@ class RestaurantPosController extends Controller
             ->whereIn('status', ['held', 'preparing', 'ready'])
             ->count();
 
+        // Task 113 (ZFC, 2 Aug 2026): Cancelled Orders tile — current BUSINESS
+        // day's cancelled count, same cutoff window the dashboard's "today"
+        // metrics use ($today = bizDate + cutoff). cancelled_at NULL fallback
+        // (column nayi hai) → updated_at, matching the report's query.
+        $cancelledTodayCount = RestaurantOrder::where('company_id', $companyId)
+            ->where('status', 'cancelled')
+            ->whereRaw('COALESCE(cancelled_at, updated_at) >= ?', [$today])
+            ->count();
+
         $totalTables = RestaurantTable::where('company_id', $companyId)->count();
         $occupiedTables = RestaurantTable::where('company_id', $companyId)->where('status', 'occupied')->count();
 
@@ -1954,7 +1963,7 @@ class RestaurantPosController extends Controller
             'peakHour', 'todayTax', 'todayDiscount',
             'todayCost', 'todayProfit', 'kitchenStats',
             'dashboardStyle', 'isRestaurant', 'isAdmin', 'praStatus', 'isCashier',
-            'pendingProvisional', 'openOrdersCount'
+            'pendingProvisional', 'openOrdersCount', 'cancelledTodayCount'
         ));
     }
 

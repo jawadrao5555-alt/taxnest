@@ -51,6 +51,17 @@
                     <span class="block text-[10px] text-gray-400">{{ __('pos.pending_open_tables_sub') }}</span>
                 </span>
             </a>
+            {{-- Task 113: Cancelled Orders count (current business day) → report page.
+                 Informational only — NOT part of the pending total (cancelled ≠ pending). --}}
+            @php $pbCancelled = (int) ($cancelledTodayCount ?? 0); @endphp
+            <a href="{{ route('pos.restaurant.cancelled-orders') }}"
+               class="flex items-center gap-2.5 px-3.5 py-2 rounded-lg border bg-white dark:bg-gray-800 {{ $pbCancelled > 0 ? 'border-red-200 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/30' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700' }} transition">
+                <span class="text-xl font-extrabold {{ $pbCancelled > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-400' }}">{{ $pbCancelled }}</span>
+                <span class="text-left">
+                    <span class="block text-[11px] font-bold text-gray-800 dark:text-gray-200">{{ __('pos.cancelled_orders_tile') }}</span>
+                    <span class="block text-[10px] text-gray-400">{{ __('pos.cancelled_orders_tile_sub') }}</span>
+                </span>
+            </a>
             @endif
         </div>
     </div>

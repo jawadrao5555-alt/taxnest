@@ -414,6 +414,8 @@ return [
     'pending_provisional_sub' => 'Abhi final nahi hue',
     'pending_open_tables' => 'Khule dine-in orders',
     'pending_open_tables_sub' => 'Abhi settle nahi hue',
+    'cancelled_orders_tile' => 'Cancelled orders',
+    'cancelled_orders_tile_sub' => 'Aaj cancel hue',
     'pending_all_clear' => 'Sab clear — koi pending bill nahi',
     'ti_carry_forward' => 'Pending provisional bills day close ke baad bhi F10 mein rahenge — agle din final kar sakenge',
     'badge_finalize' => 'Khud Final',

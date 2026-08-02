@@ -414,6 +414,8 @@ return [
     'pending_provisional_sub' => 'Not made final yet',
     'pending_open_tables' => 'Open dine-in orders',
     'pending_open_tables_sub' => 'Not settled yet',
+    'cancelled_orders_tile' => 'Cancelled orders',
+    'cancelled_orders_tile_sub' => 'Cancelled today',
     'pending_all_clear' => 'All clear — no pending bills',
     'ti_carry_forward' => 'Pending provisional bills survive day close and stay in F10 for the next day',
     'badge_finalize' => 'Make Final',

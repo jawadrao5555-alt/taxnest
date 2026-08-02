@@ -334,7 +334,15 @@
                                             @endif
                                             <div class="font-semibold text-xl text-[#0A4D5C]">PKR {{ number_format($plan->sale_price) }}<span class="text-sm text-gray-500 font-normal">/yr</span></div>
                                             @if((float) ($plan->price_quarterly ?? 0) > 0)
-                                                <div class="text-[10px] text-gray-500 mt-0.5">or PKR {{ number_format($plan->price_quarterly) }} / 3 months@if($hasOffer) &nbsp;<span class="text-amber-600 font-semibold">(sale sirf annual par)</span>@endif</div>
+                                                {{-- NOTE: never glue @if directly after a word character ("months@if") —
+                                                     Blade's \B@ regex skips it but still compiles the closing @endif,
+                                                     producing an unmatched endif → ParseError 500 on the whole page. --}}
+                                                <div class="text-[10px] text-gray-500 mt-0.5">
+                                                    or PKR {{ number_format($plan->price_quarterly) }} / 3 months
+                                                    @if($hasOffer)
+                                                        <span class="text-amber-600 font-semibold">(sale sirf annual par)</span>
+                                                    @endif
+                                                </div>
                                             @endif
                                         </div>
                                     </div>

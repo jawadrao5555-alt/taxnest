@@ -3532,6 +3532,7 @@ Bills stay with the cashier — this only clears the kitchen display.',
     'dayclose_bills_submitted_pra' => ' :count submitted to PRA.',
     'dayclose_bills_queued_pra' => ' :count queued for the desktop agent (Agent Sync).',
     'dayclose_bills_offline_pra' => ' :count saved as Offline (PRA unreachable/rejected — retry from Transactions).',
+    'dayclose_bills_quota_blocked' => ' — Warning: :count pending bill(s) could NOT be made FINAL (monthly bill quota exhausted). They were carried forward — upgrade or wait for the new month, then finalize them.',
     // ---- Auth screens (login / register) — task: auth pages follow chosen language ----
     'auth_login_title' => 'Login',
     'auth_signup_title' => 'Sign Up',

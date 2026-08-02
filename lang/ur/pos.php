@@ -3532,6 +3532,7 @@ Bills stay with the cashier — this only clears the kitchen display.',
     'dayclose_bills_submitted_pra' => ' :count بل PRA کو جمع ہو گئے۔',
     'dayclose_bills_queued_pra' => ' :count بل ڈیسک ٹاپ ایجنٹ (Agent Sync) کی قطار میں ہیں۔',
     'dayclose_bills_offline_pra' => ' :count بل آف لائن محفوظ ہوئے (PRA تک رسائی نہیں ہو سکی — Transactions سے دوبارہ کوشش کریں)۔',
+    'dayclose_bills_quota_blocked' => ' — خبردار: :count کچے بل فائنل نہیں ہو سکے (مہینے کا بل کوٹہ ختم)۔ یہ اگلے دن کے لیے محفوظ ہیں — پلان اپ گریڈ کریں یا نئے مہینے کا انتظار کریں، پھر فائنل کریں۔',
     // ---- Auth screens (login / register) — task: auth pages follow chosen language ----
     'auth_login_title' => 'Login',
     'auth_signup_title' => 'Sign Up',

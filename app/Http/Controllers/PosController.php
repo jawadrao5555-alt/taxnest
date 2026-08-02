@@ -7552,6 +7552,13 @@ class PosController extends Controller
                 $msg .= __('pos.dayclose_bills_offline_pra', ['count' => $sweep['offline']]);
             }
         }
+        // Quota warning (Task 166): if the monthly FINAL-bill quota ran out
+        // mid-sweep, the leftover provisionals were silently CARRIED. Tell the
+        // cashier how many could NOT be finalized — outside the finalized>0
+        // block, because quota can block the very first bill. Zero-count skips.
+        if (($sweep['quota_blocked'] ?? 0) > 0) {
+            $msg .= __('pos.dayclose_bills_quota_blocked', ['count' => $sweep['quota_blocked']]);
+        }
         return back()->with('success', $msg);
     }
 

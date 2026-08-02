@@ -549,6 +549,78 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         $this->assertStringContainsString(__('pos.dayclose_bills_offline_pra', ['count' => 1]), $msg);
     }
 
+    public function test_flash_warns_quota_blocked_count(): void
+    {
+        // Quota 1: first bill finalizes, the other two are quota-blocked and
+        // carried — the flash MUST warn the cashier (Task 166).
+        $companyId = $this->makeHttpCompany(['invoice_limit_override' => 1]);
+        $this->makeProvisional($companyId, 'L-0001');
+        $this->makeProvisional($companyId, 'L-0002');
+        $this->makeProvisional($companyId, 'L-0003');
+
+        $response = $this->closeDay($this->makePosUser($companyId));
+
+        $response->assertSessionHas('success');
+        $msg = session('success');
+        $this->assertStringContainsString(__('pos.dayclose_bills_finalized', ['count' => 1]), $msg);
+        $this->assertStringContainsString(__('pos.dayclose_bills_quota_blocked', ['count' => 2]), $msg);
+    }
+
+    public function test_flash_warns_quota_blocked_even_when_nothing_finalized(): void
+    {
+        // Quota already fully consumed BEFORE the sweep → finalized 0, but the
+        // warning must still appear (it lives OUTSIDE the finalized>0 block).
+        $companyId = $this->makeHttpCompany(['invoice_limit_override' => 1]);
+        // A completed final from earlier today consumes the whole monthly quota.
+        $this->makeProvisional($companyId, 'P-0001', [
+            'invoice_mode' => 'pra',
+            'pra_status' => 'submitted',
+            'pra_invoice_number' => 'PRA-123',
+        ]);
+        $this->makeProvisional($companyId, 'L-0001');
+        $this->makeProvisional($companyId, 'L-0002');
+
+        $response = $this->closeDay($this->makePosUser($companyId));
+
+        $response->assertSessionHas('success');
+        $msg = session('success');
+        $this->assertStringNotContainsString(__('pos.dayclose_bills_finalized', ['count' => 0]), $msg);
+        $this->assertStringContainsString(__('pos.dayclose_bills_quota_blocked', ['count' => 2]), $msg);
+    }
+
+    public function test_flash_has_no_quota_warning_when_quota_not_hit(): void
+    {
+        // Unlimited quota (default -1): zero-count skip — no warning text at all.
+        $companyId = $this->makeHttpCompany();
+        $this->makeProvisional($companyId, 'L-0001');
+
+        $response = $this->closeDay($this->makePosUser($companyId));
+
+        $response->assertSessionHas('success');
+        $this->assertStringNotContainsString(
+            __('pos.dayclose_bills_quota_blocked', ['count' => 0]),
+            session('success')
+        );
+    }
+
+    public function test_urdu_user_gets_urdu_quota_warning(): void
+    {
+        $companyId = $this->makeHttpCompany(['invoice_limit_override' => 1]);
+        $this->makeProvisional($companyId, 'L-0001');
+        $this->makeProvisional($companyId, 'L-0002');
+
+        $response = $this->closeDay($this->makePosUser($companyId, 'ur'));
+
+        $response->assertSessionHas('success');
+        $urWarn = trans('pos.dayclose_bills_quota_blocked', ['count' => 1], 'ur');
+        $this->assertStringContainsString($urWarn, session('success'));
+        $this->assertNotSame(
+            trans('pos.dayclose_bills_quota_blocked', ['count' => 1], 'en'),
+            $urWarn,
+            'ur key must not silently fall back to English'
+        );
+    }
+
     public function test_no_sweep_summary_when_policy_is_not_finalize(): void
     {
         // Default 'save' policy: provisional gets ARCHIVED (not finalized) →
@@ -612,7 +684,7 @@ class PosDayCloseAutoFinalizeTest extends TestCase
 
     public function test_all_pra_sweep_summary_keys_exist_in_en_and_ur(): void
     {
-        foreach (['dayclose_bills_finalized', 'dayclose_bills_submitted_pra', 'dayclose_bills_queued_pra', 'dayclose_bills_offline_pra'] as $key) {
+        foreach (['dayclose_bills_finalized', 'dayclose_bills_submitted_pra', 'dayclose_bills_queued_pra', 'dayclose_bills_offline_pra', 'dayclose_bills_quota_blocked'] as $key) {
             foreach (['en', 'ur'] as $locale) {
                 $this->assertTrue(
                     \Illuminate\Support\Facades\Lang::has("pos.$key", $locale),

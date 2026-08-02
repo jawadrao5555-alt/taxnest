@@ -9,7 +9,7 @@ Deep module invariants live in `.agents/memory/` topic files — this file is th
 - **Issue-log workflow (owner, 28 Jul 2026)**: jab owner issues bataye, sirf NOTE karo (`.local/issue-log.md` mein) — build/fix mat karo. "Summary do" kahe to logged issues ki summary do; "kaam karo" kahe tab hi implement karo.
 - **CURRENT FOCUS (owner, 18 Jul 2026): work ONLY on NestPOS PRA (PRA POS) for now** — DI, FBR POS, admin/SaaS surfaces sirf tab touch karo jab owner kahe.
 - ZIA CORPORATION is a REAL production account (not demo) — NTN 3620291786117, Digital Invoice ONLY (no POS data).
-- NestPOS Enterprise Store (company_id 11) = dedicated POS test company (posadmin@taxnest.com / Admin@12345). Test Trading Company (company_id 12, test@testtrading.pk / Admin@12345) = admin-approval-workflow testing.
+- NestPOS Enterprise Store (company_id 11) = dedicated POS test company; Test Trading Company (company_id 12) = admin-approval-workflow testing. All dev/QA logins live in untracked `.local/qa-creds.env` — repo is PUBLIC, never write passwords into tracked files.
 - DI and POS data are FULLY ISOLATED — no cross-contamination, ever.
 - **UI language rule (owner, 20 Jul 2026)**: admin panel UI text = ENGLISH only; customer-facing POS surfaces may use Roman Urdu; customer-submitted content shown as-is. **UPDATE (28 Jul 2026): printed receipts/bills = ENGLISH only — no Roman Urdu lines on any printed ticket.**
 - Billing: POS = ANNUAL-ONLY (6% discount baked in, no cycle toggle). DI = full toggle: Monthly / Quarterly(-1%) / Semi-Annual(-3%) / Annual(-6%).

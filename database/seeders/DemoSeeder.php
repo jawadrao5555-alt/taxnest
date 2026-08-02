@@ -37,7 +37,7 @@ class DemoSeeder extends Seeder
             ['email' => 'demo@taxnest.pk'],
             [
                 'name' => 'Demo Company Admin',
-                'password' => Hash::make('password123'),
+                'password' => Hash::make(env('SEED_DEFAULT_PASSWORD', 'TaxNest#Dev2026')),
                 'role' => 'company_admin',
                 'company_id' => $company->id,
             ]

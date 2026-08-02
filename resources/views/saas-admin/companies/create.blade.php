@@ -137,7 +137,7 @@
                 </div>
                 <div>
                     <label class="text-xs text-gray-400 mb-1 block">Password <span class="text-red-400">*</span></label>
-                    <input type="text" name="admin_password" value="{{ old('admin_password', 'Admin@12345') }}" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 placeholder-gray-600">
+                    <input type="text" name="admin_password" value="{{ old('admin_password', \Illuminate\Support\Str::password(12)) }}" required class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 placeholder-gray-600">
                 </div>
             </div>
         </div>

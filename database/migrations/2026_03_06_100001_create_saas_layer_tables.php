@@ -127,7 +127,7 @@ return new class extends Migration
         DB::table('admin_users')->insertOrIgnore([
             'name' => 'Super Admin',
             'email' => 'admin@taxnest.com',
-            'password' => Hash::make('Admin@12345'),
+            'password' => Hash::make(env('SEED_DEFAULT_PASSWORD', 'TaxNest#Dev2026')),
             'role' => 'super_admin',
             'created_at' => now(),
             'updated_at' => now(),

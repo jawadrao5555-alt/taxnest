@@ -30,10 +30,17 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 BASE_URL="${BASE_URL:-http://127.0.0.1:5000}"
-LOGIN="${POS_CHECK_LOGIN:-posadmin@taxnest.com}"
-PASSWORD="${POS_CHECK_PASSWORD:-Admin@12345}"
-FBR_LOGIN="${FBR_CHECK_LOGIN:-fbrpostest@taxnest.com}"
-FBR_PASSWORD="${FBR_CHECK_PASSWORD:-Admin@12345}"
+# Credentials come from env or the untracked .local/qa-creds.env — repo is
+# PUBLIC, never hardcode passwords in this file.
+if [ -f .local/qa-creds.env ]; then . .local/qa-creds.env; fi
+LOGIN="${POS_CHECK_LOGIN:-${DEV_POS_LOGIN:-}}"
+PASSWORD="${POS_CHECK_PASSWORD:-${DEV_POS_PASS:-}}"
+FBR_LOGIN="${FBR_CHECK_LOGIN:-${DEV_FBR_LOGIN:-}}"
+FBR_PASSWORD="${FBR_CHECK_PASSWORD:-${DEV_FBR_PASS:-}}"
+if [ -z "$LOGIN" ] || [ -z "$PASSWORD" ]; then
+    echo "ERROR: POS check credentials missing — set POS_CHECK_LOGIN/POS_CHECK_PASSWORD or create .local/qa-creds.env" >&2
+    exit 2
+fi
 STATIC_ONLY=0
 [ "${1:-}" = "--static-only" ] && STATIC_ONLY=1
 

@@ -51,7 +51,7 @@ class PosCompanySeeder extends Seeder
                 DB::table('users')->insert([
                     'name' => 'POS Admin',
                     'email' => 'posadmin@taxnest.com',
-                    'password' => Hash::make('Admin@12345'),
+                    'password' => Hash::make(env('SEED_DEFAULT_PASSWORD', 'TaxNest#Dev2026')),
                     'company_id' => $companyId,
                     'role' => 'company_admin',
                     'is_active' => true,

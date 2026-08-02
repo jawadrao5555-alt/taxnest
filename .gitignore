@@ -27,3 +27,5 @@ Thumbs.db
 
 pra-agent/dist/
 .local/rider-signing/
+.agents/
+.local/

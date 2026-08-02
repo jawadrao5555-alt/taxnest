@@ -43,7 +43,7 @@ return new class extends Migration
             DB::table('users')->insert([
                 'name' => 'MUHAMMAD JAWAD SAEED',
                 'email' => 'jawadrao5555@gmail.com',
-                'password' => Hash::make('Admin@12345'),
+                'password' => Hash::make(env('SEED_DEFAULT_PASSWORD', 'TaxNest#Dev2026')),
                 'company_id' => $companyId,
                 'role' => 'company_admin',
                 'is_active' => true,

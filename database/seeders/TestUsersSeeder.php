@@ -32,7 +32,7 @@ class TestUsersSeeder extends Seeder
             ['email' => 'admin@test.com'],
             [
                 'name' => 'Admin',
-                'password' => Hash::make('admin123'),
+                'password' => Hash::make(env('SEED_DEFAULT_PASSWORD', 'TaxNest#Dev2026')),
                 'role' => 'super_admin',
                 'company_id' => $company->id,
             ]
@@ -42,7 +42,7 @@ class TestUsersSeeder extends Seeder
             ['email' => 'jawad@test.com'],
             [
                 'name' => 'Jawad',
-                'password' => Hash::make('jawad123'),
+                'password' => Hash::make(env('SEED_DEFAULT_PASSWORD', 'TaxNest#Dev2026')),
                 'role' => 'employee',
                 'company_id' => $company->id,
             ]
@@ -76,7 +76,7 @@ class TestUsersSeeder extends Seeder
             ['email' => 'fbrtest@taxnest.com'],
             [
                 'name' => 'FBR POS Test',
-                'password' => Hash::make('Admin@12345'),
+                'password' => Hash::make(env('SEED_DEFAULT_PASSWORD', 'TaxNest#Dev2026')),
                 'role' => 'company_admin',
                 'company_id' => $fbrCompany->id,
             ]

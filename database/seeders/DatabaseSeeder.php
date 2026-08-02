@@ -25,7 +25,7 @@ class DatabaseSeeder extends Seeder
             ['email' => 'admin@test.com'],
             [
                 'name' => 'Super Admin',
-                'password' => Hash::make('admin123'),
+                'password' => Hash::make(env('SEED_DEFAULT_PASSWORD', 'TaxNest#Dev2026')),
                 'role' => 'super_admin',
             ]
         );
@@ -46,7 +46,7 @@ class DatabaseSeeder extends Seeder
             ['email' => 'company_admin@test.com'],
             [
                 'name' => 'Company Admin',
-                'password' => Hash::make('admin123'),
+                'password' => Hash::make(env('SEED_DEFAULT_PASSWORD', 'TaxNest#Dev2026')),
                 'role' => 'company_admin',
                 'company_id' => $company->id,
             ]
@@ -56,7 +56,7 @@ class DatabaseSeeder extends Seeder
             ['email' => 'jawad@test.com'],
             [
                 'name' => 'Jawad Employee',
-                'password' => Hash::make('jawad123'),
+                'password' => Hash::make(env('SEED_DEFAULT_PASSWORD', 'TaxNest#Dev2026')),
                 'role' => 'employee',
                 'company_id' => $company->id,
             ]

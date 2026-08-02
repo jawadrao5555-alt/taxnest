@@ -369,7 +369,9 @@ class AuditPackTest extends TestCase
                 && str_contains($mail->subjectLine, 'ready')
                 && str_contains(implode(' ', $mail->paragraphs), '2 invoice PDF(s)')
                 && str_contains(implode(' ', $mail->paragraphs), $pack->expiresAt()->format('d M Y'))
-                && $mail->ctaUrl === route('compliance.index');
+                // CTA is now a temporary signed direct-download URL (no login needed).
+                && str_contains($mail->ctaUrl, '/compliance/audit-packs/' . $pack->id . '/download-signed')
+                && str_contains($mail->ctaUrl, 'signature=');
         });
     }
 
@@ -462,5 +464,98 @@ class AuditPackTest extends TestCase
 
         $this->actingAs($adminA)->get('/compliance/audit-packs/' . $foreignPack->id . '/status')->assertStatus(403);
         $this->actingAs($adminA)->get('/compliance/audit-packs/' . $foreignPack->id . '/download')->assertStatus(403);
+    }
+
+    // ---------------------------------------------------------------
+    // 5. Signed email download link (no login needed)
+    // ---------------------------------------------------------------
+
+    protected function makeReadyPackWithFile(int $companyId): AuditPack
+    {
+        $pack = AuditPack::create([
+            'company_id' => $companyId,
+            'user_id' => null,
+            'date_from' => '2026-03-01',
+            'date_to' => '2026-03-31',
+            'status' => 'ready',
+        ]);
+        $path = 'audit-packs/company_' . $companyId . '/fbr-audit-pack-' . $pack->id . '.zip';
+        Storage::disk('local')->put($path, 'PK-zip-bytes');
+        $pack->forceFill(['file_path' => $path, 'progress' => 100])->save();
+
+        return $pack;
+    }
+
+    public function test_valid_signed_link_downloads_zip_without_login(): void
+    {
+        Storage::fake('local');
+        $companyId = $this->makeCompany();
+        $pack = $this->makeReadyPackWithFile($companyId);
+
+        $url = \Illuminate\Support\Facades\URL::temporarySignedRoute(
+            'compliance.packs.download-signed',
+            $pack->expiresAt(),
+            ['pack' => $pack->id]
+        );
+
+        $this->assertGuest();
+        $this->get($url)
+            ->assertStatus(200)
+            ->assertHeader('Content-Type', 'application/zip');
+    }
+
+    public function test_tampered_signed_link_is_rejected(): void
+    {
+        Storage::fake('local');
+        $companyId = $this->makeCompany();
+        $pack = $this->makeReadyPackWithFile($companyId);
+
+        $url = \Illuminate\Support\Facades\URL::temporarySignedRoute(
+            'compliance.packs.download-signed',
+            $pack->expiresAt(),
+            ['pack' => $pack->id]
+        );
+
+        // Tamper with the signature.
+        $this->get(preg_replace('/signature=\w{10}/', 'signature=aaaaaaaaaa', $url))->assertStatus(403);
+
+        // Unsigned URL entirely.
+        $this->get('/compliance/audit-packs/' . $pack->id . '/download-signed')->assertStatus(403);
+    }
+
+    public function test_expired_signed_link_is_rejected(): void
+    {
+        Storage::fake('local');
+        $companyId = $this->makeCompany();
+        $pack = $this->makeReadyPackWithFile($companyId);
+
+        $url = \Illuminate\Support\Facades\URL::temporarySignedRoute(
+            'compliance.packs.download-signed',
+            now()->subMinute(),
+            ['pack' => $pack->id]
+        );
+
+        $this->get($url)->assertStatus(403);
+    }
+
+    public function test_signed_link_for_unready_pack_is_rejected(): void
+    {
+        Storage::fake('local');
+        $companyId = $this->makeCompany();
+        $pack = AuditPack::create([
+            'company_id' => $companyId,
+            'user_id' => null,
+            'date_from' => '2026-03-01',
+            'date_to' => '2026-03-31',
+            'status' => 'processing',
+        ]);
+
+        $url = \Illuminate\Support\Facades\URL::temporarySignedRoute(
+            'compliance.packs.download-signed',
+            now()->addDay(),
+            ['pack' => $pack->id]
+        );
+
+        $this->get($url)->assertStatus(403);
     }
 }

@@ -45,6 +45,12 @@ use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\AnnouncementController;
 
+// Audit Pack ZIP via temporary signed URL from the "pack ready" email — no login
+// needed. 'signed' middleware 403s tampered/expired links (expiry = pack retention).
+Route::get('/compliance/audit-packs/{pack}/download-signed', [ComplianceController::class, 'downloadSigned'])
+    ->middleware('signed')
+    ->name('compliance.packs.download-signed');
+
 Route::get('/share/invoice/{uuid}', [ShareController::class, 'show']);
 Route::get('/share/invoice/{uuid}/pdf', [ShareController::class, 'pdf'])->name('share.invoice.pdf');
 

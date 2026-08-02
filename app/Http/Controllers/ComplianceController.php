@@ -188,6 +188,28 @@ class ComplianceController extends Controller
             return redirect()->route('compliance.index')->with('error', 'This Audit Pack file has expired. Please generate a new one.');
         }
 
+        return $this->sendZip($pack, $companyId, $abs);
+    }
+
+    /**
+     * Public download via a temporary signed URL (sent in the "pack ready" email).
+     * The 'signed' middleware already 403s tampered/expired links; the URL expiry
+     * equals the pack's retention expiry, so a valid signature implies the file
+     * is still within its retention window. Company scoping comes from the pack
+     * itself (the signature covers the pack id, so it can't be swapped).
+     */
+    public function downloadSigned(AuditPack $pack)
+    {
+        abort_if($pack->status !== 'ready' || !$pack->file_path, 403);
+
+        $abs = Storage::disk('local')->path($pack->file_path);
+        abort_unless(is_file($abs), 410, 'This Audit Pack file has expired. Please generate a new one from the Compliance page.');
+
+        return $this->sendZip($pack, (int) $pack->company_id, $abs);
+    }
+
+    protected function sendZip(AuditPack $pack, int $companyId, string $abs)
+    {
         try {
             AuditLogService::log('audit_pack_downloaded', 'AuditPack', $pack->id, null, [
                 'date_from' => $pack->date_from->toDateString(),

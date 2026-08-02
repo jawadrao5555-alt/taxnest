@@ -550,18 +550,37 @@ class AuditPackBuilderService
                 $ctaUrl = route('compliance.index');
 
                 if ($success) {
-                    $expires = optional($pack->expiresAt())->format('d M Y');
+                    $expiresAt = $pack->expiresAt();
+                    $expires = optional($expiresAt)->format('d M Y');
+
+                    // One-click download: temporary signed URL (no login needed).
+                    // Expiry = pack retention expiry; after that the link is dead
+                    // and the file is deleted anyway. Falls back to the Compliance
+                    // page if the URL can't be signed for any reason.
+                    $downloadUrl = $ctaUrl;
+                    try {
+                        if ($expiresAt && $expiresAt->isFuture()) {
+                            $downloadUrl = \Illuminate\Support\Facades\URL::temporarySignedRoute(
+                                'compliance.packs.download-signed',
+                                $expiresAt,
+                                ['pack' => $pack->id]
+                            );
+                        }
+                    } catch (\Throwable $e) {
+                        Log::warning('AuditPack signed URL failed, using Compliance page link', ['pack_id' => $pack->id, 'error' => $e->getMessage()]);
+                    }
+
                     $paragraphs = [
                         'Your FBR Audit Pack for the period ' . $period . ' is ready to download.',
                         'It contains ' . number_format((int) $pack->total_invoices) . ' invoice PDF(s) plus the invoice register, audit trail and FBR submission log.',
-                        'The download link is available on your Compliance page' . ($expires ? ' until ' . $expires : '') . ' — after that the file is automatically deleted (' . self::RETENTION_DAYS . '-day retention).',
+                        'The button below downloads the ZIP directly — no login needed. The link works' . ($expires ? ' until ' . $expires : ' for ' . self::RETENTION_DAYS . ' days') . '; after that the file is automatically deleted (' . self::RETENTION_DAYS . '-day retention). You can also download it any time from your Compliance page.',
                     ];
                     $mail = new \App\Mail\AuditPackMail(
                         subjectLine: 'Your FBR Audit Pack is ready (' . $period . ')',
                         companyName: $company->name ?? 'your company',
                         headline: 'FBR Audit Pack ready',
                         paragraphs: $paragraphs,
-                        ctaUrl: $ctaUrl,
+                        ctaUrl: $downloadUrl,
                         ctaLabel: 'Download Audit Pack',
                         panelName: 'Digital Invoicing',
                     );

@@ -605,6 +605,36 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
         $this->assertFalse(PlanLimitService::canCreatePosBill($companyId)['allowed']);
     }
 
+    public function test_pay_order_provisional_settle_allowed_at_quota_full_and_stays_quota_free(): void
+    {
+        // Task 215 — quota-full must NOT deadlock the shop: a provisional settle
+        // (delivery-only on restaurant-ish companies) skips the quota gate exactly
+        // like storeInvoice's save_as_provisional path, and charges nothing.
+        $companyId = $this->makeRestaurantCompany(['invoice_limit_override' => 1]);
+        $this->makeFinal($companyId, 'L-050');
+        $orderId = $this->makeOrder($companyId, ['order_type' => 'delivery']);
+
+        $response = $this->actingAs($this->makeUser($companyId), 'pos')
+            ->postJson("/pos/restaurant/orders/{$orderId}/pay", [
+                'payment_method' => 'cash',
+                'save_as_provisional' => 1,
+            ]);
+
+        $response->assertStatus(200)->assertJson(['success' => true]);
+
+        $order = DB::table('restaurant_orders')->where('id', $orderId)->first();
+        $this->assertSame('completed', $order->status);
+
+        $tx = DB::table('pos_transactions')->where('id', $order->pos_transaction_id)->first();
+        $this->assertSame('local', $tx->invoice_mode, 'provisional must be stored as local/local');
+        $this->assertSame('local', $tx->pra_status);
+
+        // Still exactly ONE quota-counted final — the provisional charged nothing,
+        // and the quota stays closed for FINAL settles.
+        $this->assertSame(1, $this->finalsCount($companyId));
+        $this->assertFalse(PlanLimitService::canCreatePosBill($companyId)['allowed']);
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     // PATH 3 — PosController::retryPra (provisional promote / plain retry)
     // ════════════════════════════════════════════════════════════════════════

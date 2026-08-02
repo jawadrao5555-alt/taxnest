@@ -732,9 +732,15 @@ class RestaurantPosController extends Controller
 
         // Monthly bill quota (paid-plan package limits, Jul 2026) — paying a
         // restaurant order creates a FINAL bill, same gate as storeInvoice.
-        $quota = \App\Services\PlanLimitService::canCreatePosBill($companyId);
-        if (!($quota['allowed'] ?? true)) {
-            return response()->json(['success' => false, 'message' => $quota['reason']], 403);
+        // Task 215: provisional settles are quota-FREE (mirrors storeInvoice's
+        // save_as_provisional skip) so a quota-full shop can still park delivery
+        // orders as provisionals mid-day instead of deadlocking. The quota is
+        // charged later at promote time (retryPra / apiPromoteProvisional).
+        if (!$request->boolean('save_as_provisional')) {
+            $quota = \App\Services\PlanLimitService::canCreatePosBill($companyId);
+            if (!($quota['allowed'] ?? true)) {
+                return response()->json(['success' => false, 'message' => $quota['reason']], 403);
+            }
         }
 
         $paymentMethod = $request->input('payment_method', 'cash');

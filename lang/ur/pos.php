@@ -1017,6 +1017,8 @@ return [
     'search_label' => 'Search',
     'ti_quick_command' => 'Quick Command (Ctrl+K)',
     'download_app' => 'Download App',
+    'apk_update_banner' => 'App ka naya version aa gaya hai.',
+    'apk_update_download' => 'Abhi download karein',
     'install_app_device' => 'Install App on this Device',
     'ti_exit_fullscreen' => 'Exit Fullscreen (F11)',
     'ti_fullscreen' => 'Fullscreen (F11)',

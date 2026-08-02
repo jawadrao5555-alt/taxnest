@@ -26,6 +26,7 @@ class AdminSettingsController extends Controller
         'payment_account_number',
         'payment_iban',
         'payment_instructions',
+        'pos_app_latest_version',
     ];
 
     public function index()
@@ -64,6 +65,10 @@ class AdminSettingsController extends Controller
             'payment_account_number' => ['nullable', 'string', 'max:60'],
             'payment_iban' => ['nullable', 'string', 'max:60'],
             'payment_instructions' => ['nullable', 'string', 'max:1000'],
+            // Latest released Android POS APK version (e.g. 1.0.1). Old app
+            // installs (UA "TaxNestPOSApp/<ver>") see an update banner when
+            // their version is lower. Digits and dots only; empty = banner off.
+            'pos_app_latest_version' => ['nullable', 'string', 'max:20', 'regex:/^\d+(\.\d+)*$/'],
         ]);
 
         // Normalise the WhatsApp number to digits only (country code + number, no +).

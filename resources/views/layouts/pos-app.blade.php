@@ -66,6 +66,21 @@
             }
         }
     } catch (\Throwable $e) { /* keep POS pages alive */ }
+    // "New APK available" update banner — ONLY for the Android WebView shell.
+    // The shell appends "TaxNestPOSApp/<versionName>" to its user agent; compare
+    // that against the latest released APK version (SystemSetting, admin-editable
+    // on the SaaS admin settings page). Old installs with the legacy hardcoded
+    // "TaxNestPOSApp/1.0" suffix are matched too. Fail silent — never break POS.
+    $apkBannerShow = false; $apkLatestVer = '';
+    try {
+        $uaApk = request()->userAgent() ?? '';
+        if (preg_match('/TaxNestPOSApp\/(\d+(?:\.\d+)*)/', $uaApk, $mApk)) {
+            $apkLatestVer = trim((string) \App\Models\SystemSetting::get('pos_app_latest_version', ''));
+            if ($apkLatestVer !== '' && version_compare($mApk[1], $apkLatestVer, '<')) {
+                $apkBannerShow = true;
+            }
+        }
+    } catch (\Throwable $e) { /* keep POS pages alive */ }
 @endphp
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="{{ $isDarkMode ? 'dark' : '' }}">
     <head>
@@ -785,6 +800,27 @@
                     <x-pwa-install-menu-item color="teal" app-name="Nest POS" :label="__('pos.download_app')" item-class="nav-pill inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 ring-1 ring-white/20" />
                 </div>
             </header>
+
+            {{-- "New APK available" banner — Android shell only (UA-detected), outside
+                 the scrollable <main> (top-banner clipping convention). Dismiss is
+                 per-session per-version via sessionStorage: no POST route, so it is
+                 safe for pending companies / read-only impersonation / cashiers. --}}
+            @if($apkBannerShow)
+            <div x-data="{ show: sessionStorage.getItem('tnApkBannerV') !== '{{ $apkLatestVer }}' }"
+                 x-show="show" x-cloak
+                 class="flex-shrink-0 bg-amber-500 dark:bg-amber-600 text-white px-3 sm:px-5 py-2 flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2 min-w-0">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4"/></svg>
+                    <span class="text-[12px] sm:text-[13px] font-semibold truncate">{{ __('pos.apk_update_banner') }}</span>
+                    <a href="{{ route('downloads.page') }}" class="text-[12px] sm:text-[13px] font-extrabold underline underline-offset-2 whitespace-nowrap">{{ __('pos.apk_update_download') }}</a>
+                </div>
+                <button type="button"
+                        @click="show = false; sessionStorage.setItem('tnApkBannerV', '{{ $apkLatestVer }}')"
+                        class="flex-shrink-0 p-1 rounded hover:bg-white/20 transition" aria-label="Dismiss">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            @endif
 
             <main class="flex-1 overflow-y-auto overflow-x-hidden main-scroll bg-slate-50 dark:bg-gray-950 page-fade" style="min-width: 0;">
                 <x-trial-reminder-banner />

@@ -19,6 +19,19 @@
             @error('support_whatsapp_number') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
         </div>
 
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <h2 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                Mobile App (APK)
+            </h2>
+            <label class="block text-xs font-medium text-gray-400 mb-1">Latest Android App Version</label>
+            <input type="text" name="pos_app_latest_version" value="{{ old('pos_app_latest_version', $settings['pos_app_latest_version']) }}"
+                   placeholder="e.g. 1.0.1"
+                   class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
+            <p class="text-[11px] text-gray-500 mt-1">Set this to the versionName of the newest released POS APK. Users on an older app version see a dismissible "new app available" banner linking to the download page. Leave empty to disable the banner. Digits and dots only (e.g. 1.0.2).</p>
+            @error('pos_app_latest_version') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
+        </div>
+
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
             <h2 class="text-sm font-semibold text-white flex items-center gap-2">
                 <svg class="w-5 h-5 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>

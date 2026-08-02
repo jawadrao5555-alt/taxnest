@@ -71,8 +71,10 @@ class MainActivity : Activity() {
             setSupportMultipleWindows(true)
             javaScriptCanOpenWindowsAutomatically = true
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-            // Server-side detection hook (e.g. hide "download our app" banners):
-            userAgentString = "$userAgentString TaxNestPOSApp/1.0"
+            // Server-side detection hook (e.g. hide "download our app" banners,
+            // show "new APK available" update banner). MUST carry the real
+            // versionName so the server can compare against the latest release.
+            userAgentString = "$userAgentString TaxNestPOSApp/${BuildConfig.VERSION_NAME}"
         }
 
         CookieManager.getInstance().setAcceptCookie(true)

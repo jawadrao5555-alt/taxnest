@@ -63,10 +63,11 @@ $EXPECTED_GATE_ORDER = [
 ];
 $MATRIX = [
     // plan name => [deals, riders, hazri, analytics, reports, rider_tracking, custom_access, qr_menu, offline]
-    'Starter'   => [false, false, false, false, false, false, false, false, false],
+    // Aug 2026 ladder: Starter gets basic reports; rider LIVE tracking moved DOWN to Pro Max.
+    'Starter'   => [false, false, false, false, true,  false, false, false, false],
     'Business'  => [true,  false, false, false, true,  false, false, false, true ],
     'Pro'       => [true,  true,  false, true,  true,  false, false, true,  true ],
-    'Pro Max'   => [true,  true,  true,  true,  true,  false, false, true,  true ],
+    'Pro Max'   => [true,  true,  true,  true,  true,  true,  false, true,  true ],
     'Unlimited' => [true,  true,  true,  true,  true,  true,  true,  true,  true ],
 ];
 // Derived-surface expectations per plan:

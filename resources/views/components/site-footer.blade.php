@@ -43,6 +43,7 @@
                     <li><a href="/pos" class="hover:text-white transition-colors">NestPOS (PRA)</a></li>
                     <li><a href="/fbr-pos-landing" class="hover:text-white transition-colors">FBR POS</a></li>
                     <li><a href="/#compare" class="hover:text-white transition-colors">Compare</a></li>
+                    <li><a href="/download" class="hover:text-white transition-colors">Downloads</a></li>
                 </ul>
             </div>
 

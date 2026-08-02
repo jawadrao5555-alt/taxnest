@@ -143,6 +143,12 @@ Route::get('/', function () {
 
 Route::get('/contact', fn () => view('contact'))->name('contact');
 
+// Public downloads hub — /download (singular) on purpose: /downloads/ is a real
+// directory in public/ (APKs, agent zip) and Apache serves existing dirs
+// directly, so that path never reaches Laravel.
+Route::get('/download', fn () => view('downloads'))->name('downloads.page');
+Route::get('/download/agent', [\App\Http\Controllers\AgentManagementController::class, 'downloadAgent'])->name('public.agent.download');
+
 Route::get('/digital-invoice', function () {
     $plans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', 'di')->orderBy('price')->get();
     return view('di-landing', ['plans' => $plans]);

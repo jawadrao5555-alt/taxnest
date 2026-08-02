@@ -39,6 +39,7 @@
                 <a href="/digital-invoice" class="hover:text-white transition-colors hidden sm:inline">Digital Invoice</a>
                 <a href="/pos" class="hover:text-white transition-colors hidden sm:inline">NestPOS</a>
                 <a href="/fbr-pos-landing" class="hover:text-white transition-colors hidden md:inline">FBR POS</a>
+                <a href="/download" class="hover:text-white transition-colors hidden md:inline">Downloads</a>
                 <a href="/login" class="text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-md transition-colors">Log In</a>
             </div>
         </div>

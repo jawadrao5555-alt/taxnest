@@ -2493,7 +2493,21 @@ class FbrPosController extends Controller
 
         $analytics = $this->buildFbrDayCloseAnalytics($companyId, $date, $transactions);
 
-        return view('fbr-pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'analytics'));
+        // 'Khud Final' policy preview (Task mirror of PRA UX, Aug 2026): when the
+        // company opted into auto-finalize, count exactly the bills the day-close
+        // sweep (finalizeFbrProvisionalsAtDayClose) will flip — same filters incl.
+        // the MONTH GATE (previous-month locals are carried, never finalized).
+        $pendingAutoFinal = 0;
+        if (!$existingReport && ($company->pos_dayclose_provisional_action ?? null) === 'finalize') {
+            $pendingAutoFinal = FbrPosTransaction::where('company_id', $companyId)
+                ->whereDate('created_at', '<=', $date)
+                ->where('created_at', '>=', now()->startOfMonth())
+                ->where('invoice_mode', 'local')
+                ->where('fbr_status', 'local')
+                ->count();
+        }
+
+        return view('fbr-pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'analytics', 'pendingAutoFinal'));
     }
 
     /**

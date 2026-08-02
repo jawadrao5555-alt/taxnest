@@ -358,6 +358,17 @@
     </div>
 
     @if(!$existingReport)
+    {{-- 'Khud Final' policy notice (Aug 2026, PRA UX mirror): when auto-finalize is
+         ON and pending local bills exist, warn the cashier BEFORE the close so the
+         auto-FINAL sweep is never a surprise. Wording follows reporting ON/OFF. --}}
+    @if(($pendingAutoFinal ?? 0) > 0)
+    <div class="mb-6 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-400 dark:border-emerald-700">
+        <p class="text-sm font-bold text-emerald-800 dark:text-emerald-300">
+            {{ __(($company->fbr_reporting_enabled ?? false) ? 'pos.fbr_auto_final_notice_on' : 'pos.fbr_auto_final_notice_off', ['count' => $pendingAutoFinal]) }}
+        </p>
+        <p class="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">{{ __('pos.fbr_auto_final_notice_hint') }}</p>
+    </div>
+    @endif
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <h3 class="font-semibold text-gray-900 dark:text-white mb-3">{{ __('pos.close_day') }}</h3>
         <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">{{ __('pos.close_day_desc', ['date' => \Carbon\Carbon::parse($date)->format('d M Y')]) }}</p>

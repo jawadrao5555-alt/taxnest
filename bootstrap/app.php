@@ -43,6 +43,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             \App\Http\Middleware\ReadOnlyImpersonation::class,
             \App\Http\Middleware\LogImpersonatedWrites::class,
+            // Consultant "switch into client": re-validates client consent on
+            // every request while the switch flag is set; forces exit when the
+            // link is revoked mid-session. Same StartSession constraint as above.
+            \App\Http\Middleware\ConsultantSwitchGuard::class,
             \App\Http\Middleware\SetPosLocale::class,
         ]);
     })

@@ -36,7 +36,21 @@ class RegisteredUserController extends Controller
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'company_name' => ['required', 'string', 'max:255'],
             'company_ntn' => ['required', 'string', 'max:50', 'unique:companies,ntn'],
+            'referral_code' => ['nullable', 'string', 'max:30'],
         ]);
+
+        // Referral attribution (affiliate program): a provided code must match
+        // an ACTIVE consultant — otherwise fail loudly so nobody loses
+        // attribution to a typo. Empty code = normal signup.
+        $referrer = null;
+        if (filled($request->referral_code)) {
+            $referrer = \App\Services\ConsultantService::profileForReferralCode($request->referral_code);
+            if (!$referrer) {
+                throw ValidationException::withMessages([
+                    'referral_code' => 'This referral code is not valid. Remove it or ask your consultant for the correct code.',
+                ]);
+            }
+        }
 
         // Anti free-trial-abuse: block if any credential was ever used before
         // (survives account deletion) — force login / subscription instead.
@@ -50,15 +64,32 @@ class RegisteredUserController extends Controller
             throw ValidationException::withMessages([$field => $message]);
         }
 
-        $user = DB::transaction(function () use ($request) {
-            $company = Company::create([
+        // First-touch attribution, set once at signup, immutable after. Only
+        // touch the columns when a code was actually used AND the columns
+        // exist (deploy-before-migrate window must never break signups).
+        $referralAttrs = [];
+        if ($referrer) {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'referred_by_user_id')) {
+                $referralAttrs = [
+                    'referred_by_user_id' => $referrer->user_id,
+                    'referral_code_used' => $referrer->referral_code,
+                ];
+            } else {
+                \Log::warning('Referral code used before consultant migration ran — attribution skipped', [
+                    'code' => $referrer->referral_code,
+                ]);
+            }
+        }
+
+        $user = DB::transaction(function () use ($request, $referralAttrs) {
+            $company = Company::create(array_merge([
                 'name' => $request->company_name,
                 'ntn' => $request->company_ntn,
                 'email' => $request->email,
                 'product_type' => 'di',
                 'company_status' => 'active',
                 'status' => 'pending',
-            ]);
+            ], $referralAttrs));
 
             // Always attaches a trial subscription (even if the trial plan
             // seed row is missing) — no signup may leave a company bare.

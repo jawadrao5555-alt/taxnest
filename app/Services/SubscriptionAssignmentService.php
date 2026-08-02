@@ -88,7 +88,7 @@ class SubscriptionAssignmentService
             ->where('active', true)
             ->update(['active' => false]);
 
-        return Subscription::create([
+        $subscription = Subscription::create([
             'company_id' => $companyId,
             'pricing_plan_id' => $pricingPlanId,
             'start_date' => now()->toDateString(),
@@ -98,6 +98,13 @@ class SubscriptionAssignmentService
             'discount_percent' => $priced['discount_percent'],
             'final_price' => $priced['final_price'],
         ]);
+
+        // Affiliate program: every admin-recorded payment of a referred company
+        // earns its consultant a commission. Internally duplicate-safe and
+        // failure-safe (never blocks the assignment itself).
+        ConsultantService::recordCommissionForSubscription($subscription);
+
+        return $subscription;
     }
 
     /**

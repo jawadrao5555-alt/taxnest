@@ -44,6 +44,8 @@ class Company extends Model
         'user_limit_override',
         'branch_limit_override',
         'requested_plan_id',
+        'referred_by_user_id',
+        'referral_code_used',
         'registration_no',
         'mobile',
         'city',

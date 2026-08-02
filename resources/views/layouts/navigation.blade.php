@@ -119,6 +119,11 @@
             <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 14v6m-3-3h6M6 10h2a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2zm10 0h2a2 2 0 002-2V6a2 2 0 00-2-2h-2a2 2 0 00-2 2v2a2 2 0 002 2zM6 20h2a2 2 0 002-2v-2a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2z"/></svg>
             Tax Summary
         </a>
+
+        <a href="/consultant" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->is('consultant*') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-200' }}">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6-4a4 4 0 11-8 0"/></svg>
+            Consultant Console
+        </a>
         </div>
 
         @if(auth()->user()->role === 'company_admin')
@@ -143,6 +148,11 @@
         <a href="/tax-overrides" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->is('tax-overrides*') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-200' }}">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
             Tax Rules
+        </a>
+
+        <a href="/company/consultants" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->is('company/consultants*') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-200' }}">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+            Consultant Access
         </a>
 
         <a href="/company/fbr-settings" class="sidebar-link flex items-center gap-3 py-3 px-4 rounded-lg text-sm {{ request()->is('company/fbr*') ? 'active text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-200' }}">

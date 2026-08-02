@@ -17,6 +17,8 @@ use App\Http\Controllers\SroReferenceController;
 use App\Http\Controllers\Admin\HsMasterController;
 use App\Http\Controllers\ShareController;
 use App\Http\Controllers\CompanyUserController;
+use App\Http\Controllers\CompanyConsultantController;
+use App\Http\Controllers\ConsultantConsoleController;
 use App\Http\Controllers\CompanySettingsController;
 use App\Http\Controllers\CustomerLedgerController;
 use App\Http\Controllers\PosController;
@@ -187,6 +189,21 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
     Route::post('/onboarding/skip', [OnboardingController::class, 'skip']);
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // ── Tax Consultant Console (any DI web user can become a consultant) ──
+    // Linking is consent-based ONLY: redeem a client-generated invite code, or
+    // send a request the client admin must approve. Switch = audited login as
+    // the client's admin user, watched by ConsultantSwitchGuard middleware.
+    Route::prefix('consultant')->group(function () {
+        Route::get('/', [ConsultantConsoleController::class, 'index'])->name('consultant.console');
+        Route::get('/earnings', [ConsultantConsoleController::class, 'earnings'])->name('consultant.earnings');
+        Route::post('/join', [ConsultantConsoleController::class, 'join'])->name('consultant.join');
+        Route::post('/redeem', [ConsultantConsoleController::class, 'redeem'])->middleware('throttle:10,1')->name('consultant.redeem');
+        Route::post('/request', [ConsultantConsoleController::class, 'requestLink'])->middleware('throttle:10,1')->name('consultant.request');
+        Route::post('/links/{link}/cancel', [ConsultantConsoleController::class, 'cancel'])->name('consultant.cancel');
+        Route::post('/links/{link}/revoke', [ConsultantConsoleController::class, 'revoke'])->name('consultant.revoke');
+        Route::post('/switch/{company}', [ConsultantConsoleController::class, 'switchIn'])->name('consultant.switch');
+    });
     Route::post('/notifications/{id}/dismiss', [DashboardController::class, 'dismissNotification'])->name('notifications.dismiss');
     Route::post('/notifications/dismiss-all', [DashboardController::class, 'dismissAllNotifications'])->name('notifications.dismiss-all');
 
@@ -252,6 +269,14 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
 
 
     Route::middleware(['role:company_admin'])->group(function () {
+        // Client-side consultant consent: invites, approvals, revokes.
+        Route::get('/company/consultants', [CompanyConsultantController::class, 'index'])->name('company.consultants');
+        Route::post('/company/consultants/invite', [CompanyConsultantController::class, 'createInvite'])->name('company.consultants.invite');
+        Route::post('/company/consultants/invites/{invite}/revoke', [CompanyConsultantController::class, 'revokeInvite'])->name('company.consultants.invite-revoke');
+        Route::post('/company/consultants/links/{link}/approve', [CompanyConsultantController::class, 'approve'])->name('company.consultants.approve');
+        Route::post('/company/consultants/links/{link}/reject', [CompanyConsultantController::class, 'reject'])->name('company.consultants.reject');
+        Route::post('/company/consultants/links/{link}/revoke', [CompanyConsultantController::class, 'revokeLink'])->name('company.consultants.revoke');
+
         Route::get('/company/users', [CompanyUserController::class, 'index']);
         Route::post('/company/users', [CompanyUserController::class, 'store'])->middleware('plan.limit:users');
         Route::patch('/company/users/{user}/role', [CompanyUserController::class, 'updateRole']);
@@ -406,6 +431,10 @@ Route::middleware(['auth', 'company', 'rate_limit_company', 'company.approval'])
 
     });
 });
+
+// Consultant exit: 'auth' ONLY (no company/approval gates) so leaving a client
+// session ALWAYS works, even if the client company got demoted mid-session.
+Route::middleware('auth')->post('/consultant/exit', [ConsultantConsoleController::class, 'exitSwitch'])->name('consultant.exit');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -923,6 +952,13 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::delete('/sales/{id}', [AdminSaleController::class, 'destroy'])->name('saas.admin.sales.destroy');
     Route::get('/subscriptions', [AdminSubscriptionController::class, 'index'])->name('saas.admin.subscriptions');
     Route::post('/subscriptions/assign', [AdminSubscriptionController::class, 'assign'])->name('saas.admin.subscriptions.assign');
+
+    // Consultant program oversight: consultants, links, commissions, payouts.
+    Route::get('/consultants', [\App\Http\Controllers\SaasAdmin\AdminConsultantController::class, 'index'])->name('saas.admin.consultants');
+    Route::post('/consultants/{id}/toggle', [\App\Http\Controllers\SaasAdmin\AdminConsultantController::class, 'toggle'])->name('saas.admin.consultants.toggle');
+    Route::post('/consultants/{id}/rate', [\App\Http\Controllers\SaasAdmin\AdminConsultantController::class, 'updateRate'])->name('saas.admin.consultants.rate');
+    Route::post('/consultant-links/{id}/revoke', [\App\Http\Controllers\SaasAdmin\AdminConsultantController::class, 'revokeLink'])->name('saas.admin.consultants.revoke-link');
+    Route::post('/consultant-commissions/{id}/paid', [\App\Http\Controllers\SaasAdmin\AdminConsultantController::class, 'markPaid'])->name('saas.admin.consultants.mark-paid');
     Route::post('/subscriptions/{id}/toggle', [AdminSubscriptionController::class, 'toggle'])->name('saas.admin.subscriptions.toggle');
     Route::get('/franchises', [AdminFranchiseController::class, 'index'])->name('saas.admin.franchises');
     Route::post('/franchises', [AdminFranchiseController::class, 'store'])->name('saas.admin.franchises.store');

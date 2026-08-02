@@ -4362,6 +4362,12 @@ function restaurantPos() {
                     // PROVISIONAL BILL FLOW — when true, store() forces invoice_mode='local'
                     // + fbr_status='local' and skips FBR submission. Promote later via F10.
                     save_as_provisional: !!provisional,
+                    // Task 156: order-type + delivery-address snapshot — Pending
+                    // Deliveries panel filters provisionals to order_type='delivery'.
+                    // Address comes from the selected customer's saved address
+                    // (frozen on the bill server-side; delivery orders only).
+                    order_type: this.orderType || null,
+                    delivery_address: this.orderType === 'delivery' ? ((this.selectedCustomer?.address || '').trim() || null) : null,
                 };
                 const res = await fetch('{{ route("fbrpos.store") }}', {
                     method: 'POST',
@@ -4635,9 +4641,9 @@ function restaurantPos() {
         },
         // ─── PENDING DELIVERIES panel (Task 122 — FBR port of PRA Task 114) ──
         // TODAY's business-day delivery provisionals only. fbr_pos_transactions
-        // has no order_type column yet — bills without one are included (the
-        // filter tightens automatically once the column exists and non-delivery
-        // provisionals start carrying a type). Date scope: API falls back to
+        // now stores order_type (Task 156) — new provisionals carry their type,
+        // so the filter self-tightens to real deliveries; legacy null-typed
+        // bills stay included until they clear. Date scope: API falls back to
         // created_at's date when business_date is missing, so old confidential
         // provisionals never flood the badge.
         pendingDeliveryBills() {

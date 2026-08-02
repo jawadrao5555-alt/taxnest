@@ -18,6 +18,8 @@ class FbrPosTransaction extends Model
         'customer_id', 'promotion_id', 'promotion_code',
         'loyalty_points_earned', 'loyalty_points_redeemed', 'loyalty_redemption_amount',
         'cash_received', 'change_due', 'payment_breakdown',
+        // Task 156: order-type + delivery-address snapshot (Pending Deliveries panel)
+        'order_type', 'delivery_address',
     ];
 
     protected $casts = [

@@ -720,6 +720,11 @@ class FbrPosController extends Controller
             'payment_breakdown.*.method' => 'required_with:payment_breakdown|string',
             'payment_breakdown.*.amount' => 'required_with:payment_breakdown|numeric|min:0',
             'tax_inclusive' => 'nullable|boolean',
+            // Task 156: order-type + delivery-address SNAPSHOT — frozen on the
+            // bill so later edits to the customer's saved address never rewrite
+            // receipts. Feeds the Pending Deliveries panel (Task 122).
+            'order_type' => 'nullable|string|max:20',
+            'delivery_address' => 'nullable|string|max:500',
             ]);
         } catch (\Illuminate\Validation\ValidationException $ve) {
             Log::warning('FBR POS Store: validation failed', [
@@ -941,7 +946,22 @@ class FbrPosController extends Controller
                     ? $this->generateLocalInvoiceNumber($companyId)
                     : $this->generateInvoiceNumber($companyId);
 
-                $transaction = FbrPosTransaction::create([
+                // Task 156: order-type + delivery-address snapshot. hasColumn-guarded
+                // so a not-yet-migrated PROD schema never 500s a sale (fields simply
+                // don't stick until the migration lands — PRA rider-columns pattern).
+                $orderTypeColumnsExist = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'order_type')
+                    && \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'delivery_address');
+                $orderTypeSnapshot = $request->filled('order_type')
+                    ? substr((string) $request->input('order_type'), 0, 20)
+                    : null;
+                $orderTypeFields = $orderTypeColumnsExist ? [
+                    'order_type' => $orderTypeSnapshot,
+                    'delivery_address' => $orderTypeSnapshot === 'delivery'
+                        ? ($request->input('delivery_address') ?: null)
+                        : null,
+                ] : [];
+
+                $transaction = FbrPosTransaction::create($orderTypeFields + [
                     'company_id' => $companyId,
                     'branch_id' => app()->bound('currentBranchId') ? app('currentBranchId') : null,
                     'terminal_id' => $request->terminal_id,

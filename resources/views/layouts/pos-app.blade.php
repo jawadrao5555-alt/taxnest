@@ -81,6 +81,18 @@
             }
         }
     } catch (\Throwable $e) { /* keep POS pages alive */ }
+    // "Download Android App" soft nudge — ordinary ANDROID browsers only
+    // (Task #228). iOS / desktop browsers intentionally see NOTHING (no APK
+    // for them). The Android shell is excluded (already inside the app) — it
+    // gets the version-update banner above instead. Dismiss is one-time via
+    // localStorage (no POST route: safe for pending companies / read-only
+    // impersonation / cashiers). Fail silent — never break POS.
+    $apkNudgeShow = false;
+    try {
+        $uaNudge = request()->userAgent() ?? '';
+        $apkNudgeShow = stripos($uaNudge, 'Android') !== false
+            && stripos($uaNudge, 'TaxNestPOSApp') === false;
+    } catch (\Throwable $e) { /* keep POS pages alive */ }
 @endphp
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="{{ $isDarkMode ? 'dark' : '' }}">
     <head>
@@ -816,6 +828,26 @@
                 </div>
                 <button type="button"
                         @click="show = false; sessionStorage.setItem('tnApkBannerV', '{{ $apkLatestVer }}')"
+                        class="flex-shrink-0 p-1 rounded hover:bg-white/20 transition" aria-label="Dismiss">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            @endif
+
+            {{-- "Download Android App" soft nudge — ordinary Android browsers only
+                 (Task #228). One-time dismiss via localStorage; outside <main>
+                 (top-banner clipping convention). iOS / desktop get nothing. --}}
+            @if($apkNudgeShow)
+            <div x-data="{ show: localStorage.getItem('tnApkNudgeDismissed') !== '1' }"
+                 x-show="show" x-cloak
+                 class="flex-shrink-0 bg-teal-700 dark:bg-teal-800 text-white px-3 sm:px-5 py-2 flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2 min-w-0">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                    <span class="text-[12px] sm:text-[13px] font-semibold truncate">{{ __('pos.apk_nudge_banner') }}</span>
+                    <a href="{{ route('downloads.page') }}" class="text-[12px] sm:text-[13px] font-extrabold underline underline-offset-2 whitespace-nowrap">{{ __('pos.apk_update_download') }}</a>
+                </div>
+                <button type="button"
+                        @click="show = false; localStorage.setItem('tnApkNudgeDismissed', '1')"
                         class="flex-shrink-0 p-1 rounded hover:bg-white/20 transition" aria-label="Dismiss">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>

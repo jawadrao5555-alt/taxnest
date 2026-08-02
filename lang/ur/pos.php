@@ -1020,6 +1020,7 @@ return [
     'download_app' => 'Download App',
     'apk_update_banner' => 'App ka naya version aa gaya hai.',
     'apk_update_download' => 'Abhi download karein',
+    'apk_nudge_banner' => 'TaxNest POS ki Android app maujood hai.',
     'install_app_device' => 'Install App on this Device',
     'ti_exit_fullscreen' => 'Exit Fullscreen (F11)',
     'ti_fullscreen' => 'Fullscreen (F11)',

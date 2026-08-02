@@ -34,11 +34,14 @@ use Tests\TestCase;
  */
 class PosApkUpdateBannerTest extends TestCase
 {
-    // Locale-independent marker: the POS locale defaults to Urdu, so we assert
-    // on the Alpine sessionStorage key — only emitted by the banner markup.
+    // Locale-independent markers: the POS locale defaults to Urdu, so we assert
+    // on the Alpine storage keys — each only emitted by its banner markup.
     private const BANNER_MARKER = 'tnApkBannerV';
+    private const NUDGE_MARKER = 'tnApkNudgeDismissed';
 
     private const UA_BROWSER = 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/125.0 Mobile Safari/537.36';
+    private const UA_IOS = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Version/17.5 Mobile/15E148 Safari/604.1';
+    private const UA_DESKTOP = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/125.0 Safari/537.36';
 
     private int $companyId;
     private int $adminId;
@@ -212,5 +215,41 @@ class PosApkUpdateBannerTest extends TestCase
         $resp2 = $this->renderProfile(self::UA_BROWSER . ' TaxNestPOSApp/1.0');
         $resp2->assertStatus(200);
         $resp2->assertDontSee(self::BANNER_MARKER);
+    }
+
+    // ------------------------------------------------------------------
+    // "Download Android App" soft nudge (Task #228): ordinary ANDROID
+    // browsers get a one-time-dismissible nudge; the shell never does
+    // (already in the app); iOS / desktop browsers see NOTHING at all.
+    // ------------------------------------------------------------------
+
+    public function test_android_browser_sees_download_nudge(): void
+    {
+        $resp = $this->renderProfile(self::UA_BROWSER);
+        $resp->assertStatus(200);
+        $resp->assertSee(self::NUDGE_MARKER);
+        $resp->assertSee('/download');
+    }
+
+    public function test_shell_never_sees_download_nudge(): void
+    {
+        SystemSetting::set('pos_app_latest_version', '9.9.9');
+        $resp = $this->renderProfile(self::UA_BROWSER . ' TaxNestPOSApp/1.0');
+        $resp->assertStatus(200);
+        $resp->assertDontSee(self::NUDGE_MARKER);
+        // (It sees the update banner instead — covered above.)
+        $resp->assertSee(self::BANNER_MARKER);
+    }
+
+    public function test_ios_and_desktop_browsers_see_nothing(): void
+    {
+        SystemSetting::set('pos_app_latest_version', '9.9.9');
+
+        foreach ([self::UA_IOS, self::UA_DESKTOP] as $ua) {
+            $resp = $this->renderProfile($ua);
+            $resp->assertStatus(200);
+            $resp->assertDontSee(self::BANNER_MARKER);
+            $resp->assertDontSee(self::NUDGE_MARKER);
+        }
     }
 }

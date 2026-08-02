@@ -106,6 +106,7 @@ return [
     'payment_error_prefix' => 'Payment error: ',
     'payment_failed' => 'Payment failed',
     'quota_provisional_prompt' => 'Mahana bill limit full hai — yeh bill PROVISIONAL mein save karein? Yeh edit ho sakta hai aur final banane par hi quota mein ginta hai.',
+    'quota_provisional_prompt_offline' => 'Mahana bill limit full hai — queued offline bill(s) PROVISIONAL mein sync karein? Yeh edit ho sakte hain aur final banane par hi quota mein ginte hain.',
     'phone_required' => 'Phone number is required',
     'proof_bill_sent_to_printer' => 'Proof bill sent to printer',
     'provisional_bill_deleted' => 'Provisional bill deleted',

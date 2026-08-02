@@ -116,6 +116,9 @@ return new class extends Migration
         $existingCols = array_flip(Schema::getColumnListing('pricing_plans'));
 
         foreach ($plans as $p) {
+            // Fresh installs (tests, new envs) can run this BEFORE later migrations
+            // that add columns like rider_tracking_enabled — only update columns
+            // that exist now (the later migration sets its own column's values).
             $update = array_intersect_key($p['update'], $existingCols);
             $skipped = array_diff_key($p['update'], $update);
 

@@ -4336,6 +4336,26 @@ function restaurantPos() {
             this.offlineSyncing = true;
             this.syncStatus = 'syncing';
             let ok = 0, failed = 0, authStop = false, poisoned = 0;
+            // Task 217: quota-full 403 with provisional_allowed → ask the cashier ONCE
+            // per sync run whether to replay the queued bill(s) as PROVISIONAL (same
+            // offline_uuid — dedupe intact; provisionals don't consume the quota until
+            // promoted). null = not asked yet, true/false = cashier's answer.
+            let provisionalConsent = null;
+            const postBill = async (payload) => {
+                const res = await fetch('{{ route("pos.invoice.store") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify(payload),
+                });
+                let data = null;
+                try { data = JSON.parse(await res.text()); } catch (_) {}
+                return { res, data };
+            };
             for (const b of bills.sort((a, z) => a.queued_at - z.queued_at)) {
                 // Poison-bill cap: after 50 REJECTED attempts (server said no — not
                 // network drops, those `break` before counting) stop retrying so one
@@ -4343,18 +4363,27 @@ function restaurantPos() {
                 // (badge + count) for support to inspect.
                 if ((b.tries || 0) >= 50) { poisoned++; continue; }
                 try {
-                    const res = await fetch('{{ route("pos.invoice.store") }}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                            'X-Requested-With': 'XMLHttpRequest',
-                        },
-                        body: JSON.stringify(b.payload),
-                    });
-                    let data = null;
-                    try { data = JSON.parse(await res.text()); } catch (_) {}
+                    // Cashier already agreed to provisional fallback this run? Replay
+                    // remaining non-provisional bills as provisional up front — the
+                    // quota 403 would reject them as finals anyway.
+                    if (provisionalConsent === true && !b.payload.save_as_provisional) {
+                        b.payload.save_as_provisional = true;
+                        b.provisional = true;
+                    }
+                    let { res, data } = await postBill(b.payload);
+                    // Quota-full 403 where the backend says a provisional retry would
+                    // pass the flow rules → offer the same one-click provisional save
+                    // the online path got in Task 216, instead of a stuck queue.
+                    if (res.status === 403 && data && data.quota_full && data.provisional_allowed && !b.payload.save_as_provisional) {
+                        if (provisionalConsent === null) {
+                            provisionalConsent = confirm(window.TXT.quota_provisional_prompt_offline || window.TXT.quota_provisional_prompt || (data.message || ''));
+                        }
+                        if (provisionalConsent) {
+                            b.payload.save_as_provisional = true;
+                            b.provisional = true;
+                            ({ res, data } = await postBill(b.payload));
+                        }
+                    }
                     if (res.ok && data && data.success) {
                         await this.idbDelete(b.uuid);
                         ok++;
@@ -4366,6 +4395,9 @@ function restaurantPos() {
                     await this.idbPut(b);
                     failed++;
                     // Quota block (403) fails every remaining bill too — stop hammering.
+                    // (If the cashier accepted provisional fallback, this 403 was NOT a
+                    // plain quota block — it hit even as provisional — so stopping is
+                    // still the safe move.)
                     if (res.status === 403) break;
                 } catch (e) {
                     // Network dropped again mid-sync — keep the rest queued.

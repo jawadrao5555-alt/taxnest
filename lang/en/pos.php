@@ -106,6 +106,7 @@ return [
     'payment_error_prefix' => 'Payment error: ',
     'payment_failed' => 'Payment failed',
     'quota_provisional_prompt' => 'Monthly bill limit is full — save this bill as a PROVISIONAL instead? It stays editable and counts against the quota only when promoted to final.',
+    'quota_provisional_prompt_offline' => 'Monthly bill limit is full — sync the queued offline bill(s) as PROVISIONAL instead? They stay editable and count against the quota only when promoted to final.',
     'phone_required' => 'Phone number is required',
     'proof_bill_sent_to_printer' => 'Proof bill sent to printer',
     'provisional_bill_deleted' => 'Provisional bill deleted',

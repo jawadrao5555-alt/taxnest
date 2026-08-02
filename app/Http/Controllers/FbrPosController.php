@@ -35,26 +35,66 @@ class FbrPosController extends Controller
         if (!empty($pinCompany?->confidential_pin) && !$this->isPinSessionValid()) {
             return response()->json(['success' => false, 'pin_required' => true, 'message' => __('pos.pin_verification_required')], 403);
         }
+        // Pending Deliveries panel (Task 122 — FBR port of PRA Task 114): the
+        // sale screen needs business_date / order_type / rider context to show
+        // "aaj ke pending deliveries". fbr_pos_transactions may not have these
+        // columns (no riders on FBR POS; business_date arrives with the FBR
+        // business-day work) — hasColumn guards + created_at fallback keep the
+        // API shape identical to PRA's PosController::apiProvisionalBills.
+        $hasBizDate   = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'business_date');
+        $hasOrderType = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'order_type');
+        $hasAddress   = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'delivery_address');
         $bills = \App\Models\FbrPosTransaction::where('company_id', $companyId)
             ->where('invoice_mode', 'local')
             ->where('fbr_status', 'local')
             ->withCount('items')
             ->orderByDesc('id')
             ->limit(50)
-            ->get(['id', 'invoice_number', 'total_amount', 'created_at', 'customer_name', 'customer_phone'])
-            ->map(function ($b) {
+            ->get(['id', 'invoice_number', 'total_amount', 'created_at', 'customer_name', 'customer_phone', 'payment_method',
+                   ...($hasBizDate ? ['business_date'] : []),
+                   ...($hasOrderType ? ['order_type'] : []),
+                   ...($hasAddress ? ['delivery_address'] : [])])
+            ->map(function ($b) use ($companyId, $hasBizDate, $hasOrderType, $hasAddress) {
                 return [
                     'id' => $b->id,
                     'invoice_number' => $b->invoice_number,
                     'total_amount' => (float) $b->total_amount,
                     'customer_name' => $b->customer_name ?? 'Walk-in',
                     'customer_phone' => $b->customer_phone,
+                    'payment_method' => $b->payment_method,
                     'items_count' => (int) ($b->items_count ?? 0),
                     'created_human' => $b->created_at?->diffForHumans(),
                     'created_at' => optional($b->created_at)->format('d M, h:i A'),
+                    'created_time' => $b->created_at?->format('h:i A'),
+                    // No business_date column yet → derive from created_at via
+                    // PosBusinessDay so the fallback uses the SAME cutoff rule
+                    // as business_today below (a 01:00 bill must never mismatch
+                    // the badge's date filter) and the panel stays scoped to
+                    // TODAY (never floods with old confidential provisionals).
+                    'business_date' => ($hasBizDate && $b->business_date)
+                        ? (string) $b->business_date
+                        : ($b->created_at ? \App\Services\PosBusinessDay::forMoment((int) $companyId, $b->created_at) : null),
+                    'order_type' => $hasOrderType ? $b->order_type : null,
+                    'delivery_address' => $hasAddress ? $b->delivery_address : null,
+                    // FBR POS has no delivery riders — mirror fields stay empty
+                    // so the shared panel markup degrades gracefully.
+                    'rider_name' => null,
+                    'rider_unsettled' => false,
+                    'rider_id' => null,
+                    'rider_open_count' => 0,
+                    'rider_open_amount' => 0,
+                    'kot_pending' => false,
                 ];
             });
-        return response()->json(['success' => true, 'bills' => $bills, 'count' => $bills->count()]);
+        return response()->json([
+            'success' => true,
+            'bills' => $bills,
+            'count' => $bills->count(),
+            // Current business day for the badge's client-side date filter.
+            // PosBusinessDay is company-cutoff based (00:00–05:59 counts in
+            // yesterday) and applies to FBR shops the same way.
+            'business_today' => \App\Services\PosBusinessDay::current($companyId),
+        ]);
     }
 
     public function apiDeleteProvisional(Request $request, $id)
@@ -93,6 +133,18 @@ class FbrPosController extends Controller
         // reporting-OFF promote → fbr/NULL (FINAL, no submission — NEVER leave 'pending',
         // it would sit forever in the fail-queue/agent lists with reporting disabled).
         $reportingOn = (bool) (($pinCompany ?? Company::find($companyId))?->fbr_reporting_enabled ?? false);
+        // Pending Deliveries quick-final (Task 122): cashier picks the settlement
+        // method AT promote time (Cash/Card). Amounts are NEVER re-derived on
+        // FBR POS (stored subtotal/tax are authoritative) — only the payment
+        // method label updates. 'card' normalizes to 'debit_card' (card bucket
+        // convention). Missing/invalid method → stored value stays untouched.
+        $method = $request->input('payment_method');
+        if ($method === 'card') {
+            $method = 'debit_card';
+        }
+        if (!in_array($method, ['cash', 'debit_card', 'credit_card', 'qr_payment'], true)) {
+            $method = null;
+        }
         // 🔒 Race-safe atomic claim: only flips if still local — prevents double-promote
         $affected = \App\Models\FbrPosTransaction::where('id', $id)
             ->where('company_id', $companyId)
@@ -101,6 +153,7 @@ class FbrPosController extends Controller
             ->update([
                 'invoice_mode' => 'fbr',
                 'fbr_status' => $reportingOn ? 'pending' : null,
+                ...($method ? ['payment_method' => $method] : []),
                 'updated_at' => now(),
             ]);
         if ($affected === 0) {

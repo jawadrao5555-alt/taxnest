@@ -606,6 +606,14 @@ window.addEventListener('popstate', function() {
             <span x-show="localBills.length > 0" class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-blue-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="localBills.length"></span>
         </button>
 
+        {{-- Pending Deliveries (Task 122, FBR port of PRA Task 114) — today's delivery
+             provisionals, one-click Final (Cash/Card). Badge auto-hides when empty. --}}
+        <button x-show="pendingDeliveryBills().length > 0" x-cloak @click="openPendingDeliveries()" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition" title="{{ __('pos.pending_deliveries_hint') }}">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+            <span class="hidden sm:inline">{{ __('pos.pending_deliveries') }}</span>
+            <span class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-amber-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="pendingDeliveryBills().length"></span>
+        </button>
+
         {{-- ── FAILED BILLS — header shortcut. F11. Red theme = needs attention. ── --}}
         {{-- Click → modal with Retry / Edit / Delete actions inline. --}}
         <button @click="openFailedBills()" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 transition" title="{{ __('pos.ti_failed_fbr_f11') }}">
@@ -763,6 +771,11 @@ window.addEventListener('popstate', function() {
             </div>
 
             <div class="md:hidden flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
+                {{-- Pending Deliveries badge — mobile (Task 122) --}}
+                <button x-show="pendingDeliveryBills().length > 0" x-cloak @click="openPendingDeliveries()" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition" title="{{ __('pos.pending_deliveries_hint') }}">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+                    <span class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-amber-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="pendingDeliveryBills().length"></span>
+                </button>
                 <button @click="mobileView = 'cart'" class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold shadow-sm">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
                     {{ __('pos.cart') }}
@@ -1392,6 +1405,96 @@ window.addEventListener('popstate', function() {
             <div x-show="failedBills.length > 0" class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-[11px] text-gray-500 flex items-center justify-between">
                 <span>{{ __('pos.failed_tip_fbr') }}</span>
                 <a href="{{ route('fbrpos.transactions') }}?tab=failed" class="text-red-600 hover:underline font-semibold">{{ __('pos.open_full_page') }}</a>
+            </div>
+        </div>
+    </div>
+
+    {{-- ─────────────────────────────────────────────────────────────────────── --}}
+    {{-- PENDING DELIVERIES panel (Task 122 — FBR port of PRA Task 114).        --}}
+    {{-- TODAY's (business day) delivery provisionals — payment aate hi ek      --}}
+    {{-- click Final (Cash/Card) via the SAME promote path as F10 Make Final.  --}}
+    {{-- Receipt print = opt-in checkbox (default NO). FBR POS has no riders   --}}
+    {{-- — rider-khata warning/settle from the PRA panel is intentionally      --}}
+    {{-- absent here (API mirrors the fields as null/false).                   --}}
+    {{-- ─────────────────────────────────────────────────────────────────────── --}}
+    <div x-show="showPendingDeliveries" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPendingDeliveries = false">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden" x-transition.scale.90>
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-amber-50 dark:bg-amber-900/20 flex-shrink-0">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <svg class="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+                        {{ __('pos.pending_deliveries_title') }} <span class="text-xs font-medium text-amber-600 ml-1" x-text="'(' + pendingDeliveryBills().length + ')'"></span>
+                    </h3>
+                    <p class="text-[10px] text-gray-500 mt-0.5">{{ __('pos.pending_deliveries_hint') }}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button @click="loadLocalBills()" :disabled="localBillsLoading" class="text-xs text-amber-600 hover:text-amber-800 font-semibold px-2 py-1 rounded hover:bg-amber-100 disabled:opacity-50" title="{{ __('pos.ti_refresh_list') }}">
+                        <svg class="w-4 h-4" :class="localBillsLoading ? 'animate-spin' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    </button>
+                    <button @click="showPendingDeliveries = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto">
+                <template x-if="localBillsLoading && pendingDeliveryBills().length === 0">
+                    <div class="p-12 text-center text-gray-400">
+                        <svg class="w-8 h-8 mx-auto mb-2 animate-spin text-amber-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                        <p class="text-sm">{{ __('pos.loading_provisional_bills') }}</p>
+                    </div>
+                </template>
+                <template x-if="!localBillsLoading && pendingDeliveryBills().length === 0">
+                    <div class="p-12 text-center text-gray-400">
+                        <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <p class="text-sm font-medium">{{ __('pos.no_pending_deliveries') }}</p>
+                    </div>
+                </template>
+                {{-- x-for cap: server already limits to 50 provisionals; slice keeps the
+                     render bounded even if that ever changes (pos-boot-splash-perf rule). --}}
+                <template x-for="bill in pendingDeliveryBills().slice(0, 100)" :key="bill.id">
+                    <div class="p-4 border-b border-gray-100 dark:border-gray-800">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-sm font-bold text-gray-900 dark:text-white" x-text="bill.invoice_number"></span>
+                                <template x-if="bill.order_type === 'delivery'">
+                                    <span class="text-[9px] bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide" x-text="window.TXT.delivery"></span>
+                                </template>
+                            </div>
+                            <span class="text-sm font-bold text-amber-700 dark:text-amber-400" x-text="'Rs. ' + Number(bill.total_amount).toLocaleString()"></span>
+                        </div>
+                        <template x-if="bill.customer_name || bill.customer_phone">
+                            <p class="text-[11px] font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5 flex-wrap">
+                                <svg class="w-3 h-3 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                <span x-text="bill.customer_name || window.TXT.customer_word"></span>
+                                <template x-if="bill.customer_phone">
+                                    <span class="font-mono font-medium text-gray-500" x-text="bill.customer_phone"></span>
+                                </template>
+                            </p>
+                        </template>
+                        <template x-if="bill.delivery_address">
+                            <p class="text-[11px] text-gray-500 flex items-start gap-1.5">
+                                <svg class="w-3 h-3 mt-0.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                <span x-text="bill.delivery_address"></span>
+                            </p>
+                        </template>
+                        <p class="text-[11px] text-gray-500 mb-2" x-text="bill.items_count + window.TXT.sfx_item_s_dot + (bill.created_time || bill.created_human)"></p>
+                        <div class="flex gap-2">
+                            <button @click="finalizeDelivery(bill, 'cash')" :disabled="deliveryFinalBusyId" class="flex-1 py-2.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50">
+                                <template x-if="deliveryFinalBusyId === bill.id"><svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg></template>
+                                <template x-if="deliveryFinalBusyId !== bill.id"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg></template>
+                                {{ __('pos.final_cash') }}
+                            </button>
+                            <button @click="finalizeDelivery(bill, 'card')" :disabled="deliveryFinalBusyId" class="flex-1 py-2.5 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                                {{ __('pos.final_card') }}
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <div class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
+                <label class="flex items-center gap-2 text-[11px] text-gray-600 dark:text-gray-300 cursor-pointer select-none">
+                    <input type="checkbox" x-model="deliveryPrintReceipt" @change="try{localStorage.setItem('fbrpos_delivery_final_print', deliveryPrintReceipt ? '1' : '0')}catch(e){}" class="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                    <span>{{ __('pos.delivery_print_receipt') }}</span>
+                </label>
             </div>
         </div>
     </div>
@@ -2264,6 +2367,17 @@ function restaurantPos() {
         localPinInput: '',
         localPinError: '',
         localPinVerifying: false,
+        // ── PENDING DELIVERIES panel (Task 122 — FBR port of PRA Task 114) ──
+        // Quick-final for TODAY's delivery provisionals: payment aate hi cashier
+        // ek click mein Final (Cash/Card) — same promote path as F10 Make Final.
+        // bizToday = current business day from the provisional-bills API
+        // (00:00–05:59 counts in yesterday — PosBusinessDay, never client date).
+        showPendingDeliveries: false,
+        bizToday: '',
+        deliveryFinalBusyId: null,
+        // Receipt print default = NO (delivery customer isn't at the counter).
+        // Opt-in checkbox persisted per device.
+        deliveryPrintReceipt: (function(){ try { return localStorage.getItem('fbrpos_delivery_final_print') === '1'; } catch(e) { return false; } })(),
         // 🧾 FBR compliance — buyer NTN (optional, B2B) + UoM list (mirrors store() validation)
         customerNtn: '',
         uomOptions: ['U','KG','GM','LTR','ML','MTR','SQM','PCS','PKT','DOZ','BOX','SET','BAG','BTL','CTN','ROL','FT','IN','YDS','TIN','CAN','BUN'],
@@ -3464,7 +3578,7 @@ function restaurantPos() {
             // F10 keystroke would steal focus from Pay/Held/Receipt/etc.
             if (e.key === 'F10') {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries) return;
                 this.openLocalBills();
                 return;
             }
@@ -3472,7 +3586,7 @@ function restaurantPos() {
             // Same gating as F10. Browser's native F11 = fullscreen toggle is overridden.
             if (e.key === 'F11') {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries) return;
                 this.openFailedBills();
                 return;
             }
@@ -3485,7 +3599,7 @@ function restaurantPos() {
             // for their delete-row action (held/local/failed).
             // ═══════════════════════════════════════════════════════════════
             if ((e.key === 'd' || e.key === 'D' || e.code === 'KeyD') && !e.ctrlKey && !e.metaKey
-                && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills
+                && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills && !this.showPendingDeliveries
                 && !this.showPayModal && !this.showReceipt && !this.showQuickType
                 && !this.showManualItem && !this.showCustomerPicker && !this.showShortcuts
                 && !this.showManagerPinModal) {
@@ -3522,7 +3636,7 @@ function restaurantPos() {
             // future modal "N" shortcuts have a clear path.
             // ═══════════════════════════════════════════════════════════════
             if ((e.key === 'n' || e.key === 'N' || e.code === 'KeyN') && !e.ctrlKey && !e.metaKey
-                && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills
+                && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills && !this.showPendingDeliveries
                 && !this.showPayModal && !this.showReceipt && !this.showQuickType
                 && !this.showManualItem && !this.showCustomerPicker && !this.showShortcuts
                 && !this.showManagerPinModal) {
@@ -3657,6 +3771,11 @@ function restaurantPos() {
             }
             if (this.showFailedBills) {
                 if (e.key === 'Escape') { e.preventDefault(); this.showFailedBills = false; }
+                return;
+            }
+            // Pending Deliveries panel (Task 122) — Escape closes; other keys inert.
+            if (this.showPendingDeliveries) {
+                if (e.key === 'Escape') { e.preventDefault(); this.showPendingDeliveries = false; }
                 return;
             }
             if (this.showManagerPinModal) {
@@ -4477,6 +4596,7 @@ function restaurantPos() {
                 if (data && data.success) {
                     this.localPinRequired = false;
                     this.localBills = data.bills || [];
+                    if (data.business_today) this.bizToday = data.business_today;
                     if (this.activeLocalIndex >= this.filteredLocalBills().length) {
                         this.activeLocalIndex = Math.max(0, this.filteredLocalBills().length - 1);
                     }
@@ -4512,6 +4632,34 @@ function restaurantPos() {
             this.showLocalBills = true;
             this.loadLocalBills();
             this.$nextTick(() => { const el = this.$refs.localSearchInput; if (el) el.focus(); });
+        },
+        // ─── PENDING DELIVERIES panel (Task 122 — FBR port of PRA Task 114) ──
+        // TODAY's business-day delivery provisionals only. fbr_pos_transactions
+        // has no order_type column yet — bills without one are included (the
+        // filter tightens automatically once the column exists and non-delivery
+        // provisionals start carrying a type). Date scope: API falls back to
+        // created_at's date when business_date is missing, so old confidential
+        // provisionals never flood the badge.
+        pendingDeliveryBills() {
+            return this.localBills.filter(b => (b.order_type == null || b.order_type === 'delivery')
+                && (!this.bizToday || !b.business_date || b.business_date === this.bizToday));
+        },
+        openPendingDeliveries() {
+            this.showPendingDeliveries = true;
+            this.loadLocalBills();
+        },
+        // One-click final — reuses the EXACT promote path (race-safe claim,
+        // reporting-OFF invariant, PIN gate). Receipt print follows the panel's
+        // own opt-in checkbox (default NO).
+        async finalizeDelivery(bill, method) {
+            if (!bill || this.deliveryFinalBusyId) return;
+            this.deliveryFinalBusyId = bill.id;
+            try {
+                await this.promoteProvisional(bill, method, true);
+            } finally {
+                this.deliveryFinalBusyId = null;
+            }
+            if (this.pendingDeliveryBills().length === 0) this.showPendingDeliveries = false;
         },
         // Filtered view of localBills — matches invoice number, customer name,
         // phone, or delivery address. ALL list rendering + keyboard nav MUST go
@@ -4551,18 +4699,28 @@ function restaurantPos() {
                 }
             } catch (e) { console.error('deleteProvisional', e); this.showToast(window.TXT.network_error, 'error'); }
         },
-        async promoteProvisional(bill) {
+        // Task 122: optional `method` (cash/card) + `quick` flag for the Pending
+        // Deliveries one-click Final — quick path skips the confirm() prompt and
+        // the fbrEnabled JS gate (server handles reporting-OFF correctly: bill
+        // becomes a fbr/NULL FINAL, never a stuck 'pending').
+        async promoteProvisional(bill, method = null, quick = false) {
             if (!bill) return;
-            if (!this.fbrEnabled) { this.showToast(window.TXT.fbr_reporting_disabled_enable, 'error'); return; }
-            if (!confirm(window.TXT.submit_bill_q_prefix + (bill.invoice_number || '#' + bill.id) + ' to FBR as a FINAL invoice?\n\nOnce reported, the bill will be locked — no more edit or delete. Continue?')) return;
+            if (!quick) {
+                if (!this.fbrEnabled) { this.showToast(window.TXT.fbr_reporting_disabled_enable, 'error'); return; }
+                if (!confirm(window.TXT.submit_bill_q_prefix + (bill.invoice_number || '#' + bill.id) + ' to FBR as a FINAL invoice?\n\nOnce reported, the bill will be locked — no more edit or delete. Continue?')) return;
+            }
             try {
                 const res = await fetch('{{ url('/fbr-pos/api/provisional-bills') }}/' + bill.id + '/promote', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify(method ? { payment_method: method } : {}),
                 });
                 const data = await res.json();
                 if (res.status === 403 && data && data.pin_required) {
                     // 🔒 PIN session expired mid-modal — show the gate again.
+                    // The PIN input lives inside the F10 Local modal; quick path
+                    // (Pending Deliveries panel) must swap modals to reach it.
+                    if (quick) { this.showPendingDeliveries = false; this.showLocalBills = true; }
                     this.localPinRequired = true;
                     setTimeout(() => document.querySelector('input[name="pos_local_pin_nofill"]')?.focus(), 150);
                     return;
@@ -4573,6 +4731,11 @@ function restaurantPos() {
                     if (this.activeLocalIndex >= this.filteredLocalBills().length) this.activeLocalIndex = Math.max(0, this.filteredLocalBills().length - 1);
                     if (this.localBills.length === 0) { this.showLocalBills = false; this.activeLocalIndex = 0; }
                     this.showToast(data.message || window.TXT.submitted_to_fbr, 'success');
+                    // Task 122: Pending Deliveries opt-in receipt print (default NO —
+                    // delivery customer is not at the counter, paper saved).
+                    if (quick && this.deliveryPrintReceipt) {
+                        this._printViaIframe('print-receipt-frame', '/fbr-pos/transaction/' + bill.id + '/receipt?auto_print=1', 'width=400,height=700');
+                    }
                 } else {
                     // Failed — refresh list so cashier sees current state.
                     this.showToast((data && data.message) || window.TXT.submit_failed, 'error');

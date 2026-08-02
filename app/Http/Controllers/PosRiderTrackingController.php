@@ -36,6 +36,11 @@ class PosRiderTrackingController extends Controller
     private const POINT_MAX_AGE_DAYS = 7;    // oldest offline-buffered point accepted
     private const RETENTION_DAYS = 30;       // history kept for trails
 
+    // Bump on each Android release; APK hosted on OUR server (never a GitHub
+    // release — desktop agents auto-update from this repo's releases/latest).
+    private const APP_LATEST_VERSION = '1.0.0';
+    private const APP_DOWNLOAD_URL = 'https://taxnest.com.pk/downloads/taxnest-rider.apk';
+
     // ─── Shared gates ───────────────────────────────────────────────────────
 
     /** Null when allowed; otherwise a translated refusal message. */
@@ -238,6 +243,16 @@ class PosRiderTrackingController extends Controller
             'open_deliveries' => (int) $openDeliveries,
             'khata_owed' => (float) $rider->openCashBills()->sum('total_amount'),
             'last_located_at' => optional($rider->last_located_at)->toIso8601String(),
+        ]);
+    }
+
+    /** GET /api/rider-app/v1/version — app self-update check (public). */
+    public function appVersion()
+    {
+        return response()->json([
+            'ok' => true,
+            'latest' => self::APP_LATEST_VERSION,
+            'url' => self::APP_DOWNLOAD_URL,
         ]);
     }
 

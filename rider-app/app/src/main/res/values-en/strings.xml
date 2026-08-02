@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TaxNest Rider</string>
+    <string name="login_title">Rider Login</string>
+    <string name="login_hint">Same email and password your shop admin created</string>
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="login_btn">Log in</string>
+    <string name="login_failed">Login failed — check email or password</string>
+    <string name="network_error">Network problem — try again</string>
+    <string name="duty_on">Start duty</string>
+    <string name="duty_off">End duty</string>
+    <string name="duty_running">On duty — location is being shared</string>
+    <string name="duty_stopped">Duty is off</string>
+    <string name="logout">Log out</string>
+    <string name="notif_channel">Duty tracking</string>
+    <string name="notif_title">TaxNest Rider — on duty</string>
+    <string name="notif_text">Sharing location with your shop</string>
+    <string name="perm_location_needed">Location permission is required — tracking cannot work without it</string>
+    <string name="perm_background_needed">Please choose “Allow all the time” in location permission so tracking works with the screen off</string>
+    <string name="perm_battery">Set this app to “Unrestricted” in battery settings so it is not killed during duty</string>
+    <string name="open_settings">Open settings</string>
+    <string name="skip">Continue</string>
+    <string name="points_pending">Points waiting to send: %1$d</string>
+    <string name="last_sync">Last update: %1$s</string>
+    <string name="never">not yet</string>
+    <string name="plan_locked">This feature is not in your shop’s package — talk to your admin</string>
+    <string name="session_expired">Session expired — log in again</string>
+    <string name="update_available">A new version is available — please update</string>
+    <string name="update_btn">Download update</string>
+    <string name="welcome">Welcome, %1$s</string>
+    <string name="open_deliveries">Open deliveries: %1$d</string>
+    <string name="khata_owed">Khata (cash): Rs %1$s</string>
+</resources>

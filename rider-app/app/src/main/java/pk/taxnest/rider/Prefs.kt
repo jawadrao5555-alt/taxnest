@@ -1,0 +1,34 @@
+package pk.taxnest.rider
+
+import android.content.Context
+import android.content.SharedPreferences
+
+/** Tiny SharedPreferences wrapper — single source of app state. */
+object Prefs {
+    private const val FILE = "rider_prefs"
+
+    private fun sp(c: Context): SharedPreferences =
+        c.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+
+    fun token(c: Context): String? = sp(c).getString("token", null)
+    fun setToken(c: Context, v: String?) = sp(c).edit().putString("token", v).apply()
+
+    fun riderName(c: Context): String = sp(c).getString("rider_name", "") ?: ""
+    fun setRiderName(c: Context, v: String) = sp(c).edit().putString("rider_name", v).apply()
+
+    fun companyName(c: Context): String = sp(c).getString("company_name", "") ?: ""
+    fun setCompanyName(c: Context, v: String) = sp(c).edit().putString("company_name", v).apply()
+
+    fun duty(c: Context): Boolean = sp(c).getBoolean("duty", false)
+    fun setDuty(c: Context, v: Boolean) = sp(c).edit().putBoolean("duty", v).apply()
+
+    fun queueJson(c: Context): String = sp(c).getString("queue", "[]") ?: "[]"
+    fun setQueueJson(c: Context, v: String) = sp(c).edit().putString("queue", v).apply()
+
+    fun lastSync(c: Context): Long = sp(c).getLong("last_sync", 0L)
+    fun setLastSync(c: Context, v: Long) = sp(c).edit().putLong("last_sync", v).apply()
+
+    fun clearSession(c: Context) =
+        sp(c).edit().remove("token").remove("rider_name").remove("company_name")
+            .putBoolean("duty", false).putString("queue", "[]").apply()
+}

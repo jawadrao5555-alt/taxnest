@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Default locale = Urdu (rider audience); values-en carries English. -->
+<resources>
+    <string name="app_name">TaxNest Rider</string>
+    <string name="login_title">رائیڈر لاگ ان</string>
+    <string name="login_hint">وہی ای میل اور پاس ورڈ جو دکان کے ایڈمن نے بنایا ہے</string>
+    <string name="email">ای میل</string>
+    <string name="password">پاس ورڈ</string>
+    <string name="login_btn">لاگ ان کریں</string>
+    <string name="login_failed">لاگ ان ناکام — ای میل یا پاس ورڈ چیک کریں</string>
+    <string name="network_error">انٹرنیٹ مسئلہ — دوبارہ کوشش کریں</string>
+    <string name="duty_on">ڈیوٹی شروع کریں</string>
+    <string name="duty_off">ڈیوٹی ختم کریں</string>
+    <string name="duty_running">ڈیوٹی جاری ہے — لوکیشن جا رہی ہے</string>
+    <string name="duty_stopped">ڈیوٹی بند ہے</string>
+    <string name="logout">لاگ آؤٹ</string>
+    <string name="notif_channel">ڈیوٹی ٹریکنگ</string>
+    <string name="notif_title">TaxNest Rider — ڈیوٹی آن</string>
+    <string name="notif_text">لوکیشن دکان کو جا رہی ہے</string>
+    <string name="perm_location_needed">لوکیشن کی اجازت ضروری ہے — بغیر اس کے ٹریکنگ نہیں چلے گی</string>
+    <string name="perm_background_needed">براہ کرم لوکیشن کی اجازت میں «Allow all the time» چنیں تاکہ اسکرین بند ہونے پر بھی ٹریکنگ چلے</string>
+    <string name="perm_battery">بیٹری سیٹنگ سے اس ایپ کو «Unrestricted / بلا پابندی» کریں تاکہ ڈیوٹی کے دوران ایپ بند نہ ہو</string>
+    <string name="open_settings">سیٹنگ کھولیں</string>
+    <string name="skip">آگے بڑھیں</string>
+    <string name="points_pending">بھیجنے باقی پوائنٹس: %1$d</string>
+    <string name="last_sync">آخری اپ ڈیٹ: %1$s</string>
+    <string name="never">ابھی نہیں</string>
+    <string name="plan_locked">یہ فیچر آپ کی دکان کے پیکج میں شامل نہیں — ایڈمن سے بات کریں</string>
+    <string name="session_expired">سیشن ختم — دوبارہ لاگ ان کریں</string>
+    <string name="update_available">نیا ورژن آ گیا ہے — اپ ڈیٹ کریں</string>
+    <string name="update_btn">اپ ڈیٹ ڈاؤن لوڈ کریں</string>
+    <string name="welcome">خوش آمدید، %1$s</string>
+    <string name="open_deliveries">زیرِ ترسیل بل: %1$d</string>
+    <string name="khata_owed">کھاتہ (نقدی): روپے %1$s</string>
+</resources>

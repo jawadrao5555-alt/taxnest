@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.TaxNestRider" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">#0A4D5C</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSecondary">#E7BF3B</item>
+        <item name="android:statusBarColor">#0A4D5C</item>
+    </style>
+</resources>

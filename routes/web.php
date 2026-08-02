@@ -1126,6 +1126,7 @@ Route::prefix('api/rider-app/v1')->middleware(['throttle:120,1'])->group(functio
     Route::post('/duty', [\App\Http\Controllers\PosRiderTrackingController::class, 'appDuty'])->name('riderapp.duty');
     Route::post('/locations', [\App\Http\Controllers\PosRiderTrackingController::class, 'appLocations'])->name('riderapp.locations');
     Route::get('/me', [\App\Http\Controllers\PosRiderTrackingController::class, 'appMe'])->name('riderapp.me');
+    Route::get('/version', [\App\Http\Controllers\PosRiderTrackingController::class, 'appVersion'])->name('riderapp.version');
     Route::post('/logout', [\App\Http\Controllers\PosRiderTrackingController::class, 'appLogout'])->name('riderapp.logout');
 });
 

@@ -34,6 +34,21 @@ class SetPosLocale
                     if (!$lang) {
                         $lang = $user->company->default_language ?? null;
                     }
+                    $lang = in_array($lang, ['ur', 'en'], true) ? $lang : 'ur';
+                    App::setLocale($lang);
+                    // Remember the resolved language so guest pages (login /
+                    // register after logout) keep following the user's choice.
+                    if ($request->hasSession()) {
+                        $request->session()->put('pos_locale', $lang);
+                    }
+                } else {
+                    // Guest (login / register / forgot password): no user pref
+                    // yet — use last-known session language, else browser hint,
+                    // else Roman Urdu default (same default as logged-in users).
+                    $lang = $request->hasSession() ? $request->session()->get('pos_locale') : null;
+                    if (!in_array($lang, ['ur', 'en'], true)) {
+                        $lang = $request->getPreferredLanguage(['ur', 'en']) ?: 'ur';
+                    }
                     App::setLocale(in_array($lang, ['ur', 'en'], true) ? $lang : 'ur');
                 }
             }

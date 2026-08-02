@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.6') }}">
         <meta name="csrf-token" content="{{ csrf_token() }}">
-        <title>FBR POS — Login</title>
+        <title>FBR POS — {{ __('pos.auth_login_title') }}</title>
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700&display=swap" rel="stylesheet" />
         @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -46,7 +46,7 @@
                     <h1 class="mt-5 text-3xl font-black text-white tracking-tight" style="text-shadow: 0 2px 18px rgba(0,0,0,0.45);">
                         Nest <span style="background: linear-gradient(135deg, #fcd34d, #fbbf24); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">FBR</span> Pos
                     </h1>
-                    <p class="text-blue-100/85 text-sm mt-1.5 font-medium">FBR-Integrated Mall-Grade Point of Sale</p>
+                    <p class="text-blue-100/85 text-sm mt-1.5 font-medium">{{ __('pos.auth_fbr_tagline') }}</p>
                     <div class="mt-3 flex justify-center gap-2 flex-wrap">
                         <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider gold-pill">
                             <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z"/></svg>
@@ -55,7 +55,7 @@
                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider bg-white/15 text-white border border-white/25 backdrop-blur">PREMIUM EDITION</span>
                     </div>
                     <div class="mt-4 flex justify-center">
-                        <x-pwa-install color="blue" label="Install Nest FBR Pos" />
+                        <x-pwa-install color="blue" label="{{ __('pos.auth_install_fbr') }}" />
                     </div>
                 </div>
 
@@ -73,39 +73,39 @@
                     @endif
 
                     <div class="px-7 pt-7 pb-2 text-center">
-                        <h2 class="text-xl font-extrabold text-gray-900 tracking-tight">Welcome Back</h2>
-                        <p class="text-[13px] text-gray-500 mt-1">Sign in to your FBR POS account</p>
+                        <h2 class="text-xl font-extrabold text-gray-900 tracking-tight">{{ __('pos.auth_welcome_back') }}</h2>
+                        <p class="text-[13px] text-gray-500 mt-1">{{ __('pos.auth_fbr_sign_in_sub') }}</p>
                     </div>
 
                     <form method="POST" action="/fbr-pos/login" class="px-7 pb-7 pt-4 space-y-4">
                         @csrf
                         <div>
-                            <label for="login" class="block text-[12px] font-bold text-gray-700 mb-1.5 uppercase tracking-wide">Email / Phone / Username / NTN / CNIC</label>
-                            <input id="login" type="text" name="login" value="{{ old('login') }}" required autofocus autocomplete="username" placeholder="Enter your credential" class="w-full rounded-xl text-sm text-gray-900 placeholder-gray-400 input-premium">
+                            <label for="login" class="block text-[12px] font-bold text-gray-700 mb-1.5 uppercase tracking-wide">{{ __('pos.auth_login_field') }}</label>
+                            <input id="login" type="text" name="login" value="{{ old('login') }}" required autofocus autocomplete="username" placeholder="{{ __('pos.auth_ph_credential') }}" class="w-full rounded-xl text-sm text-gray-900 placeholder-gray-400 input-premium">
                             @error('login')<p class="text-xs text-red-600 mt-1.5 font-medium">{{ $message }}</p>@enderror
                         </div>
 
                         <div>
-                            <label for="password" class="block text-[12px] font-bold text-gray-700 mb-1.5 uppercase tracking-wide">Password</label>
-                            <input id="password" type="password" name="password" required autocomplete="current-password" placeholder="Enter your password" class="w-full rounded-xl text-sm text-gray-900 placeholder-gray-400 input-premium">
+                            <label for="password" class="block text-[12px] font-bold text-gray-700 mb-1.5 uppercase tracking-wide">{{ __('pos.auth_password') }}</label>
+                            <input id="password" type="password" name="password" required autocomplete="current-password" placeholder="{{ __('pos.auth_ph_password') }}" class="w-full rounded-xl text-sm text-gray-900 placeholder-gray-400 input-premium">
                             @error('password')<p class="text-xs text-red-600 mt-1.5 font-medium">{{ $message }}</p>@enderror
                         </div>
 
                         <div class="flex items-center justify-between">
                             <label class="flex items-center cursor-pointer group">
                                 <input id="remember_me" type="checkbox" name="remember" class="rounded border-blue-300 bg-white text-blue-600 focus:ring-blue-500 focus:ring-offset-0 w-4 h-4">
-                                <span class="ml-2 text-sm text-gray-600 group-hover:text-gray-900 transition">Remember me</span>
+                                <span class="ml-2 text-sm text-gray-600 group-hover:text-gray-900 transition">{{ __('pos.auth_remember_me') }}</span>
                             </label>
                         </div>
 
                         <button type="submit" class="btn-premium w-full py-3 rounded-xl text-sm font-black text-white tracking-wide transition-all duration-200">
-                            <span class="relative z-10">Sign In Securely</span>
+                            <span class="relative z-10">{{ __('pos.auth_sign_in_securely') }}</span>
                         </button>
 
                         <div class="pt-3 border-t border-gray-200 text-center">
                             <p class="text-sm text-gray-500">
-                                Don't have an account?
-                                <a href="/fbr-pos/register" class="font-bold text-blue-700 hover:text-blue-900 transition">Sign Up</a>
+                                {{ __('pos.auth_no_account') }}
+                                <a href="/fbr-pos/register" class="font-bold text-blue-700 hover:text-blue-900 transition">{{ __('pos.auth_sign_up') }}</a>
                             </p>
                         </div>
                     </form>
@@ -115,22 +115,22 @@
                 <div class="mt-5 grid grid-cols-3 gap-2 text-center">
                     <div class="px-2 py-2 rounded-lg bg-white/8 border border-white/15 backdrop-blur">
                         <div class="text-[10px] font-black text-amber-300">FBR LIVE</div>
-                        <div class="text-[9px] text-blue-100/70 mt-0.5">Real-time submit</div>
+                        <div class="text-[9px] text-blue-100/70 mt-0.5">{{ __('pos.auth_realtime_submit') }}</div>
                     </div>
                     <div class="px-2 py-2 rounded-lg bg-white/8 border border-white/15 backdrop-blur">
                         <div class="text-[10px] font-black text-emerald-300">256-BIT SSL</div>
-                        <div class="text-[9px] text-blue-100/70 mt-0.5">Bank-grade</div>
+                        <div class="text-[9px] text-blue-100/70 mt-0.5">{{ __('pos.auth_bank_grade') }}</div>
                     </div>
                     <div class="px-2 py-2 rounded-lg bg-white/8 border border-white/15 backdrop-blur">
                         <div class="text-[10px] font-black text-sky-300">PWA READY</div>
-                        <div class="text-[9px] text-blue-100/70 mt-0.5">Works offline</div>
+                        <div class="text-[9px] text-blue-100/70 mt-0.5">{{ __('pos.auth_works_offline') }}</div>
                     </div>
                 </div>
 
                 <div class="mt-5 text-center space-x-4">
-                    <a href="/digital-invoice" class="text-xs text-blue-200/70 hover:text-white transition">Digital Invoice (FBR) Portal</a>
+                    <a href="/digital-invoice" class="text-xs text-blue-200/70 hover:text-white transition">{{ __('pos.auth_di_portal') }}</a>
                     <span class="text-blue-200/30">|</span>
-                    <a href="/pos" class="text-xs text-blue-200/70 hover:text-white transition">PRA POS Portal</a>
+                    <a href="/pos" class="text-xs text-blue-200/70 hover:text-white transition">{{ __('pos.auth_pra_portal') }}</a>
                 </div>
             </div>
         </div>

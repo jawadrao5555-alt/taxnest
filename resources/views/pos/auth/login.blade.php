@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.6') }}">
         <meta name="csrf-token" content="{{ csrf_token() }}">
-        <title>NestPOS — Login</title>
+        <title>NestPOS — {{ __('pos.auth_login_title') }}</title>
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700&display=swap" rel="stylesheet" />
         @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -29,9 +29,9 @@
                         <img src="/icons/nest-pra/icon-192.png" alt="Nest Pra Pos" class="w-20 h-20 mx-auto rounded-2xl shadow-2xl shadow-purple-500/40 ring-1 ring-white/10">
                     </a>
                     <h1 class="mt-4 text-2xl font-extrabold text-white tracking-tight">Nest Pra Pos</h1>
-                    <p class="text-purple-200/60 text-sm mt-1">Mall-Grade Retail &amp; Restaurant POS</p>
+                    <p class="text-purple-200/60 text-sm mt-1">{{ __('pos.auth_pra_tagline') }}</p>
                     <div class="mt-3 flex justify-center">
-                        <x-pwa-install color="purple" label="Install Nest Pra Pos" />
+                        <x-pwa-install color="purple" label="{{ __('pos.auth_install_pra') }}" />
                     </div>
                 </div>
 
@@ -49,23 +49,23 @@
                         @endif
 
                         <div class="px-6 pt-6 pb-2 text-center">
-                            <h2 class="text-lg font-bold text-white">Welcome Back</h2>
-                            <p class="text-sm text-purple-200/50 mt-1">Sign in to your account</p>
+                            <h2 class="text-lg font-bold text-white">{{ __('pos.auth_welcome_back') }}</h2>
+                            <p class="text-sm text-purple-200/50 mt-1">{{ __('pos.auth_sign_in_sub') }}</p>
                         </div>
 
                         <form method="POST" action="/pos/login" class="px-6 pb-6 pt-4 space-y-4">
                             @csrf
                             <div>
-                                <label for="login" class="block text-sm font-medium text-purple-100/70 mb-1.5">Email / Phone / Username / NTN / CNIC</label>
-                                <input id="login" type="text" name="login" value="{{ old('login') }}" required autofocus autocomplete="username" placeholder="Enter your credential" class="w-full rounded-xl text-sm text-white placeholder-purple-300/30 transition" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(139,92,246,0.15)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
+                                <label for="login" class="block text-sm font-medium text-purple-100/70 mb-1.5">{{ __('pos.auth_login_field') }}</label>
+                                <input id="login" type="text" name="login" value="{{ old('login') }}" required autofocus autocomplete="username" placeholder="{{ __('pos.auth_ph_credential') }}" class="w-full rounded-xl text-sm text-white placeholder-purple-300/30 transition" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(139,92,246,0.15)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
                                 @error('login')
                                 <p class="text-sm text-red-400 mt-1.5">{{ $message }}</p>
                                 @enderror
                             </div>
 
                             <div>
-                                <label for="password" class="block text-sm font-medium text-purple-100/70 mb-1.5">Password</label>
-                                <input id="password" type="password" name="password" required autocomplete="current-password" placeholder="Enter your password" class="w-full rounded-xl text-sm text-white placeholder-purple-300/30 transition" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(139,92,246,0.15)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
+                                <label for="password" class="block text-sm font-medium text-purple-100/70 mb-1.5">{{ __('pos.auth_password') }}</label>
+                                <input id="password" type="password" name="password" required autocomplete="current-password" placeholder="{{ __('pos.auth_ph_password') }}" class="w-full rounded-xl text-sm text-white placeholder-purple-300/30 transition" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(139,92,246,0.15)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
                                 @error('password')
                                 <p class="text-sm text-red-400 mt-1.5">{{ $message }}</p>
                                 @enderror
@@ -74,19 +74,19 @@
                             <div class="flex items-center justify-between">
                                 <label class="flex items-center">
                                     <input id="remember_me" type="checkbox" name="remember" @if(str_contains(request()->userAgent() ?? '', 'NestPOSDesktop')) checked @endif class="rounded border-purple-300/30 bg-white/5 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 w-4 h-4">
-                                    <span class="ml-2 text-sm text-purple-200/50">Remember me</span>
+                                    <span class="ml-2 text-sm text-purple-200/50">{{ __('pos.auth_remember_me') }}</span>
                                 </label>
-                                <a href="{{ route('password.request') }}" class="text-sm text-purple-300/70 hover:text-purple-200 transition">Forgot Password?</a>
+                                <a href="{{ route('password.request') }}" class="text-sm text-purple-300/70 hover:text-purple-200 transition">{{ __('pos.auth_forgot_password') }}</a>
                             </div>
 
                             <button type="submit" class="w-full py-3 rounded-xl text-sm font-bold text-white transition-all duration-200" style="background: linear-gradient(135deg, #7c3aed, #a855f7); box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4);" onmouseover="this.style.boxShadow='0 6px 28px rgba(124, 58, 237, 0.55)'; this.style.transform='translateY(-1px)';" onmouseout="this.style.boxShadow='0 4px 20px rgba(124, 58, 237, 0.4)'; this.style.transform='translateY(0)';">
-                                Sign In
+                                {{ __('pos.auth_sign_in') }}
                             </button>
 
                             <div class="pt-3 border-t border-white/10 text-center">
                                 <p class="text-sm text-purple-200/40">
-                                    Don't have an account?
-                                    <a href="/pos/register" class="font-semibold text-purple-300 hover:text-white transition">Sign Up</a>
+                                    {{ __('pos.auth_no_account') }}
+                                    <a href="/pos/register" class="font-semibold text-purple-300 hover:text-white transition">{{ __('pos.auth_sign_up') }}</a>
                                 </p>
                             </div>
                         </form>
@@ -94,7 +94,7 @@
                 </div>
 
                 <div class="mt-5 text-center">
-                    <a href="/digital-invoice" class="text-xs text-purple-300/30 hover:text-purple-200/60 transition">Digital Invoice (FBR) Portal</a>
+                    <a href="/digital-invoice" class="text-xs text-purple-300/30 hover:text-purple-200/60 transition">{{ __('pos.auth_di_portal') }}</a>
                 </div>
             </div>
         </div>

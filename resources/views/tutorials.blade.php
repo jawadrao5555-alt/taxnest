@@ -80,15 +80,15 @@
             </div>
         </section>
         @empty
-        <p class="text-center text-gray-500 py-16">Videos jald aa rahi hain — thodi der mein dobara dekhein.</p>
+        <p class="text-center text-gray-500 py-16">Videos jald isi page par aayengi — thodi der baad phir kholiye.</p>
         @endforelse
 
         <!-- More coming + help strip -->
         <div class="rounded-2xl border border-gray-200 bg-white p-6 sm:p-8 text-center">
-            <p class="text-sm sm:text-base font-semibold text-gray-900 mb-1">Aur videos jald aa rahi hain</p>
-            <p class="text-xs sm:text-sm text-gray-500 mb-4">Products, inventory, reports, restaurant aur day close — har feature ki video tayyar ho rahi hai.</p>
+            <p class="text-sm sm:text-base font-semibold text-gray-900 mb-1">Aur videos jald isi page par</p>
+            <p class="text-xs sm:text-sm text-gray-500 mb-4">Products, inventory, reports, restaurant aur day close — har feature ki alag video, sab isi page par.</p>
             <div class="flex flex-wrap items-center justify-center gap-3">
-                <a href="/pos/register" class="text-sm font-semibold text-white px-5 py-2.5 rounded-lg" style="background: var(--teal-main);">Aaj hi muft trial shuru karein</a>
+                <a href="/pos/register" class="text-sm font-semibold text-white px-5 py-2.5 rounded-lg" style="background: var(--teal-main);">Muft Trial — aaj hi shuru</a>
                 <a href="/contact" class="text-sm font-semibold px-5 py-2.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">Sawal poochein</a>
             </div>
         </div>

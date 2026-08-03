@@ -1,0 +1,89 @@
+{
+  "slug": "team-access",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Team Accounts — Cashier, Permissions, Hazri",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": { "heading": "Team Accounts", "sub": "Cashier banana · Permissions · Staff Hazri" },
+      "narration": "अस्सलामु अलैकुम! नेस्ट पी ओ एस में ख़ुश आमदीद। आज हम सीखेंगे कि अपने स्टाफ़ के अकाउंट कैसे बनाते हैं, हर मेम्बर की परमिशन कैसे सेट करते हैं, और स्टाफ़ हाज़री की रिपोर्ट कैसे देखते हैं।",
+      "minMs": 5000
+    },
+    {
+      "id": "s02_login",
+      "narration": "सब से पहले अपने एडमिन अकाउंट से लॉगिन करें, क्योंकि टीम के अकाउंट सिर्फ़ एडमिन ही बना सकता है।",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 800 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 45 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 45 },
+        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
+        { "do": "waitFor", "selector": ".prod-card" }
+      ]
+    },
+    {
+      "id": "s03_team_page",
+      "narration": "अब टीम के पेज पर चलते हैं। यहाँ आपकी पूरी टीम की लिस्ट नज़र आती है — हर मेम्बर का नाम, रोल, और स्टेटस। देखें, हमारी दुकान में पहले से एक मैनेजर और एक कैशियर मौजूद हैं।",
+      "actions": [
+        { "do": "goto", "url": "/pos/team" },
+        { "do": "wait", "ms": 800 },
+        { "do": "highlight", "selector": "table", "after": 1500 }
+      ]
+    },
+    {
+      "id": "s04_add_member",
+      "narration": "नया कैशियर बनाने के लिए ऊपर मेम्बर ऐड करें का बटन दबाएँ। एक छोटा सा फ़ॉर्म खुल जाता है — यहाँ नाम, ईमेल, फ़ोन नंबर और पासवर्ड लिखें।",
+      "actions": [
+        { "do": "click", "selector": "button:has-text('Member add karein')", "after": 700 },
+        { "do": "type", "selector": "form input[name=name]", "text": "Bilal Hussain", "delay": 60 },
+        { "do": "type", "selector": "form input[name=email]", "text": "bilal@alnoor-demo.pk", "delay": 45 },
+        { "do": "type", "selector": "form input[name=phone]", "text": "03005557788", "delay": 45 },
+        { "do": "type", "selector": "form input[name=password]", "text": "Demo@1234", "delay": 60 }
+      ]
+    },
+    {
+      "id": "s05_role_save",
+      "narration": "अब रोल चुनें। कैशियर सिर्फ़ बिलिंग कर सकता है, और मैनेजर को ज़्यादा इख़्तियारात मिलते हैं। हम कैशियर चुन कर अकाउंट बना देते हैं। देखें — बिलाल का अकाउंट फ़ौरन लिस्ट में आ गया।",
+      "actions": [
+        { "do": "select", "selector": "form select[name=pos_role]", "value": "pos_cashier", "after": 800 },
+        { "do": "click", "selector": "form button:has-text('Account banayein')", "after": 1800 },
+        { "do": "highlight", "selector": "tr:has-text('Bilal Hussain')", "after": 1500 }
+      ]
+    },
+    {
+      "id": "s06_custom_access",
+      "narration": "अब सब से काम की चीज़ — कस्टम एक्सेस। अगर आप चाहते हैं कि कोई मेम्बर सिर्फ़ चुनी हुई चीज़ें ही देख सके, तो उसकी लाइन में कस्टम एक्सेस का बटन दबाएँ।",
+      "actions": [
+        { "do": "click", "selector": "tr:has-text('Bilal Hussain') button:has-text('Custom access')", "after": 1200 },
+        { "do": "highlight", "selector": "div.fixed .max-w-md", "after": 1200 }
+      ]
+    },
+    {
+      "id": "s07_tick_features",
+      "narration": "पहले कस्टम एक्सेस ऑन करें, फिर सिर्फ़ वो फ़ीचर टिक करें जो आप बिलाल को देना चाहते हैं — जैसे डैशबोर्ड, ऑर्डर्ज़ और रिपोर्ट्स। बाक़ी सब उस से छुपे रहेंगे। आख़िर में सेव कर दें।",
+      "actions": [
+        { "do": "click", "selector": "div.fixed label:has(input[x-model=customOn])", "after": 900 },
+        { "do": "click", "selector": "div.fixed label:has(input[value=dashboard])", "after": 500 },
+        { "do": "click", "selector": "div.fixed label:has(input[value=orders])", "after": 500 },
+        { "do": "click", "selector": "div.fixed label:has(input[value=reports])", "after": 700 },
+        { "do": "click", "selector": "div.fixed button[type=submit]:has-text('Save karein')", "after": 1800 }
+      ]
+    },
+    {
+      "id": "s08_hazri",
+      "narration": "और अब स्टाफ़ हाज़री की रिपोर्ट। रिपोर्ट्स में स्टाफ़ हाज़री खोलें — यहाँ हर मेम्बर की पहली लॉगिन, आख़री लॉगआउट, और उसके बनाए हुए बिल नज़र आते हैं। यानी आपको घर बैठे पता है कि कौन कितने बजे आया और कितना काम किया।",
+      "actions": [
+        { "do": "goto", "url": "/pos/reports/hazri" },
+        { "do": "wait", "ms": 900 },
+        { "do": "highlight", "selector": "table", "after": 1800 },
+        { "do": "highlight", "selector": "tr:has-text('Ahmed Raza')", "after": 1500 }
+      ]
+    },
+    {
+      "id": "s09_outro",
+      "card": { "heading": "Shukriya!", "sub": "Team accounts · Permissions · Hazri" },
+      "narration": "तो ये था टीम मैनेजमेंट का पूरा तरीक़ा — नया अकाउंट बनाएँ, परमिशन सेट करें, और हाज़री पर नज़र रखें। अगली वीडियो में मिलते हैं। शुक्रिया!",
+      "minMs": 5000
+    }
+  ]
+}

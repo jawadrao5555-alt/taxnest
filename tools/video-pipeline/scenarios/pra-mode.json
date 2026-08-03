@@ -1,0 +1,94 @@
+{
+  "slug": "pra-mode",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "PRA Mode — Settings aur Official Bill",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": { "heading": "PRA Reporting Mode", "sub": "Settings · Local vs Official bill" },
+      "narration": "अस्सलामु अलैकुम! अगर आपकी दुकान पंजाब रेवेन्यू अथॉरिटी, यानी पी आर ए के साथ रजिस्टर्ड है, तो नेस्ट पी ओ एस आपके बिल सीधे पी आर ए को रिपोर्ट कर सकता है। आज हम इसकी सेटिंग्ज़ देखेंगे, और समझेंगे कि लोकल बिल और ऑफ़िशियल बिल में क्या फ़र्क़ है।",
+      "minMs": 6000
+    },
+    {
+      "id": "s02_settings",
+      "narration": "लॉगिन कर के पी आर ए इंटीग्रेशन सेटिंग्ज़ खोलें। यहाँ तीन अहम चीज़ें हैं — एनवायरनमेंट, जहाँ टेस्टिंग के लिए सैंडबॉक्स और असल कारोबार के लिए प्रोडक्शन चुना जाता है।",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 800 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 45 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 45 },
+        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "goto", "url": "/pos/pra-settings" },
+        { "do": "wait", "ms": 900 },
+        { "do": "highlight", "selector": "select[name=pra_environment]", "after": 1500 }
+      ]
+    },
+    {
+      "id": "s03_posid_token",
+      "narration": "दूसरी चीज़ — पॉज़ रजिस्ट्रेशन आई डी, जो पी आर ए आपकी दुकान को जारी करता है। और तीसरी — प्रोडक्शन टोकन। ये दोनों आपको पी आर ए से रजिस्ट्रेशन के वक़्त मिलते हैं। ये सिर्फ़ डेमो दुकान है, इसलिए यहाँ मिसाली नंबर दिखा रहे हैं — अपनी असल आई डी और टोकन कभी किसी को न दिखाएँ।",
+      "actions": [
+        { "do": "highlight", "selector": "input[name=pra_pos_id]", "after": 1500 },
+        { "do": "highlight", "selector": "input[name=pra_production_token]", "after": 1500 },
+        { "do": "highlight", "selector": ".bg-blue-50", "after": 1500 }
+      ]
+    },
+    {
+      "id": "s04_status",
+      "narration": "साथ वाले ख़ाने में मौजूदा स्टेटस नज़र आता है — पी आर ए रिपोर्टिंग इस वक़्त बंद है, एनवायरनमेंट सैंडबॉक्स है, और नीचे पी आर ए की हालिया लॉग्ज़ आती हैं — हर बिल की रिपोर्टिंग का रिकॉर्ड यहीं मिलता है।",
+      "actions": [
+        { "do": "highlight", "selector": "div.space-y-6 > div:has-text('PRA Reporting')", "after": 1800 },
+        { "do": "highlight", "selector": "div:has(> h3:has-text('PRA'))", "after": 1500 }
+      ]
+    },
+    {
+      "id": "s05_sale_toggle",
+      "narration": "अब सेल स्क्रीन पर चलते हैं। यहाँ ऊपर पी आर ए रिपोर्टिंग का स्विच है। जब ये ऑन हो, तो हर फ़ाइनल बिल पी आर ए को जाता है और उसे सरकारी इनवॉइस नंबर और क्यू आर कोड मिलता है। जब ऑफ़ हो, तो बिल सिर्फ़ लोकल बनता है। हम स्विच ऑन कर के दिखाते हैं — और चूँकि ये डेमो दुकान पी आर ए से रजिस्टर्ड नहीं, इसे वापस ऑफ़ कर देते हैं।",
+      "actions": [
+        { "do": "goto", "url": "/pos/invoice/create" },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "wait", "ms": 1200 },
+        { "do": "click", "selector": "button:has-text('Switches')", "after": 900 },
+        { "do": "highlight", "selector": "div:has(> span:has-text('PRA Reporting')) button.rounded-full", "after": 1200 },
+        { "do": "click", "selector": "div:has(> span:has-text('PRA Reporting')) button.rounded-full", "after": 2000 },
+        { "do": "click", "selector": "div:has(> span:has-text('PRA Reporting')) button.rounded-full", "after": 1500 },
+        { "do": "press", "key": "Escape", "after": 600 }
+      ]
+    },
+    {
+      "id": "s06_local_bill",
+      "narration": "अब एक लोकल बिल बना कर फ़र्क़ देखते हैं। चीनी और चाय पत्ती लें, और कैश दबाएँ। रसीद पर देखें — इस पर लोकल बिल का निशान है, एल सीरीज़ का नंबर है, और कोई पी आर ए क्यू आर कोड नहीं। जब आपका पी आर ए टोकन लगा हो और रिपोर्टिंग ऑन हो, तो इसी रसीद पर पी आर ए का नंबर और क्यू आर कोड छपता है।",
+      "actions": [
+        { "do": "click", "selector": ".prod-card:has-text('Cheeni 1kg')", "after": 800 },
+        { "do": "click", "selector": ".prod-card:has-text('Chai Patti 950g')", "after": 800 },
+        { "do": "click", "selector": "button.bg-purple-600:has-text('CASH')", "after": 2500 },
+        { "do": "wait", "ms": 800 },
+        { "do": "highlight", "selector": "div.fixed .rounded-full.text-\\[10px\\], div.fixed span[x-text*='lastIsOffline']", "after": 2000 }
+      ]
+    },
+    {
+      "id": "s07_cashier_assign",
+      "narration": "एक और काम की बात — टीम पेज पर आप हर कैशियर के लिए अलग से तय कर सकते हैं कि उसके बिल पी आर ए को जाएँ या नहीं। कैशियर की लाइन में ऑनलाइन या ऑफ़लाइन की गोली दबाएँ — कैशियर ख़ुद ये सेटिंग नहीं बदल सकता, सिर्फ़ एडमिन।",
+      "actions": [
+        { "do": "goto", "url": "/pos/team" },
+        { "do": "wait", "ms": 900 },
+        { "do": "highlight", "selector": "tr:has-text('Ahmed Raza') button.rounded-full", "after": 1800 }
+      ]
+    },
+    {
+      "id": "s08_agent_note",
+      "narration": "आख़री बात — कुछ नए पी आर ए रजिस्ट्रेशन में बिल दुकान के कम्प्यूटर पर लगे फ़िस्कल डिवाइस सॉफ़्टवेयर से रिपोर्ट होते हैं। उसके लिए नेस्ट पी ओ एस का डेस्कटॉप एजेंट आपके विंडोज़ कम्प्यूटर पर इंस्टॉल होता है, और सेटिंग्ज़ में कनेक्शन मोड फ़िस्कल डिवाइस चुना जाता है — हमारी टीम सेटअप में पूरी मदद करती है।",
+      "actions": [
+        { "do": "goto", "url": "/pos/pra-settings" },
+        { "do": "wait", "ms": 900 },
+        { "do": "highlight", "selector": "select[name=pra_connection_mode]", "after": 2000 }
+      ]
+    },
+    {
+      "id": "s09_outro",
+      "card": { "heading": "Shukriya!", "sub": "PRA reporting — asaan aur mehfooz" },
+      "narration": "तो ये था पी आर ए मोड — सेटिंग्ज़ लगाएँ, रिपोर्टिंग ऑन करें, और हर ऑफ़िशियल बिल ख़ुद पी आर ए तक पहुँचे। रजिस्ट्रेशन या सेटअप में मदद चाहिए हो तो हमारी टीम हाज़िर है। शुक्रिया!",
+      "minMs": 5000
+    }
+  ]
+}

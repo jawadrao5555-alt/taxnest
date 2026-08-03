@@ -28,10 +28,15 @@ the browser binary.
    (fictional "Al-Noor General Store", login `videodemo@nestpos.pk` /
    `NestPOS@Demo1`, dev DB only). Never record a real customer company.
 2. **Scenario** — one JSON per video in `scenarios/` (format below).
-3. **TTS** — per-scene female Urdu narration via ElevenLabs
+3. **TTS** — per-scene Urdu narration via ElevenLabs
    (`externalApi__elevenlabs` in the agent's CodeExecution sandbox; the API is
    NOT callable from plain node). Model `eleven_multilingual_v2`, voice
-   "Sarah" `EXAVITQu4vr4xnSDxMaL` (owner-approved pilot voice). Save each scene
+   **"NestPOS Urdu Announcer (B1)"** `v1PxIIJZSZzAub07hKLn` with
+   `voice_settings {stability:0.5, similarity_boost:0.75, speed:0.95}` —
+   owner-approved for the WHOLE series (the earlier female "Sarah" pilot voice
+   was rejected and the pilot re-voiced in B1; see
+   `.agents/memory/video-voice-style.md`). Write narration in Devanagari-script
+   Urdu for correct pronunciation. Save each scene
    as `out/<slug>/tts/<sceneId>.mp3`, then run
    `node tools/video-pipeline/durations.cjs <slug>` to write
    `out/<slug>/tts/durations.cjson`. Keep each scene's text short (proxy caps
@@ -89,6 +94,10 @@ Notes:
   fonts); the voiceover carries the Urdu.
 - Privacy: only the seeded demo shop on the dev server; password fields are
   masked; never show tokens/settings pages unless the scenario is about them.
-- Style contract for the series (pilot-approved): female voice "Sarah",
-  natural bol-chaal Urdu with English tech words as-is, teal `#0A4D5C` /
-  gold `#E7BF3B` cards, synthetic amber cursor with purple click ripple.
+- Style contract for the series (owner-approved): male announcer voice B1
+  (`v1PxIIJZSZzAub07hKLn`, ustaad pacing), natural bol-chaal Urdu with English
+  tech words as-is, teal `#0A4D5C` / gold `#E7BF3B` cards, synthetic amber
+  cursor with purple click ripple.
+- Recording Urdu-script UI? Install Noto Nastaliq Urdu / Noto Naskh Arabic /
+  Noto Sans Arabic TTFs into `~/.fonts` + `fc-cache -f` first, or the browser
+  shows ⬜ boxes for some glyphs.

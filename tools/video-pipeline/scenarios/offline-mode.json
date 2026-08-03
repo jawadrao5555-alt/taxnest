@@ -1,0 +1,88 @@
+{
+  "slug": "offline-mode",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Offline Mode — Net band, billing chalu",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": { "heading": "Offline Mode", "sub": "Net band ho — billing phir bhi chalti rahe" },
+      "narration": "अस्सलामु अलैकुम! पाकिस्तान में बिजली और इंटरनेट का भरोसा नहीं — इसीलिए नेस्ट पी ओ एस में ऑफ़लाइन मोड है। आज हम सच में इंटरनेट बंद कर के दिखाएँगे कि बिलिंग फिर भी चलती रहती है, और नेट वापस आते ही सब कुछ ख़ुद ब ख़ुद सिंक हो जाता है।",
+      "minMs": 6000
+    },
+    {
+      "id": "s02_login",
+      "narration": "पहले लॉगिन कर के सेल स्क्रीन पर आते हैं। ऊपर ये हरा बटन देखें — इस पर ऑनलाइन लिखा है, यानी इस वक़्त इंटरनेट चल रहा है।",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 800 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 45 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 45 },
+        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "wait", "ms": 1500 },
+        { "do": "highlight", "selector": "button:has-text('Online'):has(span.w-2)", "after": 1500 }
+      ]
+    },
+    {
+      "id": "s03_go_offline",
+      "narration": "अब हम इंटरनेट बिल्कुल बंद कर देते हैं — ये कोई ड्रामा नहीं, वाक़ई नेटवर्क कट गया है। देखें, बटन फ़ौरन लाल हो गया और ऑफ़लाइन लिखा आ गया।",
+      "actions": [
+        { "do": "offline", "on": true, "after": 1200 },
+        { "do": "highlight", "selector": "button:has-text('Offline'):has(span.w-2)", "after": 1800 }
+      ]
+    },
+    {
+      "id": "s04_offline_bill",
+      "narration": "अब बग़ैर इंटरनेट के बिल बनाते हैं। प्रोडक्ट चुनें — चावल और घी — और कैश का बटन दबा दें।",
+      "actions": [
+        { "do": "click", "selector": ".prod-card:has-text('Chawal Basmati 5kg')", "after": 800 },
+        { "do": "click", "selector": ".prod-card:has-text('Cooking Oil 1L')", "after": 800 },
+        { "do": "click", "selector": "button.bg-purple-600:has-text('CASH')", "after": 2500 }
+      ]
+    },
+    {
+      "id": "s05_offline_receipt",
+      "narration": "देखें — बिल बन गया! रसीद पर साफ़ लिखा है कि ये बिल आपकी डिवाइस पर महफ़ूज़ हो गया है, और इंटरनेट वापस आते ही ख़ुद सिंक हो जाएगा। गाहक को रसीद भी अभी प्रिंट कर के दे सकते हैं।",
+      "actions": [
+        { "do": "wait", "ms": 600 },
+        { "do": "highlight", "selector": "div.fixed p.border-dashed", "after": 2000 }
+      ]
+    },
+    {
+      "id": "s06_second_bill",
+      "narration": "चलें, एक और बिल बनाते हैं — दूध और अंडे। ये भी उसी तरह डिवाइस पर महफ़ूज़ हो गया। ऊपर बटन पर गिनती देखें — दो बिल सिंक के इंतिज़ार में हैं।",
+      "actions": [
+        { "do": "click", "selector": ".prod-card:has-text('Doodh 1L')", "after": 700 },
+        { "do": "click", "selector": ".prod-card:has-text('Anday (Darjan)')", "after": 700 },
+        { "do": "click", "selector": "button.bg-purple-600:has-text('CASH')", "after": 2200 },
+        { "do": "wait", "ms": 9000 },
+        { "do": "highlight", "selector": "button:has-text('Offline'):has(span.w-2)", "after": 1500 }
+      ]
+    },
+    {
+      "id": "s07_reconnect",
+      "narration": "और अब इंटरनेट वापस ऑन करते हैं। ग़ौर से देखें — बटन पहले पीला हुआ, यानी सिंक हो रही है, और फिर हरा — दोनों बिल सर्वर पर पहुँच गए, और गिनती ग़ायब। आपको कुछ भी दबाना नहीं पड़ा।",
+      "actions": [
+        { "do": "offline", "on": false, "after": 1000 },
+        { "do": "wait", "ms": 2500 },
+        { "do": "highlight", "selector": "button:has-text('Online'):has(span.w-2)", "after": 2000 }
+      ]
+    },
+    {
+      "id": "s08_verify",
+      "narration": "यक़ीन करने के लिए ऑर्डर्ज़ की लिस्ट खोलते हैं — देखें, दोनों ऑफ़लाइन बिल अपने नंबर के साथ यहाँ मौजूद हैं। यानी नेट जाए या आए, आपका कोई बिल कभी ज़ाया नहीं होता।",
+      "actions": [
+        { "do": "goto", "url": "/pos/transactions" },
+        { "do": "wait", "ms": 1000 },
+        { "do": "click", "selector": "a:has-text('Local Invoices')", "after": 1200 },
+        { "do": "highlight", "selector": "table", "after": 2000 }
+      ]
+    },
+    {
+      "id": "s09_outro",
+      "card": { "heading": "Shukriya!", "sub": "Net band — kaam band nahi" },
+      "narration": "तो ये है नेस्ट पी ओ एस का ऑफ़लाइन मोड — नेट बंद, मगर काम बंद नहीं। बिल बनते रहें, और नेट आते ही सब ख़ुद सिंक। अगली वीडियो में मिलते हैं। शुक्रिया!",
+      "minMs": 5000
+    }
+  ]
+}

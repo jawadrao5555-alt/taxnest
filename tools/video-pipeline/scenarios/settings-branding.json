@@ -1,0 +1,97 @@
+{
+  "slug": "settings-branding",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Settings — Branding, Style, Urdu, Printer",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": { "heading": "Settings & Branding", "sub": "Logo · Style/Theme · Urdu · Printer" },
+      "narration": "अस्सलामु अलैकुम! आज की वीडियो में हम नेस्ट पी ओ एस को अपनी दुकान के रंग में ढालेंगे — रसीद पर अपना लोगो लगाएँगे, स्टाइल और थीम बदलेंगे, उर्दू ज़बान ऑन करेंगे, और प्रिंटर की सेटिंग्ज़ देखेंगे।",
+      "minMs": 5000
+    },
+    {
+      "id": "s02_login_customize",
+      "narration": "लॉगिन करने के बाद कस्टमाइज़ के पेज पर आएँ — यही आपका कंट्रोल सेंटर है। यहाँ से हर सेटिंग तक पहुँचा जा सकता है।",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 800 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 45 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 45 },
+        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "goto", "url": "/pos/customize" },
+        { "do": "wait", "ms": 900 },
+        { "do": "highlight", "selector": "#style", "after": 1500 }
+      ]
+    },
+    {
+      "id": "s03_theme",
+      "narration": "पहले थीम। थीम पिकर में छह रंग मौजूद हैं — जिस पर क्लिक करें, पूरा पी ओ एस उसी रंग में बदल जाता है। देखें, हमने एमराल्ड चुना — और फिर वापस पर्पल।",
+      "actions": [
+        { "do": "highlight", "selector": "div:has(> div > div > p:has-text('POS Theme')), .grid-cols-6", "after": 800 },
+        { "do": "click", "selector": "button[title=Emerald]", "after": 1600 },
+        { "do": "click", "selector": "button[title=Purple]", "after": 1200 }
+      ]
+    },
+    {
+      "id": "s04_language",
+      "narration": "अब ज़बान की बारी। दुकान की डिफ़ॉल्ट लैंग्वेज में तीन ऑप्शन हैं — रोमन उर्दू, इंग्लिश, और असली उर्दू स्क्रिप्ट। उर्दू स्क्रिप्ट पर क्लिक करें — पूरा पी ओ एस दाएँ से बाएँ, उर्दू में बदल जाता है।",
+      "actions": [
+        { "do": "scroll", "selector": "form:has(input[value=ur])", "after": 600 },
+        { "do": "highlight", "selector": "form:has(input[value=ur]) button", "after": 800 },
+        { "do": "click", "selector": "form:has(input[value=ur]) button", "after": 2500 },
+        { "do": "wait", "ms": 1200 }
+      ]
+    },
+    {
+      "id": "s05_language_back",
+      "narration": "जिन साथियों को रोमन उर्दू आसान लगती है, वो उसी तरह वापस भी बदल सकते हैं — हर यूज़र अपनी अलग ज़बान भी चुन सकता है। हम फ़िलहाल रोमन उर्दू पर वापस आ जाते हैं।",
+      "actions": [
+        { "do": "scroll", "selector": "form:has(input[value=rur])", "after": 600 },
+        { "do": "click", "selector": "form:has(input[value=rur]) button", "after": 2500 }
+      ]
+    },
+    {
+      "id": "s06_logo",
+      "narration": "अब रसीद पर अपनी दुकान का लोगो। बिज़नेस प्रोफ़ाइल खोलें, लोगो अपलोड करें, और चेंजेज़ सेव कर दें। बस — अब हर रसीद पर आपकी दुकान की पहचान छपेगी।",
+      "actions": [
+        { "do": "goto", "url": "/pos/business-profile" },
+        { "do": "wait", "ms": 800 },
+        { "do": "highlight", "selector": "input[name=logo]", "after": 900 },
+        { "do": "upload", "selector": "input[name=logo]", "file": "assets/alnoor-logo.png", "after": 1400 },
+        { "do": "click", "selector": "button:has-text('Business profile save karein')", "after": 2000 },
+        { "do": "goto", "url": "/pos/business-profile" },
+        { "do": "wait", "ms": 800 },
+        { "do": "highlight", "selector": "img[alt='Business Logo']", "after": 1800 }
+      ]
+    },
+    {
+      "id": "s07_receipt_settings",
+      "narration": "रसीद पर क्या-क्या नज़र आए, ये रिसीट सेटिंग्ज़ से कंट्रोल होता है — एड्रेस, फ़ोन नंबर, कैशियर का नाम, और नीचे शुक्रिया वाला मैसेज। लोगो का स्टाइल भी यहीं से चुनें — साइड में छोटा, या दरमियान में बड़ा।",
+      "actions": [
+        { "do": "goto", "url": "/pos/receipt-settings" },
+        { "do": "wait", "ms": 800 },
+        { "do": "highlight", "selector": ".grid.grid-cols-1.sm\\:grid-cols-2.gap-3", "after": 1400 },
+        { "do": "select", "selector": "select[name=rp_logo_style]", "value": "center", "after": 900 },
+        { "do": "click", "selector": "button:has-text('Receipt settings save karein')", "after": 1800 }
+      ]
+    },
+    {
+      "id": "s08_printer",
+      "narration": "आख़िर में प्रिंटर सेटिंग्ज़। अगर आपके कम्प्यूटर पर नेस्ट पी ओ एस का डेस्कटॉप एजेंट इंस्टॉल हो, तो आपके सारे प्रिंटर यहाँ ख़ुद नज़र आते हैं — बिल का प्रिंटर अलग, किचन का अलग — और रसीदें बग़ैर किसी पॉपअप के ख़ामोशी से छपती हैं।",
+      "actions": [
+        { "do": "goto", "url": "/pos/printer-settings" },
+        { "do": "wait", "ms": 800 },
+        { "do": "highlight", "selector": "input[name=silent_print_enabled]", "after": 1200 },
+        { "do": "highlight", "selector": "select[name=receipt_printer]", "after": 1200 },
+        { "do": "highlight", "selector": "select[name=kot_printer]", "after": 1200 }
+      ]
+    },
+    {
+      "id": "s09_outro",
+      "card": { "heading": "Shukriya!", "sub": "Apni dukan, apna style" },
+      "narration": "तो आज हमने पी ओ एस को अपनी दुकान के मुताबिक़ सजाया — लोगो, थीम, ज़बान और प्रिंटर, सब आपके हाथ में। अगली वीडियो में मिलते हैं। शुक्रिया!",
+      "minMs": 5000
+    }
+  ]
+}

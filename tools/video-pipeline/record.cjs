@@ -151,6 +151,24 @@ async function runAction(page, a) {
       await page.context().clearCookies();
       await sleep(200);
       break;
+    case 'upload': { // file input (may be hidden) — real upload, no fake
+      await page.locator(a.selector).first().setInputFiles(path.resolve(__dirname, a.file));
+      await sleep(a.after || 600);
+      break;
+    }
+    case 'offline': { // REAL network offline/online toggle (Task 234)
+      await page.context().setOffline(!!a.on);
+      // fire the browser events the app listens to
+      await page.evaluate((on) => window.dispatchEvent(new Event(on ? 'offline' : 'online')), !!a.on);
+      await sleep(a.after || 600);
+      break;
+    }
+    case 'scroll': {
+      if (a.selector) { const l = page.locator(a.selector).locator('visible=true').first(); await l.scrollIntoViewIfNeeded(); }
+      else await page.mouse.wheel(0, a.dy || 400);
+      await sleep(a.after || 500);
+      break;
+    }
     default: throw new Error('unknown action ' + a.do);
   }
 }

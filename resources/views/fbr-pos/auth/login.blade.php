@@ -57,6 +57,9 @@
                     <div class="mt-4 flex justify-center">
                         <x-pwa-install color="blue" label="{{ __('pos.auth_install_fbr') }}" />
                     </div>
+                    <div class="mt-3">
+                        <x-guest-language-picker :action="route('fbrpos.guest-language')" theme="blue" />
+                    </div>
                 </div>
 
                 {{-- Glass card --}}

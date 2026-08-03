@@ -216,7 +216,7 @@ class PosAuthController extends Controller
 
         $company = Company::create($companyData);
 
-        $user = User::create([
+        $userData = [
             'name' => $request->name,
             'email' => $request->email,
             'phone' => $request->phone,
@@ -225,7 +225,15 @@ class PosAuthController extends Controller
             'role' => 'company_admin',
             'pos_role' => 'pos_admin',
             'is_active' => true,
-        ]);
+        ];
+        // Guest language picker on the register page: keep the language the
+        // user chose before signing up. hasColumn = PROD schema-drift guard.
+        $guestLang = $request->session()->get(\App\Support\PosLocale::SESSION_KEY);
+        if (\App\Support\PosLocale::isValid($guestLang)
+            && \Illuminate\Support\Facades\Schema::hasColumn('users', 'language')) {
+            $userData['language'] = $guestLang;
+        }
+        $user = User::create($userData);
 
         CredentialLedgerService::record([
             'email' => $request->email,

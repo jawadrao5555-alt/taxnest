@@ -177,6 +177,15 @@ Route::post('/pos/login', [PosAuthController::class, 'login']);
 Route::get('/pos/register', [PosAuthController::class, 'showRegister'])->name('pos.register');
 Route::post('/pos/register', [PosAuthController::class, 'register']);
 Route::post('/pos/logout', [PosAuthController::class, 'logout'])->name('pos.logout');
+// Guest language picker on login/register (Aug 2026): session-only choice —
+// SetPosLocale then follows it on all guest pages incl. root forgot/reset-password.
+Route::post('/pos/guest-language', function (\Illuminate\Http\Request $request) {
+    $lang = $request->input('language');
+    if (\App\Support\PosLocale::isValid($lang)) {
+        $request->session()->put(\App\Support\PosLocale::SESSION_KEY, $lang);
+    }
+    return back();
+})->name('pos.guest-language');
 
 Route::get('/pos/invoice/share/{token}', [PosController::class, 'publicInvoicePdf'])->name('pos.invoice.share');
 
@@ -1070,6 +1079,14 @@ Route::post('/fbr-pos/login', [FbrPosAuthController::class, 'login']);
 Route::get('/fbr-pos/register', [FbrPosAuthController::class, 'showRegister'])->name('fbrpos.register');
 Route::post('/fbr-pos/register', [FbrPosAuthController::class, 'register']);
 Route::post('/fbr-pos/logout', [FbrPosAuthController::class, 'logout'])->name('fbrpos.logout');
+// Guest language picker on login/register (Aug 2026): session-only choice.
+Route::post('/fbr-pos/guest-language', function (\Illuminate\Http\Request $request) {
+    $lang = $request->input('language');
+    if (\App\Support\PosLocale::isValid($lang)) {
+        $request->session()->put(\App\Support\PosLocale::SESSION_KEY, $lang);
+    }
+    return back();
+})->name('fbrpos.guest-language');
 
 Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group(function () {
     Route::get('/dashboard', [FbrPosController::class, 'dashboard'])->name('fbrpos.dashboard');

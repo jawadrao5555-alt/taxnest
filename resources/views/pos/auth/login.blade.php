@@ -33,6 +33,9 @@
                     <div class="mt-3 flex justify-center">
                         <x-pwa-install color="purple" label="{{ __('pos.auth_install_pra') }}" />
                     </div>
+                    <div class="mt-3">
+                        <x-guest-language-picker :action="route('pos.guest-language')" theme="purple" />
+                    </div>
                 </div>
 
                 <div class="w-full max-w-md mx-auto px-4">

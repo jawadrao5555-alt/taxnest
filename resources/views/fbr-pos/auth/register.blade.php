@@ -37,6 +37,9 @@
                     </a>
                     <h1 class="mt-4 text-2xl font-extrabold text-gray-900 tracking-tight">FBR POS</h1>
                     <p class="text-blue-800/60 text-sm mt-1">{{ __('pos.auth_fbr_pos_system') }}</p>
+                    <div class="mt-3">
+                        <x-guest-language-picker :action="route('fbrpos.guest-language')" theme="light" />
+                    </div>
                 </div>
 
                 <div class="rounded-2xl overflow-hidden" style="background: rgba(255,255,255,0.85); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.6); box-shadow: 0 25px 60px -12px rgba(0,0,0,0.15), 0 0 0 1px rgba(37, 99, 235, 0.08);">

@@ -37,6 +37,9 @@
                     </a>
                     <h1 class="mt-4 text-2xl font-extrabold text-white tracking-tight">NestPOS</h1>
                     <p class="text-purple-200/60 text-sm mt-1">{{ __('pos.auth_enterprise_pos') }}</p>
+                    <div class="mt-3">
+                        <x-guest-language-picker :action="route('pos.guest-language')" theme="purple" />
+                    </div>
                 </div>
 
                 <div class="rounded-2xl overflow-hidden" style="background: rgba(255,255,255,0.07); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 25px 60px -12px rgba(0,0,0,0.5), 0 0 0 1px rgba(139, 92, 246, 0.1);">

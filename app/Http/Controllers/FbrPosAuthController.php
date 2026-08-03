@@ -147,7 +147,7 @@ class FbrPosAuthController extends Controller
             'fbr_reporting_enabled' => true,
         ]);
 
-        $user = User::create([
+        $userData = [
             'name' => $request->name,
             'email' => $request->email,
             'phone' => $request->phone,
@@ -155,7 +155,15 @@ class FbrPosAuthController extends Controller
             'company_id' => $company->id,
             'role' => 'company_admin',
             'is_active' => true,
-        ]);
+        ];
+        // Guest language picker on the register page: keep the language the
+        // user chose before signing up. hasColumn = PROD schema-drift guard.
+        $guestLang = $request->session()->get(\App\Support\PosLocale::SESSION_KEY);
+        if (\App\Support\PosLocale::isValid($guestLang)
+            && \Illuminate\Support\Facades\Schema::hasColumn('users', 'language')) {
+            $userData['language'] = $guestLang;
+        }
+        $user = User::create($userData);
 
         CredentialLedgerService::record([
             'email' => $request->email,

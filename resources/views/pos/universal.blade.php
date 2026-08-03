@@ -1940,6 +1940,33 @@ window.addEventListener('popstate', function() {
         </template>
     </div>
 
+    {{-- ═══ UNSENT-CART SWITCH PROMPT (ZFC, Aug 2026) ═══
+         Table already selected + unsent items in the cart, and the cashier moves
+         to a DIFFERENT table or Takeaway/Delivery: explicit choice — take items
+         along, or remove them. Silent carry-over band. z-[60] so it stacks above
+         the table picker (picker stays open behind for Esc/cancel). --}}
+    <div x-show="tableSwitchPrompt" x-cloak x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4" @click.self="tableSwitchPrompt = null">
+        <template x-if="tableSwitchPrompt">
+            <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
+                <div class="p-5 text-center border-b border-gray-100 dark:border-gray-800">
+                    <div class="w-12 h-12 mx-auto rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mb-2">
+                        <svg class="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.947-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"/></svg>
+                    </div>
+                    <p class="text-xs font-bold text-gray-400 uppercase tracking-wide">{{ __('pos.unsent_items_in_cart') }}</p>
+                    <p class="text-2xl font-black text-gray-900 dark:text-white mt-1" x-text="tableSwitchTargetLabel()"></p>
+                    <p class="text-[12px] text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.unsent_take_or_remove_q') }}</p>
+                </div>
+                <div class="p-4 space-y-2">
+                    <button @click="confirmTableSwitch('move')" class="w-full py-3 rounded-xl text-sm font-bold text-white bg-purple-600 hover:bg-purple-700 transition ring-offset-2 dark:ring-offset-gray-900" :class="tableSwitchIndex === 0 ? 'ring-2 ring-purple-500' : ''">1 · {{ __('pos.unsent_take_items_btn') }}</button>
+                    <button @click="confirmTableSwitch('discard')" class="w-full py-3 rounded-xl text-sm font-bold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 hover:bg-red-100 hover:border-red-400 transition ring-offset-2 dark:ring-offset-gray-900" :class="tableSwitchIndex === 1 ? 'ring-2 ring-red-500' : ''">2 · {{ __('pos.unsent_remove_items_btn') }}</button>
+                </div>
+                <div class="px-4 pb-4">
+                    <button @click="tableSwitchPrompt = null" class="w-full py-2 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition">{{ __('pos.cancel_esc') }}</button>
+                </div>
+            </div>
+        </template>
+    </div>
+
     {{-- ═══ CANCEL-ORDER WARNING MODAL (ZFC, 2 Aug 2026) ═══
          Bare confirm() ki jagah: items ki list + KOT-kitchen warning, taake
          bana hua khana anjane mein cancel na ho. --}}
@@ -3664,6 +3691,12 @@ function restaurantPos() {
         heldOrders: {!! $jsEnc($heldOrders) !!},
         showTablePicker: false,
         tablePickerIndex: 0,
+        // ZFC (Aug 2026): unsent-cart switch prompt — { kind:'table', table } |
+        // { kind:'type', type }. Opens when a table is ALREADY selected and the
+        // cashier moves to a different table / Takeaway / Delivery with unsent
+        // items: explicit move/discard choice, never a silent carry-over.
+        tableSwitchPrompt: null,
+        tableSwitchIndex: 0, // 0 = take items along, 1 = remove items
         // Dine-In Select-Table picker — live floors/tables (fetched on open).
         tableFloors: [],
         tablesLoading: false,
@@ -4721,6 +4754,10 @@ function restaurantPos() {
             // re-seeds the highlight back to the current orderType and never confirms.
             // !e?.repeat mirrors the document-path held-Enter guard in handleKey.
             if (this.guidedFlow && this.flowStep === 'type') { if (!e?.repeat) this.confirmGuidedType(); return; }
+            // ZFC SWITCH PROMPT open + focus raced back into the search box:
+            // forward Enter to the prompt's confirm (same pattern as below) —
+            // it must never re-run search/guided logic behind the modal.
+            if (this.tableSwitchPrompt) { if (!e?.repeat) this.confirmTableSwitch(this.tableSwitchIndex === 1 ? 'discard' : 'move'); return; }
             // TABLE PICKER open + focus raced back into the search box: the input's
             // .stop keeps Enter from reaching handleKey's picker branch, so forward
             // it here (same pattern as the type-step forwarding above) — Enter must
@@ -5375,6 +5412,23 @@ function restaurantPos() {
 
         handleKey(e) {
             // ═══════════════════════════════════════════════════════════════
+            // ZFC UNSENT-CART SWITCH PROMPT — TOPMOST modal, owns the keyboard
+            // while open (renders above the table picker / board). 1/arrows
+            // toggle the highlight, Enter confirms, Esc cancels (old table/
+            // type stays exactly as it was; picker stays open behind for the
+            // table case). Everything else is swallowed so keys can't leak
+            // into the picker/search behind it.
+            // ═══════════════════════════════════════════════════════════════
+            if (this.tableSwitchPrompt) {
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Tab') { e.preventDefault(); this.tableSwitchIndex = this.tableSwitchIndex === 0 ? 1 : 0; return; }
+                if (e.key === '1') { e.preventDefault(); this.tableSwitchIndex = 0; return; }
+                if (e.key === '2') { e.preventDefault(); this.tableSwitchIndex = 1; return; }
+                if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); this.confirmTableSwitch(this.tableSwitchIndex === 1 ? 'discard' : 'move'); return; }
+                if (e.key === 'Escape') { e.preventDefault(); this.tableSwitchPrompt = null; return; }
+                if (/^F\d+$/.test(e.key) || ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'e'))) { e.preventDefault(); }
+                return;
+            }
+            // ═══════════════════════════════════════════════════════════════
             // GUIDED FLOW: Order-Type step capture (dine in / takeaway / delivery).
             // Owner-specified step BETWEEN Items and Cart. Runs FIRST so the overlay
             // fully owns the keyboard: arrows/1-3 move the highlight, Enter confirms +
@@ -5462,7 +5516,7 @@ function restaurantPos() {
             //   the old empty-search shortcut ate the first letter of "Tapal"/"tea".
             // Always operates on activeCartIndex if valid, else on the LAST cart row.
             // ═══════════════════════════════════════════════════════════════
-            if ((e.key === 't' || e.key === 'T' || e.code === 'KeyT') && !e.ctrlKey && !e.metaKey && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.boardShift && !this.heldMenu) {
+            if ((e.key === 't' || e.key === 'T' || e.code === 'KeyT') && !e.ctrlKey && !e.metaKey && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.boardShift && !this.heldMenu && !this.tableSwitchPrompt) {
                 const tgt = e.target;
                 const isSearchInput = tgt && tgt === this.$refs.searchInput;
                 const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
@@ -5496,7 +5550,7 @@ function restaurantPos() {
             // F10 keystroke would steal focus from Pay/Held/Receipt/etc.
             if (e.key === 'F10') {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardShift || this.heldMenu) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
                 this.openLocalBills();
                 return;
             }
@@ -5504,7 +5558,7 @@ function restaurantPos() {
             // Same gating as F10. Browser's native F11 = fullscreen toggle is overridden.
             if (e.key === 'F11') {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardShift || this.heldMenu) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
                 this.openFailedBills();
                 return;
             }
@@ -5515,7 +5569,7 @@ function restaurantPos() {
                 e.preventDefault();
                 if (this.tableBoardOpen) {
                     this.tableBoardOpen = false;
-                } else if (!(this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardShift || this.heldMenu)) {
+                } else if (!(this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardShift || this.heldMenu || this.tableSwitchPrompt)) {
                     this.tableBoardOpen = true;
                 }
                 return;
@@ -5525,7 +5579,7 @@ function restaurantPos() {
             // search input is never hijacked. Same modal-gating as F10/F11.
             if (e.altKey && (e.key === 'r' || e.key === 'R' || e.code === 'KeyR')) {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardShift || this.heldMenu) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
                 this.openReprint();
                 return;
             }
@@ -5535,7 +5589,7 @@ function restaurantPos() {
             // keeps the modal. Alt-chord so plain digits keep qty-typing.
             if (e.altKey && (e.code === 'Digit1' || e.code === 'Digit2' || e.key === '1' || e.key === '2')) {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardShift || this.heldMenu) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
                 if (this.cart.length === 0 || this.submitting) return;
                 const oneTapCard = (e.code === 'Digit2' || e.key === '2');
                 this.payingHeldOrderId = null;
@@ -5556,7 +5610,7 @@ function restaurantPos() {
                 && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills && !this.showPendingDeliveries
                 && !this.showPayModal && !this.showReceipt && !this.showQuickType
                 && !this.showManualItem && !this.showCustomerPicker && !this.showShortcuts
-                && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.boardShift && !this.heldMenu) {
+                && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.boardShift && !this.heldMenu && !this.tableSwitchPrompt) {
                 const tgt = e.target;
                 const isSearchInput = tgt && tgt === this.$refs.searchInput;
                 const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
@@ -5591,7 +5645,7 @@ function restaurantPos() {
                 && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills && !this.showPendingDeliveries
                 && !this.showPayModal && !this.showReceipt && !this.showQuickType
                 && !this.showManualItem && !this.showCustomerPicker && !this.showShortcuts
-                && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.boardShift && !this.heldMenu) {
+                && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.boardShift && !this.heldMenu && !this.tableSwitchPrompt) {
                 const tgt = e.target;
                 const isSearchInput = tgt && tgt === this.$refs.searchInput;
                 const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
@@ -5871,12 +5925,75 @@ function restaurantPos() {
             if (!confirm(window.TXT.void_current_order_q)) return;
             this.clearCart(); this.showToast(window.TXT.order_voided, 'success');
         },
+        // ── ZFC unsent-cart switch guard (Aug 2026) ───────────────────────────────
+        // Live bug (ZFC Pizza Point videos): cashier T-1 par item dalta hai — kuch
+        // send/hold NAHI kiya — table ya order-type badalta hai to wahi item chupke
+        // se naye context mein baitha milta hai. Fix: explicit choice. Discard SIRF
+        // cashier ke choose par hota hai (owner ka "cart kabhi discard na ho" rule
+        // silent discard par hai — explicit choice uske andar hai).
+        hasUnsentCart() {
+            // Edit/recall/waiter-claim carts belong to a REAL stored order — the
+            // guard must never fire there (Table Shift covers held orders).
+            return this.cart.length > 0 && !this.editingBillId && !this.recalledOrderId && !this.incomingOrderId;
+        },
+        openTableSwitchPrompt(target) {
+            this.tableSwitchPrompt = target;
+            this.tableSwitchIndex = 0;
+            // Blur so a focused search/qty input can't swallow the prompt's keys.
+            try { document.activeElement?.blur(); } catch(_) {}
+        },
+        tableSwitchTargetLabel() {
+            const p = this.tableSwitchPrompt;
+            if (!p) return '';
+            if (p.kind === 'table') return window.TXT.table_t_prefix2 + p.table.table_number;
+            return p.type === 'delivery' ? window.TXT.delivery : window.TXT.takeaway;
+        },
+        // Lighter than clearCart(): sirf UNSENT items + unke saath chalne wala
+        // state saaf hota hai (kitchen notes, discount, delivery charge input,
+        // cart focus) — customer selection aur table release yahan NAHI chhede
+        // jaate (caller hi table/type ka faisla karta hai). Persisted cart
+        // storage bhi saaf — offline persistence items wapas na le aaye.
+        discardUnsentCart() {
+            this.cart = [];
+            this.kitchenNotes = '';
+            this.showCartNote = false;
+            this.priorityOrder = false;
+            this.stockError = '';
+            this.discountType = 'percentage';
+            this.discountValue = 0;
+            this.discountAmount = 0;
+            this.showDiscount = false;
+            this.deliveryChargeInput = '';
+            this.activeCartIndex = -1;
+            this.cartMode = false;
+            this.fixCartIndex();
+            this.clearCartStorage();
+        },
+        async confirmTableSwitch(action) {
+            const p = this.tableSwitchPrompt;
+            if (!p) return;
+            this.tableSwitchPrompt = null;
+            if (action === 'discard') this.discardUnsentCart();
+            // Re-run the original move with the prompt skipped — "move" then
+            // follows today's exact path (reserve + dine_in_auto_kot etc.),
+            // "discard" reserves/switches with an empty cart.
+            if (p.kind === 'table') { await this.selectTable(p.table, { skipSwitchPrompt: true }); }
+            else { this.setOrderType(p.type, { skipSwitchPrompt: true }); }
+        },
         // ── Dine-In Select-Table picker (Jul 2026) ────────────────────────────────
         // Dine In pill → picker opens (if no table yet). Selecting a table
         // RESERVES it server-side (race-safe; 409 if another cashier got it).
         // Reservation auto-frees on: bill stored (backend, final+provisional),
         // void/new-sale/clear-cart, or switching to Takeaway/Delivery.
-        setOrderType(type) {
+        setOrderType(type, opts) {
+            // ZFC (Aug 2026): dine-in table + UNSENT cart → Takeaway/Delivery par
+            // jaate hue explicit move/discard choice. Runs FIRST — even
+            // removeDeliveryCharge must not touch the cart before the cashier
+            // chooses. Cancel/Esc = dine-in + table bilkul jaisa tha.
+            if (!(opts && opts.skipSwitchPrompt) && type !== 'dine_in' && this.selectedTable && this.hasUnsentCart()) {
+                this.openTableSwitchPrompt({ kind: 'type', type });
+                return;
+            }
             // Item #3: the delivery-charge line only belongs to Delivery orders —
             // leaving the type removes it so it can never bill on dine-in/takeaway.
             if (type !== 'delivery') this.removeDeliveryCharge();
@@ -6057,7 +6174,7 @@ function restaurantPos() {
             } catch (e) { console.error('[tables] status load failed', e); }
             this.tablesLoading = false;
         },
-        async selectTable(table) {
+        async selectTable(table, opts) {
             // Table-se-Bill (Jul 2026): occupied table WITH a waiting waiter order
             // → claim it and load straight into the cart (no reserve, no auto-KOT —
             // the table stays occupied until settlement frees it). Early return
@@ -6072,6 +6189,15 @@ function restaurantPos() {
                 // hai" se cashier samajhta tha ke table kharab/phansa hua hai.
                 if (this.cart.length === 0) { this.showTablePicker = false; this.openBoardMenu(table); return; }
                 this.showToast(window.TXT.table_t_prefix2 + table.table_number + window.TXT.table_occupied_cart_hint, 'warning'); return;
+            }
+            // ZFC (Aug 2026): table ALREADY selected + a DIFFERENT free table +
+            // unsent cart → explicit move/discard choice BEFORE reserving (cancel
+            // must never leave a zombie reservation on the new table). First-time
+            // table pick (no selectedTable) stays prompt-free — normal flow,
+            // dine_in_auto_kot and the guided Enter-chain run exactly as before.
+            if (!(opts && opts.skipSwitchPrompt) && this.selectedTable && this.selectedTable.id !== table.id && this.hasUnsentCart()) {
+                this.openTableSwitchPrompt({ kind: 'table', table });
+                return;
             }
             try {
                 const res = await fetch('/pos/restaurant/tables/' + table.id + '/reserve', {

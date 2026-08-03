@@ -16,7 +16,7 @@ const L = aspect === '1x1'
   : { padTop: 250, brand: 96, barMargin: 36, sub: 46, footBottom: 150, foot: 38 };
 const out = path.join(__dirname, 'out', slug, aspect === '1x1' ? 'bg-1x1.png' : 'bg.png');
 (async () => {
-  const b = await chromium.launch({ executablePath: execSync('which chromium').toString().trim(), headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+  const b = await chromium.launch({ executablePath: process.env.CHROMIUM_BIN || execSync('which chromium').toString().trim(), headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
   const p = await b.newPage({ viewport: { width: w, height: h } });
   await p.setContent(`<html><body style="margin:0;width:${w}px;height:${h}px;
     background:radial-gradient(120% 80% at 50% 30%, #0E5B6C 0%, #0A4D5C 55%, #073843 100%);

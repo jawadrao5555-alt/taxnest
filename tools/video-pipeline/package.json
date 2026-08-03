@@ -1,0 +1,9 @@
+{
+    "$schema": "https://www.schemastore.org/package.json",
+    "name": "nestpos-video-pipeline",
+    "private": true,
+    "description": "NestPOS Urdu tutorial video pipeline (record/make-bg drive system Chromium via playwright-core). See README.md.",
+    "dependencies": {
+        "playwright-core": "1.62.1"
+    }
+}

@@ -4,6 +4,24 @@ Repeatable pipeline to produce Urdu-voiceover tutorial videos from **real**
 NestPOS screen recordings. Outputs (MP4/MP3) are git-ignored — only the
 pipeline + scenarios are committed.
 
+## Dependencies (fresh checkout)
+
+The scripts need only `playwright-core` (system Chromium is used, nothing is
+downloaded). It is pinned both in the repo root `package.json` and in this
+folder's own `package.json`, so either of these makes the pipeline runnable:
+
+```sh
+npm install                                  # repo root — normal setup, covers the pipeline too
+# or, standalone (no root install):
+npm install --prefix tools/video-pipeline    # creates tools/video-pipeline/node_modules
+```
+
+Node resolves `playwright-core` from `tools/video-pipeline/node_modules` first,
+falling back to the repo root `node_modules`. No NODE_PATH or `.local/` state
+is required. `ffmpeg`, `chromium` and `openssl` must be on PATH (they are in
+this workspace); `record.cjs`/`make-bg.cjs` honor `CHROMIUM_BIN` to override
+the browser binary.
+
 ## Flow
 
 1. **Demo shop** — `php artisan db:seed --class=VideoDemoShopSeeder --force`

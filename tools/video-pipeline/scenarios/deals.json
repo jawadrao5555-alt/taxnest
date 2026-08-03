@@ -5,7 +5,10 @@
   "scenes": [
     {
       "id": "s01_intro",
-      "card": { "heading": "Deals", "sub": "Deal banayen · Sale screen par bechen" },
+      "card": {
+        "heading": "Deals",
+        "sub": "Deal banayen · Sale screen par bechen"
+      },
       "narration": "अस्सलामु अलैकुम! आज हम नेस्ट पी ओ एस में deals सीखेंगे — जैसे Family Deal या Student Deal। deal एक ही बटन में कई items बेचने का आसान तरीक़ा है — fixed क़ीमत पर। आइए, पहले deal बनाते हैं, फिर बेच कर दिखाते हैं।",
       "minMs": 5000
     },
@@ -13,76 +16,191 @@
       "id": "s02_deals_page",
       "narration": "login कर के menu से Deals के page पर आएं। यहां आप की तमाम deals नज़र आती हैं — हर deal में उस के items और क़ीमत। हमारी दो deals पहले से बनी हैं — Family Deal और Karahi Deal।",
       "actions": [
-        { "do": "goto", "url": "/pos/login" },
-        { "do": "wait", "ms": 700 },
-        { "do": "type", "selector": "#login", "text": "videoresto@nestpos.pk", "delay": 40 },
-        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
-        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
-        { "do": "goto", "url": "/pos/deals" },
-        { "do": "wait", "ms": 1800 },
-        { "do": "highlight", "selector": "h4:has-text('Family Deal')", "after": 2000 }
+        {
+          "do": "goto",
+          "url": "/pos/login"
+        },
+        {
+          "do": "wait",
+          "ms": 700
+        },
+        {
+          "do": "type",
+          "selector": "#login",
+          "text": "videoresto@nestpos.pk",
+          "delay": 40
+        },
+        {
+          "do": "type",
+          "selector": "#password",
+          "text": "NestPOS@Demo1",
+          "delay": 40
+        },
+        {
+          "do": "click",
+          "selector": "button[type=submit]",
+          "after": 1500
+        },
+        {
+          "do": "goto",
+          "url": "/pos/deals"
+        },
+        {
+          "do": "wait",
+          "ms": 1800
+        },
+        {
+          "do": "highlight",
+          "selector": "h4:has-text('Family Deal')",
+          "after": 2000
+        }
       ]
     },
     {
       "id": "s03_create_name",
       "narration": "नई deal बनाना बहुत आसान है। ऊपर form में deal का नाम लिखें — हम बनाते हैं Student Deal — और उस की fixed क़ीमत, तीन सौ निनानवे रुपे।",
       "actions": [
-        { "do": "wait", "ms": 1500 },
-        { "do": "type", "selector": "form[action$='/deals'] input[name='name']", "text": "Student Deal", "delay": 90, "after": 1200 },
-        { "do": "type", "selector": "form[action$='/deals'] input[name='price']", "text": "399", "delay": 130, "after": 1200 }
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "type",
+          "selector": "form[action$='/deals'] input[name='name']",
+          "text": "Student Deal",
+          "delay": 90,
+          "after": 1200
+        },
+        {
+          "do": "type",
+          "selector": "form[action$='/deals'] input[name='price']",
+          "text": "399",
+          "delay": 130,
+          "after": 1200
+        }
       ]
     },
     {
       "id": "s04_create_items",
       "narration": "अब बताएं के इस deal में मिलेगा क्या। पहली item चुनें — Chicken Biryani Single। फिर Add Item दबा कर दूसरी item डालें — Cold Drink। आप जितनी चाहें items डाल सकते हैं, और हर item की तादाद भी।",
       "actions": [
-        { "do": "wait", "ms": 2000 },
-        { "do": "select", "selector": "form[action$='/deals'] select >> nth=0", "value": "5567", "after": 2000 },
-        { "do": "click", "selector": "form[action$='/deals'] button:has-text('Item add karein')", "after": 1500 },
-        { "do": "select", "selector": "form[action$='/deals'] select >> nth=1", "value": "5582", "after": 1500 }
+        {
+          "do": "wait",
+          "ms": 2000
+        },
+        {
+          "do": "select",
+          "selector": "form[action$='/deals'] select >> nth=0",
+          "value": "5567",
+          "after": 2000
+        },
+        {
+          "do": "click",
+          "selector": "form[action$='/deals'] button:has-text('Item add karein')",
+          "after": 1500
+        },
+        {
+          "do": "select",
+          "selector": "form[action$='/deals'] select >> nth=1",
+          "value": "5582",
+          "after": 1500
+        }
       ]
     },
     {
       "id": "s05_save",
       "narration": "बस — Add Deal दबा दें। लीजिए, Student Deal तैयार है, और list में आ गई — biryani और drink, सिर्फ़ तीन सौ निनानवे में।",
       "actions": [
-        { "do": "wait", "ms": 1200 },
-        { "do": "click", "selector": "form[action$='/deals'] button:has-text('Deal add karein')", "after": 2500 },
-        { "do": "highlight", "selector": "h4:has-text('Student Deal')", "after": 2000 }
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "click",
+          "selector": "form[action$='/deals'] button:has-text('Deal add karein')",
+          "after": 2500
+        },
+        {
+          "do": "highlight",
+          "selector": "h4:has-text('Student Deal')",
+          "after": 2000
+        }
       ]
     },
     {
       "id": "s06_sale_grid",
       "narration": "अब बेचते हैं। sale screen पर आएं, और category में Deals चुन लें — आप की तमाम deals सामने आ जाती हैं, हर एक पर उस के items भी लिखे हैं।",
       "actions": [
-        { "do": "goto", "url": "/pos/invoice/create" },
-        { "do": "waitFor", "selector": ".prod-card" },
-        { "do": "wait", "ms": 1800 },
-        { "do": "select", "selector": "select:has(option[value='deals'])", "value": "deals", "after": 2000 },
-        { "do": "wait", "ms": 1200 }
+        {
+          "do": "goto",
+          "url": "/pos/invoice/create"
+        },
+        {
+          "do": "waitFor",
+          "selector": ".prod-card"
+        },
+        {
+          "do": "wait",
+          "ms": 1800
+        },
+        {
+          "do": "select",
+          "selector": "select:has(option[value='deals'])",
+          "value": "deals",
+          "after": 2000
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        }
       ]
     },
     {
       "id": "s07_sell",
-      "narration": "गाहक ने Family Deal मंगवाई? बस उस पर click करें — पूरी deal, अपने तमाम items के साथ, एक ही line में cart में आ गई — fixed क़ीमत पर। क़ीमत में कोई गड़बड़ मुमकिन ही नहीं, क्योंकि deal का rate system ख़ुद लगाता है।",
+      "narration": "گا ہَک ने Family Deal मंगवाई? बस उस पर click करें — पूरी deal, अपने तमाम items के साथ, एक ही line में cart में आ गई — fixed क़ीमत पर। क़ीमत में कोई गड़बड़ मुमकिन ही नहीं, क्योंकि deal का rate system ख़ुद लगाता है।",
       "actions": [
-        { "do": "wait", "ms": 2000 },
-        { "do": "click", "selector": ".prod-card:has-text('Family Deal')", "after": 2000 },
-        { "do": "highlight", "selector": ".tn-cart-col", "after": 2500 }
+        {
+          "do": "wait",
+          "ms": 2000
+        },
+        {
+          "do": "click",
+          "selector": ".prod-card:has-text('Family Deal')",
+          "after": 2000
+        },
+        {
+          "do": "highlight",
+          "selector": ".tn-cart-col",
+          "after": 2500
+        }
       ]
     },
     {
       "id": "s08_pay",
-      "narration": "अब payment — वही एक बटन — CASH। bill final, और receipt पर deal के सारे items अलग-अलग साफ़ लिखे आते हैं, ताके गाहक को भी सब पता हो।",
+      "narration": "अब payment — वही एक बटन — CASH। bill final, और receipt पर deal के सारे items अलग-अलग साफ़ लिखे आते हैं, ताके گا ہَک को भी सब पता हो।",
       "actions": [
-        { "do": "wait", "ms": 1800 },
-        { "do": "click", "selector": "button.bg-purple-600:has-text('CASH')", "after": 3000 },
-        { "do": "highlight", "selector": "div.fixed button:has-text('Print'):not(:has-text('Reprint'))", "after": 1500 }
+        {
+          "do": "wait",
+          "ms": 1800
+        },
+        {
+          "do": "click",
+          "selector": "button.bg-purple-600:has-text('CASH')",
+          "after": 3000
+        },
+        {
+          "do": "highlight",
+          "selector": "div.fixed button:has-text('Print'):not(:has-text('Reprint'))",
+          "after": 1500
+        }
       ]
     },
     {
       "id": "s09_outro",
-      "card": { "heading": "Shukriya!", "sub": "Restaurant aur Riders ki videos bhi dekhen" },
+      "card": {
+        "heading": "Shukriya!",
+        "sub": "Restaurant aur Riders ki videos bhi dekhen"
+      },
       "narration": "तो ये थीं deals — एक बार बनाएं, और रोज़ एक click में बेचें। restaurant mode और delivery riders की videos भी ज़रूर देखें। शुक्रिया!",
       "minMs": 5000
     }

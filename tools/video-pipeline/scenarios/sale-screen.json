@@ -9,7 +9,7 @@
         "heading": "Sale Screen",
         "sub": "Bill banana · Payment lena · Receipt print"
       },
-      "narration": "السلام علیکم! نیسٹ پی او ایس میں خوش آمدید۔ آج ہم سیکھیں گے کہ سیل اسکرین پر بل کیسے بنتا ہے، payment کیسے لیتے ہیں، اور receipt کیسے print ہوتی ہے۔",
+      "narration": "السلام علیکم! نیسٹ پی او ایس میں خوش آمدید۔ آج ہم سیکھیں گے کہ سَیل اسکرین پر بِل کیسے بنتا ہے، payment کیسے لیتے ہیں، اور receipt کیسے print ہوتی ہے۔",
       "minMs": 5000
     },
     {
@@ -53,7 +53,7 @@
     },
     {
       "id": "s03_overview",
-      "narration": "یہ ہے آپ کی سیل اسکرین۔ بائیں طرف آپ کی تمام products نظر آ رہی ہیں، اور دائیں طرف cart ہے، جہاں گاہک کا بل بنتا ہے۔",
+      "narration": "یہ ہے آپ کی سَیل اسکرین۔ بائیں طرف آپ کی تمام products نظر آ رہی ہیں، اور دائیں طرف cart ہے، جہاں گاھَک کا بِل بنتا ہے۔",
       "actions": [
         {
           "do": "highlight",
@@ -69,7 +69,7 @@
     },
     {
       "id": "s04_add_products",
-      "narration": "بل بنانا بہت آسان ہے۔ کسی بھی product پر click کریں، وہ سیدھی cart میں شامل ہو جاتی ہے۔ دیکھیں، ہم نے چاول اور چینی cart میں ڈال دیے۔",
+      "narration": "بِل بنانا بہت آسان ہے۔ کسی بھی product پر click کریں، وہ سیدھی cart میں شامل ہو جاتی ہے۔ دیکھیں، ہم نے چاول اور چینی cart میں ڈال دیے۔",
       "actions": [
         {
           "do": "click",
@@ -125,7 +125,7 @@
     },
     {
       "id": "s07_discount",
-      "narration": "اگر گاہک کو رعایت دینی ہو تو Discount کا بٹن دبائیں اور رقم لکھ دیں۔ دیکھیں، total میں سے پچاس روپے کم ہو گئے۔",
+      "narration": "اگر گا ہَک کو رعایت دینی ہو تو Discount کا بٹن دبائیں اور رقم لکھ دیں۔ دیکھیں، total میں سے پچاس روپے کم ہو گئے۔",
       "actions": [
         {
           "do": "click",
@@ -153,7 +153,7 @@
     },
     {
       "id": "s08_payment",
-      "narration": "بل تیار ہے۔ اگر گاہک cash دے رہا ہے تو نیچے CASH کا بڑا بٹن دبائیں — بس، ایک click میں بل مکمل ہو گیا۔",
+      "narration": "بِل تیار ہے۔ اگر گا ہَک cash دے رہا ہے تو نیچے CASH کا بڑا بٹن دبائیں — بس، ایک click میں بِل مکمل ہو گیا۔",
       "actions": [
         {
           "do": "highlight",
@@ -169,7 +169,7 @@
     },
     {
       "id": "s09_receipt",
-      "narration": "یہ رہی گاہک کی receipt۔ Print کا بٹن دبائیں تو یہ receipt printer سے نکل آئے گی۔ اور نیا بل شروع کرنے کے لیے بس New Sale دبا دیں۔",
+      "narration": "یہ رہی گاھَک کی receipt۔ Print کا بٹن دبائیں تو یہ receipt printer سے نکل آئے گی۔ اور نیا بِل شروع کرنے کے لیے بس New Sale دبا دیں۔",
       "actions": [
         {
           "do": "wait",
@@ -188,7 +188,7 @@
         "heading": "Shukriya!",
         "sub": "Agli video mein mazeed features seekhenge"
       },
-      "narration": "تو یہ تھا سیل اسکرین کا مکمل طریقہ — product شامل کریں، payment لیں، اور receipt print کریں۔ اگلی ویڈیو میں ہم مزید features سیکھیں گے۔ شکریہ!",
+      "narration": "تو یہ تھا سَیل اسکرین کا مکمل طریقہ — product شامل کریں، payment لیں، اور receipt print کریں۔ اگلی ویڈیو میں ہم مزید features سیکھیں گے۔ شکریہ!",
       "minMs": 5000
     }
   ]

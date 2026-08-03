@@ -53,7 +53,7 @@
     },
     {
       "id": "s03_ordertype",
-      "narration": "restaurant mode में ऊपर तीन बटन नज़र आते हैं — Dine In, Takeaway, और Delivery। गाहक table पर बैठा है, तो Dine In दबाएं। देखें — tables का नक़्शा खुल गया। सब्ज़ table ख़ाली है, सुर्ख़ occupied। हम T-3 चुन लेते हैं।",
+      "narration": "restaurant mode में ऊपर तीन बटन नज़र आते हैं — Dine In, Takeaway, और Delivery। گا ہَک table पर बैठा है, तो Dine In दबाएं। देखें — tables का नक़्शा खुल गया। सब्ज़ table ख़ाली है, सुर्ख़ occupied। हम T-3 चुन लेते हैं।",
       "actions": [
         {
           "do": "highlight",
@@ -78,7 +78,7 @@
     },
     {
       "id": "s04_additems",
-      "narration": "अब order लें। जो dish गाहक मंगवाए, उस पर click करते जाएं — Beef Pulao, Chicken Karahi, और Chicken Tikka। हर item cart में जुड़ती जाती है, और total ख़ुद बन रहा है।",
+      "narration": "अब order लें। जो dish گا ہَک मंगवाए, उस पर click करते जाएं — Beef Pulao, Chicken Karahi, और Chicken Tikka। हर item cart में जुड़ती जाती है, और total ख़ुद बन रहा है।",
       "actions": [
         {
           "do": "wait",
@@ -248,7 +248,7 @@
     },
     {
       "id": "s10_receipt",
-      "narration": "bill final हो गया, receipt तैयार है, और table दोबारा ख़ाली हो गया — अगले गाहक के लिए। यही है restaurant mode का पूरा chakkar — table, order, kitchen, और settle।",
+      "narration": "bill final हो गया, receipt तैयार है, और table दोबारा ख़ाली हो गया — अगले گا ہَک के लिए। यही है restaurant mode का पूरा chakkar — table, order, kitchen, और settle।",
       "actions": [
         {
           "do": "wait",

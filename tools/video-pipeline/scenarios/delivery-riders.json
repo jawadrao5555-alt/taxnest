@@ -5,7 +5,10 @@
   "scenes": [
     {
       "id": "s01_intro",
-      "card": { "heading": "Delivery Riders", "sub": "Order assign · Rider portal · Khata & settlement" },
+      "card": {
+        "heading": "Delivery Riders",
+        "sub": "Order assign · Rider portal · Khata & settlement"
+      },
       "narration": "अस्सलामु अलैकुम! आज हम नेस्ट पी ओ एस का delivery riders का nizaam सीखेंगे — delivery order बनाना, rider को order देना, rider की अपनी mobile screen, और आख़िर में cash का hisaab — यानी rider khata।",
       "minMs": 5000
     },
@@ -13,97 +16,286 @@
       "id": "s02_riders_page",
       "narration": "login कर के menu से Riders के page पर आएं। यहां आप अपने तमाम rider register करते हैं — बस नाम और mobile number लिखें और add कर दें। हमारे पास दो rider पहले से मौजूद हैं — Imran Ali और Waqas Ahmed।",
       "actions": [
-        { "do": "goto", "url": "/pos/login" },
-        { "do": "wait", "ms": 700 },
-        { "do": "type", "selector": "#login", "text": "videoresto@nestpos.pk", "delay": 40 },
-        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
-        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
-        { "do": "goto", "url": "/pos/riders" },
-        { "do": "wait", "ms": 1500 },
-        { "do": "highlight", "selector": "table >> nth=0", "after": 2000 }
+        {
+          "do": "goto",
+          "url": "/pos/login"
+        },
+        {
+          "do": "wait",
+          "ms": 700
+        },
+        {
+          "do": "type",
+          "selector": "#login",
+          "text": "videoresto@nestpos.pk",
+          "delay": 40
+        },
+        {
+          "do": "type",
+          "selector": "#password",
+          "text": "NestPOS@Demo1",
+          "delay": 40
+        },
+        {
+          "do": "click",
+          "selector": "button[type=submit]",
+          "after": 1500
+        },
+        {
+          "do": "goto",
+          "url": "/pos/riders"
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "highlight",
+          "selector": "table >> nth=0",
+          "after": 2000
+        }
       ]
     },
     {
       "id": "s03_delivery_order",
-      "narration": "अब एक delivery order बनाते हैं। sale screen पर Delivery का बटन दबाएं। फिर गाहक चुनें — नाम लिखते ही पुराना गाहक मिल जाता है, और उस का saved address ख़ुद आ जाता है।",
+      "narration": "अब एक delivery order बनाते हैं। sale screen पर Delivery का बटन दबाएं। फिर گا ہَک चुनें — नाम लिखते ही पुराना گا ہَک मिल जाता है, और उस का saved address ख़ुद आ जाता है।",
       "actions": [
-        { "do": "goto", "url": "/pos/invoice/create" },
-        { "do": "waitFor", "selector": ".prod-card" },
-        { "do": "wait", "ms": 1500 },
-        { "do": "click", "selector": "button[\\@click=\"setOrderType('delivery')\"]", "after": 2000 },
-        { "do": "wait", "ms": 1500 },
-        { "do": "type", "selector": "input[placeholder*='Customer']", "text": "Ahmed", "delay": 110, "after": 1500 },
-        { "do": "click", "selector": "button:has-text('Ahmed Sahab')", "after": 1500 }
+        {
+          "do": "goto",
+          "url": "/pos/invoice/create"
+        },
+        {
+          "do": "waitFor",
+          "selector": ".prod-card"
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "click",
+          "selector": "button[\\@click=\"setOrderType('delivery')\"]",
+          "after": 2000
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "type",
+          "selector": "input[placeholder*='Customer']",
+          "text": "Ahmed",
+          "delay": 110,
+          "after": 1500
+        },
+        {
+          "do": "click",
+          "selector": "button:has-text('Ahmed Sahab')",
+          "after": 1500
+        }
       ]
     },
     {
       "id": "s04_items_pay",
-      "narration": "अब order के items डालें — Chicken Karahi और Garlic Naan — और CASH दबा दें। bill बन गया। rider ये cash गाहक से वुसूल करेगा, इसलिए ये रक़म अब rider के khate में जाएगी।",
+      "narration": "अब order के items डालें — Chicken Karahi और Garlic Naan — और CASH दबा दें। bill बन गया। rider ये cash گا ہَک से वुसूल करेगा, इसलिए ये रक़म अब rider के khate में जाएगी।",
       "actions": [
-        { "do": "wait", "ms": 1500 },
-        { "do": "click", "selector": ".prod-card:has-text('Chicken Karahi (Full)')", "after": 1200 },
-        { "do": "click", "selector": ".prod-card:has-text('Garlic Naan')", "after": 1200 },
-        { "do": "wait", "ms": 1500 },
-        { "do": "click", "selector": "button.bg-purple-600:has-text('CASH')", "after": 3000 },
-        { "do": "press", "selector": "body", "key": "Escape", "after": 800 }
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "click",
+          "selector": ".prod-card:has-text('Chicken Karahi (Full)')",
+          "after": 1200
+        },
+        {
+          "do": "click",
+          "selector": ".prod-card:has-text('Garlic Naan')",
+          "after": 1200
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "click",
+          "selector": "button.bg-purple-600:has-text('CASH')",
+          "after": 3000
+        },
+        {
+          "do": "press",
+          "selector": "body",
+          "key": "Escape",
+          "after": 800
+        }
       ]
     },
     {
       "id": "s05_assign",
       "narration": "अब Deliveries के page पर आएं — यहां आज के तमाम delivery order नज़र आते हैं। order के सामने rider चुन लें — हम Imran Ali को ये order दे देते हैं। बस — order assign हो गया, और cash Imran के khate पर चढ़ गया।",
       "actions": [
-        { "do": "goto", "url": "/pos/deliveries" },
-        { "do": "wait", "ms": 2000 },
-        { "do": "highlight", "selector": "select[name='rider_id']", "after": 2500 },
-        { "do": "select", "selector": "select[name='rider_id']", "value": { "label": "Imran Ali" }, "after": 2500 },
-        { "do": "wait", "ms": 1500 },
-        { "do": "highlight", "selector": "button:has-text('Settle Cash')", "after": 2000 }
+        {
+          "do": "goto",
+          "url": "/pos/deliveries"
+        },
+        {
+          "do": "wait",
+          "ms": 2000
+        },
+        {
+          "do": "highlight",
+          "selector": "select[name='rider_id']",
+          "after": 2500
+        },
+        {
+          "do": "select",
+          "selector": "select[name='rider_id']",
+          "value": {
+            "label": "Imran Ali"
+          },
+          "after": 2500
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "highlight",
+          "selector": "button:has-text('Settle Cash')",
+          "after": 2000
+        }
       ]
     },
     {
       "id": "s06_rider_portal",
-      "narration": "अब देखें rider की screen। Imran अपने mobile पर अपनी ID से login करता है, तो उसे सिर्फ़ अपनी deliveries नज़र आती हैं — गाहक का नाम, mobile number, address, और वुसूल करने वाली रक़म। ऊपर साफ़ लिखा है — कितना cash counter पर जमा करवाना है।",
+      "narration": "अब देखें rider की screen। Imran अपने mobile पर अपनी ID से login करता है, तो उसे सिर्फ़ अपनी deliveries नज़र आती हैं — گا ہَک का नाम, mobile number, address, और वुसूल करने वाली रक़म। ऊपर साफ़ लिखा है — कितना cash counter पर जमा करवाना है।",
       "actions": [
-        { "do": "clearCookies" },
-        { "do": "viewport", "width": 430, "height": 932 },
-        { "do": "goto", "url": "/pos/login" },
-        { "do": "wait", "ms": 700 },
-        { "do": "type", "selector": "#login", "text": "videorider@nestpos.pk", "delay": 45 },
-        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 45 },
-        { "do": "click", "selector": "button[type=submit]", "after": 2000 },
-        { "do": "wait", "ms": 2000 },
-        { "do": "highlight", "selector": "div:has-text('CASH JO JAMA KARWANA HAI') >> nth=-1", "after": 2500 }
+        {
+          "do": "clearCookies"
+        },
+        {
+          "do": "viewport",
+          "width": 430,
+          "height": 932
+        },
+        {
+          "do": "goto",
+          "url": "/pos/login"
+        },
+        {
+          "do": "wait",
+          "ms": 700
+        },
+        {
+          "do": "type",
+          "selector": "#login",
+          "text": "videorider@nestpos.pk",
+          "delay": 45
+        },
+        {
+          "do": "type",
+          "selector": "#password",
+          "text": "NestPOS@Demo1",
+          "delay": 45
+        },
+        {
+          "do": "click",
+          "selector": "button[type=submit]",
+          "after": 2000
+        },
+        {
+          "do": "wait",
+          "ms": 2000
+        },
+        {
+          "do": "highlight",
+          "selector": "div:has-text('CASH JO JAMA KARWANA HAI') >> nth=-1",
+          "after": 2500
+        }
       ]
     },
     {
       "id": "s07_delivered",
       "narration": "delivery मुकम्मल कर के rider बस Delivered का बटन दबा देता है — order का status ख़ुद update हो जाता है, और counter पर भी नज़र आ जाता है के ये order पहुंच गया।",
       "actions": [
-        { "do": "wait", "ms": 2500 },
-        { "do": "click", "selector": "button:has-text('Delivered')", "after": 2500 }
+        {
+          "do": "wait",
+          "ms": 2500
+        },
+        {
+          "do": "click",
+          "selector": "button:has-text('Delivered')",
+          "after": 2500
+        }
       ]
     },
     {
       "id": "s08_settle",
       "narration": "दिन के आख़िर में rider cash ले कर counter पर आता है। Deliveries के page पर Settle Cash दबाएं — पूरा hisaab सामने है, कौन से bill, कितनी रक़म। Settlement Confirm करें — और Imran का khata saaf। ना कोई परची, ना भूल-चूक।",
       "actions": [
-        { "do": "clearCookies" },
-        { "do": "viewport", "width": 1920, "height": 1080 },
-        { "do": "goto", "url": "/pos/login" },
-        { "do": "wait", "ms": 600 },
-        { "do": "type", "selector": "#login", "text": "videoresto@nestpos.pk", "delay": 35 },
-        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 35 },
-        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
-        { "do": "goto", "url": "/pos/deliveries" },
-        { "do": "wait", "ms": 1500 },
-        { "do": "click", "selector": "button:has-text('Settle Cash')", "after": 2500 },
-        { "do": "wait", "ms": 2000 },
-        { "do": "click", "selector": "button:has-text('Settlement Confirm karein')", "after": 2500 }
+        {
+          "do": "clearCookies"
+        },
+        {
+          "do": "viewport",
+          "width": 1920,
+          "height": 1080
+        },
+        {
+          "do": "goto",
+          "url": "/pos/login"
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "type",
+          "selector": "#login",
+          "text": "videoresto@nestpos.pk",
+          "delay": 35
+        },
+        {
+          "do": "type",
+          "selector": "#password",
+          "text": "NestPOS@Demo1",
+          "delay": 35
+        },
+        {
+          "do": "click",
+          "selector": "button[type=submit]",
+          "after": 1500
+        },
+        {
+          "do": "goto",
+          "url": "/pos/deliveries"
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "click",
+          "selector": "button:has-text('Settle Cash')",
+          "after": 2500
+        },
+        {
+          "do": "wait",
+          "ms": 2000
+        },
+        {
+          "do": "click",
+          "selector": "button:has-text('Settlement Confirm karein')",
+          "after": 2500
+        }
       ]
     },
     {
       "id": "s09_outro",
-      "card": { "heading": "Shukriya!", "sub": "Restaurant aur Deals ki videos bhi dekhen" },
+      "card": {
+        "heading": "Shukriya!",
+        "sub": "Restaurant aur Deals ki videos bhi dekhen"
+      },
       "narration": "तो ये था delivery riders का पूरा nizaam — order से ले कर settlement तक, हर रुपे का hisaab। restaurant mode और deals की videos भी ज़रूर देखें। शुक्रिया!",
       "minMs": 5000
     }

@@ -43,9 +43,19 @@ return new class extends Migration
                 $table->boolean('show_public')->default(false)->after('is_published');
             });
 
-            // Only on first add: rows existing right now are the owner-approved
-            // launch set — keep them visible on the landing page.
-            DB::table('tutorial_videos')->update(['show_public' => 1]);
+            // Only on first add: flip ONLY the owner-approved 2 Aug 2026 launch
+            // set to public. Explicit allowlist (not a blanket update) so that
+            // on a fresh machine any video row inserted by an earlier-timestamp
+            // migration (e.g. task-merged restaurant/riders/offline videos)
+            // stays show_public=0 until the super admin allows it — the owner
+            // ordered that the offline video must never auto-publish.
+            DB::table('tutorial_videos')->whereIn('slug', [
+                'nestpos-taaruf', 'account-banana', 'sale-screen-tutorial',
+                'customers-add-import-export', 'pos-customize', 'app-install-pwa',
+                'madadgar-raabta', 'barcode-scan-search', 'discount-dena',
+                'provisional-bills', 'bills-history', 'day-opening',
+                'staff-hazri', 'desktop-agent-printing', 'package-billing',
+            ])->update(['show_public' => 1]);
         }
 
         // Feature gates for the launch set (idempotent, re-runnable).

@@ -44,6 +44,8 @@ class TutorialVideo extends Model
         'customers'  => 'Customers',
         'products'   => 'Products aur Inventory',
         'restaurant' => 'Restaurant (KOT, Tables, Recipes)',
+        'riders'     => 'Delivery Riders',
+        'deals'      => 'Deals aur Combos',
         'reports'    => 'Reports aur Day Close',
         'settings'   => 'Settings aur Customize',
     ];
@@ -86,12 +88,35 @@ class TutorialVideo extends Model
     }
 
     /**
+     * Local video files must actually exist before the card is shown —
+     * rows are seeded by migration ahead of their MP4s landing in the repo
+     * (each video task commits its own file), so a missing file would
+     * otherwise render a broken player. External URLs pass through.
+     */
+    public function fileAvailable(): bool
+    {
+        $url = (string) $this->video_url;
+        if ($url === '') {
+            return false;
+        }
+        if (str_starts_with($url, '/')) {
+            return is_file(public_path(ltrim($url, '/')));
+        }
+
+        return true; // absolute/external URL — trust it
+    }
+
+    /**
      * Group an already-filtered collection by category, in display order.
+     * Rows whose local MP4 is missing are dropped here so EVERY display
+     * path (public landing + in-app) keeps the broken-player guard.
      * Returns [category => ['label' => ..., 'videos' => Collection]].
      */
     public static function groupedFrom(Collection $videos): array
     {
-        $byCat = $videos->groupBy('category');
+        $byCat = $videos
+            ->filter(fn (self $v) => $v->fileAvailable())
+            ->groupBy('category');
 
         $out = [];
         foreach (self::CATEGORIES as $key => $label) {

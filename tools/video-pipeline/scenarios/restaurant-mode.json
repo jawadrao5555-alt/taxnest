@@ -1,0 +1,274 @@
+{
+  "slug": "restaurant-mode",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Restaurant Mode — Tables, KOT, Kitchen Display",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": {
+        "heading": "Restaurant Mode",
+        "sub": "Tables · KOT · Kitchen Display · Settle"
+      },
+      "narration": "अस्सलामु अलैकुम! नेस्ट पी ओ एस में ख़ुश आमदीद। आज हम restaurant mode सीखेंगे — table चुनना, order kitchen में भेजना, kitchen display पर तैयारी, और आख़िर में bill settle करना। पूरा flow, शुरू से आख़िर तक।",
+      "minMs": 5000
+    },
+    {
+      "id": "s02_login",
+      "narration": "सब से पहले login करें। अपना email और password लिख कर Login का बटन दबाएं — और आप सीधे sale screen पर पहुंच जाएंगे।",
+      "actions": [
+        {
+          "do": "goto",
+          "url": "/pos/login"
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "type",
+          "selector": "#login",
+          "text": "videoresto@nestpos.pk",
+          "delay": 50
+        },
+        {
+          "do": "type",
+          "selector": "#password",
+          "text": "NestPOS@Demo1",
+          "delay": 50
+        },
+        {
+          "do": "click",
+          "selector": "button[type=submit]",
+          "after": 1500
+        },
+        {
+          "do": "waitFor",
+          "selector": ".prod-card"
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        }
+      ]
+    },
+    {
+      "id": "s03_ordertype",
+      "narration": "restaurant mode में ऊपर तीन बटन नज़र आते हैं — Dine In, Takeaway, और Delivery। गाहक table पर बैठा है, तो Dine In दबाएं। देखें — tables का नक़्शा खुल गया। सब्ज़ table ख़ाली है, सुर्ख़ occupied। हम T-3 चुन लेते हैं।",
+      "actions": [
+        {
+          "do": "highlight",
+          "selector": "button[\\@click=\"setOrderType('dine_in')\"]",
+          "after": 2500
+        },
+        {
+          "do": "click",
+          "selector": "button[\\@click=\"setOrderType('dine_in')\"]",
+          "after": 2500
+        },
+        {
+          "do": "wait",
+          "ms": 2000
+        },
+        {
+          "do": "click",
+          "selector": "div[x-show=\"showTablePicker\"] button:has-text(\"T-3\")",
+          "after": 1200
+        }
+      ]
+    },
+    {
+      "id": "s04_additems",
+      "narration": "अब order लें। जो dish गाहक मंगवाए, उस पर click करते जाएं — Beef Pulao, Chicken Karahi, और Chicken Tikka। हर item cart में जुड़ती जाती है, और total ख़ुद बन रहा है।",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 2500
+        },
+        {
+          "do": "click",
+          "selector": ".prod-card:has-text('Beef Pulao')",
+          "after": 1400
+        },
+        {
+          "do": "click",
+          "selector": ".prod-card:has-text('Chicken Karahi (Full)')",
+          "after": 1400
+        },
+        {
+          "do": "click",
+          "selector": ".prod-card:has-text('Chicken Tikka')",
+          "after": 1200
+        }
+      ]
+    },
+    {
+      "id": "s05_kot",
+      "narration": "order मुकम्मल है — अब इसे kitchen भेजना है। नीचे नारंगी बटन देखें — Kitchen में send करें। इस पर click करते ही K O T यानी kitchen order ticket बन जाता है, table occupied हो जाता है, और bawarchi ko order मिल जाता है।",
+      "actions": [
+        {
+          "do": "highlight",
+          "selector": "button[\\@click=\"sendToKitchen()\"]",
+          "after": 3500
+        },
+        {
+          "do": "click",
+          "selector": "button[\\@click=\"sendToKitchen()\"]",
+          "after": 3000
+        },
+        {
+          "do": "press",
+          "selector": "body",
+          "key": "Escape",
+          "after": 800
+        }
+      ]
+    },
+    {
+      "id": "s06_kds",
+      "narration": "अब देखते हैं kitchen की screen — इसे Kitchen Display System कहते हैं। kitchen में एक screen या tablet लगा दें, और हर नया order ख़ुद यहां नज़र आ जाता है — table number, items, और वक़्त के साथ।",
+      "actions": [
+        {
+          "do": "goto",
+          "url": "/pos/restaurant/kds"
+        },
+        {
+          "do": "wait",
+          "ms": 2000
+        },
+        {
+          "do": "highlight",
+          "selector": "div:has-text('Beef Pulao') >> nth=-1",
+          "after": 2000
+        }
+      ]
+    },
+    {
+      "id": "s07_kds_progress",
+      "narration": "bawarchi jab khana banana शुरू करे, तो तैयारी शुरू करें दबाए — order का रंग बदल जाता है। और jab khana तैयार हो जाए, तो तैयार का बटन दबा दे। counter पर बैठे cashier को फ़ौरन पता चल जाता है के order तैयार है।",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 3000
+        },
+        {
+          "do": "click",
+          "selector": "button[\\@click=\"kitchenUpdate(order.id, 'preparing')\"]",
+          "after": 3000
+        },
+        {
+          "do": "wait",
+          "ms": 2500
+        },
+        {
+          "do": "click",
+          "selector": "button[\\@click=\"kitchenUpdate(order.id, 'ready')\"]",
+          "after": 2000
+        }
+      ]
+    },
+    {
+      "id": "s08_waiter",
+      "narration": "और अगर आप के waiter हैं, तो उन के लिए अलग waiter screen भी है — mobile या tablet पर। waiter अपनी ID से login कर के table से ही order ले सकता है — item चुनें, table चुनें, और Send Order दबा दें। order सीधा kitchen पहुंच जाता है।",
+      "actions": [
+        {
+          "do": "goto",
+          "url": "/pos/waiter"
+        },
+        {
+          "do": "wait",
+          "ms": 2500
+        },
+        {
+          "do": "click",
+          "selector": "button:has-text('Seekh Kabab')",
+          "after": 1500
+        },
+        {
+          "do": "click",
+          "selector": "button:has-text('Table choose karein')",
+          "after": 1500
+        },
+        {
+          "do": "click",
+          "selector": "button:has-text('T-5')",
+          "after": 1500
+        },
+        {
+          "do": "click",
+          "selector": "button:has-text('ORDER SEND KAREIN')",
+          "after": 2000
+        }
+      ]
+    },
+    {
+      "id": "s09_settle",
+      "narration": "khana khatam — अब bill settle करना है। cart के ऊपर Table Board खोलें — पूरे restaurant के tables एक ही नज़र में। T-3 पर click करें — पूरा order सामने आ गया। अब Make Final दबाएं, payment चुनें — CASH — और bill final हो गया।",
+      "actions": [
+        {
+          "do": "goto",
+          "url": "/pos/invoice/create"
+        },
+        {
+          "do": "waitFor",
+          "selector": ".prod-card"
+        },
+        {
+          "do": "wait",
+          "ms": 2500
+        },
+        {
+          "do": "click",
+          "selector": "button[\\@click=\"tableBoardOpen = true\"]",
+          "after": 2500
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "click",
+          "selector": "div[x-show=\"tableBoardOpen\"] button:has-text(\"T-3\")",
+          "after": 2500
+        },
+        {
+          "do": "wait",
+          "ms": 1000
+        },
+        {
+          "do": "click",
+          "selector": "button[\\@click=\"boardAskFinal()\"]",
+          "after": 2000
+        },
+        {
+          "do": "click",
+          "selector": "div[x-show=\"boardConfirm\"] button:has-text(\"CASH\")",
+          "after": 2500
+        }
+      ]
+    },
+    {
+      "id": "s10_receipt",
+      "narration": "bill final हो गया, receipt तैयार है, और table दोबारा ख़ाली हो गया — अगले गाहक के लिए। यही है restaurant mode का पूरा chakkar — table, order, kitchen, और settle।",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 1000
+        },
+        {
+          "do": "highlight",
+          "selector": "div.fixed button:has-text('Print'):not(:has-text('Reprint'))",
+          "after": 1500
+        }
+      ]
+    },
+    {
+      "id": "s11_outro",
+      "card": {
+        "heading": "Shukriya!",
+        "sub": "Riders aur Deals ki videos zaroor dekhen"
+      },
+      "narration": "तो ये था नेस्ट पी ओ एस का restaurant mode — tables से ले कर kitchen display तक, सब कुछ एक ही nizaam में। delivery riders और deals की videos भी ज़रूर देखें। शुक्रिया!",
+      "minMs": 5000
+    }
+  ]
+}

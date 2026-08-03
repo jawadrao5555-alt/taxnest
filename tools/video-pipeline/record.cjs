@@ -135,6 +135,22 @@ async function runAction(page, a) {
       break;
     }
     case 'eval': await page.evaluate(a.js); break;
+    case 'select': { // native <select> dropdowns (e.g. sale-screen category picker)
+      const p = await center(page, a.selector);
+      await moveCursorTo(page, p.x, p.y, 400);
+      await page.evaluate(([x, y]) => window.__tnRipple(x, y), [p.x, p.y]);
+      await p.loc.selectOption(a.value);
+      await sleep(a.after || 500);
+      break;
+    }
+    case 'viewport': // phone-frame scenes (rider portal): page is letterboxed in the 16:9 video
+      await page.setViewportSize({ width: a.width || 430, height: a.height || 1080 });
+      await sleep(a.after || 400);
+      break;
+    case 'clearCookies': // switch role/session mid-video (waiter → kitchen → cashier)
+      await page.context().clearCookies();
+      await sleep(200);
+      break;
     default: throw new Error('unknown action ' + a.do);
   }
 }

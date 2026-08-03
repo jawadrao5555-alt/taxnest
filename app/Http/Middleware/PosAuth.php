@@ -50,6 +50,8 @@ class PosAuth
         if (($user->pos_role ?? null) === 'archive_viewer') {
             $path = ltrim($request->path(), '/');
             $allowed = str_starts_with($path, 'pos/archive')
+                // Tutorial videos (owner, 2 Aug 2026) — every role may learn.
+                || str_starts_with($path, 'pos/tutorials')
                 || $path === 'pos/logout'
                 || $path === 'pos/login';
             if (!$allowed) {
@@ -71,6 +73,8 @@ class PosAuth
         if (($user->pos_role ?? null) === 'local_viewer') {
             $path = ltrim($request->path(), '/');
             $allowed = str_starts_with($path, 'pos/local-bills')
+                // Tutorial videos (owner, 2 Aug 2026) — every role may learn.
+                || str_starts_with($path, 'pos/tutorials')
                 || $path === 'pos/logout'
                 || $path === 'pos/login';
             if (!$allowed) {
@@ -95,6 +99,8 @@ class PosAuth
                 || preg_match('#^pos/restaurant/orders/\d+/kitchen-ticket$#', $path)
                 // Silent printing — KDS enqueues KOT jobs for the Desktop Agent.
                 || $path === 'pos/api/print-jobs'
+                // Tutorial videos (owner, 2 Aug 2026) — every role may learn.
+                || str_starts_with($path, 'pos/tutorials')
                 || $path === 'pos/logout'
                 || $path === 'pos/login';
             if (!$allowed) {
@@ -110,6 +116,8 @@ class PosAuth
             $path = ltrim($request->path(), '/');
             $allowed = $path === 'pos/rider'
                 || str_starts_with($path, 'pos/rider/')
+                // Tutorial videos (owner, 2 Aug 2026) — every role may learn.
+                || str_starts_with($path, 'pos/tutorials')
                 || $path === 'pos/logout'
                 || $path === 'pos/login';
             if (!$allowed) {
@@ -128,6 +136,8 @@ class PosAuth
             $allowed = $path === 'pos/deliveries'
                 || str_starts_with($path, 'pos/deliveries/')
                 || preg_match('#^pos/riders/\d+/settle$#', $path)
+                // Tutorial videos (owner, 2 Aug 2026) — every role may learn.
+                || str_starts_with($path, 'pos/tutorials')
                 || $path === 'pos/logout'
                 || $path === 'pos/login';
             if (!$allowed) {

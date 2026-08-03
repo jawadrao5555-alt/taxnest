@@ -26,9 +26,14 @@ pipeline + scenarios are committed.
    `out/<slug>/timeline.json` (scene start offsets).
 5. **Assemble** — `node tools/video-pipeline/assemble.cjs <slug>`
    Muxes narration onto the capture at the recorded offsets →
-   `out/<slug>/<slug>-16x9.mp4`, then builds the framed 9:16 version →
-   `out/<slug>/<slug>-9x16.mp4` (branded teal frame, video centered, big
-   captions — WhatsApp-status readable).
+   `out/<slug>/<slug>-16x9.mp4`, then builds the framed social versions:
+   - `out/<slug>/<slug>-9x16.mp4` — TikTok/Reels/Shorts (1080x1920 branded
+     teal frame, video centered, big captions — WhatsApp-status readable)
+   - `out/<slug>/<slug>-1x1.mp4` — Facebook/Instagram feed (1080x1080 square
+     frame, same uncut video, compact header/footer)
+   One `assemble.cjs <slug>` run produces all three files deterministically:
+   the full 16:9 video is always shown uncut at 1044px wide, centered on the
+   aspect's branded background (no cropping, so UI text is never cut off).
 
 ## Scenario format (`scenarios/*.json`)
 

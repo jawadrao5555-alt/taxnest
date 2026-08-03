@@ -34,6 +34,13 @@ class PosDayCloseAutoFinalizeTest extends TestCase
     {
         parent::setUp();
 
+        // Freeze the clock at mid-day: between 00:00 and the 06:00 business-day
+        // cutoff PosBusinessDay::current() correctly returns YESTERDAY, while
+        // these fixtures write business_date = today — running the suite in
+        // that window made every day-close see "no transactions". Deterministic
+        // mid-day time keeps fixture dates and the trading day in agreement.
+        \Illuminate\Support\Carbon::setTestNow(now()->setTime(12, 0));
+
         Schema::dropAllTables();
 
         Schema::create('companies', function (Blueprint $table) {

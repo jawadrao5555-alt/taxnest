@@ -1,4 +1,4 @@
-// Assemble final MP4s (16:9 + framed 9:16) from capture.webm + per-scene TTS.
+// Assemble final MP4s (16:9 + framed 9:16 + framed 1:1) from capture.webm + per-scene TTS.
 // Usage: node tools/video-pipeline/assemble.cjs <slug> [title]
 const fs = require('fs'); const path = require('path'); const { execSync } = require('child_process');
 const slug = process.argv[2];
@@ -29,4 +29,11 @@ const V = path.join(OUT, `${slug}-9x16.mp4`);
 const title = process.argv[3] || slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) + ' Tutorial';
 sh(`node "${path.join(__dirname, 'make-bg.cjs')}" ${slug} "${title}"`);
 sh(`ffmpeg -y -loglevel error -loop 1 -i "${path.join(OUT, 'bg.png')}" -i "${master}" -filter_complex "[1:v]scale=1044:-2[v];[0:v][v]overlay=(W-w)/2:640:shortest=1[out]" -map "[out]" -map 1:a -c:v libx264 -preset veryfast -crf 21 -pix_fmt yuv420p -r 30 -c:a copy -movflags +faststart "${V}"`);
-console.log('✓', master, '\n✓', V);
+
+// ── 1:1 framed version (Facebook/Instagram feed): square branded canvas ──
+// Same recipe as 9:16 — a 1080x1080 background card rendered once by
+// make-bg.cjs, full uncut 16:9 video (1044x~587) centered below the header.
+const SQ = path.join(OUT, `${slug}-1x1.mp4`);
+sh(`node "${path.join(__dirname, 'make-bg.cjs')}" ${slug} "${title}" 1x1`);
+sh(`ffmpeg -y -loglevel error -loop 1 -i "${path.join(OUT, 'bg-1x1.png')}" -i "${master}" -filter_complex "[1:v]scale=1044:-2[v];[0:v][v]overlay=(W-w)/2:330:shortest=1[out]" -map "[out]" -map 1:a -c:v libx264 -preset veryfast -crf 21 -pix_fmt yuv420p -r 30 -c:a copy -movflags +faststart "${SQ}"`);
+console.log('✓', master, '\n✓', V, '\n✓', SQ);

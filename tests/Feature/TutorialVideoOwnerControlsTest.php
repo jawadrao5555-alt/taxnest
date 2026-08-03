@@ -49,7 +49,7 @@ class TutorialVideoOwnerControlsTest extends TestCase
             ['slug' => 'x-riders-video', 'category' => 'riders', 'expected' => 'riders_enabled'],
             ['slug' => 'rider-live-tracking', 'category' => 'riders', 'expected' => 'rider_tracking_enabled'],
             ['slug' => 'x-deals-video', 'category' => 'deals', 'expected' => 'deals_enabled'],
-            ['slug' => 'team-custom-access', 'category' => 'settings', 'expected' => 'custom_access_enabled'],
+            ['slug' => 'x-custom-access-video', 'category' => 'settings', 'expected' => 'custom_access_enabled'],
             ['slug' => 'qr-menu-tutorial', 'category' => 'restaurant', 'expected' => 'qr_menu_enabled'],
             ['slug' => 'day-close-tutorial', 'category' => 'reports', 'expected' => null], // core stays NULL
         ];

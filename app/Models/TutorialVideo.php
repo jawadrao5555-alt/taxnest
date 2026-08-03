@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Services\PosFeatureService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * One Urdu tutorial video shown on the public /tutorials page and inside the
@@ -23,11 +24,13 @@ class TutorialVideo extends Model
     protected $fillable = [
         'slug', 'product', 'title', 'description', 'video_url', 'category',
         'required_feature', 'sort', 'is_published', 'show_public', 'duration_seconds',
+        'controls_applied',
     ];
 
     protected $casts = [
         'is_published' => 'boolean',
         'show_public' => 'boolean',
+        'controls_applied' => 'boolean',
     ];
 
     /** Product folders on the public page, in display order. */
@@ -49,6 +52,85 @@ class TutorialVideo extends Model
         'reports'    => 'Reports aur Day Close',
         'settings'   => 'Settings aur Customize',
     ];
+
+    /**
+     * Owner default gates by category (3 Aug 2026): a video row that arrives
+     * from a task-merge migration WITHOUT an explicit required_feature gets
+     * one from its category. Core categories (shuruat/billing/customers/
+     * products/reports/settings) stay NULL — everyone sees them.
+     */
+    public const CATEGORY_GATES = [
+        'restaurant' => 'restaurant',
+        'riders'     => 'riders_enabled',
+        'deals'      => 'deals_enabled',
+    ];
+
+    /** Slug-pattern gates — more specific than the category defaults. */
+    public const SLUG_GATES = [
+        'tracking'      => 'rider_tracking_enabled',
+        'custom-access' => 'custom_access_enabled',
+        'custom_access' => 'custom_access_enabled',
+        'qr-menu'       => 'qr_menu_enabled',
+        'qr_menu'       => 'qr_menu_enabled',
+    ];
+
+    private static ?bool $controlsColumnExists = null;
+
+    /**
+     * One-time-per-row enforcement of the owner's 3 Aug 2026 controls.
+     *
+     * Video rows are seeded by task-merge migrations that were authored in
+     * isolated environments and know nothing about these controls — and they
+     * can merge AFTER this task's migration has already run, so a one-shot
+     * migration cannot catch them. This self-heal runs on every tutorials
+     * page load, processes only rows with controls_applied=0, then marks
+     * them applied — so the super admin's later manual toggles from
+     * /admin/tutorial-videos are never overridden.
+     *
+     * Rules:
+     *  - required_feature default: slug-pattern gate, else category gate
+     *    (only when the row shipped with NULL).
+     *  - OFFLINE LOCKDOWN (owner's order): any slug containing "offline" is
+     *    force-unpublished everywhere (is_published=0, show_public=0) until
+     *    the owner enables it himself from the admin panel.
+     */
+    public static function applyOwnerControls(): void
+    {
+        try {
+            self::$controlsColumnExists ??= Schema::hasColumn((new self)->getTable(), 'controls_applied');
+            if (!self::$controlsColumnExists) {
+                return; // migration not run yet
+            }
+
+            foreach (self::query()->where('controls_applied', false)->get() as $video) {
+                $updates = ['controls_applied' => true];
+                $slug = (string) $video->slug;
+
+                if ($video->required_feature === null) {
+                    $gate = null;
+                    foreach (self::SLUG_GATES as $needle => $slugGate) {
+                        if (str_contains($slug, $needle)) {
+                            $gate = $slugGate;
+                            break;
+                        }
+                    }
+                    $gate ??= self::CATEGORY_GATES[(string) $video->category] ?? null;
+                    if ($gate !== null) {
+                        $updates['required_feature'] = $gate;
+                    }
+                }
+
+                if (str_contains($slug, 'offline')) {
+                    $updates['is_published'] = false;
+                    $updates['show_public'] = false;
+                }
+
+                $video->forceFill($updates)->saveQuietly();
+            }
+        } catch (\Throwable $e) {
+            report($e); // never 500 a tutorials page over the self-heal
+        }
+    }
 
     public function scopePublished($query)
     {

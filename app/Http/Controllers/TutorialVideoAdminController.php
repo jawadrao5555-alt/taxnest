@@ -17,6 +17,8 @@ class TutorialVideoAdminController extends Controller
 {
     public function index()
     {
+        TutorialVideo::applyOwnerControls();
+
         $videos = TutorialVideo::orderBy('product')->orderBy('sort')->orderBy('id')->get();
 
         return view('admin.tutorial-videos', [

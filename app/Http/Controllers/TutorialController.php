@@ -19,6 +19,8 @@ class TutorialController extends Controller
 {
     public function publicIndex()
     {
+        TutorialVideo::applyOwnerControls();
+
         $videos = TutorialVideo::publicVisible()
             ->orderBy('sort')->orderBy('id')->get();
 
@@ -49,6 +51,8 @@ class TutorialController extends Controller
 
     public function posIndex()
     {
+        TutorialVideo::applyOwnerControls();
+
         $user = auth('pos')->user();
         $company = $user?->company ?: Company::find(app()->bound('currentCompanyId') ? app('currentCompanyId') : null);
 

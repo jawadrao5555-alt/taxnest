@@ -144,7 +144,9 @@ class PosAuth
                 // may hide/show items on their OWN tablet grid.
                 || str_starts_with($path, 'pos/grid-prefs')
                 // Tutorial videos (owner, 2 Aug 2026) — every role may learn.
-                || str_starts_with($path, 'pos/tutorials')
+                // Exact match on purpose: future pos/tutorials/* sub-routes must
+                // NOT be silently admitted into waiter confinement.
+                || $path === 'pos/tutorials'
                 || $path === 'pos/logout'
                 || $path === 'pos/login';
             if (!$allowed) {

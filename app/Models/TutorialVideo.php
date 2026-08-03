@@ -2,22 +2,39 @@
 
 namespace App\Models;
 
+use App\Services\PosFeatureService;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 
 /**
  * One Urdu tutorial video shown on the public /tutorials page and inside the
  * POS panel (/pos/tutorials). Videos are static mp4 files under
- * public/videos/ (committed to the repo); rows are seeded via migration.
+ * public/videos/ (committed to the repo); rows are seeded via migration and
+ * managed from the super-admin panel (/admin/tutorial-videos).
+ *
+ * Visibility rules (owner, 3 Aug 2026):
+ *  - Public landing page: is_published AND show_public (super-admin allowlist).
+ *  - Inside a company login: is_published AND the company's subscription
+ *    actually includes the feature (required_feature plan-gate; NULL = core
+ *    feature, everyone sees it).
  */
 class TutorialVideo extends Model
 {
     protected $fillable = [
-        'slug', 'title', 'description', 'video_url', 'category',
-        'sort', 'is_published', 'duration_seconds',
+        'slug', 'product', 'title', 'description', 'video_url', 'category',
+        'required_feature', 'sort', 'is_published', 'show_public', 'duration_seconds',
     ];
 
     protected $casts = [
         'is_published' => 'boolean',
+        'show_public' => 'boolean',
+    ];
+
+    /** Product folders on the public page, in display order. */
+    public const PRODUCTS = [
+        'nestpos' => 'NestPOS',
+        'fbrpos'  => 'FBR POS',
+        'di'      => 'Digital Invoicing',
     ];
 
     /** Display order + Roman Urdu labels of the category sections. */
@@ -36,28 +53,56 @@ class TutorialVideo extends Model
         return $query->where('is_published', true);
     }
 
+    /** Landing-page set: published AND super-admin allowed. */
+    public function scopePublicVisible($query)
+    {
+        return $query->where('is_published', true)->where('show_public', true);
+    }
+
     /**
-     * All published videos grouped by category, in display order.
+     * May this video be shown inside the given company's login?
+     * NULL gate = core feature (every subscription). 'restaurant' uses the
+     * restaurant plan check; anything else is a PLAN_GATES pricing column.
+     * Unknown/broken company => only ungated videos (fail closed).
+     */
+    public function visibleToCompany(?Company $company): bool
+    {
+        $gate = trim((string) $this->required_feature);
+        if ($gate === '') {
+            return true;
+        }
+        if (!$company) {
+            return false;
+        }
+        try {
+            if ($gate === 'restaurant' || $gate === 'restaurant_enabled') {
+                return PosFeatureService::restaurantAllowed($company);
+            }
+
+            return PosFeatureService::planAllows($company, $gate);
+        } catch (\Throwable $e) {
+            return false; // never 500 the tutorials page over a bad gate key
+        }
+    }
+
+    /**
+     * Group an already-filtered collection by category, in display order.
      * Returns [category => ['label' => ..., 'videos' => Collection]].
      */
-    public static function groupedForDisplay(): array
+    public static function groupedFrom(Collection $videos): array
     {
-        $videos = static::published()
-            ->orderBy('sort')
-            ->orderBy('id')
-            ->get()
-            ->groupBy('category');
+        $byCat = $videos->groupBy('category');
 
         $out = [];
         foreach (self::CATEGORIES as $key => $label) {
-            if ($videos->has($key) && $videos[$key]->isNotEmpty()) {
-                $out[$key] = ['label' => $label, 'videos' => $videos[$key]];
+            if ($byCat->has($key) && $byCat[$key]->isNotEmpty()) {
+                $out[$key] = ['label' => $label, 'videos' => $byCat[$key]];
             }
         }
         // Any category not in the fixed list goes last (future-proof).
-        foreach ($videos as $key => $list) {
+        foreach ($byCat as $key => $list) {
             if (!isset(self::CATEGORIES[$key])) {
-                $out[$key] = ['label' => ucfirst($key), 'videos' => $list];
+                $out[$key] = ['label' => ucfirst((string) $key), 'videos' => $list];
             }
         }
 

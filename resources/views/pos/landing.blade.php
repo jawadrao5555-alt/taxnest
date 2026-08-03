@@ -102,6 +102,7 @@
                 <div class="hidden md:flex items-center space-x-8">
                     <a href="#features" class="text-sm font-medium text-gray-200 hover:text-white transition-colors">Features</a>
                     <a href="#editions" class="text-sm font-medium text-gray-200 hover:text-white transition-colors">Editions & Pricing</a>
+                    <a href="/tutorials" class="text-sm font-medium text-gray-200 hover:text-white transition-colors">Tutorials</a>
                 </div>
                 
                 <div class="flex items-center space-x-4">
@@ -117,6 +118,7 @@
             <div x-show="mobileMenuOpen" x-cloak @click.away="mobileMenuOpen = false" class="md:hidden border-t border-white/10 py-4 space-y-1 bg-[#052730]">
                 <a href="#features" @click="mobileMenuOpen = false" class="block px-4 py-2.5 text-sm font-medium text-gray-200 hover:bg-white/5">Features</a>
                 <a href="#editions" @click="mobileMenuOpen = false" class="block px-4 py-2.5 text-sm font-medium text-gray-200 hover:bg-white/5">Editions & Pricing</a>
+                <a href="/tutorials" class="block px-4 py-2.5 text-sm font-medium text-gray-200 hover:bg-white/5">Tutorials</a>
                 <a href="/pos/login" class="block px-4 py-2.5 text-sm font-medium text-gray-200 hover:bg-white/5">Log In</a>
             </div>
         </div>

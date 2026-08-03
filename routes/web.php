@@ -923,6 +923,12 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/app-updates/{id}/toggle', [\App\Http\Controllers\AppUpdateController::class, 'toggle'])->name('admin.app-updates.toggle');
     Route::delete('/app-updates/{id}/delete', [\App\Http\Controllers\AppUpdateController::class, 'destroy'])->name('admin.app-updates.destroy');
 
+    // Tutorial videos visibility control (owner request 3 Aug 2026)
+    Route::get('/tutorial-videos', [\App\Http\Controllers\TutorialVideoAdminController::class, 'index'])->name('admin.tutorial-videos');
+    Route::post('/tutorial-videos/{id}/toggle-published', [\App\Http\Controllers\TutorialVideoAdminController::class, 'togglePublished'])->name('admin.tutorial-videos.toggle-published');
+    Route::post('/tutorial-videos/{id}/toggle-public', [\App\Http\Controllers\TutorialVideoAdminController::class, 'togglePublic'])->name('admin.tutorial-videos.toggle-public');
+    Route::post('/tutorial-videos/{id}/gate', [\App\Http\Controllers\TutorialVideoAdminController::class, 'setGate'])->name('admin.tutorial-videos.gate');
+
     // POS Feature Suggestions review (owner request 20 Jul 2026)
     Route::get('/feature-suggestions', [\App\Http\Controllers\FeatureSuggestionController::class, 'adminIndex'])->name('admin.feature-suggestions');
     Route::post('/feature-suggestions/{id}/status', [\App\Http\Controllers\FeatureSuggestionController::class, 'setStatus'])->name('admin.feature-suggestions.status');

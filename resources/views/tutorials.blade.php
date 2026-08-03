@@ -59,25 +59,36 @@
 
     <!-- Video sections -->
     <main class="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
-        @forelse($groups as $key => $group)
-        <section class="mb-12">
-            <div class="flex items-center gap-3 mb-5">
-                <h2 class="text-xl sm:text-2xl font-bold" style="color: var(--teal-dark);">{{ $group['label'] }}</h2>
-                <div class="h-1 w-10 rounded-full" style="background: var(--gold);"></div>
+        @forelse($products as $productKey => $product)
+        <!-- Product folder -->
+        <section class="mb-14">
+            <div class="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-4 shadow-sm mb-8">
+                <svg class="w-7 h-7 flex-shrink-0" style="color: var(--gold);" fill="currentColor" viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                <h2 class="text-xl sm:text-2xl font-bold" style="color: var(--teal-dark);">{{ $product['label'] }}</h2>
+                <span class="ml-auto text-xs sm:text-sm font-semibold text-gray-500 bg-gray-100 rounded-full px-3 py-1">{{ $product['count'] }} videos</span>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                @foreach($group['videos'] as $v)
-                <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                    <video class="tut-video" controls preload="metadata" playsinline src="{{ $v->video_url }}"></video>
-                    <div class="p-4 sm:p-5">
-                        <h3 class="text-base sm:text-lg font-bold text-gray-900" style="font-family: 'Inter', sans-serif;">{{ $v->title }}</h3>
-                        @if($v->description)
-                        <p class="text-xs sm:text-sm text-gray-500 mt-1.5 leading-relaxed">{{ $v->description }}</p>
-                        @endif
-                    </div>
+
+            @foreach($product['groups'] as $group)
+            <div class="mb-12 sm:pl-4">
+                <div class="flex items-center gap-3 mb-5">
+                    <h3 class="text-lg sm:text-xl font-bold font-serif" style="color: var(--teal-dark);">{{ $group['label'] }}</h3>
+                    <div class="h-1 w-10 rounded-full" style="background: var(--gold);"></div>
                 </div>
-                @endforeach
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    @foreach($group['videos'] as $v)
+                    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                        <video class="tut-video" controls preload="metadata" playsinline src="{{ $v->video_url }}"></video>
+                        <div class="p-4 sm:p-5">
+                            <h4 class="text-base sm:text-lg font-bold text-gray-900" style="font-family: 'Inter', sans-serif;">{{ $v->title }}</h4>
+                            @if($v->description)
+                            <p class="text-xs sm:text-sm text-gray-500 mt-1.5 leading-relaxed">{{ $v->description }}</p>
+                            @endif
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
             </div>
+            @endforeach
         </section>
         @empty
         <p class="text-center text-gray-500 py-16">Videos jald isi page par aayengi — thodi der baad phir kholiye.</p>
@@ -86,7 +97,8 @@
         <!-- More coming + help strip -->
         <div class="rounded-2xl border border-gray-200 bg-white p-6 sm:p-8 text-center">
             <p class="text-sm sm:text-base font-semibold text-gray-900 mb-1">Aur videos jald isi page par</p>
-            <p class="text-xs sm:text-sm text-gray-500 mb-4">Products, inventory, reports, restaurant aur day close — har feature ki alag video, sab isi page par.</p>
+            <p class="text-xs sm:text-sm text-gray-500 mb-1">Products, inventory, reports, restaurant aur day close — har feature ki alag video, sab isi page par.</p>
+            <p class="text-xs sm:text-sm text-gray-500 mb-4">Offline billing bhi NestPOS ka hissa — bijli ya internet band, billing phir bhi chalti. Is ki video jald.</p>
             <div class="flex flex-wrap items-center justify-center gap-3">
                 <a href="/pos/register" class="text-sm font-semibold text-white px-5 py-2.5 rounded-lg" style="background: var(--teal-main);">Muft Trial — aaj hi shuru</a>
                 <a href="/contact" class="text-sm font-semibold px-5 py-2.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">Sawal poochein</a>

@@ -83,3 +83,9 @@ Isolated POS (own auth/layouts/models); PRA integration with offline billing + a
 - **FBR POS aur Digital Invoice (DI) se related KOI task propose/show na karein** — dono streams mukammal band hain jab tak owner khud in par kaam start na kare. Yeh rule HAR agent par lagu hai (task agents bhi). (Owner, 2 Aug 2026)
 - **Naye/advance feature tasks NA bhejein.** Sirf PRA POS ke tasks, aur wo bhi sirf "jo ban chuka usko stable karne" wale — bug fixes, test-locks, hardening. Advance kaam owner ke kehne par hi. (Owner, 2 Aug 2026)
 - Jab owner FBR POS par working shuru kare, tab SAB jama-shuda FBR tajaweez ek hi baar mashware ke liye pesh karein (owner har aik par haan/na kahega). (Owner, 2 Aug 2026)
+
+## Tutorial Videos (Aug 2026)
+- Public page `/tutorials` + inside-POS page `/pos/tutorials` (pos.auth), linked from landing nav + POS profile dropdown.
+- Data: `tutorial_videos` table (Model `TutorialVideo`, categories shuruat/billing/customers/products/restaurant/reports/settings). Rows seeded idempotently inside the create migration (prod runs `migrate --force`).
+- Files: `public/videos/tutorials/<slug>.mp4` (committed, ~5MB each, 1080p). 15 Urdu videos live (Aug 3): intro/promo, account, sale-screen, customers, customize, PWA install, madadgar, barcode, discount, provisional, bills-history, day-opening, hazri, desktop-agent, package-billing.
+- Pipeline: `tools/video-pipeline/` (scenario JSON → record.cjs Playwright capture on demo shop company `videodemo@nestpos.pk` → assemble.cjs ffmpeg + ElevenLabs Urdu TTS). Demo shop reseed: `VideoDemoShopSeeder`.

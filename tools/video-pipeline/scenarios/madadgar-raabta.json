@@ -1,0 +1,45 @@
+{
+  "slug": "madadgar-raabta",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Madadgar Bot, Updates aur Suggestions",
+  "scenes": [
+    { "id": "s01_intro", "card": { "heading": "Madad chahiye?", "sub": "Madadgar bot · Updates · Suggestions" }, "minMs": 4500 },
+    {
+      "id": "s02_bot",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 900 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 40 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
+        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "goto", "url": "/pos/customers" },
+        { "do": "waitFor", "selector": "[aria-label='Madadgar Support']" },
+        { "do": "click", "selector": "[aria-label='Madadgar Support']", "after": 1200 },
+        { "do": "eval", "js": "document.querySelectorAll('button, a').forEach(function(b){ if ((b.textContent||'').indexOf('Madadgar se poochein') !== -1) b.id = 'tnVidAi'; })" },
+        { "do": "click", "selector": "#tnVidAi", "after": 1000 },
+        { "do": "type", "selector": "[x-ref='minput']", "text": "Receipt kaise print hoti hai?", "delay": 55 },
+        { "do": "wait", "ms": 1000 }
+      ]
+    },
+    {
+      "id": "s03_bell",
+      "actions": [
+        { "do": "click", "selector": "[aria-label='Madadgar Support']", "after": 800 },
+        { "do": "eval", "js": "document.querySelectorAll('button').forEach(function(b){ if ((b.getAttribute('@click')||'').indexOf('toggleBell') !== -1) b.id = 'tnVidBell'; })" },
+        { "do": "click", "selector": "#tnVidBell", "after": 1400 },
+        { "do": "wait", "ms": 1000 }
+      ]
+    },
+    {
+      "id": "s04_suggest",
+      "actions": [
+        { "do": "goto", "url": "/pos/suggestions" },
+        { "do": "waitFor", "selector": "textarea[name='details']" },
+        { "do": "type", "selector": "textarea[name='details']", "text": "Sale screen par calculator ka button ho", "delay": 45 },
+        { "do": "wait", "ms": 900 }
+      ]
+    },
+    { "id": "s05_outro", "card": { "heading": "Hum sun rahe hain", "sub": "Aap ki baat — hamara agla feature" }, "minMs": 4500 }
+  ]
+}

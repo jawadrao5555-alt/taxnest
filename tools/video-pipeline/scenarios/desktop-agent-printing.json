@@ -1,0 +1,32 @@
+{
+  "slug": "desktop-agent-printing",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Desktop Agent — Silent Printing",
+  "scenes": [
+    { "id": "s01_intro", "card": { "heading": "Silent Printing", "sub": "Receipt seedha printer par — apne aap" }, "minMs": 5000 },
+    {
+      "id": "s02_download",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 900 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 40 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
+        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "goto", "url": "/pos/agent" },
+        { "do": "wait", "ms": 1200 },
+        { "do": "highlight", "selector": "a[href*='agent/download']", "after": 1600 }
+      ]
+    },
+    {
+      "id": "s03_setup",
+      "actions": [
+        { "do": "eval", "js": "window.scrollBy({top: 420, behavior: 'smooth'})" },
+        { "do": "wait", "ms": 1600 },
+        { "do": "eval", "js": "window.scrollBy({top: 420, behavior: 'smooth'})" },
+        { "do": "wait", "ms": 1600 }
+      ]
+    },
+    { "id": "s04_outro", "card": { "heading": "Ek dafa setup — hamesha aaram", "sub": "Receipt bhi, KOT bhi — apne aap" }, "minMs": 5000 }
+  ]
+}

@@ -213,4 +213,5 @@ async function startTlsProxy() {
   fs.writeFileSync(path.join(OUT, 'timeline.json'), JSON.stringify(timeline, null, 2));
   await browser.close();
   console.log('✓ wrote', dest, 'and timeline.json');
+  process.exit(0); // playwright leaves the event loop alive in this env — force a clean exit
 })().catch(e => { console.error(e); process.exit(1); });

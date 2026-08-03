@@ -1,0 +1,74 @@
+{
+  "slug": "account-banana",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Account Banana — Muft Trial Registration",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": { "heading": "Account Banayen", "sub": "taxnest.com.pk · 2 minute · bilkul muft" },
+      "minMs": 5000
+    },
+    {
+      "id": "s02_open",
+      "actions": [
+        { "do": "goto", "url": "/pos/register" },
+        { "do": "wait", "ms": 1000 },
+        { "do": "waitFor", "selector": "#company_name" },
+        { "do": "wait", "ms": 800 }
+      ]
+    },
+    {
+      "id": "s03_plan",
+      "actions": [
+        { "do": "highlight", "selector": "form .grid.grid-cols-2", "after": 1200 },
+        { "do": "click", "selector": "form .grid.grid-cols-2 label:nth-child(2)", "after": 1200 },
+        { "do": "wait", "ms": 600 }
+      ]
+    },
+    {
+      "id": "s04_biztype",
+      "actions": [
+        { "do": "highlight", "selector": "form .grid.grid-cols-5", "after": 1200 },
+        { "do": "click", "selector": "form .grid.grid-cols-5 label:nth-child(1)", "after": 1000 },
+        { "do": "wait", "ms": 600 }
+      ]
+    },
+    {
+      "id": "s05_shop",
+      "actions": [
+        { "do": "type", "selector": "#company_name", "text": "Al-Noor General Store", "delay": 60 },
+        { "do": "wait", "ms": 500 },
+        { "do": "highlight", "selector": "#company_ntn", "after": 1100 }
+      ]
+    },
+    {
+      "id": "s06_admin",
+      "actions": [
+        { "do": "type", "selector": "#name", "text": "Mohammad Rasheed", "delay": 55 },
+        { "do": "type", "selector": "#email", "text": "rasheed.alnoor@gmail.com", "delay": 45 },
+        { "do": "type", "selector": "#phone", "text": "03001234567", "delay": 55 }
+      ]
+    },
+    {
+      "id": "s07_pass",
+      "actions": [
+        { "do": "type", "selector": "#password", "text": "AlNoor@2026", "delay": 60 },
+        { "do": "type", "selector": "#password_confirmation", "text": "AlNoor@2026", "delay": 60 },
+        { "do": "wait", "ms": 500 }
+      ]
+    },
+    {
+      "id": "s08_submit",
+      "actions": [
+        { "do": "eval", "js": "document.querySelector('button[type=submit]').scrollIntoView({behavior:'smooth',block:'center'})" },
+        { "do": "wait", "ms": 900 },
+        { "do": "highlight", "selector": "button[type=submit]", "after": 1600 }
+      ]
+    },
+    {
+      "id": "s09_outro",
+      "card": { "heading": "Mubarak ho!", "sub": "Account tayyar — ab pehla bill banayen" },
+      "minMs": 5000
+    }
+  ]
+}

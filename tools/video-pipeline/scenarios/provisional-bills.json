@@ -1,0 +1,38 @@
+{
+  "slug": "provisional-bills",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Provisional Bill — Payment Baad Mein",
+  "scenes": [
+    { "id": "s01_intro", "card": { "heading": "Provisional Bill", "sub": "Bill abhi — payment baad mein" }, "minMs": 4500 },
+    {
+      "id": "s02_items",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 900 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 40 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
+        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "click", "selector": ".prod-card >> nth=0", "after": 800 },
+        { "do": "click", "selector": ".prod-card >> nth=1", "after": 800 }
+      ]
+    },
+    {
+      "id": "s03_save",
+      "actions": [
+        { "do": "eval", "js": "document.querySelectorAll('button').forEach(function(b){ if ((b.getAttribute('@click')||'').indexOf('saveProvisionalDirect') !== -1) b.id = 'tnVidProv'; })" },
+        { "do": "highlight", "selector": "#tnVidProv", "after": 1300 },
+        { "do": "click", "selector": "#tnVidProv", "after": 2500 }
+      ]
+    },
+    {
+      "id": "s04_promote",
+      "actions": [
+        { "do": "wait", "ms": 1000 },
+        { "do": "highlight", "selector": "[x-show='showReceipt']", "after": 1600 },
+        { "do": "wait", "ms": 800 }
+      ]
+    },
+    { "id": "s05_outro", "card": { "heading": "Quota bhi bacha, hisaab bhi pakka", "sub": "Provisional → Final ek click mein" }, "minMs": 5000 }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "slug": "customers-add-import-export",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Customers — Add, Import, Export",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": { "heading": "Customers", "sub": "Add · Import · Export" },
+      "minMs": 5000
+    },
+    {
+      "id": "s02_open",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 900 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 45 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 45 },
+        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "goto", "url": "/pos/customers" },
+        { "do": "waitFor", "selector": "#custSearchInput" },
+        { "do": "wait", "ms": 1000 }
+      ]
+    },
+    {
+      "id": "s03_add",
+      "actions": [
+        { "do": "click", "selector": "button[onclick*='addCustomerForm']", "after": 900 },
+        { "do": "type", "selector": "#addCustomerForm input[name='name']", "text": "Bashir Ahmed", "delay": 60 },
+        { "do": "type", "selector": "#addCustomerForm input[name='phone']", "text": "03214567890", "delay": 55 },
+        { "do": "click", "selector": "#addCustomerForm button[type=submit]", "after": 1600 },
+        { "do": "waitFor", "selector": "#custSearchInput" },
+        { "do": "wait", "ms": 900 }
+      ]
+    },
+    {
+      "id": "s04_import",
+      "actions": [
+        { "do": "click", "selector": "button[onclick*='importCustomerForm']", "after": 900 },
+        { "do": "highlight", "selector": "#importCustomerForm a[href*='template']", "after": 1400 },
+        { "do": "highlight", "selector": "#importCustomerForm button[type=submit]", "after": 1200 }
+      ]
+    },
+    {
+      "id": "s05_export",
+      "actions": [
+        { "do": "highlight", "selector": "a[href*='customers/export']", "after": 1600 },
+        { "do": "wait", "ms": 800 }
+      ]
+    },
+    {
+      "id": "s06_outro",
+      "card": { "heading": "Customers tayyar!", "sub": "Har bill par khata apne aap" },
+      "minMs": 5000
+    }
+  ]
+}

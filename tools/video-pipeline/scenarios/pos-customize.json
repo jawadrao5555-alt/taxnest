@@ -1,0 +1,66 @@
+{
+  "slug": "pos-customize",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Customize — Style, Rang, Zuban",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": { "heading": "Customize", "sub": "Style · Rang · Zuban — sab aap ki pasand" },
+      "minMs": 4500
+    },
+    {
+      "id": "s02_open",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 900 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 45 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 45 },
+        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "goto", "url": "/pos/customize" },
+        { "do": "waitFor", "selector": "#style" },
+        { "do": "wait", "ms": 800 }
+      ]
+    },
+    {
+      "id": "s03_style",
+      "actions": [
+        { "do": "eval", "js": "document.getElementById('style').scrollIntoView({behavior:'smooth',block:'center'})" },
+        { "do": "wait", "ms": 900 },
+        { "do": "highlight", "selector": "#style button", "after": 1400 },
+        { "do": "highlight", "selector": "#style button >> nth=1", "after": 1400 }
+      ]
+    },
+    {
+      "id": "s04_theme",
+      "actions": [
+        { "do": "eval", "js": "var g=document.querySelector('.grid-cols-6'); if(g) g.scrollIntoView({behavior:'smooth',block:'center'})" },
+        { "do": "wait", "ms": 900 },
+        { "do": "highlight", "selector": ".grid-cols-6", "after": 1500 },
+        { "do": "wait", "ms": 800 }
+      ]
+    },
+    {
+      "id": "s05_lang",
+      "actions": [
+        { "do": "eval", "js": "var f=document.querySelector(\"input[name='default_language']\"); if(f) f.closest('section, .rounded-2xl, div').scrollIntoView({behavior:'smooth',block:'center'})" },
+        { "do": "wait", "ms": 1000 },
+        { "do": "highlight", "selector": "form:has(input[name='default_language'])", "after": 1500 }
+      ]
+    },
+    {
+      "id": "s06_guided",
+      "actions": [
+        { "do": "eval", "js": "window.scrollBy({top: 350, behavior:'smooth'})" },
+        { "do": "wait", "ms": 1400 },
+        { "do": "eval", "js": "window.scrollBy({top: 300, behavior:'smooth'})" },
+        { "do": "wait", "ms": 1200 }
+      ]
+    },
+    {
+      "id": "s07_outro",
+      "card": { "heading": "Aap ki dukaan, aap ka andaaz", "sub": "NestPOS — customize sab kuch" },
+      "minMs": 5000
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "slug": "discount-dena",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Discount Dena — % ya Rs",
+  "scenes": [
+    { "id": "s01_intro", "card": { "heading": "Discount Dena", "sub": "% ya fix raqam — ek click" }, "minMs": 4500 },
+    {
+      "id": "s02_items",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 900 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 40 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
+        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "click", "selector": ".prod-card >> nth=0", "after": 700 },
+        { "do": "click", "selector": ".prod-card >> nth=1", "after": 700 }
+      ]
+    },
+    {
+      "id": "s03_percent",
+      "actions": [
+        { "do": "eval", "js": "document.querySelectorAll('button').forEach(function(b){ var c = b.getAttribute('@click')||''; if (c.indexOf('showDiscount = !showDiscount') !== -1) b.id = 'tnVidDiscT'; if (c.indexOf(\"discountType = 'percentage'\") !== -1) b.id = 'tnVidPct'; if (c.indexOf(\"discountType = 'amount'\") !== -1) b.id = 'tnVidAmt'; })" },
+        { "do": "click", "selector": "#tnVidDiscT", "after": 900 },
+        { "do": "click", "selector": "#tnVidPct", "after": 700 },
+        { "do": "type", "selector": "[x-ref='billDiscountInput']", "text": "10", "delay": 120 },
+        { "do": "wait", "ms": 1200 }
+      ]
+    },
+    {
+      "id": "s04_amount",
+      "actions": [
+        { "do": "click", "selector": "#tnVidAmt", "after": 800 },
+        { "do": "press", "selector": "[x-ref='billDiscountInput']", "key": "Control+a" },
+        { "do": "type", "selector": "[x-ref='billDiscountInput']", "text": "50", "delay": 120 },
+        { "do": "wait", "ms": 1400 }
+      ]
+    },
+    { "id": "s05_outro", "card": { "heading": "Gahak khush, hisaab saaf", "sub": "Discount receipt par bhi chhapta hai" }, "minMs": 5000 }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "slug": "barcode-scan-search",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Barcode Scan aur Search",
+  "scenes": [
+    { "id": "s01_intro", "card": { "heading": "Barcode Scan / Search", "sub": "Item foran cart mein" }, "minMs": 4500 },
+    {
+      "id": "s02_search",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 900 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 40 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
+        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "highlight", "selector": "[x-ref='searchInput']", "after": 1400 }
+      ]
+    },
+    {
+      "id": "s03_type",
+      "actions": [
+        { "do": "type", "selector": "[x-ref='searchInput']", "text": "Chawal", "delay": 90 },
+        { "do": "wait", "ms": 1100 },
+        { "do": "press", "selector": "[x-ref='searchInput']", "key": "Enter" },
+        { "do": "wait", "ms": 1300 }
+      ]
+    },
+    {
+      "id": "s04_scanner",
+      "actions": [
+        { "do": "type", "selector": "[x-ref='searchInput']", "text": "Chawal", "delay": 30 },
+        { "do": "wait", "ms": 400 },
+        { "do": "press", "selector": "[x-ref='searchInput']", "key": "Enter" },
+        { "do": "wait", "ms": 900 },
+        { "do": "type", "selector": "[x-ref='searchInput']", "text": "Chawal", "delay": 30 },
+        { "do": "wait", "ms": 400 },
+        { "do": "press", "selector": "[x-ref='searchInput']", "key": "Enter" },
+        { "do": "wait", "ms": 1100 }
+      ]
+    },
+    { "id": "s05_outro", "card": { "heading": "Scan, scan, scan — bill tayyar", "sub": "Hazaron items, seconds mein" }, "minMs": 5000 }
+  ]
+}

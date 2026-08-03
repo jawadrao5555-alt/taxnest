@@ -1,0 +1,40 @@
+{
+  "slug": "bills-history",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Bills ki History — Search aur Reprint",
+  "scenes": [
+    { "id": "s01_intro", "card": { "heading": "Bills ki History", "sub": "Purane bill — search · receipt · record" }, "minMs": 4500 },
+    {
+      "id": "s02_open",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 900 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 40 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
+        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "goto", "url": "/pos/transactions?tab=local" },
+        { "do": "waitFor", "selector": "input[name='search']" },
+        { "do": "wait", "ms": 1200 }
+      ]
+    },
+    {
+      "id": "s03_search",
+      "actions": [
+        { "do": "type", "selector": "input[name='search']", "text": "100", "delay": 110 },
+        { "do": "wait", "ms": 900 },
+        { "do": "press", "selector": "input[name='search']", "key": "Enter" },
+        { "do": "wait", "ms": 1500 }
+      ]
+    },
+    {
+      "id": "s04_receipt",
+      "actions": [
+        { "do": "goto", "url": "/pos/transactions?tab=local" },
+        { "do": "wait", "ms": 1000 },
+        { "do": "highlight", "selector": "a[href*='receipt']", "after": 1800 }
+      ]
+    },
+    { "id": "s05_outro", "card": { "heading": "Kuch nahi khota", "sub": "Har bill ka poora record" }, "minMs": 4500 }
+  ]
+}

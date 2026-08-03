@@ -1,0 +1,31 @@
+{
+  "slug": "package-billing",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Package aur Billing",
+  "scenes": [
+    { "id": "s01_intro", "card": { "heading": "Package aur Payment", "sub": "Upgrade · Payment proof · Muddat" }, "minMs": 4500 },
+    {
+      "id": "s02_page",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 900 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 40 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
+        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "goto", "url": "/pos/billing" },
+        { "do": "wait", "ms": 1500 }
+      ]
+    },
+    {
+      "id": "s03_proof",
+      "actions": [
+        { "do": "eval", "js": "window.scrollBy({top: 400, behavior: 'smooth'})" },
+        { "do": "wait", "ms": 1600 },
+        { "do": "eval", "js": "window.scrollBy({top: 400, behavior: 'smooth'})" },
+        { "do": "wait", "ms": 1400 }
+      ]
+    },
+    { "id": "s04_outro", "card": { "heading": "Hisaab saaf, service jaari", "sub": "Payment proof — upload, manzoor, done" }, "minMs": 4500 }
+  ]
+}

@@ -136,21 +136,21 @@
         <div class="stat-card card-reveal bg-gradient-to-br from-emerald-500 to-emerald-700 p-4 shadow-lg shadow-emerald-500/15">
             <div class="relative z-10">
                 <span class="text-[9px] font-bold uppercase tracking-wider text-emerald-100/70">{{ __("pos.todays_revenue") }}</span>
-                <p class="text-xl font-extrabold text-white mt-1">Rs. <span data-count-target="{{ $todaySales ?? $todayStats->revenue ?? 0 }}">0</span></p>
+                <p class="text-xl font-extrabold text-white mt-1">Rs. <span data-count-target="{{ $todaySales ?? $todayStats->revenue ?? 0 }}">{{ number_format($todaySales ?? $todayStats->revenue ?? 0, 0) }}</span></p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: {{ min(100, ($monthSales ?? $monthStats->revenue ?? 1) > 0 ? (($todaySales ?? $todayStats->revenue ?? 0) / ($monthSales ?? $monthStats->revenue ?? 1) * 100) : 0) }}%"></div></div>
             </div>
         </div>
         <div class="stat-card card-reveal bg-gradient-to-br from-teal-600 to-teal-800 p-4 shadow-lg shadow-teal-600/15">
             <div class="relative z-10">
                 <span class="text-[9px] font-bold uppercase tracking-wider text-teal-100/70">{{ __("pos.orders_word") }}</span>
-                <p class="text-xl font-extrabold text-white mt-1"><span data-count-target="{{ $todayOrders ?? $todayStats->count ?? 0 }}">0</span></p>
+                <p class="text-xl font-extrabold text-white mt-1"><span data-count-target="{{ $todayOrders ?? $todayStats->count ?? 0 }}">{{ number_format($todayOrders ?? $todayStats->count ?? 0) }}</span></p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: {{ min(100, ($todayOrders ?? $todayStats->count ?? 0) * 5) }}%"></div></div>
             </div>
         </div>
         <div class="stat-card card-reveal bg-gradient-to-br from-purple-500 to-purple-700 p-4 shadow-lg">
             <div class="relative z-10">
                 <span class="text-[9px] font-bold uppercase tracking-wider text-white/70">{{ __("pos.avg_order") }}</span>
-                <p class="text-xl font-extrabold text-white mt-1">Rs. <span data-count-target="{{ round($todayStats->avg_ticket ?? (($todayOrders ?? 0) > 0 ? ($todaySales ?? 0) / ($todayOrders ?? 1) : 0)) }}">0</span></p>
+                <p class="text-xl font-extrabold text-white mt-1">Rs. <span data-count-target="{{ round($todayStats->avg_ticket ?? (($todayOrders ?? 0) > 0 ? ($todaySales ?? 0) / ($todayOrders ?? 1) : 0)) }}">{{ number_format(round($todayStats->avg_ticket ?? (($todayOrders ?? 0) > 0 ? ($todaySales ?? 0) / ($todayOrders ?? 1) : 0))) }}</span></p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: 60%"></div></div>
             </div>
         </div>
@@ -158,7 +158,7 @@
         <div class="stat-card card-reveal bg-gradient-to-br from-amber-500 to-orange-600 p-4 shadow-lg shadow-amber-500/15">
             <div class="relative z-10">
                 <span class="text-[9px] font-bold uppercase tracking-wider text-amber-100/70">{{ __("pos.tables_word") }}</span>
-                <p class="text-xl font-extrabold text-white mt-1"><span data-count-target="{{ $occupiedTables ?? 0 }}">0</span><span class="text-sm text-white/80">/{{ $totalTables ?? 0 }}</span></p>
+                <p class="text-xl font-extrabold text-white mt-1"><span data-count-target="{{ $occupiedTables ?? 0 }}">{{ $occupiedTables ?? 0 }}</span><span class="text-sm text-white/80">/{{ $totalTables ?? 0 }}</span></p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: {{ ($totalTables ?? 0) > 0 ? round(($occupiedTables ?? 0) / ($totalTables ?? 1) * 100) : 0 }}%"></div></div>
             </div>
         </div>
@@ -166,7 +166,7 @@
         <div class="stat-card card-reveal bg-gradient-to-br from-amber-500 to-orange-600 p-4 shadow-lg shadow-amber-500/15">
             <div class="relative z-10">
                 <span class="text-[9px] font-bold uppercase tracking-wider text-amber-100/70">{{ __("pos.monthly_word") }}</span>
-                <p class="text-xl font-extrabold text-white mt-1">Rs. <span data-count-target="{{ $monthSales ?? $monthStats->revenue ?? 0 }}">0</span></p>
+                <p class="text-xl font-extrabold text-white mt-1">Rs. <span data-count-target="{{ $monthSales ?? $monthStats->revenue ?? 0 }}">{{ number_format($monthSales ?? $monthStats->revenue ?? 0, 0) }}</span></p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: 75%"></div></div>
             </div>
         </div>

@@ -2530,6 +2530,8 @@ class FbrPosController extends Controller
             ->with(['items', 'creator'])
             ->findOrFail($id);
 
+        \App\Support\PosLocale::applyPdfSafeLocale(); // DomPDF can't shape Urdu script — PDF falls back to Roman Urdu
+
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fbr-pos.invoice-pdf', compact('transaction', 'company'));
         $pdf->setPaper('a4', 'portrait');
 
@@ -2543,6 +2545,8 @@ class FbrPosController extends Controller
         $transaction = FbrPosTransaction::where('company_id', $companyId)
             ->with(['items', 'creator'])
             ->findOrFail($id);
+
+        \App\Support\PosLocale::applyPdfSafeLocale(); // DomPDF can't shape Urdu script — PDF falls back to Roman Urdu
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fbr-pos.invoice-pdf', compact('transaction', 'company'));
         $pdf->setPaper('a4', 'portrait');

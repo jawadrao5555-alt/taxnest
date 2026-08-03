@@ -36,4 +36,18 @@ final class PosLocale
     {
         return self::isValid($lang) ? $lang : $default;
     }
+
+    /**
+     * DomPDF fallback (Task 240): DomPDF cannot shape Arabic script — no
+     * contextual glyph joining and no RTL, so Urdu script would print as
+     * disconnected, left-to-right letters (unreadable). Documented fallback:
+     * every DomPDF render drops 'ur' → 'rur' (Roman Urdu). Browser/agent
+     * (Chromium) print paths are unaffected and DO render real Urdu script.
+     */
+    public static function applyPdfSafeLocale(): void
+    {
+        if (app()->getLocale() === self::URDU_SCRIPT) {
+            app()->setLocale(self::ROMAN_URDU);
+        }
+    }
 }

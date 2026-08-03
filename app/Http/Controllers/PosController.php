@@ -3522,6 +3522,8 @@ class PosController extends Controller
         // 'a4' mode makes the PDF a real A4 page with the receipt strip top-left.
         $pdfPaper = ($company->invoice_display_prefs['pos_style']['pdf_paper'] ?? 'thermal') === 'a4' ? 'a4' : 'thermal';
 
+        \App\Support\PosLocale::applyPdfSafeLocale(); // DomPDF can't shape Urdu script — PDF falls back to Roman Urdu
+
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($receiptView, ['transaction' => $transaction, 'company' => $company, 'pdfMode' => true, 'pdfPaper' => $pdfPaper])
             ->setOption('isRemoteEnabled', true)
             ->setOption('isHtml5ParserEnabled', true);
@@ -3580,6 +3582,8 @@ class PosController extends Controller
         // Same PDF Download Paper handling as downloadInvoicePdf — share-link
         // recipients print on regular printers even more often than cashiers.
         $pdfPaper = ($company->invoice_display_prefs['pos_style']['pdf_paper'] ?? 'thermal') === 'a4' ? 'a4' : 'thermal';
+
+        \App\Support\PosLocale::applyPdfSafeLocale(); // DomPDF can't shape Urdu script — PDF falls back to Roman Urdu
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($receiptView, ['transaction' => $transaction, 'company' => $company, 'pdfMode' => true, 'pdfPaper' => $pdfPaper])
             ->setOption('isRemoteEnabled', true)

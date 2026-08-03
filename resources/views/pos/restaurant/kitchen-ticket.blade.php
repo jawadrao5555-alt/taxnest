@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="en">
+@php $urduScript = app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT; @endphp
+<html lang="{{ $urduScript ? 'ur' : 'en' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -172,6 +173,20 @@
         @media print {
             html body { margin-left: {{ $kotMarginMm }}mm; }
         }
+        @endif
+
+        @if($urduScript)
+        /* Urdu script mode (Task 240): browser + Desktop Agent renders are
+           Chromium — Arabic shaping & bidi work natively. Layout stays LTR
+           (columns/widths untouched, thermal-print-width rules intact);
+           Unicode bidi flips each Urdu text run RTL on its own, so mixed
+           label/number lines still line up. Naskh-first font stack: Nastaliq
+           is too tall/thin for cheap thermal heads at receipt sizes; Tahoma/
+           Arial keep full Arabic coverage as fallback on any Windows PC.
+           Taller line-height — Urdu glyphs clip at Latin line heights.
+           NOTE: DomPDF PDFs never reach here — PosLocale::applyPdfSafeLocale()
+           drops 'ur' → 'rur' before every PDF render (DomPDF can't shape). */
+        body { font-family: 'Noto Naskh Arabic', 'Urdu Typesetting', Tahoma, Arial, 'Segoe UI', sans-serif; line-height: 1.6; }
         @endif
     </style>
     @if($kotShowBarcode)

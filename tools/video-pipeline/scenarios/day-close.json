@@ -1,0 +1,195 @@
+{
+  "slug": "day-close",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Day Close & Opening Cash",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": {
+        "heading": "Day Close & Opening Cash",
+        "sub": "Opening cash · Din band karna · Z-Report"
+      },
+      "narration": "السلام علیکم! آج ہم دن کا سب سے اہم معمول سیکھیں گے — صبح opening cash درج کرنا، رات کو دن بند کرنا، اور دن بھر کی مکمل رپورٹ نکالنا۔",
+      "minMs": 5000
+    },
+    {
+      "id": "s02_opening",
+      "narration": "صبح دکان کھولتے وقت dashboard پر یہ خانہ نظر آتا ہے۔ جو نقدی آپ گلے میں رکھ کر دن شروع کر رہے ہیں وہ یہاں لکھیں — ہم نے پانچ ہزار لکھے — اور Opening save karein دبا دیں۔ یہی رقم رات کو حساب ملاتے وقت خود بخود استعمال ہو گی۔",
+      "actions": [
+        {
+          "do": "goto",
+          "url": "/pos/login"
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "type",
+          "selector": "#login",
+          "text": "videodemo@nestpos.pk",
+          "delay": 45
+        },
+        {
+          "do": "type",
+          "selector": "#password",
+          "text": "NestPOS@Demo1",
+          "delay": 45
+        },
+        {
+          "do": "click",
+          "selector": "button[type=submit]",
+          "after": 1500
+        },
+        {
+          "do": "waitFor",
+          "selector": ".prod-card"
+        },
+        {
+          "do": "goto",
+          "url": "/pos/dashboard"
+        },
+        {
+          "do": "wait",
+          "ms": 1000
+        },
+        {
+          "do": "type",
+          "selector": "input[name=opening_cash]",
+          "text": "5000",
+          "delay": 120
+        },
+        {
+          "do": "click",
+          "selector": "button:has-text('Opening save karein')",
+          "after": 2000
+        }
+      ]
+    },
+    {
+      "id": "s03_daycllose_kpis",
+      "narration": "رات کو دن بند کرنے کے لیے Day Close کے صفحے پر آئیں۔ اوپر پورے دن کا خلاصہ ہے — کل کتنے بل بنے، کل sales کتنی ہوئیں، کتنا tax بنا، اور اوسط بل کتنے کا رہا۔ کل کے مقابلے کا فرق بھی ساتھ نظر آتا ہے۔",
+      "actions": [
+        {
+          "do": "goto",
+          "url": "/pos/day-close"
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "highlight",
+          "selector": "p:has-text('Total invoices')",
+          "after": 1400
+        },
+        {
+          "do": "highlight",
+          "selector": "p:has-text('Gross sales')",
+          "after": 1400
+        },
+        {
+          "do": "highlight",
+          "selector": "p:has-text('Total tax')",
+          "after": 1400
+        },
+        {
+          "do": "highlight",
+          "selector": "p:has-text('Average bill')",
+          "after": 1400
+        }
+      ]
+    },
+    {
+      "id": "s04_breakdowns",
+      "narration": "نیچے تفصیل ہے — کتنی sale نقد ہوئی اور کتنی card پر، کس cashier نے کتنے بل بنائے، اور کون سی categories سب سے زیادہ بکیں۔ دن بند کرنے سے پہلے یہ سب ایک نظر دیکھ لیں۔",
+      "actions": [
+        {
+          "do": "scroll",
+          "by": 500,
+          "after": 1400
+        },
+        {
+          "do": "scroll",
+          "by": 500,
+          "after": 1400
+        },
+        {
+          "do": "scroll",
+          "by": 500,
+          "after": 1400
+        }
+      ]
+    },
+    {
+      "id": "s05_reconcile",
+      "narration": "اب حساب ملانے کی باری۔ Opening cash خود بخود بھر چکی ہے۔ گلا گن کر جتنی نقدی نکلے وہ counted cash میں لکھیں۔ نظام خود بتا دیتا ہے کہ حساب برابر ہے یا کوئی کمی بیشی ہے۔",
+      "actions": [
+        {
+          "do": "scroll",
+          "selector": "input[name=counted_cash]",
+          "after": 900
+        },
+        {
+          "do": "highlight",
+          "selector": "input[name=opening_float]",
+          "after": 1300
+        },
+        {
+          "do": "type",
+          "selector": "input[name=counted_cash]",
+          "text": "62098",
+          "delay": 100
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        }
+      ]
+    },
+    {
+      "id": "s06_close",
+      "narration": "سب کچھ ٹھیک ہے تو نیچے دن بند کرنے کا بٹن دبا دیں۔ بس — دن بند ہو گیا اور Z-Report بن گئی، جس میں پورے دن کا مکمل حساب محفوظ ہے۔",
+      "actions": [
+        {
+          "do": "click",
+          "selector": "form:has(textarea[name=notes]) button[type=submit]",
+          "after": 3000
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        }
+      ]
+    },
+    {
+      "id": "s07_report",
+      "narration": "یہ رہی آپ کی Z-Report — سارے بل، کل sales، tax، اور cash کا ملا ہوا حساب۔ PDF کا بٹن دبائیں تو یہی رپورٹ print کے لیے تیار ہو جاتی ہے، اور پرانے دنوں کی رپورٹیں بھی نیچے ہمیشہ محفوظ رہتی ہیں۔",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 800
+        },
+        {
+          "do": "highlight",
+          "selector": "a:has-text('PDF')",
+          "after": 1500
+        },
+        {
+          "do": "scroll",
+          "by": 600,
+          "after": 1400
+        }
+      ]
+    },
+    {
+      "id": "s08_outro",
+      "card": {
+        "heading": "Shukriya!",
+        "sub": "Agli video: Reports aur analytics"
+      },
+      "narration": "تو یہ تھا روزانہ کا معمول — صبح opening cash، رات کو حساب ملا کر دن بند، اور Z-Report محفوظ۔ اگلی ویڈیو میں ہم reports اور analytics سیکھیں گے۔ شکریہ!",
+      "minMs": 5000
+    }
+  ]
+}

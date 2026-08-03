@@ -1,0 +1,79 @@
+{
+  "slug": "reports",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Reports & Analytics",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": {
+        "heading": "Reports & Analytics",
+        "sub": "Sales reports · Charts · CSV aur PDF export"
+      },
+      "narration": "السلام علیکم! آج ہم نیسٹ پی او ایس کی reports دیکھیں گے — دن، ہفتے اور مہینے کی sales، خوبصورت charts، اور ایک click میں CSV یا PDF export۔",
+      "minMs": 5000
+    },
+    {
+      "id": "s02_login_kpis",
+      "narration": "Login کے بعد Reports کے صفحے پر آئیں۔ اوپر منتخب عرصے کا خلاصہ ہے — کل sales، کتنے بل بنے، کتنا tax جمع ہوا، اور کتنا discount دیا گیا۔",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 900 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 45 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 45 },
+        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "goto", "url": "/pos/reports" },
+        { "do": "wait", "ms": 1400 },
+        { "do": "highlight", "selector": "p:has-text('Bills')", "after": 1300 },
+        { "do": "highlight", "selector": "p:has-text('Tax')", "after": 1300 }
+      ]
+    },
+    {
+      "id": "s03_daterange",
+      "narration": "اوپر تاریخ کا انتخاب ہے — جو بھی عرصہ دیکھنا ہو، اس کی تاریخیں چن کر Apply دبائیں۔ ہم نے پچھلے سات دن منتخب کیے — ساری رپورٹ اسی عرصے پر update ہو گئی۔",
+      "actions": [
+        { "do": "highlight", "selector": "input[name=from]", "after": 1000 },
+        { "do": "eval", "js": "const f=document.querySelector('input[name=from]'); if(f){f.value=new Date(Date.now()-6*864e5).toISOString().slice(0,10); f.dispatchEvent(new Event('input',{bubbles:true}));}" },
+        { "do": "wait", "ms": 700 },
+        { "do": "click", "selector": "button:has-text('Apply karein')", "after": 2200 },
+        { "do": "wait", "ms": 1200 }
+      ]
+    },
+    {
+      "id": "s04_charts",
+      "narration": "نیچے آئیں تو روزانہ sales کا chart ہے — ایک نظر میں پتہ چل جاتا ہے کہ کون سا دن اچھا گیا۔ اس کے ساتھ payment کے طریقوں کا خلاصہ ہے — کتنی sale نقد ہوئی اور کتنی card پر۔",
+      "actions": [
+        { "do": "scroll", "by": 600, "after": 1600 },
+        { "do": "scroll", "by": 500, "after": 1600 },
+        { "do": "scroll", "by": 500, "after": 1400 }
+      ]
+    },
+    {
+      "id": "s05_top_items",
+      "narration": "یہ ہیں آپ کے سب سے زیادہ بکنے والے items — کون سی چیز کتنی بار بکی اور کتنی کمائی ہوئی۔ اسی طرح مہینے کا رجحان بھی نظر آتا ہے کہ کاروبار بڑھ رہا ہے یا نہیں۔",
+      "actions": [
+        { "do": "scroll", "selector": "h3:has-text('Sab se zyada bikne wale items')", "after": 1200 },
+        { "do": "highlight", "selector": "h3:has-text('Sab se zyada bikne wale items')", "after": 1600 },
+        { "do": "scroll", "by": 500, "after": 1500 }
+      ]
+    },
+    {
+      "id": "s06_export",
+      "narration": "اور آخر میں export — CSV کا بٹن دبائیں تو ساری رپورٹ Excel کے لیے download ہو جاتی ہے، اور PDF کا بٹن پوری analytics رپورٹ بنا دیتا ہے، جو آپ print کر سکتے ہیں یا کسی کو بھیج سکتے ہیں۔",
+      "actions": [
+        { "do": "scroll", "selector": "a[href*='reports/csv']", "after": 1000 },
+        { "do": "highlight", "selector": "a[href*='reports/csv']", "after": 1500 },
+        { "do": "highlight", "selector": "a[href*='analytics-pdf']", "after": 1500 }
+      ]
+    },
+    {
+      "id": "s07_outro",
+      "card": {
+        "heading": "Shukriya!",
+        "sub": "NestPOS ke sath apna karobar aasan banayen"
+      },
+      "narration": "تو یہ تھیں نیسٹ پی او ایس کی reports — پورا کاروبار ایک صفحے پر، charts کے ساتھ، اور ایک click میں export۔ امید ہے یہ سلسلہ آپ کے کام آ رہا ہے۔ شکریہ!",
+      "minMs": 5000
+    }
+  ]
+}

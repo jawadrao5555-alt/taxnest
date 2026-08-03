@@ -135,12 +135,15 @@ async function runAction(page, a) {
       break;
     }
     case 'eval': await page.evaluate(a.js); break;
-    case 'select': { // native <select> dropdowns (e.g. sale-screen category picker)
+    case 'select': {
+      // Choose a native <select> option (value or label) with a visible cursor
+      // move (e.g. sale-screen category picker).
       const p = await center(page, a.selector);
-      await moveCursorTo(page, p.x, p.y, 400);
+      await moveCursorTo(page, p.x, p.y, 450);
       await page.evaluate(([x, y]) => window.__tnRipple(x, y), [p.x, p.y]);
-      await p.loc.selectOption(a.value);
-      await sleep(a.after || 500);
+      const sel = page.locator(a.selector).locator('visible=true').first();
+      await sel.selectOption(a.value !== undefined ? { value: a.value } : { label: a.label });
+      await sleep(a.after || 600);
       break;
     }
     case 'viewport': // phone-frame scenes (rider portal): page is letterboxed in the 16:9 video
@@ -163,10 +166,30 @@ async function runAction(page, a) {
       await sleep(a.after || 600);
       break;
     }
+    case 'setFile': {
+      // Attach a file to an <input type=file> (Excel-import scenes) with a
+      // visible cursor move to the input first.
+      const p = await center(page, a.selector);
+      await moveCursorTo(page, p.x, p.y, 450);
+      await page.evaluate(([x, y]) => window.__tnRipple(x, y), [p.x, p.y]);
+      await page.locator(a.selector).locator('visible=true').first().setInputFiles(a.path);
+      await sleep(a.after || 600);
+      break;
+    }
     case 'scroll': {
-      if (a.selector) { const l = page.locator(a.selector).locator('visible=true').first(); await l.scrollIntoViewIfNeeded(); }
-      else await page.mouse.wheel(0, a.dy || 400);
-      await sleep(a.after || 500);
+      // Smooth-scroll the page (or a container) so long report pages can be toured.
+      // Supports both arg styles: `dy` (mouse-wheel, Task 234 scenes) and
+      // `by` (smooth scrollBy, Task 232 scenes).
+      if (a.selector) {
+        const p = await center(page, a.selector); // scrollIntoViewIfNeeded already ran
+        await sleep(a.after || 700);
+      } else if (a.dy !== undefined) {
+        await page.mouse.wheel(0, a.dy || 400);
+        await sleep(a.after || 500);
+      } else {
+        await page.evaluate((y) => window.scrollBy({ top: y, behavior: 'smooth' }), a.by || 600);
+        await sleep(a.after || 900);
+      }
       break;
     }
     default: throw new Error('unknown action ' + a.do);
@@ -219,6 +242,8 @@ async function startTlsProxy() {
   ctx.setDefaultTimeout(20000);
   await ctx.addInitScript(CURSOR_JS);
   const page = await ctx.newPage();
+  // Auto-accept confirm()/alert() dialogs (e.g. day-close "are you sure").
+  page.on('dialog', (d) => d.accept().catch(() => {}));
   await page.goto('about:blank');
   const t0 = Date.now(); // ≈ recording start (context creation happened ~instantly before)
 

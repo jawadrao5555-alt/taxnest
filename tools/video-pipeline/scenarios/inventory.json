@@ -1,0 +1,84 @@
+{
+  "slug": "inventory",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Inventory & Stock",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": {
+        "heading": "Inventory & Stock",
+        "sub": "Stock dekhna · Adjust karna · Low-stock alerts"
+      },
+      "narration": "السلام علیکم! آج ہم نیسٹ پی او ایس کا inventory نظام سیکھیں گے — stock کیسے دیکھتے ہیں، کم یا زیادہ کیسے کرتے ہیں، اور جب کوئی چیز ختم ہونے لگے تو نظام خود کیسے خبردار کرتا ہے۔",
+      "minMs": 5000
+    },
+    {
+      "id": "s02_login_dash",
+      "narration": "Login کے بعد Inventory کے صفحے پر آئیں۔ یہ ہے آپ کا inventory dashboard — ایک نظر میں پتہ چل جاتا ہے کہ کل کتنے products ہیں، ان کی مالیت کتنی ہے، اور کتنی چیزیں کم یا ختم ہو رہی ہیں۔",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 900 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 45 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 45 },
+        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "goto", "url": "/pos/inventory" },
+        { "do": "wait", "ms": 1000 },
+        { "do": "highlight", "selector": "p:has-text('Total products')", "after": 1200 },
+        { "do": "highlight", "selector": "p:has-text('Stock value')", "after": 1200 },
+        { "do": "highlight", "selector": "p:has-text('Low Stock')", "after": 1200 }
+      ]
+    },
+    {
+      "id": "s03_stock_list",
+      "narration": "پوری فہرست دیکھنے کے لیے Stock کے صفحے پر جائیں۔ ہر product کے سامنے اس کا موجودہ stock، کم سے کم level، اور حالت نظر آتی ہے — سبز یعنی ٹھیک، اور سرخ یعنی توجہ چاہیے۔",
+      "actions": [
+        { "do": "goto", "url": "/pos/inventory/stock" },
+        { "do": "wait", "ms": 1000 },
+        { "do": "highlight", "selector": "table", "after": 1500 },
+        { "do": "highlight", "selector": "tr:has-text('Cheeni 1kg')", "after": 1500 }
+      ]
+    },
+    {
+      "id": "s04_adjust",
+      "narration": "جب نیا مال آئے تو stock بڑھانا بہت آسان ہے۔ Stock adjust کے صفحے پر product منتخب کریں — ہم نے دودھ چنا۔ کتنی تعداد آئی وہ لکھیں، wajah میں New Purchase چنیں، اور Save کر دیں۔",
+      "actions": [
+        { "do": "goto", "url": "/pos/inventory/adjust" },
+        { "do": "wait", "ms": 900 },
+        { "do": "select", "selector": "select[name=product_id]", "label": "Doodh 1L", "after": 900 },
+        { "do": "type", "selector": "input[name=quantity]", "text": "24", "delay": 110 },
+        { "do": "select", "selector": "select[name=reason]", "value": "New Purchase", "after": 900 },
+        { "do": "click", "selector": "form button[type=submit].bg-purple-600", "after": 2200 }
+      ]
+    },
+    {
+      "id": "s05_movements",
+      "narration": "ہر تبدیلی کا مکمل ریکارڈ Movements کے صفحے پر محفوظ رہتا ہے — کب کتنا مال آیا، کتنا بکا، اور کس نے adjust کیا۔ دیکھیں، ہماری ابھی والی entry سب سے اوپر موجود ہے۔",
+      "actions": [
+        { "do": "goto", "url": "/pos/inventory/movements" },
+        { "do": "wait", "ms": 1000 },
+        { "do": "highlight", "selector": "tr:has-text('Doodh 1L')", "after": 1800 },
+        { "do": "scroll", "by": 500, "after": 1200 }
+      ]
+    },
+    {
+      "id": "s06_lowstock",
+      "narration": "اور یہ ہے Low Stock کا صفحہ — جو چیزیں اپنے کم سے کم level سے نیچے آ جائیں وہ خود بخود یہاں آ جاتی ہیں، تاکہ آپ وقت پر نیا مال منگوا لیں اور کوئی چیز کبھی ختم نہ ہو۔",
+      "actions": [
+        { "do": "goto", "url": "/pos/inventory/low-stock" },
+        { "do": "wait", "ms": 1000 },
+        { "do": "highlight", "selector": "tr:has-text('Cheeni 1kg'), div:has-text('Cheeni 1kg')", "after": 1500 },
+        { "do": "highlight", "selector": "tr:has-text('Lays Chips'), div:has-text('Lays Chips')", "after": 1500 }
+      ]
+    },
+    {
+      "id": "s07_outro",
+      "card": {
+        "heading": "Shukriya!",
+        "sub": "Agli video: Day-close aur opening cash"
+      },
+      "narration": "تو یہ تھا inventory کا نظام — dashboard پر ایک نظر، stock کی پوری فہرست، آسان adjustment، اور low stock کی خودکار خبرداری۔ اگلی ویڈیو میں ہم دن بند کرنا سیکھیں گے۔ شکریہ!",
+      "minMs": 5000
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "slug": "products",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Products & Categories — Excel Import/Export",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": {
+        "heading": "Products & Categories",
+        "sub": "Naya product · Price aur tax · Excel import/export"
+      },
+      "narration": "السلام علیکم! نیسٹ پی او ایس میں خوش آمدید۔ آج ہم سیکھیں گے کہ نیا product کیسے بنتا ہے، اس کی category، قیمت اور tax کیسے set کرتے ہیں، اور Excel سے ڈھیر سارے products ایک ساتھ کیسے import اور export کرتے ہیں۔",
+      "minMs": 5000
+    },
+    {
+      "id": "s02_login",
+      "narration": "سب سے پہلے login کریں، پھر اوپر والے menu سے Products کے صفحے پر جائیں۔ یہاں آپ کی دکان کے تمام products ایک فہرست میں نظر آتے ہیں۔",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 900 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 45 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 45 },
+        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "goto", "url": "/pos/products" },
+        { "do": "wait", "ms": 1200 }
+      ]
+    },
+    {
+      "id": "s03_add_open",
+      "narration": "نیا product بنانے کے لیے Product add karein کا بٹن دبائیں۔ ایک form کھل جائے گا جس میں product کی تمام تفصیل لکھنی ہے۔",
+      "actions": [
+        { "do": "click", "selector": "button:has-text('Product add karein')", "after": 1000 },
+        { "do": "highlight", "selector": "#addProductForm", "after": 1200 }
+      ]
+    },
+    {
+      "id": "s04_add_fill",
+      "narration": "سب سے پہلے product کا نام لکھیں — ہم لکھ رہے ہیں شان بریانی مصالحہ۔ پھر category میں Grocery، اور قیمت ایک سو نوے روپے۔ Tax کا خانہ پہلے ہی سولہ فیصد پر set ہے — اگر آپ کے product پر tax مختلف ہو تو یہاں بدل سکتے ہیں۔",
+      "actions": [
+        { "do": "type", "selector": "#addProductForm input[name=name]", "text": "Shan Biryani Masala", "delay": 60 },
+        { "do": "type", "selector": "#addProductForm input[name=category]", "text": "Grocery", "delay": 60 },
+        { "do": "type", "selector": "#addProductForm input[name=price]", "text": "190", "delay": 90 },
+        { "do": "highlight", "selector": "#addProductForm input[name=tax_rate]", "after": 1400 }
+      ]
+    },
+    {
+      "id": "s05_add_stock_save",
+      "narration": "اگر آپ stock بھی رکھنا چاہیں تو شروع کا stock یہاں لکھ دیں — ہم نے ساٹھ لکھا۔ اب نیچے Product save karein کا بٹن دبائیں — بس، نیا product بن گیا اور فہرست میں شامل ہو گیا۔",
+      "actions": [
+        { "do": "type", "selector": "#addProductForm input[name=stock_quantity]", "text": "60", "delay": 100 },
+        { "do": "click", "selector": "#addProductForm button[type=submit]", "after": 2000 },
+        { "do": "wait", "ms": 1000 },
+        { "do": "highlight", "selector": "tr:has-text('Shan Biryani Masala'), div:has-text('Shan Biryani Masala')", "after": 1500 }
+      ]
+    },
+    {
+      "id": "s06_export",
+      "narration": "اب Excel کی باری۔ اوپر Import Excel کا بٹن دبائیں۔ یہاں Download Excel کا link ہے — اس پر click کریں تو آپ کے سارے products ایک Excel file میں download ہو جاتے ہیں۔ یہی آپ کا export ہے، اور یہی file import کا نمونہ بھی ہے۔",
+      "actions": [
+        { "do": "click", "selector": "button:has-text('Import Excel')", "after": 1000 },
+        { "do": "highlight", "selector": "#importSection a[href*='template']", "after": 1500 },
+        { "do": "click", "selector": "#importSection a[href*='template']", "after": 1800 }
+      ]
+    },
+    {
+      "id": "s07_import",
+      "narration": "Import کرنے کے لیے اسی Excel file میں اپنے نئے products کی قطاریں بھر لیں — نام، قیمت، category، وغیرہ۔ پھر یہاں Choose File سے وہ file منتخب کریں اور Import کا بٹن دبا دیں۔",
+      "actions": [
+        { "do": "setFile", "selector": "#importSection input[name=csv_file]", "path": "assets/naye-products.xlsx", "after": 1200 },
+        { "do": "click", "selector": "#importSection button[type=submit]", "after": 2500 },
+        { "do": "wait", "ms": 1200 }
+      ]
+    },
+    {
+      "id": "s08_import_result",
+      "narration": "دیکھیں — file کے پانچوں نئے products ایک ساتھ فہرست میں آ گئے، اپنی قیمت اور tax کے ساتھ۔ سینکڑوں products بھی اسی طرح منٹوں میں چڑھ جاتے ہیں۔",
+      "actions": [
+        { "do": "highlight", "selector": "tr:has-text('Green Tea 25 Bags'), div:has-text('Green Tea 25 Bags')", "after": 1500 },
+        { "do": "highlight", "selector": "tr:has-text('Honey 500g'), div:has-text('Honey 500g')", "after": 1500 }
+      ]
+    },
+    {
+      "id": "s09_outro",
+      "card": {
+        "heading": "Shukriya!",
+        "sub": "Agli video: Inventory aur stock"
+      },
+      "narration": "تو یہ تھا products کا مکمل نظام — نیا product بنائیں، قیمت اور tax set کریں، اور Excel سے پوری فہرست import یا export کریں۔ اگلی ویڈیو میں ہم inventory اور stock سیکھیں گے۔ شکریہ!",
+      "minMs": 5000
+    }
+  ]
+}

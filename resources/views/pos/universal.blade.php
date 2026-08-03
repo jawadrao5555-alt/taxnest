@@ -1770,9 +1770,11 @@ window.addEventListener('popstate', function() {
                                      order = clickable purple "Order Tayyar" card (claim + load to
                                      cart). 26 Jul 2026 (owner item 5): occupied WITHOUT waiter order
                                      ab bhi clickable — board ACTION MENU khulta hai (view/final/shift)
-                                     — magar sirf jab cart KHALI ho; bhara cart = disabled (view-only
-                                     rule: naya order galti se purane bill par na chadhe). --}}
-                                <button @click="selectTable(t)" :disabled="t.status === 'occupied' && !incomingForTable(t) && cart.length > 0" class="py-3 px-2 rounded-xl text-center border-2 transition"
+                                     — magar sirf jab cart KHALI ho. ZFC (3 Aug 2026): bhara cart ab
+                                     DISABLED button NAHI — chup-chaap dead tile se cashier samjha
+                                     table hamesha ke liye PHANS gaya; ab click chalta hai aur
+                                     selectTable() hint deta hai (view-only rule barqarar). --}}
+                                <button @click="selectTable(t)" class="py-3 px-2 rounded-xl text-center border-2 transition"
                                     :class="(incomingForTable(t) ? 'border-purple-400 bg-purple-50 dark:bg-purple-900/20 hover:border-purple-500 hover:scale-105' : (t.status === 'occupied' ? (cart.length > 0 ? 'border-red-300 bg-red-50 dark:bg-red-900/20 cursor-not-allowed' : 'border-red-300 bg-red-50 dark:bg-red-900/20 hover:border-red-500 hover:scale-105') : (t.status === 'reserved' ? 'border-amber-300 bg-amber-50 dark:bg-amber-900/20 hover:border-amber-400 hover:scale-105' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:border-purple-400 hover:scale-105'))) + (tablePickerFlat()[tablePickerIndex]?.id === t.id ? ' ring-2 ring-emerald-500 ring-offset-1 dark:ring-offset-gray-900' : '')">
                                     {{-- Top-view table + chairs diagram (color = status) --}}
                                     <svg viewBox="0 0 48 48" class="w-8 h-8 mx-auto mb-1" :class="incomingForTable(t) ? 'text-purple-500' : (t.status === 'occupied' ? 'text-red-500' : (t.status === 'reserved' ? 'text-amber-500' : 'text-green-500 dark:text-green-400'))" fill="currentColor" aria-hidden="true">
@@ -3742,6 +3744,7 @@ function restaurantPos() {
         // picker as purple "Order Tayyar" cards until a cashier claims them.
         notifiedIncoming: [],
         chimedIncoming: [], // Task 106: chime dedupe is separate — hidden-tab chime must not eat the toast
+        _incomingBaselined: false, // ZFC 3 Aug 2026: pehla poll = silent baseline — purane pending orders boot par "NAYA order" ban kar na chillayen
         // ── AUTO-SYNC ENGINE ──────────────────────────────────────────────
         // syncStatus: 'online' | 'syncing' | 'offline'
         // _syncTimer fires every 30 sec; pings count endpoint then silently
@@ -4114,6 +4117,11 @@ function restaurantPos() {
             // EDIT MODE (Jul 2026): ?edit_bill= → load the provisional bill into the
             // cart. Also show the "updated" toast after a successful edit-reload.
             this._initEditMode();
+            // ZFC (3 Aug 2026): Tables page se occupied table khol kar cashier ko
+            // KHALI cart milta tha — lagta tha purana order GHAYAB ho gaya (asal
+            // mein woh held-order mein mehfooz tha). ?table_id= boot par us table
+            // ka chalta order khud cart mein load ho (waiter order = atomic claim).
+            setTimeout(() => this.autoOpenPreselectedTable(), 600);
             try {
                 const up = new URLSearchParams(window.location.search).get('updated');
                 if (up) {
@@ -6004,9 +6012,11 @@ function restaurantPos() {
             if (table.status === 'occupied') {
                 // 26 Jul 2026 (owner item 5): khali cart + occupied tile = board
                 // ACTION MENU (view/final/KOT/shift) yahin picker se. Bhara cart
-                // par sirf warning (view-only rule — cart kabhi discard na ho).
+                // par warning (view-only rule — cart kabhi discard na ho). ZFC
+                // (3 Aug 2026): warning ab AGLA QADAM batati hai — sirf "masroof
+                // hai" se cashier samajhta tha ke table kharab/phansa hua hai.
                 if (this.cart.length === 0) { this.showTablePicker = false; this.openBoardMenu(table); return; }
-                this.showToast(window.TXT.table_t_prefix2 + table.table_number + window.TXT.table_occupied_suffix, 'warning'); return;
+                this.showToast(window.TXT.table_t_prefix2 + table.table_number + window.TXT.table_occupied_cart_hint, 'warning'); return;
             }
             try {
                 const res = await fetch('/pos/restaurant/tables/' + table.id + '/reserve', {
@@ -6235,6 +6245,28 @@ function restaurantPos() {
             } catch (e) {
                 this.showToast(window.TXT.order_load_failed_conn, 'error');
             } finally { this.boardBusy = false; }
+        },
+        // ZFC (3 Aug 2026): boot-time twin of boardViewEdit for ?table_id= landings
+        // (Tables page tile → sale screen). Agar us table par koi ACTIVE order hai
+        // to wohi load karo — warna kuch na karo (naya-order flow jaisa tha waisa).
+        // Waiter orders hamesha atomic claim se (single-winner invariant barqarar).
+        async autoOpenPreselectedTable() {
+            const t = this.selectedTable;
+            if (!t || !t.id) return;
+            // Kisi aur boot-flow ne cart le liya (edit-bill / restore / claim)? Haath na lagao.
+            if (this.cart.length || this.editingBillId || this.recalledOrderId || this.incomingOrderId) return;
+            try {
+                const res = await fetch('/pos/restaurant/orders/by-table/' + t.id, { headers: { 'Accept': 'application/json' } });
+                if (!res.ok) return;
+                const list = await res.json();
+                const ord = (Array.isArray(list) && list.length) ? list[0] : null;
+                if (!ord) return; // koi chalta order nahi — table sach mein nayi sale ke liye hai
+                if (ord.source === 'waiter') { await this.claimAndLoadIncoming({ id: ord.id }); return; }
+                // by-table 'table' relation nahi bhejta — baked table info se bharo
+                // (recallOrder isi se selectedTable/dine_in set karta hai).
+                ord.table = ord.table || { id: t.id, table_number: t.table_number, occupied_since: null };
+                this.recallOrder(ord);
+            } catch (e) { /* silent — board/Recall raste bahar-haal khule hain */ }
         },
         // FINAL — step 1: close menu, open the explicit confirm (anti "anjaane
         // mein final"). Both modals are z-50; they never overlap.
@@ -7490,6 +7522,20 @@ function restaurantPos() {
                 const kdsAlive = res.headers.get('X-KDS-Alive');
                 if (kdsAlive !== null) this.kitchenSettings.kds_alive = (kdsAlive === '1');
                 this.incomingOrders = await res.json();
+                // ZFC (3 Aug 2026): pehli KAMYAB fetch = baseline — jo orders pehle
+                // se pending the woh boot par chime/"NAYA order" toast na bajayen
+                // (2 din purana order har screen-load par chillata tha); bas EK
+                // summary. Baseline khali poll par bhi set ho — warna baad mein
+                // aane wala pehla ASLI naya order chupke se absorb ho jata.
+                if (!this._incomingBaselined) {
+                    this._incomingBaselined = true;
+                    this.incomingOrders.forEach(o => {
+                        if (!this.chimedIncoming.includes(o.id)) this.chimedIncoming.push(o.id);
+                        if (!this.notifiedIncoming.includes(o.id)) this.notifiedIncoming.push(o.id);
+                    });
+                    if (this.incomingOrders.length && !document.hidden) this.showToast(this.incomingOrders.length + window.TXT.waiter_orders_pending_summary, 'info');
+                    return;
+                }
                 this.maybeAutoLoadIncoming();
             } catch (e) { /* silent — badge just goes stale until next poll */ }
         },
@@ -7499,6 +7545,10 @@ function restaurantPos() {
         // This is just the one-time toast nudge per new order.
         maybeAutoLoadIncoming() {
             if (!this.isRestaurantMode || !this.incomingOrders.length) return;
+            // ZFC (3 Aug 2026): baseline loadIncoming() ki pehli kamyab fetch par
+            // set hota hai. Us se PEHLE (visibilitychange boot se aage nikal jaye)
+            // kuch na bajao — warna purane pending orders "NAYA" ban kar chillate.
+            if (!this._incomingBaselined) return;
             // Task 106: chime fires even when the tab is HIDDEN — that's the whole
             // point of an audible alert. Separate dedupe list (chimedIncoming) so a
             // hidden-tab chime doesn't swallow the toast shown on return.

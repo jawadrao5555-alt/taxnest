@@ -3670,4 +3670,18 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'tutorials_sub' => 'Chhoti chhoti Urdu videos — har feature aaram se dekh kar seekhein.',
     'tutorials_more_soon' => 'Aur videos jald aa rahi hain.',
     'tutorials_watch_public' => 'Yeh videos hamari website par bhi hain — apni team ko link bhejein.',
+
+    // Deliveries board upgrades + Pending Deliveries popup finals (owner batch, 3 Aug 2026)
+    'delivery_status_dispatched' => 'Rawana',
+    'rider_out_pill' => ':count bahar',
+    'del_search_ph' => 'Bill / customer / rider / address dhoondein…',
+    'del_no_match' => 'Koi milta bill nahi',
+    'delivery_took_mins' => ':mins minute mein deliver hui',
+    'nav_my_panel' => 'Mera Panel',
+    'item_note_btn' => 'Item ka note',
+    'ph_item_note' => 'Is item ka note (maslan: zyada teekha)',
+    'view_receipt_btn' => 'Raseed',
+    'final_word' => 'Final',
+    'marked_delivered_ok' => 'Delivered mark ho gaya.',
+    'status_update_failed' => 'Status update nahi hua.',
 ];

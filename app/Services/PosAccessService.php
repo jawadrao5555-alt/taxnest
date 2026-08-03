@@ -147,8 +147,49 @@ class PosAccessService
     public static function customAllows(?User $user, string $feature): ?bool
     {
         $set = self::customSet($user);
+        if ($set === null) {
+            return null;
+        }
+        $allowed = in_array($feature, $set, true);
+        // Owner rule (3 Aug 2026): jab company mein koi alag Delivery Manager
+        // account (pos_role='pos_delivery') maujood hi nahi, to cashier/manager
+        // Deliveries board (rider assign/settle) chala sakte hain — chahe unka
+        // custom set 'deliveries' unticked ho. Delivery account bante hi yeh
+        // fallback khud band ho jata hai (asal gating wapas lag jati hai).
+        // Nav ($posNavCan) + route gate (PosAuth) + posCashierBlocked() sab isi
+        // ek verdict se chalte hain — single source of truth barqarar.
+        if (!$allowed && $feature === 'deliveries' && self::deliveriesFallbackOpen($user)) {
+            return true;
+        }
 
-        return $set === null ? null : in_array($feature, $set, true);
+        return $allowed;
+    }
+
+    /**
+     * TRUE when the company has NO active Delivery Manager account
+     * (pos_role='pos_delivery') — the Deliveries board then opens up to
+     * cashiers/managers whose custom set left 'deliveries' unticked.
+     */
+    public static function deliveriesFallbackOpen(?User $user): bool
+    {
+        if (!$user || !$user->company_id) {
+            return false;
+        }
+        static $cache = [];
+        $cid = (int) $user->company_id;
+        if (!array_key_exists($cid, $cache)) {
+            try {
+                $q = User::where('company_id', $cid)->where('pos_role', 'pos_delivery');
+                if (Schema::hasColumn('users', 'is_active')) {
+                    $q->where('is_active', true);
+                }
+                $cache[$cid] = !$q->exists();
+            } catch (\Throwable $e) {
+                $cache[$cid] = false; // fail closed — existing gating stands
+            }
+        }
+
+        return $cache[$cid];
     }
 
     /** Feature key a request path belongs to, or NULL (always-allowed path). */

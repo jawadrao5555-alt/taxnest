@@ -16,7 +16,26 @@
     // $posNavCan('feature', $roleDefault) — no custom set → role default
     // (existing behavior, zero change for existing shops); custom set →
     // ONLY ticked features render in the nav (route gate lives in PosAuth).
-    $posNavCan = function (string $f, bool $default = true) use ($posUserLayout) {
+    // Confined roles (waiter/kitchen/rider/delivery/viewers) are path-confined
+    // by PosAuth — admin links sirf bounce back karte. Owner screenshot
+    // (3 Aug 2026): waiter ke menu mein poora admin quick-access dikh raha tha
+    // (routes blocked thay, par menu gumrah-kun) — confined role = NO feature
+    // links, sirf apna panel + tutorials + logout.
+    $confinedRoleLayout = in_array($posUserLayout->pos_role ?? null,
+        ['pos_waiter', 'pos_kitchen', 'pos_rider', 'pos_delivery', 'archive_viewer', 'local_viewer'], true);
+    $confinedHomeLayout = match ($posUserLayout->pos_role ?? null) {
+        'pos_waiter' => url('/pos/waiter'),
+        'pos_kitchen' => url('/pos/restaurant/kds'),
+        'pos_rider' => url('/pos/rider'),
+        'pos_delivery' => url('/pos/deliveries'),
+        'archive_viewer' => url('/pos/archive'),
+        'local_viewer' => url('/pos/local-bills'),
+        default => null,
+    };
+    $posNavCan = function (string $f, bool $default = true) use ($posUserLayout, $confinedRoleLayout) {
+        if ($confinedRoleLayout) {
+            return false;
+        }
         return ($posUserLayout ? $posUserLayout->posCustomAllows($f) : null) ?? $default;
     };
     // POS UNIFICATION: every company (restaurant or retail) now bills on the single
@@ -28,7 +47,15 @@
     $companyName = $companyLayout->name ?? 'My Business';
     $userName = $posUserLayout->name ?? 'User';
     $userInitial = strtoupper(substr($userName, 0, 1));
-    $userRole = $isCashierLayout ? __('pos.role_cashier') : __('pos.role_admin');
+    // Role label (3 Aug 2026): confined roles apna asal naam dikhayein —
+    // "waiter · Admin" jaisa gumrah-kun label kabhi nahi.
+    $userRole = match ($posUserLayout->pos_role ?? null) {
+        'pos_waiter' => __('pos.role_waiter'),
+        'pos_kitchen' => __('pos.role_kitchen'),
+        'pos_rider' => __('pos.role_rider'),
+        'pos_delivery' => __('pos.role_delivery_manager'),
+        default => ($isCashierLayout ? __('pos.role_cashier') : __('pos.role_admin')),
+    };
     $posTheme = $companyLayout->pos_theme ?? 'purple';
     // "What's New" app updates (popup + bell). Admin-controlled via SystemSetting
     // pos_whats_new_enabled. NEVER break POS pages if the table is missing on prod
@@ -369,7 +396,7 @@
                             {{-- Sale-screen redesign (Jul 2026): on the sale screen itself the static
                                  "New Sale" link is replaced by the teleported action button (newSale())
                                  that lands in #tn-nav-sale-tools below — see universal.blade.php. --}}
-                            @unless(request()->routeIs('pos.invoice.create'))
+                            @unless(request()->routeIs('pos.invoice.create') || $confinedRoleLayout)
                             <a href="{{ route('pos.invoice.create') }}"
                                class="nav-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-white">
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
@@ -598,6 +625,17 @@
                                     <div class="px-3 pt-2 pb-1">
                                         <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">{{ __('pos.nav_quick_access') }}</p>
                                     </div>
+                                    @if($confinedRoleLayout && $confinedHomeLayout)
+                                    {{-- Confined role: sirf apna panel + tutorials (PosAuth-allowed paths). --}}
+                                    <a href="{{ $confinedHomeLayout }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3m10-11v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                                        {{ __('pos.nav_my_panel') }}
+                                    </a>
+                                    <a href="{{ route('pos.tutorials') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                        {{ __('pos.nav_tutorials') }}
+                                    </a>
+                                    @endif
                                     @if($posNavCan('dashboard'))
                                     <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>

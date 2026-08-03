@@ -2055,7 +2055,9 @@ class RestaurantPosController extends Controller
         $recentOrders = RestaurantOrder::where('company_id', $companyId)
             ->where('customer_id', $customer->id)
             ->where('status', 'completed')
-            ->with('items')
+            // 'transaction' eager-loaded: live par lazy-loading STRICT hai —
+            // asal bill number (L-xx) + View Receipt ke liye (owner, 3 Aug 2026).
+            ->with(['items', 'transaction:id,invoice_number'])
             ->orderBy('created_at', 'desc')
             ->limit(5)
             ->get()
@@ -2063,6 +2065,10 @@ class RestaurantPosController extends Controller
                 return [
                     'id' => $o->id,
                     'order_number' => $o->order_number,
+                    // Asal POS bill number + receipt link target (NULL jab order
+                    // kabhi bill nahi bana — modal ORD- number par fallback karta hai).
+                    'txn_id' => $o->pos_transaction_id ? (int) $o->pos_transaction_id : null,
+                    'invoice_number' => $o->transaction?->invoice_number,
                     'total' => (float)$o->total_amount,
                     'date' => $o->created_at->format('M d, g:i A'),
                     'items' => $o->items->map(fn($i) => [

@@ -3670,4 +3670,18 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'tutorials_sub' => 'Short Urdu videos — watch and learn every feature at your ease.',
     'tutorials_more_soon' => 'More videos are on the way.',
     'tutorials_watch_public' => 'These videos are also on our website — share the link with your team.',
+
+    // Deliveries board upgrades + Pending Deliveries popup finals (owner batch, 3 Aug 2026)
+    'delivery_status_dispatched' => 'Dispatched',
+    'rider_out_pill' => ':count out',
+    'del_search_ph' => 'Search bill / customer / rider / address…',
+    'del_no_match' => 'No matching bills',
+    'delivery_took_mins' => 'Delivered in :mins min',
+    'nav_my_panel' => 'My Panel',
+    'item_note_btn' => 'Item note',
+    'ph_item_note' => 'Note for this item (e.g. extra spicy)',
+    'view_receipt_btn' => 'Receipt',
+    'final_word' => 'Final',
+    'marked_delivered_ok' => 'Marked delivered.',
+    'status_update_failed' => 'Status update failed.',
 ];

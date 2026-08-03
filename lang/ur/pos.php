@@ -3671,4 +3671,18 @@ return [
     'tutorials_sub' => 'چھوٹی چھوٹی اردو ویڈیوز — ہر فیچر آرام سے دیکھ کر سیکھیں۔',
     'tutorials_more_soon' => 'مزید ویڈیوز جلد آ رہی ہیں۔',
     'tutorials_watch_public' => 'یہ ویڈیوز ہماری ویب سائٹ پر بھی ہیں — اپنی ٹیم کو لنک بھیجیں۔',
+
+    // Deliveries board upgrades + Pending Deliveries popup finals (owner batch, 3 Aug 2026)
+    'delivery_status_dispatched' => 'روانہ',
+    'rider_out_pill' => ':count باہر',
+    'del_search_ph' => 'بل / گاہک / رائیڈر / پتہ تلاش کریں…',
+    'del_no_match' => 'کوئی ملتا جلتا بل نہیں',
+    'delivery_took_mins' => ':mins منٹ میں ڈیلیور ہوئی',
+    'nav_my_panel' => 'میرا پینل',
+    'item_note_btn' => 'آئٹم کا نوٹ',
+    'ph_item_note' => 'اس آئٹم کا نوٹ (مثلاً: زیادہ تیز)',
+    'view_receipt_btn' => 'رسید',
+    'final_word' => 'فائنل',
+    'marked_delivered_ok' => 'ڈیلیورڈ نشان لگ گیا۔',
+    'status_update_failed' => 'اسٹیٹس تبدیل نہیں ہوا۔',
 ];

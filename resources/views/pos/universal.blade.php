@@ -1372,6 +1372,15 @@ window.addEventListener('popstate', function() {
                                  (is_tax_exempt / item_discount_* / special_notes) stay in the cart
                                  model + every payload so recalled/edited bills keep their values.
                                  Keyboard T / Alt+T tax toggle kept (NO TAX badge shows state). --}}
+                            {{-- Per-item note SIDE BUTTON (owner, 3 Aug 2026): 26 Jul ki
+                                 cart-height complaint wale hamesha-khule inputs wapas NAHI
+                                 aaye — note sirf button dabane par khulta hai. KOT template
+                                 special_notes pehle se chhapta hai. --}}
+                            <button @click.stop="toggleItemNote(index)" title="{{ __('pos.item_note_btn') }}"
+                                :class="(item.special_notes || '').length ? 'text-amber-500' : 'text-gray-300 dark:text-gray-600'"
+                                class="p-1.5 flex-shrink-0 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition active:scale-90">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            </button>
                             <button @click.stop="removeFromCart(index)" class="p-1.5 flex-shrink-0 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition active:scale-90">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                             </button>
@@ -1382,8 +1391,21 @@ window.addEventListener('popstate', function() {
                         <div x-show="item.is_tax_exempt || (item.item_discount_value || 0) > 0 || (item.special_notes || '').length > 0" class="mt-0.5 flex items-center gap-1 flex-wrap">
                             <span x-show="item.is_tax_exempt" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-green-500 text-white">NO TAX</span>
                             <span x-show="(item.item_discount_value || 0) > 0" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-600" x-text="(item.item_discount_type || 'percentage') === 'percentage' ? '-' + item.item_discount_value + '%' : '-Rs.' + item.item_discount_value"></span>
-                            <span x-show="(item.special_notes || '').length > 0" class="text-[9px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300 truncate max-w-[180px]" x-text="item.special_notes"></span>
+                            <span x-show="(item.special_notes || '').length > 0 && !item._showNote" class="text-[9px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300 truncate max-w-[180px]" x-text="item.special_notes"></span>
                         </div>
+                        {{-- Per-item note inline input (side button se khulta hai) --}}
+                        <template x-if="item._showNote">
+                            <div class="mt-1.5" @click.stop>
+                                <input type="text" maxlength="190" x-model="item.special_notes"
+                                    :data-item-note="index"
+                                    autocomplete="off" name="item_note_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                                    @keydown.stop
+                                    @keydown.enter.prevent="item._showNote = false"
+                                    @keydown.escape.prevent="item._showNote = false"
+                                    placeholder="{{ __('pos.ph_item_note') }}"
+                                    class="w-full text-[11px] rounded-lg border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-900/10 dark:text-white px-2 py-1.5 focus:ring-amber-500 focus:border-amber-500">
+                            </div>
+                        </template>
                     </div>
                 </template>
             </div>
@@ -2242,6 +2264,9 @@ window.addEventListener('popstate', function() {
                                 <template x-if="bill.rider_name">
                                     <span class="text-[9px] bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300 px-2 py-0.5 rounded-full font-bold" x-text="'{{ __('pos.rider_word') }}: ' + bill.rider_name"></span>
                                 </template>
+                                <template x-if="bill.is_final">
+                                    <span class="text-[9px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">{{ __('pos.final_word') }}</span>
+                                </template>
                             </div>
                             <span class="text-sm font-bold text-amber-700 dark:text-amber-400" x-text="'Rs. ' + Number(bill.total_amount).toLocaleString()"></span>
                         </div>
@@ -2281,6 +2306,9 @@ window.addEventListener('popstate', function() {
                                 </button>
                             </div>
                         </template>
+                        {{-- PROVISIONAL bill: Final Cash/Card (promote path). FINAL bills
+                             par yeh buttons render hi nahi hote — promote unpar kabhi nahi. --}}
+                        <template x-if="!bill.is_final">
                         <div class="flex gap-2">
                             <button @click="finalizeDelivery(bill, 'cash')" :disabled="deliveryFinalBusyId || promoteSubmitting" class="flex-1 py-2.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50">
                                 <template x-if="deliveryFinalBusyId === bill.id"><svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg></template>
@@ -2292,6 +2320,23 @@ window.addEventListener('popstate', function() {
                                 {{ __('pos.final_card') }}
                             </button>
                         </div>
+                        </template>
+                        {{-- FINAL bill (3 Aug 2026): status chip + Delivered mark. Cash
+                             khata settle upar wale orange rider block se hota hai. --}}
+                        <template x-if="bill.is_final">
+                        <div class="flex gap-2 items-stretch">
+                            <span class="flex items-center px-2.5 rounded-xl text-[10px] font-bold"
+                                  :class="bill.delivery_status === 'delivered' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300'"
+                                  x-text="bill.delivery_status === 'delivered' ? @json(__('pos.delivery_status_delivered')) : (bill.delivery_status === 'dispatched' ? @json(__('pos.delivery_status_dispatched')) : @json(__('pos.delivery_status_assigned')))"></span>
+                            <template x-if="bill.delivery_status !== 'delivered'">
+                                <button @click="markFinalDelivered(bill)" :disabled="deliveryFinalBusyId" class="flex-1 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50">
+                                    <template x-if="deliveryFinalBusyId === bill.id"><svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg></template>
+                                    <template x-if="deliveryFinalBusyId !== bill.id"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg></template>
+                                    {{ __('pos.delivered_word') }}
+                                </button>
+                            </template>
+                        </div>
+                        </template>
                     </div>
                 </template>
             </div>
@@ -3260,13 +3305,19 @@ window.addEventListener('popstate', function() {
                                     <template x-for="ord in customerHistory.recent_orders" :key="ord.id">
                                         <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
                                             <div class="flex items-center justify-between mb-1.5">
-                                                <span class="text-xs font-bold text-gray-900 dark:text-white" x-text="ord.order_number"></span>
+                                                {{-- Asal POS bill number (L-xx) jab order bill bana tha; warna ORD- token (owner, 3 Aug 2026) --}}
+                                                <span class="text-xs font-bold text-gray-900 dark:text-white" x-text="ord.invoice_number || ord.order_number"></span>
                                                 <span class="text-[10px] text-gray-400" x-text="ord.date"></span>
                                             </div>
                                             <div class="text-[10px] text-gray-500 mb-2" x-text="ord.items.map(i => i.qty + 'x ' + i.name).join(', ')"></div>
                                             <div class="flex items-center justify-between">
                                                 <span class="text-xs font-bold text-purple-600" x-text="'Rs. ' + Number(ord.total).toLocaleString()"></span>
-                                                <button @click="reorderItems(ord)" class="text-[10px] font-bold text-white bg-purple-600 hover:bg-purple-700 px-2.5 py-1 rounded-lg transition">{{ __('pos.reorder') }}</button>
+                                                <div class="flex items-center gap-1.5">
+                                                    <template x-if="ord.txn_id">
+                                                        <button @click="window.open(receiptViewUrl({ id: ord.txn_id }), '_blank')" class="text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-900/50 px-2.5 py-1 rounded-lg transition">{{ __('pos.view_receipt_btn') }}</button>
+                                                    </template>
+                                                    <button @click="reorderItems(ord)" class="text-[10px] font-bold text-white bg-purple-600 hover:bg-purple-700 px-2.5 py-1 rounded-lg transition">{{ __('pos.reorder') }}</button>
+                                                </div>
                                             </div>
                                         </div>
                                     </template>
@@ -3693,6 +3744,10 @@ function restaurantPos() {
         // Lazy-loaded list of all bills with pra_status='local' for current company.
         // Refreshed on page mount, after every bill save, and after each modal action.
         localBills: [],
+        // Open FINAL delivery bills (3 Aug 2026) — Pending Deliveries popup ki
+        // ginti ab rider app / khata se milti hai. F10 Local Bills modal inhe
+        // KABHI nahi dikhata (woh sirf localBills parhta hai).
+        finalDeliveryBills: [],
         showLocalBills: false,
         activeLocalIndex: 0,
         localBillsLoading: false,
@@ -7745,6 +7800,7 @@ function restaurantPos() {
                 const data = await res.json();
                 if (data && data.success) {
                     this.localBills = data.bills || [];
+                    this.finalDeliveryBills = data.final_deliveries || [];
                     if (data.business_today) this.bizToday = data.business_today;
                     if (this.activeLocalIndex >= this.filteredLocalBills().length) {
                         this.activeLocalIndex = Math.max(0, this.filteredLocalBills().length - 1);
@@ -7771,12 +7827,29 @@ function restaurantPos() {
             bill.kot_pending = false; // optimistic — server stamps kot_sent_at on render
             this.printTxnKitchenTicket(bill.id);
         },
+        // Per-item note toggle (owner, 3 Aug 2026). Focus via document.querySelector —
+        // x-for row scope mein component-root $refs undefined hote hain (Alpine rule).
+        toggleItemNote(index) {
+            const item = this.cart[index];
+            if (!item) return;
+            item._showNote = !item._showNote;
+            if (item._showNote) {
+                this.$nextTick(() => {
+                    const el = document.querySelector('[data-item-note="' + index + '"]');
+                    if (el) el.focus();
+                });
+            }
+        },
         // ─── PENDING DELIVERIES panel (Task 114) ────────────────────────────
         // TODAY's business-day delivery provisionals only. Bills without a
         // business_date (pre-migration window) are included rather than hidden.
         pendingDeliveryBills() {
-            return this.localBills.filter(b => b.order_type === 'delivery'
-                && (!this.bizToday || !b.business_date || b.business_date === this.bizToday));
+            const isToday = b => (!this.bizToday || !b.business_date || b.business_date === this.bizToday);
+            const prov = this.localBills.filter(b => b.order_type === 'delivery' && isToday(b));
+            // FINAL delivery bills bhi (3 Aug 2026): jo abhi deliver nahi hue ya
+            // cash rider ke khaate par hai — popup ki ginti ab rider app se milti hai.
+            const finals = (this.finalDeliveryBills || []).filter(isToday);
+            return [...prov, ...finals];
         },
         openPendingDeliveries() {
             this.showPendingDeliveries = true;
@@ -7795,6 +7868,32 @@ function restaurantPos() {
                 this.deliveryFinalBusyId = null;
             }
             if (this.pendingDeliveryBills().length === 0) this.showPendingDeliveries = false;
+        },
+        // FINAL delivery bill ko panel se Delivered mark karna (3 Aug 2026) —
+        // reuses POST /pos/deliveries/{id}/status (JSON). Promote yahan kabhi
+        // nahi chalta: bill pehle se final hai, sirf delivery status badalta hai.
+        async markFinalDelivered(bill) {
+            if (!bill || !bill.is_final || this.deliveryFinalBusyId) return;
+            this.deliveryFinalBusyId = bill.id;
+            try {
+                const res = await fetch('{{ url('/pos/deliveries') }}/' + bill.id + '/status', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ delivery_status: 'delivered' }),
+                });
+                const data = await res.json().catch(() => null);
+                if (res.ok && data && data.success) {
+                    bill.delivery_status = 'delivered';
+                    this.showToast(@json(__('pos.marked_delivered_ok')), 'success');
+                    // Card bill delivered = khata par nahi → refresh par list se nikal jata hai.
+                    this.loadLocalBills();
+                } else {
+                    this.showToast((data && data.message) || @json(__('pos.status_update_failed')), 'error');
+                }
+            } catch (e) {
+                this.showToast(window.TXT.network_error, 'error');
+            }
+            this.deliveryFinalBusyId = null;
         },
         // ─── Rider WHOLE-khata settle from the panel (Task 123) ─────────────
         // Reuses POST /pos/riders/{id}/settle with settle_all — settles EVERY

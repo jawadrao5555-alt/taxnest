@@ -52,13 +52,19 @@
             $owed = (float) $open->sum('total_amount');
         @endphp
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-4">
-            <div class="flex items-center justify-between mb-1">
-                <div class="font-semibold text-gray-900 dark:text-white text-sm truncate">
+            @php $openDel = (int) ($openDeliveryCounts[$rider->id] ?? 0); @endphp
+            <div class="flex items-center justify-between gap-2 mb-1">
+                <div class="font-bold text-gray-900 dark:text-white text-sm truncate">
                     {{ $rider->name }}
                     @unless($rider->is_active)<span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 align-middle">{{ __('pos.inactive_word') }}</span>@endunless
                 </div>
-                @if($rider->phone)<div class="text-[11px] text-gray-400">{{ $rider->phone }}</div>@endif
+                {{-- Owner (3 Aug 2026): "pehle se kitne order bahar" numaya ho —
+                     assign karte waqt cashier ko ek nazar mein dikhe. --}}
+                @if($openDel > 0)
+                <span class="flex-shrink-0 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">{{ __('pos.rider_out_pill', ['count' => $openDel]) }}</span>
+                @endif
             </div>
+            @if($rider->phone)<div class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{{ $rider->phone }}</div>@endif
             @if($owed > 0)
                 <div class="text-lg font-bold text-amber-600 dark:text-amber-400">Rs. {{ number_format($owed) }}</div>
                 <div class="text-[11px] text-gray-400 mb-3">{{ __('pos.unsettled_cash_bills', ['count' => $open->count()]) }}</div>
@@ -69,8 +75,8 @@
                 <div class="text-[11px] text-gray-400">{{ __('pos.no_cash_pending') }}</div>
             @endif
             {{-- Bulk update: mark ALL of this rider's open (assigned/dispatched)
-                 deliveries in one go. Delivered/returned bills stay untouched. --}}
-            @php $openDel = (int) ($openDeliveryCounts[$rider->id] ?? 0); @endphp
+                 deliveries in one go. Delivered/returned bills stay untouched.
+                 ($openDel is computed at the card header above.) --}}
             @if($openDel > 0)
             <div class="mt-2 pt-2 border-t border-gray-100 dark:border-gray-800">
                 <div class="text-[11px] text-gray-400 mb-1.5">{{ __('pos.orders_out_for_delivery', ['count' => $openDel]) }}</div>
@@ -140,9 +146,17 @@
 
     {{-- Day's delivery bills --}}
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-        <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.delivery_bills') }} — {{ $day->format('d M Y') }}</h3>
-            <span class="text-[11px] text-gray-400">{{ $bills->count() }}{{ __('pos.sfx_bills') }}</span>
+        <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between">
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white flex-shrink-0">{{ __('pos.delivery_bills') }} — {{ $day->format('d M Y') }}</h3>
+            <div class="flex items-center gap-2">
+                {{-- Owner (3 Aug 2026): bill/customer/rider/address search — list lambi
+                     ho to dhoondna aasan. Client-side filter, koi request nahi. --}}
+                <input type="text" id="del-search" name="delsearch_nofill" autocomplete="off"
+                       data-lpignore="true" data-form-type="other" data-1p-ignore
+                       placeholder="{{ __('pos.del_search_ph') }}"
+                       class="w-full sm:w-64 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1.5 focus:ring-purple-500 focus:border-purple-500">
+                <span class="text-[11px] text-gray-400 flex-shrink-0"><span id="del-count">{{ $bills->count() }}</span>{{ __('pos.sfx_bills') }}</span>
+            </div>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-full text-sm">
@@ -159,7 +173,7 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                     @forelse($bills as $b)
-                    <tr>
+                    <tr data-delrow data-search="{{ Str::lower(($b->invoice_number ?: ('#' . $b->id)) . ' ' . ($b->customer_name ?? '') . ' ' . ($b->customer_phone ?? '') . ' ' . ($b->delivery_address ?? '') . ' ' . ($b->rider->name ?? '') . ' ' . ($b->delivery_status ?? '')) }}">
                         <td class="px-4 py-3">
                             <div class="font-semibold text-gray-900 dark:text-white">{{ $b->invoice_number ?: ('#' . $b->id) }}</div>
                             <div class="text-[11px] text-gray-400">{{ $b->created_at->format('h:i A') }}</div>
@@ -195,7 +209,9 @@
                                          falls back to "— no rider —" even though the rider is saved. --}}
                                     @foreach($riders as $r)
                                     @if($r->is_active || (int) $b->rider_id === (int) $r->id)
-                                    <option value="{{ $r->id }}" {{ (int) $b->rider_id === (int) $r->id ? 'selected' : '' }}>{{ $r->name }}{{ $r->is_active ? '' : __('pos.sfx_inactive_paren') }}</option>
+                                    {{-- Owner (3 Aug 2026): dropdown mein bhi dikhe kis rider ke
+                                         kitne order pehle se bahar hain — barabar batwara aasan. --}}
+                                    <option value="{{ $r->id }}" {{ (int) $b->rider_id === (int) $r->id ? 'selected' : '' }}>{{ $r->name }}{{ ($openDeliveryCounts[$r->id] ?? 0) > 0 ? ' — ' . __('pos.rider_out_pill', ['count' => $openDeliveryCounts[$r->id]]) : '' }}{{ $r->is_active ? '' : __('pos.sfx_inactive_paren') }}</option>
                                     @endif
                                     @endforeach
                                 </select>
@@ -213,6 +229,12 @@
                                 ][$st] ?? 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400';
                             @endphp
                             <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold {{ $stClass }}">{{ $st ? (Lang::has('pos.delivery_status_' . $st) ? __('pos.delivery_status_' . $st) : ucfirst($st)) : '—' }}</span>
+                            {{-- Delivery duration (owner, 3 Aug 2026): rider assign se
+                                 delivered tak kitne minute lage. --}}
+                            @if($st === 'delivered' && $b->delivered_at && $b->rider_assigned_at)
+                                @php $delMins = (int) \Carbon\Carbon::parse($b->rider_assigned_at)->diffInMinutes(\Carbon\Carbon::parse($b->delivered_at)); @endphp
+                                <div class="text-[10px] text-gray-400 mt-0.5">{{ __('pos.delivery_took_mins', ['mins' => $delMins]) }}</div>
+                            @endif
                         </td>
                         <td class="px-4 py-3 text-right whitespace-nowrap">
                             @if($b->rider_id && !$b->rider_settlement_id)
@@ -240,9 +262,28 @@
                     @empty
                     <tr><td colspan="7" class="px-4 py-8 text-center text-sm text-gray-400">{{ __('pos.no_delivery_bills_day') }}</td></tr>
                     @endforelse
+                    <tr id="del-search-empty" style="display:none"><td colspan="7" class="px-4 py-8 text-center text-sm text-gray-400">{{ __('pos.del_no_match') }}</td></tr>
                 </tbody>
             </table>
         </div>
     </div>
 </div>
+<script>
+(function () {
+    var inp = document.getElementById('del-search');
+    if (!inp) return;
+    var emptyRow = document.getElementById('del-search-empty');
+    var cnt = document.getElementById('del-count');
+    inp.addEventListener('input', function () {
+        var q = inp.value.trim().toLowerCase(), shown = 0;
+        document.querySelectorAll('tr[data-delrow]').forEach(function (tr) {
+            var hit = !q || (tr.getAttribute('data-search') || '').indexOf(q) !== -1;
+            tr.style.display = hit ? '' : 'none';
+            if (hit) shown++;
+        });
+        if (emptyRow) emptyRow.style.display = shown === 0 ? '' : 'none';
+        if (cnt) cnt.textContent = shown;
+    });
+})();
+</script>
 </x-pos-layout>

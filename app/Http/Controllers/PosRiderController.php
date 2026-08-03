@@ -329,10 +329,21 @@ class PosRiderController extends Controller
             }
         }
 
-        $txn->update([
+        $upd = [
             'rider_id' => $riderId,
             'delivery_status' => $riderId ? ($txn->delivery_status && $txn->delivery_status !== 'returned' ? $txn->delivery_status : 'assigned') : null,
-        ]);
+        ];
+        // Delivery-duration stamp (owner, 3 Aug 2026): rider lagte hi ghari
+        // shuru. DIFFERENT rider par re-assign = clock restart; unassign = clear.
+        // hasColumn guard — cPanel PROD schema-drift self-heal convention.
+        if (Schema::hasColumn('pos_transactions', 'rider_assigned_at')) {
+            if (!$riderId) {
+                $upd['rider_assigned_at'] = null;
+            } elseif ((int) $txn->rider_id !== (int) $riderId || !$txn->rider_assigned_at) {
+                $upd['rider_assigned_at'] = now();
+            }
+        }
+        $txn->update($upd);
 
         return back()->with('success', $riderId ? 'Rider assigned.' : 'Rider removed.');
     }
@@ -362,7 +373,18 @@ class PosRiderController extends Controller
             return back()->with('error', 'This delivery is already delivered — it can only be marked returned.');
         }
 
-        $txn->update(['delivery_status' => $newStatus]);
+        $upd = ['delivery_status' => $newStatus];
+        if ($newStatus === 'delivered' && !$txn->delivered_at
+            && Schema::hasColumn('pos_transactions', 'delivered_at')) {
+            $upd['delivered_at'] = now();
+        }
+        $txn->update($upd);
+
+        // Sale-screen Pending Deliveries panel (3 Aug 2026) marks FINAL bills
+        // delivered via fetch — JSON clients get JSON; page forms keep back().
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'delivery_status' => $newStatus]);
+        }
 
         return back()->with('success', 'Delivery status updated.');
     }
@@ -386,7 +408,12 @@ class PosRiderController extends Controller
             ->where('rider_id', $rider->id)
             ->whereNull('rider_settlement_id')
             ->whereIn('delivery_status', ['assigned', 'dispatched'])
-            ->update(['delivery_status' => $newStatus]);
+            ->update(array_merge(
+                ['delivery_status' => $newStatus],
+                // Bulk "All Delivered" bhi duration stamp kare (3 Aug 2026).
+                ($newStatus === 'delivered' && Schema::hasColumn('pos_transactions', 'delivered_at'))
+                    ? ['delivered_at' => now()] : []
+            ));
 
         if ($count === 0) {
             return back()->with('error', 'No open deliveries for ' . $rider->name . '.');
@@ -512,7 +539,11 @@ class PosRiderController extends Controller
             ->whereNull('rider_settlement_id')
             ->findOrFail($txnId);
 
-        $txn->update(['delivery_status' => 'delivered']);
+        $upd = ['delivery_status' => 'delivered'];
+        if (!$txn->delivered_at && Schema::hasColumn('pos_transactions', 'delivered_at')) {
+            $upd['delivered_at'] = now();
+        }
+        $txn->update($upd);
 
         return back()->with('success', 'Marked delivered.');
     }

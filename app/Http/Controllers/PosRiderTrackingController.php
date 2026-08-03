@@ -11,6 +11,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
@@ -229,18 +230,48 @@ class PosRiderTrackingController extends Controller
     {
         $rider = $this->riderFromToken($request);
 
-        $openDeliveries = PosTransaction::withoutGlobalScope('hide_archived')
+        // Owner fix #4 (3 Aug 2026): rider app ab sirf ginti nahi, poori list
+        // dikhaye — bill no, customer, phone, address, raqam, maps link, aur
+        // kitni der se assign hai. Purane APK is extra field ko ignore karte
+        // hain (backward compatible).
+        $hasAssignedAt = Schema::hasColumn('pos_transactions', 'rider_assigned_at');
+        $openBills = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $rider->company_id)
             ->where('rider_id', $rider->id)
             ->whereIn('delivery_status', ['assigned', 'dispatched'])
-            ->count();
+            ->orderBy('id')
+            ->limit(50)
+            ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'delivery_address', 'total_amount', 'payment_method', 'delivery_status', 'created_at',
+                   ...($hasAssignedAt ? ['rider_assigned_at'] : [])]);
+
+        $deliveries = $openBills->map(function ($b) use ($hasAssignedAt) {
+            $assignedAt = $hasAssignedAt && $b->rider_assigned_at
+                ? Carbon::parse($b->rider_assigned_at)
+                : null;
+            return [
+                'id'             => (int) $b->id,
+                'invoice_number' => $b->invoice_number,
+                'customer_name'  => $b->customer_name,
+                'customer_phone' => $b->customer_phone,
+                'address'        => $b->delivery_address,
+                'amount'         => (float) $b->total_amount,
+                'payment_method' => $b->payment_method,
+                'status'         => $b->delivery_status,
+                'assigned_at'    => $assignedAt?->toIso8601String(),
+                'assigned_mins'  => $assignedAt ? (int) $assignedAt->diffInMinutes(now()) : null,
+                'maps_url'       => filled($b->delivery_address)
+                    ? 'https://www.google.com/maps/search/?api=1&query=' . urlencode($b->delivery_address)
+                    : null,
+            ];
+        });
 
         return response()->json([
             'ok' => true,
             'rider' => ['id' => (int) $rider->id, 'name' => $rider->name],
             'duty' => (bool) $rider->on_duty,
             'duty_started_at' => optional($rider->duty_started_at)->toIso8601String(),
-            'open_deliveries' => (int) $openDeliveries,
+            'open_deliveries' => $openBills->count(),
+            'deliveries' => $deliveries,
             'khata_owed' => (float) $rider->openCashBills()->sum('total_amount'),
             'last_located_at' => optional($rider->last_located_at)->toIso8601String(),
         ]);

@@ -2688,13 +2688,47 @@ class PosController extends Controller
                    ...($hasRiderCols ? ['rider_id', 'rider_settlement_id'] : []),
                    ...($hasBizDate ? ['business_date'] : [])]);
 
+        // ─── FINAL delivery bills still OPEN (owner bug report, 3 Aug 2026) ───
+        // Ginti ka farq: sale-screen Pending Deliveries popup sirf provisionals
+        // ginta tha jabke rider app / rider khata FINAL delivery bills bhi
+        // ginte hain (popup 1 vs khata 2). Yahan wohi final bills add hote hain
+        // jo abhi deliver nahi hue, ya deliver ho kar bhi cash rider ke khaate
+        // par hai. Display + delivered-mark/settle ONLY — promote (Final
+        // Cash/Card) in par KABHI nahi chalta (bill pehle se final hai).
+        $finalBills = collect();
+        $hasDelStatus = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'delivery_status');
+        if ($hasRiderCols && $hasDelStatus) {
+            $finalBills = PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->where('status', 'completed')
+                ->whereNotNull('rider_id')
+                // NOT a provisional (local+local triple = provisional definition).
+                ->whereNot(function ($q) {
+                    $q->where('invoice_mode', 'local')->where('pra_status', 'local');
+                })
+                ->where(function ($q) {
+                    // Abhi raste mein…
+                    $q->whereIn('delivery_status', ['assigned', 'dispatched'])
+                        // …ya deliver ho gaya par cash abhi rider ke paas.
+                        ->orWhere(function ($q2) {
+                            $q2->where('delivery_status', 'delivered')
+                               ->where('payment_method', 'cash')
+                               ->whereNull('rider_settlement_id');
+                        });
+                })
+                ->orderBy('id', 'desc')
+                ->limit(50)
+                ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'order_type', 'delivery_address', 'total_amount', 'payment_method', 'created_at', 'rider_id', 'rider_settlement_id', 'delivery_status',
+                       ...($hasBizDate ? ['business_date'] : [])]);
+        }
+
         // Rider names — one batch lookup for the Pending Deliveries panel (rider
         // warning: "bill Asgar ke khaate mein hai"). Riders NEVER touch
         // invoice_mode/serials; this is display-only context.
         $riderNames = [];
         $riderOpen = []; // rider_id => ['count' => n, 'amount' => rs] — WHOLE khata
         if ($hasRiderCols && \Illuminate\Support\Facades\Schema::hasTable('pos_riders')) {
-            $riderIds = $bills->pluck('rider_id')->filter()->unique();
+            $riderIds = $bills->pluck('rider_id')->merge($finalBills->pluck('rider_id'))->filter()->unique();
             if ($riderIds->isNotEmpty()) {
                 $riderNames = \DB::table('pos_riders')
                     ->where('company_id', $companyId)
@@ -2755,10 +2789,39 @@ class PosController extends Controller
             ];
         });
 
+        // Open FINAL delivery bills — same shape as provisionals + is_final flag
+        // + delivery_status (panel inhe alag actions deta hai: Delivered mark /
+        // khata settle; Final Cash/Card buttons in par render hi nahi hote).
+        $finalData = $finalBills->map(function ($b) use ($hasBizDate, $riderNames, $riderOpen) {
+            return [
+                'id'               => $b->id,
+                'is_final'         => true,
+                'invoice_number'   => $b->invoice_number,
+                'customer_name'    => $b->customer_name,
+                'customer_phone'   => $b->customer_phone,
+                'order_type'       => $b->order_type,
+                'delivery_address' => $b->delivery_address,
+                'total_amount'     => (float) $b->total_amount,
+                'payment_method'   => $b->payment_method,
+                'items_count'      => PosTransactionItem::where('transaction_id', $b->id)->count(),
+                'created_human'    => $b->created_at?->diffForHumans(),
+                'created_time'     => $b->created_at?->format('h:i A'),
+                'business_date'    => $hasBizDate ? ($b->business_date ? (string) $b->business_date : null) : null,
+                'delivery_status'  => $b->delivery_status,
+                'rider_id'         => $b->rider_id ? (int) $b->rider_id : null,
+                'rider_name'       => $b->rider_id ? ($riderNames[$b->rider_id] ?? null) : null,
+                // Cash bill jo rider ke khaate par hai (card bills khata par nahi hote).
+                'rider_unsettled'  => (bool) ($b->rider_id && empty($b->rider_settlement_id) && $b->payment_method === 'cash' && $b->delivery_status !== 'returned'),
+                'rider_open_count' => $b->rider_id ? ($riderOpen[$b->rider_id]['count'] ?? 0) : 0,
+                'rider_open_amount'=> $b->rider_id ? ($riderOpen[$b->rider_id]['amount'] ?? 0) : 0,
+            ];
+        });
+
         return response()->json([
             'success' => true,
             'count'   => $data->count(),
             'bills'   => $data,
+            'final_deliveries' => $finalData,
             // Current business day (00:00–05:59 counts in yesterday) — the
             // Pending Deliveries badge filters bills to THIS date client-side.
             'business_today' => $hasBizDate ? \App\Services\PosBusinessDay::current($companyId) : null,

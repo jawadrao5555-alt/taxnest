@@ -7481,18 +7481,60 @@ class PosController extends Controller
         // reconciliation's opening float for this date.
         $dayOpening = \App\Models\PosDayOpening::forDate($companyId, $date);
 
-        // Day-close warning (ZFC 28 Jul 2026): open held orders / occupied tables
-        // must be surfaced BEFORE closing — otherwise they dangle into tomorrow.
-        $openOrders = \App\Models\RestaurantOrder::where('company_id', $companyId)
-            ->whereIn('status', ['held', 'preparing', 'ready'])
-            ->count();
-        $occupiedTables = \App\Models\RestaurantOrder::where('company_id', $companyId)
-            ->whereIn('status', ['held', 'preparing', 'ready'])
-            ->whereNotNull('table_id')
-            ->distinct('table_id')
-            ->count('table_id');
+        // Day-close warning (ZFC 28 Jul 2026, detailed 3 Aug 2026): open held
+        // orders / occupied tables must be surfaced BEFORE closing — otherwise
+        // they dangle into tomorrow (ZFC: 5 tables sat occupied for 2 days and
+        // nobody noticed). Shows table numbers + amounts, restaurant-mode only.
+        $openHeld = $this->openHeldOrdersSummary($companyId, $company);
+        $openOrders = $openHeld->count;
+        $occupiedTables = $openHeld->tables;
 
-        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables'));
+        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld'));
+    }
+
+    /**
+     * Open held-order summary for day-close warnings (ZFC 3 Aug 2026): how many
+     * orders are still un-settled, which table numbers, and how much money is
+     * sitting on them. Restaurant-mode companies only (plan-allowed + toggled on);
+     * everyone else gets a zeroed summary so the warning block never renders.
+     * Purely informational — day-close is NEVER blocked by open orders.
+     */
+    private function openHeldOrdersSummary(int $companyId, ?Company $company): object
+    {
+        $empty = (object) ['count' => 0, 'tables' => 0, 'tableNumbers' => '', 'amount' => 0.0, 'noTableCount' => 0];
+        $restaurantEnabled = $company
+            && \App\Services\PosFeatureService::restaurantAllowed($company)
+            && (bool) ($company->restaurant_mode ?? false);
+        if (! $restaurantEnabled || ! \Schema::hasTable('restaurant_orders')) {
+            return $empty;
+        }
+
+        // Same "open" definition as the TABLE board: held/preparing/ready —
+        // anything not completed/cancelled. Item-less shells (created then
+        // abandoned before adding anything) carry no money and no KOT — skip.
+        $orders = \App\Models\RestaurantOrder::where('company_id', $companyId)
+            ->whereIn('status', ['held', 'preparing', 'ready'])
+            ->whereHas('items')
+            ->with('table:id,table_number')
+            ->get(['id', 'table_id', 'total_amount']);
+
+        if ($orders->isEmpty()) {
+            return $empty;
+        }
+
+        $tableNumbers = $orders->filter(fn ($o) => $o->table)
+            ->map(fn ($o) => $o->table->table_number)
+            ->unique()
+            ->sort(SORT_NATURAL)
+            ->values();
+
+        return (object) [
+            'count' => $orders->count(),
+            'tables' => $tableNumbers->count(),
+            'tableNumbers' => $tableNumbers->implode(', '),
+            'amount' => (float) $orders->sum('total_amount'),
+            'noTableCount' => $orders->whereNull('table_id')->count(),
+        ];
     }
 
     public function closeDayReport(Request $request)
@@ -8527,6 +8569,28 @@ class PosController extends Controller
                     'deleted_final_count' => $deletedByKind['final_local'],
                     'deleted_provisional_count' => $deletedByKind['provisional'],
                 ])->save();
+            }
+
+            // Open held orders AT close time (ZFC 3 Aug 2026): stamped on the
+            // report so both close paths surface them — manual close sees the
+            // live warning on the page, the user-less AUTO close leaves this
+            // durable record ("din band hua magar X tables khule the") on the
+            // Z-report view. Informational only — the close never touches or
+            // blocks on held orders. try/catch: reporting must never fail a close.
+            try {
+                $heldAtClose = $this->openHeldOrdersSummary($companyId, Company::find($companyId));
+                if ($heldAtClose->count > 0) {
+                    // key is 'orders' (not 'count') — the day-close view gates the
+                    // wash section on sum('count') across local_summary entries.
+                    $localSummary['open_orders_at_close'] = [
+                        'orders' => $heldAtClose->count,
+                        'tables' => $heldAtClose->tables,
+                        'table_numbers' => $heldAtClose->tableNumbers,
+                        'amount' => $heldAtClose->amount,
+                    ];
+                }
+            } catch (\Throwable $e) {
+                // never fail the close over the informational summary
             }
 
             // Comprehensive wash detail for the Z-report view/PDF. try/catch: the

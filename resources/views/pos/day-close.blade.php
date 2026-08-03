@@ -545,8 +545,18 @@
             <div class="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-400 dark:border-amber-700">
                 <div class="text-sm">
                     <span class="font-bold text-amber-800 dark:text-amber-300">{{ __('pos.open_orders_warning', ['count' => $openOrders]) }}{{ ($occupiedTables ?? 0) > 0 ? ' — ' . __('pos.n_tables_occupied', ['count' => $occupiedTables]) : '' }}</span>
+                    @if(!empty($openHeld->tableNumbers ?? ''))
+                    {{-- ZFC 3 Aug 2026: WHICH tables and HOW MUCH — 5 tables sat
+                         occupied for 2 days because nobody could see the detail. --}}
+                    <p class="text-xs font-semibold text-amber-800 dark:text-amber-300 mt-1">
+                        {{ __('pos.dc_open_tables_list', ['tables' => $openHeld->tableNumbers]) }} — {{ __('pos.dc_open_orders_amount', ['amount' => number_format($openHeld->amount ?? 0)]) }}@if(($openHeld->noTableCount ?? 0) > 0) ({{ __('pos.dc_open_no_table', ['count' => $openHeld->noTableCount]) }})@endif
+                    </p>
+                    @elseif(($openHeld->amount ?? 0) > 0)
+                    <p class="text-xs font-semibold text-amber-800 dark:text-amber-300 mt-1">{{ __('pos.dc_open_orders_amount', ['amount' => number_format($openHeld->amount)]) }}</p>
+                    @endif
                     <p class="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
                         {{ __('pos.settle_held_before_close') }}
+                        <a href="{{ route('pos.invoice.create') }}" class="underline font-semibold">{{ __('pos.dc_open_table_board') }}</a>
                     </p>
                 </div>
             </div>
@@ -570,6 +580,21 @@
     {{-- After close: what the wash actually did (stored on the report). OUTSIDE the
          sales gate above — a day closed with ONLY backlog local bills has zero PRA
          sales, yet its wash summary must still show. --}}
+    {{-- ZFC 3 Aug 2026: open held orders stamped AT close time — the user-less
+         AUTO close has no live warning, so the Z-report carries the record.
+         Rendered from the stored snapshot, not live data (a table settled after
+         the close should not erase what the close saw). --}}
+    @php $oatc = ($existingReport && is_array($existingReport->local_summary)) ? ($existingReport->local_summary['open_orders_at_close'] ?? null) : null; @endphp
+    @if(is_array($oatc) && ($oatc['orders'] ?? 0) > 0)
+    <div class="mb-6 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-400 dark:border-amber-700">
+        <span class="text-sm font-bold text-amber-800 dark:text-amber-300">{{ __('pos.dc_closed_with_open_orders', ['count' => $oatc['orders'], 'amount' => number_format($oatc['amount'] ?? 0)]) }}</span>
+        @if(!empty($oatc['table_numbers']))
+        <p class="text-xs font-semibold text-amber-800 dark:text-amber-300 mt-1">{{ __('pos.dc_open_tables_list', ['tables' => $oatc['table_numbers']]) }}</p>
+        @endif
+        <p class="text-xs text-amber-700 dark:text-amber-400 mt-0.5">{{ __('pos.dc_closed_open_orders_hint') }} <a href="{{ route('pos.invoice.create') }}" class="underline font-semibold">{{ __('pos.dc_open_table_board') }}</a></p>
+    </div>
+    @endif
+
     @if($existingReport && is_array($existingReport->local_summary) && (collect($existingReport->local_summary)->sum('count') > 0 || collect($existingReport->local_summary)->sum('finalized') > 0))
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <h3 class="font-semibold text-gray-900 dark:text-white mb-4">{{ __('pos.local_bills_closed_with_day') }}</h3>

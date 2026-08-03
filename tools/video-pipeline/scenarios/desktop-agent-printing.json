@@ -3,30 +3,93 @@
   "baseUrl": "https://127.0.0.1:5443",
   "title": "Desktop Agent — Silent Printing",
   "scenes": [
-    { "id": "s01_intro", "card": { "heading": "Silent Printing", "sub": "Receipt seedha printer par — apne aap" }, "minMs": 5000 },
+    {
+      "id": "s01_intro",
+      "card": {
+        "heading": "Silent Printing",
+        "sub": "Receipt seedha printer par — apne aap"
+      },
+      "minMs": 5000,
+      "narration": "अस्सलामु अलैकुम, चाहते हैं कि بِل बनते ही رَسِید खुद प्रिंट हो जाए, बिना किसी पॉपअप, बिना किसी क्लिक के, इसके लिए है Nest POS Desktop Agent."
+    },
     {
       "id": "s02_download",
       "actions": [
-        { "do": "goto", "url": "/pos/login" },
-        { "do": "wait", "ms": 900 },
-        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 40 },
-        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
-        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
-        { "do": "waitFor", "selector": ".prod-card" },
-        { "do": "goto", "url": "/pos/agent" },
-        { "do": "wait", "ms": 1200 },
-        { "do": "highlight", "selector": "a[href*='agent/download']", "after": 1600 }
-      ]
+        {
+          "do": "goto",
+          "url": "/pos/login"
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "type",
+          "selector": "#login",
+          "text": "videodemo@nestpos.pk",
+          "delay": 40
+        },
+        {
+          "do": "type",
+          "selector": "#password",
+          "text": "NestPOS@Demo1",
+          "delay": 40
+        },
+        {
+          "do": "click",
+          "selector": "button[type=submit]",
+          "after": 1500
+        },
+        {
+          "do": "waitFor",
+          "selector": ".prod-card"
+        },
+        {
+          "do": "goto",
+          "url": "/pos/agent"
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "highlight",
+          "selector": "a[href*='agent/download']",
+          "after": 1600
+        }
+      ],
+      "narration": "प्रोफ़ाइल मेन्यू से एजेंट का पेज खोलें यहाँ से विंडोज़ के लिए डेस्कटॉप एजेंट डाउनलोड करें"
     },
     {
       "id": "s03_setup",
       "actions": [
-        { "do": "eval", "js": "window.scrollBy({top: 420, behavior: 'smooth'})" },
-        { "do": "wait", "ms": 1600 },
-        { "do": "eval", "js": "window.scrollBy({top: 420, behavior: 'smooth'})" },
-        { "do": "wait", "ms": 1600 }
-      ]
+        {
+          "do": "eval",
+          "js": "window.scrollBy({top: 420, behavior: 'smooth'})"
+        },
+        {
+          "do": "wait",
+          "ms": 1600
+        },
+        {
+          "do": "eval",
+          "js": "window.scrollBy({top: 420, behavior: 'smooth'})"
+        },
+        {
+          "do": "wait",
+          "ms": 1600
+        }
+      ],
+      "narration": "इंस्टॉल करें, एजेंट खुद आपकी दुकान से जुड़ जाता है, प्रिंटर चुनें और बस, अब हर رَسِید अपने आप चुपचाप प्रिंट होती है"
     },
-    { "id": "s04_outro", "card": { "heading": "Ek dafa setup — hamesha aaram", "sub": "Receipt bhi, KOT bhi — apne aap" }, "minMs": 5000 }
+    {
+      "id": "s04_outro",
+      "card": {
+        "heading": "Ek dafa setup — hamesha aaram",
+        "sub": "Receipt bhi, KOT bhi — apne aap"
+      },
+      "minMs": 5000,
+      "narration": "रेस्टोरेंट में के ऑर्डर भी सीधा किचन के प्रिंटर पर जाता है एक बार सेटअप हमेशा का आराम नेस्ट पीओएस आसान भी, तेज भी"
+    }
   ]
 }

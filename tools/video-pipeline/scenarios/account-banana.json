@@ -5,70 +5,169 @@
   "scenes": [
     {
       "id": "s01_intro",
-      "card": { "heading": "Account Banayen", "sub": "taxnest.com.pk · 2 minute · bilkul muft" },
-      "minMs": 5000
+      "card": {
+        "heading": "Account Banayen",
+        "sub": "taxnest.com.pk · 2 minute · bilkul muft"
+      },
+      "minMs": 5000,
+      "narration": "السلام علیکم، نیسٹ پی او ایس میں خوش آمدید، آج ہم سیکھیں گے کہ اپنی دکان کا اکاؤنٹ کیسے بنتا ہے صرف دو منٹ میں بالکل مفت"
     },
     {
       "id": "s02_open",
       "actions": [
-        { "do": "goto", "url": "/pos/register" },
-        { "do": "wait", "ms": 1000 },
-        { "do": "waitFor", "selector": "#company_name" },
-        { "do": "wait", "ms": 800 }
-      ]
+        {
+          "do": "goto",
+          "url": "/pos/register"
+        },
+        {
+          "do": "wait",
+          "ms": 1000
+        },
+        {
+          "do": "waitFor",
+          "selector": "#company_name"
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        }
+      ],
+      "narration": "ब्राउज़र में टैक्सनेस डॉट कॉम डॉट पीके खोलकर नेस्ट पीओएस का पेज खोलें और मुफ़्त ट्रायल का बटन दबाएं यह रजिस्ट्रेशन फॉर्म खुल जाएगा"
     },
     {
       "id": "s03_plan",
       "actions": [
-        { "do": "highlight", "selector": "form .grid.grid-cols-2", "after": 1200 },
-        { "do": "click", "selector": "form .grid.grid-cols-2 label:nth-child(2)", "after": 1200 },
-        { "do": "wait", "ms": 600 }
-      ]
+        {
+          "do": "highlight",
+          "selector": "form .grid.grid-cols-2",
+          "after": 1200
+        },
+        {
+          "do": "click",
+          "selector": "form .grid.grid-cols-2 label:nth-child(2)",
+          "after": 1200
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        }
+      ],
+      "narration": "सबसे पहले अपना पैकेज चुनें। हर पैकेज में टीम अकाउंट्स और बिल्स की गिनती अलग है। घबराएं नहीं, शुरुआत हमेशा मुफ़्त ट्रायल से होती है।"
     },
     {
       "id": "s04_biztype",
       "actions": [
-        { "do": "highlight", "selector": "form .grid.grid-cols-5", "after": 1200 },
-        { "do": "click", "selector": "form .grid.grid-cols-5 label:nth-child(1)", "after": 1000 },
-        { "do": "wait", "ms": 600 }
-      ]
+        {
+          "do": "highlight",
+          "selector": "form .grid.grid-cols-5",
+          "after": 1200
+        },
+        {
+          "do": "click",
+          "selector": "form .grid.grid-cols-5 label:nth-child(1)",
+          "after": 1000
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        }
+      ],
+      "narration": "अब अपने कारोबार की क़िस्म चुनें। जनरल स्टोर, रेस्टोरेंट, फार्मेसी जो भी आपका बिजनेस है, हम जनरल स्टोर चुनते हैं।"
     },
     {
       "id": "s05_shop",
       "actions": [
-        { "do": "type", "selector": "#company_name", "text": "Al-Noor General Store", "delay": 60 },
-        { "do": "wait", "ms": 500 },
-        { "do": "highlight", "selector": "#company_ntn", "after": 1100 }
-      ]
+        {
+          "do": "type",
+          "selector": "#company_name",
+          "text": "Al-Noor General Store",
+          "delay": 60
+        },
+        {
+          "do": "wait",
+          "ms": 500
+        },
+        {
+          "do": "highlight",
+          "selector": "#company_ntn",
+          "after": 1100
+        }
+      ],
+      "narration": "अब अपनी दुकान का नाम लिखें एनटीएन नंबर ऑप्शनल है अगर अभी नहीं है तो खाली छोड़ दें बाद में कभी भी ऐड हो सकता है"
     },
     {
       "id": "s06_admin",
       "actions": [
-        { "do": "type", "selector": "#name", "text": "Mohammad Rasheed", "delay": 55 },
-        { "do": "type", "selector": "#email", "text": "rasheed.alnoor@gmail.com", "delay": 45 },
-        { "do": "type", "selector": "#phone", "text": "03001234567", "delay": 55 }
-      ]
+        {
+          "do": "type",
+          "selector": "#name",
+          "text": "Mohammad Rasheed",
+          "delay": 55
+        },
+        {
+          "do": "type",
+          "selector": "#email",
+          "text": "rasheed.alnoor@gmail.com",
+          "delay": 45
+        },
+        {
+          "do": "type",
+          "selector": "#phone",
+          "text": "03001234567",
+          "delay": 55
+        }
+      ],
+      "narration": "फिर अपना नाम, ईमेल एड्रेस और मोबाइल नंबर लिखें, यही आपका एडमिन लॉगिन बनेगा।"
     },
     {
       "id": "s07_pass",
       "actions": [
-        { "do": "type", "selector": "#password", "text": "AlNoor@2026", "delay": 60 },
-        { "do": "type", "selector": "#password_confirmation", "text": "AlNoor@2026", "delay": 60 },
-        { "do": "wait", "ms": 500 }
-      ]
+        {
+          "do": "type",
+          "selector": "#password",
+          "text": "AlNoor@2026",
+          "delay": 60
+        },
+        {
+          "do": "type",
+          "selector": "#password_confirmation",
+          "text": "AlNoor@2026",
+          "delay": 60
+        },
+        {
+          "do": "wait",
+          "ms": 500
+        }
+      ],
+      "narration": "अब कम से कम आठ हर्फों का पासवर्ड रखें और नीचे दोबारा लिखकर कन्फर्म करें। पासवर्ड ऐसा रखें जो याद रहे, मगर मुश्किल हो।"
     },
     {
       "id": "s08_submit",
       "actions": [
-        { "do": "eval", "js": "document.querySelector('button[type=submit]').scrollIntoView({behavior:'smooth',block:'center'})" },
-        { "do": "wait", "ms": 900 },
-        { "do": "highlight", "selector": "button[type=submit]", "after": 1600 }
-      ]
+        {
+          "do": "eval",
+          "js": "document.querySelector('button[type=submit]').scrollIntoView({behavior:'smooth',block:'center'})"
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "highlight",
+          "selector": "button[type=submit]",
+          "after": 1600
+        }
+      ],
+      "narration": "बस अब रजिस्टर का बटन दबाएँ, आपका अकाउंट बन जाएगा और हमारी टीम उसे जल्दी मंज़ूर कर देगी। सूचना आपको ईमेल पर मिल जाएगी।"
     },
     {
       "id": "s09_outro",
-      "card": { "heading": "Mubarak ho!", "sub": "Account tayyar — ab pehla bill banayen" },
-      "minMs": 5000
+      "card": {
+        "heading": "Mubarak ho!",
+        "sub": "Account tayyar — ab pehla bill banayen"
+      },
+      "minMs": 5000,
+      "narration": "तो यह था अकाउंट बनाने का आसान तरीका। अगली वीडियो में सीखेंगे, पहला بِل कैसे बनता है Nest POS, आसान भी, तेज़ भी।"
     }
   ]
 }

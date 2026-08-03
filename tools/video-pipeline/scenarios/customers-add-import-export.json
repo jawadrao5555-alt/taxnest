@@ -5,53 +5,140 @@
   "scenes": [
     {
       "id": "s01_intro",
-      "card": { "heading": "Customers", "sub": "Add · Import · Export" },
-      "minMs": 5000
+      "card": {
+        "heading": "Customers",
+        "sub": "Add · Import · Export"
+      },
+      "minMs": 5000,
+      "narration": "अस्सलामू अलैकुम, आज हम कस्टमर सीखेंगे, नया कस्टमर ऐड करना, एक्सेल से पूरी लिस्ट इम्पोर्ट करना और अपनी लिस्ट एक्सपोर्ट करना।"
     },
     {
       "id": "s02_open",
       "actions": [
-        { "do": "goto", "url": "/pos/login" },
-        { "do": "wait", "ms": 900 },
-        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 45 },
-        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 45 },
-        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
-        { "do": "waitFor", "selector": ".prod-card" },
-        { "do": "goto", "url": "/pos/customers" },
-        { "do": "waitFor", "selector": "#custSearchInput" },
-        { "do": "wait", "ms": 1000 }
-      ]
+        {
+          "do": "goto",
+          "url": "/pos/login"
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "type",
+          "selector": "#login",
+          "text": "videodemo@nestpos.pk",
+          "delay": 45
+        },
+        {
+          "do": "type",
+          "selector": "#password",
+          "text": "NestPOS@Demo1",
+          "delay": 45
+        },
+        {
+          "do": "click",
+          "selector": "button[type=submit]",
+          "after": 1500
+        },
+        {
+          "do": "waitFor",
+          "selector": ".prod-card"
+        },
+        {
+          "do": "goto",
+          "url": "/pos/customers"
+        },
+        {
+          "do": "waitFor",
+          "selector": "#custSearchInput"
+        },
+        {
+          "do": "wait",
+          "ms": 1000
+        }
+      ],
+      "narration": "सबसे पहले लॉगिन करें, फिर मेन्यू से कस्टमर्स का पेज खोलें, यहाँ आपके सारे कस्टमर्स की लिस्ट होती है, नाम, मोबाइल नंबर सब कुछ"
     },
     {
       "id": "s03_add",
       "actions": [
-        { "do": "click", "selector": "button[onclick*='addCustomerForm']", "after": 900 },
-        { "do": "type", "selector": "#addCustomerForm input[name='name']", "text": "Bashir Ahmed", "delay": 60 },
-        { "do": "type", "selector": "#addCustomerForm input[name='phone']", "text": "03214567890", "delay": 55 },
-        { "do": "click", "selector": "#addCustomerForm button[type=submit]", "after": 1600 },
-        { "do": "waitFor", "selector": "#custSearchInput" },
-        { "do": "wait", "ms": 900 }
-      ]
+        {
+          "do": "click",
+          "selector": "button[onclick*='addCustomerForm']",
+          "after": 900
+        },
+        {
+          "do": "type",
+          "selector": "#addCustomerForm input[name='name']",
+          "text": "Bashir Ahmed",
+          "delay": 60
+        },
+        {
+          "do": "type",
+          "selector": "#addCustomerForm input[name='phone']",
+          "text": "03214567890",
+          "delay": 55
+        },
+        {
+          "do": "click",
+          "selector": "#addCustomerForm button[type=submit]",
+          "after": 1600
+        },
+        {
+          "do": "waitFor",
+          "selector": "#custSearchInput"
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        }
+      ],
+      "narration": "नया कस्टमर एड करने के लिए एड कस्टमर दबाएँ, नाम लिखें, मोबाइल नंबर डालें और सेव कर दें. देखें, कस्टमर लिस्ट में आ गया."
     },
     {
       "id": "s04_import",
       "actions": [
-        { "do": "click", "selector": "button[onclick*='importCustomerForm']", "after": 900 },
-        { "do": "highlight", "selector": "#importCustomerForm a[href*='template']", "after": 1400 },
-        { "do": "highlight", "selector": "#importCustomerForm button[type=submit]", "after": 1200 }
-      ]
+        {
+          "do": "click",
+          "selector": "button[onclick*='importCustomerForm']",
+          "after": 900
+        },
+        {
+          "do": "highlight",
+          "selector": "#importCustomerForm a[href*='template']",
+          "after": 1400
+        },
+        {
+          "do": "highlight",
+          "selector": "#importCustomerForm button[type=submit]",
+          "after": 1200
+        }
+      ],
+      "narration": "पुराने कस्टमर्स बहुत सारे हैं, एक-एक करके लिखने की ज़रूरत नहीं, इंपोर्ट दबाएँ, पहले टेम्पलेट डाउनलोड करें, उसमें नाम और नंबर भरें, फिर वही फाइल अपलोड कर दें, सैकड़ों कस्टमर्स एक साथ आ जाते हैं।"
     },
     {
       "id": "s05_export",
       "actions": [
-        { "do": "highlight", "selector": "a[href*='customers/export']", "after": 1600 },
-        { "do": "wait", "ms": 800 }
-      ]
+        {
+          "do": "highlight",
+          "selector": "a[href*='customers/export']",
+          "after": 1600
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        }
+      ],
+      "narration": "और पूरी लिस्ट एक्सेल में चाहिए, बैकअप या हिसाब के लिए। एक्सपोर्ट का बटन दबाएँ, पूरी लिस्ट फौरन डाउनलोड हो जाती है।"
     },
     {
       "id": "s06_outro",
-      "card": { "heading": "Customers tayyar!", "sub": "Har bill par khata apne aap" },
-      "minMs": 5000
+      "card": {
+        "heading": "Customers tayyar!",
+        "sub": "Har bill par khata apne aap"
+      },
+      "minMs": 5000,
+      "narration": "अब हर بِل पर कस्टमर चुनें, उसकी खरीदारी की हिस्ट्री और खाता अपने आप बनता जाएगा। नेक्स्ट पॉस आसान भी, तेज़ भी।"
     }
   ]
 }

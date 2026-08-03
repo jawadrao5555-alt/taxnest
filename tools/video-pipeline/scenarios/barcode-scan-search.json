@@ -3,41 +3,132 @@
   "baseUrl": "https://127.0.0.1:5443",
   "title": "Barcode Scan aur Search",
   "scenes": [
-    { "id": "s01_intro", "card": { "heading": "Barcode Scan / Search", "sub": "Item foran cart mein" }, "minMs": 4500 },
+    {
+      "id": "s01_intro",
+      "card": {
+        "heading": "Barcode Scan / Search",
+        "sub": "Item foran cart mein"
+      },
+      "minMs": 4500,
+      "narration": "अस्सलामु अलैकुम, दुकान पर हज़ारों आइटम्स हों तो ढूंढेंगे कैसे? इसके लिए है बारकोड स्कैनर और तेज़ सर्च, आइए देखें"
+    },
     {
       "id": "s02_search",
       "actions": [
-        { "do": "goto", "url": "/pos/login" },
-        { "do": "wait", "ms": 900 },
-        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 40 },
-        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
-        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
-        { "do": "waitFor", "selector": ".prod-card" },
-        { "do": "highlight", "selector": "[x-ref='searchInput']", "after": 1400 }
-      ]
+        {
+          "do": "goto",
+          "url": "/pos/login"
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "type",
+          "selector": "#login",
+          "text": "videodemo@nestpos.pk",
+          "delay": 40
+        },
+        {
+          "do": "type",
+          "selector": "#password",
+          "text": "NestPOS@Demo1",
+          "delay": 40
+        },
+        {
+          "do": "click",
+          "selector": "button[type=submit]",
+          "after": 1500
+        },
+        {
+          "do": "waitFor",
+          "selector": ".prod-card"
+        },
+        {
+          "do": "highlight",
+          "selector": "[x-ref='searchInput']",
+          "after": 1400
+        }
+      ],
+      "narration": "सेल्स اسکرین पर सबसे ऊपर सर्च का खाना है, यहीं से आइटम ढूंढते हैं और यहीं स्कैनर भी काम करता है"
     },
     {
       "id": "s03_type",
       "actions": [
-        { "do": "type", "selector": "[x-ref='searchInput']", "text": "Chawal", "delay": 90 },
-        { "do": "wait", "ms": 1100 },
-        { "do": "press", "selector": "[x-ref='searchInput']", "key": "Enter" },
-        { "do": "wait", "ms": 1300 }
-      ]
+        {
+          "do": "type",
+          "selector": "[x-ref='searchInput']",
+          "text": "Chawal",
+          "delay": 90
+        },
+        {
+          "do": "wait",
+          "ms": 1100
+        },
+        {
+          "do": "press",
+          "selector": "[x-ref='searchInput']",
+          "key": "Enter"
+        },
+        {
+          "do": "wait",
+          "ms": 1300
+        }
+      ],
+      "narration": "आइटम का नाम या कोड लिखें, फ़ौरन लिस्ट आ जाती है। एंटर दबाएँ, आइटम कार्ट में"
     },
     {
       "id": "s04_scanner",
       "actions": [
-        { "do": "type", "selector": "[x-ref='searchInput']", "text": "Chawal", "delay": 30 },
-        { "do": "wait", "ms": 400 },
-        { "do": "press", "selector": "[x-ref='searchInput']", "key": "Enter" },
-        { "do": "wait", "ms": 900 },
-        { "do": "type", "selector": "[x-ref='searchInput']", "text": "Chawal", "delay": 30 },
-        { "do": "wait", "ms": 400 },
-        { "do": "press", "selector": "[x-ref='searchInput']", "key": "Enter" },
-        { "do": "wait", "ms": 1100 }
-      ]
+        {
+          "do": "type",
+          "selector": "[x-ref='searchInput']",
+          "text": "Chawal",
+          "delay": 30
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "press",
+          "selector": "[x-ref='searchInput']",
+          "key": "Enter"
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "type",
+          "selector": "[x-ref='searchInput']",
+          "text": "Chawal",
+          "delay": 30
+        },
+        {
+          "do": "wait",
+          "ms": 400
+        },
+        {
+          "do": "press",
+          "selector": "[x-ref='searchInput']",
+          "key": "Enter"
+        },
+        {
+          "do": "wait",
+          "ms": 1100
+        }
+      ],
+      "narration": "और अगर बारकोड स्कैनर लगा है तो बस स्कैन करें, आइटम खुद कार्ट में आ जाता है। न क्लिक, न टाइपिंग, स्कैन, स्कैन, स्कैन, بِل तैयार।"
     },
-    { "id": "s05_outro", "card": { "heading": "Scan, scan, scan — bill tayyar", "sub": "Hazaron items, seconds mein" }, "minMs": 5000 }
+    {
+      "id": "s05_outro",
+      "card": {
+        "heading": "Scan, scan, scan — bill tayyar",
+        "sub": "Hazaron items, seconds mein"
+      },
+      "minMs": 5000,
+      "narration": "स्कैनर हो या सर्च, بِل सेकंडों में बनता है। नेस्ट पीओएस आसान भी, तेज़ भी।"
+    }
   ]
 }

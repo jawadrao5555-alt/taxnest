@@ -3,38 +3,114 @@
   "baseUrl": "https://127.0.0.1:5443",
   "title": "Bills ki History — Search aur Reprint",
   "scenes": [
-    { "id": "s01_intro", "card": { "heading": "Bills ki History", "sub": "Purane bill — search · receipt · record" }, "minMs": 4500 },
+    {
+      "id": "s01_intro",
+      "card": {
+        "heading": "Bills ki History",
+        "sub": "Purane bill — search · receipt · record"
+      },
+      "minMs": 4500,
+      "narration": "السلام علیکم ہر دکاندار کا سوال کل والا بِل کہاں گیا؟ آئیے دیکھیں بلز کی پوری ہسٹری"
+    },
     {
       "id": "s02_open",
       "actions": [
-        { "do": "goto", "url": "/pos/login" },
-        { "do": "wait", "ms": 900 },
-        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 40 },
-        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
-        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
-        { "do": "waitFor", "selector": ".prod-card" },
-        { "do": "goto", "url": "/pos/transactions?tab=local" },
-        { "do": "waitFor", "selector": "input[name='search']" },
-        { "do": "wait", "ms": 1200 }
-      ]
+        {
+          "do": "goto",
+          "url": "/pos/login"
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "type",
+          "selector": "#login",
+          "text": "videodemo@nestpos.pk",
+          "delay": 40
+        },
+        {
+          "do": "type",
+          "selector": "#password",
+          "text": "NestPOS@Demo1",
+          "delay": 40
+        },
+        {
+          "do": "click",
+          "selector": "button[type=submit]",
+          "after": 1500
+        },
+        {
+          "do": "waitFor",
+          "selector": ".prod-card"
+        },
+        {
+          "do": "goto",
+          "url": "/pos/transactions?tab=local"
+        },
+        {
+          "do": "waitFor",
+          "selector": "input[name='search']"
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        }
+      ],
+      "narration": "मेन्यू से बिल्स का पेज खोलें, यहाँ हर بِل की लिस्ट है, नंबर, वक़्त, रकम, पेमेंट का तरीका, सब कुछ"
     },
     {
       "id": "s03_search",
       "actions": [
-        { "do": "type", "selector": "input[name='search']", "text": "100", "delay": 110 },
-        { "do": "wait", "ms": 900 },
-        { "do": "press", "selector": "input[name='search']", "key": "Enter" },
-        { "do": "wait", "ms": 1500 }
-      ]
+        {
+          "do": "type",
+          "selector": "input[name='search']",
+          "text": "100",
+          "delay": 110
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "press",
+          "selector": "input[name='search']",
+          "key": "Enter"
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        }
+      ],
+      "narration": "ऊपर सर्च के खाने में بِل नंबर या कस्टमर का नाम लिखें पुराने से पुराना بِل भी सेकंडों में मिल जाता है"
     },
     {
       "id": "s04_receipt",
       "actions": [
-        { "do": "goto", "url": "/pos/transactions?tab=local" },
-        { "do": "wait", "ms": 1000 },
-        { "do": "highlight", "selector": "a[href*='receipt']", "after": 1800 }
-      ]
+        {
+          "do": "goto",
+          "url": "/pos/transactions?tab=local"
+        },
+        {
+          "do": "wait",
+          "ms": 1000
+        },
+        {
+          "do": "highlight",
+          "selector": "a[href*='receipt']",
+          "after": 1800
+        }
+      ],
+      "narration": "किसी भी بِل के सामने रिसीप्ट दबाएं, रिसीप्ट दोबारा खुल जाती है और प्रिंट भी हो सकती है, चाहे महीना पुराना بِل हो"
     },
-    { "id": "s05_outro", "card": { "heading": "Kuch nahi khota", "sub": "Har bill ka poora record" }, "minMs": 4500 }
+    {
+      "id": "s05_outro",
+      "card": {
+        "heading": "Kuch nahi khota",
+        "sub": "Har bill ka poora record"
+      },
+      "minMs": 4500,
+      "narration": "पूरा रिकॉर्ड, हर वक्त आपके पास, कुछ नहीं खोता। نیسٹ پی او ایس, आसान भी तेज़ भी।"
+    }
   ]
 }

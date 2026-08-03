@@ -3,31 +3,99 @@
   "baseUrl": "https://127.0.0.1:5443",
   "title": "NestPOS App Install — Computer aur Mobile",
   "scenes": [
-    { "id": "s01_intro", "card": { "heading": "NestPOS App", "sub": "Computer aur mobile par — ek click install" }, "minMs": 4500 },
+    {
+      "id": "s01_intro",
+      "card": {
+        "heading": "NestPOS App",
+        "sub": "Computer aur mobile par — ek click install"
+      },
+      "minMs": 4500,
+      "narration": "نیسٹ پی او ایس को बार-बार ब्राउज़र में खोलने की ज़रूरत नहीं, इसे ऐप की तरह इंस्टॉल करें एक क्लिक में, आइए देखें"
+    },
     {
       "id": "s02_install",
       "actions": [
-        { "do": "goto", "url": "/pos/login" },
-        { "do": "wait", "ms": 900 },
-        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 40 },
-        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
-        { "do": "click", "selector": "button[type=submit]", "after": 1500 },
-        { "do": "waitFor", "selector": ".prod-card" },
-        { "do": "goto", "url": "/pos/customers" },
-        { "do": "wait", "ms": 1000 },
-        { "do": "eval", "js": "document.querySelectorAll('button').forEach(function(b){ if ((b.getAttribute('@click')||'').indexOf('profileOpen = !profileOpen') !== -1) b.id = 'tnVidProf'; })" },
-        { "do": "click", "selector": "#tnVidProf", "after": 1000 },
-        { "do": "eval", "js": "var els = document.querySelectorAll('a[id^=tnPwaMi]'); for (var i = 0; i < els.length; i++) { if (els[i].offsetParent !== null) { els[i].id = 'tnVidPwa'; break; } }" },
-        { "do": "highlight", "selector": "#tnVidPwa", "after": 1800 }
-      ]
+        {
+          "do": "goto",
+          "url": "/pos/login"
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "type",
+          "selector": "#login",
+          "text": "videodemo@nestpos.pk",
+          "delay": 40
+        },
+        {
+          "do": "type",
+          "selector": "#password",
+          "text": "NestPOS@Demo1",
+          "delay": 40
+        },
+        {
+          "do": "click",
+          "selector": "button[type=submit]",
+          "after": 1500
+        },
+        {
+          "do": "waitFor",
+          "selector": ".prod-card"
+        },
+        {
+          "do": "goto",
+          "url": "/pos/customers"
+        },
+        {
+          "do": "wait",
+          "ms": 1000
+        },
+        {
+          "do": "eval",
+          "js": "document.querySelectorAll('button').forEach(function(b){ if ((b.getAttribute('@click')||'').indexOf('profileOpen = !profileOpen') !== -1) b.id = 'tnVidProf'; })"
+        },
+        {
+          "do": "click",
+          "selector": "#tnVidProf",
+          "after": 1000
+        },
+        {
+          "do": "eval",
+          "js": "var els = document.querySelectorAll('a[id^=tnPwaMi]'); for (var i = 0; i < els.length; i++) { if (els[i].offsetParent !== null) { els[i].id = 'tnVidPwa'; break; } }"
+        },
+        {
+          "do": "highlight",
+          "selector": "#tnVidPwa",
+          "after": 1800
+        }
+      ],
+      "narration": "ऊपर अपने नाम पर क्लिक करें। यहाँ इंस्टॉल ऐप का ऑप्शन है। दबाते ही नेस्ट पीओएस आपके कंप्यूटर पर ऐप बन जाता है। अपना आइकॉन, अपनी अलग विंडो।"
     },
     {
       "id": "s03_mobile",
       "actions": [
-        { "do": "highlight", "selector": "#tnVidPwa", "after": 1500 },
-        { "do": "wait", "ms": 1200 }
-      ]
+        {
+          "do": "highlight",
+          "selector": "#tnVidPwa",
+          "after": 1500
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        }
+      ],
+      "narration": "मोबाइल पर भी यही तरीका है, क्रोम में लॉगइन करें और इंस्टॉल ऐप दबाएँ, पूरी दुकान का नज़्म आपके जेब में"
     },
-    { "id": "s04_outro", "card": { "heading": "App tayyar!", "sub": "Ek click — NestPOS hazir" }, "minMs": 5000 }
+    {
+      "id": "s04_outro",
+      "card": {
+        "heading": "App tayyar!",
+        "sub": "Ek click — NestPOS hazir"
+      },
+      "minMs": 5000,
+      "narration": "ना ब्राउज़र ढूँढना, ना एड्रेस लिखना, बस ऐप खोलें और काम शुरू। नेस्ट पीओएस, आसान भी तेज़ भी।"
+    }
   ]
 }

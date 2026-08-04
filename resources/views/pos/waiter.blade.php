@@ -444,11 +444,19 @@ function waiterApp() {
             // of the name ("f" = Fries…, NOT "Beef Loaded Fries"). Barcode
             // matching only when the query has a digit/symbol.
             const codeSearch = /[^a-z\s]/.test(q);
-            this.filtered = pool.filter(p =>
-                (this.activeCategory === 'all' || p.category === this.activeCategory) &&
-                (!q || p.name.toLowerCase().startsWith(q)
-                    || (codeSearch && p.barcode && String(p.barcode).toLowerCase().includes(q)))
+            const scoped = pool.filter(p => this.activeCategory === 'all' || p.category === this.activeCategory);
+            let hits = scoped.filter(p =>
+                !q || p.name.toLowerCase().startsWith(q)
+                    || (codeSearch && p.barcode && String(p.barcode).toLowerCase().includes(q))
             );
+            // WORD-START FALLBACK (owner, Aug 2026 — Pizza Master: "Win" found nothing
+            // because items are named "5 Piece Hot Wings"): ONLY when strict prefix
+            // yields ZERO results, match the start of any WORD in the name. Still no
+            // mid-word hits, and the 24 Jul prefix rule stays intact whenever it works.
+            if (q && !hits.length) {
+                hits = scoped.filter(p => p.name.toLowerCase().split(/\s+/).some(w => w.startsWith(q)));
+            }
+            this.filtered = hits;
         },
 
         isItemVisible(p) {

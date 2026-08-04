@@ -4756,6 +4756,16 @@ function restaurantPos() {
                             if (other.length < 12) other.push(it);
                         }
                     }
+                    // WORD-START FALLBACK (owner, Aug 2026): if NO name starts with the
+                    // query ("win" vs "5 Piece Hot Wings"), rescan matching the start of
+                    // any WORD in the name — dropdown must never dead-end on real menus.
+                    if (!pref.length && q) {
+                        for (let i = 0; i < all.length && pref.length < 12; i++) {
+                            const it = all[i];
+                            if (!it.name || !(parseFloat(it.price) > 0)) continue;
+                            if (it.name.toLowerCase().split(/\s+/).some(w => w.startsWith(q))) pref.push(it);
+                        }
+                    }
                     const out = [...pref, ...other].slice(0, 12);
                     // (Scanner safety: pool is global now, so an exact barcode/SKU match is
                     // always already in scope — the old category-filter rescue is unnecessary.)
@@ -4877,12 +4887,20 @@ function restaurantPos() {
                 // of the name (mirrors the dropdown matcher); BARCODE/SKU substring matching
                 // only when the query has a digit/symbol (letters-only = name search).
                 const codeSearch = /[^a-z\s]/.test(q);
-                items = items.filter(i => i.name.toLowerCase().startsWith(q)
+                let matches = items.filter(i => i.name.toLowerCase().startsWith(q)
                     || (codeSearch && ((i.barcode && String(i.barcode).toLowerCase().includes(q))
                         || (i.sku && String(i.sku).toLowerCase().includes(q)))));
+                // WORD-START FALLBACK (owner, Aug 2026 — "Win" must find "5 Piece Hot
+                // Wings"; menus often lead with sizes/counts): ONLY when strict prefix
+                // finds NOTHING, match the start of any WORD in the name. No mid-word
+                // hits; the 24 Jul prefix rule is untouched whenever it has results.
+                if (!matches.length) {
+                    matches = items.filter(i => i.name.toLowerCase().split(/\s+/).some(w => w.startsWith(q)));
+                }
                 // Name-prefix matches float above barcode/SKU-only matches; stable sort
                 // keeps the original order within each group.
-                items.sort((a, b) => (b.name.toLowerCase().startsWith(q) ? 1 : 0) - (a.name.toLowerCase().startsWith(q) ? 1 : 0));
+                matches.sort((a, b) => (b.name.toLowerCase().startsWith(q) ? 1 : 0) - (a.name.toLowerCase().startsWith(q) ? 1 : 0));
+                items = matches;
             }
             this.filteredItems = items;
             this.displayCount = 60;

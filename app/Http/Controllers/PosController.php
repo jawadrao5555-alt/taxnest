@@ -8855,6 +8855,9 @@ class PosController extends Controller
      * Attendance report page — ADMIN/MANAGER-ONLY (cashiers & confined roles
      * kabhi staff ki hazri na dekhein). Data = pos_user_sessions (login/logout/
      * last-seen) + us business day ke bills (min/max sale time per user).
+     *
+     * Payroll range summary added Task #280: optional ?date_from=&date_to= params
+     * build a per-staff aggregated total-duty-hours table across the range.
      */
     public function hazriReport(Request $request)
     {
@@ -8899,7 +8902,245 @@ class PosController extends Controller
             }
         }
 
-        return view('pos.reports-hazri', compact('company', 'date', 'rows', 'opening', 'bioPunches', 'hasBioDevices', 'unmappedPinCount'));
+        // ── Payroll range summary (Task #280) ─────────────────────────────
+        $rangeRows    = null;   // array of session-summary stdClass objects, or null = not requested
+        $rangeBioRows = null;   // array of biometric-summary stdClass objects, or null = not requested
+        $dateFrom     = null;
+        $dateTo       = null;
+        $rangeError   = null;
+
+        if ($request->filled('date_from') && $request->filled('date_to')) {
+            try {
+                $dateFrom = \Carbon\Carbon::parse($request->get('date_from'))->toDateString();
+                $dateTo   = \Carbon\Carbon::parse($request->get('date_to'))->toDateString();
+            } catch (\Throwable $e) {
+                $rangeError = __('pos.payroll_range_invalid');
+                $dateFrom = $dateTo = null;
+            }
+
+            if ($dateFrom && $dateTo) {
+                try {
+                    [$rangeRows, $rangeBioRows] = $this->buildHazriRangeSummary($companyId, $dateFrom, $dateTo);
+                } catch (\InvalidArgumentException $e) {
+                    $rangeError = $e->getMessage() === 'range_too_long'
+                        ? __('pos.payroll_range_too_long')
+                        : ($e->getMessage() === 'range_future'
+                            ? __('pos.payroll_range_future')
+                            : __('pos.payroll_range_invalid'));
+                    $dateFrom = $dateTo = null;
+                } catch (\Throwable $e) {
+                    \Log::warning('hazri range summary error: ' . $e->getMessage());
+                    $rangeError = __('pos.payroll_range_invalid');
+                    $dateFrom = $dateTo = null;
+                }
+            }
+        }
+
+        return view('pos.reports-hazri', compact(
+            'company', 'date', 'rows', 'opening', 'bioPunches', 'hasBioDevices', 'unmappedPinCount',
+            'rangeRows', 'rangeBioRows', 'dateFrom', 'dateTo', 'rangeError'
+        ));
+    }
+
+    /**
+     * Payroll PDF export — same gates as hazriReport.
+     * GET /reports/hazri/payroll-pdf?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
+     */
+    public function payrollHazriPdf(Request $request)
+    {
+        if ($r = $this->planGate('hazri_enabled')) {
+            return $r;
+        }
+        $companyId = app('currentCompanyId');
+        $user = auth('pos')->user();
+        if (!$user->isPosAdmin()) {
+            abort(403);
+        }
+        $company = Company::find($companyId);
+
+        $dateFrom = $request->get('date_from');
+        $dateTo   = $request->get('date_to');
+
+        try {
+            $dateFrom = $dateFrom ? \Carbon\Carbon::parse($dateFrom)->toDateString() : null;
+            $dateTo   = $dateTo   ? \Carbon\Carbon::parse($dateTo)->toDateString()   : null;
+        } catch (\Throwable $e) {
+            abort(400, __('pos.payroll_range_invalid'));
+        }
+
+        if (!$dateFrom || !$dateTo) {
+            abort(400, 'Date range required.');
+        }
+
+        try {
+            [$rangeRows, $rangeBioRows] = $this->buildHazriRangeSummary($companyId, $dateFrom, $dateTo);
+        } catch (\InvalidArgumentException $e) {
+            $msg = $e->getMessage() === 'range_too_long'
+                ? __('pos.payroll_range_too_long')
+                : ($e->getMessage() === 'range_future'
+                    ? __('pos.payroll_range_future')
+                    : __('pos.payroll_range_invalid'));
+            abort(400, $msg);
+        }
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView(
+            'pos.reports-hazri-payroll-pdf',
+            compact('company', 'dateFrom', 'dateTo', 'rangeRows', 'rangeBioRows')
+        )->setPaper('a4', 'portrait');
+
+        $filename = 'Payroll-Hazri-' . $dateFrom . '-to-' . $dateTo . '.pdf';
+        return $pdf->download($filename);
+    }
+
+    /**
+     * ── Payroll range summary (Task #280) ──────────────────────────────────
+     * Builds per-staff aggregated duty hours across a date range.
+     *
+     * Strategy: ONE bulk DB query per table (sessions, bills, biometric) for
+     * the whole range, then group by business-day bucket (6 AM boundary) and
+     * user/pin in PHP.  This keeps query count to 3 regardless of range length
+     * (vs N-per-day loop).  The business-day cutoff per day is computed from
+     * the pre-grouped bucket, so PosHazriDutyHours sees the correct cutoff.
+     *
+     * Returns [sessionSummary[], biometricSummary[]]
+     * Throws \InvalidArgumentException('range_too_long' | 'range_future') on bad input.
+     */
+    private function buildHazriRangeSummary(int $companyId, string $from, string $to): array
+    {
+        $start = \Carbon\Carbon::parse($from);
+        $end   = \Carbon\Carbon::parse($to);
+
+        if ($end->lt($start)) {
+            throw new \InvalidArgumentException('range_future');
+        }
+        if ($start->diffInDays($end) > 62) {
+            throw new \InvalidArgumentException('range_too_long');
+        }
+
+        // Bulk window: $from 06:00 → ($to + 1 day) 06:00
+        $rangeStart = \Carbon\Carbon::parse($from, config('app.timezone'))->setTime(6, 0);
+        $rangeEnd   = \Carbon\Carbon::parse($to,   config('app.timezone'))->setTime(6, 0)->addDay();
+
+        // ── 1. Fetch all sessions, bills, and biometric punches in one pass ──
+        $allSessions = collect();
+        if (\Illuminate\Support\Facades\Schema::hasTable('pos_user_sessions')) {
+            $allSessions = \App\Models\PosUserSession::where('company_id', $companyId)
+                ->where('login_at', '>=', $rangeStart)
+                ->where('login_at', '<', $rangeEnd)
+                ->orderBy('login_at')
+                ->get();
+        }
+
+        $allBills = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->whereBetween('business_date', [$from, $to])
+            ->selectRaw('created_by, business_date, COUNT(*) as bill_count, SUM(total_amount) as revenue')
+            ->groupBy('created_by', 'business_date')
+            ->get();
+
+        $allPunches = collect();
+        if (\Illuminate\Support\Facades\Schema::hasTable('pos_biometric_punches')) {
+            $allPunches = \App\Models\PosBiometricPunch::where('company_id', $companyId)
+                ->where('punched_at', '>=', $rangeStart)
+                ->where('punched_at', '<', $rangeEnd)
+                ->orderBy('punched_at')
+                ->get();
+        }
+
+        // ── 2. Pre-fetch all users in a single query ─────────────────────────
+        $allUserIds = $allSessions->pluck('user_id')
+            ->merge($allBills->pluck('created_by'))
+            ->merge($allPunches->pluck('user_id')->filter())
+            ->unique()->filter()->values();
+        $users = $allUserIds->isNotEmpty()
+            ? User::where('company_id', $companyId)->whereIn('id', $allUserIds)->get()->keyBy('id')
+            : collect();
+
+        // ── 3. Bucket sessions by business date (subHours(6) maps 6AM–6AM → date) ──
+        //  login_at 06:00 Aug 15 → sub 6h → 00:00 Aug 15 → "2024-08-15"  ✓
+        //  login_at 05:59 Aug 15 → sub 6h → 23:59 Aug 14 → "2024-08-14"  ✓
+        $sessionsByDay = [];    // ['YYYY-MM-DD' => ['user_id' => [sessions…]]]
+        foreach ($allSessions as $s) {
+            $biz = \Carbon\Carbon::parse($s->login_at, config('app.timezone'))->subHours(6)->toDateString();
+            $sessionsByDay[$biz][$s->user_id][] = $s;
+        }
+
+        // ── 4. Per-staff session totals ───────────────────────────────────────
+        $sessionTotals = [];  // user_id => stdClass aggregate
+
+        foreach ($sessionsByDay as $bizDate => $byUser) {
+            $cutoff = \Carbon\Carbon::parse($bizDate, config('app.timezone'))->setTime(6, 0)->addDay();
+            foreach ($byUser as $uid => $sList) {
+                $duty = \App\Support\PosHazriDutyHours::fromSessions(collect($sList), $cutoff);
+                if (!isset($sessionTotals[$uid])) {
+                    $u = $users->get($uid);
+                    $sessionTotals[$uid] = (object)[
+                        'user_id'       => $uid,
+                        'name'          => $u?->name ?? ('#'.$uid),
+                        'pos_role'      => $u ? ($u->pos_role ?: ($u->role === 'company_admin' ? 'pos_admin' : null)) : null,
+                        'days_present'  => 0,
+                        'total_minutes' => 0,
+                        'any_open'      => false,
+                        'total_bills'   => 0,
+                        'total_revenue' => 0.0,
+                    ];
+                }
+                $sessionTotals[$uid]->days_present++;
+                $sessionTotals[$uid]->total_minutes += $duty->minutes;
+                if ($duty->open) { $sessionTotals[$uid]->any_open = true; }
+            }
+        }
+
+        // Merge bill totals (already grouped by user+business_date, just sum)
+        foreach ($allBills as $b) {
+            $uid = $b->created_by;
+            if (isset($sessionTotals[$uid])) {
+                $sessionTotals[$uid]->total_bills   += (int)   $b->bill_count;
+                $sessionTotals[$uid]->total_revenue += (float) $b->revenue;
+            }
+        }
+
+        usort($sessionTotals, fn($a, $b) => strcmp($a->name, $b->name));
+
+        // ── 5. Bucket biometric punches by business date ─────────────────────
+        $punchesByDay = [];   // ['YYYY-MM-DD' => ['u_N' | 'pin_X' => [punches…]]]
+        foreach ($allPunches as $p) {
+            $biz = \Carbon\Carbon::parse($p->punched_at, config('app.timezone'))->subHours(6)->toDateString();
+            $key = $p->user_id ? 'u_'.$p->user_id : 'pin_'.($p->device_pin ?? 'unknown');
+            $punchesByDay[$biz][$key][] = $p;
+        }
+
+        // ── 6. Per-staff biometric totals ─────────────────────────────────────
+        $bioTotals = [];  // key => stdClass aggregate
+
+        foreach ($punchesByDay as $bizDate => $byKey) {
+            $cutoff = \Carbon\Carbon::parse($bizDate, config('app.timezone'))->setTime(6, 0)->addDay();
+            foreach ($byKey as $key => $pList) {
+                $duty = \App\Support\PosHazriDutyHours::fromPunches($pList, $cutoff);
+                if (!isset($bioTotals[$key])) {
+                    $first = $pList[0];
+                    $u = $first->user_id ? $users->get($first->user_id) : null;
+                    $bioTotals[$key] = (object)[
+                        'user_id'       => $first->user_id,
+                        'device_pin'    => $first->device_pin,
+                        'name'          => $u?->name,
+                        'days_present'  => 0,
+                        'total_minutes' => 0,
+                        'any_open'      => false,
+                    ];
+                }
+                $bioTotals[$key]->days_present++;
+                $bioTotals[$key]->total_minutes += $duty->minutes;
+                if ($duty->open) { $bioTotals[$key]->any_open = true; }
+            }
+        }
+
+        usort($bioTotals, fn($a, $b) => strcmp(
+            $a->name ?? ($a->device_pin ?? ''),
+            $b->name ?? ($b->device_pin ?? '')
+        ));
+
+        return [array_values($sessionTotals), array_values($bioTotals)];
     }
 
     /**

@@ -657,6 +657,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/reports/csv', [PosController::class, 'exportReportCsv'])->name('pos.reports.csv');
     // Staff Hazri (owner batch, 26 Jul 2026) — ADMIN/MANAGER-ONLY (403 in controller).
     Route::get('/reports/hazri', [PosController::class, 'hazriReport'])->name('pos.reports.hazri');
+    // Payroll PDF export (Task #280) — same gates (planGate hazri_enabled + isPosAdmin).
+    Route::get('/reports/hazri/payroll-pdf', [PosController::class, 'payrollHazriPdf'])->name('pos.reports.hazri.payroll-pdf');
     // Biometric device setup + CSV import (4 Aug 2026) — admin only (403 in controller).
     Route::get('/bio-sync', [\App\Http\Controllers\PosBiometricController::class, 'setup'])->name('pos.bio-sync.setup');
     Route::post('/bio-sync/device', [\App\Http\Controllers\PosBiometricController::class, 'storeDevice'])->name('pos.bio-sync.store-device');

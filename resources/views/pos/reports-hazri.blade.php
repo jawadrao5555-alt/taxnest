@@ -108,6 +108,12 @@
             <div class="flex items-center gap-2">
                 <svg class="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
                 <span class="text-sm font-bold text-gray-800 dark:text-white">{{ __('pos.bio_hazri_section') }}</span>
+                @if(!empty($unmappedPinCount) && auth('pos')->user()?->isPosAdmin())
+                <a href="{{ route('pos.bio-sync.setup') }}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-[10px] font-bold hover:bg-amber-200 dark:hover:bg-amber-800/60 transition" title="{{ __('pos.bio_unmapped_badge_title') }}">
+                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01"/></svg>
+                    {{ $unmappedPinCount }} {{ __('pos.bio_unmapped_badge') }}
+                </a>
+                @endif
             </div>
             @if(auth('pos')->user()?->isPosAdmin())
             <a href="{{ route('pos.bio-sync.setup') }}" class="text-xs text-purple-600 dark:text-purple-400 hover:underline">{{ __('pos.bio_hazri_setup_link') }} →</a>

@@ -59,6 +59,48 @@
         </form>
     </div>
 
+    {{-- ── Unmapped PIN Alert (Aug 2026) ──────────────────────────────────── --}}
+    @if($unmappedPins->isNotEmpty())
+    <div class="mb-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-xl overflow-hidden">
+        <div class="flex items-start gap-3 px-4 py-3 bg-amber-100 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-700">
+            <svg class="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+            <div>
+                <p class="text-sm font-bold text-amber-800 dark:text-amber-200">{{ __('pos.bio_unmapped_banner_title', ['count' => $unmappedPins->count()]) }}</p>
+                <p class="text-xs text-amber-700 dark:text-amber-300 mt-0.5">{{ __('pos.bio_unmapped_banner_sub') }}</p>
+            </div>
+        </div>
+        <div class="divide-y divide-amber-100 dark:divide-amber-800/40">
+            @foreach($unmappedPins as $upin)
+            <div class="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3">
+                <div class="flex-1 min-w-0">
+                    <span class="inline-flex items-center gap-1.5">
+                        <span class="font-mono font-bold text-gray-900 dark:text-white text-sm">PIN {{ $upin->device_pin }}</span>
+                        <span class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200">
+                            {{ $upin->punch_count }} {{ __('pos.bio_punches') }}
+                        </span>
+                    </span>
+                    <p class="text-[11px] text-gray-400 mt-0.5">{{ __('pos.bio_last_seen') }}: {{ \Carbon\Carbon::parse($upin->last_punch_at)->format('d M, h:i A') }}</p>
+                </div>
+                <form method="POST" action="{{ route('pos.bio-sync.quick-map') }}" class="flex items-center gap-2">
+                    @csrf
+                    <input type="hidden" name="device_pin" value="{{ $upin->device_pin }}">
+                    <select name="user_id" required
+                            class="rounded-lg border border-amber-300 dark:border-amber-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-1.5 focus:ring-2 focus:ring-amber-500 transition min-w-[160px]">
+                        <option value="">— {{ __('pos.bio_select_user') }} —</option>
+                        @foreach($posUsers as $u)
+                        <option value="{{ $u->id }}">{{ $u->name }}</option>
+                        @endforeach
+                    </select>
+                    <button type="submit" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition whitespace-nowrap">
+                        {{ __('pos.bio_map_now') }}
+                    </button>
+                </form>
+            </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
+
     {{-- Protocol help banner --}}
     <div class="mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-xl p-4">
         <div class="flex items-start gap-3">

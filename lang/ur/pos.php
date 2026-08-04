@@ -3797,4 +3797,12 @@ return [
     'bio_source_import'      => 'درآمد شدہ',
     'bio_hazri_none'         => 'اس دن کا کوئی بایومیٹرک پنچ نہیں۔',
     'bio_hazri_hint'         => 'رجسٹرڈ ڈیوائسز کے پنچز یہاں نظر آئیں گے۔ ڈیوائس لگانے کے لیے "ڈیوائسز ترتیب دیں" دبائیں۔',
+    'bio_unmapped_banner_title' => 'گزشتہ ۱۴ دنوں میں :count غیر میپ شدہ PIN ملے',
+    'bio_unmapped_banner_sub'   => 'ان ڈیوائس PIN کا کوئی صارف نہیں۔ ہر PIN کے لیے ٹیم ممبر چنیں — پرانے پنچز خود بخود اپ ڈیٹ ہو جائیں گے۔',
+    'bio_punches'               => 'پنچ',
+    'bio_last_seen'             => 'آخری پنچ',
+    'bio_map_now'               => 'ابھی میپ کریں',
+    'bio_quick_map_saved'       => 'PIN میپ ہو گئی۔ پرانے پنچز بھی اپ ڈیٹ ہو گئے۔',
+    'bio_unmapped_badge'        => 'غیر میپ شدہ PIN',
+    'bio_unmapped_badge_title'  => 'کچھ PIN کا کوئی صارف نہیں — بایومیٹرک سیٹ اَپ میں درست کریں',
 ];

@@ -191,7 +191,24 @@ class PosBiometricController extends Controller
 
         $company = \App\Models\Company::find($companyId);
 
-        return view('pos.biometric-setup', compact('company', 'devices', 'posUsers'));
+        // Distinct unmapped PINs (last 14 days) — for the alert banner.
+        $unmappedPins = collect();
+        if (Schema::hasTable('pos_biometric_punches')) {
+            $unmappedPins = PosBiometricPunch::where('company_id', $companyId)
+                ->whereNull('user_id')
+                ->whereNotNull('device_pin')
+                ->where('punched_at', '>=', now()->subDays(14))
+                ->groupBy('device_pin')
+                ->select(
+                    'device_pin',
+                    DB::raw('COUNT(*) as punch_count'),
+                    DB::raw('MAX(punched_at) as last_punch_at')
+                )
+                ->orderByDesc('last_punch_at')
+                ->get();
+        }
+
+        return view('pos.biometric-setup', compact('company', 'devices', 'posUsers', 'unmappedPins'));
     }
 
     /**
@@ -324,6 +341,65 @@ class PosBiometricController extends Controller
 
         return redirect()->route('pos.bio-sync.setup')
             ->with('success', __('pos.bio_mapping_saved'));
+    }
+
+    /**
+     * POST /pos/bio-sync/quick-map
+     * One-click inline mapping from the unmapped-PIN alert banner.
+     * Creates PosBiometricUserMap entries for every device that carries
+     * this PIN, then backfills all NULL-user punches for this company+PIN.
+     */
+    public function quickMapPin(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        if (!auth('pos')->user()->isPosAdmin()) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'device_pin' => 'required|string|max:50',
+            'user_id'    => 'required|integer',
+        ]);
+
+        $pin    = trim($validated['device_pin']);
+        $userId = (int) $validated['user_id'];
+
+        // Verify user belongs to this company
+        if (!User::where('id', $userId)->where('company_id', $companyId)->exists()) {
+            abort(403);
+        }
+
+        DB::transaction(function () use ($companyId, $pin, $userId) {
+            // Discover all device_ids that have unmapped punches with this PIN
+            $deviceIds = PosBiometricPunch::where('company_id', $companyId)
+                ->where('device_pin', $pin)
+                ->whereNull('user_id')
+                ->whereNotNull('device_id')
+                ->distinct()
+                ->pluck('device_id');
+
+            foreach ($deviceIds as $deviceId) {
+                $device = PosBiometricDevice::where('id', $deviceId)
+                    ->where('company_id', $companyId)
+                    ->first();
+                if (!$device) {
+                    continue;
+                }
+                PosBiometricUserMap::updateOrCreate(
+                    ['device_id' => $deviceId, 'device_pin' => $pin],
+                    ['company_id' => $companyId, 'user_id'   => $userId]
+                );
+            }
+
+            // Backfill all NULL-user punches for this company+PIN
+            PosBiometricPunch::where('company_id', $companyId)
+                ->where('device_pin', $pin)
+                ->whereNull('user_id')
+                ->update(['user_id' => $userId]);
+        });
+
+        return redirect()->route('pos.bio-sync.setup')
+            ->with('success', __('pos.bio_quick_map_saved'));
     }
 
     // ─── CSV / Excel Import Fallback ───────────────────────────────────────

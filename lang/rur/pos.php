@@ -2849,6 +2849,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'rt_on_duty' => 'Duty par',
     'rt_open_deliveries' => 'Zair-e-tarseel bill',
     'rt_plan_locked_api' => 'Live tracking aapke package mein shamil nahi — admin se Unlimited upgrade ka kahein.',
+    'rt_search_no_results' => 'Koi jagah nahi mili — hijje badal kar dobara talash karein.',
+    'rt_search_placeholder' => 'Jagah talash karein… (maslan Lodhran)',
     'rt_title' => 'Rider live tracking',
     'rt_trail' => 'Aaj ka rasta',
     'rt_upgrade_btn' => 'Packages dekhein',

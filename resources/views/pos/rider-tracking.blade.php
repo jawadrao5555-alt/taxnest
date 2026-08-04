@@ -84,6 +84,32 @@
 
             {{-- Map --}}
             <div class="md:col-span-3 order-1 md:order-2">
+                {{-- Place search (Nominatim, PK-only) — owner request Aug 2026 --}}
+                <div class="relative mb-2">
+                    <div class="flex gap-2">
+                        <input type="text" x-model="searchQ" @keydown.enter.prevent="searchPlace()"
+                               autocomplete="off" name="rt_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                               placeholder="{{ __('pos.rt_search_placeholder') }}"
+                               class="flex-1 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 outline-none">
+                        <button type="button" @click="searchPlace()"
+                                class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold">
+                            <span x-show="!searchBusy">🔍</span><span x-show="searchBusy" x-cloak>…</span>
+                        </button>
+                    </div>
+                    <div x-show="searchResults.length > 0 || searchDone" x-cloak
+                         @click.outside="searchResults = []; searchDone = false"
+                         class="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden"
+                         style="z-index:1200;">
+                        <template x-for="(res, i) in searchResults" :key="i">
+                            <button type="button" @click="gotoResult(res)"
+                                    class="w-full text-left px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700"
+                                    x-text="res.display_name"></button>
+                        </template>
+                        <template x-if="searchDone && !searchResults.length">
+                            <div class="px-3 py-2 text-xs text-gray-400 dark:text-gray-500">{{ __('pos.rt_search_no_results') }}</div>
+                        </template>
+                    </div>
+                </div>
                 <div id="rt-map" class="rt-map shadow-sm border border-gray-200 dark:border-gray-700"></div>
                 <p class="mt-1.5 text-[10px] text-gray-400 dark:text-gray-500" x-show="selected" x-cloak>
                     <span x-text="i18n.trail"></span>: <span x-text="selected ? selected.name : ''"></span>
@@ -107,13 +133,21 @@
             polyline: null,
             timer: null,
             didFit: false,
+            searchQ: '',
+            searchResults: [],
+            searchBusy: false,
+            searchDone: false,
             init() {
                 this.map = L.map('rt-map', { zoomControl: true }).setView([31.5204, 74.3587], 12);
-                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                // Carto Voyager basemap — English/Latin place labels (owner rule Aug 2026:
+                // OSM default tiles label Pakistani cities in Urdu script; owner wants English).
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
                     maxZoom: 19,
-                    attribution: '© OpenStreetMap'
+                    subdomains: 'abcd',
+                    attribution: '© OpenStreetMap © CARTO'
                 }).addTo(this.map);
                 this.load();
+                this.ipCenter();
                 this.timer = setInterval(() => this.load(), 20000);
                 document.addEventListener('visibilitychange', () => {
                     if (!document.hidden) this.load();
@@ -189,6 +223,41 @@
             clearTrail() {
                 this.selected = null;
                 if (this.polyline) { this.polyline.remove(); this.polyline = null; }
+            },
+            // Center on the shop's own city via IP lookup (owner rule Aug 2026: a Lodhran
+            // shop must not open on Lahore). Riders' fitBounds (didFit) always wins.
+            ipCenter() {
+                fetch('https://ipwho.is/', { headers: { 'Accept': 'application/json' } })
+                    .then(r => r.ok ? r.json() : null)
+                    .then(j => {
+                        if (!j || !j.success || this.didFit) return;
+                        const lat = parseFloat(j.latitude), lng = parseFloat(j.longitude);
+                        if (!isFinite(lat) || !isFinite(lng)) return;
+                        this.map.setView([lat, lng], 13);
+                    })
+                    .catch(() => {});
+            },
+            searchPlace() {
+                const q = (this.searchQ || '').trim();
+                if (!q || this.searchBusy) return;
+                this.searchBusy = true;
+                this.searchDone = false;
+                const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=pk&accept-language=en&q=' + encodeURIComponent(q);
+                fetch(url, { headers: { 'Accept': 'application/json' } })
+                    .then(r => r.ok ? r.json() : [])
+                    .then(list => {
+                        this.searchResults = Array.isArray(list) ? list : [];
+                        this.searchDone = true;
+                        this.searchBusy = false;
+                    })
+                    .catch(() => { this.searchResults = []; this.searchDone = true; this.searchBusy = false; });
+            },
+            gotoResult(res) {
+                const lat = parseFloat(res.lat), lng = parseFloat(res.lon);
+                this.searchResults = [];
+                this.searchDone = false;
+                if (!isFinite(lat) || !isFinite(lng)) return;
+                this.map.setView([lat, lng], 14);
             },
             esc(s) {
                 return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

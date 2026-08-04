@@ -478,4 +478,215 @@ class PosUnmappedPinAlertTest extends TestCase
         $after = $this->renderProfile($this->adminId);
         $after->assertDontSee(self::BANNER_MARKER);
     }
+
+    // ── Cooldown / re-surface tests (Task #278) ───────────────────────────
+
+    /**
+     * 10. A punch arriving within 7 days of dismissal must NOT re-surface the
+     *     alert (cooldown window — dismissed_at stays set, row stays inactive).
+     */
+    public function test_dismissed_alert_within_cooldown_does_not_resurface(): void
+    {
+        $pin = '200';
+
+        // Create and dismiss the alert 3 days ago (within the 7-day window).
+        DB::table('pos_bio_pin_alerts')->insert([
+            'company_id'    => $this->companyId,
+            'device_pin'    => $pin,
+            'first_seen_at' => now()->subDays(10)->format('Y-m-d H:i:s'),
+            'dismissed_at'  => now()->subDays(3)->format('Y-m-d H:i:s'),
+            'mapped_at'     => null,
+            'created_at'    => now()->subDays(10),
+            'updated_at'    => now()->subDays(3),
+        ]);
+
+        // Simulate a new punch arriving now (still within cooldown).
+        $this->callFireUnmappedPinAlert($pin, now());
+
+        $row = DB::table('pos_bio_pin_alerts')
+            ->where('company_id', $this->companyId)
+            ->where('device_pin', $pin)
+            ->first();
+
+        // dismissed_at must still be set — alert must NOT have been reactivated.
+        $this->assertNotNull($row->dismissed_at,
+            'Alert must stay dismissed when punch arrives within 7-day cooldown');
+    }
+
+    /**
+     * 11. A punch arriving 7+ days after dismissal MUST re-surface the alert:
+     *     dismissed_at is cleared so the row becomes active again.
+     */
+    public function test_dismissed_alert_after_cooldown_resurfaces_on_new_punch(): void
+    {
+        $pin = '201';
+
+        // Create and dismiss the alert 8 days ago (outside the 7-day window).
+        DB::table('pos_bio_pin_alerts')->insert([
+            'company_id'    => $this->companyId,
+            'device_pin'    => $pin,
+            'first_seen_at' => now()->subDays(20)->format('Y-m-d H:i:s'),
+            'dismissed_at'  => now()->subDays(8)->format('Y-m-d H:i:s'),
+            'mapped_at'     => null,
+            'created_at'    => now()->subDays(20),
+            'updated_at'    => now()->subDays(8),
+        ]);
+
+        // Simulate a new punch arriving now (past the cooldown).
+        $this->callFireUnmappedPinAlert($pin, now());
+
+        $row = DB::table('pos_bio_pin_alerts')
+            ->where('company_id', $this->companyId)
+            ->where('device_pin', $pin)
+            ->first();
+
+        // dismissed_at must have been cleared — alert is active again.
+        $this->assertNull($row->dismissed_at,
+            'dismissed_at must be cleared when punch arrives after 7-day cooldown');
+        $this->assertNull($row->mapped_at,
+            'mapped_at must also be cleared on re-surface');
+
+        // Verify the alert is now visible in the banner.
+        $resp = $this->renderProfile($this->adminId);
+        $resp->assertSee(self::BANNER_MARKER);
+    }
+
+    /**
+     * 11b. Delayed ingestion: punch device-timestamp is 3 days after dismissal
+     *      (inside the 7-day cooldown), but the punch arrives at the server
+     *      much later — now() is well past 7 days after dismissal.
+     *      The alert must stay dismissed because the cooldown is measured
+     *      against $punchedAt (device time), not now().
+     */
+    public function test_delayed_ingestion_within_cooldown_does_not_resurface(): void
+    {
+        $pin = '203';
+
+        // Dismissed 10 days ago (wall-clock).
+        $dismissedAt = now()->subDays(10);
+
+        DB::table('pos_bio_pin_alerts')->insert([
+            'company_id'    => $this->companyId,
+            'device_pin'    => $pin,
+            'first_seen_at' => now()->subDays(20)->format('Y-m-d H:i:s'),
+            'dismissed_at'  => $dismissedAt->format('Y-m-d H:i:s'),
+            'mapped_at'     => null,
+            'created_at'    => now()->subDays(20),
+            'updated_at'    => $dismissedAt,
+        ]);
+
+        // Punch device-timestamp = 3 days after dismissal (inside the window),
+        // even though now() is 10 days after dismissal (outside the window).
+        $punchTime = $dismissedAt->copy()->addDays(3);
+        $this->callFireUnmappedPinAlert($pin, $punchTime);
+
+        $row = DB::table('pos_bio_pin_alerts')
+            ->where('company_id', $this->companyId)
+            ->where('device_pin', $pin)
+            ->first();
+
+        $this->assertNotNull($row->dismissed_at,
+            'Alert must stay dismissed: punch device-time was inside the 7-day cooldown, '
+            . 'even though server wall-clock is past 7 days after dismissal');
+    }
+
+    /**
+     * 11c. Regression: punch device-timestamp is BEFORE dismissed_at (e.g. a
+     *      replayed old punch from 10 days before dismissal). diffInDays() is
+     *      absolute so without a direction guard it would compute 10 ≥ 7 and
+     *      wrongly reactivate. The alert must stay dismissed.
+     */
+    public function test_punch_predating_dismissal_does_not_resurface(): void
+    {
+        $pin = '204';
+
+        $dismissedAt = now()->subDays(2); // dismissed recently
+
+        DB::table('pos_bio_pin_alerts')->insert([
+            'company_id'    => $this->companyId,
+            'device_pin'    => $pin,
+            'first_seen_at' => now()->subDays(15)->format('Y-m-d H:i:s'),
+            'dismissed_at'  => $dismissedAt->format('Y-m-d H:i:s'),
+            'mapped_at'     => null,
+            'created_at'    => now()->subDays(15),
+            'updated_at'    => $dismissedAt,
+        ]);
+
+        // Replayed punch whose device-timestamp is 10 days BEFORE dismissal.
+        $punchTime = $dismissedAt->copy()->subDays(10);
+        $this->callFireUnmappedPinAlert($pin, $punchTime);
+
+        $row = DB::table('pos_bio_pin_alerts')
+            ->where('company_id', $this->companyId)
+            ->where('device_pin', $pin)
+            ->first();
+
+        $this->assertNotNull($row->dismissed_at,
+            'Alert must stay dismissed when punch device-timestamp pre-dates the dismissal');
+    }
+
+    /**
+     * 12. Active-alert dedupe is unchanged: if an alert is already active
+     *     (dismissed_at=null, mapped_at=null) a subsequent punch must NOT
+     *     create a second row or alter the existing one.
+     */
+    public function test_active_alert_dedupe_unchanged(): void
+    {
+        $pin = '202';
+
+        // Create an active alert.
+        $this->fireAlert($pin, '2026-08-05 08:00:00');
+
+        $before = DB::table('pos_bio_pin_alerts')
+            ->where('company_id', $this->companyId)
+            ->where('device_pin', $pin)
+            ->first();
+
+        // Fire again (second punch, same PIN, alert already active).
+        $this->callFireUnmappedPinAlert($pin, now());
+
+        $count = DB::table('pos_bio_pin_alerts')
+            ->where('company_id', $this->companyId)
+            ->where('device_pin', $pin)
+            ->count();
+
+        $this->assertEquals(1, $count,
+            'Exactly one alert row must exist — no duplicate created for active alert');
+
+        $after = DB::table('pos_bio_pin_alerts')
+            ->where('company_id', $this->companyId)
+            ->where('device_pin', $pin)
+            ->first();
+
+        // first_seen_at must be unchanged (row was not touched).
+        $this->assertEquals($before->first_seen_at, $after->first_seen_at,
+            'first_seen_at must not change when alert is already active');
+    }
+
+    // ── Helper: call the private fireUnmappedPinAlert via the controller ──
+
+    /**
+     * Invoke fireUnmappedPinAlert directly (it is private) via a real ADMS
+     * POST that carries an unmapped punch for the given PIN. We use a unique
+     * timestamp so the punch row itself doesn't conflict with pre-existing rows.
+     *
+     * @param \Carbon\Carbon|string $punchedAt
+     */
+    private function callFireUnmappedPinAlert(string $pin, $punchedAt): void
+    {
+        $ts = ($punchedAt instanceof \Carbon\Carbon)
+            ? $punchedAt->format('Y-m-d H:i:s')
+            : $punchedAt;
+
+        // Bind currentCompanyId so the controller helper can read it.
+        app()->instance('currentCompanyId', $this->companyId);
+
+        // Use reflection to call the private method directly — avoids the ADMS
+        // HTTP layer (token, duplicate-punch unique key) and tests only the
+        // alert logic in isolation.
+        $controller = app(\App\Http\Controllers\PosBiometricController::class);
+        $method = new \ReflectionMethod($controller, 'fireUnmappedPinAlert');
+        $method->setAccessible(true);
+        $method->invoke($controller, $this->companyId, $pin, \Carbon\Carbon::parse($ts));
+    }
 }

@@ -10,9 +10,12 @@ use Illuminate\Database\Eloquent\Model;
  * One row per (company_id, device_pin). Lifecycle:
  *   created  — first unmapped punch arrives for this PIN.
  *   mapped   — saveMapping() / quickMapPin() sets mapped_at.
- *   dismissed — admin dismisses banner; sets dismissed_at (never re-fires
- *               for the same PIN unless the alert row is hard-deleted, which
- *               happens when saveMapping() removes a PIN from a device mapping).
+ *   dismissed — admin dismisses banner; sets dismissed_at. Re-surfaces after
+ *               DISMISS_COOLDOWN_DAYS (7) days measured from the punch time —
+ *               so delayed/CSV-imported punches from inside the window stay
+ *               silent even when they arrive at the server later.
+ *               Hard-delete also resets it (saveMapping removes a PIN from a
+ *               device mapping, allowing a fresh alert on the next punch).
  */
 class PosUnmappedPinAlert extends Model
 {

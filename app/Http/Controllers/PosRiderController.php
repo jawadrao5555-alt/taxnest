@@ -358,7 +358,7 @@ class PosRiderController extends Controller
             ->where('company_id', $companyId)->whereNotNull('rider_id')->findOrFail($txnId);
 
         if ($txn->rider_settlement_id) {
-            return back()->with('error', 'This bill is already settled — status is locked.');
+            return $this->statusError($request, 'This bill is already settled — status is locked.');
         }
 
         // Terminal-state guard (owner, Jul 2026): delivered/returned lock the
@@ -367,10 +367,10 @@ class PosRiderController extends Controller
         // UI's Returned button); returned is fully final.
         $newStatus = $request->input('delivery_status');
         if ($txn->delivery_status === 'returned') {
-            return back()->with('error', 'This delivery is already returned — status is final.');
+            return $this->statusError($request, 'This delivery is already returned — status is final.');
         }
         if ($txn->delivery_status === 'delivered' && $newStatus !== 'returned') {
-            return back()->with('error', 'This delivery is already delivered — it can only be marked returned.');
+            return $this->statusError($request, 'This delivery is already delivered — it can only be marked returned.');
         }
 
         $upd = ['delivery_status' => $newStatus];
@@ -387,6 +387,16 @@ class PosRiderController extends Controller
         }
 
         return back()->with('success', 'Delivery status updated.');
+    }
+
+    /** Guard-failure reply: JSON clients (sale-screen popup fetch) get JSON 422,
+     *  page forms keep the flash-redirect (3 Aug 2026). */
+    private function statusError(Request $request, string $message)
+    {
+        if ($request->expectsJson()) {
+            return response()->json(['success' => false, 'message' => $message], 422);
+        }
+        return back()->with('error', $message);
     }
 
     /** Bulk mark ALL of one rider's OPEN (assigned/dispatched) deliveries as

@@ -89,9 +89,30 @@ class PosBiometricController extends Controller
         return $this->ingestPunches($device, $request);
     }
 
-    /** Shared ATTLOG ingestion for both token-path and SN-root endpoints. */
-    private function ingestPunches(PosBiometricDevice $device, Request $request)
+    /**
+     * Shared ATTLOG ingestion for both token-path and SN-root endpoints.
+     *
+     * $strictWindow (SN-root only): the root endpoint is authenticated by SN
+     * alone — SNs are printed on the hardware, so we additionally reject punch
+     * lines with implausible timestamps (older than 30 days or more than 1 day
+     * in the future) to shut down backdated payroll forgery. Token-path pushes
+     * keep full flexibility (token is a real secret).
+     */
+    private function ingestPunches(PosBiometricDevice $device, Request $request, bool $strictWindow = false)
     {
+        // Audit trail: remember where the last push came from (schema-guarded —
+        // prod may lag a migration; never let audit bookkeeping break ingestion).
+        try {
+            if (Schema::hasColumn('pos_biometric_devices', 'last_push_ip')) {
+                $device->forceFill([
+                    'last_push_ip' => mb_substr((string) $request->ip(), 0, 45),
+                    'last_push_at' => now(),
+                ])->save();
+            }
+        } catch (\Throwable $e) {
+            // ignore — audit only
+        }
+
         $table = $request->query('table', '');
         if (strtoupper($table) !== 'ATTLOG') {
             // Other tables (OPERLOG, USERINFO, etc.) — acknowledge but ignore
@@ -132,6 +153,12 @@ class PosBiometricController extends Controller
                 } catch (\Throwable $e2) {
                     continue; // unparseable timestamp — skip
                 }
+            }
+
+            // SN-root hardening: implausible timestamps are dropped (see docblock).
+            if ($strictWindow && ($punchedAt->lt(now()->subDays(30)) || $punchedAt->gt(now()->addDay()))) {
+                Log::warning("biometric: out-of-window punch dropped (root/SN) device={$device->id} line=" . mb_substr($line, 0, 100));
+                continue;
             }
 
             $punchType = match($status) {
@@ -221,7 +248,7 @@ class PosBiometricController extends Controller
             return response('ERROR', 403)->header('Content-Type', 'text/plain');
         }
 
-        return $this->ingestPunches($device, $request);
+        return $this->ingestPunches($device, $request, strictWindow: true);
     }
 
     /**

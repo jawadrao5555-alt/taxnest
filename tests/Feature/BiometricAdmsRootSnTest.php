@@ -80,6 +80,8 @@ class BiometricAdmsRootSnTest extends TestCase
             $table->string('device_sn', 100)->nullable();
             $table->string('push_token', 64)->unique();
             $table->boolean('is_active')->default(true);
+            $table->string('last_push_ip', 45)->nullable();
+            $table->dateTime('last_push_at')->nullable();
             $table->timestamps();
         });
         Schema::create('pos_biometric_user_map', function (Blueprint $table) {
@@ -227,6 +229,45 @@ class BiometricAdmsRootSnTest extends TestCase
     {
         DB::table('pos_biometric_devices')->where('id', $this->deviceId)->update(['is_active' => false]);
         $this->get('/iclock/cdata?SN=' . $this->sn)->assertStatus(403);
+    }
+
+    public function test_root_out_of_window_timestamps_dropped(): void
+    {
+        // SN-only auth is weak (SN is printed on the device), so the root
+        // endpoint drops backdated (>30d) and far-future (>1d) punch lines.
+        $old    = now()->subDays(45)->format('Y-m-d H:i:s');
+        $future = now()->addDays(3)->format('Y-m-d H:i:s');
+        $valid  = now()->subHour()->format('Y-m-d H:i:s');
+        $body = "7\t{$old}\t1\t0\t0\t\r\n7\t{$future}\t1\t0\t0\t\r\n7\t{$valid}\t1\t0\t0\t\r\n";
+
+        $res = $this->admsRootPost($this->sn, $body);
+        $res->assertStatus(200);
+        $this->assertStringContainsString('OK: 1', $res->getContent());
+        $this->assertDatabaseCount('pos_biometric_punches', 1);
+        $this->assertDatabaseHas('pos_biometric_punches', ['punched_at' => $valid]);
+    }
+
+    public function test_root_push_records_source_ip_audit(): void
+    {
+        $this->admsRootPost($this->sn, "7\t" . now()->format('Y-m-d H:i:s') . "\t1\t0\t0\t\r\n");
+        $row = DB::table('pos_biometric_devices')->where('id', $this->deviceId)->first();
+        $this->assertNotNull($row->last_push_ip);
+        $this->assertNotNull($row->last_push_at);
+    }
+
+    public function test_token_path_still_accepts_old_timestamps(): void
+    {
+        // Token is a real secret — the 30-day window must NOT apply there
+        // (offline devices legitimately batch-send old records).
+        $old = now()->subDays(45)->format('Y-m-d H:i:s');
+        $res = $this->call(
+            'POST', '/bio-sync/k50token123abc/iclock/cdata?table=ATTLOG',
+            [], [], [], ['CONTENT_TYPE' => 'text/plain'],
+            "7\t{$old}\t1\t0\t0\t\r\n"
+        );
+        $res->assertStatus(200);
+        $this->assertStringContainsString('OK: 1', $res->getContent());
+        $this->assertDatabaseHas('pos_biometric_punches', ['punched_at' => $old]);
     }
 
     public function test_getrequest_returns_ok(): void

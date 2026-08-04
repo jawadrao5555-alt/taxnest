@@ -9,10 +9,12 @@ class PosBiometricDevice extends Model
 {
     protected $fillable = [
         'company_id', 'label', 'device_sn', 'push_token', 'is_active',
+        'last_push_ip', 'last_push_at',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'is_active'    => 'boolean',
+        'last_push_at' => 'datetime',
     ];
 
     public function userMaps()

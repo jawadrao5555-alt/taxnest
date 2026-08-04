@@ -131,6 +131,9 @@
                         @else
                             {{ __('pos.bio_no_punches_yet') }}
                         @endif
+                        @if($device->last_push_ip ?? null)
+                            · IP: {{ $device->last_push_ip }} ({{ $device->last_push_at ? $device->last_push_at->format('d M, h:i A') : '' }})
+                        @endif
                     </p>
                 </div>
             </div>

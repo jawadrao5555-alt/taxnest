@@ -23,6 +23,7 @@
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.deliveries') }}</h1>
         </div>
         <form method="GET" action="{{ route('pos.deliveries') }}" class="flex items-center gap-2">
+            <input type="hidden" name="tab" value="{{ $activeTab }}">
             <input type="date" name="date" value="{{ $day->format('Y-m-d') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
             <button type="submit" class="px-3 py-2 rounded-lg bg-purple-600 text-white text-xs font-semibold shadow-sm hover:bg-purple-700 transition">{{ __('pos.go_btn') }}</button>
         </form>
@@ -144,8 +145,36 @@
     </div>
     @endif
 
-    {{-- Day's delivery bills --}}
+    {{-- Day's delivery bills with status tabs (owner, 4 Aug 2026) --}}
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+
+        {{-- Tab bar --}}
+        <div class="border-b border-gray-100 dark:border-gray-800 flex items-center gap-0 px-4 pt-3 overflow-x-auto">
+            @php
+                $tabs = [
+                    'pending'   => ['label' => __('pos.pending_word'),   'sub' => __('pos.del_tab_pending_sub'), 'count' => $tabCounts['pending']],
+                    'delivered' => ['label' => __('pos.delivered_word'), 'sub' => null,                          'count' => $tabCounts['delivered']],
+                    'returned'  => ['label' => __('pos.returned_word'),  'sub' => null,                          'count' => $tabCounts['returned']],
+                ];
+            @endphp
+            @foreach($tabs as $tabKey => $tabMeta)
+            <a href="{{ route('pos.deliveries', array_filter(['date' => request('date'), 'tab' => $tabKey])) }}"
+               class="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border-b-2 whitespace-nowrap transition
+                      {{ $activeTab === $tabKey
+                          ? 'border-purple-600 text-purple-700 dark:text-purple-300'
+                          : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600' }}">
+                {{ $tabMeta['label'] }}
+                @if($tabMeta['sub'])
+                    <span class="hidden sm:inline text-[10px] font-normal text-gray-400 dark:text-gray-500">({{ $tabMeta['sub'] }})</span>
+                @endif
+                <span class="px-1.5 py-0.5 rounded-full text-[11px] font-extrabold
+                             {{ $activeTab === $tabKey
+                                 ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                 : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400' }}">{{ $tabMeta['count'] }}</span>
+            </a>
+            @endforeach
+        </div>
+
         <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between">
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white flex-shrink-0">{{ __('pos.delivery_bills') }} — {{ $day->format('d M Y') }}</h3>
             <div class="flex items-center gap-2">
@@ -168,7 +197,9 @@
                         <th class="px-4 py-3">{{ __('pos.payment_label') }}</th>
                         <th class="px-4 py-3">{{ __('pos.rider_label') }}</th>
                         <th class="px-4 py-3">{{ __('pos.status_label') }}</th>
+                        @if($activeTab === 'pending')
                         <th class="px-4 py-3 text-right">{{ __('pos.update_label') }}</th>
+                        @endif
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -236,6 +267,7 @@
                                 <div class="text-[10px] text-gray-400 mt-0.5">{{ __('pos.delivery_took_mins', ['mins' => $delMins]) }}</div>
                             @endif
                         </td>
+                        @if($activeTab === 'pending')
                         <td class="px-4 py-3 text-right whitespace-nowrap">
                             @if($b->rider_id && !$b->rider_settlement_id)
                                 @if(in_array($st, ['assigned']))
@@ -258,11 +290,12 @@
                                 @endif
                             @endif
                         </td>
+                        @endif
                     </tr>
                     @empty
-                    <tr><td colspan="7" class="px-4 py-8 text-center text-sm text-gray-400">{{ __('pos.no_delivery_bills_day') }}</td></tr>
+                    <tr><td colspan="{{ $activeTab === 'pending' ? 7 : 6 }}" class="px-4 py-8 text-center text-sm text-gray-400">{{ __('pos.no_delivery_bills_day') }}</td></tr>
                     @endforelse
-                    <tr id="del-search-empty" style="display:none"><td colspan="7" class="px-4 py-8 text-center text-sm text-gray-400">{{ __('pos.del_no_match') }}</td></tr>
+                    <tr id="del-search-empty" style="display:none"><td colspan="{{ $activeTab === 'pending' ? 7 : 6 }}" class="px-4 py-8 text-center text-sm text-gray-400">{{ __('pos.del_no_match') }}</td></tr>
                 </tbody>
             </table>
         </div>

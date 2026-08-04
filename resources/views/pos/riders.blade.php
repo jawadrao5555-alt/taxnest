@@ -38,6 +38,24 @@
     </div>
     @endif
 
+    {{-- Rider App download card (v1.2.0, Aug 2026) --}}
+    <div class="bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-200 dark:border-indigo-700 shadow-sm p-4 mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
+        <div class="flex-1">
+            <div class="flex items-center gap-2 mb-0.5">
+                <span class="text-lg">📱</span>
+                <span class="font-bold text-indigo-800 dark:text-indigo-200 text-sm">TaxNest Rider App v1.2.0</span>
+                <span class="px-1.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-semibold">NEW</span>
+            </div>
+            <p class="text-xs text-indigo-700 dark:text-indigo-300">Offline route recording — riders ke phone ka GPS band ya network gum ho jaye tab bhi trail save hoti hai aur baad mein sync hoti hai.</p>
+        </div>
+        <a href="https://taxnest.com.pk/downloads/taxnest-rider.apk"
+           class="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition"
+           download>
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            APK Download
+        </a>
+    </div>
+
     {{-- Add rider --}}
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5 mb-6">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">{{ __('pos.add_new_rider') }}</h3>

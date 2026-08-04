@@ -323,6 +323,10 @@
                     .then(r => r.ok ? r.json() : null)
                     .then(j => {
                         if (!j || !j.success || this.didFit || this.userCentered) return;
+                        // Owner report (Aug 2026): kuch ISP IPs Pakistan se BAHAR geolocate
+                        // hote hain (map India par khula). Sirf Pakistan wala result maano;
+                        // warna default (Lahore) par hi raho.
+                        if (String(j.country_code || '').toUpperCase() !== 'PK') return;
                         const lat = parseFloat(j.latitude), lng = parseFloat(j.longitude);
                         if (!isFinite(lat) || !isFinite(lng)) return;
                         this.map.setView([lat, lng], 13);

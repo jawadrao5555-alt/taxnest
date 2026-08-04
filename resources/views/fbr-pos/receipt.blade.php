@@ -10,6 +10,10 @@
         $is58 = $paperSize === 'thermal58';
         // Receipt Display toggles (owner, 22 Jul 2026) — business-profile Print Settings.
         $rd = $company->displayPrefs('fbrpos');
+        // Print style (bold + logo position) — shared with PRA receipts.
+        // posReceiptStyle() defaults: bold=true, logo='center'.
+        // logo_finals_only is ignored on FBR (no local/provisional bills flow here).
+        $printStyle = $company->posReceiptStyle();
     @endphp
     <style>
         @if($paperSize === 'a4')
@@ -134,6 +138,15 @@
         body { font-family: 'Noto Naskh Arabic', 'Urdu Typesetting', Tahoma, Arial, 'Segoe UI', sans-serif; line-height: 1.6; }
         @endif
     </style>
+    @if($printStyle['bold'])
+    <style>
+        /* BOLD PRINT STYLE (ported from PRA receipt_80mm, Task #286): whole
+           receipt in bold — cheap thermal heads print the plain weight too
+           thin/light. Universal default ON; company can opt out via Receipt
+           Settings. Plain bold 700, no text-stroke (owner: "kafi zyada bold"). */
+        body, td, th, p, span, div, h1, strong { font-weight: bold !important; }
+    </style>
+    @endif
 </head>
 <body>
     <div class="no-print" id="receiptActions">
@@ -158,13 +171,34 @@
 
     <div class="receipt-wrap">
     <div class="header text-center">
+        {{-- Logo placement (Task #286, ported from PRA receipt_80mm):
+             'center' = large centered logo above business name (default).
+             'side'   = compact logo to the right of business name in a table row.
+             Companies without a logo get the plain name-only header either way.
+             logo_finals_only is ignored on FBR (no local/provisional path). --}}
         @if($company->logo_path)
-        {{-- line-height:0 wrapper + block img: no inline-descender gap under the logo (mirrors PRA receipts, 22 Jul 2026) --}}
-        <div style="line-height: 0; margin: 0;">
-            <img src="{{ asset('storage/' . $company->logo_path) }}" alt="{{ $company->name }}" style="max-width: 150px; max-height: 55px; margin: 0 auto; display: block; object-fit: contain;">
+        @if($printStyle['logo'] === 'center')
+        {{-- line-height:0 wrapper + block img: no inline-descender gap under logo --}}
+        <div style="text-align:center; margin:0; padding:2mm 0 0; line-height:0;">
+            <img src="{{ asset('storage/' . $company->logo_path) }}" alt="{{ $company->name }}" style="width:32mm; max-height:27mm; object-fit:contain; display:block; margin:0 auto;">
         </div>
-        @endif
         <h1>{{ $company->name }}</h1>
+        @else
+        {{-- Side logo: business name left, logo right — compact header --}}
+        <table style="width:100%; border-collapse:collapse; margin-bottom:2px;">
+            <tr>
+                <td style="text-align:left; vertical-align:middle; width:64%; padding:0;">
+                    <h1 style="text-align:left; margin:0;">{{ $company->name }}</h1>
+                </td>
+                <td style="text-align:right; vertical-align:middle; width:36%; padding:0;">
+                    <img src="{{ asset('storage/' . $company->logo_path) }}" alt="{{ $company->name }}" style="max-width:80px; max-height:42px; object-fit:contain;">
+                </td>
+            </tr>
+        </table>
+        @endif
+        @else
+        <h1>{{ $company->name }}</h1>
+        @endif
         @if($rd['show_address'] && $company->address)<p>{{ $company->address }}</p>@endif
         @if($rd['show_mobile'] && $company->phone)<p>{{ __('pos.rcpt_tel') }} {{ $company->phone }}</p>@endif
         @if($rd['show_ntn'] && $company->ntn)<p>NTN: {{ $company->ntn }}</p>@endif

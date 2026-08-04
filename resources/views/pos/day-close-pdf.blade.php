@@ -392,6 +392,7 @@
                 <th class="c">{{ __('pos.dcp_last_out') }}</th>
                 <th class="c">{{ __('pos.bio_punch_in') }}</th>
                 <th class="c">{{ __('pos.bio_punch_out') }}</th>
+                <th class="c">{{ __('pos.bio_duty_hours') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -402,6 +403,7 @@
                 <td class="c">{{ $bp->last_out ? \Carbon\Carbon::parse($bp->last_out)->format('h:i A') : '-' }}</td>
                 <td class="c">{{ $bp->in_count }}</td>
                 <td class="c">{{ $bp->out_count }}</td>
+                <td class="c">{{ \App\Support\PosHazriDutyHours::format($bp->duty_minutes ?? 0) }}{{ !empty($bp->duty_open) ? '*' : '' }}</td>
             </tr>
             @endforeach
         </tbody>

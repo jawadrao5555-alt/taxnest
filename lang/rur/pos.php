@@ -3792,6 +3792,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'bio_nav'                => 'Biometric Setup',
     'bio_hazri_section'      => 'Biometric Punches',
     'bio_hazri_setup_link'   => 'Devices configure karein',
+    'bio_duty_hours'         => 'Duty Hours',
+    'bio_duty_open'          => '*open',
     'bio_punch_in'           => 'In',
     'bio_punch_out'          => 'Out',
     'bio_punch_unknown'      => '—',

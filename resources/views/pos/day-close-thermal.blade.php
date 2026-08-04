@@ -182,7 +182,7 @@
         @foreach($bioPunches as $bp)
         <tr>
             <td>{{ \Illuminate\Support\Str::limit($bp->name ?? __('pos.bio_unmapped_pin', ['pin' => $bp->device_pin ?? '?']), 14) }}</td>
-            <td class="r">{{ $bp->first_in ? \Carbon\Carbon::parse($bp->first_in)->format('h:iA') : '-' }} &rarr; {{ $bp->last_out ? \Carbon\Carbon::parse($bp->last_out)->format('h:iA') : '-' }} &middot; {{ $bp->in_count }}/{{ $bp->out_count }}</td>
+            <td class="r">{{ $bp->first_in ? \Carbon\Carbon::parse($bp->first_in)->format('h:iA') : '-' }} &rarr; {{ $bp->last_out ? \Carbon\Carbon::parse($bp->last_out)->format('h:iA') : '-' }} &middot; {{ \App\Support\PosHazriDutyHours::format($bp->duty_minutes ?? 0) }}{{ !empty($bp->duty_open) ? '*' : '' }}</td>
         </tr>
         @endforeach
     </table>

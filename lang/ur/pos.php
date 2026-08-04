@@ -3793,6 +3793,8 @@ return [
     'bio_nav'                => 'بایومیٹرک سیٹ اَپ',
     'bio_hazri_section'      => 'بایومیٹرک پنچز',
     'bio_hazri_setup_link'   => 'ڈیوائسز ترتیب دیں',
+    'bio_duty_hours'         => 'ڈیوٹی اوقات',
+    'bio_duty_open'          => '*جاری',
     'bio_punch_in'           => 'In',
     'bio_punch_out'          => 'آؤٹ',
     'bio_punch_unknown'      => '—',

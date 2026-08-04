@@ -8951,6 +8951,7 @@ class PosController extends Controller
                 $b = $bills->get($uid);
                 $openSession = $s->firstWhere('logout_at', null);
                 $lastSeen = $s->map(fn ($x) => $x->last_activity_at ?? $x->logout_at ?? $x->login_at)->filter()->max();
+                $duty = \App\Support\PosHazriDutyHours::fromSessions($s, $end);
                 $rows[] = (object) [
                     'user_id' => $uid,
                     'name' => $u->name,
@@ -8964,6 +8965,8 @@ class PosController extends Controller
                     'revenue' => $b ? (float) $b->revenue : 0.0,
                     'first_sale' => $b?->first_sale,
                     'last_sale' => $b?->last_sale,
+                    'duty_minutes' => $duty->minutes,
+                    'duty_open'    => $duty->open,
                 ];
             }
 
@@ -9029,22 +9032,26 @@ class PosController extends Controller
             foreach ($groups as $g) {
                 $ps       = $g['punches'];
                 $user     = $g['user_id'] ? $users->get($g['user_id']) : null;
-                $ins      = array_filter($ps, fn ($p) => $p->punch_type === 'check_in');
-                $outs     = array_filter($ps, fn ($p) => $p->punch_type === 'check_out');
+                $ins      = array_values(array_filter($ps, fn ($p) => $p->punch_type === 'check_in'));
+                $outs     = array_values(array_filter($ps, fn ($p) => $p->punch_type === 'check_out'));
                 $firstIn  = collect($ins)->min('punched_at');
                 $lastOut  = collect($outs)->max('punched_at');
                 $sources  = collect($ps)->pluck('source')->unique()->values()->all();
 
+                $duty = \App\Support\PosHazriDutyHours::fromPunches($ps, $end);
+
                 $rows[] = (object) [
-                    'user_id'    => $g['user_id'],
-                    'name'       => $user?->name,
-                    'device_pin' => $g['device_pin'],
-                    'first_in'   => $firstIn,
-                    'last_out'   => $lastOut,
-                    'in_count'   => count($ins),
-                    'out_count'  => count($outs),
-                    'total'      => count($ps),
-                    'sources'    => $sources,
+                    'user_id'      => $g['user_id'],
+                    'name'         => $user?->name,
+                    'device_pin'   => $g['device_pin'],
+                    'first_in'     => $firstIn,
+                    'last_out'     => $lastOut,
+                    'in_count'     => count($ins),
+                    'out_count'    => count($outs),
+                    'total'        => count($ps),
+                    'sources'      => $sources,
+                    'duty_minutes' => $duty->minutes,
+                    'duty_open'    => $duty->open,
                 ];
             }
 

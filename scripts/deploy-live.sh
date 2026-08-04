@@ -148,7 +148,10 @@ echo "live HEAD (after): $LIVE_HEAD_AFTER — matches workspace."
 
 if [ $NEED_COMPOSER -eq 1 ]; then
   step "Live: composer install (composer.json/lock changed in gap)"
-  run_ssh "cd $LIVE_DIR && /usr/local/bin/ea-php84 \$(command -v composer || echo composer.phar) install --no-interaction --prefer-dist --no-dev 2>&1" \
+  # Composer MUST run under /usr/local/bin/php (CloudLinux alt-php — the SAME
+  # runtime as the lsphp web handler, has gd/iconv). ea-php84 CLI lacks gd+iconv
+  # → mPDF/PhpSpreadsheet platform checks fail (discovered 4 Aug 2026).
+  run_ssh "cd $LIVE_DIR && /usr/local/bin/php \$(command -v composer || echo composer.phar) install --no-interaction --prefer-dist --no-dev 2>&1" \
     || fail "composer install failed on live"
 fi
 

@@ -452,6 +452,10 @@
             : (in_array($rcptPayRaw, ['card', 'debit_card', 'credit_card'], true) ? 'CARD'
             : ($rcptPayRaw === 'qr_payment' ? 'ONLINE / QR' : strtoupper(str_replace('_', ' ', $rcptPayRaw))));
     @endphp
+    @if($rcptPayRaw === 'qr_payment')
+    {{-- PREPAID marker (Task 291): prominent stamp for riders/customers so no cash is mistakenly collected. --}}
+    <div style="border: 3px solid #000; text-align: center; font-weight: bold; font-size: 14px; letter-spacing: 1px; padding: 4px 2px; margin: 4px 0; margin-left: 0.5mm; margin-right: 0.5mm; color: #000;">&#10003; {{ __('pos.rcpt_prepaid_marker') }}</div>
+    @endif
     <div style="border: 2px solid #000; text-align: center; font-weight: bold; font-size: 12px; letter-spacing: 1px; padding: 3px 2px; margin: 3px 0; color: #000;">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>
     @endif
 

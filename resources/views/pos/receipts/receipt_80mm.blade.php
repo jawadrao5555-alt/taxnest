@@ -114,7 +114,7 @@
                showed the SALE RECEIPT / TOTAL / PAYMENT boxes missing their left
                border). Inset every full-width bordered box 1mm per side so the
                corners always print; text tables keep the full content width. */
-            .invoice-numbers, .pra-badge, .local-badge, .edge-box { margin-left: 1mm; margin-right: 1mm; }
+            .invoice-numbers, .pra-badge, .local-badge, .edge-box, .prepaid-banner { margin-left: 1mm; margin-right: 1mm; }
             .no-print { display: none !important; }
         }
         @media screen {
@@ -518,6 +518,10 @@
             : (in_array($rcptPayRaw, ['card', 'debit_card', 'credit_card'], true) ? 'CARD'
             : ($rcptPayRaw === 'qr_payment' ? 'ONLINE / QR' : strtoupper(str_replace('_', ' ', $rcptPayRaw))));
     @endphp
+    @if($rcptPayRaw === 'qr_payment')
+    {{-- PREPAID marker (Task 291): prominent stamp for riders/customers so no cash is mistakenly collected. --}}
+    <div class="prepaid-banner" style="border: 3px solid #000; text-align: center; font-weight: bold; font-size: 16px; letter-spacing: 1px; padding: 4px 2px; margin: 4px 0; color: #000;">&#10003; {{ __('pos.rcpt_prepaid_marker') }}</div>
+    @endif
     <div class="edge-box" style="border: 2px solid #000; text-align: center; font-weight: bold; font-size: 14px; letter-spacing: 1px; padding: 3px 2px; margin: 3px 0; color: #000;">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>
     @endif
 

@@ -2610,6 +2610,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'rcpt_fbr_pending' => 'FBR PENDING',
     'rcpt_fbr_pending_retry' => 'FBR PENDING — Khud dobara koshish karega',
     'rcpt_fbr_verified_invoice' => 'FBR TASDEEQ SHUDA INVOICE',
+    'rcpt_prepaid_marker' => 'PREPAID — Online Pay Ho Chuka',
     'rcpt_payment_banner' => 'PAYMENT:',
     'rcpt_pos_reg' => 'POS Reg:',
     'rcpt_pos_reg_hash' => 'POS Reg #',

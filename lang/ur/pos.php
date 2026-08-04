@@ -2610,6 +2610,7 @@ return [
     'rcpt_fbr_pending' => 'FBR پینڈنگ',
     'rcpt_fbr_pending_retry' => 'FBR پینڈنگ — خودکار طریقے سے دوبارہ کوشش ہوگی',
     'rcpt_fbr_verified_invoice' => 'FBR ویریفائیڈ انوائس',
+    'rcpt_prepaid_marker' => 'پری پیڈ — آن لائن ادا ہو چکا',
     'rcpt_payment_banner' => 'پیمنٹ: ',
     'rcpt_pos_reg' => 'POS رجسٹریشن: ',
     'rcpt_pos_reg_hash' => 'POS رجسٹریشن #',

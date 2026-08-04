@@ -164,6 +164,7 @@
                 <button onclick="navigator.clipboard.writeText(document.getElementById('url-{{ $device->id }}').textContent.trim()); this.textContent='✓'" class="text-xs px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition whitespace-nowrap">{{ __('pos.copy') }}</button>
             </div>
             <p class="text-[11px] text-gray-400 mt-1">{{ __('pos.bio_push_url_hint') }}</p>
+            <p class="text-[11px] text-amber-600 dark:text-amber-400 mt-1">{{ __('pos.bio_push_url_hint_domain', ['host' => request()->getHost()]) }}</p>
         </div>
 
         {{-- PIN → User mapping --}}

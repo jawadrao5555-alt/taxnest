@@ -3750,6 +3750,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'bio_device_sn_ph'       => 'Maslan: BDC2190780001 (zaruri nahi)',
     'bio_push_url_label'     => 'Push URL — yeh device ki settings mein daalein',
     'bio_push_url_hint'      => 'ZKTeco: Management → Comm → ADMS → Server Address. Port = 443 (HTTPS), Path = ooper wala pura URL.',
+    'bio_push_url_hint_domain' => 'K50 / K40 jaise devices mein Path ka khana nahi hota — pehle yahan device ka Serial Number save karen, phir device mein: Cloud Server / ADMS → Server Address = :host, Port = 80. URL path ki zaroorat nahi.',
     'bio_pin_mapping'        => 'Employee PIN → POS User Mapping',
     'bio_pin_ph'             => 'PIN / Emp ID',
     'bio_select_user'        => 'Staff chunein',

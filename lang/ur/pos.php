@@ -3751,6 +3751,7 @@ return [
     'bio_device_sn_ph'       => 'مثلاً: "BDC2190780001" (ضروری نہیں)',
     'bio_push_url_label'     => '"Push URL" — یہ ڈیوائس کی سیٹنگز میں ڈالیں',
     'bio_push_url_hint'      => 'ZKTeco ڈیوائس میں: "Management → Comm → ADMS → Server Address" ۔ "Port" = 443، باقی سب اوپر والے URL سے لیں۔',
+    'bio_push_url_hint_domain' => '"K50 / K40" جیسی ڈیوائسز میں "Path" کا خانہ نہیں ہوتا — پہلے یہاں ڈیوائس کا سیریل نمبر محفوظ کریں، پھر ڈیوائس میں: "Cloud Server / ADMS" → "Server Address" = :host اور "Port" = 80 رکھیں۔ مکمل URL کی ضرورت نہیں۔',
     'bio_pin_mapping'        => 'ملازم PIN → POS صارف میپنگ',
     'bio_pin_ph'             => 'PIN / ملازم نمبر',
     'bio_select_user'        => 'اسٹاف چنیں',

@@ -194,6 +194,13 @@ Route::get('/pos/invoice/share/{token}', [PosController::class, 'publicInvoicePd
 // Token identifies + scopes the company; no session/CSRF needed.
 Route::get('/bio-sync/{token}/iclock/cdata', [\App\Http\Controllers\PosBiometricController::class, 'admsHandshake'])->name('pos.bio-sync.adms-get');
 Route::post('/bio-sync/{token}/iclock/cdata', [\App\Http\Controllers\PosBiometricController::class, 'admsReceivePunches'])->name('pos.bio-sync.adms-post');
+// Root ADMS endpoints (4 Aug 2026) — K50/K40-class firmware only accepts a bare
+// server address (no URL path), so those devices push to /iclock/cdata at the
+// domain root. Device is identified by ?SN= (must be pre-registered on /pos/bio-sync).
+Route::get('/iclock/cdata', [\App\Http\Controllers\PosBiometricController::class, 'admsHandshakeBySn'])->name('pos.bio-sync.adms-root-get');
+Route::post('/iclock/cdata', [\App\Http\Controllers\PosBiometricController::class, 'admsReceivePunchesBySn'])->name('pos.bio-sync.adms-root-post');
+Route::match(['get', 'post'], '/iclock/getrequest', [\App\Http\Controllers\PosBiometricController::class, 'admsNoCommand'])->name('pos.bio-sync.adms-getrequest');
+Route::match(['get', 'post'], '/iclock/devicecmd', [\App\Http\Controllers\PosBiometricController::class, 'admsNoCommand'])->name('pos.bio-sync.adms-devicecmd');
 
 // ═══ Local Bills Archive Portal ═══
 // Isolated read-only portal for users with pos_role='archive_viewer'. Same /pos/login URL

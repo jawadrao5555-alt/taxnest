@@ -50,7 +50,12 @@ class PosBiometricController extends Controller
             $device->save();
         }
 
-        // Standard ADMS response: tell device to send all records from stamp 0
+        return $this->handshakeResponse();
+    }
+
+    /** Standard ADMS handshake response: tell device to send all records. */
+    private function handshakeResponse()
+    {
         $serverTime = now()->format('Y-m-d H:i:s');
         $body = "GET OPTION FROM:ZKTIMEII\r\n"
               . "Stamp=9999999999\r\n"
@@ -81,6 +86,12 @@ class PosBiometricController extends Controller
             return response('ERROR', 403)->header('Content-Type', 'text/plain');
         }
 
+        return $this->ingestPunches($device, $request);
+    }
+
+    /** Shared ATTLOG ingestion for both token-path and SN-root endpoints. */
+    private function ingestPunches(PosBiometricDevice $device, Request $request)
+    {
         $table = $request->query('table', '');
         if (strtoupper($table) !== 'ATTLOG') {
             // Other tables (OPERLOG, USERINFO, etc.) — acknowledge but ignore
@@ -160,6 +171,66 @@ class PosBiometricController extends Controller
         }
 
         return response("OK: {$saved}\r\n", 200)->header('Content-Type', 'text/plain');
+    }
+
+    // ─── Root ADMS endpoints (SN-based) ────────────────────────────────────
+    //
+    // K50/K40-class ZKTeco firmware only accepts a bare server address + port
+    // in its Cloud Server / ADMS setting — no URL path — so those devices hit
+    // /iclock/cdata at the DOMAIN ROOT. We identify the device by its ?SN=
+    // query param, which the admin must pre-register (device_sn) on
+    // /pos/bio-sync. An SN that matches zero or more than one active device is
+    // rejected (ambiguity would leak punches across companies).
+
+    /** Resolve an active registered device from the ?SN= query param, or null. */
+    private function deviceBySn(Request $request): ?PosBiometricDevice
+    {
+        $sn = trim((string) $request->query('SN', ''));
+        if ($sn === '') {
+            return null;
+        }
+
+        $devices = PosBiometricDevice::where('device_sn', $sn)
+            ->where('is_active', true)
+            ->limit(2)
+            ->get();
+
+        if ($devices->count() > 1) {
+            Log::warning("biometric: duplicate active device_sn '{$sn}' — root ADMS push rejected");
+            return null;
+        }
+
+        return $devices->first();
+    }
+
+    /** GET /iclock/cdata — root handshake for domain-only firmware. */
+    public function admsHandshakeBySn(Request $request)
+    {
+        if (!$this->deviceBySn($request)) {
+            return response('ERROR', 403)->header('Content-Type', 'text/plain');
+        }
+
+        return $this->handshakeResponse();
+    }
+
+    /** POST /iclock/cdata — root punch push for domain-only firmware. */
+    public function admsReceivePunchesBySn(Request $request)
+    {
+        $device = $this->deviceBySn($request);
+        if (!$device) {
+            return response('ERROR', 403)->header('Content-Type', 'text/plain');
+        }
+
+        return $this->ingestPunches($device, $request);
+    }
+
+    /**
+     * GET|POST /iclock/getrequest and /iclock/devicecmd — devices poll these
+     * for server commands. We issue none; a plain OK keeps the device happy.
+     */
+    public function admsNoCommand()
+    {
+        return response("OK\r\n", 200)->header('Content-Type', 'text/plain');
     }
 
     // ─── Admin Setup Page ──────────────────────────────────────────────────

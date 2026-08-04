@@ -291,6 +291,10 @@ class Company extends Model
         return [
             'bold' => filter_var($style['bold'] ?? true, FILTER_VALIDATE_BOOLEAN),
             'logo' => in_array(($style['logo'] ?? 'center'), ['side', 'center'], true) ? ($style['logo'] ?? 'center') : 'center',
+            // logo_finals_only: when true the logo is suppressed on local/provisional
+            // bills (invoice_mode='local') and printed only on final/PRA bills.
+            // Default false = current behaviour (logo on every bill).
+            'logo_finals_only' => filter_var($style['logo_finals_only'] ?? false, FILTER_VALIDATE_BOOLEAN),
         ];
     }
 

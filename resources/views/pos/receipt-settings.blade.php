@@ -203,6 +203,15 @@
                 </select>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.logo_style_hint') }}</p>
             </div>
+            {{-- Logo on Finals Only (Task #284): suppress logo on local/provisional
+                 bills; print it only on final/PRA bills. Default OFF = logo everywhere. --}}
+            <label class="flex items-start gap-2.5 cursor-pointer p-3 rounded-lg border {{ ($ps['logo_finals_only'] ?? false) ? 'border-purple-400 bg-purple-50/40 dark:bg-purple-900/10' : 'border-gray-200 dark:border-gray-700' }} transition">
+                <input type="checkbox" name="rp_logo_finals_only" value="1" {{ ($ps['logo_finals_only'] ?? false) ? 'checked' : '' }} class="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4">
+                <span class="flex-1 min-w-0">
+                    <span class="block text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.logo_finals_only_label') }}</span>
+                    <span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.logo_finals_only_hint') }}</span>
+                </span>
+            </label>
         </div>
 
         <div class="flex items-center justify-between gap-3">

@@ -243,6 +243,9 @@ class PosController extends Controller
                 // roll-width PDF page (default); 'a4' = real A4 page, receipt strip
                 // top-left — fixes right-shifted/clipped prints on office printers.
                 'pdf_paper' => $request->input('rp_pdf_paper') === 'a4' ? 'a4' : 'thermal',
+                // Logo on finals only: when ON, logo prints only on final/PRA bills —
+                // suppressed on local/provisional (invoice_mode='local') bills.
+                'logo_finals_only' => $request->has('rp_logo_finals_only'),
             ];
             $company->update([
                 'invoice_display_prefs' => $prefs,

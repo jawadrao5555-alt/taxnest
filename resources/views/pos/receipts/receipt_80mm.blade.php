@@ -269,6 +269,11 @@
         $rcptOffline = $transaction->pra_status === 'offline';
         $rcptTopBadge = !$rcptPraFiscal && !$rcptOffline;
         $rcptTopProvisional = ($transaction->invoice_mode ?? 'pra') === 'local';
+        // Logo-on-finals-only gate (Task #284): when the company opts in, suppress
+        // the logo on local/provisional bills (invoice_mode='local'). Reporting-OFF
+        // finals (invoice_mode='pra' + pra_status=NULL) are NOT local, so logo
+        // still prints on them. Default OFF = logo on every bill (unchanged behaviour).
+        $showLogo = $logoDataUri && (!($printStyle['logo_finals_only'] ?? false) || !$rcptTopProvisional);
     @endphp
     <div class="header text-center">
         {{-- Logo placement (customer request Jul 2026): logo sits to the RIGHT of the
@@ -276,7 +281,7 @@
              shorter. Table layout (not flex) so DomPDF renders it identically.
              'center' style (Pizza Master Jul 2026): LARGE centered logo above the
              name, like classic printed bills — opt-in via Receipt Settings. --}}
-        @if($logoDataUri)
+        @if($showLogo)
         @if($printStyle['logo'] === 'center')
         {{-- display:block kills the inline-image baseline gap under the logo
              (owner report Jul 2026: "remove space under logo"). --}}

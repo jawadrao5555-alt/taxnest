@@ -1649,6 +1649,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'logo_style_hint' => 'Business Profile page par apna logo upload karein. "Large" se bill par bara aur center mein logo print hoga.',
     'logo_style_large' => 'Large — bill ke top par bara centered logo (default)',
     'logo_style_on_receipt' => 'Receipt par Logo Style',
+    'logo_finals_only_label' => 'Logo sirf final / PRA bills par print karein',
+    'logo_finals_only_hint' => 'Jab yeh on ho, to local / provisional bills par shop ka logo nahi chapega. Sirf mukammal PRA bills par aayega. Default: off (har bill par logo).',
     'logout' => 'Logout',
     'low_50_100' => 'Low (50-100%)',
     'low_badge' => 'LOW',

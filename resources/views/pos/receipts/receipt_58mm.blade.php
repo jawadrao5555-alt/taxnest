@@ -222,12 +222,14 @@
         $rcptOffline = $transaction->pra_status === 'offline';
         $rcptTopBadge = !$rcptPraFiscal && !$rcptOffline;
         $rcptTopProvisional = ($transaction->invoice_mode ?? 'pra') === 'local';
+        // Logo-on-finals-only gate (Task #284) — mirrors receipt_80mm; keep in sync.
+        $showLogo = $logoDataUri && (!($printStyle['logo_finals_only'] ?? false) || !$rcptTopProvisional);
     @endphp
     <div class="header text-center">
         {{-- Logo placement (customer request Jul 2026): logo sits to the RIGHT of the
              business name on one row (was stacked above it) — the header prints
              shorter. Table layout (not flex) so DomPDF renders it identically. --}}
-        @if($logoDataUri)
+        @if($showLogo)
         @if($printStyle['logo'] === 'center')
         {{-- 'center' style (Pizza Master Jul 2026): LARGE centered logo above the
              name, like classic printed bills — opt-in via Receipt Settings. --}}

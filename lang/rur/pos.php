@@ -3647,6 +3647,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'waiter_orders_awaiting' => 'Waiter Orders — payment ka intezar',
     'waiter_tablet' => 'Waiter Tablet',
     'waiter_tablet_subtitle' => 'Order banayein, phir payment ke liye cashier ko bhejein.',
+    'waiter_app_download' => 'Waiter App (APK)',
     'waiting_paren' => '(intezar...)',
     'walk_in' => 'Walk-in',
     'walk_in_customer' => 'Walk-in Customer',

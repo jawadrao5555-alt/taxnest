@@ -16,6 +16,12 @@
             <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('pos.waiter_tablet_subtitle') }}</p>
         </div>
         <div class="flex items-center gap-2">
+            {{-- Waiter APK download (Aug 2026) — cookie-less public static file,
+                 same pattern as Rider APK on rider-tracking page. --}}
+            <a href="{{ url('/downloads/taxnest-waiter.apk') }}"
+               class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200">
+                ⬇ {{ __('pos.waiter_app_download') }}
+            </a>
             {{-- ZFC (29 Jul 2026): manual refresh — waiter phones keep this tab
                  open for days; this pulls the LATEST code with a cache-buster. --}}
             <button @click="hardRefresh()" title="{{ __('pos.ti_refresh_app') }}" class="px-3 py-2 rounded-xl text-sm font-bold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-teal-500 transition">

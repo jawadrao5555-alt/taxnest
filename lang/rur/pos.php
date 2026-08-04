@@ -3686,6 +3686,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'waiter_order_cancel_side' => 'Waiter ka order — cancel sirf waiter/admin side se',
     'waiter_order_loaded_settle' => 'Waiter order load ho gaya — payment le kar settle karein (kitchen ko KOT mil chuka hai).',
     'waiter_order_prefix' => 'Waiter order ',
+    'waiter_more_label' => 'Mazeed options (takeaway, phone, note, cashier)',
     'waiter_orders_awaiting' => 'Waiter Orders — payment ka intezar',
     'waiter_tablet' => 'Waiter Tablet',
     'waiter_tablet_subtitle' => 'Order banayein, phir payment ke liye cashier ko bhejein.',

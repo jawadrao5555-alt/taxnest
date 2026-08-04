@@ -94,6 +94,14 @@
         <div class="order-1 lg:order-2 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4 flex flex-col gap-3 h-fit lg:sticky lg:top-4">
             <h2 class="text-sm font-black uppercase tracking-wide text-gray-500 dark:text-gray-400" x-text="appendOrderId ? {{ Js::from(__('pos.new_items')) }} : {{ Js::from(__('pos.order_word')) }}"></h2>
 
+            {{-- SADA MODE (owner, 4 Aug 2026): table SAB SE PEHLE — bada button
+                 panel ke top par (mobile par panel khud top par hai). Dine-in
+                 default; Takeaway ab "Mazeed" fold ke andar hai (hataya NahiN). --}}
+            <button x-show="!appendOrderId && orderType === 'dine_in'" @click="openTables()"
+                    class="w-full py-3 rounded-xl text-base font-black border-2 border-dashed transition"
+                    :class="selectedTable ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300' : 'border-amber-400 bg-amber-50 dark:bg-amber-900/15 text-amber-700 dark:text-amber-300'"
+                    x-text="selectedTable ? ({{ Js::from(__('pos.table_t_prefix2')) }} + selectedTable.table_number + ' · ' + selectedTable.floor) : {{ Js::from(__('pos.choose_table')) }}"></button>
+
             {{-- Cart lines --}}
             <div class="space-y-2 max-h-[32vh] overflow-y-auto" x-show="cart.length">
                 <template x-for="(line, i) in cart" :key="line.uid">
@@ -133,38 +141,49 @@
                 </div>
             </div>
 
-            {{-- Order details (hidden in append mode — the order already has them) --}}
+            {{-- Order details (hidden in append mode — the order already has them).
+                 SADA MODE (owner, 4 Aug 2026): sirf customer ka naam khula rahta
+                 hai; Takeaway toggle, phone, order-note aur cashier chunna sab
+                 "Mazeed" fold ke andar — koi feature HATAYA nahi, sirf chhupaya. --}}
             <template x-if="!appendOrderId">
                 <div class="space-y-3">
-                    <div class="grid grid-cols-2 gap-2">
-                        <button @click="orderType = 'dine_in'" :class="orderType === 'dine_in' ? 'bg-teal-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'" class="py-2.5 rounded-xl text-xs font-bold transition">{{ __('pos.dine_in') }}</button>
-                        <button @click="orderType = 'takeaway'; selectedTable = null" :class="orderType === 'takeaway' ? 'bg-teal-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'" class="py-2.5 rounded-xl text-xs font-bold transition">{{ __('pos.take_away') }}</button>
-                    </div>
-                    <button x-show="orderType === 'dine_in'" @click="openTables()" class="w-full py-2.5 rounded-xl text-sm font-bold border-2 border-dashed transition"
-                            :class="selectedTable ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-300' : 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400'"
-                            x-text="selectedTable ? ({{ Js::from(__('pos.table_t_prefix2')) }} + selectedTable.table_number + ' · ' + selectedTable.floor) : {{ Js::from(__('pos.choose_table')) }}"></button>
                     <input type="text" x-model="customerName" placeholder="{{ __('pos.ph_customer_name_optional') }}"
                            autocomplete="off" name="waiter_customer_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                            class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm px-3 py-2.5 focus:ring-teal-500 focus:border-teal-500">
-                    <input type="text" x-model="customerPhone" placeholder="{{ __('pos.ph_customer_phone_optional') }}" inputmode="tel"
-                           autocomplete="off" name="waiter_phone_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
-                           class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm px-3 py-2.5 focus:ring-teal-500 focus:border-teal-500">
-                    <textarea x-model="kitchenNotes" rows="2" placeholder="{{ __('pos.ph_kitchen_note_order') }}"
-                              autocomplete="off" name="waiter_kn_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
-                              class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm px-3 py-2.5 focus:ring-teal-500 focus:border-teal-500"></textarea>
-                    <div>
-                        {{-- Cashier pick is OPTIONAL (customer feedback, 23 Jul 2026): default = counter,
-                             order shows on EVERY cashier's incoming list. Picking a specific cashier
-                             still works and sticks for the day (owner, 20 Jul 2026). --}}
-                        <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.send_to') }}</label>
-                        <select x-model="cashierId" class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm px-3 py-2.5 focus:ring-teal-500 focus:border-teal-500">
-                            <option value="">{{ __('pos.counter_all_cashiers') }}</option>
-                            @foreach($cashiers as $c)
-                                <option value="{{ $c->id }}">{{ $c->name }}</option>
-                            @endforeach
-                        </select>
-                        <p x-show="cashierId" class="mt-1 text-[11px] text-teal-600 dark:text-teal-400 font-medium">{{ __('pos.cashier_remembered_today') }}</p>
-                        <p x-show="!cashierId" class="mt-1 text-[11px] text-gray-400">{{ __('pos.all_cashiers_will_see') }}</p>
+
+                    <button type="button" @click="moreOpen = !moreOpen" title="{{ __('pos.ti_more_options') }}"
+                            class="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-teal-400 transition">
+                        <span x-text="(moreOpen ? '▾ ' : '▸ ') + {{ Js::from(__('pos.waiter_more_label')) }}"></span>
+                        {{-- Fold band ho tab bhi pata rahe ke andar kuch chuna hua hai --}}
+                        <span x-show="!moreOpen && (orderType === 'takeaway' || cashierId)" x-cloak class="text-[10px] font-black text-amber-600 dark:text-amber-400"
+                              x-text="[orderType === 'takeaway' ? {{ Js::from(__('pos.take_away')) }} : null, cashierId ? {{ Js::from(__('pos.send_to')) }} + ' ✓' : null].filter(Boolean).join(' · ')"></span>
+                    </button>
+
+                    <div x-show="moreOpen" x-cloak class="space-y-3">
+                        <div class="grid grid-cols-2 gap-2">
+                            <button @click="orderType = 'dine_in'" :class="orderType === 'dine_in' ? 'bg-teal-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'" class="py-2.5 rounded-xl text-xs font-bold transition">{{ __('pos.dine_in') }}</button>
+                            <button @click="orderType = 'takeaway'; selectedTable = null" :class="orderType === 'takeaway' ? 'bg-teal-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'" class="py-2.5 rounded-xl text-xs font-bold transition">{{ __('pos.take_away') }}</button>
+                        </div>
+                        <input type="text" x-model="customerPhone" placeholder="{{ __('pos.ph_customer_phone_optional') }}" inputmode="tel"
+                               autocomplete="off" name="waiter_phone_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                               class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm px-3 py-2.5 focus:ring-teal-500 focus:border-teal-500">
+                        <textarea x-model="kitchenNotes" rows="2" placeholder="{{ __('pos.ph_kitchen_note_order') }}"
+                                  autocomplete="off" name="waiter_kn_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                                  class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm px-3 py-2.5 focus:ring-teal-500 focus:border-teal-500"></textarea>
+                        <div>
+                            {{-- Cashier pick is OPTIONAL (customer feedback, 23 Jul 2026): default = counter,
+                                 order shows on EVERY cashier's incoming list. Picking a specific cashier
+                                 still works and sticks for the day (owner, 20 Jul 2026). --}}
+                            <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.send_to') }}</label>
+                            <select x-model="cashierId" class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm px-3 py-2.5 focus:ring-teal-500 focus:border-teal-500">
+                                <option value="">{{ __('pos.counter_all_cashiers') }}</option>
+                                @foreach($cashiers as $c)
+                                    <option value="{{ $c->id }}">{{ $c->name }}</option>
+                                @endforeach
+                            </select>
+                            <p x-show="cashierId" class="mt-1 text-[11px] text-teal-600 dark:text-teal-400 font-medium">{{ __('pos.cashier_remembered_today') }}</p>
+                            <p x-show="!cashierId" class="mt-1 text-[11px] text-gray-400">{{ __('pos.all_cashiers_will_see') }}</p>
+                        </div>
                     </div>
                 </div>
             </template>
@@ -345,6 +364,9 @@ function waiterApp() {
         activeCategory: 'all',
         cart: [],
         orderType: 'dine_in',
+        // SADA MODE (owner, 4 Aug 2026): Takeaway/phone/note/cashier "Mazeed"
+        // fold ke andar — default band, order bhejne par wapas band.
+        moreOpen: false,
         selectedTable: null,
         customerName: '',
         customerPhone: '',
@@ -696,6 +718,10 @@ function waiterApp() {
                     this.cart = [];
                     this.customerName = ''; this.customerPhone = ''; this.kitchenNotes = '';
                     this.selectedTable = null;
+                    // SADA MODE: agla order phir dine-in se, fold band — screen
+                    // khud "naya order" halat par wapas (cashier ka intikhab
+                    // din bhar qaim rehta hai, jaan boojh kar reset NahiN).
+                    this.orderType = 'dine_in'; this.moreOpen = false;
                     this.appendOrderId = null; this.appendOrderNumber = '';
                     this.loadMyOrders();
                 }

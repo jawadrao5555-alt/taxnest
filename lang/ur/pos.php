@@ -3687,6 +3687,7 @@ return [
     'waiter_order_cancel_side' => 'ویٹر آرڈر — صرف ویٹر/ایڈمن سائیڈ سے کینسل کریں',
     'waiter_order_loaded_settle' => 'ویٹر آرڈر لوڈ ہو گیا — سیٹل کرنے کے لیے پیمنٹ لیں (کچن کے پاس KOT موجود ہے)۔',
     'waiter_order_prefix' => 'ویٹر آرڈر ',
+    'waiter_more_label' => 'مزید اختیارات (ٹیک اوے، فون، نوٹ، کیشئر)',
     'waiter_orders_awaiting' => 'ویٹر آرڈرز — پیمنٹ کا انتظار',
     'waiter_tablet' => 'ویٹر ٹیبلیٹ',
     'waiter_tablet_subtitle' => 'آرڈر بنائیں، پھر پیمنٹ کے لیے کیشئر کو بھیجیں۔',

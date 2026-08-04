@@ -1,8 +1,11 @@
 {{--
-PWA auto-update toast — premium notification when a new SW version is ready.
+PWA update toast — premium notification when a new SW version is ready.
 Requires <x-pwa-init /> to be included once on the page first (it owns controllerchange auto-reload).
-Auto-checks: every 5 min + on tab focus + on online event + on visibilitychange.
-Auto-applies after 30s (countdown) — user can dismiss to postpone for 5 min.
+Auto-checks: every minute + on tab focus + on online event + on visibilitychange.
+NEVER auto-applies (owner rule Aug 2026: "bar bar load hone ka nuksan — sale bana
+rahe hote hain, POS load ho jata"): the old 30s countdown yanked cashiers mid-work
+whenever a deploy landed. Updates apply ONLY on user action — this toast's Refresh
+button or the header <x-pwa-refresh-btn />. Dismiss hides the toast for 5 minutes.
 Usage: <x-pwa-update color="emerald" />
 --}}
 @props(['color' => 'emerald'])
@@ -24,7 +27,7 @@ Usage: <x-pwa-update color="emerald" />
             </div>
             <div style="display:flex; flex-direction:column; gap:1px; line-height:1.25; color:#fff;">
                 <div style="font-size:13px; font-weight:800; letter-spacing:0.2px;">New update available</div>
-                <div style="font-size:11px; opacity:0.92; font-weight:500;">{{ __('pos.pwa_apply_hint') }} <span id="tnPwaUpdateCountdown" style="font-weight:700;"></span></div>
+                <div style="font-size:11px; opacity:0.92; font-weight:500;">{{ __('pos.pwa_apply_hint') }}</div>
             </div>
             <button id="tnPwaUpdateBtn" style="flex-shrink:0; margin-left:6px; padding:7px 14px; border-radius:10px; background:#fff; color:{{ $c['to'] }}; border:none; font-size:12px; font-weight:800; cursor:pointer; transition: all .15s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.18);">
                 Refresh
@@ -47,11 +50,8 @@ Usage: <x-pwa-update color="emerald" />
     const bar = document.getElementById('tnPwaUpdateBar');
     const btn = document.getElementById('tnPwaUpdateBtn');
     const dismissBtn = document.getElementById('tnPwaUpdateDismiss');
-    const countdownEl = document.getElementById('tnPwaUpdateCountdown');
     if (!bar || !btn) return;
 
-    let countdownTimer = null;
-    let countdownSeconds = 30;
     let postponedUntil = 0;
 
     const showBar = () => {
@@ -62,44 +62,17 @@ Usage: <x-pwa-update color="emerald" />
             bar.style.transform = 'translateX(-50%) translateY(0)';
         });
         document.dispatchEvent(new CustomEvent('tn-pwa-update-available'));
-        startCountdown();
     };
 
     const hideBar = () => {
         bar.style.opacity = '0';
         bar.style.transform = 'translateX(-50%) translateY(-8px)';
         setTimeout(() => { bar.style.display = 'none'; }, 250);
-        stopCountdown();
     };
 
-    const startCountdown = () => {
-        stopCountdown();
-        countdownSeconds = 30;
-        countdownEl.textContent = ' (' + countdownSeconds + 's)';
-        countdownTimer = setInterval(() => {
-            countdownSeconds--;
-            if (countdownSeconds <= 0) {
-                // Mid-task hold: pages can register window.tnPwaUpdateHold (e.g. POS sale
-                // screen with items in the cart / pay modal open). While it returns true,
-                // keep the toast visible but DON'T auto-reload — retry every 30s. The
-                // manual Refresh button still works immediately.
-                if (typeof window.tnPwaUpdateHold === 'function') {
-                    let busy = false;
-                    try { busy = !!window.tnPwaUpdateHold(); } catch (e) {}
-                    if (busy) { countdownSeconds = 30; countdownEl.textContent = ''; return; }
-                }
-                stopCountdown();
-                applyUpdate();
-                return;
-            }
-            countdownEl.textContent = ' (' + countdownSeconds + 's)';
-        }, 1000);
-    };
-
-    const stopCountdown = () => {
-        if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
-    };
-
+    // NO auto-apply (owner rule Aug 2026): the update waits silently until the
+    // user clicks Refresh here or the header refresh icon — a deploy must never
+    // reload a screen on its own while a cashier is working.
     const applyUpdate = () => {
         if (typeof window.tnPwaApplyWaitingUpdate === 'function') {
             window.tnPwaApplyWaitingUpdate();
@@ -134,7 +107,7 @@ Usage: <x-pwa-update color="emerald" />
         setTimeout(checkNow, 2000);
     });
 
-    btn.addEventListener('click', () => { stopCountdown(); applyUpdate(); });
+    btn.addEventListener('click', () => { applyUpdate(); });
     dismissBtn.addEventListener('click', () => {
         // Postpone for 5 minutes — user is mid-task, don't reload
         postponedUntil = Date.now() + 5 * 60 * 1000;

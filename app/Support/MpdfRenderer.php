@@ -40,11 +40,12 @@ final class MpdfRenderer
     /**
      * Render a Blade view to a PDF response via mPDF.
      *
-     * @param  string        $view      Blade view name
-     * @param  array         $data      View data
-     * @param  string|array  $paper     'a4'  OR  [widthMm, heightMm]
-     * @param  string        $filename  PDF filename (used in Content-Disposition)
-     * @param  bool          $stream    true = inline preview, false = download
+     * @param  string        $view        Blade view name
+     * @param  array         $data        View data
+     * @param  string|array  $paper       'a4' | 'a4-report' | [widthMm, heightMm]
+     * @param  string        $filename    PDF filename (used in Content-Disposition)
+     * @param  bool          $stream      true = inline preview, false = download
+     * @param  string        $orientation 'portrait' | 'landscape' (A4 paper types only)
      * @return Response
      */
     public static function render(
@@ -52,9 +53,10 @@ final class MpdfRenderer
         array $data,
         string|array $paper,
         string $filename,
-        bool $stream
+        bool $stream,
+        string $orientation = 'portrait'
     ): Response {
-        $mpdf = static::makeMpdf($paper);
+        $mpdf = static::makeMpdf($paper, $orientation);
 
         $html = static::prepareHtml(view($view, $data)->render(), $paper);
         $mpdf->WriteHTML($html);
@@ -101,7 +103,7 @@ final class MpdfRenderer
         return $html;
     }
 
-    private static function makeMpdf(string|array $paper): \Mpdf\Mpdf
+    private static function makeMpdf(string|array $paper, string $orientation = 'portrait'): \Mpdf\Mpdf
     {
         // mPDF needs a writable temp dir. storage/app/mpdf is safe on both
         // dev and cPanel (storage/ is always writable in a Laravel app).
@@ -122,11 +124,20 @@ final class MpdfRenderer
         if ($paper === 'a4') {
             // A4 portrait. Margins match the @page CSS rule in fbr-pos/invoice-pdf:
             // 15mm top/left/right, 18mm bottom.
-            $config['format']        = 'A4';
+            $config['format']        = $orientation === 'landscape' ? 'A4-L' : 'A4';
             $config['margin_left']   = 15;
             $config['margin_right']  = 15;
             $config['margin_top']    = 15;
             $config['margin_bottom'] = 18;
+        } elseif ($paper === 'a4-report') {
+            // A4 report pages. Margins match @page { margin: 10mm 15mm } that the
+            // report templates declare and that prepareHtml() strips before mPDF
+            // sees the HTML — so these values must be the effective page margins.
+            $config['format']        = $orientation === 'landscape' ? 'A4-L' : 'A4';
+            $config['margin_left']   = 15;
+            $config['margin_right']  = 15;
+            $config['margin_top']    = 10;
+            $config['margin_bottom'] = 10;
         } else {
             // Thermal custom size [widthMm, heightMm].
             // Margins 0 — the Blade template's body padding (3mm) handles all

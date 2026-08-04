@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="{{ ($pdfUrdu ?? false) ? 'ur' : 'en' }}" dir="{{ ($pdfUrdu ?? false) ? 'rtl' : 'ltr' }}">
 <head>
     <meta charset="utf-8">
     <style>
@@ -21,40 +21,49 @@
         .tot { font-weight: bold; }
         .foot { margin-top: 16px; font-size: 9px; color: #9ca3af; text-align: center; }
     </style>
+    @if($pdfUrdu ?? false)
+    <style>
+        * { font-family: 'XB Riyaz', DejaVu Sans, sans-serif; }
+        body { direction: rtl; }
+        table.tx, .kpis { direction: rtl; }
+        table.tx th { text-transform: none; letter-spacing: 0; }
+        .kpis .lbl { text-transform: none; }
+    </style>
+    @endif
 </head>
 <body>
     <div class="head">
-        <h1>Customer Purchase History</h1>
-        <div class="sub">{{ $company->name ?? '' }} · Generated {{ now()->format('d M Y, H:i') }}</div>
+        <h1>{{ __('pos.ch_title') }}</h1>
+        <div class="sub">{{ $company->name ?? '' }} &middot; {{ __('pos.dcp_generated') }} {{ now()->format('d M Y, H:i') }}</div>
     </div>
 
     <div class="meta">
-        <div><b>Customer:</b> {{ $customer->name }}</div>
-        <div><b>Phone:</b> {{ $customer->phone ?: '—' }}</div>
-        @if($customer->cnic)<div><b>CNIC:</b> {{ $customer->cnic }}</div>@endif
-        @if($customer->city)<div><b>City:</b> {{ $customer->city }}</div>@endif
-        <div><b>Type:</b> {{ ucfirst($customer->type) }}</div>
+        <div><b>{{ __('pos.ch_label_customer') }}</b> {{ $customer->name }}</div>
+        <div><b>{{ __('pos.ch_label_phone') }}</b> {{ $customer->phone ?: '—' }}</div>
+        @if($customer->cnic)<div><b>{{ __('pos.ch_label_cnic') }}</b> {{ $customer->cnic }}</div>@endif
+        @if($customer->city)<div><b>{{ __('pos.ch_label_city') }}</b> {{ $customer->city }}</div>@endif
+        <div><b>{{ __('pos.ch_label_type') }}</b> {{ ucfirst($customer->type) }}</div>
     </div>
 
     <table class="kpis">
         <tr>
-            <td><div class="lbl">Total Orders</div><div class="val">{{ number_format($totalOrders) }}</div></td>
-            <td><div class="lbl">Total Spent</div><div class="val">PKR {{ number_format($totalSpent, 0) }}</div></td>
-            <td><div class="lbl">Avg. Order</div><div class="val">PKR {{ number_format($totalOrders > 0 ? $totalSpent / $totalOrders : 0, 0) }}</div></td>
+            <td><div class="lbl">{{ __('pos.ch_total_orders') }}</div><div class="val">{{ number_format($totalOrders) }}</div></td>
+            <td><div class="lbl">{{ __('pos.ch_total_spent') }}</div><div class="val">PKR {{ number_format($totalSpent, 0) }}</div></td>
+            <td><div class="lbl">{{ __('pos.ch_avg_order') }}</div><div class="val">PKR {{ number_format($totalOrders > 0 ? $totalSpent / $totalOrders : 0, 0) }}</div></td>
         </tr>
     </table>
 
     <table class="tx">
         <thead>
             <tr>
-                <th>Date</th>
-                <th>Invoice #</th>
-                <th>Mode</th>
-                <th>Payment</th>
-                <th class="r">Subtotal</th>
-                <th class="r">Discount</th>
-                <th class="r">Tax</th>
-                <th class="r">Total</th>
+                <th>{{ __('pos.dc_date') }}</th>
+                <th>{{ __('pos.ch_col_invoice') }}</th>
+                <th>{{ __('pos.ch_col_mode') }}</th>
+                <th>{{ __('pos.ch_col_payment') }}</th>
+                <th class="r">{{ __('pos.tr_col_subtotal') }}</th>
+                <th class="r">{{ __('pos.tr_col_discount') }}</th>
+                <th class="r">{{ __('pos.tr_col_tax_amt') }}</th>
+                <th class="r">{{ __('pos.ch_col_total') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -62,7 +71,7 @@
             <tr>
                 <td>{{ $t->created_at->format('d M Y H:i') }}</td>
                 <td>{{ $t->invoice_number }}</td>
-                <td>{{ $t->isLocalBill() ? (($t->is_spend_snapshot ?? false) ? 'Local (record)' : 'Local') : 'PRA' }}</td>
+                <td>{{ $t->isLocalBill() ? (($t->is_spend_snapshot ?? false) ? __('pos.ch_local_record') : __('pos.dc_local')) : 'PRA' }}</td>
                 <td>{{ ucwords(str_replace('_', ' ', (string) $t->payment_method)) }}</td>
                 <td class="r">{{ number_format($t->subtotal, 0) }}</td>
                 <td class="r">{{ number_format($t->discount_amount, 0) }}</td>
@@ -70,19 +79,19 @@
                 <td class="r">{{ number_format($t->total_amount, 0) }}</td>
             </tr>
             @empty
-            <tr><td colspan="8" style="text-align:center; padding:20px; color:#9ca3af;">No purchase history found.</td></tr>
+            <tr><td colspan="8" style="text-align:center; padding:20px; color:#9ca3af;">{{ __('pos.ch_no_history') }}</td></tr>
             @endforelse
         </tbody>
         @if($transactions->count())
         <tfoot>
             <tr class="tot">
-                <td colspan="7" class="r">TOTAL</td>
+                <td colspan="7" class="r">{{ __('pos.ch_total_label') }}</td>
                 <td class="r">PKR {{ number_format($totalSpent, 0) }}</td>
             </tr>
         </tfoot>
         @endif
     </table>
 
-    <div class="foot">History matches sales by linked customer or phone number. NestPOS (PRA) — confidential.</div>
+    <div class="foot">{{ __('pos.ch_footer') }}</div>
 </body>
 </html>

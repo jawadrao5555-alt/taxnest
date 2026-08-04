@@ -2159,10 +2159,11 @@ class FbrPosController extends Controller
         [$from, $to] = $this->resolveFbrReportRange($request);
         $analytics = $this->buildFbrReportRangeAnalytics($companyId, $from, $to, Auth::guard('fbrpos')->user());
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fbr-pos.reports-analytics-pdf', compact('company', 'analytics'));
-        $pdf->setPaper('a4', 'portrait');
-
-        return $pdf->download('FBR-Sales-Analytics-' . $analytics->from . '-to-' . $analytics->to . '.pdf');
+        return $this->renderReportPdf(
+            'fbr-pos.reports-analytics-pdf',
+            compact('company', 'analytics'),
+            'FBR-Sales-Analytics-' . $analytics->from . '-to-' . $analytics->to . '.pdf'
+        );
     }
 
     /**
@@ -2171,6 +2172,38 @@ class FbrPosController extends Controller
      *
      * @return array{0:\Carbon\Carbon,1:\Carbon\Carbon}
      */
+    /**
+     * Render an A4 report PDF via mPDF for 'ur' locale or DomPDF for en/rur.
+     * Mirrors PosController::renderReportPdf — see that method for full notes.
+     */
+    private function renderReportPdf(
+        string $view,
+        array $data,
+        string $filename,
+        string $orientation = 'portrait'
+    ): \Illuminate\Http\Response {
+        $isUrdu = app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT;
+        $data['pdfUrdu'] = $isUrdu;
+
+        if ($isUrdu) {
+            try {
+                return \App\Support\MpdfRenderer::render(
+                    $view, $data, 'a4-report', $filename, false, $orientation
+                );
+            } catch (\Throwable $e) {
+                \Log::warning("mPDF report render failed [{$filename}]: " . $e->getMessage());
+            }
+        }
+
+        \App\Support\PosLocale::applyPdfSafeLocale();
+        $data['pdfUrdu'] = false;
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($view, $data)
+            ->setPaper('a4', $orientation);
+
+        return $pdf->download($filename);
+    }
+
     private function resolveFbrReportRange(Request $request): array
     {
         try {
@@ -2831,10 +2864,11 @@ class FbrPosController extends Controller
 
         $analytics = $this->buildFbrDayCloseAnalytics($companyId, $report->report_date->toDateString(), $transactions);
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fbr-pos.day-close-pdf', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics'));
-        $pdf->setPaper('a4', 'portrait');
-
-        return $pdf->download("Day-Close-{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf");
+        return $this->renderReportPdf(
+            'fbr-pos.day-close-pdf',
+            compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics'),
+            "Day-Close-{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf"
+        );
     }
 
     /**

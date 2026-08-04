@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="{{ ($pdfUrdu ?? false) ? 'ur' : 'en' }}" dir="{{ ($pdfUrdu ?? false) ? 'rtl' : 'ltr' }}">
 <head>
     <meta charset="utf-8">
-    <title>NestPOS Tax Report</title>
+    <title>{{ __('pos.tr_report_title') }}</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'DejaVu Sans', Arial, Helvetica, sans-serif; font-size: 9px; color: #1a1a1a; line-height: 1.4; }
@@ -39,14 +39,22 @@
         .total-row { background-color: #f3f0ff !important; font-weight: bold; }
         .total-row td { border-top: 2px solid #7c3aed; border-bottom: 2px solid #7c3aed; }
     </style>
+    @if($pdfUrdu ?? false)
+    <style>
+        body { font-family: 'XB Riyaz', 'DejaVu Sans', sans-serif; direction: rtl; }
+        table { direction: rtl; }
+        th { text-transform: none; letter-spacing: 0; }
+        .summary-label { text-transform: none; letter-spacing: 0; }
+    </style>
+    @endif
 </head>
 <body>
     <div class="header">
         <div class="company-name">{{ $company->company_name ?? $company->name ?? 'Company' }}</div>
-        <div class="report-title">NestPOS Tax Report &mdash; {{ $taxRateLabel }}</div>
+        <div class="report-title">{{ __('pos.tr_report_title') }} &mdash; {{ $taxRateLabel }}</div>
         <div class="report-meta">
-            <span>Period: {{ $dateLabel }}</span>
-            <span>Generated: {{ now()->format('d M Y, h:i A') }}</span>
+            <span>{{ __('pos.tr_period') }} {{ $dateLabel }}</span>
+            <span>{{ __('pos.dcp_generated') }} {{ now()->format('d M Y, h:i A') }}</span>
             <span>NTN: {{ $company->ntn ?? 'N/A' }}</span>
         </div>
     </div>
@@ -55,26 +63,26 @@
         <table>
             <thead>
                 <tr>
-                    <th>POS Invoice #</th>
-                    <th>PRA Fiscal #</th>
-                    <th>Date</th>
-                    <th>Customer</th>
-                    <th>Payment</th>
+                    <th>{{ __('pos.tr_col_pos_inv') }}</th>
+                    <th>{{ __('pos.tr_col_pra_fiscal') }}</th>
+                    <th>{{ __('pos.dc_date') }}</th>
+                    <th>{{ __('pos.receipt_customer') }}</th>
+                    <th>{{ __('pos.tr_col_payment') }}</th>
                     @if($taxRateFilter ?? false)
-                    <th class="right">{{ $taxRateLabel }} Value</th>
-                    <th class="right">{{ $taxRateLabel }} Tax</th>
-                    <th class="right">{{ $taxRateLabel }} Total</th>
+                    <th class="right">{{ $taxRateLabel }} {{ __('pos.tr_col_subtotal') }}</th>
+                    <th class="right">{{ $taxRateLabel }} {{ __('pos.tr_col_tax_amt') }}</th>
+                    <th class="right">{{ $taxRateLabel }} {{ __('pos.tr_col_total') }}</th>
                     @else
-                    <th class="right">Subtotal</th>
-                    <th class="right">Discount</th>
-                    <th class="right">Taxable</th>
-                    <th class="right">Exempt</th>
-                    <th class="right">Tax %</th>
-                    <th class="right">Tax Amt</th>
-                    <th class="right">Total</th>
+                    <th class="right">{{ __('pos.tr_col_subtotal') }}</th>
+                    <th class="right">{{ __('pos.tr_col_discount') }}</th>
+                    <th class="right">{{ __('pos.tr_col_taxable') }}</th>
+                    <th class="right">{{ __('pos.tr_col_exempt') }}</th>
+                    <th class="right">{{ __('pos.tr_col_tax_pct') }}</th>
+                    <th class="right">{{ __('pos.tr_col_tax_amt') }}</th>
+                    <th class="right">{{ __('pos.tr_col_total') }}</th>
                     @endif
-                    <th>Terminal</th>
-                    <th>PRA Status</th>
+                    <th>{{ __('pos.tr_col_terminal') }}</th>
+                    <th>{{ __('pos.tr_col_pra_status') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -89,7 +97,7 @@
                     <td style="font-weight:bold;">{{ $t->invoice_number }}</td>
                     <td>{{ $t->pra_invoice_number ?? '—' }}</td>
                     <td>{{ $t->created_at->format('d/m/Y H:i') }}</td>
-                    <td>{{ $t->customer_name ?? 'Walk-in' }}</td>
+                    <td>{{ $t->customer_name ?? __('pos.tr_walk_in') }}</td>
                     <td>
                         <span class="badge {{ $t->payment_method === 'cash' ? 'badge-cash' : 'badge-card' }}">
                             {{ ucwords(str_replace('_', ' ', $t->payment_method)) }}
@@ -125,13 +133,13 @@
                 @endforeach
                 <tr class="total-row">
                     @if($taxRateFilter ?? false)
-                    <td colspan="5" style="font-size:9px;">{{ $taxRateLabel }} TOTALS ({{ $summary->total_invoices }} invoices)</td>
+                    <td colspan="5" style="font-size:9px;">{{ $taxRateLabel }} {{ __('pos.tr_totals', ['count' => $summary->total_invoices]) }}</td>
                     <td class="right" style="color:#059669;">{{ number_format($summary->total_sales, 2) }}</td>
                     <td class="right" style="color:#7c3aed;">{{ number_format($summary->total_tax, 2) }}</td>
                     <td class="right">{{ number_format($summary->total_sales + $summary->total_tax, 2) }}</td>
                     <td colspan="2"></td>
                     @else
-                    <td colspan="5" style="font-size:9px;">TOTALS ({{ $summary->total_invoices }} invoices)</td>
+                    <td colspan="5" style="font-size:9px;">{{ __('pos.tr_totals', ['count' => $summary->total_invoices]) }}</td>
                     <td class="right">—</td>
                     <td class="right" style="color:#dc2626;">{{ number_format($summary->total_discount, 2) }}</td>
                     <td class="right">{{ number_format($summary->total_taxable, 2) }}</td>
@@ -146,44 +154,44 @@
         </table>
 
         <div class="summary-box">
-            <div class="summary-title">Report Summary &mdash; {{ $taxRateLabel }}</div>
+            <div class="summary-title">{{ __('pos.tr_summary_title') }} &mdash; {{ $taxRateLabel }}</div>
             <div class="summary-grid">
                 <div class="summary-item">
-                    <div class="summary-label">Invoices</div>
+                    <div class="summary-label">{{ __('pos.tr_sum_invoices') }}</div>
                     <div class="summary-value">{{ number_format($summary->total_invoices) }}</div>
                 </div>
                 @if($taxRateFilter ?? false)
                 <div class="summary-item">
-                    <div class="summary-label">{{ $taxRateLabel }} Value</div>
+                    <div class="summary-label">{{ $taxRateLabel }} {{ __('pos.tr_col_subtotal') }}</div>
                     <div class="summary-value green">PKR {{ number_format($summary->total_sales, 2) }}</div>
                 </div>
                 <div class="summary-item">
-                    <div class="summary-label">{{ $taxRateLabel }} Tax</div>
+                    <div class="summary-label">{{ $taxRateLabel }} {{ __('pos.tr_col_tax_amt') }}</div>
                     <div class="summary-value purple">PKR {{ number_format($summary->total_tax, 2) }}</div>
                 </div>
                 <div class="summary-item">
-                    <div class="summary-label">{{ $taxRateLabel }} Total</div>
+                    <div class="summary-label">{{ $taxRateLabel }} {{ __('pos.tr_col_total') }}</div>
                     <div class="summary-value">PKR {{ number_format($summary->total_sales + $summary->total_tax, 2) }}</div>
                 </div>
                 @else
                 <div class="summary-item">
-                    <div class="summary-label">Total Sales Amount</div>
+                    <div class="summary-label">{{ __('pos.tr_sum_total_sales') }}</div>
                     <div class="summary-value green">PKR {{ number_format($summary->total_sales, 2) }}</div>
                 </div>
                 <div class="summary-item">
-                    <div class="summary-label">Total Discount</div>
+                    <div class="summary-label">{{ __('pos.tr_sum_discount') }}</div>
                     <div class="summary-value red">PKR {{ number_format($summary->total_discount, 2) }}</div>
                 </div>
                 <div class="summary-item">
-                    <div class="summary-label">Total Taxable Amount</div>
+                    <div class="summary-label">{{ __('pos.tr_sum_taxable') }}</div>
                     <div class="summary-value">PKR {{ number_format($summary->total_taxable, 2) }}</div>
                 </div>
                 <div class="summary-item">
-                    <div class="summary-label">Tax Exempt Amount</div>
+                    <div class="summary-label">{{ __('pos.tr_sum_exempt') }}</div>
                     <div class="summary-value" style="color:#d97706;">PKR {{ number_format($summary->total_exempt ?? 0, 2) }}</div>
                 </div>
                 <div class="summary-item">
-                    <div class="summary-label">Total Tax Collected</div>
+                    <div class="summary-label">{{ __('pos.tr_sum_tax') }}</div>
                     <div class="summary-value purple">PKR {{ number_format($summary->total_tax, 2) }}</div>
                 </div>
                 @endif
@@ -192,7 +200,7 @@
     </div>
 
     <div class="footer">
-        Generated by NestPOS &mdash; {{ $company->company_name ?? $company->name ?? 'Company' }} &mdash; {{ now()->format('d M Y, h:i A') }}
+        {{ __('pos.tr_footer') }} &mdash; {{ $company->company_name ?? $company->name ?? 'Company' }} &mdash; {{ now()->format('d M Y, h:i A') }}
     </div>
 </body>
 </html>

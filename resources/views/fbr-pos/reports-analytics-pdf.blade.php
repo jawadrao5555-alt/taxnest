@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ ($pdfUrdu ?? false) ? 'ur' : 'en' }}" dir="{{ ($pdfUrdu ?? false) ? 'rtl' : 'ltr' }}">
 <head>
     <meta charset="UTF-8">
     <title>Sales Analytics {{ $analytics->from }} to {{ $analytics->to }}</title>
@@ -40,6 +40,16 @@
         .footer p { font-size: 9px; color: #374151; }
         .footer .brand { font-size: 10px; font-weight: bold; color: #1e3a5f; margin-top: 3px; }
     </style>
+    @if($pdfUrdu ?? false)
+    <style>
+        body { font-family: 'XB Riyaz', 'DejaVu Sans', sans-serif; direction: rtl; }
+        table.data, .info-box, .info-row { direction: rtl; }
+        .section-title { text-transform: none; letter-spacing: 0; }
+        table.data thead th { text-transform: none; letter-spacing: 0; }
+        .header h1 { text-transform: none; letter-spacing: 0; }
+        .report-title h2 { text-transform: none; letter-spacing: 0; }
+    </style>
+    @endif
 </head>
 <body>
     <div class="header">

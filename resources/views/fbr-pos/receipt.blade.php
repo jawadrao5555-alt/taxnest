@@ -175,8 +175,10 @@
              'center' = large centered logo above business name (default).
              'side'   = compact logo to the right of business name in a table row.
              Companies without a logo get the plain name-only header either way.
-             logo_finals_only is ignored on FBR (no local/provisional path). --}}
-        @if($company->logo_path)
+             logo_finals_only is ignored on FBR (no local/provisional path).
+             Task #292: show_logo master switch respected here too — when off,
+             logo never prints on any FBR receipt either. --}}
+        @if($company->logo_path && ($printStyle['show_logo'] ?? true))
         @if($printStyle['logo'] === 'center')
         {{-- line-height:0 wrapper + block img: no inline-descender gap under logo --}}
         <div style="text-align:center; margin:0; padding:2mm 0 0; line-height:0;">

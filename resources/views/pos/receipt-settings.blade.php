@@ -183,6 +183,54 @@
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.pdf_paper_hint') }}</p>
         </div>
 
+        {{-- Receipt Content Checklist (Task #292): simple on/off per optional element.
+             Global (like paper size) — applies to both PRA and Local receipts.
+             Tick = prints, untick = NEVER prints on ANY receipt path. --}}
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-6 space-y-4"
+             x-data="{ showLogo: {{ ($ps['show_logo'] ?? true) ? 'true' : 'false' }} }">
+            <h3 class="text-sm font-bold text-gray-900 dark:text-white">🖼️ {{ __('pos.receipt_content_section') }} <span class="text-xs font-normal text-gray-500 dark:text-gray-400">{{ __('pos.receipt_content_sub') }}</span></h3>
+
+            {{-- ── Logo ── --}}
+            <div>
+                <label class="flex items-start gap-2.5 cursor-pointer p-3 rounded-lg border {{ ($ps['show_logo'] ?? true) ? 'border-purple-400 bg-purple-50/40 dark:bg-purple-900/10' : 'border-gray-200 dark:border-gray-700' }} transition"
+                       :class="showLogo ? 'border-purple-400 bg-purple-50/40 dark:bg-purple-900/10' : 'border-gray-200 dark:border-gray-700'">
+                    <input type="checkbox" name="rp_show_logo" value="1"
+                           {{ ($ps['show_logo'] ?? true) ? 'checked' : '' }}
+                           x-model="showLogo"
+                           class="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4">
+                    <span class="flex-1 min-w-0">
+                        <span class="block text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.show_logo_label') }}</span>
+                        <span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.show_logo_hint') }}</span>
+                    </span>
+                </label>
+
+                {{-- Sub-option: sirf final bill par (logo_finals_only). Visible + enabled
+                     only when the Logo master tick is ON. Disabled visually when off. --}}
+                <div x-show="showLogo" x-transition class="mt-2 ml-6 pl-3 border-l-2 border-purple-200 dark:border-purple-800">
+                    <label class="flex items-start gap-2.5 cursor-pointer p-2.5 rounded-lg border {{ ($ps['logo_finals_only'] ?? false) ? 'border-purple-300 bg-purple-50/30 dark:bg-purple-900/10' : 'border-gray-200 dark:border-gray-700' }} transition">
+                        <input type="checkbox" name="rp_logo_finals_only" value="1"
+                               {{ ($ps['logo_finals_only'] ?? false) ? 'checked' : '' }}
+                               class="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4">
+                        <span class="flex-1 min-w-0">
+                            <span class="block text-sm font-semibold text-gray-800 dark:text-gray-200">{{ __('pos.logo_on_final_only') }}</span>
+                            <span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.logo_finals_only_hint') }}</span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+
+            {{-- ── Menu QR ── --}}
+            <label class="flex items-start gap-2.5 cursor-pointer p-3 rounded-lg border {{ ($ps['show_menu_qr'] ?? true) ? 'border-purple-400 bg-purple-50/40 dark:bg-purple-900/10' : 'border-gray-200 dark:border-gray-700' }} transition">
+                <input type="checkbox" name="rp_show_menu_qr" value="1"
+                       {{ ($ps['show_menu_qr'] ?? true) ? 'checked' : '' }}
+                       class="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4">
+                <span class="flex-1 min-w-0">
+                    <span class="block text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.show_menu_qr_label') }}</span>
+                    <span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.show_menu_qr_hint') }}</span>
+                </span>
+            </label>
+        </div>
+
         {{-- Print Style (customer feedback Jul 2026 — Pizza Master): GLOBAL like
              paper size — it's the printer/brand look, not a bill-type setting.
              Applies to both PRA and Local receipts. --}}
@@ -203,15 +251,6 @@
                 </select>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.logo_style_hint') }}</p>
             </div>
-            {{-- Logo on Finals Only (Task #284): suppress logo on local/provisional
-                 bills; print it only on final/PRA bills. Default OFF = logo everywhere. --}}
-            <label class="flex items-start gap-2.5 cursor-pointer p-3 rounded-lg border {{ ($ps['logo_finals_only'] ?? false) ? 'border-purple-400 bg-purple-50/40 dark:bg-purple-900/10' : 'border-gray-200 dark:border-gray-700' }} transition">
-                <input type="checkbox" name="rp_logo_finals_only" value="1" {{ ($ps['logo_finals_only'] ?? false) ? 'checked' : '' }} class="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4">
-                <span class="flex-1 min-w-0">
-                    <span class="block text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.logo_finals_only_label') }}</span>
-                    <span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.logo_finals_only_hint') }}</span>
-                </span>
-            </label>
         </div>
 
         <div class="flex items-center justify-between gap-3">

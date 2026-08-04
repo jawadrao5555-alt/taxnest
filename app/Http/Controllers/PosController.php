@@ -243,9 +243,15 @@ class PosController extends Controller
                 // roll-width PDF page (default); 'a4' = real A4 page, receipt strip
                 // top-left — fixes right-shifted/clipped prints on office printers.
                 'pdf_paper' => $request->input('rp_pdf_paper') === 'a4' ? 'a4' : 'thermal',
-                // Logo on finals only: when ON, logo prints only on final/PRA bills —
-                // suppressed on local/provisional (invoice_mode='local') bills.
+                // show_logo (Task #292): master logo toggle. Default ON (checkbox
+                // present = on; absent = off). When off, logo never prints on any receipt.
+                'show_logo' => $request->has('rp_show_logo'),
+                // Logo on finals only: sub-option under show_logo — when ON, logo prints
+                // only on final/PRA bills; suppressed on local/provisional bills.
                 'logo_finals_only' => $request->has('rp_logo_finals_only'),
+                // show_menu_qr (Task #292): master QR toggle. When off, neither the
+                // Menu QR nor the invoice JSON fallback QR prints. PRA fiscal QR unaffected.
+                'show_menu_qr' => $request->has('rp_show_menu_qr'),
             ];
             $company->update([
                 'invoice_display_prefs' => $prefs,

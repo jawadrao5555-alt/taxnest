@@ -269,11 +269,18 @@
         $rcptOffline = $transaction->pra_status === 'offline';
         $rcptTopBadge = !$rcptPraFiscal && !$rcptOffline;
         $rcptTopProvisional = ($transaction->invoice_mode ?? 'pra') === 'local';
-        // Logo-on-finals-only gate (Task #284): when the company opts in, suppress
-        // the logo on local/provisional bills (invoice_mode='local'). Reporting-OFF
-        // finals (invoice_mode='pra' + pra_status=NULL) are NOT local, so logo
-        // still prints on them. Default OFF = logo on every bill (unchanged behaviour).
-        $showLogo = $logoDataUri && (!($printStyle['logo_finals_only'] ?? false) || !$rcptTopProvisional);
+        // Logo gate (Task #292): show_logo is the master switch (default true).
+        // When on, logo_finals_only (Task #284) still applies as the sub-gate:
+        // suppress on local/provisional bills when that sub-option is set.
+        // Reporting-OFF finals (invoice_mode='pra' + pra_status=NULL) are NOT local,
+        // so logo still prints on them. Default OFF for logo_finals_only = unchanged.
+        $showLogo = $logoDataUri
+            && ($printStyle['show_logo'] ?? true)
+            && (!($printStyle['logo_finals_only'] ?? false) || !$rcptTopProvisional);
+        // show_menu_qr gate (Task #292): when false, suppress both the public-profile
+        // Menu QR and the invoice JSON fallback QR on non-fiscal receipts.
+        // The PRA Sahulat fiscal QR (pra_status='submitted') is NEVER affected.
+        $showReceiptQr = (bool) ($printStyle['show_menu_qr'] ?? true);
     @endphp
     <div class="header text-center">
         {{-- Logo placement (customer request Jul 2026): logo sits to the RIGHT of the
@@ -560,25 +567,32 @@
         $rcptIsProvisional = ($transaction->invoice_mode ?? 'pra') === 'local';
         // F8: local/provisional receipts carry the PUBLIC profile QR when the
         // company enabled its public page (PRA fiscal branch above is untouched).
-        $publicUrl = \App\Http\Controllers\PublicProfileController::publicUrlFor($transaction->company);
-        if ($publicUrl) {
-            $qrUrl = \App\Support\QrImage::dataUri($publicUrl);
-            $qrCaption = __('pos.receipt_scan_menu');
-        } else {
-            // ZFC issue #9 (28 Jul 2026): business name OFF => QR payload must
-            // not leak the name either (owner scanned QR, saw "business" field).
-            $qrPayload = [
-                'type' => $rcptIsProvisional ? 'Provisional Bill' : 'Sale Receipt',
-                'inv' => $transaction->invoice_number,
-                'date' => $transaction->created_at->format('d/m/Y H:i'),
-                'total' => number_format($transaction->total_amount, 2),
-            ];
-            if ($rp['show_business_name'] ?? true) {
-                $qrPayload['business'] = $transaction->company->name ?? 'NestPOS';
+        // Task #292: show_menu_qr=false suppresses BOTH the Menu QR and the invoice
+        // JSON fallback QR. $showReceiptQr computed in the @php block above.
+        if ($showReceiptQr) {
+            $publicUrl = \App\Http\Controllers\PublicProfileController::publicUrlFor($transaction->company);
+            if ($publicUrl) {
+                $qrUrl = \App\Support\QrImage::dataUri($publicUrl);
+                $qrCaption = __('pos.receipt_scan_menu');
+            } else {
+                // ZFC issue #9 (28 Jul 2026): business name OFF => QR payload must
+                // not leak the name either (owner scanned QR, saw "business" field).
+                $qrPayload = [
+                    'type' => $rcptIsProvisional ? 'Provisional Bill' : 'Sale Receipt',
+                    'inv' => $transaction->invoice_number,
+                    'date' => $transaction->created_at->format('d/m/Y H:i'),
+                    'total' => number_format($transaction->total_amount, 2),
+                ];
+                if ($rp['show_business_name'] ?? true) {
+                    $qrPayload['business'] = $transaction->company->name ?? 'NestPOS';
+                }
+                $qrData = json_encode($qrPayload);
+                $qrUrl = \App\Support\QrImage::dataUri($qrData);
+                $qrCaption = __('pos.receipt_scan_invoice');
             }
-            $qrData = json_encode($qrPayload);
-            $qrUrl = \App\Support\QrImage::dataUri($qrData);
-            $qrCaption = __('pos.receipt_scan_invoice');
+        } else {
+            $qrUrl = null;
+            $qrCaption = '';
         }
     @endphp
     {{-- Bottom SALE RECEIPT / PROVISIONAL badge removed (owner, Jul 2026) — the

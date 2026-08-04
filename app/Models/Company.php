@@ -291,10 +291,20 @@ class Company extends Model
         return [
             'bold' => filter_var($style['bold'] ?? true, FILTER_VALIDATE_BOOLEAN),
             'logo' => in_array(($style['logo'] ?? 'center'), ['side', 'center'], true) ? ($style['logo'] ?? 'center') : 'center',
-            // logo_finals_only: when true the logo is suppressed on local/provisional
-            // bills (invoice_mode='local') and printed only on final/PRA bills.
-            // Default false = current behaviour (logo on every bill).
+            // show_logo (Task #292): master switch — when false the logo NEVER prints
+            // on any receipt. Default true = existing behaviour (logo on every bill
+            // that has one uploaded). Existing companies with no saved value get true.
+            'show_logo' => filter_var($style['show_logo'] ?? true, FILTER_VALIDATE_BOOLEAN),
+            // logo_finals_only: sub-option under show_logo — when true the logo is
+            // suppressed on local/provisional bills (invoice_mode='local') and printed
+            // only on final/PRA bills. Only meaningful when show_logo is true.
+            // Default false = logo on every bill (unchanged behaviour).
             'logo_finals_only' => filter_var($style['logo_finals_only'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            // show_menu_qr (Task #292): when false, NEITHER the public-profile Menu QR
+            // nor the invoice JSON fallback QR prints on non-fiscal receipts.
+            // The PRA Sahulat fiscal QR (pra_status='submitted') is NEVER affected.
+            // Default true = existing behaviour (QR always renders).
+            'show_menu_qr' => filter_var($style['show_menu_qr'] ?? true, FILTER_VALIDATE_BOOLEAN),
         ];
     }
 

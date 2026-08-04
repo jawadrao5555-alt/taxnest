@@ -3804,4 +3804,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'bio_quick_map_saved'       => 'PIN map ho gayi. Purane punches bhi update ho gaye.',
     'bio_unmapped_badge'        => 'unmapped PIN(s)',
     'bio_unmapped_badge_title'  => 'Kuch PINs ka koi user nahi — Biometric Setup mein theek karein',
+    // Panel alert banner (Task #277)
+    'bio_alert_panel_title'     => ':count device PIN(s) unmapped mile',
+    'bio_alert_panel_sub'       => 'Hazri sahi track karne ke liye inhe Biometric Setup mein map karein.',
+    'bio_alert_panel_dismiss'   => 'Yeh PIN alert band karein',
 ];

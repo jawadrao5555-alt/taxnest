@@ -3805,4 +3805,8 @@ return [
     'bio_quick_map_saved'       => 'PIN میپ ہو گئی۔ پرانے پنچز بھی اپ ڈیٹ ہو گئے۔',
     'bio_unmapped_badge'        => 'غیر میپ شدہ PIN',
     'bio_unmapped_badge_title'  => 'کچھ PIN کا کوئی صارف نہیں — بایومیٹرک سیٹ اَپ میں درست کریں',
+    // Panel alert banner (Task #277)
+    'bio_alert_panel_title'     => ':count ڈیوائس PIN غیر میپ شدہ ملے',
+    'bio_alert_panel_sub'       => 'حاضری درست ٹریک کرنے کے لیے انہیں بایومیٹرک سیٹ اَپ میں میپ کریں۔',
+    'bio_alert_panel_dismiss'   => 'یہ PIN الرٹ بند کریں',
 ];

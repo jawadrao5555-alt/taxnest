@@ -120,6 +120,23 @@
         $apkNudgeShow = stripos($uaNudge, 'Android') !== false
             && stripos($uaNudge, 'TaxNestPOSApp') === false;
     } catch (\Throwable $e) { /* keep POS pages alive */ }
+    // Unmapped biometric PIN alerts — admin/manager only (Task #277, Aug 2026).
+    // Schema::hasTable guard + try/catch: prod schema drift must never break the layout.
+    // Pending companies and confined roles (cashier/waiter/kitchen/rider) are excluded
+    // via isPosAdmin() — identical gating to the What's New bell.
+    $bioAlerts = collect();
+    try {
+        $bioAllowed = $posUserLayout && $posUserLayout->isPosAdmin();
+        $bioPending = ($companyLayout->status ?? null) === 'pending';
+        if ($bioAllowed && !$bioPending
+            && \Illuminate\Support\Facades\Schema::hasTable('pos_bio_pin_alerts')) {
+            $bioAlerts = \App\Models\PosUnmappedPinAlert::where('company_id', app('currentCompanyId'))
+                ->whereNull('dismissed_at')
+                ->whereNull('mapped_at')
+                ->orderBy('first_seen_at')
+                ->get(['id', 'device_pin', 'first_seen_at']);
+        }
+    } catch (\Throwable $e) { /* never break POS pages */ }
 @endphp
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="{{ $isDarkMode ? 'dark' : '' }}">
     <head>
@@ -906,6 +923,7 @@
             <main class="flex-1 overflow-y-auto overflow-x-hidden main-scroll bg-slate-50 dark:bg-gray-950 page-fade" style="min-width: 0;">
                 <x-trial-reminder-banner />
                 <x-payment-status-banner />
+                <x-bio-unmapped-pin-banner :alerts="$bioAlerts" />
                 <x-trial-restaurant-notice />
                 @if(session('success'))
                     <div class="max-w-7xl mx-auto px-4 sm:px-6 pt-4">

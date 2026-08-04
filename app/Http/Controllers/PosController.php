@@ -4417,12 +4417,22 @@ class PosController extends Controller
         }
 
         $dateLabel = $this->getReportDateLabel($request);
-        $taxRateLabel = 'All Taxes';
+        // taxRateLabel is built via __() so it translates at request-locale time
+        // (the locale is already set by SetPosLocale middleware before this runs).
+        // The download filename always uses safe ASCII derived from the raw filter
+        // value so it never embeds Urdu script into a filename.
         if ($taxRateFilter) {
-            $taxRateLabel = $taxRateFilter === 'exempt' ? 'Exempt Items Only' : $taxRateFilter . '% Tax Only';
+            $taxRateLabel = $taxRateFilter === 'exempt'
+                ? __('pos.tr_exempt_only')
+                : __('pos.tr_tax_rate_pct', ['rate' => $taxRateFilter]);
+        } else {
+            $taxRateLabel = __('pos.tr_all_taxes');
         }
 
-        $filename = 'NestPOS_Tax_Report_' . str_replace([' ', '/', '(', ')'], '_', $taxRateLabel) . '_' . now()->format('Ymd_His') . '.pdf';
+        $filenamePart = $taxRateFilter
+            ? ($taxRateFilter === 'exempt' ? 'Exempt' : $taxRateFilter . 'pct')
+            : 'All_Taxes';
+        $filename = 'NestPOS_Tax_Report_' . $filenamePart . '_' . now()->format('Ymd_His') . '.pdf';
 
         return $this->renderReportPdf(
             'pos.tax-report-pdf',

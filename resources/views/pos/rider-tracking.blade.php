@@ -137,6 +137,7 @@
             searchResults: [],
             searchBusy: false,
             searchDone: false,
+            userCentered: false,
             init() {
                 this.map = L.map('rt-map', { zoomControl: true }).setView([31.5204, 74.3587], 12);
                 // Carto Voyager basemap — English/Latin place labels (owner rule Aug 2026:
@@ -230,7 +231,7 @@
                 fetch('https://ipwho.is/', { headers: { 'Accept': 'application/json' } })
                     .then(r => r.ok ? r.json() : null)
                     .then(j => {
-                        if (!j || !j.success || this.didFit) return;
+                        if (!j || !j.success || this.didFit || this.userCentered) return;
                         const lat = parseFloat(j.latitude), lng = parseFloat(j.longitude);
                         if (!isFinite(lat) || !isFinite(lng)) return;
                         this.map.setView([lat, lng], 13);
@@ -257,6 +258,7 @@
                 this.searchResults = [];
                 this.searchDone = false;
                 if (!isFinite(lat) || !isFinite(lng)) return;
+                this.userCentered = true; // late ipCenter() must not override a manual search
                 this.map.setView([lat, lng], 14);
             },
             esc(s) {

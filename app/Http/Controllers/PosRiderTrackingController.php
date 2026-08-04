@@ -36,6 +36,8 @@ class PosRiderTrackingController extends Controller
 {
     private const POINT_MAX_AGE_DAYS = 7;    // oldest offline-buffered point accepted
     private const RETENTION_DAYS = 30;       // history kept for trails
+    private const GAP_THRESHOLD_MINUTES = 5; // default gap detection threshold
+    private const OFFLINE_HEURISTIC_MINUTES = 5; // created_at - recorded_at delta for offline tag
 
     // Bump on each Android release; APK hosted on OUR server (never a GitHub
     // release — desktop agents auto-update from this repo's releases/latest).
@@ -378,7 +380,7 @@ class PosRiderTrackingController extends Controller
         return response()->json(['ok' => true, 'riders' => $riders, 'server_time' => now()->toIso8601String()]);
     }
 
-    /** GET /pos/riders/tracking/trail/{rider}?date=Y-m-d — polyline points. */
+    /** GET /pos/riders/tracking/trail/{rider}?date=Y-m-d&gap_min=N — polyline points. */
     public function trail($riderId, Request $request)
     {
         $companyId = app('currentCompanyId');
@@ -397,27 +399,98 @@ class PosRiderTrackingController extends Controller
             $day = now();
         }
 
-        $points = DB::table('pos_rider_locations')
+        // Optional gap threshold override — clamped to a sane range.
+        $gapMin = (int) ($request->query('gap_min', self::GAP_THRESHOLD_MINUTES));
+        $gapMin = max(2, min(60, $gapMin));
+
+        // Fetch full set including created_at for offline heuristic.
+        $rawPoints = DB::table('pos_rider_locations')
             ->where('company_id', $companyId)
             ->where('rider_id', $rider->id)
             ->whereBetween('recorded_at', [$day->copy()->startOfDay(), $day->copy()->endOfDay()])
             ->orderBy('recorded_at')
-            ->get(['lat', 'lng', 'recorded_at']);
+            ->get(['lat', 'lng', 'recorded_at', 'created_at']);
 
-        // Downsample huge trails so the polyline stays light.
-        $stride = max(1, (int) ceil($points->count() / 3000));
-        $trail = $points->values()->filter(fn ($p, $i) => $i % $stride === 0)
-            ->map(fn ($p) => [
-                (float) $p->lat,
-                (float) $p->lng,
-                Carbon::parse($p->recorded_at)->format('H:i'),
-            ])->values();
+        $total = $rawPoints->count();
+
+        // ── Gap detection on the full (pre-downsample) set ──────────────────
+        // We also compute a "boundary" flag so stride never drops the point
+        // immediately before or after a gap.
+        $gapThresholdSecs = $gapMin * 60;
+        $offlineThresholdSecs = self::OFFLINE_HEURISTIC_MINUTES * 60;
+
+        $gapMeta    = []; // keyed by full-set index of the point BEFORE the gap
+        $boundaries = []; // set of full-set indices that must survive downsampling
+
+        for ($i = 1; $i < $total; $i++) {
+            $prev = $rawPoints[$i - 1];
+            $curr = $rawPoints[$i];
+
+            $prevTs = strtotime($prev->recorded_at);
+            $currTs = strtotime($curr->recorded_at);
+            $gapSecs = $currTs - $prevTs;
+
+            if ($gapSecs >= $gapThresholdSecs) {
+                // Determine if the batch of points after the gap were offline-buffered:
+                // check the first up-to-3 points after the gap — if most of them were
+                // uploaded much later than recorded, the rider had them buffered offline.
+                $offlineCount = 0;
+                $checkUpTo = min($i + 3, $total);
+                for ($j = $i; $j < $checkUpTo; $j++) {
+                    $pt = $rawPoints[$j];
+                    $lag = strtotime($pt->created_at) - strtotime($pt->recorded_at);
+                    if ($lag >= $offlineThresholdSecs) {
+                        $offlineCount++;
+                    }
+                }
+                $isOfflineAfter = $offlineCount >= (int) ceil(($checkUpTo - $i) / 2);
+
+                $gapMeta[$i - 1] = [
+                    'gap_secs'        => $gapSecs,
+                    'is_offline_after' => $isOfflineAfter,
+                ];
+                // Protect boundary points from stride-based downsampling.
+                $boundaries[$i - 1] = true;
+                $boundaries[$i]     = true;
+            }
+        }
+
+        // ── Downsample, preserving boundary points ───────────────────────────
+        $stride = max(1, (int) ceil($total / 3000));
+        $kept = []; // map: full-set index → kept point array index
+        $trail = [];
+
+        foreach ($rawPoints->values() as $idx => $p) {
+            if ($stride === 1 || $idx % $stride === 0 || isset($boundaries[$idx])) {
+                $kept[$idx] = count($trail);
+                $trail[] = [
+                    (float) $p->lat,
+                    (float) $p->lng,
+                    Carbon::parse($p->recorded_at)->format('H:i'),
+                ];
+            }
+        }
+
+        // ── Re-index gaps using kept[] map ───────────────────────────────────
+        $gaps = [];
+        foreach ($gapMeta as $fullIdx => $meta) {
+            // Both boundary points are guaranteed kept, so this lookup always hits.
+            if (!isset($kept[$fullIdx])) {
+                continue; // safety (should not happen)
+            }
+            $gaps[] = [
+                'after_idx'        => $kept[$fullIdx],
+                'minutes'          => (int) round($meta['gap_secs'] / 60),
+                'is_offline_after' => $meta['is_offline_after'],
+            ];
+        }
 
         return response()->json([
             'ok' => true,
             'rider' => ['id' => (int) $rider->id, 'name' => $rider->name],
             'date' => $day->format('Y-m-d'),
-            'points' => $trail,
+            'points' => array_values($trail),
+            'gaps'   => $gaps,
         ]);
     }
 }

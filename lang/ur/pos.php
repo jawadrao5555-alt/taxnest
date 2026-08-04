@@ -2861,6 +2861,8 @@ return [
     'rt_search_placeholder' => 'جگہ تلاش کریں… (مثلاً لودھراں)',
     'rt_title' => 'رائیڈر لائیو ٹریکنگ',
     'rt_trail' => 'آج کا راستہ',
+    'rt_gap_recording_stopped' => 'ریکارڈنگ رکی تھی (:min منٹ)',
+    'rt_gap_offline_sync' => 'آف لائن ڈیٹا (:min منٹ)',
     'rt_upgrade_btn' => 'پیکجز دیکھیں',
     'running_amount_sfx' => ' جاری',
     'rush_badge' => 'فوری',

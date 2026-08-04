@@ -2861,6 +2861,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'rt_search_placeholder' => 'Jagah talash karein… (maslan Lodhran)',
     'rt_title' => 'Rider live tracking',
     'rt_trail' => 'Aaj ka rasta',
+    'rt_gap_recording_stopped' => 'Recording ruki thi (:min min)',
+    'rt_gap_offline_sync' => 'Offline data (:min min)',
     'rt_upgrade_btn' => 'Packages dekhein',
     'running_amount_sfx' => ' chalu',
     'rush_badge' => 'URGENT',

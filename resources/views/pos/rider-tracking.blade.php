@@ -22,6 +22,18 @@
         .rt-map { height: calc(100vh - 170px); min-height: 420px; border-radius: 1rem; z-index: 0; }
         .rt-dot { width: 10px; height: 10px; border-radius: 9999px; display: inline-block; }
         @media (max-width: 767px) { .rt-map { height: 52vh; min-height: 320px; } }
+        .rt-gap-pill {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+            box-shadow: 0 1px 4px rgba(0,0,0,.18);
+            pointer-events: none;
+        }
+        .rt-gap-pill.stopped { background: #f59e0b; color: #fff; }
+        .rt-gap-pill.offline { background: #6366f1; color: #fff; }
     </style>
 
     <div class="px-3 sm:px-4 py-3" x-data="riderTracking(@js([
@@ -36,6 +48,8 @@
             'trail' => __('pos.rt_trail'),
             'min_ago' => __('pos.rt_min_ago'),
             'just_now' => __('pos.rt_just_now'),
+            'gap_stopped' => __('pos.rt_gap_recording_stopped'),
+            'gap_offline' => __('pos.rt_gap_offline_sync'),
         ],
     ]))" x-init="init()">
 
@@ -131,6 +145,7 @@
             map: null,
             markers: {},
             polyline: null,
+            gapLayers: [],
             timer: null,
             didFit: false,
             searchQ: '',
@@ -213,17 +228,93 @@
                     .then(resp => resp.ok ? resp.json() : null)
                     .then(j => {
                         if (!j || !j.ok) return;
-                        if (this.polyline) this.polyline.remove();
-                        const pts = (j.points || []).map(p => [p[0], p[1]]);
+                        this.clearTrailLayers();
+                        const pts = j.points || [];
+                        const gaps = j.gaps || [];
                         if (!pts.length) return;
-                        this.polyline = L.polyline(pts, { color: '#4f46e5', weight: 4, opacity: 0.75 }).addTo(this.map);
-                        this.map.fitBounds(this.polyline.getBounds(), { padding: [40, 40] });
+
+                        // Build gap index: after_idx → gap meta
+                        const gapByIdx = {};
+                        gaps.forEach(g => { gapByIdx[g.after_idx] = g; });
+
+                        // Split pts into solid segments separated by gaps.
+                        // A gap at after_idx means: segment ends at pts[after_idx],
+                        // next segment starts at pts[after_idx+1].
+                        const segmentBreaks = new Set(gaps.map(g => g.after_idx));
+                        const segments = [];
+                        let seg = [];
+                        pts.forEach((p, i) => {
+                            seg.push([p[0], p[1]]);
+                            if (segmentBreaks.has(i)) {
+                                // Segment ends at pts[i] (inclusive).
+                                // Next segment starts fresh at pts[i+1] — do NOT
+                                // seed it with p, or the dashed connector becomes
+                                // zero-length (point-to-itself) and the solid line
+                                // across the gap is drawn by the next segment.
+                                segments.push({ pts: seg, gapAfter: gapByIdx[i] });
+                                seg = [];
+                            }
+                        });
+                        if (seg.length) segments.push({ pts: seg, gapAfter: null });
+
+                        const allBounds = [];
+                        const solidStyle = { color: '#4f46e5', weight: 4, opacity: 0.75 };
+
+                        segments.forEach((s, si) => {
+                            if (s.pts.length >= 2) {
+                                const pl = L.polyline(s.pts, solidStyle).addTo(this.map);
+                                this.gapLayers.push(pl);
+                                s.pts.forEach(p => allBounds.push(p));
+                            } else if (s.pts.length === 1) {
+                                allBounds.push(s.pts[0]);
+                            }
+
+                            // If there's a gap after this segment, draw a dashed connector.
+                            if (s.gapAfter && si + 1 < segments.length) {
+                                const fromPt = s.pts[s.pts.length - 1];
+                                const toPt   = segments[si + 1].pts[0];
+                                const isOffline = s.gapAfter.is_offline_after;
+                                const gapColor = isOffline ? '#6366f1' : '#f59e0b';
+
+                                const dash = L.polyline([fromPt, toPt], {
+                                    color: gapColor, weight: 2.5,
+                                    dashArray: '7 11', opacity: 0.85
+                                }).addTo(this.map);
+                                this.gapLayers.push(dash);
+
+                                // divIcon pill label at midpoint of the dashed line.
+                                const midLat = (fromPt[0] + toPt[0]) / 2;
+                                const midLng = (fromPt[1] + toPt[1]) / 2;
+                                const mins = s.gapAfter.minutes;
+                                const tpl = isOffline ? this.i18n.gap_offline : this.i18n.gap_stopped;
+                                const label = tpl.replace(':min', mins);
+                                const cls   = isOffline ? 'offline' : 'stopped';
+                                const icon  = L.divIcon({
+                                    className: '',
+                                    html: '<span class="rt-gap-pill ' + cls + '">' + this.esc(label) + '</span>',
+                                    iconAnchor: [0, 0],
+                                });
+                                const marker = L.marker([midLat, midLng], { icon: icon, interactive: false }).addTo(this.map);
+                                this.gapLayers.push(marker);
+                            }
+                        });
+
+                        if (allBounds.length >= 2) {
+                            this.map.fitBounds(allBounds, { padding: [40, 40] });
+                        } else if (allBounds.length === 1) {
+                            this.map.setView(allBounds[0], 15);
+                        }
                     })
                     .catch(() => {});
             },
+            clearTrailLayers() {
+                if (this.polyline) { this.polyline.remove(); this.polyline = null; }
+                this.gapLayers.forEach(l => { try { l.remove(); } catch(e) {} });
+                this.gapLayers = [];
+            },
             clearTrail() {
                 this.selected = null;
-                if (this.polyline) { this.polyline.remove(); this.polyline = null; }
+                this.clearTrailLayers();
             },
             // Center on the shop's own city via IP lookup (owner rule Aug 2026: a Lodhran
             // shop must not open on Lahore). Riders' fitBounds (didFit) always wins.

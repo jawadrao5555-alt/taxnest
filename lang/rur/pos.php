@@ -3681,6 +3681,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     // Deliveries board upgrades + Pending Deliveries popup finals (owner batch, 3 Aug 2026)
     'delivery_status_dispatched' => 'Rawana',
     'rider_out_pill' => ':count bahar',
+    'rider_day_summary_title' => 'Rider Khulasa',
+    'rider_day_summary_total' => 'Kul',
     'del_search_ph' => 'Bill / customer / rider / address dhoondein…',
     'del_no_match' => 'Koi milta bill nahi',
     'delivery_took_mins' => ':mins minute mein deliver hui',

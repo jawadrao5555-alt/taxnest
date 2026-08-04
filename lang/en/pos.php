@@ -3681,6 +3681,8 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     // Deliveries board upgrades + Pending Deliveries popup finals (owner batch, 3 Aug 2026)
     'delivery_status_dispatched' => 'Dispatched',
     'rider_out_pill' => ':count out',
+    'rider_day_summary_title' => 'Rider Summary',
+    'rider_day_summary_total' => 'Total',
     'del_search_ph' => 'Search bill / customer / rider / address…',
     'del_no_match' => 'No matching bills',
     'delivery_took_mins' => 'Delivered in :mins min',

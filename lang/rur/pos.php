@@ -3675,6 +3675,9 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'tutorials_more_soon' => 'Aur videos jald aa rahi hain.',
     'tutorials_watch_public' => 'Yeh videos hamari website par bhi hain — apni team ko link bhejein.',
 
+    // Deliveries board tabs + date filter (owner, 4 Aug 2026)
+    'del_tab_pending_sub' => 'Assigned aur dispatched',
+
     // Deliveries board upgrades + Pending Deliveries popup finals (owner batch, 3 Aug 2026)
     'delivery_status_dispatched' => 'Rawana',
     'rider_out_pill' => ':count bahar',

@@ -229,24 +229,63 @@ class PosRiderController extends Controller
         $companyId = app('currentCompanyId');
 
         $date = $request->input('date');
-        try {
-            $day = $date ? \Carbon\Carbon::parse($date)->startOfDay() : now()->startOfDay();
-        } catch (\Throwable $e) {
-            $day = now()->startOfDay();
-        }
+        $hasBizDate = Schema::hasColumn('pos_transactions', 'business_date');
 
-        // Delivery bills for the chosen day — archived included (day-close
+        // Default to today's business date (respects company cutoff — post-midnight
+        // sales count in yesterday until the day is closed).
+        if ($date) {
+            try {
+                $businessDate = \Carbon\Carbon::parse($date)->format('Y-m-d');
+            } catch (\Throwable $e) {
+                $businessDate = \App\Services\PosBusinessDay::current($companyId);
+            }
+        } else {
+            $businessDate = \App\Services\PosBusinessDay::current($companyId);
+        }
+        $day = \Carbon\Carbon::parse($businessDate)->startOfDay();
+
+        // Delivery bills for the chosen business day — archived included (day-close
         // archives bills that may still be out with a rider).
-        $bills = PosTransaction::withoutGlobalScope('hide_archived')
+        // business_date is a DATE column; compare with = on the string, NEVER
+        // whereDate() (kills the index — pos-business-day.md).
+        $billQuery = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
-            ->whereBetween('created_at', [$day, $day->copy()->endOfDay()])
             ->where(function ($q) {
                 $q->where('order_type', 'delivery')->orWhereNotNull('rider_id');
             })
             ->whereIn('status', ['completed'])
             ->with('rider')
-            ->orderByDesc('id')
-            ->get();
+            ->orderByDesc('id');
+
+        if ($hasBizDate) {
+            $billQuery->where('business_date', $businessDate);
+        } else {
+            // Pre-migration fallback — safe during the schema-drift window.
+            $billQuery->whereBetween('created_at', [$day, $day->copy()->endOfDay()]);
+        }
+
+        $allBills = $billQuery->get();
+
+        // Tab counts (computed on the collection — single DB round-trip).
+        $tabCounts = [
+            'pending'   => $allBills->whereIn('delivery_status', ['assigned', 'dispatched'])->count(),
+            'delivered' => $allBills->where('delivery_status', 'delivered')->count(),
+            'returned'  => $allBills->where('delivery_status', 'returned')->count(),
+        ];
+
+        // Filter bills by active tab; Pending = open (assigned/dispatched only).
+        // Delivered/Returned also include settled bills — read-only view.
+        $activeTab = $request->input('tab', 'pending');
+        if (!in_array($activeTab, ['pending', 'delivered', 'returned'], true)) {
+            $activeTab = 'pending';
+        }
+        if ($activeTab === 'pending') {
+            $bills = $allBills->whereIn('delivery_status', ['assigned', 'dispatched'])->values();
+        } elseif ($activeTab === 'delivered') {
+            $bills = $allBills->where('delivery_status', 'delivered')->values();
+        } else {
+            $bills = $allBills->where('delivery_status', 'returned')->values();
+        }
 
         // Active riders + ANY inactive rider still holding open cash khata —
         // otherwise deactivating a rider strands his outstanding cash with no
@@ -292,7 +331,7 @@ class PosRiderController extends Controller
             ->groupBy('rider_id')
             ->pluck('c', 'rider_id');
 
-        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts'));
+        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'tabCounts', 'activeTab'));
     }
 
     /** Assign / reassign / unassign a rider on a delivery bill. */

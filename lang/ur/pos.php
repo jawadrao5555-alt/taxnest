@@ -3676,6 +3676,9 @@ return [
     'tutorials_more_soon' => 'مزید ویڈیوز جلد آ رہی ہیں۔',
     'tutorials_watch_public' => 'یہ ویڈیوز ہماری ویب سائٹ پر بھی ہیں — اپنی ٹیم کو لنک بھیجیں۔',
 
+    // Deliveries board tabs + date filter (owner, 4 Aug 2026)
+    'del_tab_pending_sub' => 'تفویض و روانہ',
+
     // Deliveries board upgrades + Pending Deliveries popup finals (owner batch, 3 Aug 2026)
     'delivery_status_dispatched' => 'روانہ',
     'rider_out_pill' => ':count باہر',

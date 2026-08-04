@@ -3675,6 +3675,9 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'tutorials_more_soon' => 'More videos are on the way.',
     'tutorials_watch_public' => 'These videos are also on our website — share the link with your team.',
 
+    // Deliveries board tabs + date filter (owner, 4 Aug 2026)
+    'del_tab_pending_sub' => 'Assigned & dispatched',
+
     // Deliveries board upgrades + Pending Deliveries popup finals (owner batch, 3 Aug 2026)
     'delivery_status_dispatched' => 'Dispatched',
     'rider_out_pill' => ':count out',

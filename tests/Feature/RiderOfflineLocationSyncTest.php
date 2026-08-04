@@ -93,6 +93,8 @@ class RiderOfflineLocationSyncTest extends TestCase
             $table->unsignedSmallInteger('accuracy_m')->nullable();
             $table->dateTime('recorded_at');
             $table->bigInteger('client_ts_ms')->nullable()->unsigned();
+            // Stamped at insert: true=offline-buffered, false=live, NULL=pre-migration row.
+            $table->boolean('is_offline')->nullable()->default(null);
             $table->timestamp('created_at')->useCurrent();
             $table->unique(['rider_id', 'client_ts_ms'], 'prl_rider_client_ts_dedup');
             $table->index(['company_id', 'rider_id', 'recorded_at'], 'prl_company_rider_time');

@@ -202,6 +202,19 @@ class PosRiderTrackingController extends Controller
                     continue; // stale offline buffer — beyond accepted window
                 }
             }
+            // Stamp is_offline at insert time so trail() never has to rely on a
+            // clock-skew-sensitive heuristic for new points.
+            // A point is offline when its recorded_at is 5+ minutes older than
+            // server now() — rider buffered it while off-network and uploaded later.
+            // For old APKs that send no `at`, $clientTsMs is NULL and $at was
+            // set to now() above, so lag == 0 → is_offline = false (correct:
+            // we cannot know, and false is the safe / non-alarming default).
+            //
+            // Use raw timestamps: $at <= now() is already enforced above (future
+            // values are clamped), so the difference is always non-negative.
+            $isOffline = (now()->timestamp - $at->timestamp)
+                >= (self::OFFLINE_HEURISTIC_MINUTES * 60);
+
             $rows[] = [
                 'company_id'   => $rider->company_id,
                 'rider_id'     => $rider->id,
@@ -211,6 +224,7 @@ class PosRiderTrackingController extends Controller
                     ? min(65000, max(0, (int) $p['acc'])) : null,
                 'recorded_at'  => $at->format('Y-m-d H:i:s'),
                 'client_ts_ms' => $clientTsMs, // always present (may be NULL)
+                'is_offline'   => $isOffline,  // stamped server-side at insert
                 'created_at'   => now(),
             ];
             $lastRow = $rows[count($rows) - 1];
@@ -403,13 +417,15 @@ class PosRiderTrackingController extends Controller
         $gapMin = (int) ($request->query('gap_min', self::GAP_THRESHOLD_MINUTES));
         $gapMin = max(2, min(60, $gapMin));
 
-        // Fetch full set including created_at for offline heuristic.
+        // Fetch full set. is_offline is NULL on pre-migration rows → heuristic
+        // fallback used in gap detection below; created_at still fetched for
+        // that fallback path.
         $rawPoints = DB::table('pos_rider_locations')
             ->where('company_id', $companyId)
             ->where('rider_id', $rider->id)
             ->whereBetween('recorded_at', [$day->copy()->startOfDay(), $day->copy()->endOfDay()])
             ->orderBy('recorded_at')
-            ->get(['lat', 'lng', 'recorded_at', 'created_at']);
+            ->get(['lat', 'lng', 'recorded_at', 'created_at', 'is_offline']);
 
         $total = $rawPoints->count();
 
@@ -431,16 +447,30 @@ class PosRiderTrackingController extends Controller
             $gapSecs = $currTs - $prevTs;
 
             if ($gapSecs >= $gapThresholdSecs) {
-                // Determine if the batch of points after the gap were offline-buffered:
-                // check the first up-to-3 points after the gap — if most of them were
-                // uploaded much later than recorded, the rider had them buffered offline.
+                // Determine if the batch of points after the gap were offline-buffered.
+                //
+                // Strategy (per-point):
+                //  • is_offline NOT NULL (stamped at insert by server) → trust it directly.
+                //  • is_offline IS NULL (pre-migration row) → fall back to
+                //    created_at − recorded_at heuristic (original logic).
+                //
+                // A gap is "offline after" when the majority of the first 1-3 points
+                // after the gap are classified as offline by whichever signal applies.
                 $offlineCount = 0;
                 $checkUpTo = min($i + 3, $total);
                 for ($j = $i; $j < $checkUpTo; $j++) {
                     $pt = $rawPoints[$j];
-                    $lag = strtotime($pt->created_at) - strtotime($pt->recorded_at);
-                    if ($lag >= $offlineThresholdSecs) {
-                        $offlineCount++;
+                    if ($pt->is_offline !== null) {
+                        // Column is authoritative — no heuristic needed.
+                        if ((bool) $pt->is_offline) {
+                            $offlineCount++;
+                        }
+                    } else {
+                        // Pre-migration row: fall back to created_at − recorded_at.
+                        $lag = strtotime($pt->created_at) - strtotime($pt->recorded_at);
+                        if ($lag >= $offlineThresholdSecs) {
+                            $offlineCount++;
+                        }
                     }
                 }
                 $isOfflineAfter = $offlineCount >= (int) ceil(($checkUpTo - $i) / 2);

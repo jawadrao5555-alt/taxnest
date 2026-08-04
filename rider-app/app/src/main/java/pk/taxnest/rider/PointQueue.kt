@@ -6,10 +6,11 @@ import org.json.JSONObject
 
 /**
  * Offline-first GPS point buffer, persisted to SharedPreferences so points
- * survive process death. Capped — oldest dropped first.
+ * survive process death.  Capped at 5000 points (~27 h of duty at typical
+ * GPS cadence).  Oldest points are dropped first when the cap is hit.
  */
 object PointQueue {
-    private const val CAP = 600
+    private const val CAP = 5000
     private val lock = Any()
 
     fun add(c: Context, lat: Double, lng: Double, accuracyM: Int?) {

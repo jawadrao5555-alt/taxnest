@@ -39,7 +39,7 @@ class PosRiderTrackingController extends Controller
 
     // Bump on each Android release; APK hosted on OUR server (never a GitHub
     // release — desktop agents auto-update from this repo's releases/latest).
-    private const APP_LATEST_VERSION = '1.1.0';
+    private const APP_LATEST_VERSION = '1.2.0';
     private const APP_DOWNLOAD_URL = 'https://taxnest.com.pk/downloads/taxnest-rider.apk';
 
     // ─── Shared gates ───────────────────────────────────────────────────────
@@ -146,6 +146,15 @@ class PosRiderTrackingController extends Controller
     /**
      * POST /api/rider-app/v1/locations {points: [{lat, lng, acc?, at?}, ...]}
      * `at` = epoch milliseconds (client clock, clamped server-side).
+     *
+     * Offline-buffer support (v1.2.0+):
+     *  - client_ts_ms stored per row for replay-dedupe via unique index
+     *    (rider_id, client_ts_ms); insertOrIgnore silently skips duplicates.
+     *  - last_lat/last_lng/last_located_at updated only when the batch's
+     *    newest recorded_at is strictly newer than the stored value (regression
+     *    guard: a replayed batch of old points must not overwrite a fresher fix).
+     *  - Old APKs that omit `at` get client_ts_ms=NULL; NULL rows bypass the
+     *    unique constraint (MySQL/SQLite both allow multiple NULLs in unique idx).
      */
     public function appLocations(Request $request)
     {
@@ -172,14 +181,17 @@ class PosRiderTrackingController extends Controller
                 continue;
             }
             $at = now();
+            $clientTsMs = null; // NULL for old APKs — bypasses unique constraint
             if (!empty($p['at']) && is_numeric($p['at'])) {
+                $clientTsMs = (int) $p['at'];
                 try {
                     // Epoch is absolute — convert to app TZ so recorded_at
                     // lines up with created_at/now() comparisons everywhere.
-                    $at = Carbon::createFromTimestampMs((int) $p['at'])
+                    $at = Carbon::createFromTimestampMs($clientTsMs)
                         ->setTimezone(config('app.timezone'));
                 } catch (\Throwable $e) {
                     $at = now();
+                    $clientTsMs = null;
                 }
                 if ($at->gt(now())) {
                     $at = now();
@@ -189,29 +201,42 @@ class PosRiderTrackingController extends Controller
                 }
             }
             $rows[] = [
-                'company_id' => $rider->company_id,
-                'rider_id' => $rider->id,
-                'lat' => round($lat, 7),
-                'lng' => round($lng, 7),
-                'accuracy_m' => isset($p['acc']) && is_numeric($p['acc'])
+                'company_id'   => $rider->company_id,
+                'rider_id'     => $rider->id,
+                'lat'          => round($lat, 7),
+                'lng'          => round($lng, 7),
+                'accuracy_m'   => isset($p['acc']) && is_numeric($p['acc'])
                     ? min(65000, max(0, (int) $p['acc'])) : null,
-                'recorded_at' => $at->format('Y-m-d H:i:s'),
-                'created_at' => now(),
+                'recorded_at'  => $at->format('Y-m-d H:i:s'),
+                'client_ts_ms' => $clientTsMs, // always present (may be NULL)
+                'created_at'   => now(),
             ];
-            if ($newest === null || $rows[count($rows) - 1]['recorded_at'] > $newest['recorded_at']) {
-                $newest = $rows[count($rows) - 1];
+            $lastRow = $rows[count($rows) - 1];
+            if ($newest === null || $lastRow['recorded_at'] > $newest['recorded_at']) {
+                $newest = $lastRow;
             }
         }
 
         if ($rows) {
+            // insertOrIgnore: duplicate (rider_id, client_ts_ms) rows from a
+            // replayed offline batch are silently skipped by the unique index.
             foreach (array_chunk($rows, 100) as $chunk) {
-                DB::table('pos_rider_locations')->insert($chunk);
+                DB::table('pos_rider_locations')->insertOrIgnore($chunk);
             }
-            $rider->update([
-                'last_lat' => $newest['lat'],
-                'last_lng' => $newest['lng'],
-                'last_located_at' => $newest['recorded_at'],
-            ]);
+
+            // Regression guard: only advance last_lat/lng/located_at when the
+            // incoming batch carries a strictly newer fix than what is stored.
+            // NULL stored = always update (first ever fix for this rider).
+            $currentLocatedAt = $rider->last_located_at
+                ? $rider->last_located_at->format('Y-m-d H:i:s')
+                : null;
+            if ($currentLocatedAt === null || $newest['recorded_at'] > $currentLocatedAt) {
+                $rider->update([
+                    'last_lat'        => $newest['lat'],
+                    'last_lng'        => $newest['lng'],
+                    'last_located_at' => $newest['recorded_at'],
+                ]);
+            }
         }
 
         // Opportunistic retention purge — no cron dependency.

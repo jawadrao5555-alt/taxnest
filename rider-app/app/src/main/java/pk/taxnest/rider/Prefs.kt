@@ -28,7 +28,26 @@ object Prefs {
     fun lastSync(c: Context): Long = sp(c).getLong("last_sync", 0L)
     fun setLastSync(c: Context, v: Long) = sp(c).edit().putLong("last_sync", v).apply()
 
+    /**
+     * Token-only eviction — used when the server returns 401 (token rotated by
+     * another device login).  The GPS point queue is intentionally preserved so
+     * the rider can re-login on this device and the buffered offline points will
+     * drain automatically once duty resumes.
+     */
+    fun clearToken(c: Context) =
+        sp(c).edit()
+            .remove("token").remove("rider_name").remove("company_name")
+            .putBoolean("duty", false)
+            .apply()
+
+    /**
+     * Full session wipe — used only on VOLUNTARY logout.  Clears the queue
+     * because the rider is deliberately ending the session; stale points from a
+     * prior shift are noise on the next login.
+     */
     fun clearSession(c: Context) =
-        sp(c).edit().remove("token").remove("rider_name").remove("company_name")
-            .putBoolean("duty", false).putString("queue", "[]").apply()
+        sp(c).edit()
+            .remove("token").remove("rider_name").remove("company_name")
+            .putBoolean("duty", false).putString("queue", "[]")
+            .apply()
 }

@@ -27,6 +27,12 @@ import org.json.JSONObject
  *   every Android phone in the market.
  * - Points buffer in PointQueue (offline-safe), flushed every 45s / 20 points.
  * - Server is the boss: 401/403 → end session/duty; 409 → duty already off.
+ *
+ * 401 handling — token-only eviction:
+ *   On 401 the token has been rotated (rider logged in on another device).
+ *   We evict the token and stop the service but PRESERVE the GPS point queue
+ *   so that when the rider re-logs in on this device the buffered offline
+ *   points drain automatically once duty resumes.
  */
 class TrackingService : Service(), LocationListener {
 
@@ -135,8 +141,11 @@ class TrackingService : Service(), LocationListener {
                 PointQueue.removeFirst(this, batch.length())
                 Prefs.setLastSync(this, System.currentTimeMillis())
             }
-            code == 401 -> { // token revoked / logged in elsewhere
-                Prefs.clearSession(this)
+            code == 401 -> {
+                // Token was rotated (rider logged in on another device).
+                // Evict token + duty state but KEEP the queue so points can be
+                // uploaded after the rider re-logs in on this device.
+                Prefs.clearToken(this)
                 stopSelf()
             }
             code == 403 -> { // plan downgraded — stop cleanly, keep session
@@ -147,7 +156,7 @@ class TrackingService : Service(), LocationListener {
                 Prefs.setDuty(this, false)
                 stopSelf()
             }
-            // network failure → keep buffer, try next loop
+            // network failure / other transient error → keep buffer, try next loop
         }
     }
 

@@ -461,9 +461,10 @@ class PosBiometricController extends Controller
     /**
      * POST /pos/bio-sync/pin-alert/dismiss
      * Admin dismisses a per-PIN unmapped alert from the panel banner.
-     * Sets dismissed_at — the alert will never re-surface for this PIN
-     * unless the alert row is hard-deleted (e.g. when saveMapping removes
-     * the PIN entirely from a device, allowing a fresh alert on next punch).
+     * Sets dismissed_at. The alert re-surfaces automatically when the next
+     * punch for this PIN arrives with a device timestamp ≥ DISMISS_COOLDOWN_DAYS
+     * (7 days) after dismissal. Hard-deleting the row (e.g. saveMapping removes
+     * the PIN from a device) also resets the cooldown.
      */
     public function dismissPinAlert(Request $request)
     {
@@ -662,9 +663,27 @@ class PosBiometricController extends Controller
     // ─── Private helpers ───────────────────────────────────────────────────
 
     /**
-     * Fire an unmapped-PIN alert the FIRST time a given (company, pin) pair
-     * is seen without a mapped user. Uses firstOrCreate so subsequent calls
-     * for the same pair are silent no-ops (deduplicated).
+     * Number of days after a dismissal before the same PIN can re-surface as
+     * an active alert. Punches within this window are silent (no-ops). Once the
+     * window expires, the next punch reactivates the existing row (dismissed_at
+     * and mapped_at are cleared) so the admin sees the alert again.
+     */
+    private const DISMISS_COOLDOWN_DAYS = 7;
+
+    /**
+     * Fire an unmapped-PIN alert for a given (company, pin) pair.
+     *
+     * Lifecycle:
+     *  • No row yet            → create it (first time this PIN is seen).
+     *  • Row exists, active    → silent no-op (already visible to admin).
+     *  • Row dismissed < 7d    → silent no-op (cooldown window, avoid spam).
+     *  • Row dismissed ≥ 7d    → reactivate: clear dismissed_at + mapped_at
+     *                            so the admin sees the alert again.
+     *
+     * The cooldown is measured relative to $punchedAt (the device timestamp),
+     * NOT now(). This ensures delayed/replayed/CSV-imported punches that were
+     * recorded within the cooldown window do not accidentally re-surface a
+     * dismissed alert just because they arrive late at the server.
      *
      * Always wrapped in Schema::hasTable guard + try/catch so any DB or
      * migration issue never breaks punch ingestion or the ADMS response.
@@ -675,10 +694,54 @@ class PosBiometricController extends Controller
             if (!Schema::hasTable('pos_bio_pin_alerts')) {
                 return;
             }
-            PosUnmappedPinAlert::firstOrCreate(
-                ['company_id' => $companyId, 'device_pin' => $pin],
-                ['first_seen_at' => $punchedAt->format('Y-m-d H:i:s')]
-            );
+
+            $alert = PosUnmappedPinAlert::where('company_id', $companyId)
+                ->where('device_pin', $pin)
+                ->first();
+
+            if ($alert === null) {
+                // First punch ever for this PIN — create the alert.
+                PosUnmappedPinAlert::create([
+                    'company_id'    => $companyId,
+                    'device_pin'    => $pin,
+                    'first_seen_at' => $punchedAt->format('Y-m-d H:i:s'),
+                ]);
+                return;
+            }
+
+            // Alert already exists and is currently active (not dismissed, not
+            // mapped) — nothing to do, it is already visible to the admin.
+            if ($alert->dismissed_at === null && $alert->mapped_at === null) {
+                return;
+            }
+
+            // Alert was dismissed. Re-surface only when the punch device-timestamp
+            // is at least DISMISS_COOLDOWN_DAYS AFTER dismissed_at. Two conditions
+            // must both hold:
+            //  a) $punchedAt >= dismissed_at  — replayed/old punches pre-dating the
+            //     dismissal must never reactivate (diffInDays is absolute, so we
+            //     guard direction explicitly first).
+            //  b) elapsed days >= DISMISS_COOLDOWN_DAYS — punch is past the window.
+            if ($alert->dismissed_at !== null) {
+                if ($punchedAt->lt($alert->dismissed_at)) {
+                    return; // Punch pre-dates dismissal — stay silent regardless of gap.
+                }
+                $daysSinceDismiss = $alert->dismissed_at->diffInDays($punchedAt, true);
+                if ($daysSinceDismiss < self::DISMISS_COOLDOWN_DAYS) {
+                    return; // Punch occurred within cooldown — stay silent.
+                }
+                // Punch occurred after the cooldown: reactivate the existing row.
+                $alert->dismissed_at = null;
+                $alert->mapped_at    = null;
+                $alert->save();
+                return;
+            }
+
+            // Alert was mapped (mapped_at set, dismissed_at null). Reactivate
+            // so the admin is informed the PIN is unmapped again.
+            $alert->mapped_at = null;
+            $alert->save();
+
         } catch (\Throwable $e) {
             Log::warning("bio unmapped-pin alert failed: {$e->getMessage()} | company={$companyId} pin={$pin}");
         }

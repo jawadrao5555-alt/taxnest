@@ -3585,6 +3585,23 @@ class PosController extends Controller
         // 'a4' mode makes the PDF a real A4 page with the receipt strip top-left.
         $pdfPaper = ($company->invoice_display_prefs['pos_style']['pdf_paper'] ?? 'thermal') === 'a4' ? 'a4' : 'thermal';
 
+        // Task 260: locale 'ur' → mPDF (Arabic OTL shaping). en/rur → DomPDF unchanged.
+        // If mPDF is unavailable or throws, log + fall back to DomPDF Roman Urdu (never 500).
+        if (app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT) {
+            try {
+                $viewData = ['transaction' => $transaction, 'company' => $company, 'pdfMode' => true, 'pdfPaper' => $pdfPaper];
+                if ($pdfPaper === 'a4') {
+                    $paper = 'a4';
+                } else {
+                    $heightPt = $this->estimateReceiptHeightPt($transaction, $company, $printerSize);
+                    $paper = [$paperWidthPt / 2.8346, $heightPt / 2.8346]; // pt → mm
+                }
+                return \App\Support\MpdfRenderer::render($receiptView, $viewData, $paper, "Invoice-{$transaction->invoice_number}.pdf", false);
+            } catch (\Throwable $e) {
+                \Log::warning('mPDF render failed for downloadInvoicePdf, falling back to DomPDF Roman Urdu: ' . $e->getMessage());
+            }
+        }
+
         \App\Support\PosLocale::applyPdfSafeLocale(); // DomPDF can't shape Urdu script — PDF falls back to Roman Urdu
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($receiptView, ['transaction' => $transaction, 'company' => $company, 'pdfMode' => true, 'pdfPaper' => $pdfPaper])
@@ -3645,6 +3662,22 @@ class PosController extends Controller
         // Same PDF Download Paper handling as downloadInvoicePdf — share-link
         // recipients print on regular printers even more often than cashiers.
         $pdfPaper = ($company->invoice_display_prefs['pos_style']['pdf_paper'] ?? 'thermal') === 'a4' ? 'a4' : 'thermal';
+
+        // Task 260: locale 'ur' → mPDF (Arabic OTL shaping). en/rur → DomPDF unchanged.
+        if (app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT) {
+            try {
+                $viewData = ['transaction' => $transaction, 'company' => $company, 'pdfMode' => true, 'pdfPaper' => $pdfPaper];
+                if ($pdfPaper === 'a4') {
+                    $paper = 'a4';
+                } else {
+                    $heightPt = $this->estimateReceiptHeightPt($transaction, $company, $printerSize);
+                    $paper = [$paperWidthPt / 2.8346, $heightPt / 2.8346];
+                }
+                return \App\Support\MpdfRenderer::render($receiptView, $viewData, $paper, "Invoice-{$transaction->invoice_number}.pdf", true);
+            } catch (\Throwable $e) {
+                \Log::warning('mPDF render failed for publicInvoicePdf, falling back to DomPDF Roman Urdu: ' . $e->getMessage());
+            }
+        }
 
         \App\Support\PosLocale::applyPdfSafeLocale(); // DomPDF can't shape Urdu script — PDF falls back to Roman Urdu
 

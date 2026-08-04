@@ -2530,6 +2530,21 @@ class FbrPosController extends Controller
             ->with(['items', 'creator'])
             ->findOrFail($id);
 
+        // Task 260: locale 'ur' → mPDF (Arabic OTL shaping). en/rur → DomPDF unchanged.
+        if (app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT) {
+            try {
+                return \App\Support\MpdfRenderer::render(
+                    'fbr-pos.invoice-pdf',
+                    compact('transaction', 'company'),
+                    'a4',
+                    "FBR-POS-Invoice-{$transaction->invoice_number}.pdf",
+                    false
+                );
+            } catch (\Throwable $e) {
+                \Log::warning('mPDF render failed for FBR downloadPdf, falling back to DomPDF Roman Urdu: ' . $e->getMessage());
+            }
+        }
+
         \App\Support\PosLocale::applyPdfSafeLocale(); // DomPDF can't shape Urdu script — PDF falls back to Roman Urdu
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fbr-pos.invoice-pdf', compact('transaction', 'company'));
@@ -2545,6 +2560,21 @@ class FbrPosController extends Controller
         $transaction = FbrPosTransaction::where('company_id', $companyId)
             ->with(['items', 'creator'])
             ->findOrFail($id);
+
+        // Task 260: locale 'ur' → mPDF (Arabic OTL shaping). en/rur → DomPDF unchanged.
+        if (app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT) {
+            try {
+                return \App\Support\MpdfRenderer::render(
+                    'fbr-pos.invoice-pdf',
+                    compact('transaction', 'company'),
+                    'a4',
+                    "FBR-POS-Invoice-{$transaction->invoice_number}.pdf",
+                    true
+                );
+            } catch (\Throwable $e) {
+                \Log::warning('mPDF render failed for FBR previewPdf, falling back to DomPDF Roman Urdu: ' . $e->getMessage());
+            }
+        }
 
         \App\Support\PosLocale::applyPdfSafeLocale(); // DomPDF can't shape Urdu script — PDF falls back to Roman Urdu
 

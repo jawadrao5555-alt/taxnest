@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 @php $urduScript = app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT; @endphp
-<html lang="{{ $urduScript ? 'ur' : 'en' }}">
+<html lang="{{ $urduScript ? 'ur' : 'en' }}" dir="{{ $urduScript ? 'rtl' : 'ltr' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -125,7 +125,10 @@
            Taller line-height — Urdu glyphs clip at Latin line heights.
            NOTE: DomPDF PDFs never reach here — PosLocale::applyPdfSafeLocale()
            drops 'ur' → 'rur' before every PDF render (DomPDF can't shape). */
-        body { font-family: 'Noto Naskh Arabic', 'Urdu Typesetting', Tahoma, Arial, 'Segoe UI', sans-serif; line-height: 1.6; }
+        /* 'XB Riyaz' is first so mPDF (Urdu PDF path, Task 260) resolves it via
+           its bundled FontVariables entry (key 'xbriyaz', useOTL=0xFF, Naskh).
+           Browsers fall through to Noto Naskh Arabic → Urdu Typesetting → Tahoma. */
+        body { font-family: 'XB Riyaz', 'Noto Naskh Arabic', 'Urdu Typesetting', Tahoma, Arial, 'Segoe UI', sans-serif; line-height: 1.6; }
         @endif
     </style>
     @if(!empty($pdfMode))

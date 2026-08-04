@@ -39,7 +39,7 @@ class PosRiderTrackingController extends Controller
 
     // Bump on each Android release; APK hosted on OUR server (never a GitHub
     // release — desktop agents auto-update from this repo's releases/latest).
-    private const APP_LATEST_VERSION = '1.0.0';
+    private const APP_LATEST_VERSION = '1.1.0';
     private const APP_DOWNLOAD_URL = 'https://taxnest.com.pk/downloads/taxnest-rider.apk';
 
     // ─── Shared gates ───────────────────────────────────────────────────────
@@ -240,7 +240,6 @@ class PosRiderTrackingController extends Controller
             ->where('rider_id', $rider->id)
             ->whereIn('delivery_status', ['assigned', 'dispatched'])
             ->orderBy('id')
-            ->limit(50)
             ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'delivery_address', 'total_amount', 'payment_method', 'delivery_status', 'created_at',
                    ...($hasAssignedAt ? ['rider_assigned_at'] : [])]);
 

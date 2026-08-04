@@ -1,22 +1,25 @@
 package pk.taxnest.rider
 
-import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
+import android.view.LayoutInflater
 import android.view.View
 import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -35,12 +38,26 @@ class MainActivity : AppCompatActivity() {
     private lateinit var welcomeText: TextView
     private lateinit var summaryText: TextView
     private lateinit var updateRow: View
+    private lateinit var deliveriesContainer: LinearLayout
+    private lateinit var emptyDeliveriesText: TextView
 
     private val ui = Handler(Looper.getMainLooper())
-    private val refreshLoop = object : Runnable {
+
+    // 5-second loop — local Prefs only (duty bool, pending queue, last sync).
+    // Never touches the network.
+    private val localStateLoop = object : Runnable {
         override fun run() {
             renderState()
             ui.postDelayed(this, 5000)
+        }
+    }
+
+    // 30-second loop — polls /me to refresh duty status + deliveries list.
+    // Kept separate from the 5s loop so we don't hammer the server.
+    private val meRefreshLoop = object : Runnable {
+        override fun run() {
+            refreshMe()
+            ui.postDelayed(this, 30_000)
         }
     }
 
@@ -51,12 +68,14 @@ class MainActivity : AppCompatActivity() {
         }
         setContentView(R.layout.activity_main)
 
-        dutyBtn = findViewById(R.id.dutyBtn)
-        statusText = findViewById(R.id.statusText)
-        pendingText = findViewById(R.id.pendingText)
-        welcomeText = findViewById(R.id.welcomeText)
-        summaryText = findViewById(R.id.summaryText)
-        updateRow = findViewById(R.id.updateRow)
+        dutyBtn            = findViewById(R.id.dutyBtn)
+        statusText         = findViewById(R.id.statusText)
+        pendingText        = findViewById(R.id.pendingText)
+        welcomeText        = findViewById(R.id.welcomeText)
+        summaryText        = findViewById(R.id.summaryText)
+        updateRow          = findViewById(R.id.updateRow)
+        deliveriesContainer = findViewById(R.id.deliveriesContainer)
+        emptyDeliveriesText = findViewById(R.id.emptyDeliveriesText)
 
         welcomeText.text = getString(R.string.welcome, Prefs.riderName(this))
 
@@ -77,18 +96,23 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         renderState()
-        ui.removeCallbacks(refreshLoop)
-        ui.postDelayed(refreshLoop, 5000)
+        // Start both loops fresh (cancel any stale callbacks first).
+        ui.removeCallbacks(localStateLoop)
+        ui.removeCallbacks(meRefreshLoop)
+        ui.postDelayed(localStateLoop, 5000)
+        // Immediate /me fetch on resume; next auto-refresh 30 s later.
         refreshMe()
+        ui.postDelayed(meRefreshLoop, 30_000)
         checkUpdate()
     }
 
     override fun onPause() {
         super.onPause()
-        ui.removeCallbacks(refreshLoop)
+        ui.removeCallbacks(localStateLoop)
+        ui.removeCallbacks(meRefreshLoop)
     }
 
-    // ── Duty ON: permission chain, then server, then service ──────────────
+    // ── Duty ON: permission chain → server → service ──────────────────────
 
     private fun beginDutyChain() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
@@ -216,6 +240,7 @@ class MainActivity : AppCompatActivity() {
                 val serverDuty = body.optBoolean("duty", false)
                 val deliveries = body.optInt("open_deliveries", 0)
                 val khata = body.optDouble("khata_owed", 0.0)
+                val deliveriesArr = body.optJSONArray("deliveries") ?: JSONArray()
                 runOnUiThread {
                     // Server is the boss for duty state.
                     if (Prefs.duty(this) != serverDuty) {
@@ -226,9 +251,90 @@ class MainActivity : AppCompatActivity() {
                     summaryText.text = getString(R.string.open_deliveries, deliveries) + "\n" +
                         getString(R.string.khata_owed, String.format(Locale.US, "%,.0f", khata))
                     renderState()
+                    updateDeliveriesList(deliveriesArr)
                 }
             }
         }
+    }
+
+    /**
+     * Rebuilds the deliveries list from the JSONArray returned by /me.
+     * Must be called on the main thread.
+     */
+    private fun updateDeliveriesList(arr: JSONArray) {
+        deliveriesContainer.removeAllViews()
+
+        if (arr.length() == 0) {
+            emptyDeliveriesText.visibility = View.VISIBLE
+            return
+        }
+        emptyDeliveriesText.visibility = View.GONE
+
+        val inflater = LayoutInflater.from(this)
+        for (i in 0 until arr.length()) {
+            val item = arr.optJSONObject(i) ?: continue
+            val row = inflater.inflate(R.layout.item_delivery, deliveriesContainer, false)
+
+            row.findViewById<TextView>(R.id.invoiceNumber).text =
+                item.optString("invoice_number").ifBlank { "#${item.optInt("id")}" }
+
+            val amountVal = item.optDouble("amount", 0.0)
+            row.findViewById<TextView>(R.id.amount).text =
+                getString(R.string.amount_fmt, String.format(Locale.US, "%,.0f", amountVal))
+
+            row.findViewById<TextView>(R.id.customerName).text =
+                item.optString("customer_name").ifBlank { getString(R.string.unknown_customer) }
+
+            val pm = item.optString("payment_method")
+            row.findViewById<TextView>(R.id.paymentMethod).text = localizePaymentMethod(pm)
+
+            // Phone — tap to dial
+            val phone = item.optString("customer_phone")
+            val phoneView = row.findViewById<TextView>(R.id.phone)
+            if (phone.isNotBlank()) {
+                phoneView.text = getString(R.string.phone_prefix, phone)
+                phoneView.visibility = View.VISIBLE
+                phoneView.setOnClickListener {
+                    try { startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))) }
+                    catch (e: Exception) { showMsg(getString(R.string.no_dialer)) }
+                }
+            } else {
+                phoneView.visibility = View.GONE
+            }
+
+            // Address — tap to open maps_url
+            val mapsUrl = item.optString("maps_url")
+            val address = item.optString("address")
+            val addrView = row.findViewById<TextView>(R.id.address)
+            if (address.isNotBlank()) {
+                addrView.text = getString(R.string.address_prefix, address)
+                addrView.visibility = View.VISIBLE
+                if (mapsUrl.isNotBlank()) {
+                    addrView.setOnClickListener {
+                        try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(mapsUrl))) }
+                        catch (e: Exception) { showMsg(getString(R.string.no_maps)) }
+                    }
+                }
+            } else {
+                addrView.visibility = View.GONE
+            }
+
+            // Assigned X min ago
+            val mins = item.optInt("assigned_mins", -1)
+            val minsView = row.findViewById<TextView>(R.id.assignedMins)
+            minsView.text = if (mins >= 0) getString(R.string.assigned_mins_ago, mins)
+                            else getString(R.string.assigned_just_now)
+
+            deliveriesContainer.addView(row)
+        }
+    }
+
+    /** Maps server payment_method values to display labels. */
+    private fun localizePaymentMethod(pm: String): String = when (pm.lowercase()) {
+        "cash"       -> getString(R.string.pm_cash)
+        "debit_card", "card", "credit_card" -> getString(R.string.pm_card)
+        "online"     -> getString(R.string.pm_online)
+        else         -> pm.ifBlank { getString(R.string.pm_cash) }
     }
 
     private fun checkUpdate() {

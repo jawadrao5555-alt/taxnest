@@ -17,18 +17,33 @@
     <string name="notif_title">TaxNest Rider — on duty</string>
     <string name="notif_text">Sharing location with your shop</string>
     <string name="perm_location_needed">Location permission is required — tracking cannot work without it</string>
-    <string name="perm_background_needed">Please choose “Allow all the time” in location permission so tracking works with the screen off</string>
-    <string name="perm_battery">Set this app to “Unrestricted” in battery settings so it is not killed during duty</string>
+    <string name="perm_background_needed">Please choose "Allow all the time" in location permission so tracking works with the screen off</string>
+    <string name="perm_battery">Set this app to "Unrestricted" in battery settings so it is not killed during duty</string>
     <string name="open_settings">Open settings</string>
     <string name="skip">Continue</string>
     <string name="points_pending">Points waiting to send: %1$d</string>
     <string name="last_sync">Last update: %1$s</string>
     <string name="never">not yet</string>
-    <string name="plan_locked">This feature is not in your shop’s package — talk to your admin</string>
+    <string name="plan_locked">This feature is not in your shop\'s package — talk to your admin</string>
     <string name="session_expired">Session expired — log in again</string>
     <string name="update_available">A new version is available — please update</string>
     <string name="update_btn">Download update</string>
     <string name="welcome">Welcome, %1$s</string>
     <string name="open_deliveries">Open deliveries: %1$d</string>
     <string name="khata_owed">Khata (cash): Rs %1$s</string>
+
+    <!-- Deliveries list (v1.1.0) -->
+    <string name="deliveries_section">Delivery Bills</string>
+    <string name="no_deliveries">No bills assigned for delivery</string>
+    <string name="assigned_mins_ago">Assigned %1$d min ago</string>
+    <string name="assigned_just_now">Just assigned</string>
+    <string name="amount_fmt">Rs %1$s</string>
+    <string name="phone_prefix">📞 %1$s</string>
+    <string name="address_prefix">📍 %1$s</string>
+    <string name="unknown_customer">Unknown customer</string>
+    <string name="no_dialer">No phone app found</string>
+    <string name="no_maps">No maps app found</string>
+    <string name="pm_cash">Cash</string>
+    <string name="pm_card">Card</string>
+    <string name="pm_online">Online</string>
 </resources>

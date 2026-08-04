@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Default locale = Urdu (waiter audience); values-en carries English. -->
+<resources>
+    <string name="app_name">ٹیکس نیسٹ ویٹر</string>
+    <string name="offline_title">انٹرنیٹ نہیں مل رہا</string>
+    <string name="offline_body">اپنا وائی فائی یا موبائل ڈیٹا چیک کریں، پھر دوبارہ کوشش کریں۔</string>
+    <string name="offline_retry">دوبارہ کوشش</string>
+    <string name="download_started">ڈاؤن لوڈ شروع ہو گیا — نوٹیفیکیشن دیکھیں</string>
+</resources>

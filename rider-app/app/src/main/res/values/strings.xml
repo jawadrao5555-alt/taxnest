@@ -32,4 +32,19 @@
     <string name="welcome">خوش آمدید، %1$s</string>
     <string name="open_deliveries">زیرِ ترسیل بل: %1$d</string>
     <string name="khata_owed">کھاتہ (نقدی): روپے %1$s</string>
+
+    <!-- Deliveries list (v1.1.0) -->
+    <string name="deliveries_section">ترسیل کے بل</string>
+    <string name="no_deliveries">کوئی بل ترسیل کے لیے نہیں ہے</string>
+    <string name="assigned_mins_ago">%1$d منٹ پہلے اسائن ہوا</string>
+    <string name="assigned_just_now">ابھی اسائن ہوا</string>
+    <string name="amount_fmt">روپے %1$s</string>
+    <string name="phone_prefix">📞 %1$s</string>
+    <string name="address_prefix">📍 %1$s</string>
+    <string name="unknown_customer">نامعلوم گاہک</string>
+    <string name="no_dialer">فون ایپ نہیں ملی</string>
+    <string name="no_maps">نقشہ ایپ نہیں ملی</string>
+    <string name="pm_cash">نقد</string>
+    <string name="pm_card">کارڈ</string>
+    <string name="pm_online">آن لائن</string>
 </resources>

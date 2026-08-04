@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TaxNest Waiter</string>
+    <string name="offline_title">Internet not found</string>
+    <string name="offline_body">Check your WiFi or mobile data, then try again.</string>
+    <string name="offline_retry">Try Again</string>
+    <string name="download_started">Download started — check notification</string>
+</resources>

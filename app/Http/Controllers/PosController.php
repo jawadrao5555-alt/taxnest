@@ -3536,6 +3536,43 @@ class PosController extends Controller
      * (cut off). We size the page to its content and over-estimate slightly: trailing
      * whitespace on a thermal roll is harmless, a clipped receipt is not.
      */
+    /**
+     * Render an A4 report PDF via mPDF for 'ur' locale (shaped Urdu, RTL) or
+     * DomPDF for en/rur.  Always passes $pdfUrdu bool into view data so
+     * templates can gate RTL CSS and font overrides.
+     *
+     * On mPDF failure the method logs a warning and falls back to DomPDF Roman
+     * Urdu (applyPdfSafeLocale) — no 500 is ever returned.
+     */
+    private function renderReportPdf(
+        string $view,
+        array $data,
+        string $filename,
+        string $orientation = 'portrait'
+    ): \Illuminate\Http\Response {
+        $isUrdu = app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT;
+        $data['pdfUrdu'] = $isUrdu;
+
+        if ($isUrdu) {
+            try {
+                return \App\Support\MpdfRenderer::render(
+                    $view, $data, 'a4-report', $filename, false, $orientation
+                );
+            } catch (\Throwable $e) {
+                \Log::warning("mPDF report render failed [{$filename}]: " . $e->getMessage());
+            }
+        }
+
+        // DomPDF path — drop 'ur' → 'rur' so DomPDF never receives unshaped glyphs.
+        \App\Support\PosLocale::applyPdfSafeLocale();
+        $data['pdfUrdu'] = false; // ensure template sees false on this path
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView($view, $data)
+            ->setPaper('a4', $orientation);
+
+        return $pdf->download($filename);
+    }
+
     private function estimateReceiptHeightPt($transaction, $company, string $printerSize): float
     {
         $charsPerLine = $printerSize === '58mm' ? 12 : 18; // monospace chars fitting the Item column
@@ -3880,10 +3917,11 @@ class PosController extends Controller
         [$rangeFrom, $rangeTo] = $this->resolveReportRange($request);
         $analytics = $this->buildReportRangeAnalytics($companyId, $rangeFrom, $rangeTo, $tab, $cashierFilter, $company, $user);
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.reports-analytics-pdf', compact('company', 'analytics', 'tab'));
-        $pdf->setPaper('a4', 'portrait');
-
-        return $pdf->download('Sales-Analytics-' . $analytics->from . '-to-' . $analytics->to . '.pdf');
+        return $this->renderReportPdf(
+            'pos.reports-analytics-pdf',
+            compact('company', 'analytics', 'tab'),
+            'Sales-Analytics-' . $analytics->from . '-to-' . $analytics->to . '.pdf'
+        );
     }
 
     public function exportReportCsv(Request $request)
@@ -4384,15 +4422,14 @@ class PosController extends Controller
             $taxRateLabel = $taxRateFilter === 'exempt' ? 'Exempt Items Only' : $taxRateFilter . '% Tax Only';
         }
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.tax-report-pdf', compact(
-            'company', 'transactions', 'summary', 'dateLabel', 'taxRateLabel', 'taxRateFilter', 'itemValues'
-        ));
-
-        $pdf->setPaper('a4', 'landscape');
-
         $filename = 'NestPOS_Tax_Report_' . str_replace([' ', '/', '(', ')'], '_', $taxRateLabel) . '_' . now()->format('Ymd_His') . '.pdf';
 
-        return $pdf->download($filename);
+        return $this->renderReportPdf(
+            'pos.tax-report-pdf',
+            compact('company', 'transactions', 'summary', 'dateLabel', 'taxRateLabel', 'taxRateFilter', 'itemValues'),
+            $filename,
+            'landscape'
+        );
     }
 
     public function services()
@@ -6918,11 +6955,12 @@ class PosController extends Controller
         $totalSpent = $transactions->sum('total_amount');
         $totalOrders = $transactions->count();
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.customer-history-pdf', compact('company', 'customer', 'transactions', 'totalSpent', 'totalOrders'))
-            ->setPaper('a4', 'portrait');
-
         $filename = 'Customer_History_' . preg_replace('/[^A-Za-z0-9]+/', '_', $customer->name) . '_' . now()->format('Ymd') . '.pdf';
-        return $pdf->download($filename);
+        return $this->renderReportPdf(
+            'pos.customer-history-pdf',
+            compact('company', 'customer', 'transactions', 'totalSpent', 'totalOrders'),
+            $filename
+        );
     }
 
     public function getLastOrder(Request $request)
@@ -8750,10 +8788,11 @@ class PosController extends Controller
             ? $this->buildHazriRows($companyId, $report->report_date->toDateString())
             : [];
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pos.day-close-pdf', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri'));
-        $pdf->setPaper('a4', 'portrait');
-
-        return $pdf->download("Day-Close-{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf");
+        return $this->renderReportPdf(
+            'pos.day-close-pdf',
+            compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri'),
+            "Day-Close-{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf"
+        );
     }
 
     /**

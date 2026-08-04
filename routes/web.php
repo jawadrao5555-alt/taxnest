@@ -189,6 +189,12 @@ Route::post('/pos/guest-language', function (\Illuminate\Http\Request $request) 
 
 Route::get('/pos/invoice/share/{token}', [PosController::class, 'publicInvoicePdf'])->name('pos.invoice.share');
 
+// Biometric ADMS push endpoint (4 Aug 2026) — PUBLIC, no POS auth.
+// ZKTeco and compatible devices call /bio-sync/{token}/iclock/cdata.
+// Token identifies + scopes the company; no session/CSRF needed.
+Route::get('/bio-sync/{token}/iclock/cdata', [\App\Http\Controllers\PosBiometricController::class, 'admsHandshake'])->name('pos.bio-sync.adms-get');
+Route::post('/bio-sync/{token}/iclock/cdata', [\App\Http\Controllers\PosBiometricController::class, 'admsReceivePunches'])->name('pos.bio-sync.adms-post');
+
 // ═══ Local Bills Archive Portal ═══
 // Isolated read-only portal for users with pos_role='archive_viewer'. Same /pos/login URL
 // (auto-detected). PosAuth middleware confines archive_viewer to /pos/archive/* and
@@ -640,6 +646,14 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/reports/csv', [PosController::class, 'exportReportCsv'])->name('pos.reports.csv');
     // Staff Hazri (owner batch, 26 Jul 2026) — ADMIN/MANAGER-ONLY (403 in controller).
     Route::get('/reports/hazri', [PosController::class, 'hazriReport'])->name('pos.reports.hazri');
+    // Biometric device setup + CSV import (4 Aug 2026) — admin only (403 in controller).
+    Route::get('/bio-sync', [\App\Http\Controllers\PosBiometricController::class, 'setup'])->name('pos.bio-sync.setup');
+    Route::post('/bio-sync/device', [\App\Http\Controllers\PosBiometricController::class, 'storeDevice'])->name('pos.bio-sync.store-device');
+    Route::post('/bio-sync/device/{id}/toggle', [\App\Http\Controllers\PosBiometricController::class, 'toggleDevice'])->name('pos.bio-sync.toggle-device');
+    Route::delete('/bio-sync/device/{id}', [\App\Http\Controllers\PosBiometricController::class, 'destroyDevice'])->name('pos.bio-sync.destroy-device');
+    Route::post('/bio-sync/device/{id}/map', [\App\Http\Controllers\PosBiometricController::class, 'saveMapping'])->name('pos.bio-sync.save-mapping');
+    Route::get('/bio-sync/import', [\App\Http\Controllers\PosBiometricController::class, 'showImport'])->name('pos.bio-sync.import');
+    Route::post('/bio-sync/import', [\App\Http\Controllers\PosBiometricController::class, 'processImport'])->name('pos.bio-sync.process-import');
     Route::get('/tax-reports/csv', [PosController::class, 'exportTaxReportCsv'])->name('pos.tax-reports.csv');
     Route::get('/tax-reports/pdf', [PosController::class, 'exportTaxReportPdf'])->name('pos.tax-reports.pdf');
     Route::get('/reports/analytics-pdf', [PosController::class, 'reportsAnalyticsPdf'])->name('pos.reports.analytics-pdf');

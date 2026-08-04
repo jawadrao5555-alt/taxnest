@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/agent/*',
             'api/rider-app/*',
             'webhooks/whatsapp/*', // Meta WA Cloud API status callbacks
+            'bio-sync/*/iclock/*', // Biometric device ADMS push (no browser session)
         ]);
         $middleware->alias([
             'company' => \App\Http\Middleware\CompanyIsolation::class,

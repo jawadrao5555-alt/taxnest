@@ -8822,7 +8822,12 @@ class PosController extends Controller
         // loadMissing = explicit load (lazy access is FATAL under preventLazyLoading).
         $opening = \App\Models\PosDayOpening::forDate($companyId, $date)?->loadMissing('enteredBy');
 
-        return view('pos.reports-hazri', compact('company', 'date', 'rows', 'opening'));
+        // Biometric punches for this business day (4 Aug 2026).
+        $bioPunches = $this->buildBiometricRows($companyId, $date);
+        $hasBioDevices = \Illuminate\Support\Facades\Schema::hasTable('pos_biometric_devices')
+            && \App\Models\PosBiometricDevice::where('company_id', $companyId)->exists();
+
+        return view('pos.reports-hazri', compact('company', 'date', 'rows', 'opening', 'bioPunches', 'hasBioDevices'));
     }
 
     /**
@@ -8901,6 +8906,88 @@ class PosController extends Controller
             return $rows;
         } catch (\Throwable $e) {
             \Log::warning('hazri rows failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Biometric punch rows for one BUSINESS day (same 6 AM → 6 AM window).
+     * Returns one row per staff member (or unmapped PIN) with first check-in,
+     * last check-out, total punch count, and source (adms / csv_import).
+     * Returns empty array when table is missing or on any error.
+     */
+    private function buildBiometricRows(int $companyId, string $date): array
+    {
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('pos_biometric_punches')) {
+                return [];
+            }
+            $start = \Carbon\Carbon::parse($date, config('app.timezone'))->setTime(6, 0);
+            $end   = $start->copy()->addDay();
+
+            $punches = \App\Models\PosBiometricPunch::where('company_id', $companyId)
+                ->where('punched_at', '>=', $start)
+                ->where('punched_at', '<', $end)
+                ->orderBy('punched_at')
+                ->get();
+
+            if ($punches->isEmpty()) {
+                return [];
+            }
+
+            // Resolve user names for mapped punches
+            $userIds = $punches->pluck('user_id')->filter()->unique();
+            $users   = User::whereIn('id', $userIds)->get()->keyBy('id');
+
+            // Group by user_id (for mapped) or device_pin (for unmapped)
+            $groups = [];
+            foreach ($punches as $p) {
+                $key = $p->user_id ? 'u_' . $p->user_id : 'pin_' . ($p->device_pin ?? 'unknown');
+                if (!isset($groups[$key])) {
+                    $groups[$key] = [
+                        'user_id'    => $p->user_id,
+                        'device_pin' => $p->device_pin,
+                        'punches'    => [],
+                    ];
+                }
+                $groups[$key]['punches'][] = $p;
+            }
+
+            $rows = [];
+            foreach ($groups as $g) {
+                $ps       = $g['punches'];
+                $user     = $g['user_id'] ? $users->get($g['user_id']) : null;
+                $ins      = array_filter($ps, fn ($p) => $p->punch_type === 'check_in');
+                $outs     = array_filter($ps, fn ($p) => $p->punch_type === 'check_out');
+                $firstIn  = collect($ins)->min('punched_at');
+                $lastOut  = collect($outs)->max('punched_at');
+                $sources  = collect($ps)->pluck('source')->unique()->values()->all();
+
+                $rows[] = (object) [
+                    'user_id'    => $g['user_id'],
+                    'name'       => $user?->name,
+                    'device_pin' => $g['device_pin'],
+                    'first_in'   => $firstIn,
+                    'last_out'   => $lastOut,
+                    'in_count'   => count($ins),
+                    'out_count'  => count($outs),
+                    'total'      => count($ps),
+                    'sources'    => $sources,
+                ];
+            }
+
+            usort($rows, function ($a, $b) {
+                if ($a->first_in && $b->first_in) {
+                    return $a->first_in <=> $b->first_in;
+                }
+                if ($a->first_in) return -1;
+                if ($b->first_in) return 1;
+                return strcmp($a->name ?? $a->device_pin, $b->name ?? $b->device_pin);
+            });
+
+            return $rows;
+        } catch (\Throwable $e) {
+            \Log::warning('biometric rows failed: ' . $e->getMessage());
             return [];
         }
     }

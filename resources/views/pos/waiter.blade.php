@@ -447,9 +447,16 @@ function waiterApp() {
             // matching only when the query has a digit/symbol.
             // PER-COMPANY SEARCH MODE (owner, 4 Aug 2026): 'any_word' matches the
             // start of ANY word right away ("win" → "5 Piece Hot Wings").
+            // GLOBAL SEARCH (owner, 4 Aug 2026 — same rule as the cashier universal
+            // screen, 22 Jul): while the waiter is TYPING a search, the whole catalog
+            // is searchable — hidden (show_on_sale=false / user-pref-hidden) items and
+            // every category included. Hide/Show only declutters the idle browsing
+            // grid; a search must NEVER come up empty because an item was hidden.
             const codeSearch = /[^a-z\s]/.test(q);
             const wordHit = p => p.name.toLowerCase().split(/\s+/).some(w => w.startsWith(q));
-            const scoped = pool.filter(p => this.activeCategory === 'all' || p.category === this.activeCategory);
+            const scoped = q
+                ? this.products
+                : pool.filter(p => this.activeCategory === 'all' || p.category === this.activeCategory);
             let hits = scoped.filter(p =>
                 !q || (this.searchAnyWord ? wordHit(p) : p.name.toLowerCase().startsWith(q))
                     || (codeSearch && p.barcode && String(p.barcode).toLowerCase().includes(q))

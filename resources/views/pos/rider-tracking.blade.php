@@ -39,6 +39,7 @@
     <div class="px-3 sm:px-4 py-3" x-data="riderTracking(@js([
         'dataUrl' => route('pos.riders.tracking.data'),
         'trailUrlBase' => url('/pos/riders/tracking/trail'),
+        'companyCity' => $companyCity ?? '',
         'i18n' => [
             'on_duty' => __('pos.rt_on_duty'),
             'off_duty' => __('pos.rt_off_duty'),
@@ -153,8 +154,19 @@
             searchBusy: false,
             searchDone: false,
             userCentered: false,
+            cityCentered: false,
             init() {
-                this.map = L.map('rt-map', { zoomControl: true }).setView([31.5204, 74.3587], 12);
+                // PAKISTAN-LOCKED map (owner, Aug 2026: "Pakistan ke map ko focus
+                // kiya jaye" — map kabhi India/duniya par bhatak na sake):
+                // maxBounds = Pakistan ka box, viscosity 1 = border par sakht rok,
+                // minZoom 5 = itna zoom-out hi ho sake ke Pakistan poora dikhe.
+                const pkBounds = L.latLngBounds([22.8, 60.4], [37.5, 77.6]);
+                this.map = L.map('rt-map', {
+                    zoomControl: true,
+                    maxBounds: pkBounds,
+                    maxBoundsViscosity: 1.0,
+                    minZoom: 5,
+                }).setView([31.5204, 74.3587], 12);
                 // Carto Voyager basemap — English/Latin place labels (owner rule Aug 2026:
                 // OSM default tiles label Pakistani cities in Urdu script; owner wants English).
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
@@ -163,6 +175,7 @@
                     attribution: '© OpenStreetMap © CARTO'
                 }).addTo(this.map);
                 this.load();
+                this.cityCenter();
                 this.ipCenter();
                 this.timer = setInterval(() => this.load(), 20000);
                 document.addEventListener('visibilitychange', () => {
@@ -316,13 +329,43 @@
                 this.selected = null;
                 this.clearTrailLayers();
             },
-            // Center on the shop's own city via IP lookup (owner rule Aug 2026: a Lodhran
+            // BEST centering (owner, Aug 2026): company profile ki APNI city par
+            // khulo — IP-guess se zyada bharosemand. Nominatim se aik dafa
+            // geocode (PK-only), phir localStorage cache (roz-roz lookup nahi).
+            // Riders' fitBounds (didFit) aur manual search hamesha jeet-te hain.
+            cityCenter() {
+                const city = String(cfg.companyCity || '').trim();
+                if (!city) return;
+                const key = 'rt_city_ll:' + city.toLowerCase();
+                try {
+                    const c = JSON.parse(localStorage.getItem(key) || 'null');
+                    if (c && isFinite(c.lat) && isFinite(c.lng)) { this.applyCityCenter(c.lat, c.lng); return; }
+                } catch (e) { /* corrupt cache — fresh lookup */ }
+                const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=pk&accept-language=en&q=' + encodeURIComponent(city);
+                fetch(url, { headers: { 'Accept': 'application/json' } })
+                    .then(r => r.ok ? r.json() : [])
+                    .then(list => {
+                        const res = Array.isArray(list) && list.length ? list[0] : null;
+                        if (!res) return;
+                        const lat = parseFloat(res.lat), lng = parseFloat(res.lon);
+                        if (!isFinite(lat) || !isFinite(lng)) return;
+                        try { localStorage.setItem(key, JSON.stringify({ lat, lng })); } catch (e) {}
+                        this.applyCityCenter(lat, lng);
+                    })
+                    .catch(() => {});
+            },
+            applyCityCenter(lat, lng) {
+                this.cityCentered = true; // late ipCenter() must not override
+                if (this.didFit || this.userCentered) return;
+                this.map.setView([lat, lng], 13);
+            },
+            // Fallback: shop ki city ka IP-lookup (owner rule Aug 2026: a Lodhran
             // shop must not open on Lahore). Riders' fitBounds (didFit) always wins.
             ipCenter() {
                 fetch('https://ipwho.is/', { headers: { 'Accept': 'application/json' } })
                     .then(r => r.ok ? r.json() : null)
                     .then(j => {
-                        if (!j || !j.success || this.didFit || this.userCentered) return;
+                        if (!j || !j.success || this.didFit || this.userCentered || this.cityCentered) return;
                         // Owner report (Aug 2026): kuch ISP IPs Pakistan se BAHAR geolocate
                         // hote hain (map India par khula). Sirf Pakistan wala result maano;
                         // warna default (Lahore) par hi raho.

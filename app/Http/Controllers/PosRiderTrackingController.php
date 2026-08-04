@@ -353,7 +353,15 @@ class PosRiderTrackingController extends Controller
         $riders = $locked ? collect() : PosRider::where('company_id', $companyId)
             ->where('is_active', true)->orderBy('name')->get();
 
-        return view('pos.rider-tracking', ['locked' => $locked, 'riders' => $riders]);
+        // Company ki apni city (profile se) — map isi par khule (owner, Aug 2026:
+        // "Pakistan ke map ko focus kiya jaye"); IP-lookup sirf fallback hai.
+        $companyCity = trim((string) ($company->city ?? ''));
+
+        return view('pos.rider-tracking', [
+            'locked' => $locked,
+            'riders' => $riders,
+            'companyCity' => $companyCity,
+        ]);
     }
 
     /** GET /pos/riders/tracking/data — 20s poll: last-known positions. */

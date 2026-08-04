@@ -46,7 +46,7 @@
                 <span class="font-bold text-indigo-800 dark:text-indigo-200 text-sm">TaxNest Rider App v1.2.0</span>
                 <span class="px-1.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-semibold">NEW</span>
             </div>
-            <p class="text-xs text-indigo-700 dark:text-indigo-300">Offline route recording — riders ke phone ka GPS band ya network gum ho jaye tab bhi trail save hoti hai aur baad mein sync hoti hai.</p>
+            <p class="text-xs text-indigo-700 dark:text-indigo-300">{{ __('pos.rider_app_card_desc') }}</p>
         </div>
         <a href="https://taxnest.com.pk/downloads/taxnest-rider.apk"
            class="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition"

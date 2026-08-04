@@ -2808,6 +2808,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'rider_cash_summary_hint' => 'Rider ke paas jo cash close ke waqt tha woh drawer ke mutawaqqa cash se minha hota hai; purane dinon ke billon ki tasfiya jama hoti hai.',
     'rider_label' => 'Rider',
     'rider_login_hint' => 'Rider login sirf apni deliveries dekh sakte hain — aur kuch nahi. Ye aapki team account limit mein count nahi honge.',
+    'rider_app_card_desc' => 'Offline route recording — riders ke phone ka GPS band ya network gum ho jaye tab bhi trail save hoti hai aur baad mein sync hoti hai.',
     'rider_name_req' => 'Rider Name *',
     'rider_portal_greeting' => 'Salam :name — yeh aaj ki deliveries hain. Deliver karne ke baad "Delivered" dabayen.',
     'rider_profile_removed' => 'Aapka rider profile remove ho gaya hai. Barah-e-karam apne manager se rabta karein.',

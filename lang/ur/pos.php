@@ -3682,6 +3682,8 @@ return [
     // Deliveries board upgrades + Pending Deliveries popup finals (owner batch, 3 Aug 2026)
     'delivery_status_dispatched' => 'روانہ',
     'rider_out_pill' => ':count باہر',
+    'rider_day_summary_title' => 'رائیڈر خلاصہ',
+    'rider_day_summary_total' => 'کُل',
     'del_search_ph' => 'بل / گاہک / رائیڈر / پتہ تلاش کریں…',
     'del_no_match' => 'کوئی ملتا جلتا بل نہیں',
     'delivery_took_mins' => ':mins منٹ میں ڈیلیور ہوئی',

@@ -145,6 +145,58 @@
     </div>
     @endif
 
+    {{-- Per-rider day summary (compact read-only strip — zero extra DB queries,
+         derived from the same $allBills collection as the tab counts above). --}}
+    @if($riderDaySummary->count())
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden mb-4">
+        <div class="px-4 py-2.5 border-b border-gray-100 dark:border-gray-800">
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.rider_day_summary_title') }} — {{ $day->format('d M Y') }}</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-xs">
+                <thead class="bg-gray-50 dark:bg-gray-800/60">
+                    <tr class="text-left text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        <th class="px-4 py-2">{{ __('pos.rider_label') }}</th>
+                        <th class="px-4 py-2 text-center">{{ __('pos.pending_word') }}</th>
+                        <th class="px-4 py-2 text-center">{{ __('pos.delivered_word') }}</th>
+                        <th class="px-4 py-2 text-center">{{ __('pos.returned_word') }}</th>
+                        <th class="px-4 py-2 text-center">{{ __('pos.rider_day_summary_total') }}</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    @foreach($riderDaySummary as $rs)
+                    <tr>
+                        <td class="px-4 py-2 font-semibold text-gray-900 dark:text-white">{{ $rs['name'] }}</td>
+                        <td class="px-4 py-2 text-center">
+                            @if($rs['pending'] > 0)
+                                <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[11px] font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">{{ $rs['pending'] }}</span>
+                            @else
+                                <span class="text-gray-300 dark:text-gray-600">—</span>
+                            @endif
+                        </td>
+                        <td class="px-4 py-2 text-center">
+                            @if($rs['delivered'] > 0)
+                                <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[11px] font-bold bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400">{{ $rs['delivered'] }}</span>
+                            @else
+                                <span class="text-gray-300 dark:text-gray-600">—</span>
+                            @endif
+                        </td>
+                        <td class="px-4 py-2 text-center">
+                            @if($rs['returned'] > 0)
+                                <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[11px] font-bold bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400">{{ $rs['returned'] }}</span>
+                            @else
+                                <span class="text-gray-300 dark:text-gray-600">—</span>
+                            @endif
+                        </td>
+                        <td class="px-4 py-2 text-center font-semibold text-gray-700 dark:text-gray-300">{{ $rs['pending'] + $rs['delivered'] + $rs['returned'] }}</td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </div>
+    @endif
+
     {{-- Day's delivery bills with status tabs (owner, 4 Aug 2026) --}}
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
 

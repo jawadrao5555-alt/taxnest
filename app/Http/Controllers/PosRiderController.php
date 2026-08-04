@@ -331,7 +331,24 @@ class PosRiderController extends Controller
             ->groupBy('rider_id')
             ->pluck('c', 'rider_id');
 
-        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'tabCounts', 'activeTab'));
+        // Per-rider day summary — derived from the already-loaded $allBills collection
+        // (zero extra DB queries). Groups by rider_id and counts by delivery_status bucket.
+        // Bills with no rider_id are skipped (unassigned deliveries go into the total only).
+        $riderDaySummary = $allBills->whereNotNull('rider_id')
+            ->groupBy('rider_id')
+            ->map(function ($group) {
+                $first = $group->first();
+                return [
+                    'name'      => optional($first->rider)->name ?? ('Rider #' . $first->rider_id),
+                    'pending'   => $group->whereIn('delivery_status', ['assigned', 'dispatched'])->count(),
+                    'delivered' => $group->where('delivery_status', 'delivered')->count(),
+                    'returned'  => $group->where('delivery_status', 'returned')->count(),
+                ];
+            })
+            ->sortBy('name')
+            ->values();
+
+        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'tabCounts', 'activeTab', 'riderDaySummary'));
     }
 
     /** Assign / reassign / unassign a rider on a delivery bill. */

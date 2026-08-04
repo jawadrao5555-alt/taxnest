@@ -865,6 +865,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/deliveries', [\App\Http\Controllers\PosRiderController::class, 'deliveries'])->name('pos.deliveries');
     Route::post('/deliveries/{id}/assign', [\App\Http\Controllers\PosRiderController::class, 'assign'])->name('pos.deliveries.assign');
     Route::post('/deliveries/{id}/status', [\App\Http\Controllers\PosRiderController::class, 'updateStatus'])->name('pos.deliveries.status');
+    // Prepaid conversion (Task 285, Aug 2026) — admin/manager only; role-checked in controller.
+    Route::post('/deliveries/{id}/mark-prepaid', [\App\Http\Controllers\PosRiderController::class, 'markPrepaid'])->name('pos.deliveries.mark-prepaid');
     Route::post('/deliveries/rider/{riderId}/bulk-status', [\App\Http\Controllers\PosRiderController::class, 'bulkStatus'])->name('pos.deliveries.bulk');
     Route::post('/riders/{id}/settle', [\App\Http\Controllers\PosRiderController::class, 'settle'])->name('pos.riders.settle');
     Route::middleware([\App\Http\Middleware\PosAdminOnly::class])->group(function () {

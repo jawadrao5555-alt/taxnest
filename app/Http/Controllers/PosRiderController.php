@@ -348,7 +348,11 @@ class PosRiderController extends Controller
             ->sortBy('name')
             ->values();
 
-        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'tabCounts', 'activeTab', 'riderDaySummary'));
+        // Prepaid button visibility (Task 285): admin + manager only.
+        $currentRole = auth('pos')->user()->pos_role ?? null;
+        $isAdminOrManager = in_array($currentRole, ['pos_admin', 'pos_manager'], true);
+
+        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager'));
     }
 
     /** Assign / reassign / unassign a rider on a delivery bill. */
@@ -554,6 +558,100 @@ class PosRiderController extends Controller
             }
             return back()->with('success', $msg);
         });
+    }
+
+    // ─── Prepaid conversion (admin/manager only) ───────────────────────────
+
+    /**
+     * Mark a delivery bill as Prepaid: flip payment_method cash → qr_payment so the
+     * bill drops out of the rider's cash khata. Purely a LOCAL accounting correction:
+     * PRA already has an immutable record with its original PayMode — we never
+     * re-submit or modify the fiscal record.
+     *
+     * Guards (in order):
+     *  1. Admin or manager only (pos_cashier / pos_delivery blocked).
+     *  2. Bill must belong to this company.
+     *  3. payment_method must be 'cash' (idempotent — already non-cash = no-op).
+     *  4. Must be unsettled (rider_settlement_id IS NULL).
+     *  5. Not 'returned' (returned bills are already off the khata).
+     *  6. PRA-submitted bills are allowed; we log it clearly and warn in the flash.
+     */
+    public function markPrepaid(Request $request, $txnId)
+    {
+        $companyId = app('currentCompanyId');
+        $user      = auth('pos')->user();
+
+        // Role gate — only admin/manager; cashier and delivery_manager blocked.
+        $allowedRoles = ['pos_admin', 'pos_manager'];
+        if (!in_array($user->pos_role ?? '', $allowedRoles, true)) {
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => __('pos.admin_only_action')], 403);
+            }
+            return back()->with('error', __('pos.admin_only_action'));
+        }
+
+        $txn = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->findOrFail($txnId);
+
+        // Delivery-context guard — only bills that are actual delivery bills
+        // (order_type='delivery' AND rider assigned) may be reclassified.
+        // This prevents the action from touching walk-in/dine-in cash bills
+        // that happen to share the same company.
+        if ($txn->order_type !== 'delivery' || empty($txn->rider_id)) {
+            return back()->with('error', __('pos.mark_prepaid_err_not_delivery'));
+        }
+
+        // Idempotent — already non-cash, nothing to do.
+        if ($txn->payment_method !== 'cash') {
+            return back()->with('error', __('pos.mark_prepaid_err_not_cash'));
+        }
+
+        // Settled bills are locked (khata already closed for this bill).
+        if ($txn->rider_settlement_id) {
+            return back()->with('error', __('pos.mark_prepaid_err_settled'));
+        }
+
+        // Returned deliveries are already off the khata — no reclassification needed.
+        if ($txn->delivery_status === 'returned') {
+            return back()->with('error', __('pos.mark_prepaid_err_returned'));
+        }
+
+        $praSubmitted = !empty($txn->pra_invoice_number);
+
+        $upd = [
+            'payment_method'       => 'qr_payment',
+            'cash_received'        => null,
+            'change_due'           => null,
+        ];
+        if (\Schema::hasColumn('pos_transactions', 'prepaid_converted_at')) {
+            $upd['prepaid_converted_at'] = now();
+        }
+        if (\Schema::hasColumn('pos_transactions', 'prepaid_converted_by')) {
+            $upd['prepaid_converted_by'] = $user->id;
+        }
+
+        $txn->update($upd);
+
+        // Verify the write landed (memory: eloquent-missing-attribute-null).
+        $saved = \DB::table('pos_transactions')->where('id', $txn->id)->value('payment_method');
+
+        \Log::info('POS prepaid conversion', [
+            'company_id'    => $companyId,
+            'txn_id'        => $txn->id,
+            'invoice_no'    => $txn->invoice_number,
+            'actor_id'      => $user->id,
+            'actor_role'    => $user->pos_role,
+            'pra_submitted' => $praSubmitted,
+            'pra_invoice'   => $txn->pra_invoice_number,
+            'written_pm'    => $saved,
+        ]);
+
+        $message = $praSubmitted
+            ? __('pos.mark_prepaid_success_pra')
+            : __('pos.mark_prepaid_success');
+
+        return back()->with('success', $message);
     }
 
     // ─── Rider portal (pos_rider role, confined by PosAuth) ────────────────

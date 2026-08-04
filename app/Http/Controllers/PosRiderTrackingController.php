@@ -247,6 +247,9 @@ class PosRiderTrackingController extends Controller
             $assignedAt = $hasAssignedAt && $b->rider_assigned_at
                 ? Carbon::parse($b->rider_assigned_at)
                 : null;
+            // Task 285: is_prepaid = customer pre-paid online; rider should NOT
+            // collect cash. Non-cash payment_method is the signal.
+            $isPrepaid = $b->payment_method !== 'cash';
             return [
                 'id'             => (int) $b->id,
                 'invoice_number' => $b->invoice_number,
@@ -255,6 +258,7 @@ class PosRiderTrackingController extends Controller
                 'address'        => $b->delivery_address,
                 'amount'         => (float) $b->total_amount,
                 'payment_method' => $b->payment_method,
+                'is_prepaid'     => $isPrepaid,
                 'status'         => $b->delivery_status,
                 'assigned_at'    => $assignedAt?->toIso8601String(),
                 'assigned_mins'  => $assignedAt ? (int) $assignedAt->diffInMinutes(now()) : null,

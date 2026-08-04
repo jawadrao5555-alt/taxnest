@@ -249,7 +249,7 @@
                         <th class="px-4 py-3">{{ __('pos.payment_label') }}</th>
                         <th class="px-4 py-3">{{ __('pos.rider_label') }}</th>
                         <th class="px-4 py-3">{{ __('pos.status_label') }}</th>
-                        @if($activeTab === 'pending')
+                        @if($activeTab === 'pending' || ($activeTab === 'delivered' && $isAdminOrManager))
                         <th class="px-4 py-3 text-right">{{ __('pos.update_label') }}</th>
                         @endif
                     </tr>
@@ -270,7 +270,15 @@
                             @if($b->payment_method === 'cash')
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">{{ __('pos.cash_word') }}</span>
                             @else
-                                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">{{ ucwords(str_replace('_',' ', $b->payment_method)) }}</span>
+                                {{-- Prepaid / non-cash chip (Task 285): blue for digital payment, gray for others --}}
+                                @if($b->payment_method === 'qr_payment')
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
+                                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                        {{ __('pos.prepaid_chip') }}
+                                    </span>
+                                @else
+                                    <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">{{ ucwords(str_replace('_',' ', $b->payment_method)) }}</span>
+                                @endif
                             @endif
                             @if($b->rider_settlement_id)
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400">{{ __('pos.settled_word') }}</span>
@@ -319,9 +327,9 @@
                                 <div class="text-[10px] text-gray-400 mt-0.5">{{ __('pos.delivery_took_mins', ['mins' => $delMins]) }}</div>
                             @endif
                         </td>
-                        @if($activeTab === 'pending')
+                        @if($activeTab === 'pending' || ($activeTab === 'delivered' && $isAdminOrManager))
                         <td class="px-4 py-3 text-right whitespace-nowrap">
-                            @if($b->rider_id && !$b->rider_settlement_id)
+                            @if($activeTab === 'pending' && $b->rider_id && !$b->rider_settlement_id)
                                 @if(in_array($st, ['assigned']))
                                 <form method="POST" action="{{ route('pos.deliveries.status', $b->id) }}" class="inline">
                                     @csrf<input type="hidden" name="delivery_status" value="dispatched">
@@ -341,13 +349,31 @@
                                 </form>
                                 @endif
                             @endif
+                            {{-- Prepaid conversion button (Task 285, Aug 2026): admin/manager only,
+                                 cash + unsettled + not returned — any tab (pending OR delivered).
+                                 PRA-submitted bills get a different confirm dialog noting the PRA record is unchanged. --}}
+                            @if($isAdminOrManager && $b->payment_method === 'cash' && $b->rider_id && !$b->rider_settlement_id && $b->delivery_status !== 'returned')
+                            @php
+                                $praNote = !empty($b->pra_invoice_number);
+                                $confirmMsg = $praNote
+                                    ? __('pos.confirm_mark_prepaid_pra', ['invoice' => $b->pra_invoice_number])
+                                    : __('pos.confirm_mark_prepaid');
+                            @endphp
+                            <form method="POST" action="{{ route('pos.deliveries.mark-prepaid', $b->id) }}" class="inline"
+                                  onsubmit="return confirm({{ Js::from($confirmMsg) }});">
+                                @csrf
+                                <button type="submit" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition">{{ __('pos.mark_prepaid_online') }}</button>
+                            </form>
+                            @endif
                         </td>
                         @endif
                     </tr>
                     @empty
-                    <tr><td colspan="{{ $activeTab === 'pending' ? 7 : 6 }}" class="px-4 py-8 text-center text-sm text-gray-400">{{ __('pos.no_delivery_bills_day') }}</td></tr>
+                    @php $colSpan = ($activeTab === 'pending' || ($activeTab === 'delivered' && $isAdminOrManager)) ? 7 : 6; @endphp
+                    <tr><td colspan="{{ $colSpan }}" class="px-4 py-8 text-center text-sm text-gray-400">{{ __('pos.no_delivery_bills_day') }}</td></tr>
                     @endforelse
-                    <tr id="del-search-empty" style="display:none"><td colspan="{{ $activeTab === 'pending' ? 7 : 6 }}" class="px-4 py-8 text-center text-sm text-gray-400">{{ __('pos.del_no_match') }}</td></tr>
+                    @php $colSpan = $colSpan ?? (($activeTab === 'pending' || ($activeTab === 'delivered' && $isAdminOrManager)) ? 7 : 6); @endphp
+                    <tr id="del-search-empty" style="display:none"><td colspan="{{ $colSpan }}" class="px-4 py-8 text-center text-sm text-gray-400">{{ __('pos.del_no_match') }}</td></tr>
                 </tbody>
             </table>
         </div>

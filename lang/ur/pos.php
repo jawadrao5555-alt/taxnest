@@ -3648,6 +3648,7 @@ return [
     'waiter_orders_awaiting' => 'ویٹر آرڈرز — پیمنٹ کا انتظار',
     'waiter_tablet' => 'ویٹر ٹیبلیٹ',
     'waiter_tablet_subtitle' => 'آرڈر بنائیں، پھر پیمنٹ کے لیے کیشئر کو بھیجیں۔',
+    'waiter_app_download' => 'ویٹر ایپ (APK)',
     'waiting_paren' => '(انتظار...)',
     'walk_in' => 'واک اِن',
     'walk_in_customer' => 'واک اِن کسٹمر',

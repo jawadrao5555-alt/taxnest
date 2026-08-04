@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\PosBiometricDevice;
 use App\Models\PosBiometricUserMap;
 use App\Models\PosBiometricPunch;
+use App\Models\PosUnmappedPinAlert;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Schema;
@@ -148,6 +149,13 @@ class PosBiometricController extends Controller
                 $saved++;
             } catch (\Throwable $e) {
                 Log::warning("biometric punch insert failed: {$e->getMessage()} | line={$line}");
+            }
+
+            // Fire an unmapped-PIN alert on the FIRST punch for this PIN (deduplicated).
+            // Wrapped in its own try/catch + Schema guard so an alert failure never
+            // breaks punch ingestion or the ADMS response (prod schema drift safety).
+            if ($userId === null) {
+                $this->fireUnmappedPinAlert($device->company_id, $pin, $punchedAt);
             }
         }
 
@@ -303,6 +311,17 @@ class PosBiometricController extends Controller
 
         $mappings = $validated['mappings'] ?? [];
 
+        // Snapshot old pins BEFORE wiping, so we can hard-delete alert rows for
+        // pins that are removed from the mapping (decision #5: allows re-alert
+        // if the same PIN punches a new device after the mapping is dropped).
+        $oldPins = PosBiometricUserMap::where('device_id', $device->id)
+            ->pluck('device_pin')->all();
+
+        $newPins = collect($mappings)
+            ->map(fn ($m) => trim($m['device_pin']))
+            ->filter()
+            ->values()->all();
+
         DB::transaction(function () use ($device, $companyId, $mappings) {
             // Delete all existing mappings for this device, then re-insert
             PosBiometricUserMap::where('device_id', $device->id)->delete();
@@ -338,6 +357,31 @@ class PosBiometricController extends Controller
                     ->update(['user_id' => $userId]);
             }
         });
+
+        // Update alert rows outside the punch transaction (separate concern;
+        // Schema guard + try/catch so prod drift never breaks the mapping save).
+        try {
+            if (Schema::hasTable('pos_bio_pin_alerts')) {
+                // Newly mapped PINs → mark their alerts resolved.
+                if (!empty($newPins)) {
+                    PosUnmappedPinAlert::where('company_id', $companyId)
+                        ->whereIn('device_pin', $newPins)
+                        ->whereNull('mapped_at')
+                        ->update(['mapped_at' => now()]);
+                }
+
+                // Pins removed from mapping → hard-delete alert so the same PIN
+                // can re-alert if it punches a new device later.
+                $removedPins = array_values(array_diff($oldPins, $newPins));
+                if (!empty($removedPins)) {
+                    PosUnmappedPinAlert::where('company_id', $companyId)
+                        ->whereIn('device_pin', $removedPins)
+                        ->delete();
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning("bio alert update failed after saveMapping: {$e->getMessage()}");
+        }
 
         return redirect()->route('pos.bio-sync.setup')
             ->with('success', __('pos.bio_mapping_saved'));
@@ -398,8 +442,52 @@ class PosBiometricController extends Controller
                 ->update(['user_id' => $userId]);
         });
 
+        // Mark the alert as resolved (Schema guard + try/catch for prod drift safety).
+        try {
+            if (Schema::hasTable('pos_bio_pin_alerts')) {
+                PosUnmappedPinAlert::where('company_id', $companyId)
+                    ->where('device_pin', $pin)
+                    ->whereNull('mapped_at')
+                    ->update(['mapped_at' => now()]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning("bio alert update failed after quickMapPin: {$e->getMessage()}");
+        }
+
         return redirect()->route('pos.bio-sync.setup')
             ->with('success', __('pos.bio_quick_map_saved'));
+    }
+
+    /**
+     * POST /pos/bio-sync/pin-alert/dismiss
+     * Admin dismisses a per-PIN unmapped alert from the panel banner.
+     * Sets dismissed_at — the alert will never re-surface for this PIN
+     * unless the alert row is hard-deleted (e.g. when saveMapping removes
+     * the PIN entirely from a device, allowing a fresh alert on next punch).
+     */
+    public function dismissPinAlert(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        if (!auth('pos')->user()->isPosAdmin()) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'device_pin' => 'required|string|max:50',
+        ]);
+
+        try {
+            if (Schema::hasTable('pos_bio_pin_alerts')) {
+                PosUnmappedPinAlert::where('company_id', $companyId)
+                    ->where('device_pin', trim($validated['device_pin']))
+                    ->whereNull('dismissed_at')
+                    ->update(['dismissed_at' => now()]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning("bio alert dismiss failed: {$e->getMessage()} | company={$companyId}");
+        }
+
+        return redirect()->back();
     }
 
     // ─── CSV / Excel Import Fallback ───────────────────────────────────────
@@ -559,6 +647,12 @@ class PosBiometricController extends Controller
             } catch (\Throwable $e) {
                 $skipped++;
             }
+
+            // Fire unmapped-PIN alert for CSV imports too (same admin action needed
+            // regardless of source). Only when pin is known and resolved to no user.
+            if ($userId === null && $pin !== '') {
+                $this->fireUnmappedPinAlert($companyId, $pin, $punchedAt);
+            }
         }
 
         return redirect()->route('pos.bio-sync.setup')
@@ -566,6 +660,29 @@ class PosBiometricController extends Controller
     }
 
     // ─── Private helpers ───────────────────────────────────────────────────
+
+    /**
+     * Fire an unmapped-PIN alert the FIRST time a given (company, pin) pair
+     * is seen without a mapped user. Uses firstOrCreate so subsequent calls
+     * for the same pair are silent no-ops (deduplicated).
+     *
+     * Always wrapped in Schema::hasTable guard + try/catch so any DB or
+     * migration issue never breaks punch ingestion or the ADMS response.
+     */
+    private function fireUnmappedPinAlert(int $companyId, string $pin, Carbon $punchedAt): void
+    {
+        try {
+            if (!Schema::hasTable('pos_bio_pin_alerts')) {
+                return;
+            }
+            PosUnmappedPinAlert::firstOrCreate(
+                ['company_id' => $companyId, 'device_pin' => $pin],
+                ['first_seen_at' => $punchedAt->format('Y-m-d H:i:s')]
+            );
+        } catch (\Throwable $e) {
+            Log::warning("bio unmapped-pin alert failed: {$e->getMessage()} | company={$companyId} pin={$pin}");
+        }
+    }
 
     /** Parse CSV file into array of assoc rows with normalised column keys. */
     private function parseCsv(string $path): array

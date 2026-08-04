@@ -3804,4 +3804,8 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'bio_quick_map_saved'       => 'PIN mapped. Past punches have been updated.',
     'bio_unmapped_badge'        => 'unmapped PIN(s)',
     'bio_unmapped_badge_title'  => 'Some device PINs have no user — fix in Biometric Setup',
+    // Panel alert banner (Task #277)
+    'bio_alert_panel_title'     => ':count unmapped device PIN(s) detected',
+    'bio_alert_panel_sub'       => 'Map them in Biometric Setup to track staff attendance correctly.',
+    'bio_alert_panel_dismiss'   => 'Dismiss this PIN alert',
 ];

@@ -365,6 +365,16 @@
                                 <button type="submit" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition">{{ __('pos.mark_prepaid_online') }}</button>
                             </form>
                             @endif
+                            {{-- Prepaid undo / revert (Task 288, Aug 2026): admin/manager only.
+                                 Visible when bill was converted via markPrepaid (prepaid_converted_at set)
+                                 AND still unsettled AND not returned — same window as the forward action. --}}
+                            @if($isAdminOrManager && !empty($b->prepaid_converted_at) && !$b->rider_settlement_id && $b->rider_id && $b->delivery_status !== 'returned')
+                            <form method="POST" action="{{ route('pos.deliveries.unmark-prepaid', $b->id) }}" class="inline"
+                                  onsubmit="return confirm({{ Js::from(__('pos.confirm_unmark_prepaid')) }});">
+                                @csrf
+                                <button type="submit" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition">{{ __('pos.unmark_prepaid_btn') }}</button>
+                            </form>
+                            @endif
                         </td>
                         @endif
                     </tr>

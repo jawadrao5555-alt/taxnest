@@ -654,6 +654,92 @@ class PosRiderController extends Controller
         return back()->with('success', $message);
     }
 
+    /**
+     * Revert a Prepaid conversion — restore the bill to cash so it re-enters
+     * the rider's cash khata.  This is the guarded undo of markPrepaid.
+     *
+     * What markPrepaid changed (each reversed here):
+     *  • payment_method   qr_payment  → cash
+     *  • cash_received    null        → stays null  (original not stored; khata will show the bill again)
+     *  • change_due       null        → stays null  (same reason)
+     *  • prepaid_converted_at  timestamp → null  (audit stamp cleared)
+     *  • prepaid_converted_by  user_id   → null  (audit stamp cleared)
+     *
+     * Guards (in order):
+     *  1. Admin or manager only.
+     *  2. Bill belongs to this company.
+     *  3. prepaid_converted_at NOT NULL — must have been converted via this feature.
+     *  4. rider_settlement_id IS NULL — only while unsettled.
+     *  5. Rider still attached.
+     *  6. Not 'returned' (same delivery-context guard as markPrepaid).
+     */
+    public function unmarkPrepaid(Request $request, $txnId)
+    {
+        $companyId = app('currentCompanyId');
+        $user      = auth('pos')->user();
+
+        // Role gate — only admin/manager.
+        $allowedRoles = ['pos_admin', 'pos_manager'];
+        if (!in_array($user->pos_role ?? '', $allowedRoles, true)) {
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => __('pos.admin_only_action')], 403);
+            }
+            return back()->with('error', __('pos.admin_only_action'));
+        }
+
+        $txn = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->findOrFail($txnId);
+
+        // Must have been converted via markPrepaid — not an originally prepaid bill.
+        if (empty($txn->prepaid_converted_at)) {
+            return back()->with('error', __('pos.unmark_prepaid_err_not_converted'));
+        }
+
+        // Settled bills are locked (khata already closed).
+        if ($txn->rider_settlement_id) {
+            return back()->with('error', __('pos.unmark_prepaid_err_settled'));
+        }
+
+        // Rider must still be attached.
+        if (empty($txn->rider_id)) {
+            return back()->with('error', __('pos.unmark_prepaid_err_no_rider'));
+        }
+
+        // Returned deliveries are off the khata — reverting makes no sense.
+        if ($txn->delivery_status === 'returned') {
+            return back()->with('error', __('pos.mark_prepaid_err_returned'));
+        }
+
+        $upd = [
+            'payment_method' => 'cash',
+            // cash_received / change_due cannot be restored (not stored at conversion time).
+            // They remain null; the bill is back on the rider's khata by payment_method alone.
+        ];
+        if (\Schema::hasColumn('pos_transactions', 'prepaid_converted_at')) {
+            $upd['prepaid_converted_at'] = null;
+        }
+        if (\Schema::hasColumn('pos_transactions', 'prepaid_converted_by')) {
+            $upd['prepaid_converted_by'] = null;
+        }
+
+        $txn->update($upd);
+
+        // Verify the write landed.
+        $saved = \DB::table('pos_transactions')->where('id', $txn->id)->value('payment_method');
+
+        \Log::info('POS prepaid revert (unmark)', [
+            'company_id'  => $companyId,
+            'txn_id'      => $txn->id,
+            'invoice_no'  => $txn->invoice_number,
+            'actor_id'    => $user->id,
+            'actor_role'  => $user->pos_role,
+            'written_pm'  => $saved,
+        ]);
+
+        return back()->with('success', __('pos.unmark_prepaid_success'));
+    }
+
     // ─── Rider portal (pos_rider role, confined by PosAuth) ────────────────
 
     public function portal()

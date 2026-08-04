@@ -286,6 +286,25 @@ class PosDeliveryMarkPrepaidTest extends TestCase
             ->post('/pos/deliveries/' . $billId . '/mark-prepaid');
     }
 
+    private function postUnmarkPrepaid(User $user, int $billId)
+    {
+        return $this->actingAs($user, 'pos')
+            ->from('/pos/deliveries')
+            ->post('/pos/deliveries/' . $billId . '/unmark-prepaid');
+    }
+
+    /** Helper: make a bill that has already been converted to prepaid. */
+    private function makePrepaidBill(int $companyId, int $riderId, array $attrs = []): int
+    {
+        return $this->makeBill($companyId, $riderId, array_merge([
+            'payment_method'       => 'qr_payment',
+            'cash_received'        => null,
+            'change_due'           => null,
+            'prepaid_converted_at' => now()->toDateTimeString(),
+            'prepaid_converted_by' => 1,
+        ], $attrs));
+    }
+
     // ── tests ─────────────────────────────────────────────────────────────────
 
     /** 1. Admin converts unsettled cash bill successfully. */
@@ -591,5 +610,157 @@ class PosDeliveryMarkPrepaidTest extends TestCase
         $response->assertSessionHas('error');
         // Core isolation invariant: bill must be untouched regardless of HTTP status.
         $this->assertSame('cash', DB::table('pos_transactions')->find($billB)->payment_method);
+    }
+
+    // ── Task 288: unmarkPrepaid (undo) tests ─────────────────────────────────
+
+    /**
+     * R1. Admin reverts a converted bill back to cash:
+     *  - payment_method → cash
+     *  - prepaid_converted_at → null
+     *  - prepaid_converted_by → null
+     *  - bill is back in the cash khata query
+     */
+    public function test_admin_can_revert_prepaid_bill_to_cash(): void
+    {
+        $cid    = $this->buildSchema();
+        $rider  = $this->makeRider($cid);
+        $admin  = $this->makeUser($cid, 'pos_admin');
+        $billId = $this->makePrepaidBill($cid, $rider);
+
+        $this->postUnmarkPrepaid($admin, $billId)
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $row = DB::table('pos_transactions')->find($billId);
+        $this->assertSame('cash', $row->payment_method, 'payment_method must be cash after revert');
+        $this->assertNull($row->prepaid_converted_at, 'prepaid_converted_at must be cleared');
+        $this->assertNull($row->prepaid_converted_by, 'prepaid_converted_by must be cleared');
+
+        // Bill is now back in the cash khata query.
+        $inKhata = DB::table('pos_transactions')
+            ->where('company_id', $cid)
+            ->whereNotNull('rider_id')
+            ->where('payment_method', 'cash')
+            ->whereNull('rider_settlement_id')
+            ->where(function ($q) { $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned'); })
+            ->count();
+        $this->assertSame(1, $inKhata, 'bill must be back in cash khata after revert');
+    }
+
+    /** R2. Manager can also revert a converted bill. */
+    public function test_manager_can_revert_prepaid_bill_to_cash(): void
+    {
+        $cid     = $this->buildSchema();
+        $rider   = $this->makeRider($cid);
+        $manager = $this->makeUser($cid, 'pos_manager');
+        $billId  = $this->makePrepaidBill($cid, $rider);
+
+        $this->postUnmarkPrepaid($manager, $billId)
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame('cash', DB::table('pos_transactions')->find($billId)->payment_method);
+    }
+
+    /** R3. Revert blocked for cashier — error flash, bill untouched. */
+    public function test_cashier_cannot_revert_prepaid_bill(): void
+    {
+        $cid     = $this->buildSchema();
+        $rider   = $this->makeRider($cid);
+        $cashier = $this->makeUser($cid, 'pos_cashier');
+        $billId  = $this->makePrepaidBill($cid, $rider);
+
+        $this->postUnmarkPrepaid($cashier, $billId)
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertSame('qr_payment', DB::table('pos_transactions')->find($billId)->payment_method, 'bill must be untouched after blocked revert');
+    }
+
+    /** R4. Revert blocked for delivery manager. */
+    public function test_delivery_manager_cannot_revert_prepaid_bill(): void
+    {
+        $cid    = $this->buildSchema();
+        $rider  = $this->makeRider($cid);
+        $delMgr = $this->makeUser($cid, 'pos_delivery');
+        $billId = $this->makePrepaidBill($cid, $rider);
+
+        $this->postUnmarkPrepaid($delMgr, $billId)
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertSame('qr_payment', DB::table('pos_transactions')->find($billId)->payment_method);
+    }
+
+    /** R5. Revert blocked when prepaid_converted_at is NULL (originally prepaid bill, not via this feature). */
+    public function test_revert_blocked_when_prepaid_converted_at_is_null(): void
+    {
+        $cid    = $this->buildSchema();
+        $rider  = $this->makeRider($cid);
+        $admin  = $this->makeUser($cid, 'pos_admin');
+
+        // qr_payment but NO prepaid_converted_at — simulates an originally prepaid bill.
+        $billId = $this->makeBill($cid, $rider, [
+            'payment_method'       => 'qr_payment',
+            'cash_received'        => null,
+            'prepaid_converted_at' => null,
+            'prepaid_converted_by' => null,
+        ]);
+
+        $this->postUnmarkPrepaid($admin, $billId)
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertSame('qr_payment', DB::table('pos_transactions')->find($billId)->payment_method, 'originally-prepaid bill must not be reverted');
+    }
+
+    /** R6. Revert blocked when bill is already settled. */
+    public function test_revert_blocked_when_bill_is_settled(): void
+    {
+        $cid    = $this->buildSchema();
+        $rider  = $this->makeRider($cid);
+        $admin  = $this->makeUser($cid, 'pos_admin');
+        $billId = $this->makePrepaidBill($cid, $rider, [
+            'rider_settlement_id' => 1,
+            'rider_settled_at'    => now(),
+        ]);
+
+        $this->postUnmarkPrepaid($admin, $billId)
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertSame('qr_payment', DB::table('pos_transactions')->find($billId)->payment_method, 'settled bill must not be reverted');
+    }
+
+    /** R7. Full round-trip: convert then revert restores khata membership. */
+    public function test_convert_then_revert_restores_khata(): void
+    {
+        $cid    = $this->buildSchema();
+        $rider  = $this->makeRider($cid);
+        $admin  = $this->makeUser($cid, 'pos_admin');
+        $billId = $this->makeBill($cid, $rider);
+
+        // Convert to prepaid.
+        $this->postMarkPrepaid($admin, $cid, $billId)->assertSessionHas('success');
+        $this->assertSame('qr_payment', DB::table('pos_transactions')->find($billId)->payment_method);
+
+        // Revert back to cash.
+        $this->postUnmarkPrepaid($admin, $billId)->assertSessionHas('success');
+
+        $row = DB::table('pos_transactions')->find($billId);
+        $this->assertSame('cash', $row->payment_method);
+        $this->assertNull($row->prepaid_converted_at);
+        $this->assertNull($row->prepaid_converted_by);
+
+        // Khata must contain the bill again.
+        $count = DB::table('pos_transactions')
+            ->where('company_id', $cid)
+            ->whereNotNull('rider_id')
+            ->where('payment_method', 'cash')
+            ->whereNull('rider_settlement_id')
+            ->where(function ($q) { $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned'); })
+            ->count();
+        $this->assertSame(1, $count, 'bill must be back in cash khata after round-trip');
     }
 }

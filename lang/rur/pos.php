@@ -2990,6 +2990,13 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'mark_prepaid_err_settled'   => 'Yeh bill pehle hi settle ho chuka hai — payment type nahi badli ja sakti.',
     'mark_prepaid_err_returned'      => 'Wapas ki gayi deliveries pehle hi khate se nikal chuki hain.',
     'mark_prepaid_err_not_delivery'  => 'Sirf delivery bills jisme rider assign ho, unhe Prepaid mark kiya ja sakta hai.',
+    // Task 288 — prepaid revert (undo)
+    'unmark_prepaid_btn'             => 'Wapas Cash karein',
+    'confirm_unmark_prepaid'         => 'Is bill ko wapas Cash karein? Rider ke cash khate mein yeh bill dobara aa jayega.',
+    'unmark_prepaid_success'         => 'Bill wapas Cash ho gaya — rider ke cash khate mein shamil kar diya gaya.',
+    'unmark_prepaid_err_not_converted' => 'Yeh bill Prepaid feature ke zariye tabdeel nahi kiya gaya tha — ise wapas nahi kiya ja sakta.',
+    'unmark_prepaid_err_settled'     => 'Yeh bill pehle hi settle ho chuka hai — ise wapas nahi kiya ja sakta.',
+    'unmark_prepaid_err_no_rider'    => 'Is bill mein koi rider assign nahi — ise khate mein wapas nahi kiya ja sakta.',
     'admin_only_action'              => 'Yeh kaam sirf admin ya manager kar sakta hai.',
     'setup_compliance' => 'Setup & Compliance',
     'setup_compliance_desc' => 'Business info, FBR integration aur product catalog',

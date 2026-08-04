@@ -161,6 +161,7 @@
                 // maxBounds = Pakistan ka box, viscosity 1 = border par sakht rok,
                 // minZoom 5 = itna zoom-out hi ho sake ke Pakistan poora dikhe.
                 const pkBounds = L.latLngBounds([22.8, 60.4], [37.5, 77.6]);
+                this.pkBounds = pkBounds;
                 this.map = L.map('rt-map', {
                     zoomControl: true,
                     maxBounds: pkBounds,
@@ -355,6 +356,9 @@
                     .catch(() => {});
             },
             applyCityCenter(lat, lng) {
+                // Kharab cache / Nominatim anomaly guard: Pakistan se bahar ka
+                // point kabhi center na bane (clamped-weird view se bachao).
+                if (!this.pkBounds || !this.pkBounds.contains([lat, lng])) return;
                 this.cityCentered = true; // late ipCenter() must not override
                 if (this.didFit || this.userCentered) return;
                 this.map.setView([lat, lng], 13);

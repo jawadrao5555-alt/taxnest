@@ -90,7 +90,12 @@ class RestaurantWaiterController extends Controller
         // and self-refreshes (or shows a banner if a cart is in progress).
         $appVersion = self::codeVersion();
 
-        return view('pos.waiter', compact('company', 'products', 'cashiers', 'cashTaxRate', 'userGridPrefs', 'taxInclusive', 'appVersion'));
+        // Product search mode (owner, 4 Aug 2026): 'any_word' matches the start of
+        // ANY word in the name right away; default 'prefix' = strict 24 Jul rule
+        // (+ zero-result word rescue). Missing column reads null → 'prefix' (safe).
+        $searchAnyWord = (($company->pos_product_search_mode ?? 'prefix') === 'any_word');
+
+        return view('pos.waiter', compact('company', 'products', 'cashiers', 'cashTaxRate', 'userGridPrefs', 'taxInclusive', 'appVersion', 'searchAnyWord'));
     }
 
     /** Live floors + tables — waiter-scoped twin of the sale screen's table-status API. */

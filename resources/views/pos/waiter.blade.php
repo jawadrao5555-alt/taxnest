@@ -413,6 +413,8 @@ function waiterApp() {
         // are dropped so the select never silently posts to a dead account.
         _dayCashierKey: 'waiter_day_cashier_{{ auth("pos")->id() }}',
         validCashierIds: @json($cashiers->pluck('id')->map(fn ($i) => (string) $i)),
+        // Product search mode (owner, 4 Aug 2026) — see filterProducts().
+        searchAnyWord: {{ ($searchAnyWord ?? false) ? 'true' : 'false' }},
         _today() { return new Date().toLocaleDateString('en-CA'); },
         initDayCashier() {
             try {
@@ -443,18 +445,21 @@ function waiterApp() {
             // screen, owner 24 Jul 2026): NAME matches only from the very START
             // of the name ("f" = Fries…, NOT "Beef Loaded Fries"). Barcode
             // matching only when the query has a digit/symbol.
+            // PER-COMPANY SEARCH MODE (owner, 4 Aug 2026): 'any_word' matches the
+            // start of ANY word right away ("win" → "5 Piece Hot Wings").
             const codeSearch = /[^a-z\s]/.test(q);
+            const wordHit = p => p.name.toLowerCase().split(/\s+/).some(w => w.startsWith(q));
             const scoped = pool.filter(p => this.activeCategory === 'all' || p.category === this.activeCategory);
             let hits = scoped.filter(p =>
-                !q || p.name.toLowerCase().startsWith(q)
+                !q || (this.searchAnyWord ? wordHit(p) : p.name.toLowerCase().startsWith(q))
                     || (codeSearch && p.barcode && String(p.barcode).toLowerCase().includes(q))
             );
             // WORD-START FALLBACK (owner, Aug 2026 — Pizza Master: "Win" found nothing
             // because items are named "5 Piece Hot Wings"): ONLY when strict prefix
             // yields ZERO results, match the start of any WORD in the name. Still no
-            // mid-word hits, and the 24 Jul prefix rule stays intact whenever it works.
+            // mid-word hits; a no-op in any_word mode (same predicate already ran).
             if (q && !hits.length) {
-                hits = scoped.filter(p => p.name.toLowerCase().split(/\s+/).some(w => w.startsWith(q)));
+                hits = scoped.filter(wordHit);
             }
             this.filtered = hits;
         },

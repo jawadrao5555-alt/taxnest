@@ -5543,7 +5543,7 @@ class PosController extends Controller
             }
             usort($existingRecipes, fn($a, $b) => strcasecmp($a['product_name'], $b['product_name']));
         }
-        return view('pos.products', compact('products', 'posType', 'categoryFields', 'ingredients', 'existingRecipes'));
+        return view('pos.products', compact('products', 'posType', 'categoryFields', 'ingredients', 'existingRecipes', 'company'));
     }
 
     /**
@@ -6395,6 +6395,30 @@ class PosController extends Controller
             ? __('pos.products_shown_scope', ['count' => number_format($count), 'scope' => $scope])
             : __('pos.products_hidden_scope', ['count' => number_format($count), 'scope' => $scope]);
         return back()->with('success', $msg);
+    }
+
+    /**
+     * POST /pos/products/search-mode — per-company product search mode (owner,
+     * 4 Aug 2026): 'prefix' (strict name-prefix + zero-result word rescue) or
+     * 'any_word' (match the start of ANY word right away). Same admin gate as
+     * bulkToggleSale: route sits OUTSIDE PosAdminOnly (it redirects, not 403s);
+     * the controller enforces a true 403 for cashiers/confined roles.
+     */
+    public function productSearchMode(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || ($user->isPosCashier() ? $user->posCashierBlocked() : !$user->isPosAdmin())) {
+            abort(403, 'Only POS administrators can change the product search mode.');
+        }
+        $request->validate(['mode' => 'required|in:prefix,any_word']);
+        $company = Company::find(app('currentCompanyId'));
+        // hasColumn guard (PROD schema drift): page must not 500 if the live
+        // migration lagged a deploy — silently keep the default instead.
+        if ($company && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_product_search_mode')) {
+            $company->pos_product_search_mode = $request->input('mode');
+            $company->save();
+        }
+        return back()->with('success', __('pos.search_mode_saved'));
     }
 
     /**

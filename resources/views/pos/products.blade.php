@@ -19,6 +19,32 @@
     <div class="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-300 rounded-lg px-4 py-3 text-sm">{{ $errors->first() }}</div>
     @endif
 
+    {{-- Product search mode (owner, 4 Aug 2026): admin picks how the sale/waiter
+         screen search matches names — strict name-prefix (24 Jul rule) or any-word.
+         Same admin gate as the bulk sale-visibility controls below. --}}
+    @if(auth('pos')->user() && !auth('pos')->user()->isPosCashier() && auth('pos')->user()->isPosAdmin())
+    <div class="mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-md p-4">
+        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div class="flex-1">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.search_mode_title') }}</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.search_mode_hint') }}</p>
+            </div>
+            <form method="POST" action="{{ route('pos.products.search-mode') }}" class="flex flex-col gap-2 shrink-0">
+                @csrf
+                @php($searchMode = $company->pos_product_search_mode ?? 'prefix')
+                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                    <input type="radio" name="mode" value="prefix" onchange="this.form.submit()" {{ $searchMode !== 'any_word' ? 'checked' : '' }} class="text-purple-600 focus:ring-purple-500">
+                    <span>{{ __('pos.search_mode_prefix') }}</span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                    <input type="radio" name="mode" value="any_word" onchange="this.form.submit()" {{ $searchMode === 'any_word' ? 'checked' : '' }} class="text-purple-600 focus:ring-purple-500">
+                    <span>{{ __('pos.search_mode_any_word') }}</span>
+                </label>
+            </form>
+        </div>
+    </div>
+    @endif
+
     <div id="importSection" class="hidden mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-md p-5">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">{{ __('pos.bulk_import_products_excel') }}</h3>
 

@@ -3624,6 +3624,11 @@ function restaurantPos() {
         // price IS the grand total — tax shown is the INCLUDED portion, total never
         // adds tax on top. Mirrors PosTaxMath backend math.
         taxInclusive: {{ ($company->pos_tax_inclusive ?? false) ? 'true' : 'false' }},
+        // Product search mode (owner, 4 Aug 2026): 'any_word' matches the start of
+        // ANY word in the name right away ("win" → "5 Piece Hot Wings"); default
+        // 'prefix' keeps the strict 24 Jul rule (+ zero-result word rescue).
+        // Column is in posConfigRev(), so flipping it refreshes cached screens.
+        searchAnyWord: {{ (($company->pos_product_search_mode ?? 'prefix') === 'any_word') ? 'true' : 'false' }},
         // Card-save mode (inclusive_card_save, Jul 2026): menu price is inclusive at
         // the CASH rate; card/digital bills = same base + their OWN (lower) rate, so
         // the customer saves on card. taxMenuRate = cash rate when mode 3, else null.
@@ -4746,10 +4751,15 @@ function restaurantPos() {
                     // or symbol — letters-only typing is a NAME search, otherwise SKUs like
                     // "CHI-001" leak unrelated products into a name search.
                     const codeSearch = /[^a-z\s]/.test(q);
+                    // PER-COMPANY SEARCH MODE (owner, 4 Aug 2026): any_word matches
+                    // the start of ANY word right away; prefix = strict 24 Jul rule.
+                    const nameHit = (name) => this.searchAnyWord
+                        ? name.toLowerCase().split(/\s+/).some(w => w.startsWith(q))
+                        : name.toLowerCase().startsWith(q);
                     for (let i = 0; i < all.length && pref.length < 12; i++) {
                         const it = all[i];
                         if (!it.name || !(parseFloat(it.price) > 0)) continue;
-                        if (it.name.toLowerCase().startsWith(q)) {
+                        if (nameHit(it.name)) {
                             pref.push(it);
                         } else if (codeSearch && ((it.barcode && String(it.barcode).toLowerCase().includes(q))
                             || (it.sku && String(it.sku).toLowerCase().includes(q)))) {
@@ -4887,15 +4897,18 @@ function restaurantPos() {
                 // of the name (mirrors the dropdown matcher); BARCODE/SKU substring matching
                 // only when the query has a digit/symbol (letters-only = name search).
                 const codeSearch = /[^a-z\s]/.test(q);
-                let matches = items.filter(i => i.name.toLowerCase().startsWith(q)
+                // PER-COMPANY SEARCH MODE (owner, 4 Aug 2026): 'any_word' matches the
+                // start of ANY word right away; 'prefix' keeps the strict 24 Jul rule.
+                const wordHit = i => i.name.toLowerCase().split(/\s+/).some(w => w.startsWith(q));
+                let matches = items.filter(i => (this.searchAnyWord ? wordHit(i) : i.name.toLowerCase().startsWith(q))
                     || (codeSearch && ((i.barcode && String(i.barcode).toLowerCase().includes(q))
                         || (i.sku && String(i.sku).toLowerCase().includes(q)))));
                 // WORD-START FALLBACK (owner, Aug 2026 — "Win" must find "5 Piece Hot
                 // Wings"; menus often lead with sizes/counts): ONLY when strict prefix
                 // finds NOTHING, match the start of any WORD in the name. No mid-word
-                // hits; the 24 Jul prefix rule is untouched whenever it has results.
+                // hits; a no-op in any_word mode (same predicate already ran above).
                 if (!matches.length) {
-                    matches = items.filter(i => i.name.toLowerCase().split(/\s+/).some(w => w.startsWith(q)));
+                    matches = items.filter(wordHit);
                 }
                 // Name-prefix matches float above barcode/SKU-only matches; stable sort
                 // keeps the original order within each group.

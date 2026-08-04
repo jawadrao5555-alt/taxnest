@@ -710,6 +710,9 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     // redirects instead of 403ing; controller enforces a strict admin/manager allowlist
     // (isPosAdmin) and returns a true 403 to everyone else, cashiers included.
     Route::post('/products/bulk-sale', [PosController::class, 'bulkToggleSale'])->name('pos.products.bulk-sale');
+    // Product search mode — same pattern as bulk-sale: controller enforces the
+    // admin allowlist with a true 403 (PosAdminOnly would redirect instead).
+    Route::post('/products/search-mode', [PosController::class, 'productSearchMode'])->name('pos.products.search-mode');
     Route::get('/customers', [PosController::class, 'customers'])->name('pos.customers');
     Route::post('/customers', [PosController::class, 'storeCustomer'])->name('pos.customers.store');
 

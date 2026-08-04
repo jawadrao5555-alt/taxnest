@@ -87,6 +87,7 @@ class Company extends Model
         'pos_tax_rate_card',
         'pos_tax_inclusive',
         'pos_tax_pricing_mode',
+        'pos_product_search_mode',
         'pos_setup_completed',
         'pos_use_legacy_restaurant',
         'fbr_universal_enabled',
@@ -365,7 +366,7 @@ class Company extends Model
             'pos_receipt_autoclose_seconds', 'invoice_display_prefs', 'feature_flags',
             // Tax / pricing
             'standard_tax_rate', 'pos_tax_rate_cash', 'pos_tax_rate_card',
-            'pos_tax_inclusive', 'pos_tax_pricing_mode',
+            'pos_tax_inclusive', 'pos_tax_pricing_mode', 'pos_product_search_mode',
             // Reporting / integration modes
             'pra_reporting_enabled', 'pos_integration_mode', 'pra_environment',
             'pra_pos_id', 'pra_connection_mode', 'agent_enabled', 'agent_submits_pra',

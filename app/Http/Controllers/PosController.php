@@ -8866,7 +8866,22 @@ class PosController extends Controller
         $hasBioDevices = \Illuminate\Support\Facades\Schema::hasTable('pos_biometric_devices')
             && \App\Models\PosBiometricDevice::where('company_id', $companyId)->exists();
 
-        return view('pos.reports-hazri', compact('company', 'date', 'rows', 'opening', 'bioPunches', 'hasBioDevices'));
+        // Unmapped-PIN count (last 14 days) — drives the subtle badge on this page.
+        $unmappedPinCount = 0;
+        if ($hasBioDevices && \Illuminate\Support\Facades\Schema::hasTable('pos_biometric_punches')) {
+            try {
+                $unmappedPinCount = \App\Models\PosBiometricPunch::where('company_id', $companyId)
+                    ->whereNull('user_id')
+                    ->whereNotNull('device_pin')
+                    ->where('punched_at', '>=', now()->subDays(14))
+                    ->distinct('device_pin')
+                    ->count('device_pin');
+            } catch (\Throwable $e) {
+                $unmappedPinCount = 0;
+            }
+        }
+
+        return view('pos.reports-hazri', compact('company', 'date', 'rows', 'opening', 'bioPunches', 'hasBioDevices', 'unmappedPinCount'));
     }
 
     /**

@@ -3796,4 +3796,12 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'bio_source_import'      => 'Imported',
     'bio_hazri_none'         => 'Is din ka koi biometric punch nahi.',
     'bio_hazri_hint'         => 'Registered devices ke punches yahan dikhenге. Device lagane ke liye "Devices configure karein" dabayein.',
+    'bio_unmapped_banner_title' => 'Pichle 14 dinon mein :count unmapped PIN(s) mile',
+    'bio_unmapped_banner_sub'   => 'In device PINs ka koi user assign nahi. Har PIN ke liye team member chunein — purane punches khud ba khud update ho jayenge.',
+    'bio_punches'               => 'punch(es)',
+    'bio_last_seen'             => 'Aakhri punch',
+    'bio_map_now'               => 'Abhi Map Karein',
+    'bio_quick_map_saved'       => 'PIN map ho gayi. Purane punches bhi update ho gaye.',
+    'bio_unmapped_badge'        => 'unmapped PIN(s)',
+    'bio_unmapped_badge_title'  => 'Kuch PINs ka koi user nahi — Biometric Setup mein theek karein',
 ];

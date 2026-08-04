@@ -654,6 +654,7 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/bio-sync/device/{id}/map', [\App\Http\Controllers\PosBiometricController::class, 'saveMapping'])->name('pos.bio-sync.save-mapping');
     Route::get('/bio-sync/import', [\App\Http\Controllers\PosBiometricController::class, 'showImport'])->name('pos.bio-sync.import');
     Route::post('/bio-sync/import', [\App\Http\Controllers\PosBiometricController::class, 'processImport'])->name('pos.bio-sync.process-import');
+    Route::post('/bio-sync/quick-map', [\App\Http\Controllers\PosBiometricController::class, 'quickMapPin'])->name('pos.bio-sync.quick-map');
     Route::get('/tax-reports/csv', [PosController::class, 'exportTaxReportCsv'])->name('pos.tax-reports.csv');
     Route::get('/tax-reports/pdf', [PosController::class, 'exportTaxReportPdf'])->name('pos.tax-reports.pdf');
     Route::get('/reports/analytics-pdf', [PosController::class, 'reportsAnalyticsPdf'])->name('pos.reports.analytics-pdf');

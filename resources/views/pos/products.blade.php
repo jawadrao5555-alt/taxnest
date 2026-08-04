@@ -29,9 +29,11 @@
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.search_mode_title') }}</h3>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.search_mode_hint') }}</p>
             </div>
+            @php
+                $searchMode = $company->pos_product_search_mode ?? 'prefix';
+            @endphp
             <form method="POST" action="{{ route('pos.products.search-mode') }}" class="flex flex-col gap-2 shrink-0">
                 @csrf
-                @php($searchMode = $company->pos_product_search_mode ?? 'prefix')
                 <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
                     <input type="radio" name="mode" value="prefix" onchange="this.form.submit()" {{ $searchMode !== 'any_word' ? 'checked' : '' }} class="text-purple-600 focus:ring-purple-500">
                     <span>{{ __('pos.search_mode_prefix') }}</span>

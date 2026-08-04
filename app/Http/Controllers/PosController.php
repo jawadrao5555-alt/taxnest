@@ -8787,10 +8787,14 @@ class PosController extends Controller
         $hazri = PosFeatureService::planAllows($company, 'hazri_enabled')
             ? $this->buildHazriRows($companyId, $report->report_date->toDateString())
             : [];
+        // Biometric punches — same plan gate as session hazri.
+        $bioPunches = PosFeatureService::planAllows($company, 'hazri_enabled')
+            ? $this->buildBiometricRows($companyId, $report->report_date->toDateString())
+            : [];
 
         return $this->renderReportPdf(
             'pos.day-close-pdf',
-            compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri'),
+            compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri', 'bioPunches'),
             "Day-Close-{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf"
         );
     }
@@ -8828,8 +8832,12 @@ class PosController extends Controller
         $hazri = PosFeatureService::planAllows($company, 'hazri_enabled')
             ? $this->buildHazriRows($companyId, $report->report_date->toDateString())
             : [];
+        // Biometric punches — same plan gate as session hazri.
+        $bioPunches = PosFeatureService::planAllows($company, 'hazri_enabled')
+            ? $this->buildBiometricRows($companyId, $report->report_date->toDateString())
+            : [];
 
-        return view('pos.day-close-thermal', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri'));
+        return view('pos.day-close-thermal', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri', 'bioPunches'));
     }
 
     /**

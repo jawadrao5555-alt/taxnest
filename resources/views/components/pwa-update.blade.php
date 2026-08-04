@@ -109,15 +109,11 @@ Usage: <x-pwa-update color="emerald" />
 
     btn.addEventListener('click', () => { applyUpdate(); });
     dismissBtn.addEventListener('click', () => {
-        // Postpone for 5 minutes — user is mid-task, don't reload
-        postponedUntil = Date.now() + 5 * 60 * 1000;
+        // Dismiss = gone for this page session (owner rule Aug 2026: no nagging,
+        // no re-show). The header refresh icon keeps its "!" badge as the only
+        // reminder; user updates whenever they choose.
+        postponedUntil = Infinity;
         hideBar();
-        // Re-show after 5 min if a waiting SW still exists
-        setTimeout(async () => {
-            if (Date.now() < postponedUntil) return;
-            const reg = await navigator.serviceWorker.getRegistration().catch(()=>null);
-            if (reg && reg.waiting) showBar();
-        }, 5 * 60 * 1000 + 500);
     });
 
     // If another tab activates the update, hide our toast — it's no longer relevant

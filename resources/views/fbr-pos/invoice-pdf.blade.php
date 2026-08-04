@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="en">
+@php $urduScript = app()->getLocale() === \App\Support\PosLocale::URDU_SCRIPT; @endphp
+<html lang="{{ $urduScript ? 'ur' : 'en' }}" dir="{{ $urduScript ? 'rtl' : 'ltr' }}">
 <head>
     <meta charset="UTF-8">
     <title>Invoice {{ $transaction->invoice_number }}</title>
@@ -81,6 +82,24 @@
         .footer p { font-size: 9px; color: #374151; line-height: 1.6; }
         .footer .brand { font-size: 10px; font-weight: bold; color: #1e3a5f; margin-top: 3px; }
     </style>
+    @if($urduScript)
+    <style>
+        /* Urdu script mode (Task 260): mPDF renders this path — DomPDF is
+           bypassed for locale 'ur'. mPDF's OTL engine shapes Noto Naskh Arabic
+           correctly (contextual init/medi/fina/isol forms + kashida joins).
+           Layout stays LTR (display:table columns keep fixed widths); Unicode
+           bidi algorithm flips each Urdu text run RTL on its own so mixed
+           label/number rows still line up. Taller line-height for Urdu glyphs
+           (they clip at Latin line heights on narrow leading). */
+        /* 'XB Riyaz' first so mPDF (Urdu PDF path, Task 260) resolves it via
+           its bundled FontVariables entry (key 'xbriyaz', useOTL=0xFF, Naskh).
+           Browsers fall through to Noto Naskh Arabic → Urdu Typesetting → Tahoma. */
+        body {
+            font-family: 'XB Riyaz', 'Noto Naskh Arabic', 'Urdu Typesetting', Tahoma, Arial, sans-serif;
+            line-height: 1.7;
+        }
+    </style>
+    @endif
 </head>
 <body>
     <div class="receipt">

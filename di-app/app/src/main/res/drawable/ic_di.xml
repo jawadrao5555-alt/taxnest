@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- App icon: emerald rounded tile + white invoice document + FBR-style green stamp -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Emerald rounded-square background (DI brand #059669) -->
+    <path
+        android:fillColor="#059669"
+        android:pathData="M20,0 L88,0 A20,20 0 0 1 108,20 L108,88 A20,20 0 0 1 88,108 L20,108 A20,20 0 0 1 0,88 L0,20 A20,20 0 0 1 20,0 Z" />
+
+    <!-- White document body with folded top-right corner -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28,20 L72,20 L82,30 L82,88 L28,88 Z" />
+
+    <!-- Folded corner triangle (light emerald) -->
+    <path
+        android:fillColor="#A7F3D0"
+        android:pathData="M72,20 L82,30 L72,30 Z" />
+
+    <!-- Document text lines (emerald) -->
+    <path
+        android:fillColor="#059669"
+        android:pathData="M35,38 L75,38 L75,42 L35,42 Z M35,48 L75,48 L75,52 L35,52 Z M35,58 L60,58 L60,62 L35,62 Z" />
+
+    <!-- Gold total bar (brand #E7BF3B) -->
+    <path
+        android:fillColor="#E7BF3B"
+        android:pathData="M35,70 L75,70 L75,76 L35,76 Z" />
+</vector>

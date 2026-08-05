@@ -1,6 +1,10 @@
 package pk.taxnest.rider
 
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -61,6 +65,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Network connectivity callback — fires QueueDrain and duty-off reconcile
+    // whenever connectivity is restored.
+    private var connectivityManager: ConnectivityManager? = null
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            // Reconcile pending duty-off first (idempotent), then drain queue.
+            thread(name = "connectivity-restore") {
+                reconcilePendingDutyOff()
+                QueueDrain.drainAsync(this@MainActivity)
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (Prefs.token(this) == null) {
@@ -100,16 +117,47 @@ class MainActivity : AppCompatActivity() {
         ui.removeCallbacks(localStateLoop)
         ui.removeCallbacks(meRefreshLoop)
         ui.postDelayed(localStateLoop, 5000)
-        // Immediate /me fetch on resume; next auto-refresh 30 s later.
+        // Immediate /me fetch on resume (also handles pending duty-off reconcile);
+        // next auto-refresh 30 s later.
         refreshMe()
         ui.postDelayed(meRefreshLoop, 30_000)
         checkUpdate()
+
+        // Drain any buffered offline points left from previous duty sessions.
+        QueueDrain.drainAsync(this)
+
+        // Register connectivity callback so drain fires immediately when
+        // signal returns, not just on the next 30s /me poll.
+        registerConnectivityCallback()
     }
 
     override fun onPause() {
         super.onPause()
         ui.removeCallbacks(localStateLoop)
         ui.removeCallbacks(meRefreshLoop)
+        unregisterConnectivityCallback()
+    }
+
+    // ── Connectivity callback ──────────────────────────────────────────────
+
+    private fun registerConnectivityCallback() {
+        try {
+            val cm = getSystemService(CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
+            connectivityManager = cm
+            val request = NetworkRequest.Builder()
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build()
+            cm.registerNetworkCallback(request, networkCallback)
+        } catch (e: Exception) {
+            // Silently ignore — connectivity callback is an enhancement, not critical.
+        }
+    }
+
+    private fun unregisterConnectivityCallback() {
+        try {
+            connectivityManager?.unregisterNetworkCallback(networkCallback)
+        } catch (e: Exception) {}
+        connectivityManager = null
     }
 
     // ── Duty ON: permission chain → server → service ──────────────────────
@@ -195,10 +243,22 @@ class MainActivity : AppCompatActivity() {
 
     private fun endDuty() {
         dutyBtn.isEnabled = false
+        // Set the pending flag BEFORE the network call so it survives process
+        // death if we're killed mid-flight while offline.
+        Prefs.setPendingDutyOff(this, true)
         thread {
-            ApiClient.post("/duty", JSONObject().put("on", false), Prefs.token(this))
+            val (code, _) = ApiClient.post("/duty", JSONObject().put("on", false), Prefs.token(this))
             runOnUiThread {
                 dutyBtn.isEnabled = true
+                // 200–299 or 409 (already off) both count as reconciled.
+                when {
+                    code in 200..299 || code == 409 -> Prefs.setPendingDutyOff(this, false)
+                    code == 401 -> {
+                        Prefs.setPendingDutyOff(this, false)
+                        sessionExpired(); return@runOnUiThread
+                    }
+                    // -1 / other transient failure: leave flag set; reconcile on next contact.
+                }
                 Prefs.setDuty(this, false)
                 stopService(Intent(this, TrackingService::class.java))
                 renderState()
@@ -234,6 +294,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshMe() {
         thread {
+            // Reconcile any pending duty-off before reading /me so the server
+            // state is consistent when we sync the duty flag below.
+            reconcilePendingDutyOff()
+
             val (code, body) = ApiClient.get("/me", Prefs.token(this))
             if (code == 401) { runOnUiThread { sessionExpired() }; return@thread }
             if (code in 200..299 && body?.optBoolean("ok") == true) {
@@ -254,6 +318,27 @@ class MainActivity : AppCompatActivity() {
                     updateDeliveriesList(deliveriesArr)
                 }
             }
+        }
+    }
+
+    /**
+     * Idempotent duty-off reconcile.  Posts /duty {on:false} to the server if
+     * the pending flag is set.  Safe to call when the server already has
+     * duty=false — the server /duty endpoint treats on=false as idempotent
+     * (409 = already off; also treated as success here).
+     * Must be called from a background thread.
+     */
+    private fun reconcilePendingDutyOff() {
+        if (!Prefs.pendingDutyOff(this)) return
+        val token = Prefs.token(this) ?: return
+        val (code, _) = ApiClient.post("/duty", JSONObject().put("on", false), token)
+        when (code) {
+            in 200..299, 409 -> Prefs.setPendingDutyOff(this, false) // reconciled (409 = already off)
+            401 -> {
+                Prefs.setPendingDutyOff(this, false) // token gone — nothing to reconcile
+                Prefs.clearToken(this)
+            }
+            // -1 / transient: leave flag set, retry next time
         }
     }
 

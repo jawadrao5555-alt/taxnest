@@ -68,6 +68,12 @@
             font-size: 15px; font-style: normal; color: #000; padding-left: 10px;
             font-weight: 900; -webkit-text-stroke: 0.5px #000; letter-spacing: 0.5px;
         }
+        /* ZFC (5 Aug 2026): "NOTE ke aage sab kuch jura hua ultra-bold" — label
+           chhota ultra-black rahe, asal note ka TEXT alag andaz mein (bara, bold
+           magar bina stroke ke, thora sa gap) taake kitchen asaani se parh sake.
+           Jul 2026 ka sabaq qaim: kabhi italic/patla nahi (thermal par ghayab). */
+        .items-table .note-label { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+        .items-table .note-text { font-size: 16px; font-weight: 700; -webkit-text-stroke: 0px transparent; letter-spacing: 0.2px; margin-left: 4px; }
         .items-table tr { border-bottom: 1px dashed #000; }
         .items-table tr:last-child { border-bottom: none; }
         .order-type-badge {
@@ -128,6 +134,8 @@
         .items-table td { padding: 3px 2px; font-size: 13px; }
         .items-table .qty { font-size: 15px; }
         .items-table .note { font-size: 13px; }
+        .items-table .note-label { font-size: 11px; }
+        .items-table .note-text { font-size: 14px; }
         .order-type-badge { padding: 1px 6px; font-size: 12px; }
         .station-header { font-size: 13px; padding: 3px 6px; letter-spacing: 1px; }
         .station-section { margin-bottom: 4px; }
@@ -277,7 +285,7 @@
                     <td class="name">
                         <span class="bold">{{ $item->item_name }}</span>
                         @if($item->special_notes)
-                            <br><span class="note">&raquo; {{ __('pos.kot_note') }} {{ $item->special_notes }}</span>
+                            <br><span class="note"><span class="note-label">&raquo; {{ __('pos.kot_note') }}</span><span class="note-text">{{ $item->special_notes }}</span></span>
                         @endif
                     </td>
                     <td class="qty">{{ number_format($item->quantity, $item->quantity == intval($item->quantity) ? 0 : 2) }}</td>

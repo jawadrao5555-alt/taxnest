@@ -2805,8 +2805,15 @@ function restaurantPos() {
         },
         moveGridFocus(delta) {
             if (!this.gridFocusMode) { this.enterGridMode(); return; }
-            const newIdx = this.gridFocusIndex + delta;
-            if (newIdx >= 0 && newIdx < this.displayItems.length) { this.gridFocusIndex = newIdx; this.scrollGridItemIntoView(newIdx); }
+            const n = this.displayItems.length;
+            if (n === 0) return;
+            // ZFC (5 Aug 2026): wrap-around — pehle item par Up dabao to seedha
+            // AAKHRI item par pahuncho (aur aakhri se Down wapas pehle par);
+            // neeche wale option tak bar-bar Down dabane ki zaroorat nahi.
+            let newIdx = this.gridFocusIndex + delta;
+            if (newIdx < 0) newIdx = n - 1;
+            else if (newIdx >= n) newIdx = 0;
+            this.gridFocusIndex = newIdx; this.scrollGridItemIntoView(newIdx);
         },
         scrollGridItemIntoView(idx) { this.$nextTick(() => { document.getElementById('grid-item-' + idx)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }); },
         addGridFocusedItem() {

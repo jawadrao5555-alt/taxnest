@@ -1604,7 +1604,8 @@ window.addEventListener('popstate', function() {
                     <span x-show="boardCounts().occupied > 0" class="min-w-[16px] px-1 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-[9px] rounded-full font-black" x-text="boardCounts().occupied"></span>
                     <span x-show="boardCounts().reserved > 0" class="min-w-[16px] px-1 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-[9px] rounded-full font-black" x-text="boardCounts().reserved"></span>
                     <span x-show="boardCounts().waiter > 0" class="min-w-[16px] px-1 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-[9px] rounded-full font-black animate-pulse" x-text="boardCounts().waiter"></span>
-                    <span x-show="tablelessIncoming().length > 0" class="min-w-[16px] px-1 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-[9px] rounded-full font-black" x-text="'C' + tablelessIncoming().length"></span>
+                    {{-- 'C' (counter-orders) badge REMOVED (ZFC 5 Aug 2026) — counter
+                         orders ab board par nahi dikhte, sirf ghanti panel mein. --}}
                     <span x-show="heldNoTable().length > 0" class="min-w-[16px] px-1 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-[9px] rounded-full font-black" title="{{ __('pos.ti_held_orders_no_table') }}" x-text="'H' + heldNoTable().length"></span>
                     <span class="flex-1"></span>
                     {{-- Chalti hui raqam — sab khule orders (tables + counter) ka live sum --}}
@@ -1626,7 +1627,7 @@ window.addEventListener('popstate', function() {
                         <span x-show="boardCounts().occupied > 0" class="min-w-[18px] px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-[10px] rounded-full font-black text-center" x-text="boardCounts().occupied"></span>
                         <span x-show="boardCounts().reserved > 0" class="min-w-[18px] px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-[10px] rounded-full font-black text-center" x-text="boardCounts().reserved"></span>
                         <span x-show="boardCounts().waiter > 0" class="min-w-[18px] px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-[10px] rounded-full font-black text-center animate-pulse" x-text="boardCounts().waiter"></span>
-                        <span x-show="tablelessIncoming().length > 0" class="min-w-[18px] px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-[10px] rounded-full font-black text-center" x-text="'C' + tablelessIncoming().length"></span>
+                        {{-- 'C' badge REMOVED (ZFC 5 Aug 2026) — counter orders sirf ghanti panel mein. --}}
                         <span x-show="heldNoTable().length > 0" class="min-w-[18px] px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-[10px] rounded-full font-black text-center" title="{{ __('pos.ti_held_orders_no_table') }}" x-text="'H' + heldNoTable().length"></span>
                         <span class="flex-1"></span>
                         <span x-show="boardOpenTotal() > 0" class="text-[11px] font-bold text-gray-500 dark:text-gray-400 whitespace-nowrap" title="{{ __('pos.ti_tables_running_amount') }}" x-text="'Rs ' + boardOpenTotal().toLocaleString() + window.TXT.running_amount_sfx"></span>
@@ -1652,25 +1653,10 @@ window.addEventListener('popstate', function() {
                                 </div>
                             </div>
                         </template>
-                        {{-- Counter Orders (bina table — waiter takeaway/delivery) on the
-                             board too, warna cashier ko alag window kholni parti thi sirf inke liye.
-                             Click = wahi ATOMIC claim → cart-load path (single winner). --}}
-                        <template x-if="tablelessIncoming().length > 0">
-                            <div class="mt-2.5">
-                                <p class="text-[10px] font-bold text-purple-500 uppercase px-1">{{ __('pos.counter_orders_no_table') }}</p>
-                                <div class="grid grid-cols-3 gap-2 mt-1.5">
-                                    <template x-for="o in tablelessIncoming()" :key="'bc' + o.id">
-                                        <button type="button" @click="tableBoardOpen = false; claimAndLoadIncoming(o)" class="rounded-lg border-2 px-2 py-1.5 text-left transition hover:scale-[1.02] border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20 text-purple-800 dark:text-purple-200">
-                                            <span class="flex items-center justify-between gap-1">
-                                                <span class="text-[11px] font-black truncate" x-text="o.order_type === 'delivery' ? window.TXT.delivery : window.TXT.takeaway"></span>
-                                                <span class="text-[10px] font-bold whitespace-nowrap" x-text="'Rs ' + Math.round(o.total_amount || 0).toLocaleString()"></span>
-                                            </span>
-                                            <span class="block text-[10px] truncate font-medium opacity-90" x-text="(o.waiter ? o.waiter + ' • ' : '') + o.order_number"></span>
-                                        </button>
-                                    </template>
-                                </div>
-                            </div>
-                        </template>
+                        {{-- Counter Orders (bina table) REMOVED from the board (ZFC + owner,
+                             5 Aug 2026): dining board sirf TABLES dikhaye — waiter ke
+                             takeaway/delivery orders ab SIRF ghanti (incoming) panel mein
+                             milte hain (wahan wahi ATOMIC claim → cart-load path chalta hai). --}}
                         {{-- Held Orders (bina table) — F3 window RETIRED (owner 26 Jul 2026):
                              jo held orders kisi table pe NAHIN hain woh yahan amber chips
                              mein dikhte hain. Click = tiles jaisa ACTION MENU (kabhi direct
@@ -1857,25 +1843,10 @@ window.addEventListener('popstate', function() {
                         </div>
                     </div>
                 </template>
-                {{-- Table-se-Bill (Jul 2026): waiter TAKEAWAY/DELIVERY orders have no
-                     table — surface them here so they are never stranded (the old
-                     Waiter box is retired; this picker is the ONE surface). --}}
-                <template x-if="tablelessIncoming().length > 0">
-                    <div class="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                        <p class="text-[10px] font-bold uppercase tracking-wider text-purple-500 mb-1.5">{{ __('pos.counter_orders_no_table') }}</p>
-                        <div class="space-y-1.5">
-                            <template x-for="o in tablelessIncoming()" :key="o.id">
-                                <button @click="claimAndLoadIncoming(o)" class="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border-2 border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20 hover:border-purple-500 transition text-left">
-                                    <span class="min-w-0">
-                                        <span class="block text-xs font-bold text-purple-700 dark:text-purple-300 truncate" x-text="o.order_number + ' • ' + (o.order_type === 'delivery' ? window.TXT.delivery : window.TXT.takeaway)"></span>
-                                        <span class="block text-[10px] text-gray-500 dark:text-gray-400 truncate" x-text="o.waiter + ' • ' + o.items.length + window.TXT.sfx_items_dot + o.created_at"></span>
-                                    </span>
-                                    <span class="flex-shrink-0 text-xs font-bold text-purple-700 dark:text-purple-300" x-text="'Rs ' + Math.round(o.total_amount).toLocaleString()"></span>
-                                </button>
-                            </template>
-                        </div>
-                    </div>
-                </template>
+                {{-- Counter Orders (bina table) REMOVED from the picker (ZFC + owner,
+                     5 Aug 2026): "Select Table" sirf tables ke liye hai — waiter ke
+                     takeaway/delivery orders SIRF ghanti (incoming) panel mein dikhte
+                     hain, wahan se wahi atomic claim → cart-load path chalta hai. --}}
             </div>
         </div>
     </div>
@@ -4681,8 +4652,15 @@ function restaurantPos() {
         },
         moveGridFocus(delta) {
             if (!this.gridFocusMode) { this.enterGridMode(); return; }
-            const newIdx = this.gridFocusIndex + delta;
-            if (newIdx >= 0 && newIdx < this.displayItems.length) { this.gridFocusIndex = newIdx; this.scrollGridItemIntoView(newIdx); }
+            const n = this.displayItems.length;
+            if (n === 0) return;
+            // ZFC (5 Aug 2026): wrap-around — pehle item par Up dabao to seedha
+            // AAKHRI item par pahuncho (aur aakhri se Down wapas pehle par);
+            // neeche wale option tak bar-bar Down dabane ki zaroorat nahi.
+            let newIdx = this.gridFocusIndex + delta;
+            if (newIdx < 0) newIdx = n - 1;
+            else if (newIdx >= n) newIdx = 0;
+            this.gridFocusIndex = newIdx; this.scrollGridItemIntoView(newIdx);
         },
         scrollGridItemIntoView(idx) { this.$nextTick(() => { document.getElementById('grid-item-' + idx)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }); },
         addGridFocusedItem() {
@@ -6378,17 +6356,18 @@ function restaurantPos() {
                 waiter: all.filter(t => this.boardIsWaiter(t)).length,
             };
         },
-        // Live sum of every OPEN order (table tiles + counter orders) — header
-        // "Rs X chalu" glance: kitni raqam abhi tables/counter pe khuli hai.
+        // Live sum of every OPEN order the BOARD shows (table tiles + bina-table
+        // held chips) — header "Rs X chalu" glance. Counter (takeaway/delivery)
+        // orders EXCLUDED (ZFC 5 Aug 2026): wo board par nahi dikhte (sirf ghanti
+        // panel), to unki raqam yahan ginne se "khali board, phir bhi raqam
+        // chalu" wali confusion banti thi.
         boardOpenTotal() {
             const tables = this.tableFloors.flatMap(f => f.tables)
                 .reduce((s, t) => s + (t.order ? (parseFloat(t.order.total_amount) || 0) : 0), 0);
-            const counter = this.tablelessIncoming()
-                .reduce((s, o) => s + (parseFloat(o.total_amount) || 0), 0);
             // Bina-table held orders bhi khuli raqam hain (board ki amber chips).
             const held = this.heldNoTable()
                 .reduce((s, o) => s + (parseFloat(o.total_amount) || 0), 0);
-            return Math.round(tables + counter + held);
+            return Math.round(tables + held);
         },
         // Minutes elapsed since ts (reads nowTick → refreshes on the 30s tick).
         boardMinsSince(ts) {

@@ -77,7 +77,11 @@ class PosAuthController extends Controller
             $phone = preg_replace('/\D/', '', $login);
             $user = User::where('phone', $phone)->first();
             if (!$user) {
-                $company = Company::where('ntn', $login)->orWhere('cnic', $login)->first();
+                // Frost & Brew (Aug 2026): NTN/CNIC typed WITH dashes must still
+                // match — DB stores plain digits, so compare BOTH the raw input
+                // and the digit-only form.
+                $company = Company::where('ntn', $login)->orWhere('cnic', $login)
+                    ->orWhere('ntn', $phone)->orWhere('cnic', $phone)->first();
                 if ($company) {
                     $user = User::where('company_id', $company->id)->where('role', 'company_admin')->orderBy('id')->first();
                 }

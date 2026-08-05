@@ -38,6 +38,10 @@
         }
         return ($posUserLayout ? $posUserLayout->posCustomAllows($f) : null) ?? $default;
     };
+    // Owner rule (5 Aug 2026): Day Close is admin/manager work by DEFAULT.
+    // Cashiers see it only when the company switch (Customize) or a Custom
+    // Access tick re-opens it — same verdict as the route guards.
+    $dayCloseNavDefault = \App\Services\PosAccessService::dayCloseAllowed($posUserLayout, $companyLayout);
     // POS UNIFICATION: every company (restaurant or retail) now bills on the single
     // universal sale screen (pos.universal). The legacy restaurant sale screen and its
     // per-company opt-out were retired — restaurant behavior is driven by feature flags.
@@ -711,7 +715,7 @@
                                     </a>
                                     @endif
 
-                                    @if($posNavCan('reports') || $posNavCan('tax_reports') || $posNavCan('day_close') || ($isRestaurantLayout && $posNavCan('reports')))
+                                    @if($posNavCan('reports') || $posNavCan('tax_reports') || $posNavCan('day_close', $dayCloseNavDefault) || ($isRestaurantLayout && $posNavCan('reports')))
                                     <div class="px-3 pt-3 pb-1">
                                         <p class="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-600">{{ __('pos.reports') }}</p>
                                     </div>
@@ -734,7 +738,10 @@
                                         {{ __('pos.cancelled_orders') }}
                                     </a>
                                     @endif
-                                    @if($posNavCan('day_close'))
+                                    {{-- Owner rule (5 Aug 2026): Day Close is admin/manager work by DEFAULT.
+                                         Cashiers see/reach it only via the company switch (Customize) or a
+                                         Team Custom Access grant (day_close tick). --}}
+                                    @if($posNavCan('day_close', $dayCloseNavDefault))
                                     <a href="{{ route('pos.day-close') }}" class="menu-link flex items-center gap-2.5 px-4 py-2 text-[12px] font-medium text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                         {{ __('pos.nav_day_close') }}
@@ -965,7 +972,7 @@
                     $posNavCan('products') ? ['label' => __('pos.products_word'), 'url' => route('pos.products'), 'icon' => '◫', 'kbd' => ''] : null,
                     $posNavCan('customers') ? ['label' => __('pos.nav_customers'), 'url' => route('pos.customers'), 'icon' => '◉', 'kbd' => ''] : null,
                     $posNavCan('reports') ? ['label' => __('pos.reports'), 'url' => route('pos.reports'), 'icon' => '▤', 'kbd' => ''] : null,
-                    $posNavCan('day_close') ? ['label' => __('pos.nav_day_close'), 'url' => route('pos.day-close'), 'icon' => '◆', 'kbd' => ''] : null,
+                    $posNavCan('day_close', $dayCloseNavDefault) ? ['label' => __('pos.nav_day_close'), 'url' => route('pos.day-close'), 'icon' => '◆', 'kbd' => ''] : null,
                     $posNavCan('customize') ? ['label' => __('pos.nav_billing_plan'), 'url' => route('pos.billing'), 'icon' => '₨', 'kbd' => ''] : null,
                     $posNavCan('customize') ? ['label' => __('pos.nav_business_profile'), 'url' => route('pos.business-profile'), 'icon' => '◎', 'kbd' => ''] : null,
                     ['label' => __('pos.cmd_toggle_fullscreen'), 'action' => 'fullscreen', 'icon' => '⛶', 'kbd' => 'F11'],

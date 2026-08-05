@@ -7,6 +7,10 @@
        • Restaurant (RestaurantPosController::dashboard): $todaySales, $yesterdaySales,
          $todayOrders, $completedCount, $totalTables, $occupiedTables, $topProducts, $todayProfit --}}
 @php
+    // Owner rule (5 Aug 2026): Day Close is admin/manager work by DEFAULT.
+    // Cashiers see these links only when the company switch (Customize) or a
+    // Custom Access tick re-opens it — same verdict as nav + route guards.
+    $saafCanDayClose = \App\Services\PosAccessService::dayCloseAllowed(auth('pos')->user());
     if (!empty($isRestaurant)) {
         $saafToday     = (float) ($todaySales ?? 0);
         $saafYesterday = (float) ($yesterdaySales ?? 0);
@@ -174,12 +178,14 @@
         <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
             <p class="text-sm font-extrabold text-gray-900 dark:text-white mb-3">{{ __("pos.roz_ke_kaam") }}</p>
             <div class="grid grid-cols-2 gap-3">
+                @if($saafCanDayClose)
                 <a href="{{ route('pos.day-close') }}" class="group rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center hover:border-teal-600 dark:hover:border-teal-500 transition">
                     <span class="mx-auto mb-2 w-9 h-9 rounded-lg flex items-center justify-center" style="background:#ccfbf1;">
                         <svg class="w-5 h-5" style="color:#0A4D5C;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </span>
                     <div class="text-[12px] font-bold text-gray-700 dark:text-gray-300">{{ __("pos.day_close") }}</div>
                 </a>
+                @endif
                 <a href="{{ route('pos.reports') }}" class="group rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-center hover:border-teal-600 dark:hover:border-teal-500 transition">
                     <span class="mx-auto mb-2 w-9 h-9 rounded-lg flex items-center justify-center" style="background:#ccfbf1;">
                         <svg class="w-5 h-5" style="color:#0A4D5C;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
@@ -210,13 +216,17 @@
         <p class="text-[13px] text-gray-600 dark:text-gray-300 flex-1">
             {{ __("pos.pra_reporting_theek") }}{{ isset($praSyncedToday) && $praSyncedToday !== null ? __("pos.aaj_ke_bills_sync", ["count" => number_format($praSyncedToday)]) : "." }}
         </p>
+        @if($saafCanDayClose)
         <a href="{{ route('pos.day-close') }}" class="text-[12px] font-bold whitespace-nowrap" style="color:#0A4D5C;">{{ __("pos.day_close_karein_arrow") }}</a>
+        @endif
     </div>
     @else
     <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 flex items-center gap-3">
         <div class="w-9 h-9 rounded-xl bg-gray-400 dark:bg-gray-600 flex items-center justify-center text-white text-sm flex-shrink-0">!</div>
         <p class="text-[13px] text-gray-600 dark:text-gray-300 flex-1">{{ __("pos.pra_reporting_off_local") }}</p>
+        @if($saafCanDayClose)
         <a href="{{ route('pos.day-close') }}" class="text-[12px] font-bold text-gray-500 dark:text-gray-400 whitespace-nowrap">{{ __("pos.day_close_karein_arrow") }}</a>
+        @endif
     </div>
     @endif
 

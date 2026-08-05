@@ -4846,6 +4846,29 @@ class PosController extends Controller
     }
 
     /**
+     * Customize POS → persist "Cashier bhi Day Close kar sake" (owner rule,
+     * 5 Aug 2026). Default OFF = Day Close is admin/manager work; this switch
+     * re-opens it for cashiers on ANY plan (Team Custom Access stays the
+     * per-member override on Unlimited). Verdict: PosAccessService::dayCloseAllowed.
+     */
+    public function toggleCashierDayclose(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->posCashierBlocked()) {
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
+        }
+        $company = Company::find(app('currentCompanyId'));
+        $company->pos_cashier_dayclose = $request->boolean('enabled');
+        $company->save();
+
+        return response()->json([
+            'success' => true,
+            'enabled' => (bool) $company->pos_cashier_dayclose,
+            'message' => $company->pos_cashier_dayclose ? __('pos.cashier_dayclose_enabled') : __('pos.cashier_dayclose_disabled'),
+        ]);
+    }
+
+    /**
      * Day Close page — persist the company's business-day cutoff time
      * ("Din band hone ka waqt", owner request 30 Jul 2026). Sales before this
      * time count in the PREVIOUS trading day (business_date) and the auto
@@ -7560,6 +7583,14 @@ class PosController extends Controller
 
     public function dayCloseReport(Request $request)
     {
+        // Owner rule (5 Aug 2026): Day Close is admin/manager work by DEFAULT.
+        // A cashier reaches it only when the company switch (Customize) or a
+        // Team Custom Access tick re-opens it — dayCloseAllowed = single
+        // verdict shared with the nav and dashboard links.
+        $dayCloseUser = \Illuminate\Support\Facades\Auth::guard('pos')->user();
+        if ($dayCloseUser && !\App\Services\PosAccessService::dayCloseAllowed($dayCloseUser)) {
+            return redirect()->route('pos.dashboard')->with('error', __('pos.custom_access_denied'));
+        }
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         // Default = the OPEN trading day (business day): after midnight, before
@@ -7720,6 +7751,11 @@ class PosController extends Controller
 
     public function closeDayReport(Request $request)
     {
+        // Owner rule (5 Aug 2026): cashier day-close only via company switch / Custom Access tick.
+        $dayCloseUser = \Illuminate\Support\Facades\Auth::guard('pos')->user();
+        if ($dayCloseUser && !\App\Services\PosAccessService::dayCloseAllowed($dayCloseUser)) {
+            return redirect()->route('pos.dashboard')->with('error', __('pos.custom_access_denied'));
+        }
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $user = \Illuminate\Support\Facades\Auth::guard('pos')->user();
@@ -8800,6 +8836,11 @@ class PosController extends Controller
 
     public function dayCloseReportPdf($id)
     {
+        // Owner rule (5 Aug 2026): cashier day-close only via company switch / Custom Access tick.
+        $dayCloseUser = \Illuminate\Support\Facades\Auth::guard('pos')->user();
+        if ($dayCloseUser && !\App\Services\PosAccessService::dayCloseAllowed($dayCloseUser)) {
+            return redirect()->route('pos.dashboard')->with('error', __('pos.custom_access_denied'));
+        }
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $report = PosDayCloseReport::where('company_id', $companyId)->findOrFail($id);
@@ -8849,6 +8890,11 @@ class PosController extends Controller
      */
     public function dayCloseThermal($id)
     {
+        // Owner rule (5 Aug 2026): cashier day-close only via company switch / Custom Access tick.
+        $dayCloseUser = \Illuminate\Support\Facades\Auth::guard('pos')->user();
+        if ($dayCloseUser && !\App\Services\PosAccessService::dayCloseAllowed($dayCloseUser)) {
+            return redirect()->route('pos.dashboard')->with('error', __('pos.custom_access_denied'));
+        }
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $report = PosDayCloseReport::where('company_id', $companyId)->findOrFail($id);

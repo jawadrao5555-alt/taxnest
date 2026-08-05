@@ -205,6 +205,37 @@ class PosAccessService
         return null;
     }
 
+    /**
+     * Day Close verdict — SINGLE source of truth for nav, dashboard links AND
+     * the controller route guards (owner rule, 5 Aug 2026):
+     * - Custom Access set (Unlimited/trial) → its explicit tick wins, both ways.
+     * - No set + admin/manager → allowed (unchanged).
+     * - No set + cashier → company switch `pos_cashier_dayclose` (default OFF —
+     *   Day Close is admin/manager work; ANY plan can re-open it in Customize).
+     */
+    public static function dayCloseAllowed(?User $user, $company = null): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        $custom = self::customAllows($user, 'day_close');
+        if ($custom !== null) {
+            return $custom;
+        }
+        if (!$user->isPosCashier()) {
+            return true;
+        }
+        try {
+            $company = $company ?: \App\Models\Company::find($user->company_id);
+
+            // hasColumn guard: PROD drift (migration not yet run) → column
+            // missing → attribute null → default OFF for cashiers.
+            return (bool) ($company->pos_cashier_dayclose ?? false);
+        } catch (\Throwable $e) {
+            return false; // fail closed — admin/manager path unaffected
+        }
+    }
+
     /** Whether the users.pos_custom_access column exists (PROD drift guard). */
     public static function columnReady(): bool
     {

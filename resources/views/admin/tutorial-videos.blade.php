@@ -21,6 +21,7 @@
                         <th class="px-4 py-3">Video</th>
                         <th class="px-4 py-3">Category</th>
                         <th class="px-4 py-3">Feature gate (subscription)</th>
+                        <th class="px-4 py-3">Staff visibility (role)</th>
                         <th class="px-4 py-3">Landing page</th>
                         <th class="px-4 py-3">Published</th>
                     </tr>
@@ -50,6 +51,19 @@
                                     <option value="">Everyone (core)</option>
                                     @foreach($gateOptions as $key => $label)
                                     <option value="{{ $key }}" {{ $v->required_feature === $key ? 'selected' : '' }}>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                <button type="submit" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200">Set</button>
+                            </form>
+                        </td>
+                        <td class="px-4 py-3">
+                            {{-- ZFC (5 Aug 2026): staff role tier — waiter/kitchen/rider ko
+                                 sirf 'Everyone' videos dikhti hain (PRA/settings unse chhupi). --}}
+                            <form method="POST" action="/admin/tutorial-videos/{{ $v->id }}/role" class="flex items-center gap-1.5">
+                                @csrf
+                                <select name="min_role" class="text-xs rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 py-1.5 pr-7">
+                                    @foreach($roleOptions as $key => $label)
+                                    <option value="{{ $key }}" {{ ($v->min_role ?? 'any') === $key ? 'selected' : '' }}>{{ $label }}</option>
                                     @endforeach
                                 </select>
                                 <button type="submit" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200">Set</button>

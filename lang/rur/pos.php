@@ -3217,6 +3217,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'table_number' => 'Table number',
     'table_occupied_suffix' => ' occupy hai',
     'table_occupied_cart_hint' => ' par pehle se order chal raha hai — pehle apna cart Hold (F5) karein ya khali karein, phir yeh table dobara daba kar bill kholein',
+    'type_switch_order_safe' => 'Table ka order mehfooz hai — screen nayi sale ke liye saaf ho gayi',
     'table_setup' => 'Table setup',
     'table_setup_subtitle' => 'Apne restaurant ke floors aur tables set karein',
     'table_status_available' => 'Available',

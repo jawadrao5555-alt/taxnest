@@ -3218,6 +3218,7 @@ return [
     'table_number' => 'ٹیبل نمبر',
     'table_occupied_suffix' => ' مصروف ہے',
     'table_occupied_cart_hint' => ' پر پہلے سے آرڈر چل رہا ہے — پہلے اپنا کارٹ ہولڈ (F5) کریں یا خالی کریں، پھر یہ ٹیبل دوبارہ دبا کر بل کھولیں',
+    'type_switch_order_safe' => 'ٹیبل کا آرڈر محفوظ ہے — اسکرین نئی سیل کے لیے صاف ہو گئی',
     'table_setup' => 'ٹیبل سیٹ اپ',
     'table_setup_subtitle' => 'اپنے ریسٹورنٹ کے لیے فلور اور ٹیبل کنفیگر کریں',
     'table_status_available' => 'دستیاب',

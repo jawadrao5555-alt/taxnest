@@ -24,6 +24,7 @@ class TutorialVideoAdminController extends Controller
         return view('admin.tutorial-videos', [
             'videos' => $videos,
             'gateOptions' => self::gateOptions(),
+            'roleOptions' => self::roleOptions(),
         ]);
     }
 
@@ -64,6 +65,34 @@ class TutorialVideoAdminController extends Controller
             'success',
             "'{$video->title}' gate: " . ($gate === '' ? 'everyone (core feature).' : $gate . ' subscriptions only.')
         );
+    }
+
+    /** Role tier inside company logins (ZFC, 5 Aug 2026): staff-filtering. */
+    public function setRole(Request $request, $id)
+    {
+        $video = TutorialVideo::findOrFail($id);
+        $role = (string) $request->input('min_role', 'any');
+
+        if (!array_key_exists($role, self::roleOptions())) {
+            return redirect('/admin/tutorial-videos')->with('error', 'Unknown role tier.');
+        }
+
+        $video->update(['min_role' => $role]);
+
+        return redirect('/admin/tutorial-videos')->with(
+            'success',
+            "'{$video->title}' role tier: " . self::roleOptions()[$role] . '.'
+        );
+    }
+
+    /** Valid min_role values => human labels for the dropdown. */
+    public static function roleOptions(): array
+    {
+        return [
+            'any' => 'Everyone (waiter/kitchen/rider too)',
+            'cashier' => 'Cashier & up',
+            'admin' => 'Admin/Manager only',
+        ];
     }
 
     /** Valid gate keys => human labels for the dropdown. */

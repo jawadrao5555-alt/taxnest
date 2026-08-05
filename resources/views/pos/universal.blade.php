@@ -6059,6 +6059,19 @@ function restaurantPos() {
                 this.openTableSwitchPrompt({ kind: 'type', type });
                 return;
             }
+            // ZFC (5 Aug 2026, video): table ka RECALLED/claimed order khula chhor
+            // kar Takeaway/Delivery par jao to purana cart chipka rehta tha aur
+            // naya order usi mein ghul jata. Ab: order table par mehfooz hai
+            // (held/claimed row ko kuch nahi hota) — screen saaf ho kar nayi sale
+            // ke liye tayyar. Manual (bina recall) cart upar wale explicit-choice
+            // prompt se guzarta hai — wahan silent discard ab bhi nahi hota.
+            if (type !== 'dine_in' && (this.recalledOrderId || this.incomingOrderId) && this.cart.length) {
+                this.clearCart(); // held order DB/table par jyon-ka-tyon; sirf screen reset
+                this.orderType = type;
+                if (type === 'delivery' && this.selectedCustomer && !this.customerAddresses.length) this.loadCustomerAddresses();
+                this.showToast(window.TXT.type_switch_order_safe, 'info');
+                return;
+            }
             // Item #3: the delivery-charge line only belongs to Delivery orders —
             // leaving the type removes it so it can never bill on dine-in/takeaway.
             if (type !== 'delivery') this.removeDeliveryCharge();
@@ -6242,12 +6255,22 @@ function restaurantPos() {
             this.tablesLoading = false;
         },
         async selectTable(table, opts) {
-            // Table-se-Bill (Jul 2026): occupied table WITH a waiting waiter order
-            // → claim it and load straight into the cart (no reserve, no auto-KOT —
-            // the table stays occupied until settlement frees it). Early return
-            // keeps the reserve/selectedTable/dine_in_auto_kot path untouched.
+            // Table-se-Bill (Jul 2026) + ZFC (5 Aug 2026): occupied table WITH a
+            // waiting waiter order ab bhi WAHI options menu kholta hai jo desktop
+            // wale table ko milta hai (Open/Edit, Proof Bill, Make FINAL, Shift) —
+            // pehle seedha cart+settle par utarta tha aur ek ghalat click par
+            // FINAL ho jaane ka khatra tha (ZFC video). Board-menu ke saare
+            // actions waiter orders ko pehle se atomic-claim karte hain, is liye
+            // single-winner invariant barqarar. Agar table-status mein order abhi
+            // nahi aya (poll lag) to purana direct-claim path hi chalta hai.
             const inc = this.incomingForTable(table);
-            if (inc) { await this.claimAndLoadIncoming(inc); return; }
+            if (inc) {
+                if (table.order) {
+                    if (this.cart.length === 0) { this.showTablePicker = false; this.openBoardMenu(table); return; }
+                    this.showToast(window.TXT.table_t_prefix2 + table.table_number + window.TXT.table_occupied_cart_hint, 'warning'); return;
+                }
+                await this.claimAndLoadIncoming(inc); return;
+            }
             if (table.status === 'occupied') {
                 // 26 Jul 2026 (owner item 5): khali cart + occupied tile = board
                 // ACTION MENU (view/final/KOT/shift) yahin picker se. Bhara cart

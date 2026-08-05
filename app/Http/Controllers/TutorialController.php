@@ -58,7 +58,7 @@ class TutorialController extends Controller
 
         $videos = TutorialVideo::published()
             ->orderBy('sort')->orderBy('id')->get()
-            ->filter(fn (TutorialVideo $v) => $v->visibleToCompany($company))
+            ->filter(fn (TutorialVideo $v) => $v->visibleToCompany($company) && $v->visibleToRole($user))
             ->values();
 
         return view('pos.tutorials', [

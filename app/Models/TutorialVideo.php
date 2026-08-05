@@ -23,8 +23,8 @@ class TutorialVideo extends Model
 {
     protected $fillable = [
         'slug', 'product', 'title', 'description', 'video_url', 'category',
-        'required_feature', 'sort', 'is_published', 'show_public', 'duration_seconds',
-        'controls_applied',
+        'required_feature', 'min_role', 'sort', 'is_published', 'show_public',
+        'duration_seconds', 'controls_applied',
     ];
 
     protected $casts = [
@@ -167,6 +167,31 @@ class TutorialVideo extends Model
         } catch (\Throwable $e) {
             return false; // never 500 the tutorials page over a bad gate key
         }
+    }
+
+    /**
+     * Role tier gate (ZFC, 5 Aug 2026): waiters/kitchen/riders sirf apne kaam
+     * ki videos dekhein — PRA Mode/settings jaisi cheezen unke saamne na aayen.
+     * 'any' = everyone, 'cashier' = cashier+manager+admin, 'admin' = manager+admin.
+     * hasColumn-safe: column na ho (pre-migration prod window) to sab dikhta hai.
+     */
+    public function visibleToRole(?User $user): bool
+    {
+        $min = (string) ($this->min_role ?? 'any');
+        if ($min === '' || $min === 'any') {
+            return true;
+        }
+        if (!$user) {
+            return false;
+        }
+        $posRole = (string) ($user->pos_role ?? '');
+        $isAdmin = ($user->role ?? '') === 'company_admin'
+            || in_array($posRole, ['pos_admin', 'pos_manager'], true);
+        if ($min === 'admin') {
+            return $isAdmin;
+        }
+
+        return $isAdmin || $posRole === 'pos_cashier'; // 'cashier' tier
     }
 
     /**

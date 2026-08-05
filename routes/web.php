@@ -974,6 +974,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/tutorial-videos/{id}/toggle-published', [\App\Http\Controllers\TutorialVideoAdminController::class, 'togglePublished'])->name('admin.tutorial-videos.toggle-published');
     Route::post('/tutorial-videos/{id}/toggle-public', [\App\Http\Controllers\TutorialVideoAdminController::class, 'togglePublic'])->name('admin.tutorial-videos.toggle-public');
     Route::post('/tutorial-videos/{id}/gate', [\App\Http\Controllers\TutorialVideoAdminController::class, 'setGate'])->name('admin.tutorial-videos.gate');
+    Route::post('/tutorial-videos/{id}/role', [\App\Http\Controllers\TutorialVideoAdminController::class, 'setRole'])->name('admin.tutorial-videos.role');
 
     // POS Feature Suggestions review (owner request 20 Jul 2026)
     Route::get('/feature-suggestions', [\App\Http\Controllers\FeatureSuggestionController::class, 'adminIndex'])->name('admin.feature-suggestions');

@@ -77,6 +77,13 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
+            // Fail-fast when MySQL is unreachable (shared-host evening blips):
+            // without this, a dead/hung DB host can stall every page for the
+            // full OS TCP timeout. Connect-timeout ONLY — running queries are
+            // completely unaffected (PDO_MYSQL maps ATTR_TIMEOUT to connect).
+            'options' => extension_loaded('pdo_mysql') ? [
+                PDO::ATTR_TIMEOUT => (int) env('DB_CONNECT_TIMEOUT', 5),
+            ] : [],
         ],
         'pgsql' => [
             'driver' => 'pgsql',

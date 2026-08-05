@@ -208,7 +208,7 @@
             <div>
                 <label class="block text-xs text-gray-400 mb-1">Agent Server URL</label>
                 <div class="flex gap-2">
-                    <input type="text" readonly value="{{ url('/api/agent') }}" x-ref="srv" class="w-full rounded-lg bg-gray-800 border-gray-700 text-gray-200 text-xs font-mono">
+                    <input type="text" readonly value="{{ url('/api/agent') }}" x-ref="srv" class="w-full min-w-0 rounded-lg bg-gray-800 border-gray-700 text-gray-200 text-xs font-mono">
                     <button type="button" @click="copy($refs.srv, $el)" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs rounded-lg">Copy</button>
                 </div>
             </div>
@@ -216,7 +216,7 @@
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">Company ID</label>
                     <div class="flex gap-2">
-                        <input type="text" readonly value="{{ $company->id }}" x-ref="cid" class="w-full rounded-lg bg-gray-800 border-gray-700 text-gray-200 text-xs font-mono">
+                        <input type="text" readonly value="{{ $company->id }}" x-ref="cid" class="w-full min-w-0 rounded-lg bg-gray-800 border-gray-700 text-gray-200 text-xs font-mono">
                         <button type="button" @click="copy($refs.cid, $el)" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs rounded-lg">Copy</button>
                     </div>
                 </div>
@@ -241,7 +241,7 @@
                 </template>
                 <template x-if="code">
                     <div class="flex gap-2">
-                        <input type="text" readonly :value="code" x-ref="ac" class="w-full rounded-lg bg-gray-800 border-amber-700 text-amber-300 text-xs font-mono">
+                        <input type="text" readonly :value="code" x-ref="ac" class="w-full min-w-0 rounded-lg bg-gray-800 border-amber-700 text-amber-300 text-xs font-mono">
                         <button type="button" @click="copy($refs.ac, $el)" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg">Copy</button>
                     </div>
                 </template>

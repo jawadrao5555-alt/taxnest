@@ -1175,6 +1175,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
         return back()->with('success', __('pos.language_saved'));
     })->name('fbrpos.settings.default-language');
     Route::get('/customize', [FbrPosController::class, 'customize'])->name('fbrpos.customize');
+    Route::match(['get', 'post'], '/receipt-settings', [FbrPosController::class, 'fbrReceiptSettings'])->name('fbrpos.receipt-settings');
 
     // 🎯 Universal Header API — Local / Provisional bills (F10) + Failed bills (F11)
     Route::get('/api/provisional-bills', [FbrPosController::class, 'apiProvisionalBills'])->name('fbrpos.api.provisional-bills');

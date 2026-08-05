@@ -4857,6 +4857,11 @@ class PosController extends Controller
         if (!$user || $user->posCashierBlocked()) {
             return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
         }
+        // PROD drift guard: code can land before the migration on live — fail
+        // gracefully instead of a SQL "unknown column" 500.
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_cashier_dayclose')) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_save_failed')], 503);
+        }
         $company = Company::find(app('currentCompanyId'));
         $company->pos_cashier_dayclose = $request->boolean('enabled');
         $company->save();

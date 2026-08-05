@@ -36,32 +36,34 @@
             <input type="hidden" name="tab" value="{{ $tab }}">
             @if(request()->filled('from'))<input type="hidden" name="from" value="{{ request('from') }}">@endif
             @if(request()->filled('to'))<input type="hidden" name="to" value="{{ request('to') }}">@endif
+            @if($isCashier)
+            {{-- Owner rule (5 Aug 2026): cashier reports are LOCKED to own sales —
+                 no dropdown, no "all company" escape; server forces it anyway. --}}
+            <div class="flex items-center gap-2">
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                    {{ __('pos.showing_my_sales') }}
+                </span>
+            </div>
+            @else
             <div class="w-full sm:w-auto">
                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.lbl_view_sales_by') }}</label>
                 <select name="cashier" onchange="this.form.submit()" class="w-full sm:w-56 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500 transition">
                     <option value="all" {{ $selectedCashier === 'all' ? 'selected' : '' }}>{{ __('pos.opt_all_company_sales') }}</option>
-                    @if($isCashier)
-                    <option value="{{ $user->id }}" {{ $selectedCashier == $user->id ? 'selected' : '' }}>{{ __('pos.opt_my_sales_only') }}</option>
-                    @else
                     @foreach($teamMembers as $member)
                     <option value="{{ $member->id }}" {{ $selectedCashier == $member->id ? 'selected' : '' }}>
                         {{ $member->name }} ({{ $member->pos_role === 'pos_admin' ? __('pos.role_admin') : ($member->pos_role === 'pos_manager' ? __('pos.role_manager') : __('pos.role_cashier')) }})
                     </option>
                     @endforeach
-                    @endif
                 </select>
             </div>
             @if($selectedCashier !== 'all')
             <div class="flex items-center gap-2">
                 <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
-                    @if($isCashier && $selectedCashier == $user->id)
-                        {{ __('pos.showing_my_sales') }}
-                    @else
-                        {{ __('pos.showing_name', ['name' => $teamMembers->firstWhere('id', $selectedCashier)?->name ?? __('pos.th_staff')]) }}
-                    @endif
+                    {{ __('pos.showing_name', ['name' => $teamMembers->firstWhere('id', $selectedCashier)?->name ?? __('pos.th_staff')]) }}
                 </span>
                 <a href="{{ route('pos.reports', array_filter(['tab' => $tab, 'cashier' => 'all', 'from' => request('from'), 'to' => request('to')])) }}" class="text-xs text-gray-500 hover:text-purple-600 underline">{{ __('pos.clear') }}</a>
             </div>
+            @endif
             @endif
         </form>
     </div>

@@ -3815,8 +3815,10 @@ class PosController extends Controller
         $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin()) ? 'local' : 'pra';
         $cashierFilter = $request->get('cashier', 'all');
 
-        if ($isCashier && $cashierFilter !== 'all' && $cashierFilter != $user->id) {
-            $cashierFilter = $user->id;
+        // Owner rule (5 Aug 2026): a cashier ALWAYS sees only their own sales
+        // in reports — 'all' and other members' ids are force-overridden.
+        if ($isCashier) {
+            $cashierFilter = (string) $user->id;
         }
 
         $teamMembers = User::where('company_id', $companyId)
@@ -3919,8 +3921,9 @@ class PosController extends Controller
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
         $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin()) ? 'local' : 'pra';
         $cashierFilter = $request->get('cashier', 'all');
-        if ($isCashier && $cashierFilter !== 'all' && $cashierFilter != $user->id) {
-            $cashierFilter = $user->id;
+        // Owner rule (5 Aug 2026): cashier reports are locked to OWN sales.
+        if ($isCashier) {
+            $cashierFilter = (string) $user->id;
         }
 
         [$rangeFrom, $rangeTo] = $this->resolveReportRange($request);
@@ -3947,8 +3950,10 @@ class PosController extends Controller
         $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin()) ? 'local' : 'pra';
         $cashierFilter = $request->get('cashier', 'all');
 
-        if ($isCashier && $cashierFilter !== 'all' && $cashierFilter != $user->id) {
-            $cashierFilter = $user->id;
+        // Owner rule (5 Aug 2026): a cashier ALWAYS sees only their own sales
+        // in reports — 'all' and other members' ids are force-overridden.
+        if ($isCashier) {
+            $cashierFilter = (string) $user->id;
         }
 
         // Custom date range (analytics block) wins; default stays last 30 days.

@@ -32,6 +32,30 @@ class RestaurantWaiterController extends Controller
         return (bool) (($features->tables ?? false) || ($features->kot ?? false) || ($features->kitchen ?? false) || ($features->restaurant_mode ?? false));
     }
 
+    /**
+     * Per-waiter style pref (owner, 5 Aug 2026): waiter apni marzi se Full/Saaf
+     * chun sake — users.pos_personal_style is THIS user's own pick and overrides
+     * the company style BOTH directions (NULL = company default). Column is
+     * hasColumn-guarded for prod schema drift (503 + friendly message).
+     */
+    public function saveStyle(Request $request)
+    {
+        $request->validate(['style' => 'required|in:default,saaf']);
+        $user = auth('pos')->user();
+        // Waiter-only (architect review): admins/managers can OPEN the tablet,
+        // but the personal-style override is scoped to waiters — everyone else
+        // keeps the company style everywhere (no partial-theming states).
+        if (($user->pos_role ?? null) !== 'pos_waiter') {
+            return response()->json(['ok' => false], 403);
+        }
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_personal_style')) {
+            return response()->json(['ok' => false, 'error' => __('pos.setting_save_failed')], 503);
+        }
+        $user->pos_personal_style = $request->input('style');
+        $user->save();
+        return response()->json(['ok' => true]);
+    }
+
     public function index()
     {
         $companyId = app('currentCompanyId');

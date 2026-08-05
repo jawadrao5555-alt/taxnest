@@ -21,6 +21,7 @@ class User extends Authenticatable
         'pos_role',
         'is_active',
         'dark_mode',
+        'pos_personal_style', // per-user POS style: NULL = company default, 'default'/'saaf' = user's own pick (owner, 5 Aug 2026)
         'language', // PosLocale: 'en' English / 'rur' Roman Urdu / 'ur' Urdu script; NULL = company default
         'pra_reporting_enabled',
         'pos_team_password_enc',

@@ -7,7 +7,7 @@
 @php
     $isSaaf = ($company->pos_dashboard_style ?? 'default') === 'saaf';
 @endphp
-@if($isSaaf)<link rel="stylesheet" href="{{ asset('css/pos-saaf.css') }}?v=4">@endif
+@if($isSaaf)<link rel="stylesheet" href="{{ asset('css/pos-saaf.css') }}?v=5">@endif
 {{-- Boot splash (customer report, 25 Jul 2026): on slow shop connections this ~700KB
      page looked BLANK WHITE after a hard refresh until Alpine parsed and the grid
      painted. Inline-styled overlay shows the moment its bytes stream in; removed on

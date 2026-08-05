@@ -1,5 +1,16 @@
 <x-pos-layout>
 @php
+    // Per-waiter style pref (owner, 5 Aug 2026): waiter apni marzi se Full/Saaf.
+    // Effective = user's own pick (BOTH-direction override), else company style.
+    // WAITER-ONLY: admins/managers previewing this tablet keep the company style.
+    $waiterIsWaiterRole = (auth('pos')->user()->pos_role ?? null) === 'pos_waiter';
+    $waiterOwnStyle = $waiterIsWaiterRole ? (auth('pos')->user()->pos_personal_style ?? null) : null;
+    $waiterEffStyle = in_array($waiterOwnStyle, ['default', 'saaf'], true)
+        ? $waiterOwnStyle
+        : (optional(\App\Models\Company::find(app('currentCompanyId')))->pos_dashboard_style ?? 'default');
+@endphp
+@if($waiterEffStyle === 'saaf')<link rel="stylesheet" href="{{ asset('css/pos-saaf.css') }}?v=5">@endif
+@php
     // UTF-8-safe encode — a single malformed product name must never kill the
     // whole x-data block (json_encode returns false → empty output → Alpine dead).
     $jsEnc = function ($v) {
@@ -16,6 +27,21 @@
             <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('pos.waiter_tablet_subtitle') }}</p>
         </div>
         <div class="flex items-center gap-2">
+            {{-- Per-waiter style switch (owner, 5 Aug 2026): waiter apni marzi se
+                 Saaf/Full chun sake — sirf ISI waiter ki screen badalti hai,
+                 dukan ki setting ko haath nahi lagta. Waiter-only (403 on server). --}}
+            @if($waiterIsWaiterRole)
+            <div class="flex items-center rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden" title="{{ __('pos.ti_waiter_style') }}">
+                <button type="button" @click="saveStyle('saaf')" :disabled="styleBusy"
+                        class="px-3 py-2 text-xs font-bold transition disabled:opacity-50 {{ $waiterEffStyle === 'saaf' ? 'bg-teal-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700' }}">
+                    {{ __('pos.style_saaf_word') }}
+                </button>
+                <button type="button" @click="saveStyle('default')" :disabled="styleBusy"
+                        class="px-3 py-2 text-xs font-bold transition disabled:opacity-50 {{ $waiterEffStyle !== 'saaf' ? 'bg-teal-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700' }}">
+                    {{ __('pos.style_full_word') }}
+                </button>
+            </div>
+            @endif
             {{-- Waiter APK download (Aug 2026) — cookie-less public static file,
                  same pattern as Rider APK on rider-tracking page. --}}
             <a href="{{ url('/downloads/taxnest-waiter.apk') }}"
@@ -78,7 +104,7 @@
                 </button>
                 <span x-show="gridEditMode" x-cloak class="text-[11px] font-semibold text-teal-700 dark:text-teal-300">{{ __('pos.tap_item_hide_show') }}</span>
             </div>
-            <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2.5 max-h-[60vh] overflow-y-auto pr-1">
+            <div class="tn-waiter-grid grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2.5 max-h-[60vh] overflow-y-auto pr-1">
                 <template x-for="p in filtered" :key="p.id">
                     <button @click="gridEditMode ? toggleItemVisibility(p) : addToCart(p)" class="rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-teal-500 dark:hover:border-teal-500 p-3 text-left transition active:scale-95" :class="gridEditMode && !isItemVisible(p) ? 'opacity-40' : ''">
                         <span class="block text-sm font-bold text-gray-800 dark:text-gray-100 leading-snug" x-text="p.name"></span>
@@ -362,6 +388,7 @@ function waiterApp() {
         userGridPrefs: {!! $jsEnc((object) ($userGridPrefs ?? [])) !!},
         gridEditMode: false,
         gridPrefBusy: false,
+        styleBusy: false,
         cashTaxRate: {{ (float) ($cashTaxRate ?? 16) }},
         filtered: [],
         categories: [],
@@ -541,6 +568,25 @@ function waiterApp() {
         },
         get hiddenPrefCount() {
             return Object.values(this.userGridPrefs).filter(v => v == 0).length;
+        },
+
+        // Per-waiter style pref (owner, 5 Aug 2026): apni marzi ka Full/Saaf —
+        // save then full reload so the layout re-renders with the new style.
+        async saveStyle(style) {
+            if (this.styleBusy) return;
+            this.styleBusy = true;
+            try {
+                const res = await fetch('{{ route('pos.waiter.style') }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ style }),
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                window.location.reload();
+            } catch (e) {
+                this.styleBusy = false;
+                this.showToast(@js(__('pos.setting_save_failed')), 'error');
+            }
         },
 
         addToCart(p) {

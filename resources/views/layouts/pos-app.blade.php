@@ -4,6 +4,18 @@
     $posUserLayout = auth('pos')->user();
     $isCashierLayout = $posUserLayout && $posUserLayout->isPosCashier();
     $companyLayout = \App\Models\Company::find(app('currentCompanyId'));
+    // Per-USER style pref (owner, 5 Aug 2026): waiter apni marzi se Full/Saaf
+    // chun sake — user ki apni pick company style ko BOTH directions override
+    // karti hai (pos-user-grid-prefs pattern); NULL/invalid = company default.
+    // WAITER-ONLY (architect review): other roles always follow the company
+    // style so the universal sale screen (company-driven $isSaaf) never
+    // mismatches the layout. Missing column pre-migration = silent NULL.
+    $posOwnStyleLayout = (($posUserLayout->pos_role ?? null) === 'pos_waiter')
+        ? ($posUserLayout->pos_personal_style ?? null)
+        : null;
+    $posEffStyleLayout = in_array($posOwnStyleLayout, ['default', 'saaf'], true)
+        ? $posOwnStyleLayout
+        : ($companyLayout->pos_dashboard_style ?? 'default');
     // Restaurant nav features (Tables, KDS, Ingredients, Recipes) gate.
     // Single source of truth = companies.restaurant_mode (toggle in Business Profile).
     // Disable that toggle → restaurant nav items disappear immediately, regardless of business_category or pos_type.
@@ -392,7 +404,7 @@
             }
         </script>
     </head>
-    <body class="pos-layout-root h-screen overflow-hidden antialiased" data-theme="{{ $posTheme }}"@if(($companyLayout->pos_dashboard_style ?? 'default') === 'saaf') data-saaf="1"@endif>
+    <body class="pos-layout-root h-screen overflow-hidden antialiased" data-theme="{{ $posTheme }}"@if($posEffStyleLayout === 'saaf') data-saaf="1"@endif>
         @include('partials.impersonation-banner')
         <x-pwa-init />
         <div class="flex flex-col h-full" x-data="{ profileOpen: false, mobileMenuOpen: false, themeOpen: false, currentTheme: '{{ $posTheme }}', guidedOn: {{ ($companyLayout->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }} }" @keydown.escape.window="profileOpen = false; mobileMenuOpen = false; themeOpen = false">
@@ -424,7 +436,7 @@
                                 {{ __('pos.new_sale') }}
                             </a>
                             @endunless
-                            @if(($companyLayout->pos_dashboard_style ?? 'default') === 'saaf')
+                            @if($posEffStyleLayout === 'saaf')
                             {{-- Saaf dashboard (Jul 2026): simplified always-visible nav — 5 core links; everything else stays in the profile menu. --}}
                             @if($posNavCan('dashboard'))
                             <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}"
@@ -865,7 +877,7 @@
                      x-transition:leave-end="opacity-0 -translate-y-2"
                      class="md:hidden border-t border-white/10 px-3 py-2 flex flex-wrap gap-1.5" style="background: hsla(var(--accent-h), var(--accent-s), 10%, 0.9)">
                     <a href="{{ route('pos.invoice.create') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.new_sale') }}</a>
-                    @if(($companyLayout->pos_dashboard_style ?? 'default') === 'saaf')
+                    @if($posEffStyleLayout === 'saaf')
                     @if($posNavCan('dashboard'))
                     <a href="{{ $isRestaurantLayout ? route('pos.restaurant.dashboard') : route('pos.dashboard') }}" class="nav-pill px-3 py-1.5 rounded-lg text-[11px] font-medium text-white">{{ __('pos.nav_home') }}</a>
                     @endif

@@ -3884,4 +3884,7 @@ return [
     'th_days_present'           => 'دن',
     'th_total_duty'             => 'کُل ڈیوٹی',
     'payroll_generated_at'      => 'بنایا گیا',
+    'ti_waiter_style'   => 'اسکرین کا انداز — آپ کی اپنی پسند (دکان کی ترتیب نہیں بدلتی)',
+    'style_saaf_word'   => 'سادہ',
+    'style_full_word'   => 'مکمل',
 ];

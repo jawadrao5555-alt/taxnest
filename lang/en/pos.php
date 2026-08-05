@@ -3883,4 +3883,7 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'th_days_present'           => 'Days',
     'th_total_duty'             => 'Total Duty',
     'payroll_generated_at'      => 'Generated',
+    'ti_waiter_style'   => 'Screen style — your own choice (does not change the shop setting)',
+    'style_saaf_word'   => 'Saaf',
+    'style_full_word'   => 'Full',
 ];

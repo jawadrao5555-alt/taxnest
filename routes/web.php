@@ -843,6 +843,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     // pos_waiter role is confined to these routes by PosAuth.
     Route::get('/waiter', [\App\Http\Controllers\RestaurantWaiterController::class, 'index'])->name('pos.waiter');
     Route::get('/waiter/api/version', [\App\Http\Controllers\RestaurantWaiterController::class, 'version'])->name('pos.waiter.version');
+    // Per-waiter style pref (owner, 5 Aug 2026) — path stays under pos/waiter so the PosAuth waiter allowlist covers it.
+    Route::post('/waiter/style', [\App\Http\Controllers\RestaurantWaiterController::class, 'saveStyle'])->name('pos.waiter.style');
     Route::get('/waiter/api/tables', [\App\Http\Controllers\RestaurantWaiterController::class, 'tables'])->name('pos.waiter.tables');
     Route::get('/waiter/api/orders', [\App\Http\Controllers\RestaurantWaiterController::class, 'myOrders'])->name('pos.waiter.orders');
     Route::post('/waiter/orders', [\App\Http\Controllers\RestaurantWaiterController::class, 'storeOrder'])->name('pos.waiter.orders.store');

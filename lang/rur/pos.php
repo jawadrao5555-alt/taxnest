@@ -3883,4 +3883,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'th_days_present'           => 'Din',
     'th_total_duty'             => 'Kul Duty',
     'payroll_generated_at'      => 'Banaya gaya',
+    'ti_waiter_style'   => 'Screen ka style — aap ki apni pasand (dukan ki setting nahi badalti)',
+    'style_saaf_word'   => 'Saaf',
+    'style_full_word'   => 'Full',
 ];

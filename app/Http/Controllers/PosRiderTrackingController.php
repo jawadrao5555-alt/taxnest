@@ -286,6 +286,21 @@ class PosRiderTrackingController extends Controller
                 ->limit(3000)->delete();
         }
 
+        // Backward-compat 409 for v1.2.0 clients (and v1.3.0 TrackingService):
+        // When duty is OFF and no rows were accepted (stored==0), the batch
+        // contained only fresh points (lag < OFFLINE_HEURISTIC_MINUTES, skipped
+        // by the per-point duty gate) or permanently-invalid points (bad coords /
+        // beyond 7-day window).  Returning 200 here would leave a v1.2.0
+        // TrackingService running indefinitely after an admin duty-off — it relies
+        // on 409 as its only server-side stop signal when backgrounded (the
+        // MainActivity /me poll is paused while the app is not in the foreground).
+        // v1.3.0 QueueDrain handles 409 gracefully (keeps queue, retries later).
+        // When duty is OFF but stored > 0, at least one buffered past-timestamp
+        // point was accepted — return 200 so the client trims those from the queue.
+        if (!$dutyOn && count($rows) === 0) {
+            return response()->json(['ok' => false, 'error' => 'duty_off'], 409);
+        }
+
         // Return exact stored count so the app can trim its queue precisely.
         // count($rows) = points that passed all validation (lat/lng/age/duty
         // gate); insertOrIgnore may write fewer on duplicate replay, but the

@@ -3888,4 +3888,10 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'ti_waiter_style'   => 'Screen style — your own choice (does not change the shop setting)',
     'style_saaf_word'   => 'Saaf',
     'style_full_word'   => 'Full',
+
+    // DB-down friendly page (Aug 2026) — rendered when MySQL is unreachable
+    'db_down_title' => 'Server is briefly busy',
+    'db_down_body' => 'Sorry — the system is temporarily not responding. None of your data has been lost. Please try again in a moment.',
+    'db_down_auto_retry' => 'This page will retry by itself in 12 seconds…',
+    'db_down_retry_now' => 'Retry now',
 ];

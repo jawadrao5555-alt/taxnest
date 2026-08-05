@@ -3888,4 +3888,10 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'ti_waiter_style'   => 'Screen ka style — aap ki apni pasand (dukan ki setting nahi badalti)',
     'style_saaf_word'   => 'Saaf',
     'style_full_word'   => 'Full',
+
+    // DB-down friendly page (Aug 2026) — rendered when MySQL is unreachable
+    'db_down_title' => 'Server thori der ke liye masroof hai',
+    'db_down_body' => 'Maazrat — system waqti tor par jawab nahi de raha. Aap ka koi data zaya nahi hua. Barah-e-karam thori der mein dobara koshish karein.',
+    'db_down_auto_retry' => 'Yeh page 12 second mein khud dobara koshish karega…',
+    'db_down_retry_now' => 'Abhi dobara koshish karein',
 ];

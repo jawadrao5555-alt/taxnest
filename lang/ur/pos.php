@@ -3889,4 +3889,10 @@ return [
     'ti_waiter_style'   => 'اسکرین کا انداز — آپ کی اپنی پسند (دکان کی ترتیب نہیں بدلتی)',
     'style_saaf_word'   => 'سادہ',
     'style_full_word'   => 'مکمل',
+
+    // DB-down friendly page (Aug 2026) — rendered when MySQL is unreachable
+    'db_down_title' => 'سرور تھوڑی دیر کے لیے مصروف ہے',
+    'db_down_body' => 'معذرت — سسٹم وقتی طور پر جواب نہیں دے رہا۔ آپ کا کوئی ڈیٹا ضائع نہیں ہوا۔ براہِ کرم تھوڑی دیر میں دوبارہ کوشش کریں۔',
+    'db_down_auto_retry' => 'یہ صفحہ 12 سیکنڈ میں خود دوبارہ کوشش کرے گا…',
+    'db_down_retry_now' => 'ابھی دوبارہ کوشش کریں',
 ];

@@ -134,11 +134,16 @@
                 </div>
                 {{-- Item #5: indicative tax-inclusive estimate (cash rate) — the REAL bill
                      (rate by payment method, discounts) is settled on the cashier screen.
-                     HIDDEN for tax-inclusive companies (issue #13). --}}
-                <div class="flex items-center justify-between mt-0.5" x-show="taxEstimate() > 0" @if($taxInclusive ?? false) style="display:none !important" @endif>
+                     NOT RENDERED for tax-inclusive companies (ZFC issue #13; re-broken
+                     & re-fixed 5 Aug 2026): the old inline style="display:none" was
+                     WIPED by Alpine x-show=true (x-show owns el.style.display), so the
+                     line reappeared. Blade @if = server-side, Alpine can't resurrect it. --}}
+                @if (!($taxInclusive ?? false))
+                <div class="flex items-center justify-between mt-0.5" x-show="taxEstimate() > 0">
                     <span class="text-[11px] font-semibold text-gray-400 dark:text-gray-500" x-text="{{ Js::from(__('pos.approx_incl_tax_cash')) }} + cashTaxRate + '%)'"></span>
                     <span class="text-sm font-bold text-gray-600 dark:text-gray-300" x-text="'Rs ' + (total() + taxEstimate()).toLocaleString()"></span>
                 </div>
+                @endif
             </div>
 
             {{-- Order details (hidden in append mode — the order already has them).

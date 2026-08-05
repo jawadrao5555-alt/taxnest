@@ -258,7 +258,7 @@
         <p class="text-xs text-gray-500">No user accounts for this company.</p>
         @else
         <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="w-full text-sm table-static">
                 <thead>
                     <tr class="text-left text-xs text-gray-500 border-b border-gray-800">
                         <th class="py-2 pr-4 font-medium">User</th>

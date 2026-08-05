@@ -1,14 +1,16 @@
 {{-- DB-DOWN friendly page (Aug 2026). Rendered when MySQL is unreachable
      (shared-host evening blips) instead of a raw 500/stack. MUST stay fully
-     self-contained: NO auth()/session/DB/__() calls — the database is DOWN
-     while this renders. Auto-retries via meta refresh. --}}
+     self-contained: NO auth()/session/DB calls — the database is DOWN while
+     this renders. __() is safe (file-based lang); POS users get Roman Urdu /
+     Urdu via their session locale, guests get English. Auto-retries via
+     meta refresh. --}}
 <!DOCTYPE html>
-<html lang="ur">
+<html lang="{{ app()->getLocale() }}" @if(app()->getLocale() === 'ur') dir="rtl" @endif>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="refresh" content="12">
-    <title>Server thori der mein wapas — TaxNest</title>
+    <title>{{ __('pos.db_down_title') }}</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: #f9fafb; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; color: #111827; }
@@ -26,10 +28,10 @@
 <body>
     <div class="card">
         <div class="icon">&#9888;&#65039;</div>
-        <h1>Server thori der ke liye masroof hai</h1>
-        <p>Maazrat &mdash; system waqti tor par jawab nahi de raha. Aap ka koi data zaya nahi hua. Barah-e-karam thori der mein dobara koshish karein.</p>
-        <p class="hint"><span class="spin"></span>Yeh page 12 second mein khud dobara koshish karega&hellip;</p>
-        <button onclick="location.reload()">Abhi dobara koshish karein</button>
+        <h1>{{ __('pos.db_down_title') }}</h1>
+        <p>{{ __('pos.db_down_body') }}</p>
+        <p class="hint"><span class="spin"></span>{{ __('pos.db_down_auto_retry') }}</p>
+        <button onclick="location.reload()">{{ __('pos.db_down_retry_now') }}</button>
     </div>
 </body>
 </html>

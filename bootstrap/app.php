@@ -71,7 +71,7 @@ return Application::configure(basePath: dirname(__DIR__))
             }
             if ($request->expectsJson()) {
                 return response()->json([
-                    'error' => 'Server thori der ke liye masroof hai — barah-e-karam thori der mein dobara koshish karein.',
+                    'error' => __('pos.db_down_title') . ' — ' . __('pos.db_down_body'),
                     'db_down' => true,
                 ], 503, ['Retry-After' => '15']);
             }

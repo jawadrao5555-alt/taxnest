@@ -1754,9 +1754,10 @@ window.addEventListener('popstate', function() {
                  types the note customer gave; big green "Wapas dein" shows the change.
                  CASH only (hidden when Card highlighted). Soft warning if under-paid —
                  never blocks. data-cash-input keyboard guard: digits type, Enter pays cash.
-                 HIDDEN 30 Jul 2026 (owner): UI abhi nahi chahiye, backend rehne do — the if(false) below
-                 flip to true to re-impose. --}}
-            @if(false)
+                 Aug 2026 (owner): per-company OPT-IN via companies.pos_cash_received_enabled
+                 (default OFF, switch at POS Customize); column rides posConfigRev so
+                 cached offline screens refresh when a company flips it. --}}
+            @if(!empty($company->pos_cash_received_enabled))
             <div x-show="payMethodIndex === 0" class="px-4 pb-2" @click.stop>
                 <div class="flex items-center gap-2">
                     <input type="text" inputmode="decimal" x-model="cashReceived" data-cash-input

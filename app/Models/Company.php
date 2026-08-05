@@ -55,6 +55,7 @@ class Company extends Model
         'pos_auto_purge_local_on_dayclose',
         'pos_auto_dayclose_24h',
         'pos_cashier_dayclose',
+        'pos_cash_received_enabled',
         'pra_reporting_enabled',
         'pos_integration_mode',
         'kds_enabled',
@@ -366,6 +367,7 @@ class Company extends Model
             'pos_theme', 'pos_dashboard_style', 'pos_ui_density', 'use_universal_pos',
             'pos_guided_flow_enabled', 'pos_quick_type_enabled', 'default_language',
             'pos_receipt_autoclose_seconds', 'invoice_display_prefs', 'feature_flags',
+            'pos_cash_received_enabled',
             // Tax / pricing
             'standard_tax_rate', 'pos_tax_rate_cash', 'pos_tax_rate_card',
             'pos_tax_inclusive', 'pos_tax_pricing_mode', 'pos_product_search_mode',

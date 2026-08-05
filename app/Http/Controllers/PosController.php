@@ -113,6 +113,31 @@ class PosController extends Controller
     }
 
     /**
+     * Cash Received / Wapsi (change-due) box — per-company OPT-IN toggle
+     * (owner, Aug 2026: "koi company chahti hai koi nahi" — so it's a setting,
+     * default OFF). ON = Pay modal shows the Cash Received input + 500/1000/5k
+     * quick notes + "Wapas dein" line, and the receipt popup / printed change
+     * block that rides on the entered value. OFF = sale screen stays exactly
+     * as before (backend cash_received/change_due columns keep working for
+     * historical rows either way).
+     */
+    public function toggleCashReceived(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->posCashierBlocked()) {
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
+        }
+        // Prod schema drift guard — never pretend to save into a missing column.
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_cash_received_enabled')) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_not_available_yet')], 503);
+        }
+        $enabled = $request->boolean('enabled');
+        $companyId = app('currentCompanyId');
+        Company::where('id', $companyId)->update(['pos_cash_received_enabled' => $enabled]);
+        return response()->json(['success' => true, 'enabled' => $enabled]);
+    }
+
+    /**
      * Tax-Inclusive Pricing (Menu-Rate-Final) mode toggle — admin-only.
      * Applies to NEW bills only: existing bills keep their own tax_inclusive
      * snapshot, so history/reports/PRA payloads never shift retroactively.

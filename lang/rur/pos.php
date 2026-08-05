@@ -2581,6 +2581,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'quick_type_fill_prices' => 'Type names ya unmatched lines ke prices fill karein',
     'quick_type_mode' => 'Quick type mode',
     'quick_type_mode_sub' => 'Sale screen par "Quick" button (F7) — "chai 2, samosa 1" type kar ke seedha cart. Khaane-peene ki dukaano ke liye behtareen.',
+    'cash_received_toggle' => 'Cash Received / Wapsi Khana',
+    'cash_received_toggle_sub' => 'Pay box mein "Cash Received" ka khana — customer ke paise likhein, wapas dene wali raqam foran nazar aaye. Receipt par bhi chhapti hai.',
     'quick_type_parser_hint' => 'Item ke naam type karna shuru karein — system aap ki products ke saath real-time match karega. Qty nahi dali? To 1 hi hogi.',
     'quick_type_unmatched_hint' => 'Unmatched items? Inline price input dega — type Rs. and add as a manual line.',
     'quota_provisional_prompt' => 'Mahana bill limit full hai — yeh bill PROVISIONAL mein save karein? Yeh edit ho sakta hai aur final banane par hi quota mein ginta hai.',

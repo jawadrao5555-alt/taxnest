@@ -1153,7 +1153,9 @@ window.addEventListener('popstate', function() {
                  only sends the entered amount when it covers the total.
                  HIDDEN 30 Jul 2026 (owner): UI abhi nahi chahiye, backend rehne do — the if(false) below
                  flip to true to re-impose. --}}
-            @if(false)
+            {{-- Aug 2026: per-company OPT-IN — same companies.pos_cash_received_enabled
+                 switch as the PRA screen (default OFF; flipped from POS Customize / admin). --}}
+            @if(!empty($company->pos_cash_received_enabled))
             <div x-show="payMethodIndex === 0" class="px-4 pb-2" @click.stop>
                 <div class="flex items-center gap-2">
                     <input type="text" inputmode="decimal" x-model="cashReceived" data-cash-input

@@ -2,7 +2,7 @@
 <div class="p-4 sm:p-6 max-w-5xl mx-auto" x-data="{ showDeleteModal: false }">
     <div class="flex flex-wrap items-center gap-3 mb-6">
         <a href="{{ route('saas.admin.companies') }}" class="text-gray-500 dark:text-gray-400 hover:text-indigo-400 transition text-sm">&larr; Back</a>
-        <h1 class="text-2xl font-bold text-white truncate">{{ $company->name }}</h1>
+        <h1 class="text-2xl font-bold text-white min-w-0 break-words">{{ $company->name }}</h1>
         @php
             $sc = ['approved' => 'bg-emerald-900/30 text-emerald-400', 'active' => 'bg-emerald-900/30 text-emerald-400', 'pending' => 'bg-amber-900/30 text-amber-400', 'suspended' => 'bg-red-900/30 text-red-400', 'rejected' => 'bg-gray-800 text-gray-400'];
             $tc = ['di' => 'bg-emerald-900/30 text-emerald-400', 'pos' => 'bg-purple-900/30 text-purple-400', 'fbrpos' => 'bg-blue-900/30 text-blue-400'];
@@ -11,7 +11,7 @@
         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $sc[$company->status] ?? 'bg-gray-800 text-gray-400' }}">{{ $company->status }}</span>
         <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase {{ $tc[$company->product_type] ?? 'bg-gray-800 text-gray-400' }}">{{ $typeLabels[$company->product_type] ?? $company->product_type }}</span>
         @if(!$company->trashed())
-        <div class="ml-auto flex items-center gap-2">
+        <div class="w-full sm:w-auto sm:ml-auto flex flex-wrap items-center gap-2">
             @if(($company->company_status ?? null) === 'active')
             <form method="POST" action="{{ route('saas.admin.companies.impersonate', $company->id) }}" onsubmit="return confirm('Open this company in VIEW-ONLY mode? You will see their panel exactly as they do, but cannot make any changes.');">
                 @csrf
@@ -42,17 +42,17 @@
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-white mb-3">Company Details</h3>
             <div class="space-y-2 text-sm">
-                <div class="flex justify-between"><span class="text-gray-400">Name</span><span class="text-white font-medium">{{ $company->name }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Owner</span><span class="text-white">{{ $company->owner_name ?? '—' }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">NTN</span><span class="text-white">{{ $company->ntn ?? '—' }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">CNIC</span><span class="text-white">{{ $company->cnic ?? '—' }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Email</span><span class="text-white">{{ $company->email ?? '—' }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Phone</span><span class="text-white">{{ $company->phone ?? '—' }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">City</span><span class="text-white">{{ $company->city ?? '—' }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Address</span><span class="text-white text-right max-w-[200px] truncate">{{ $company->address ?? '—' }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Province</span><span class="text-white">{{ $company->province ?? '—' }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Franchise</span><span class="text-white">{{ $company->franchise->name ?? 'None' }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Created</span><span class="text-white">{{ $company->created_at->format('d M Y, h:i A') }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Name</span><span class="text-white font-medium text-right min-w-0 break-words">{{ $company->name }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Owner</span><span class="text-white text-right min-w-0 break-words">{{ $company->owner_name ?? '—' }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">NTN</span><span class="text-white text-right min-w-0 break-all">{{ $company->ntn ?? '—' }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">CNIC</span><span class="text-white text-right min-w-0 break-all">{{ $company->cnic ?? '—' }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Email</span><span class="text-white text-right min-w-0 break-all">{{ $company->email ?? '—' }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Phone</span><span class="text-white text-right min-w-0 break-all">{{ $company->phone ?? '—' }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">City</span><span class="text-white text-right min-w-0 break-words">{{ $company->city ?? '—' }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Address</span><span class="text-white text-right min-w-0 break-words">{{ $company->address ?? '—' }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Province</span><span class="text-white text-right min-w-0 break-words">{{ $company->province ?? '—' }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Franchise</span><span class="text-white text-right min-w-0 break-words">{{ $company->franchise->name ?? 'None' }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Created</span><span class="text-white text-right min-w-0">{{ $company->created_at->format('d M Y, h:i A') }}</span></div>
             </div>
         </div>
 
@@ -65,43 +65,43 @@
             </h3>
             <div class="space-y-2 text-sm">
                 @if($company->product_type === 'di')
-                <div class="flex justify-between"><span class="text-gray-400">FBR Environment</span><span class="text-white">{{ ucfirst($company->fbr_environment ?? 'N/A') }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">FBR Reg No</span><span class="text-white">{{ $company->fbr_registration_no ?? '—' }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">FBR Business</span><span class="text-white">{{ $company->fbr_business_name ?? '—' }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Token Expiry</span><span class="text-white">{{ $company->token_expiry_date ? $company->token_expiry_date->format('d M Y') : '—' }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Connection</span>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">FBR Environment</span><span class="text-white text-right min-w-0 break-words">{{ ucfirst($company->fbr_environment ?? 'N/A') }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">FBR Reg No</span><span class="text-white text-right min-w-0 break-all">{{ $company->fbr_registration_no ?? '—' }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">FBR Business</span><span class="text-white text-right min-w-0 break-words">{{ $company->fbr_business_name ?? '—' }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Token Expiry</span><span class="text-white text-right min-w-0">{{ $company->token_expiry_date ? $company->token_expiry_date->format('d M Y') : '—' }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Connection</span>
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs {{ $company->fbr_connection_status === 'connected' ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">{{ $company->fbr_connection_status ?? 'N/A' }}</span>
                 </div>
-                <div class="flex justify-between"><span class="text-gray-400">Last Submission</span><span class="text-white">{{ $company->last_successful_submission ? $company->last_successful_submission->format('d M Y h:i A') : '—' }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Invoice Prefix</span><span class="text-white">{{ $company->invoice_number_prefix ?? '—' }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Compliance Score</span><span class="text-white">{{ $company->compliance_score ?? '—' }}%</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Last Submission</span><span class="text-white text-right min-w-0">{{ $company->last_successful_submission ? $company->last_successful_submission->format('d M Y h:i A') : '—' }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Invoice Prefix</span><span class="text-white text-right min-w-0 break-all">{{ $company->invoice_number_prefix ?? '—' }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Compliance Score</span><span class="text-white text-right min-w-0">{{ $company->compliance_score ?? '—' }}%</span></div>
                 @elseif($company->product_type === 'fbrpos')
-                <div class="flex justify-between"><span class="text-gray-400">FBR POS Environment</span><span class="text-white">{{ ucfirst($company->fbr_pos_environment ?? 'N/A') }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">FBR POS ID</span><span class="text-white">{{ $company->fbr_pos_id ?? '—' }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">FBR Reporting</span>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">FBR POS Environment</span><span class="text-white text-right min-w-0 break-words">{{ ucfirst($company->fbr_pos_environment ?? 'N/A') }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">FBR POS ID</span><span class="text-white text-right min-w-0 break-all">{{ $company->fbr_pos_id ?? '—' }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">FBR Reporting</span>
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs {{ $company->fbr_reporting_enabled ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">{{ $company->fbr_reporting_enabled ? 'Enabled' : 'Disabled' }}</span>
                 </div>
-                <div class="flex justify-between"><span class="text-gray-400">FBR POS Module</span>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">FBR POS Module</span>
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs {{ $company->fbr_pos_enabled ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">{{ $company->fbr_pos_enabled ? 'Enabled' : 'Disabled' }}</span>
                 </div>
                 @else
-                <div class="flex justify-between"><span class="text-gray-400">PRA Environment</span><span class="text-white">{{ ucfirst($company->pra_environment ?? 'N/A') }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">POS ID</span><span class="text-white">{{ $company->pra_pos_id ?? '—' }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">PRA Reporting</span>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">PRA Environment</span><span class="text-white text-right min-w-0 break-words">{{ ucfirst($company->pra_environment ?? 'N/A') }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">POS ID</span><span class="text-white text-right min-w-0 break-all">{{ $company->pra_pos_id ?? '—' }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">PRA Reporting</span>
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs {{ $company->pra_reporting_enabled ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">{{ $company->pra_reporting_enabled ? 'Enabled' : 'Disabled' }}</span>
                 </div>
-                <div class="flex justify-between"><span class="text-gray-400">Inventory</span>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Inventory</span>
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs {{ $company->inventory_enabled ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">{{ $company->inventory_enabled ? 'Enabled' : 'Disabled' }}</span>
                 </div>
                 @php $praAgentOnline = $company->agent_last_seen && $company->agent_last_seen->gt(now()->subMinutes(2)); @endphp
-                <div class="flex justify-between"><span class="text-gray-400">Desktop Agent</span>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs {{ $praAgentOnline ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Desktop Agent</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs text-right min-w-0 break-words {{ $praAgentOnline ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">
                         {{ $praAgentOnline ? 'Online' : ($company->agent_last_seen ? 'Offline' : 'Never connected') }}{{ $company->agent_version ? ' · v' . $company->agent_version : '' }}
                     </span>
                 </div>
                 @if(!is_null($company->agent_offline_mode))
-                <div class="flex justify-between"><span class="text-gray-400">Offline Mode</span>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs {{ $company->agent_offline_mode ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Offline Mode</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs text-right min-w-0 break-words {{ $company->agent_offline_mode ? 'bg-emerald-900/30 text-emerald-400' : 'bg-gray-800 text-gray-400' }}">
                         @if($company->agent_offline_mode)
                             ON · Snapshot {{ $company->agent_snapshot_at ? $company->agent_snapshot_at->diffForHumans() : 'not captured' }}
                         @else
@@ -129,12 +129,12 @@
         @if($companyAdmin)
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div class="space-y-2 text-sm">
-                <div class="flex justify-between"><span class="text-gray-400">Login Email</span><span class="text-white font-medium">{{ $companyAdmin->email }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Account Name</span><span class="text-white">{{ $companyAdmin->name ?? '—' }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Login Email</span><span class="text-white font-medium text-right min-w-0 break-all">{{ $companyAdmin->email }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Account Name</span><span class="text-white text-right min-w-0 break-words">{{ $companyAdmin->name ?? '—' }}</span></div>
                 @if($companyAdmin->username)
-                <div class="flex justify-between"><span class="text-gray-400">Username</span><span class="text-white">{{ $companyAdmin->username }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Username</span><span class="text-white text-right min-w-0 break-all">{{ $companyAdmin->username }}</span></div>
                 @endif
-                <div class="flex justify-between"><span class="text-gray-400">Current Password</span><span class="text-gray-500 italic">Hidden — one-way encrypted, cannot be shown</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Current Password</span><span class="text-gray-500 italic text-right min-w-0 break-words">Hidden — one-way encrypted, cannot be shown</span></div>
                 <p class="text-xs text-gray-500 pt-1">Passwords are stored one-way encrypted for security — nobody (including admins) can view them. To help a locked-out company, set a new password on the right and share it with the owner.</p>
             </div>
             <form method="POST" action="{{ route('saas.admin.companies.resetPassword', $company->id) }}"
@@ -199,10 +199,10 @@
             </span>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-sm mb-4">
-            <div class="flex justify-between"><span class="text-gray-400">Connection Mode</span><span class="text-white">{{ ($company->fbr_connection_mode ?? 'cloud') === 'fiscal_device' ? 'Fiscal Device (Agent)' : 'Cloud' }}</span></div>
-            <div class="flex justify-between"><span class="text-gray-400">FBR POS ID</span><span class="text-white font-mono">{{ $company->fbr_pos_id ?? '—' }}</span></div>
-            <div class="flex justify-between"><span class="text-gray-400">Environment</span><span class="text-white">{{ ucfirst($company->fbr_pos_environment ?? 'sandbox') }}</span></div>
-            <div class="flex justify-between"><span class="text-gray-400">Agent Last Seen</span><span class="text-white">{{ $company->agent_last_seen ? \Carbon\Carbon::parse($company->agent_last_seen)->format('d M Y h:i A') : 'Never' }}</span></div>
+            <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Connection Mode</span><span class="text-white text-right min-w-0 break-words">{{ ($company->fbr_connection_mode ?? 'cloud') === 'fiscal_device' ? 'Fiscal Device (Agent)' : 'Cloud' }}</span></div>
+            <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">FBR POS ID</span><span class="text-white font-mono text-right min-w-0 break-all">{{ $company->fbr_pos_id ?? '—' }}</span></div>
+            <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Environment</span><span class="text-white text-right min-w-0 break-words">{{ ucfirst($company->fbr_pos_environment ?? 'sandbox') }}</span></div>
+            <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Agent Last Seen</span><span class="text-white text-right min-w-0">{{ $company->agent_last_seen ? \Carbon\Carbon::parse($company->agent_last_seen)->format('d M Y h:i A') : 'Never' }}</span></div>
         </div>
         <div class="space-y-3 text-sm">
             <div>
@@ -223,7 +223,7 @@
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">Agent API Key</label>
                     <div class="flex gap-2">
-                        <input :type="showKey ? 'text' : 'password'" readonly value="{{ $company->agent_api_key ?? '' }}" placeholder="Not generated yet" x-ref="agkey" class="w-full rounded-lg bg-gray-800 border-gray-700 text-gray-200 text-xs font-mono">
+                        <input :type="showKey ? 'text' : 'password'" readonly value="{{ $company->agent_api_key ?? '' }}" placeholder="Not generated yet" x-ref="agkey" class="w-full min-w-0 rounded-lg bg-gray-800 border-gray-700 text-gray-200 text-xs font-mono">
                         <button type="button" @click="showKey = !showKey" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs rounded-lg" x-text="showKey ? 'Hide' : 'Show'"></button>
                         <button type="button" @click="copy($refs.agkey, $el)" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg">Copy</button>
                     </div>
@@ -296,24 +296,24 @@
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-white mb-3">Usage & Revenue</h3>
             <div class="space-y-2 text-sm">
-                <div class="flex justify-between"><span class="text-gray-400">Total Users</span><span class="text-white font-medium">{{ $extraStats['total_users'] }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Total Users</span><span class="text-white font-medium text-right min-w-0">{{ $extraStats['total_users'] }}</span></div>
                 @if($company->product_type === 'di')
-                <div class="flex justify-between"><span class="text-gray-400">Total Invoices</span><span class="text-white font-medium">{{ number_format($extraStats['total_invoices']) }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Locked (FBR)</span><span class="text-emerald-400 font-medium">{{ number_format($extraStats['locked_invoices']) }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Drafts</span><span class="text-amber-400 font-medium">{{ number_format($extraStats['draft_invoices']) }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Total Revenue</span><span class="text-emerald-400 font-bold">PKR {{ number_format($extraStats['total_revenue'], 0) }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Total Invoices</span><span class="text-white font-medium text-right min-w-0">{{ number_format($extraStats['total_invoices']) }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Locked (FBR)</span><span class="text-emerald-400 font-medium text-right min-w-0">{{ number_format($extraStats['locked_invoices']) }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Drafts</span><span class="text-amber-400 font-medium text-right min-w-0">{{ number_format($extraStats['draft_invoices']) }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Total Revenue</span><span class="text-emerald-400 font-bold text-right min-w-0">PKR {{ number_format($extraStats['total_revenue'], 0) }}</span></div>
                 @else
-                <div class="flex justify-between"><span class="text-gray-400">Transactions</span><span class="text-white font-medium">{{ number_format($extraStats['total_transactions']) }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Today's Txns</span><span class="text-white font-medium">{{ number_format($extraStats['today_transactions']) }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Today's Revenue</span><span class="text-white font-medium">PKR {{ number_format($extraStats['today_revenue'] ?? 0, 0) }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">This Month</span><span class="text-white font-medium">PKR {{ number_format($extraStats['month_revenue'] ?? 0, 0) }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Total Revenue</span><span class="text-purple-400 font-bold">PKR {{ number_format($extraStats['total_revenue'], 0) }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-400">Last Sale</span><span class="text-white">{{ !empty($extraStats['last_sale_at']) ? \Carbon\Carbon::parse($extraStats['last_sale_at'])->format('d M Y, h:i A') : '—' }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Transactions</span><span class="text-white font-medium text-right min-w-0">{{ number_format($extraStats['total_transactions']) }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Today's Txns</span><span class="text-white font-medium text-right min-w-0">{{ number_format($extraStats['today_transactions']) }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Today's Revenue</span><span class="text-white font-medium text-right min-w-0">PKR {{ number_format($extraStats['today_revenue'] ?? 0, 0) }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">This Month</span><span class="text-white font-medium text-right min-w-0">PKR {{ number_format($extraStats['month_revenue'] ?? 0, 0) }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Total Revenue</span><span class="text-purple-400 font-bold text-right min-w-0">PKR {{ number_format($extraStats['total_revenue'], 0) }}</span></div>
+                <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Last Sale</span><span class="text-white text-right min-w-0">{{ !empty($extraStats['last_sale_at']) ? \Carbon\Carbon::parse($extraStats['last_sale_at'])->format('d M Y, h:i A') : '—' }}</span></div>
                 @endif
                 @if($extraStats['active_subscription'])
                 <div class="pt-2 border-t border-gray-800">
-                    <div class="flex justify-between"><span class="text-gray-400">Plan</span><span class="text-indigo-400 font-medium">{{ $extraStats['active_subscription']->pricingPlan->name ?? 'N/A' }}</span></div>
-                    <div class="flex justify-between mt-1"><span class="text-gray-400">Billing</span><span class="text-white">{{ ucfirst(str_replace('_', ' ', $extraStats['active_subscription']->billing_cycle ?? 'N/A')) }}</span></div>
+                    <div class="flex justify-between gap-2 min-w-0"><span class="text-gray-400 shrink-0">Plan</span><span class="text-indigo-400 font-medium text-right min-w-0 break-words">{{ $extraStats['active_subscription']->pricingPlan->name ?? 'N/A' }}</span></div>
+                    <div class="flex justify-between gap-2 min-w-0 mt-1"><span class="text-gray-400 shrink-0">Billing</span><span class="text-white text-right min-w-0">{{ ucfirst(str_replace('_', ' ', $extraStats['active_subscription']->billing_cycle ?? 'N/A')) }}</span></div>
                 </div>
                 @else
                 <div class="pt-2 border-t border-gray-800">

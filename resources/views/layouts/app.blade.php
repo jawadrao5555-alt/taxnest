@@ -287,6 +287,62 @@
                 <x-trial-reminder-banner />
                 <x-payment-status-banner />
 
+                @php
+                    // DI Android app banners — both wrapped in try/catch so any failure
+                    // never breaks the DI panel. Placement before <main> per top-banner-clipping rule.
+                    $diApkBannerShow = false; $diApkLatestVer = '';
+                    try {
+                        $uaDiApk = request()->userAgent() ?? '';
+                        if (preg_match('/TaxNestDIApp\/(\d+(?:\.\d+)*)/', $uaDiApk, $mDiApk)) {
+                            $diApkLatestVer = trim((string) \App\Models\SystemSetting::get('di_app_latest_version', ''));
+                            if ($diApkLatestVer !== '' && version_compare($mDiApk[1], $diApkLatestVer, '<')) {
+                                $diApkBannerShow = true;
+                            }
+                        }
+                    } catch (\Throwable $e) { /* never break the DI panel */ }
+
+                    // Nudge: shown to Android browsers that are NOT the DI shell.
+                    // Gated on di_app_latest_version being set — empty = APK not
+                    // yet released, nothing shown to anyone.
+                    $diApkNudgeShow = false;
+                    try {
+                        $uaDiNudge = request()->userAgent() ?? '';
+                        $diNudgeGateVer = trim((string) \App\Models\SystemSetting::get('di_app_latest_version', ''));
+                        $diApkNudgeShow = $diNudgeGateVer !== ''
+                            && stripos($uaDiNudge, 'Android') !== false
+                            && stripos($uaDiNudge, 'TaxNestDIApp') === false;
+                    } catch (\Throwable $e) { /* never break the DI panel */ }
+                @endphp
+
+                {{-- Update banner: DI shell users on an older APK version --}}
+                @if($diApkBannerShow)
+                <div class="bg-emerald-700 text-white py-2.5 px-4">
+                    <div class="max-w-7xl mx-auto flex items-center justify-center gap-2 text-sm font-semibold flex-wrap">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        <span>TaxNest DI app ka naya version ({{ $diApkLatestVer }}) available hai —</span>
+                        <a href="{{ url('downloads/taxnest-di.apk') }}" class="underline font-bold hover:no-underline">abhi update karein</a>
+                    </div>
+                </div>
+                @endif
+
+                {{-- Download nudge: Android browsers not already in the DI shell.
+                     Dismissed once via localStorage (no POST, safe for any role/state). --}}
+                @if($diApkNudgeShow)
+                <div id="di-apk-nudge" class="bg-emerald-50 dark:bg-emerald-900/30 border-b border-emerald-200 dark:border-emerald-800 py-2.5 px-4">
+                    <div class="max-w-7xl mx-auto flex items-center justify-between gap-3 flex-wrap">
+                        <div class="flex items-center gap-2 text-sm text-emerald-800 dark:text-emerald-200">
+                            <svg class="w-4 h-4 flex-shrink-0 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                            <span>TaxNest DI Android app available hai — better experience ke liye install karein.</span>
+                        </div>
+                        <div class="flex items-center gap-3 flex-shrink-0">
+                            <a href="{{ url('downloads/taxnest-di.apk') }}" class="inline-flex items-center px-3 py-1 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition">Download APK</a>
+                            <button onclick="localStorage.setItem('di-apk-nudge-dismissed','1');document.getElementById('di-apk-nudge').remove();" class="text-xs text-emerald-600 dark:text-emerald-400 hover:underline">Dismiss</button>
+                        </div>
+                    </div>
+                </div>
+                <script>if(localStorage.getItem('di-apk-nudge-dismissed')==='1'){var n=document.getElementById('di-apk-nudge');if(n)n.remove();}</script>
+                @endif
+
                 <main class="flex-1 overflow-y-auto p-4 sm:p-6 main-scroll bg-gray-50 dark:bg-gray-950 page-fade">
                     @if(session('success'))
                         <div class="max-w-7xl mx-auto mb-4">

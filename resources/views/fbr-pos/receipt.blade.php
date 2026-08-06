@@ -360,18 +360,16 @@
         $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' . urlencode($qrData);
     @endphp
 
+    {{-- Owner (6 Aug 2026): QR box saaf — sirf QR + FBR invoice number + Tax Asaan
+         verify line. "Integrated/Verified" headings, POS invoice aur POS Reg #
+         yahan se hataye (POS Reg # footer mein pehle se maujood hai). --}}
     @if($transaction->fbr_status === 'submitted' && $transaction->fbr_invoice_number)
     <div class="fbr-badge">
-        <div class="fbr-title">✓ {{ __('pos.rcpt_fbr_integrated') }}</div>
-        <div style="font-size:11px; font-weight:bold; margin:3px 0;">{{ __('pos.rcpt_fbr_verified_invoice') }}</div>
         <div style="margin: 6px 0;">
             <img src="{{ $qrUrl }}" alt="FBR QR Code" style="width:100px; height:100px; margin:0 auto; display:block;">
         </div>
-        <div>POS: {{ $transaction->invoice_number }}</div>
         <div class="fbr-number">FBR: {{ $transaction->fbr_invoice_number }}</div>
-        @if($company->fbr_pos_id)
-        <div style="font-size:9px; margin-top:3px;">{{ __('pos.rcpt_pos_reg_hash') }}: {{ $company->fbr_pos_id }}</div>
-        @endif
+        <div style="font-size:9px; margin-top:3px;">{{ __('pos.receipt_scan_verify_fbr') }}</div>
     </div>
     @elseif(!$fbrRcptTopBadge)
     <div class="fbr-badge" style="border-style: dashed;">

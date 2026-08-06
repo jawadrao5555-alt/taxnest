@@ -242,14 +242,17 @@
             <div class="val">PKR {{ number_format($transaction->total_amount, 2) }}</div>
         </div>
 
+        {{-- Owner (6 Aug 2026): QR box saaf — sirf FBR invoice number + Tax Asaan
+             verify line (QR PDF mein pehle se alag block mein hai jahan lagta hai).
+             POS invoice / POS Reg # yahan se hataye (Reg # footer mein maujood). --}}
         @if($transaction->fbr_status === 'submitted' && $transaction->fbr_invoice_number)
+        @php $fbrQr = \App\Support\QrImage::dataUri($transaction->fbr_invoice_number); @endphp
         <div class="fbr-box">
-            <div class="title">✓ {{ __('pos.rcpt_fbr_verified_invoice') }}</div>
-            <div>POS: {{ $transaction->invoice_number }}</div>
-            <div class="num">FBR: {{ $transaction->fbr_invoice_number }}</div>
-            @if($company->fbr_pos_id)
-            <div style="font-size:9px; margin-top:3px;">{{ __('pos.rcpt_pos_reg_hash') }}: {{ $company->fbr_pos_id }}</div>
+            @if($fbrQr)
+            <img src="{{ $fbrQr }}" alt="FBR QR" style="width: 110px; height: 110px; margin: 4px auto; display: block;">
             @endif
+            <div class="num">FBR: {{ $transaction->fbr_invoice_number }}</div>
+            <div style="font-size:9px; margin-top:3px;">{{ __('pos.receipt_scan_verify_fbr') }}</div>
         </div>
         @elseif($transaction->fbr_status === null || $transaction->fbr_status === 'local')
         @php

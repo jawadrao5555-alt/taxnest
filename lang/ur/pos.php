@@ -3773,6 +3773,7 @@ return [
     // Tutorial video library (owner request, 2 Aug 2026)
     'nav_tutorials' => 'ویڈیو ٹیوٹوریل',
     'tutorials_title' => 'NestPOS چلانا سیکھیں',
+    'tutorials_title_fbr' => 'FBR POS چلانا سیکھیں',
     'tutorials_sub' => 'چھوٹی چھوٹی اردو ویڈیوز — ہر فیچر آرام سے دیکھ کر سیکھیں۔',
     'tutorials_more_soon' => 'مزید ویڈیوز جلد آ رہی ہیں۔',
     'tutorials_watch_public' => 'یہ ویڈیوز ہماری ویب سائٹ پر بھی ہیں — اپنی ٹیم کو لنک بھیجیں۔',

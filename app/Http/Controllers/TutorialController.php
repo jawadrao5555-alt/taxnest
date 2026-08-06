@@ -54,7 +54,9 @@ class TutorialController extends Controller
         TutorialVideo::applyOwnerControls();
 
         $user = auth('pos')->user();
-        $company = $user?->company ?: Company::find(app()->bound('currentCompanyId') ? app('currentCompanyId') : null);
+        // PROD-safe: never lazy-access $user->company (Model::preventLazyLoading
+        // is ON live) — resolve by id like FbrPosAuth/PosAuth do.
+        $company = Company::find($user?->company_id ?? (app()->bound('currentCompanyId') ? app('currentCompanyId') : null));
 
         // NestPOS panel sirf apne product ki videos dikhaye (owner, 6 Aug 2026:
         // "NestPOS ki alag, FBR POS ki alag") — NULL product = legacy nestpos rows.
@@ -79,7 +81,9 @@ class TutorialController extends Controller
         TutorialVideo::applyOwnerControls();
 
         $user = auth('fbrpos')->user();
-        $company = $user?->company ?: Company::find(app()->bound('currentCompanyId') ? app('currentCompanyId') : null);
+        // PROD-safe: never lazy-access $user->company (Model::preventLazyLoading
+        // is ON live) — resolve by id like FbrPosAuth/PosAuth do.
+        $company = Company::find($user?->company_id ?? (app()->bound('currentCompanyId') ? app('currentCompanyId') : null));
 
         $videos = TutorialVideo::published()
             ->where('product', 'fbrpos')

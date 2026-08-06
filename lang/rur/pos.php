@@ -3772,6 +3772,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     // Tutorial video library (owner request, 2 Aug 2026)
     'nav_tutorials' => 'Video Tutorials',
     'tutorials_title' => 'NestPOS chalana seekhein',
+    'tutorials_title_fbr' => 'FBR POS chalana seekhein',
     'tutorials_sub' => 'Chhoti chhoti Urdu videos — har feature aaram se dekh kar seekhein.',
     'tutorials_more_soon' => 'Aur videos jald aa rahi hain.',
     'tutorials_watch_public' => 'Yeh videos hamari website par bhi hain — apni team ko link bhejein.',

@@ -2,7 +2,7 @@
 <div class="p-4 sm:p-6 max-w-7xl mx-auto">
     <div class="mb-6 flex items-start justify-between gap-3">
         <div>
-            <h1 class="text-xl font-bold text-gray-900 dark:text-white">{{ __('pos.tutorials_title') }}</h1>
+            <h1 class="text-xl font-bold text-gray-900 dark:text-white">{{ __('pos.tutorials_title_fbr') }}</h1>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.tutorials_sub') }}</p>
         </div>
         <a href="{{ route('fbrpos.dashboard') }}" class="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap">&larr; Dashboard</a>

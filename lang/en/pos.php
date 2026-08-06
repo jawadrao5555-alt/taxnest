@@ -3772,6 +3772,7 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     // Tutorial video library (owner request, 2 Aug 2026)
     'nav_tutorials' => 'Video Tutorials',
     'tutorials_title' => 'Learn NestPOS',
+    'tutorials_title_fbr' => 'Learn FBR POS',
     'tutorials_sub' => 'Short Urdu videos — watch and learn every feature at your ease.',
     'tutorials_more_soon' => 'More videos are on the way.',
     'tutorials_watch_public' => 'These videos are also on our website — share the link with your team.',

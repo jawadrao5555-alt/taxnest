@@ -363,6 +363,7 @@ return [
     'badge_pra_count' => 'PRA: :count',
     'badge_pra_off' => 'PRA OFF',
     'badge_pra_on' => 'PRA ON',
+    'badge_print' => 'Print',
     'badge_receipt' => 'Receipt',
     'badge_silent_on' => 'Silent ON',
     'badge_tax' => 'Tax',
@@ -2692,6 +2693,9 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'receipt_price' => 'Price',
     'receipt_print' => 'Receipt Print Karein',
     'receipt_print_style' => 'Receipt print style',
+    'receipt_style_saved' => 'Receipt style save ho gaya.',
+    'fbr_receipt_style_sub' => 'Tamam FBR receipts par print weight aur logo position control karein.',
+    'fbr_receipt_style_card_desc' => 'Bold print, logo position',
     'receipt_printer_size' => 'Receipt printer ka size',
     'receipt_provisional_bill' => 'PROVISIONAL BILL',
     'receipt_provisional_note' => 'Yeh provisional bill sirf aap ke record ke liye hai',
@@ -3888,4 +3892,10 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'ti_waiter_style'   => 'Screen ka style — aap ki apni pasand (dukan ki setting nahi badalti)',
     'style_saaf_word'   => 'Saaf',
     'style_full_word'   => 'Full',
+
+    // DB-down friendly page (Aug 2026) — rendered when MySQL is unreachable
+    'db_down_title' => 'Server thori der ke liye masroof hai',
+    'db_down_body' => 'Maazrat — system waqti tor par jawab nahi de raha. Aap ka koi data zaya nahi hua. Barah-e-karam thori der mein dobara koshish karein.',
+    'db_down_auto_retry' => 'Yeh page 12 second mein khud dobara koshish karega…',
+    'db_down_retry_now' => 'Abhi dobara koshish karein',
 ];

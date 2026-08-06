@@ -2071,11 +2071,18 @@ class PosController extends Controller
                 ->with('error', __('pos.cannot_edit_submitted_pra_num', ['number' => $transaction->pra_invoice_number]));
         }
 
-        $products = PosProduct::where('company_id', $companyId)->where('is_active', true)->where('show_on_sale', true)->get();
-        $services = PosService::where('company_id', $companyId)->where('is_active', true)->get();
-        $posCustomers = PosCustomer::where('company_id', $companyId)->where('is_active', true)->orderBy('name')->get();
+        // Edit screen weight fix (ZFC 11k customers, Aug 2026): the old code
+        // hydrated EVERY customer here even though the view's customer fields
+        // are plain name/phone text inputs — the list was never rendered. Do
+        // NOT re-add a full customer bake; if a picker is ever needed, use the
+        // sale screen's 500-cap + server-search pattern. Products/services are
+        // baked into @json for the item dropdown — only the 3 columns it reads.
+        $products = PosProduct::where('company_id', $companyId)->where('is_active', true)->where('show_on_sale', true)
+            ->orderBy('name')->get(['id', 'name', 'price']);
+        $services = PosService::where('company_id', $companyId)->where('is_active', true)
+            ->orderBy('name')->get(['id', 'name', 'price']);
         $taxRules = PosTaxRule::effectiveRules($company);
-        $terminals = PosTerminal::where('company_id', $companyId)->where('is_active', true)->get();
+        $terminals = PosTerminal::where('company_id', $companyId)->where('is_active', true)->get(['id', 'terminal_name', 'terminal_code']);
 
         $transactionItems = $transaction->items->map(fn($item) => [
             'type' => $item->item_type ?? 'product',
@@ -2085,7 +2092,7 @@ class PosController extends Controller
             'unit_price' => (float) $item->unit_price,
         ])->values();
 
-        return view('pos.edit-transaction', compact('company', 'transaction', 'transactionItems', 'products', 'services', 'taxRules', 'terminals', 'posCustomers'));
+        return view('pos.edit-transaction', compact('company', 'transaction', 'transactionItems', 'products', 'services', 'taxRules', 'terminals'));
     }
 
     public function updateTransaction(Request $request, $id)

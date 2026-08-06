@@ -1,0 +1,140 @@
+// FBR POS — Naya (Retail Fast Billing) — proposed: scan-search, one-tap CASH/CARD, saaf cart, Akhri Bills
+import { Trash2, Plus, ScanBarcode, Banknote, CreditCard, Printer, RotateCcw, ChevronDown } from "lucide-react";
+
+const tiles = [
+  { n: "COMFORT 0021", p: 1200 },
+  { n: "JOGGER X-100", p: 2500 },
+  { n: "LADIES PUMP 07", p: 1800 },
+  { n: "CHAPPAL SOFT", p: 850 },
+  { n: "SCHOOL SHOE B2", p: 1450 },
+  { n: "SANDAL GOLD", p: 2200 },
+  { n: "LOAFER BROWN", p: 3200 },
+  { n: "SPORTS AIR 9", p: 4500 },
+];
+
+function CartRow({ name, qty, price, chip }: { name: string; qty: number; price: number; chip?: string }) {
+  return (
+    <div className="border border-gray-200 rounded-lg px-2.5 py-2 mb-1.5 bg-white">
+      <div className="flex items-center gap-2">
+        <span className="text-[13px] font-semibold text-gray-800 truncate flex-1">{name}</span>
+        <div className="flex items-center gap-1">
+          <button className="w-6 h-6 rounded bg-gray-100 text-gray-700 text-sm font-bold">−</button>
+          <input className="w-10 h-6 border border-blue-400 ring-1 ring-blue-100 rounded text-center text-[12px] font-semibold" value={qty} readOnly />
+          <button className="w-6 h-6 rounded bg-gray-100 text-gray-700 text-sm font-bold">+</button>
+        </div>
+        <span className="w-[74px] text-right text-[13px] font-bold text-gray-900">Rs {price.toLocaleString()}</span>
+        <button className="text-red-400"><Trash2 className="w-4 h-4" /></button>
+      </div>
+      {chip && (
+        <div className="mt-1">
+          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-200">{chip}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function Naya() {
+  return (
+    <div className="min-h-screen bg-gray-100 font-sans text-gray-900">
+      {/* top nav — sale tools ab nav mein */}
+      <div className="h-11 bg-blue-900 flex items-center px-3 gap-2">
+        <span className="text-white font-bold text-sm">NestPOS · FBR</span>
+        <span className="text-blue-200 text-[11px]">X-WAY SHOES</span>
+        <div className="ml-4 flex items-center gap-1.5">
+          {["+ New Sale", "Local F10", "Failed F11"].map((b) => (
+            <button key={b} className="h-7 px-2 rounded bg-blue-800 text-blue-100 text-[10px] font-semibold">{b}</button>
+          ))}
+          <button className="h-7 px-2 rounded bg-blue-800 text-blue-100 text-[10px] font-semibold flex items-center gap-1"><RotateCcw className="w-3 h-3" />Reprint Alt+R</button>
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-[10px] bg-emerald-500/20 text-emerald-200 px-2 py-0.5 rounded-full">FBR Sync ✓</span>
+          <div className="w-6 h-6 rounded-full bg-blue-700 text-white text-[10px] flex items-center justify-center">MT</div>
+        </div>
+      </div>
+
+      {/* NAYA: 2-row bar — Row 1: WIDE customer */}
+      <div className="bg-white px-2.5 pt-1.5 flex items-center gap-2">
+        <input className="flex-1 max-w-[520px] h-9 border border-gray-300 rounded-lg px-3 text-[12px]" placeholder="Customer phone / naam (optional — Enter = walk-in)" />
+        <div className="ml-auto flex gap-1.5">
+          {["Fit", "Keys F1"].map((b) => (
+            <button key={b} className="h-8 px-2.5 rounded-lg border border-gray-200 bg-gray-50 text-[10px] font-semibold text-gray-500">{b}</button>
+          ))}
+        </div>
+      </div>
+      {/* Row 2: category + FULL-WIDTH scan search */}
+      <div className="bg-white border-b border-gray-200 px-2.5 py-1.5 flex items-center gap-2 shadow-sm">
+        <button className="h-9 px-3 rounded-lg border border-gray-300 bg-white text-[11px] font-semibold text-gray-600 flex items-center gap-1">All <ChevronDown className="w-3.5 h-3.5" /></button>
+        <div className="relative flex-1">
+          <ScanBarcode className="w-4 h-4 absolute left-3 top-2.5 text-blue-600" />
+          <input className="w-full h-9 border-2 border-blue-400 ring-2 ring-blue-100 rounded-lg pl-9 pr-3 text-[12px]" placeholder="Barcode / Article # SCAN karein — ya naam ka pehla harf likhein" />
+        </div>
+        <button className="h-9 px-3 rounded-lg bg-amber-500 text-white text-[11px] font-bold">Hold F5</button>
+      </div>
+
+      <div className="flex" style={{ height: "calc(100vh - 122px)" }}>
+        {/* grid + Akhri Bills */}
+        <div className="flex-1 p-3 flex flex-col overflow-hidden">
+          <div className="grid grid-cols-4 gap-2">
+            {tiles.map((t) => (
+              <div key={t.n} className="bg-white rounded-lg border border-gray-200 p-2.5 relative">
+                <div className="text-[12px] font-semibold leading-tight h-8">{t.n}</div>
+                <div className="text-[13px] font-bold text-blue-800 mt-1">Rs {t.p.toLocaleString()}</div>
+                <button className="absolute bottom-2 right-2 w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center"><Plus className="w-4 h-4" /></button>
+              </div>
+            ))}
+          </div>
+          {/* Akhri Bills strip */}
+          <div className="mt-auto pt-2">
+            <div className="text-[10px] font-bold text-gray-400 mb-1">AKHRI BILLS — ek click = dobara print</div>
+            <div className="flex gap-1.5">
+              {[
+                { n: "00011", a: "1,417" },
+                { n: "00010", a: "1,417" },
+                { n: "00009", a: "2,360" },
+                { n: "00008", a: "4,890" },
+              ].map((b) => (
+                <button key={b.n} className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white text-[10px] font-semibold text-gray-600 flex items-center gap-1.5">
+                  <Printer className="w-3 h-3 text-blue-600" />#{b.n} · Rs {b.a}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* cart — saaf rows + bada total + one-tap */}
+        <div className="w-[400px] bg-gray-50 border-l border-gray-200 p-2.5 flex flex-col">
+          <div className="text-[12px] font-bold text-gray-700 mb-2">Current Order <span className="font-normal text-gray-400">· 3 items</span></div>
+          <div className="flex-1 overflow-hidden">
+            <CartRow name="COMFORT 0021" qty={1} price={1200} />
+            <CartRow name="JOGGER X-100" qty={2} price={5000} chip="-5% disc" />
+            <CartRow name="LADIES PUMP 07" qty={1} price={1800} />
+          </div>
+          {/* bada total band */}
+          <div className="rounded-xl bg-blue-900 text-white p-3 mt-2">
+            <div className="flex justify-between text-[11px] text-blue-200"><span>Subtotal</span><span>Rs 8,000</span></div>
+            <div className="flex justify-between text-[11px] text-blue-200"><span>Tax 18% + FBR fee</span><span>Rs 1,441</span></div>
+            <div className="flex justify-between items-center mt-1">
+              <span className="text-[13px] font-bold">TOTAL</span>
+              <span className="text-[22px] font-extrabold">Rs 9,441</span>
+            </div>
+          </div>
+          {/* one-tap finalize */}
+          <div className="grid grid-cols-2 gap-1.5 mt-2">
+            <button className="h-12 rounded-xl bg-emerald-600 text-white font-bold text-[13px] flex items-center justify-center gap-1.5">
+              <Banknote className="w-4 h-4" />CASH <span className="text-[9px] font-normal opacity-75">Alt+1</span>
+            </button>
+            <button className="h-12 rounded-xl bg-blue-600 text-white font-bold text-[13px] flex items-center justify-center gap-1.5">
+              <CreditCard className="w-4 h-4" />CARD <span className="text-[9px] font-normal opacity-75">Alt+2</span>
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5 mt-1.5">
+            <button className="h-9 rounded-lg border border-gray-300 bg-white text-[11px] font-semibold text-gray-600">Save Provisional</button>
+            <button className="h-9 rounded-lg border border-blue-300 bg-blue-50 text-blue-700 text-[11px] font-bold">PAY F8 (method + note)</button>
+          </div>
+          <p className="text-[10px] text-emerald-600 mt-1.5 text-center font-semibold">Ek tap = bill final + print · Receipt popup 10 sec mein khud band</p>
+        </div>
+      </div>
+    </div>
+  );
+}

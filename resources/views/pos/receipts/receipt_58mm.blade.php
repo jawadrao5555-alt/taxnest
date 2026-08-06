@@ -270,14 +270,37 @@
 
     <div class="separator"></div>
 
+    @php
+        // Bill Number Style (07 Aug 2026): token = BIG display number; serial
+        // stays underneath as reference. Mirrors receipt_80mm exactly.
+        $rcptBillToken = null;
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'bill_token') && $transaction->bill_token) {
+                $rcptIsLocalStream = $transaction->invoice_mode === 'local'
+                    || ($transaction->pra_status === null && $transaction->pra_invoice_number === null);
+                $rcptNumStyle = $rcptIsLocalStream ? ($company->local_number_style ?? 'serial') : ($company->pra_number_style ?? 'serial');
+                if ($rcptNumStyle === 'token') { $rcptBillToken = (int) $transaction->bill_token; }
+            }
+        } catch (\Throwable $e) { $rcptBillToken = null; }
+    @endphp
     @if($rcptTopBadge)
     <div class="invoice-numbers" style="text-align:center; padding:3px 4px;">
         <strong style="font-size:10px; color:#000;">{{ $rcptTopProvisional ? __('pos.receipt_provisional_bill') : __('pos.receipt_sale_receipt') }}</strong><br>
+        @if($rcptBillToken !== null)
+        <span style="font-size:18px; font-weight:bold; color:#000; line-height:1.15;">{{ $rcptBillToken }}</span><br>
+        <span style="font-size:8px; color:#000;">{{ __('pos.bill_ref_label') }}: {{ $transaction->invoice_number }}</span>
+        @else
         <span style="font-size:11px; font-weight:bold; color:#000;">{{ $transaction->invoice_number }}</span>
+        @endif
         @if($rcptTopProvisional)<br><span style="font-size:8px; color:#000;">{{ __('pos.receipt_provisional_note') }}</span>@endif
     </div>
     @else
     <div class="invoice-numbers">
+        @if($rcptBillToken !== null)
+        <div style="text-align:center; padding:2px 0 3px;">
+            <span style="font-size:18px; font-weight:bold; color:#000;">{{ $rcptBillToken }}</span>
+        </div>
+        @endif
         <table class="inv-table">
             <tr>
                 <td class="inv-label">{{ __('pos.receipt_pos_invoice') }}:</td>

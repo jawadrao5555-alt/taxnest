@@ -43,6 +43,34 @@ class User extends Authenticatable
         return (bool) ($company->pra_reporting_enabled ?? false);
     }
 
+    /**
+     * Billing Scope (owner request 07 Aug 2026): stream lock per staff account.
+     *   'both'  = dono streams (default; NULL/unknown values normalize here)
+     *   'local' = sirf offline/local billing — PRA pipeline tak rasai nahi
+     *   'pra'   = sirf PRA-reporting billing — local/provisional se door
+     * Sirf pos_cashier + pos_manager par lagta hai; owner/admin hamesha 'both'.
+     * Missing-column safe (PROD drift): not-yet-migrated DB → 'both'.
+     */
+    public function posBillingScope(): string
+    {
+        static $columnReady = null;
+        if ($columnReady === null) {
+            try {
+                $columnReady = \Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_billing_scope');
+            } catch (\Throwable $e) {
+                $columnReady = false;
+            }
+        }
+        if (!$columnReady) {
+            return 'both';
+        }
+        if (!in_array($this->pos_role, ['pos_cashier', 'pos_manager'], true)) {
+            return 'both';
+        }
+        $scope = $this->getAttributeValue('pos_billing_scope');
+        return in_array($scope, ['local', 'pra'], true) ? $scope : 'both';
+    }
+
     public function isSuperAdmin()
     {
         return $this->role === 'super_admin';

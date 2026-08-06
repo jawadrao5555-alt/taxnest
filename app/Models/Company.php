@@ -61,6 +61,12 @@ class Company extends Model
         'order_match_style',
         'pos_token_counter',
         'pos_token_date',
+        'pra_number_style',
+        'local_number_style',
+        'bill_token_counter_pra',
+        'bill_token_date_pra',
+        'bill_token_counter_local',
+        'bill_token_date_local',
         'pos_cashier_dayclose',
         'pos_cash_received_enabled',
         'pra_reporting_enabled',
@@ -396,6 +402,9 @@ class Company extends Model
             'pos_dayclose_final_local_action', 'pos_dayclose_provisional_action',
             'pos_customer_spend_persist', 'cashier_discount_limit',
             'manager_discount_limit', 'manager_override_pin',
+            // Bill Number Style (07 Aug 2026): receipt number display per stream —
+            // a settings change must refresh cached sale screens.
+            'pra_number_style', 'local_number_style',
         ];
 
         $vals = [];

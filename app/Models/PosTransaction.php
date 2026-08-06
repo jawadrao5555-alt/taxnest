@@ -17,6 +17,7 @@ class PosTransaction extends Model
         'pra_invoice_number', 'pra_response_code', 'pra_status', 'submission_hash', 'pra_qr_code', 'created_by',
         'business_date',
         'offline_uuid',
+        'bill_token',
         'share_token', 'share_token_created_at',
         'receipt_printed_at', 'reprint_count',
         'notes',

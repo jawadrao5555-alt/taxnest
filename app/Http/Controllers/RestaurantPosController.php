@@ -829,6 +829,29 @@ class RestaurantPosController extends Controller
             $initialPraStatus = null;
         }
 
+        // ── Billing Scope (owner request 07 Aug 2026) — mirrors storeInvoice ──
+        // PRA stream = pra_status 'pending' at birth; local stream = provisionals
+        // AND reporting-OFF finals. Guards direct POSTs; UI hides the buttons.
+        $billingScope = auth('pos')->user()?->posBillingScope() ?? 'both';
+        if ($billingScope === 'pra' && $initialPraStatus !== 'pending') {
+            return response()->json(['success' => false, 'message' => __('pos.billing_scope_pra_only')], 403);
+        }
+        if ($billingScope === 'local' && $initialPraStatus === 'pending') {
+            return response()->json(['success' => false, 'message' => __('pos.billing_scope_local_only')], 403);
+        }
+
+        // ── Bill Number Style (owner request 07 Aug 2026) — mirrors storeInvoice ──
+        $billTokenFields = [];
+        $billStream = $initialPraStatus === 'pending' ? 'pra' : 'local';
+        $billStyleCol = $billStream === 'pra' ? 'pra_number_style' : 'local_number_style';
+        if (($company->{$billStyleCol} ?? 'serial') === 'token'
+            && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'bill_token')) {
+            $payBillToken = \App\Services\OrderTokenService::nextBillToken($companyId, $billStream);
+            if ($payBillToken !== null) {
+                $billTokenFields = ['bill_token' => $payBillToken];
+            }
+        }
+
         DB::beginTransaction();
         try {
             // ── Single-winner guard (Table Board, Jul 2026) ──────────────────
@@ -913,7 +936,7 @@ class RestaurantPosController extends Controller
                 'submission_hash' => $submissionHash,
                 'created_by' => (int) $user->id,
                 'notes' => $order->kitchen_notes,
-            ];
+            ] + $billTokenFields;
             if ($taxInclusiveColumnExists) {
                 $transactionData['tax_inclusive'] = $taxInclusive;
             }

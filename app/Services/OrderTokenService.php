@@ -53,6 +53,53 @@ class OrderTokenService
         });
     }
 
+    /**
+     * Daily BILL token for the Bill Number Style feature ('token' display style).
+     * Same company-central lockForUpdate + business-day 6AM reset as order
+     * tokens, but with SEPARATE counters per stream so offline and PRA series
+     * each stay dense (1,2,3…) and never reveal the other stream's volume.
+     *
+     * @param string $stream 'pra' | 'local'
+     */
+    public static function nextBillToken(int $companyId, string $stream): ?int
+    {
+        $stream = $stream === 'pra' ? 'pra' : 'local';
+        $counterCol = "bill_token_counter_{$stream}";
+        $dateCol = "bill_token_date_{$stream}";
+
+        if (!Schema::hasColumn('companies', $counterCol)) {
+            return null; // PROD drift guard — feature silently off until migrated.
+        }
+
+        return DB::transaction(function () use ($companyId, $counterCol, $dateCol) {
+            $company = Company::where('id', $companyId)->lockForUpdate()->first();
+            if (!$company) {
+                return null;
+            }
+
+            $businessDate = now()->hour < 6
+                ? now()->subDay()->toDateString()
+                : now()->toDateString();
+
+            $storedDateRaw = $company->{$dateCol};
+            $storedDate = $storedDateRaw
+                ? (is_string($storedDateRaw) ? substr($storedDateRaw, 0, 10) : $storedDateRaw->toDateString())
+                : null;
+
+            $counter = ($storedDate === $businessDate)
+                ? (int) ($company->{$counterCol} ?? 0)
+                : 0;
+
+            $counter++;
+
+            $company->{$counterCol} = $counter;
+            $company->{$dateCol} = $businessDate;
+            $company->save();
+
+            return $counter;
+        });
+    }
+
     /** Short display code for the 'code' style — last segment of ORD-yymmdd-XXXXX. */
     public static function shortCode(?string $orderNumber): ?string
     {

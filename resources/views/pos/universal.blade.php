@@ -53,6 +53,10 @@
         && !empty($__pp['printers_reported_at'])
         && \Carbon\Carbon::parse($__pp['printers_reported_at'])->gt(now()->subDays(7));
     $__ppPick = $__ppShow ? \App\Http\Controllers\PosController::smartPrinterPick($__pp['available_printers']) : null;
+    // Billing Scope (07 Aug 2026): stream lock for this account — 'both' (default),
+    // 'local' (offline billing only) or 'pra' (PRA billing only). Drives which
+    // sale-screen entry points render; server guards re-enforce everything.
+    $uBillScope = $__ppUser?->posBillingScope() ?? 'both';
 @endphp
 @if($__ppShow)
 <div id="tn-silent-prompt" class="fixed bottom-4 left-4 z-40 max-w-sm rounded-xl bg-purple-800 text-white px-4 py-3 shadow-sm">
@@ -450,12 +454,15 @@ window.addEventListener('popstate', function() {
                 <span class="hidden lg:inline">{{ __('pos.new_sale') }}</span>
             </button>
 
-            {{-- Local (provisional) bills — F10 --}}
+            {{-- Local (provisional) bills — F10. Hidden for 'pra'-scoped staff:
+                 their provisional list is server-emptied anyway. --}}
+            @if($uBillScope !== 'pra')
             <button @click="openLocalBills()" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition flex-shrink-0" title="Provisional bills (local — not submitted to PRA). Press F10.">
                 <span class="tn-key-chip text-[9px] bg-purple-400/30 px-1 rounded">F10</span>
                 <span class="hidden lg:inline">Local</span>
                 <span x-show="localBills.length > 0" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-purple-600 text-white text-[9px] rounded-full flex items-center justify-center font-bold" x-text="localBills.length"></span>
             </button>
+            @endif
 
             {{-- Pending Deliveries (Task 114) — today's delivery provisionals, one-click final.
                  Button only appears when there IS something pending (light footprint). --}}
@@ -520,7 +527,9 @@ window.addEventListener('popstate', function() {
                      class="fixed bg-white dark:bg-gray-900 rounded-xl shadow-2xl shadow-black/20 border border-gray-200/80 dark:border-gray-700/80 p-3 z-[100] w-64 space-y-3">
 
                     @if(($company->pos_integration_mode ?? 'pra') !== 'standalone')
-                    @if(auth('pos')->user()?->isPosCashier())
+                    {{-- Billing Scope: stream-locked staff (incl. managers) get the
+                         read-only badge — their reporting flag is welded to the scope. --}}
+                    @if(auth('pos')->user()?->isPosCashier() || $uBillScope !== 'both')
                     @php $praAssignedOnNav = (bool) (auth('pos')->user()?->praReportingEnabled($company)); @endphp
                     <div class="flex items-center justify-between gap-2" title="{{ __('pos.ti_pra_admin_set') }}">
                         <span class="text-[10px] uppercase tracking-wider font-extrabold text-purple-700 dark:text-purple-300">{{ __('pos.pra_reporting') }}</span>
@@ -620,10 +629,11 @@ window.addEventListener('popstate', function() {
              government integration): flipping it ON would queue every sale for PRA
              submission that can only fail. togglePra also rejects server-side. --}}
         @if(($company->pos_integration_mode ?? 'pra') !== 'standalone')
-        @if(auth('pos')->user()?->isPosCashier())
+        @if(auth('pos')->user()?->isPosCashier() || $uBillScope !== 'both')
         {{-- Owner rule (20 Jul 2026): cashiers do NOT get the PRA toggle — the admin
              ASSIGNS each cashier Online/Offline from /pos/team. Read-only badge only;
-             togglePra also rejects cashier POSTs server-side. --}}
+             togglePra also rejects cashier POSTs server-side. Billing Scope (07 Aug
+             2026): scope-locked managers get the same read-only badge. --}}
         @php $praAssignedOn = (bool) (auth('pos')->user()?->praReportingEnabled($company)); @endphp
         <div class="flex items-center gap-2" title="{{ __('pos.ti_pra_admin_set') }}">
             <span class="text-[10px] uppercase tracking-wider font-extrabold text-purple-700 dark:text-purple-300">{{ __('pos.pra_reporting') }}</span>
@@ -965,12 +975,14 @@ window.addEventListener('popstate', function() {
                   x-text="failedBills.length + offlineQueueCount"></span>
         </button>
         {{-- Click → modal with Edit / Delete / Make Final actions inline. F10 shortcut. --}}
+        @if($uBillScope !== 'pra')
         <button @click="openLocalBills()" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition" title="Provisional bills (local — not submitted to PRA). Press F10.">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
             <span class="tn-key-chip text-[10px] bg-purple-400/30 px-1 rounded">F10</span>
             <span class="hidden sm:inline">Local</span>
             <span x-show="localBills.length > 0" class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-purple-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="localBills.length"></span>
         </button>
+        @endif
 
         {{-- Pending Deliveries (Task 114) — mobile copy of the nav badge --}}
         <button x-show="pendingDeliveryBills().length > 0" x-cloak @click="openPendingDeliveries()" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition" title="{{ __('pos.pending_deliveries_hint') }}">
@@ -1569,13 +1581,15 @@ window.addEventListener('popstate', function() {
                     </button>
                     @endif
                     <div class="grid grid-cols-5 gap-2">
+                        @if($uBillScope !== 'pra')
                         <button @click="saveProvisionalDirect()" :disabled="cart.length === 0 || submitting || (!editingBillId && !canProvisional())" :title="(!editingBillId && !canProvisional()) ? window.TXT.ti_provisional_delivery_only : ''" class="col-span-2 min-w-0 py-3 rounded-xl text-xs font-bold text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-30 shadow-sm transition flex items-center justify-center gap-1">
                             <svg x-show="!submitting" class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
                             <svg x-show="submitting" class="w-3.5 h-3.5 flex-shrink-0 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                             <span class="truncate" x-text="editingBillId ? (window.TXT.update_bill_prefix + editingBillNumber) : window.TXT.provisional_word"></span>
                             <kbd class="text-[9px] bg-amber-700/40 px-1.5 py-0.5 rounded font-mono flex-shrink-0">F9</kbd>
                         </button>
-                        <button @click="showPayModal = true" :disabled="cart.length === 0 || submitting" class="pay-btn-premium btn-ripple col-span-3 min-w-0 py-3 rounded-xl text-sm font-extrabold text-white disabled:opacity-30">
+                        @endif
+                        <button @click="showPayModal = true" :disabled="cart.length === 0 || submitting" class="pay-btn-premium btn-ripple {{ $uBillScope !== 'pra' ? 'col-span-3' : 'col-span-5' }} min-w-0 py-3 rounded-xl text-sm font-extrabold text-white disabled:opacity-30">
                             <span class="flex items-center justify-center gap-1.5">
                                 <svg x-show="submitting" class="w-4 h-4 flex-shrink-0 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                                 <svg x-show="!submitting" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>

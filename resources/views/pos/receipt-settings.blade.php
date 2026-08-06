@@ -195,6 +195,36 @@
             </div>
         </div>
 
+        {{-- Bill Number Style (07 Aug 2026, 2-3 companies ki tajweez): har stream
+             (PRA billing / Offline billing) apna numaya receipt number chunta hai —
+             chalti serial ya roz ka token (subah 6 baje reset). Serial andar se
+             hamesha chalta rahta hai (khata / search / return / PRA reporting). --}}
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-6">
+            @php
+                $praNumPref = ($company->pra_number_style ?? 'serial') === 'token' ? 'token' : 'serial';
+                $localNumPref = ($company->local_number_style ?? 'serial') === 'token' ? 'token' : 'serial';
+            @endphp
+            <label class="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-1">🎫 {{ __('pos.number_style_title') }} <span class="text-xs font-normal text-gray-500 dark:text-gray-400">{{ __('pos.number_style_scope') }}</span></label>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ __('pos.number_style_intro') }}</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.number_style_pra_label') }}</label>
+                    <select name="rp_pra_number_style" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-purple-500 focus:ring-purple-500">
+                        <option value="serial" {{ $praNumPref === 'serial' ? 'selected' : '' }}>{{ __('pos.number_style_serial') }}</option>
+                        <option value="token" {{ $praNumPref === 'token' ? 'selected' : '' }}>{{ __('pos.number_style_token') }}</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.number_style_local_label') }}</label>
+                    <select name="rp_local_number_style" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-purple-500 focus:ring-purple-500">
+                        <option value="serial" {{ $localNumPref === 'serial' ? 'selected' : '' }}>{{ __('pos.number_style_serial') }}</option>
+                        <option value="token" {{ $localNumPref === 'token' ? 'selected' : '' }}>{{ __('pos.number_style_token') }}</option>
+                    </select>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">{{ __('pos.number_style_hint') }}</p>
+        </div>
+
         {{-- PDF Download Paper (customer video Jul 2026): downloaded PDFs printed on
              regular office printers came out shifted to the right edge and clipped —
              PDF viewers center the narrow thermal page on the driver's A4 canvas. --}}

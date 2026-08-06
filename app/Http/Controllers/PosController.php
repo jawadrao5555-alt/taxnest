@@ -232,6 +232,8 @@ class PosController extends Controller
                 'rp_logo_style' => 'nullable|in:side,center',
                 'rp_pdf_paper' => 'nullable|in:thermal,a4',
                 'rp_order_match' => 'nullable|in:off,token,code',
+                'rp_pra_number_style' => 'nullable|in:serial,token',
+                'rp_local_number_style' => 'nullable|in:serial,token',
             ]);
             $prefs = $company->invoice_display_prefs ?? [];
             // PRA (fiscal) receipt set — legacy 'pos' key, backward compatible.
@@ -296,6 +298,18 @@ class PosController extends Controller
             if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'order_match_style')
                 && in_array($request->input('rp_order_match'), ['off', 'token', 'code'], true)) {
                 $companyUpdates['order_match_style'] = $request->input('rp_order_match');
+            }
+            // Bill Number Style (07 Aug 2026): per-stream receipt numbering display —
+            // 'serial' = chalti series (POS-YYYY-NNNNN / L-NNN), 'token' = roz ka
+            // token (1,2,3… business-day 6AM reset). Serial ALWAYS stays underneath
+            // (khata/search/returns/PRA), token sirf receipt par numaya hota hai.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pra_number_style')
+                && in_array($request->input('rp_pra_number_style'), ['serial', 'token'], true)) {
+                $companyUpdates['pra_number_style'] = $request->input('rp_pra_number_style');
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'local_number_style')
+                && in_array($request->input('rp_local_number_style'), ['serial', 'token'], true)) {
+                $companyUpdates['local_number_style'] = $request->input('rp_local_number_style');
             }
             $company->update($companyUpdates);
             return redirect()->route('pos.receipt-settings')->with('success', __('pos.receipt_display_settings_saved'));
@@ -766,12 +780,29 @@ class PosController extends Controller
 
         // Local (non-PRA) bills are excluded from ALL dashboard KPIs — they are
         // visible only in the isolated Local Bills Portal (pos_role='local_viewer').
-        $excludeLocal = function ($q) {
-            $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
-        };
-        $excludeLocalRaw = function ($q) {
-            $q->where('t.invoice_mode', 'pra')->orWhereNull('t.invoice_mode');
-        };
+        // Billing Scope (07 Aug 2026): for LOCAL-scoped staff the dashboard flips
+        // to the LOCAL stream instead (their whole world is offline billing —
+        // showing them PRA figures would leak the other stream).
+        $dashScope = auth('pos')->user()?->posBillingScope() ?? 'both';
+        if ($dashScope === 'local') {
+            $excludeLocal = function ($q) {
+                $q->where('invoice_mode', 'local')->orWhere(function ($s) {
+                    $s->whereNull('pra_status')->whereNull('pra_invoice_number');
+                });
+            };
+            $excludeLocalRaw = function ($q) {
+                $q->where('t.invoice_mode', 'local')->orWhere(function ($s) {
+                    $s->whereNull('t.pra_status')->whereNull('t.pra_invoice_number');
+                });
+            };
+        } else {
+            $excludeLocal = function ($q) {
+                $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+            };
+            $excludeLocalRaw = function ($q) {
+                $q->where('t.invoice_mode', 'pra')->orWhereNull('t.invoice_mode');
+            };
+        }
 
         $todayStats = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
@@ -1765,6 +1796,44 @@ class PosController extends Controller
             $initialPraStatus = null;
         }
 
+        // ── Billing Scope (owner request 07 Aug 2026) ─────────────────────────
+        // Stream lock per staff account. Stream definition MIRRORS the report
+        // tabs (applyReportFilters): PRA stream = bill enters the PRA pipeline
+        // at birth (pra_status='pending'); local stream = provisionals AND
+        // reporting-OFF finals. UI hides the buttons; this guards direct POSTs
+        // and offline replays.
+        $billingScope = $posUser->posBillingScope();
+        if ($billingScope === 'pra' && $initialPraStatus !== 'pending') {
+            $scopeMsg = __('pos.billing_scope_pra_only');
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'error' => $scopeMsg, 'message' => $scopeMsg], 403);
+            }
+            return back()->withInput()->with('error', $scopeMsg);
+        }
+        if ($billingScope === 'local' && $initialPraStatus === 'pending') {
+            $scopeMsg = __('pos.billing_scope_local_only');
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'error' => $scopeMsg, 'message' => $scopeMsg], 403);
+            }
+            return back()->withInput()->with('error', $scopeMsg);
+        }
+
+        // ── Bill Number Style (owner request 07 Aug 2026) ─────────────────────
+        // Company chooses per stream: 'serial' (default) ya roz ka 'token'.
+        // Token is allocated ONCE at bill birth and frozen on bill_token so
+        // reprints never change. Serial (invoice_number) ALWAYS stays underneath
+        // — khata/search/returns/PRA sab serial par chalte hain.
+        $billTokenFields = [];
+        $billStream = $initialPraStatus === 'pending' ? 'pra' : 'local';
+        $billStyleCol = $billStream === 'pra' ? 'pra_number_style' : 'local_number_style';
+        if (($company->{$billStyleCol} ?? 'serial') === 'token'
+            && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'bill_token')) {
+            $billToken = \App\Services\OrderTokenService::nextBillToken($companyId, $billStream);
+            if ($billToken !== null) {
+                $billTokenFields = ['bill_token' => $billToken];
+            }
+        }
+
         // Delivery Riders (Jul 2026): snapshot order_type + optional rider on the
         // bill. Rider only rides on Delivery orders; validated company-scoped +
         // active (invalid ids silently dropped — never block a payment). Purely
@@ -1887,7 +1956,10 @@ class PosController extends Controller
                     'locked_by_terminal_id' => null,
                     'lock_time' => null,
                     'notes' => $request->input('kitchen_notes'),
-                ] + $riderFields + $taxInclusiveFields);
+                ] + $riderFields + $taxInclusiveFields
+                  // Draft resume: NEVER overwrite an already-frozen token — a
+                  // replayed/duplicate submit must reprint the same number.
+                  + (!empty($transaction->bill_token) ? [] : $billTokenFields));
 
                 $transaction->items()->delete();
             } else {
@@ -1929,7 +2001,7 @@ class PosController extends Controller
                     // whoever's session replayed the queue next morning.
                     'created_by' => $offlineQueuedBy ?: auth('pos')->id(),
                     'notes' => $request->input('kitchen_notes'),
-                ] + $riderFields + $taxInclusiveFields);
+                ] + $riderFields + $taxInclusiveFields + $billTokenFields);
             }
 
             // Offline sync: stamp the bill with the ORIGINAL (clamped) sale moment.
@@ -2444,6 +2516,25 @@ class PosController extends Controller
      * queued/submitted to PRA. Returns false when the bill is no longer promotable.
      * $newPraStatus: 'pending' (reporting ON, will submit) or null (reporting OFF final).
      */
+    /**
+     * Bill Number Style (07 Aug 2026): when a bill JOINS the PRA pipeline
+     * (pra_status → 'pending'), its display token must follow the PRA stream's
+     * style — a fresh PRA daily token, or NULL when the style is 'serial'
+     * (never keep a stale LOCAL token on a PRA bill: reprints would show a
+     * number that can collide with a real PRA token).
+     */
+    private function praStreamBillTokenFields(int $companyId): array
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'bill_token')) {
+            return [];
+        }
+        $company = Company::find($companyId);
+        if (($company->pra_number_style ?? 'serial') !== 'token') {
+            return ['bill_token' => null];
+        }
+        return ['bill_token' => \App\Services\OrderTokenService::nextBillToken($companyId, 'pra')];
+    }
+
     private function promoteLocalToPosSerial(PosTransaction $transaction, int $companyId, ?string $newPraStatus): bool
     {
         try {
@@ -2473,7 +2564,7 @@ class PosController extends Controller
                     // on the normal POS surfaces.
                     'is_archived' => false,
                     'archived_at' => null,
-                ]);
+                ] + ($newPraStatus === 'pending' ? $this->praStreamBillTokenFields($companyId) : []));
             });
         } catch (\RuntimeException $e) {
             return false;
@@ -2514,7 +2605,7 @@ class PosController extends Controller
                     'pra_response_code' => null,
                     'is_archived' => false,
                     'archived_at' => null,
-                ]);
+                ] + $this->praStreamBillTokenFields($companyId));
             });
         } catch (\RuntimeException $e) {
             return false;
@@ -2528,6 +2619,11 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
+
+        // Billing Scope (07 Aug 2026): local-scoped staff never touch the PRA pipeline.
+        if (auth('pos')->user()?->posBillingScope() === 'local') {
+            return back()->with('error', __('pos.billing_scope_local_only'));
+        }
 
         // Archived LOCAL-category bills (day-close archive) must stay reachable for
         // the per-bill "Submit to PRA" promote — mirror the receipt()/transactionShow()
@@ -2654,6 +2750,12 @@ class PosController extends Controller
             return back()->with('error', __('pos.pra_reporting_disabled_enable'));
         }
 
+        // Billing Scope (07 Aug 2026): local-scoped staff cannot push anything
+        // into the PRA pipeline — mirrors retryPra / apiRetryFailed.
+        if ((auth('pos')->user()?->posBillingScope() ?? 'both') === 'local') {
+            return back()->with('error', __('pos.billing_scope_local_only'));
+        }
+
         $pendingInvoices = PosTransaction::where('company_id', $companyId)
             ->whereIn('pra_status', ['failed', 'offline', 'pending'])
             ->whereNull('pra_invoice_number')
@@ -2727,7 +2829,11 @@ class PosController extends Controller
         $hasRiderCols = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id')
             && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_settlement_id');
         $hasBizDate = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'business_date');
-        $bills = PosTransaction::where('company_id', $companyId)
+        // Billing Scope (07 Aug 2026): pra-scoped staff never see local/provisional
+        // bills — the provisional half of this list is emptied for them. The FINAL
+        // delivery-bill half below stays (delivery tracking is stream-agnostic).
+        $scopeHidesProvisionals = (auth('pos')->user()?->posBillingScope() ?? 'both') === 'pra';
+        $bills = $scopeHidesProvisionals ? collect() : PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
             ->where('invoice_mode', 'local')
             ->where('pra_status', 'local')
@@ -2904,6 +3010,22 @@ class PosController extends Controller
                 }
             })
             ->where('business_date', \App\Services\PosBusinessDay::current($companyId))
+            // Billing Scope (07 Aug 2026): stream-locked staff get ONLY their own
+            // stream in the Reprint list — mirrors applyReportFilters' split.
+            ->where(function ($q) {
+                $scope = auth('pos')->user()?->posBillingScope() ?? 'both';
+                if ($scope === 'local') {
+                    $q->where('invoice_mode', 'local')->orWhere(function ($s) {
+                        $s->whereNull('pra_status')->whereNull('pra_invoice_number');
+                    });
+                } elseif ($scope === 'pra') {
+                    $q->where(function ($s) {
+                        $s->where('invoice_mode', '!=', 'local')->orWhereNull('invoice_mode');
+                    })->where(function ($s) {
+                        $s->whereNotNull('pra_status')->orWhereNotNull('pra_invoice_number');
+                    });
+                }
+            })
             ->orderBy('id', 'desc')
             ->limit(300)
             ->get(['id', 'invoice_number', 'pra_invoice_number', 'customer_name', 'total_amount', 'payment_method', 'order_type', 'invoice_mode', 'pra_status', 'created_at']);
@@ -3146,7 +3268,7 @@ class PosController extends Controller
                     // on the normal POS surfaces (archived local finals included).
                     'is_archived'       => false,
                     'archived_at'       => null,
-                ]);
+                ] + ($reportingOn ? $this->praStreamBillTokenFields($companyId) : []));
 
                 // Re-tax each line for the new rate — the PRA payload reads per-item tax_rate.
                 foreach ($items as $it) {
@@ -3183,6 +3305,17 @@ class PosController extends Controller
 
         if (!$company) {
             return response()->json(['success' => false, 'message' => __('pos.company_not_found')], 404);
+        }
+
+        // Billing Scope (07 Aug 2026): send_to_pra promote = PRA pipeline entry
+        // (blocked for local-scoped staff); LOCAL FINAL = local-stream action
+        // (blocked for pra-scoped staff — they never touch local bills).
+        $promoScope = auth('pos')->user()?->posBillingScope() ?? 'both';
+        if ($request->boolean('send_to_pra', true) && $promoScope === 'local') {
+            return response()->json(['success' => false, 'message' => __('pos.billing_scope_local_only')], 403);
+        }
+        if (!$request->boolean('send_to_pra', true) && $promoScope === 'pra') {
+            return response()->json(['success' => false, 'message' => __('pos.billing_scope_pra_only')], 403);
         }
 
         // ── LOCAL FINAL (owner request Jul 2026): finalize WITHOUT sending to PRA ──
@@ -3336,6 +3469,13 @@ class PosController extends Controller
     public function apiFailedBills(Request $request)
     {
         $companyId = app('currentCompanyId');
+
+        // Billing Scope (07 Aug 2026): failed/offline/pending rows are PRA-pipeline
+        // bills — a local-scoped account has no business seeing (or retrying) them.
+        if ((auth('pos')->user()?->posBillingScope() ?? 'both') === 'local') {
+            return response()->json(['success' => true, 'count' => 0, 'bills' => []]);
+        }
+
         $bills = PosTransaction::where('company_id', $companyId)
             ->whereIn('pra_status', ['failed', 'offline', 'pending'])
             ->whereNull('pra_invoice_number')
@@ -3378,6 +3518,11 @@ class PosController extends Controller
                 'success' => false,
                 'message' => __('pos.pra_reporting_disabled_enable'),
             ], 422);
+        }
+
+        // Billing Scope (07 Aug 2026): local-scoped staff never touch the PRA pipeline.
+        if (auth('pos')->user()?->posBillingScope() === 'local') {
+            return response()->json(['success' => false, 'message' => __('pos.billing_scope_local_only')], 403);
         }
 
         // ATOMIC CLAIM — race-safe. Conditional UPDATE returns affected-row
@@ -3496,6 +3641,14 @@ class PosController extends Controller
         //   Local tab → ADMIN-ONLY: L-series bills + reporting-OFF finals (no PRA fiscal).
         // Cashiers are always forced to PRA server-side.
         $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin()) ? 'local' : 'pra';
+        // Billing Scope (07 Aug 2026): scope-locked staff are FORCED onto their
+        // own stream's tab — a local-scoped manager/cashier IS the offline-billing
+        // admin (overrides the admin-only Local rule), a pra-scoped one never
+        // sees the Local tab. The other tab is hidden in the view too.
+        $scope = $user?->posBillingScope() ?? 'both';
+        if ($scope !== 'both') {
+            $tab = $scope === 'local' ? 'local' : 'pra';
+        }
 
         $query = PosTransaction::where('company_id', $companyId)->where('status', 'completed')->with('creator');
 
@@ -3529,6 +3682,23 @@ class PosController extends Controller
         return view('pos.transactions', compact('transactions', 'tab', 'hasPinSet', 'localCount', 'user'));
     }
 
+    /**
+     * Billing Scope (07 Aug 2026) — stream-lock READ guard: may this user see
+     * this bill? Local stream mirrors applyReportFilters (L-series bills OR
+     * reporting-OFF finals: NULL pra_status + no fiscal number); everything
+     * else is the PRA stream. 'both' (default/admin) sees everything.
+     */
+    private function billingScopeAllowsRow(PosTransaction $txn): bool
+    {
+        $scope = auth('pos')->user()?->posBillingScope() ?? 'both';
+        if ($scope === 'both') {
+            return true;
+        }
+        $isLocal = $txn->invoice_mode === 'local'
+            || ($txn->pra_status === null && $txn->pra_invoice_number === null);
+        return $scope === 'local' ? $isLocal : !$isLocal;
+    }
+
     public function transactionShow($id)
     {
         $companyId = app('currentCompanyId');
@@ -3547,6 +3717,9 @@ class PosController extends Controller
             })
             ->with(['items', 'payments', 'praLogs', 'creator', 'terminal'])
             ->findOrFail($id);
+
+        // Billing Scope: stream-locked staff cannot open the other stream's bills.
+        abort_unless($this->billingScopeAllowsRow($transaction), 403);
 
         return view('pos.transaction-show', compact('transaction'));
     }
@@ -3570,6 +3743,9 @@ class PosController extends Controller
             })
             ->with(['items', 'payments', 'creator', 'terminal'])
             ->findOrFail($id);
+
+        // Billing Scope: stream-locked staff cannot reprint the other stream's bills.
+        abort_unless($this->billingScopeAllowsRow($transaction), 403);
 
         $printerSize = $company->receipt_printer_size ?? '80mm';
         $receiptView = $printerSize === '58mm' ? 'pos.receipts.receipt_58mm' : 'pos.receipts.receipt_80mm';
@@ -3657,6 +3833,9 @@ class PosController extends Controller
         $transaction = PosTransaction::where('company_id', $companyId)
             ->with(['items', 'terminal', 'creator'])
             ->findOrFail($id);
+
+        // Billing Scope: stream-locked staff cannot download the other stream's bills.
+        abort_unless($this->billingScopeAllowsRow($transaction), 403);
 
         // Use the same thermal receipt template as the screen-print path so the
         // downloadable PDF matches what the cashier sees / prints. 80mm = 226.77pt
@@ -3854,6 +4033,12 @@ class PosController extends Controller
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
         // Local Invoices tab is ADMIN-ONLY — cashiers are always forced to PRA.
         $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin()) ? 'local' : 'pra';
+        // Billing Scope (07 Aug 2026): scope-locked staff report ONLY their own
+        // stream — mirrors the Transactions tab forcing.
+        $reportScope = $user?->posBillingScope() ?? 'both';
+        if ($reportScope !== 'both') {
+            $tab = $reportScope === 'local' ? 'local' : 'pra';
+        }
         $cashierFilter = $request->get('cashier', 'all');
 
         // Owner rule (5 Aug 2026): a cashier ALWAYS sees only their own sales
@@ -4765,6 +4950,16 @@ class PosController extends Controller
             ], 403);
         }
 
+        // Billing Scope (07 Aug 2026): a scope-locked manager's stream is fixed
+        // by the admin — flipping the reporting toggle would sidestep the lock.
+        if ($togglingUser->posBillingScope() !== 'both') {
+            return response()->json([
+                'success' => false,
+                'enabled' => (bool) $effectiveNow,
+                'message' => __('pos.billing_scope_no_toggle'),
+            ], 403);
+        }
+
         // Turning PRA Reporting ON requires an NTN on file (submitted with every fiscal
         // invoice). Turning it OFF is always allowed. NTN is optional at registration.
         if (!$effectiveNow && empty($company->ntn)) {
@@ -5293,6 +5488,21 @@ class PosController extends Controller
         if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_team_password_enc')) {
             $newUserData['pos_team_password_enc'] = \Illuminate\Support\Facades\Crypt::encryptString($request->password);
         }
+        // Billing Scope (07 Aug 2026): cashier/manager accounts can be locked to
+        // one stream at creation. NULL/both = no lock (default, legacy behaviour).
+        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_billing_scope')
+            && in_array($newRole, ['pos_cashier', 'pos_manager'], true)
+            && in_array($request->input('pos_billing_scope'), ['both', 'local', 'pra'], true)) {
+            $newUserData['pos_billing_scope'] = $request->input('pos_billing_scope');
+            // Scope ↔ reporting alignment: a 'pra'-locked account MUST report
+            // (reporting-OFF finals are local-stream → their own guard would
+            // brick billing); a 'local'-locked account must NOT. 'both' inherits.
+            if ($newUserData['pos_billing_scope'] === 'pra') {
+                $newUserData['pra_reporting_enabled'] = true;
+            } elseif ($newUserData['pos_billing_scope'] === 'local') {
+                $newUserData['pra_reporting_enabled'] = false;
+            }
+        }
         User::create($newUserData);
 
         $roleLabel = ['pos_manager' => __('pos.role_manager'), 'pos_kitchen' => __('pos.role_kitchen'), 'pos_waiter' => __('pos.role_waiter'), 'pos_delivery' => __('pos.role_delivery_manager')][$newRole] ?? __('pos.role_cashier');
@@ -5330,6 +5540,15 @@ class PosController extends Controller
         }
         if ($enable && empty($company->ntn)) {
             return back()->with('error', __('pos.ntn_required_pra_on'));
+        }
+
+        // Billing Scope (07 Aug 2026): a stream-locked account's reporting flag
+        // is welded to its scope — flipping it the other way would brick billing
+        // (the sale-path scope guard rejects the resulting stream). Change the
+        // scope from the edit row instead.
+        $cashierScope = $cashier->posBillingScope();
+        if (($cashierScope === 'pra' && !$enable) || ($cashierScope === 'local' && $enable)) {
+            return back()->with('error', __('pos.billing_scope_pra_locked'));
         }
 
         $cashier->pra_reporting_enabled = $enable;
@@ -5419,6 +5638,25 @@ class PosController extends Controller
             'email' => $request->email,
             'phone' => $request->phone,
         ]);
+
+        // Billing Scope (07 Aug 2026): stream lock is editable from the team edit
+        // row — cashier + manager only. Direct assignment (pos_custom_access
+        // pattern): update() on a non-$fillable column silently drops.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_billing_scope')
+            && in_array($cashier->pos_role, ['pos_cashier', 'pos_manager'], true)
+            && in_array($request->input('pos_billing_scope'), ['both', 'local', 'pra'], true)) {
+            $newScope = $request->input('pos_billing_scope');
+            $cashier->pos_billing_scope = $newScope;
+            // Scope ↔ reporting alignment: 'pra' lock forces reporting ON,
+            // 'local' lock forces it OFF — otherwise the scope guard on the
+            // sale paths would brick the account. 'both' keeps the current flag.
+            if ($newScope === 'pra') {
+                $cashier->pra_reporting_enabled = true;
+            } elseif ($newScope === 'local') {
+                $cashier->pra_reporting_enabled = false;
+            }
+            $cashier->save();
+        }
 
         if ($request->filled('password')) {
             $pwUpdate = ['password' => bcrypt($request->password)];
@@ -7654,10 +7892,19 @@ class PosController extends Controller
 
         // Local (non-PRA) bills are excluded from the day-close view & figures —
         // visible only in the isolated Local Bills Portal (pos_role='local_viewer').
+        // Billing Scope (07 Aug 2026): LOCAL-scoped staff see the LOCAL stream's
+        // figures instead — mirrors the dashboard scope flip.
+        $dayCloseScope = $dayCloseUser?->posBillingScope() ?? 'both';
         $transactions = PosTransaction::where('company_id', $companyId)
             ->where('business_date', $date)
-            ->where(function ($q) {
-                $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+            ->where(function ($q) use ($dayCloseScope) {
+                if ($dayCloseScope === 'local') {
+                    $q->where('invoice_mode', 'local')->orWhere(function ($s) {
+                        $s->whereNull('pra_status')->whereNull('pra_invoice_number');
+                    });
+                } else {
+                    $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+                }
             })
             ->with('creator')
             ->orderBy('created_at')

@@ -63,6 +63,17 @@
                     <option value="pos_delivery">{{ __('pos.role_opt_delivery') }}</option>
                 </select>
             </div>
+            {{-- Billing Scope (07 Aug 2026): lock a cashier/manager to one billing
+                 stream. Server ignores it for confined roles (kitchen/waiter/delivery). --}}
+            <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.billing_scope_label') }}</label>
+                <select name="pos_billing_scope" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                    <option value="both">{{ __('pos.billing_scope_both') }}</option>
+                    <option value="local">{{ __('pos.billing_scope_local') }}</option>
+                    <option value="pra">{{ __('pos.billing_scope_pra') }}</option>
+                </select>
+                <p class="text-[10px] text-gray-400 dark:text-gray-500 mt-1">{{ __('pos.billing_scope_hint_role') }}</p>
+            </div>
             <div class="sm:col-span-2">
                 <button type="submit" class="px-6 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition font-semibold">{{ __('pos.create_account') }}</button>
             </div>
@@ -138,6 +149,12 @@
                             @else
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">{{ __('pos.role_cashier') }}</span>
                             @endif
+                            {{-- Billing Scope badge (07 Aug 2026): stream-locked accounts wear it openly --}}
+                            @if(in_array($member->pos_role, ['pos_cashier', 'pos_manager'], true) && $member->posBillingScope() !== 'both')
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide mt-1 {{ $member->posBillingScope() === 'local' ? 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300' }}" title="{{ __('pos.billing_scope_label') }}">
+                                {{ $member->posBillingScope() === 'local' ? __('pos.billing_scope_badge_local') : __('pos.billing_scope_badge_pra') }}
+                            </span>
+                            @endif
                         </td>
                         <td class="px-4 py-3">
                             @if($member->is_active)
@@ -192,6 +209,14 @@
                                              Setting a new password also refreshes the admin-viewable
                                              encrypted copy shown in the Password column. --}}
                                         <input form="edit-{{ $member->id }}" type="password" name="password" placeholder="{{ __('pos.ph_new_password_optional') }}" autocomplete="new-password" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-36 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1.5 focus:ring-purple-500 focus:border-purple-500">
+                                        {{-- Billing Scope (07 Aug 2026): cashier + manager only --}}
+                                        @if(in_array($member->pos_role, ['pos_cashier', 'pos_manager'], true))
+                                        <select form="edit-{{ $member->id }}" name="pos_billing_scope" title="{{ __('pos.billing_scope_label') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1.5 focus:ring-purple-500 focus:border-purple-500">
+                                            <option value="both" {{ $member->posBillingScope() === 'both' ? 'selected' : '' }}>{{ __('pos.billing_scope_both') }}</option>
+                                            <option value="local" {{ $member->posBillingScope() === 'local' ? 'selected' : '' }}>{{ __('pos.billing_scope_local') }}</option>
+                                            <option value="pra" {{ $member->posBillingScope() === 'pra' ? 'selected' : '' }}>{{ __('pos.billing_scope_pra') }}</option>
+                                        </select>
+                                        @endif
                                         <button form="edit-{{ $member->id }}" type="submit" class="text-emerald-600 hover:text-emerald-700 text-xs font-medium">{{ __('pos.save_btn') }}</button>
                                         <button @click="editing = false" class="text-gray-400 hover:text-gray-600 text-xs font-medium">{{ __('pos.cancel') }}</button>
                                     </div>

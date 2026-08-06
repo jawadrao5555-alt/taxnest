@@ -456,7 +456,7 @@ window.addEventListener('popstate', function() {
         <div class="flex-1 relative" style="min-width:170px;">
             {{-- Barcode/scan icon (retail fast-billing Aug 2026) --}}
             <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h1v12H4zm3 0h1v12H7zm3 0h2v12h-2zm4 0h1v12h-1zm3 0h1v12h-1zM2 4h20v2H2zm0 14h20v2H2z"/></svg>
-            <input type="search" x-ref="searchInput" x-model="searchQuery" @input="onSearchInput()" @keydown.arrow-down.prevent="moveHighlight(1)" @keydown.arrow-up.prevent="moveHighlight(-1)" @keydown.enter.prevent.stop="addHighlightedItem($event)" @keydown.tab="if(flowStep === 'type'){ $event.preventDefault(); } else if(!searchQuery && cart.length > 0){ $event.preventDefault(); enterCartMode('last'); }" @focus="if(searchQuery) showSearchDropdown = true" @click.away="showSearchDropdown = false" placeholder="Barcode / Article # scan karein — ya naam ka pehla harf likhein (Ctrl+S)" class="search-glow w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border-2 border-blue-200 dark:border-blue-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400 transition shadow-sm" autocomplete="one-time-code" name="pos_product_search_nofill" data-lpignore="true" data-form-type="other" role="combobox">
+            <input type="search" x-ref="searchInput" x-model="searchQuery" @input="onSearchInput()" @keydown.arrow-down.prevent="moveHighlight(1)" @keydown.arrow-up.prevent="moveHighlight(-1)" @keydown.enter.prevent.stop="addHighlightedItem($event)" @keydown.tab="if(flowStep === 'type'){ $event.preventDefault(); } else if(!searchQuery && cart.length > 0){ $event.preventDefault(); enterCartMode('last'); }" @focus="if(searchQuery) showSearchDropdown = true" @click.away="showSearchDropdown = false" placeholder="{{ __('pos.ph_scan_or_first_letter') }}" class="search-glow w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border-2 border-blue-200 dark:border-blue-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400 transition shadow-sm" autocomplete="one-time-code" name="pos_product_search_nofill" data-lpignore="true" data-form-type="other" role="combobox">
             <kbd x-show="!searchQuery" class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 font-mono">Ctrl+S</kbd>
             <button x-show="searchQuery" @click="searchQuery = ''; showSearchDropdown = false; filterProducts(); $refs.searchInput.focus()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -869,6 +869,10 @@ window.addEventListener('popstate', function() {
                             <template x-if="customerStats && customerStats.is_frequent"><span class="freq-badge">VIP</span></template>
                         </div>
                         <p class="text-[10px] text-blue-600 dark:text-blue-400" x-text="selectedCustomer.phone || window.TXT.no_phone"></p>
+                        {{-- Retail Core (Aug 2026): udhaar balance badge — cashier sees baqaya at a glance --}}
+                        <p x-show="(selectedCustomer.khata_balance || 0) > 0" x-cloak class="text-[10px] font-black text-red-600 dark:text-red-400">
+                            Udhaar: Rs <span x-text="Number(selectedCustomer.khata_balance || 0).toLocaleString()"></span>
+                        </p>
                         <template x-if="selectedCustomer.address">
                             <p class="text-[10px] text-blue-500 dark:text-blue-400 truncate" x-text="'📍 ' + selectedCustomer.address"></p>
                         </template>
@@ -992,6 +996,11 @@ window.addEventListener('popstate', function() {
                                 <button @click.stop="updateQty(index, 1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M12 4v16m8-8H4"/></svg>
                                 </button>
+                                {{-- Retail Core (Aug 2026): unit chip — weight/measure units (KG/LTR/MTR...)
+                                     visible so the cashier knows the qty box takes decimals (0.5, 1.25). --}}
+                                <span x-show="item.uom && item.uom !== 'U' && item.uom !== 'PCS'" x-cloak
+                                      class="text-[9px] font-black uppercase px-1 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 dark:text-indigo-300"
+                                      x-text="item.uom"></span>
                             </div>
                             <div class="text-right min-w-[60px]">
                                 <p class="text-sm font-extrabold text-gray-900 dark:text-white" x-text="'Rs.' + getItemTotal(item).toLocaleString()"></p>
@@ -1186,6 +1195,19 @@ window.addEventListener('popstate', function() {
                     <span class="text-sm font-bold text-blue-700 dark:text-blue-400" x-text="submitting ? window.TXT.processing_ellipsis : window.TXT.card_title"></span>
                     <span class="block text-[10px] font-semibold mt-0.5 text-blue-600/60" x-text="window.TXT.tax_rs_prefix + taxAmount.toFixed(2) + window.TXT.per_item_sfx"></span>
                     <kbd x-show="!submitting" class="block mt-0.5 text-[9px] font-mono text-blue-500/60">{{ __('pos.press_2') }}</kbd>
+                </button>
+                {{-- UDHAAR / KHATA (Aug 2026 — Retail Core): credit sale — needs a saved
+                     customer (server blocks it too). Amount lands in the customer's khata. --}}
+                <button @click="payUdhaar()" :disabled="submitting"
+                        :class="[payMethodIndex === 2 ? 'ring-2 ring-amber-500 ring-offset-2 dark:ring-offset-gray-900 scale-[1.02] shadow-sm border-amber-400' : '', !selectedCustomer ? 'opacity-50' : '']"
+                        class="col-span-2 py-3 rounded-xl text-center border-2 transition disabled:opacity-50 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 hover:bg-amber-100 hover:border-amber-400">
+                    <div class="flex items-center justify-center gap-2">
+                        <svg class="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                        <span class="text-sm font-bold text-amber-700 dark:text-amber-400">{{ __('pos.udhaar_khata_btn') }}</span>
+                        <kbd x-show="!submitting" class="text-[9px] font-mono text-amber-500/60">3</kbd>
+                    </div>
+                    <span class="block text-[10px] font-semibold mt-0.5" :class="selectedCustomer ? 'text-amber-600/70' : 'text-red-500'"
+                          x-text="selectedCustomer ? (selectedCustomer.name + window.TXT.udhaar_on_khata_sfx) : window.TXT.udhaar_pick_customer"></span>
                 </button>
             </div>
             {{-- Cash Received / Wapsi (owner request, Jul 2026): optional input — CASH only.
@@ -2546,6 +2568,10 @@ function restaurantPos() {
 
         r2(v) { return Math.round((v + Number.EPSILON) * 100) / 100; },
         _safeQty(q) { const n = Number(q); return Number.isFinite(n) && n > 0 ? n : 1; },
+        // Retail Core (Aug 2026): weight/measure units sell in fractions (0.5 KG,
+        // 1.25 LTR, 2.5 MTR) — min qty 0.001 for these; count units stay min 1.
+        _isFractionalUom(item) { return ['KG','GM','LTR','ML','MTR','SQM','FT','IN','YDS'].includes(String(item?.uom || '').toUpperCase()); },
+        _qtyMin(item) { return this._isFractionalUom(item) ? 0.001 : 1; },
         getItemDiscount(item) {
             const lineTotal = this.r2(this._safeQty(item.quantity) * item.unit_price);
             const dv = parseFloat(item.item_discount_value) || 0;
@@ -3479,18 +3505,20 @@ function restaurantPos() {
         },
         updateQty(index, delta) {
             if (!this.cart[index]) return;
+            const min = this._qtyMin(this.cart[index]);
             let current = Number(this.cart[index].quantity);
-            if (!Number.isFinite(current) || current < 1) current = 1;
+            if (!Number.isFinite(current) || current < min) current = min;
             let next = Number.isInteger(current)
-                ? Math.max(1, current + delta)
-                : Math.max(1, Math.round((current + delta) * 100) / 100);
-            if (!Number.isFinite(next) || next < 1) next = 1;
+                ? Math.max(min, current + delta)
+                : Math.max(min, Math.round((current + delta) * 100) / 100);
+            if (!Number.isFinite(next) || next < min) next = min;
             this.cart[index].quantity = next;
         },
         setQty(index, val) {
             if (!this.cart[index]) return;
+            const min = this._qtyMin(this.cart[index]);
             let v = parseFloat(val);
-            if (!Number.isFinite(v) || v < 1) v = 1;
+            if (!Number.isFinite(v) || v < min) v = min;
             this.cart[index].quantity = v;
         },
         removeFromCart(index) {
@@ -3610,8 +3638,9 @@ function restaurantPos() {
             const t = e.target;
             if (t) t.dataset._fresh = '0';
             if (!this.cart[index]) return;
+            const min = this._qtyMin(this.cart[index]);
             let n = parseFloat(this.cart[index].quantity);
-            if (!Number.isFinite(n) || n < 1) n = 1;
+            if (!Number.isFinite(n) || n < min) n = min;
             this.cart[index].quantity = Number.isInteger(n) ? n : Math.round(n * 1000) / 1000;
         },
 
@@ -3675,8 +3704,10 @@ function restaurantPos() {
             // Mirrors the mock-up (PRA-aligned): no confirmation step for simple retail sales.
             if (e.altKey && e.key === '1') { e.preventDefault(); if (this.cart.length > 0 && !this.submitting && !this.showPayModal) { this.submitting = false; this.saveAsProvisional = false; this.processPayment('cash'); } return; }
             if (e.altKey && e.key === '2') { e.preventDefault(); if (this.cart.length > 0 && !this.submitting && !this.showPayModal) { this.submitting = false; this.saveAsProvisional = false; this.processPayment('card'); } return; }
+            // Alt+3 — instant UDHAAR (khata) sale; needs a selected customer (payUdhaar guards).
+            if (e.altKey && e.key === '3') { e.preventDefault(); if (this.cart.length > 0 && !this.submitting && !this.showPayModal) { this.submitting = false; this.saveAsProvisional = false; this.payUdhaar(); } return; }
             // Alt+R — Reprint last bill (Akhri Bills top entry).
-            if (e.altKey && (e.key === 'r' || e.key === 'R')) { e.preventDefault(); const last = this.recentBills[0]; if (last) { this._printViaIframe('print-receipt-frame', '/fbr-pos/transaction/' + last.id + '/receipt?auto_print=1', 'width=400,height=700'); this.showToast('Reprinting #' + last.invoice_number, 'info'); } else if (this.lastTransactionId) { this.printReceipt(); this.showToast('Reprinting last bill...', 'info'); } else { this.showToast('Koi bill nahi mila reprint ke liye', 'warning'); } return; }
+            if (e.altKey && (e.key === 'r' || e.key === 'R')) { e.preventDefault(); const last = this.recentBills[0]; if (last) { this._printViaIframe('print-receipt-frame', '/fbr-pos/transaction/' + last.id + '/receipt?auto_print=1', 'width=400,height=700'); this.showToast('Reprinting #' + last.invoice_number, 'info'); } else if (this.lastTransactionId) { this.printReceipt(); this.showToast('Reprinting last bill...', 'info'); } else { this.showToast(window.TXT.no_bill_reprint, 'warning'); } return; }
             if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
             if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode(); this.mobileView = 'cart'; } return; }
             // ═══════════════════════════════════════════════════════════════
@@ -3834,6 +3865,8 @@ function restaurantPos() {
                 // Number keys jump straight to that method AND fire it (fast path for power cashiers).
                 if (e.key === '1') { e.preventDefault(); e.stopPropagation(); this.payMethodIndex = 0; this.processPayment('cash'); return; }
                 if (e.key === '2') { e.preventDefault(); e.stopPropagation(); this.payMethodIndex = 1; this.processPayment('card'); return; }
+                // 3 = Udhaar/Khata (Retail Core) — payUdhaar guards on selected customer.
+                if (e.key === '3') { e.preventDefault(); e.stopPropagation(); this.payMethodIndex = 2; this.payUdhaar(); return; }
                 // GUIDED FLOW (opt-in): P = save as Provisional (local).
                 if (this.guidedFlow && (e.key === 'p' || e.key === 'P')) { e.preventDefault(); e.stopPropagation(); this.saveProvisionalDirect(); return; }
                 // Enter confirms the CURRENTLY-HIGHLIGHTED method (Cash by default).
@@ -4540,6 +4573,21 @@ function restaurantPos() {
             this.saveAsProvisional = true;
             this.showPayModal = false;
             await this.processPayment('cash');
+        },
+
+        // ═══ UDHAAR / KHATA SALE (Aug 2026 — Retail Core) ═══
+        // Credit sale — the bill amount lands in the selected customer's khata
+        // (fbr_customer_ledgers + pos_customers.khata_balance, server-side).
+        // A saved customer is MANDATORY; the server rejects credit without one.
+        payUdhaar() {
+            if (this.submitting) return;
+            if (!this.selectedCustomer?.id) {
+                this.showToast(window.TXT.udhaar_need_customer_toast, 'warning');
+                this.showPayModal = false;
+                this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
+                return;
+            }
+            this.processPayment('credit');
         },
 
         async processPayment(method) {

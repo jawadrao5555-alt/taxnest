@@ -99,6 +99,33 @@
                         class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono"
                         placeholder="{{ __('pos.ph_sku_example') }}">
                 </div>
+                @php
+                    // Retail Core (Aug 2026): stock fields — current stock shown on edit.
+                    $stockRow = isset($product)
+                        ? \App\Models\InventoryStock::where('company_id', $product->company_id)->where('product_id', $product->id)->whereNull('branch_id')->first()
+                        : null;
+                    $hasOpening = isset($product) && \App\Models\InventoryMovement::where('company_id', $product->company_id)->where('product_id', $product->id)->where('type', \App\Models\InventoryMovement::TYPE_OPENING)->exists();
+                @endphp
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Opening Stock <span class="text-gray-400 text-xs">(optional)</span></label>
+                    @if($hasOpening)
+                        <div class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-sm text-gray-600 dark:text-gray-300">
+                            Current stock: <strong>{{ $stockRow ? rtrim(rtrim(number_format($stockRow->quantity, 3, '.', ''), '0'), '.') : 0 }} {{ $product->uom ?? 'U' }}</strong>
+                            <span class="text-xs text-gray-400 block">{{ __('pos.stock_receive_from_page_hint') }}</span>
+                        </div>
+                    @else
+                        <input type="number" step="0.001" min="0" name="opening_stock" value="{{ old('opening_stock') }}"
+                            class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="0">
+                    @endif
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Min Stock Alert Level <span class="text-gray-400 text-xs">(optional)</span></label>
+                    <input type="number" step="0.001" min="0" name="min_stock_level" value="{{ old('min_stock_level', $stockRow->min_stock_level ?? '') }}"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="e.g. 10">
+                    <p class="text-[11px] text-gray-400 mt-1">{{ __('pos.min_level_alert_hint') }}</p>
+                </div>
             </div>
         </div>
 

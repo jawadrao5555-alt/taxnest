@@ -1565,6 +1565,23 @@ class FbrService
     {
         $company = $transaction->company;
 
+        // ── RETURN / CREDIT NOTE (Aug 2026 — Retail Core) ────────────────────────
+        // FBR IMS spec (SRO 1279/2021): a refund invoice carries InvoiceType=3,
+        // RefUSIN = the ORIGINAL bill's USIN, and NEGATIVE quantities/amounts.
+        // transaction_type='return' rows reference their parent via parent_transaction_id.
+        $isReturn = ($transaction->transaction_type ?? 'sale') === 'return';
+        $sign = $isReturn ? -1 : 1;
+        $refUsin = null;
+        $invoiceType = 1;
+        if ($isReturn) {
+            $invoiceType = 3;
+            $parent = $transaction->parent_transaction_id
+                ? \App\Models\FbrPosTransaction::find($transaction->parent_transaction_id)
+                : null;
+            // RefUSIN must be the original USIN — without it FBR rejects the credit note.
+            $refUsin = $parent?->invoice_number;
+        }
+
         $items = [];
         $totalSaleValue = 0.0;
         $totalTaxCharged = 0.0;
@@ -1573,7 +1590,7 @@ class FbrService
 
         foreach ($transaction->items as $item) {
             $index++;
-            $quantity = round(floatval($item->quantity), 4);
+            $quantity = $sign * round(floatval($item->quantity), 4);
             $isExempt = (bool) $item->is_tax_exempt;
             $taxRate = $isExempt ? 0.0 : floatval($item->tax_rate);
 
@@ -1581,10 +1598,10 @@ class FbrService
             // and tax-exclusive cart modes (see FbrPosController::store). `subtotal` = net taxable
             // value (excl tax, after this line's item discount); `tax_amount` = tax on that value.
             // Do NOT re-derive from unit_price — that breaks tax-inclusive bills.
-            $saleValue  = round(floatval($item->subtotal), 2);
-            $taxCharged = $isExempt ? 0.00 : round(floatval($item->tax_amount), 2);
-            $itemDiscount = round(floatval($item->item_discount ?? 0), 2);
-            $totalAmount = round($saleValue + $taxCharged, 2); // = stored `total`
+            $saleValue  = $sign * round(floatval($item->subtotal), 2);
+            $taxCharged = $isExempt ? 0.00 : $sign * round(floatval($item->tax_amount), 2);
+            $itemDiscount = $sign * round(floatval($item->item_discount ?? 0), 2);
+            $totalAmount = round($saleValue + $taxCharged, 2); // = stored `total` (negated for returns)
 
             $items[] = [
                 'ItemCode'    => (string) ($item->product_id ?: ('IT-' . $index)),
@@ -1602,8 +1619,8 @@ class FbrService
                 'TaxCharged'  => (float) $taxCharged,
                 'Discount'    => (float) $itemDiscount,
                 'FurtherTax'  => 0.00,
-                'InvoiceType' => 1,
-                'RefUSIN'     => null,
+                'InvoiceType' => $invoiceType,
+                'RefUSIN'     => $refUsin,
             ];
 
             $totalSaleValue  += $saleValue;
@@ -1619,7 +1636,7 @@ class FbrService
         // transaction. Item SaleValues are already net of their own item discounts, so the header
         // Discount carries ONLY this bill-level amount (avoids double-subtraction). FBR IMS header rule:
         // TotalBillAmount = TotalSaleValue + TotalTaxCharged - Discount.
-        $billDiscount = round(floatval($transaction->discount_amount ?? 0), 2);
+        $billDiscount = $sign * round(floatval($transaction->discount_amount ?? 0), 2);
 
         // Fiscal goods total = net sale + tax - bill discount. This equals exactly what the customer
         // pays for goods. The app-only Rs 1 FBR service fee and loyalty redemption are deliberately
@@ -1652,8 +1669,8 @@ class FbrService
             'FurtherTax'       => 0.00,
             'TotalBillAmount'  => (float) $totalBillAmount,
             'PaymentMode'      => $this->mapPaymentModeToImsInt($transaction->payment_method),
-            'RefUSIN'          => null,
-            'InvoiceType'      => 1,
+            'RefUSIN'          => $refUsin,
+            'InvoiceType'      => $invoiceType,
             'Items'            => $items,
         ];
     }
@@ -1677,6 +1694,14 @@ class FbrService
             case 'cheque':
             case 'check':         return 6;
             case 'mixed':         return 5;
+            // Udhaar/Khata (Aug 2026 — Retail Core): IMS has no credit-sale slot;
+            // report as Cash (1) — the fiscal liability is identical, wasooli is
+            // an internal ledger matter, not an FBR event.
+            case 'credit':
+            case 'udhaar':        return 1;
+            // Return refunded into khata — same rationale.
+            case 'khata':         return 1;
+            case 'store_credit':  return 1;
             default:
                 Log::warning("FBR IMS POS: unmapped payment_method '{$method}', defaulting to Cash (1).");
                 return 1;

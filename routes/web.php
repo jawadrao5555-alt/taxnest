@@ -1262,6 +1262,18 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     // Returns / Refunds
     Route::get('/transactions/{id}/return', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'returnForm'])->name('fbrpos.phase2.return.form');
     Route::post('/transactions/{id}/return', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'processReturn'])->name('fbrpos.phase2.return.process');
+
+    // Udhaar / Khata (Aug 2026 — Retail Core)
+    Route::get('/khata', [\App\Http\Controllers\FbrPosKhataController::class, 'index'])->name('fbrpos.khata');
+    Route::get('/khata/{customer}/ledger', [\App\Http\Controllers\FbrPosKhataController::class, 'ledger'])->name('fbrpos.khata.ledger');
+    Route::post('/khata/wasooli', [\App\Http\Controllers\FbrPosKhataController::class, 'wasooli'])->name('fbrpos.khata.wasooli');
+
+    // Stock / Purchase / Suppliers (Aug 2026 — Retail Core)
+    Route::get('/stock', [\App\Http\Controllers\FbrPosStockController::class, 'index'])->name('fbrpos.stock');
+    Route::post('/stock/toggle', [\App\Http\Controllers\FbrPosStockController::class, 'toggle'])->name('fbrpos.stock.toggle');
+    Route::post('/stock/supplier', [\App\Http\Controllers\FbrPosStockController::class, 'storeSupplier'])->name('fbrpos.stock.supplier');
+    Route::post('/stock/purchase', [\App\Http\Controllers\FbrPosStockController::class, 'storePurchase'])->name('fbrpos.stock.purchase');
+    Route::post('/stock/min-level', [\App\Http\Controllers\FbrPosStockController::class, 'updateMinLevel'])->name('fbrpos.stock.minlevel');
 });
 
 Route::get('/setup-migrate-xK9mP2', function () {

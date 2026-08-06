@@ -662,9 +662,9 @@ class FbrPosController extends Controller
             $customersTruncated = (clone $custBase)->count() > $custBakeCap;
             $customers = $customersTruncated
                 ? (clone $custBase)->orderByDesc('updated_at')->limit($custBakeCap)
-                    ->get(['id', 'name', 'phone'])
+                    ->get(['id', 'name', 'phone', 'khata_balance'])
                     ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values()
-                : $custBase->orderBy('name')->get(['id', 'name', 'phone']);
+                : $custBase->orderBy('name')->get(['id', 'name', 'phone', 'khata_balance']);
         }
 
         return view($viewName, compact(
@@ -707,7 +707,9 @@ class FbrPosController extends Controller
             'customer_name' => 'nullable|string|max:255',
             'customer_phone' => 'nullable|string|max:20',
             'customer_ntn' => 'nullable|string|max:30',
-            'payment_method' => 'required|in:cash,card,bank_transfer,online',
+            // 'credit' = Udhaar/Khata sale (Aug 2026 — Retail Core): requires a saved
+            // customer; amount lands in fbr_customer_ledgers + pos_customers.khata_balance.
+            'payment_method' => 'required|in:cash,card,bank_transfer,online,credit',
             'discount_type' => 'nullable|in:percentage,fixed',
             'discount_value' => 'nullable|numeric|min:0',
             'terminal_id' => 'nullable|integer',
@@ -937,6 +939,15 @@ class FbrPosController extends Controller
                     $loyaltyPointsEarned = (int) floor($totalAmount / (float) $loyaltySettings->rs_per_point);
                 }
 
+                // ── UDHAAR GUARD (Aug 2026 — Retail Core) ────────────────────────
+                // Credit sale without a saved customer is meaningless (no one to
+                // collect from). Block server-side; UI enforces it too.
+                if ($request->payment_method === 'credit' && !$request->customer_id) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'customer_id' => 'Udhaar bill ke liye customer chunna zaroori hai.',
+                    ]);
+                }
+
                 // Cash received & change
                 $cashReceived = (float) ($request->cash_received ?? 0);
                 // 💵 SERVER-SIDE CASH GUARD — block sale if cash payment & received < total
@@ -1068,6 +1079,54 @@ class FbrPosController extends Controller
 
                 foreach ($itemsData as $itemData) {
                     $transaction->items()->create($itemData);
+                }
+
+                // ── UDHAAR/KHATA LEDGER (Aug 2026 — Retail Core) ─────────────────
+                // Same DB transaction as the sale: ledger row + cached balance move
+                // together or not at all.
+                if ($request->payment_method === 'credit' && $request->customer_id) {
+                    $khataCustomer = \App\Models\PosCustomer::lockForUpdate()->find($request->customer_id);
+                    if ($khataCustomer) {
+                        $newBalance = round((float) $khataCustomer->khata_balance + $totalAmount, 2);
+                        \App\Models\FbrCustomerLedger::create([
+                            'company_id' => $companyId,
+                            'customer_id' => $khataCustomer->id,
+                            'entry_type' => 'udhaar',
+                            'amount' => $totalAmount,
+                            'balance_after' => $newBalance,
+                            'transaction_id' => $transaction->id,
+                            'note' => "Udhaar bill {$invoiceNumber}",
+                            'created_by' => Auth::guard('fbrpos')->id(),
+                        ]);
+                        $khataCustomer->update(['khata_balance' => $newBalance]);
+                    }
+                }
+
+                // ── STOCK DEDUCT (Aug 2026 — Retail Core) ────────────────────────
+                // Only when the company has stock tracking ON. Sale is NEVER blocked
+                // by stock (retail reality: bill first, count later) — quantity may
+                // go negative and shows as a red badge in the stock report.
+                if ($company->inventory_enabled) {
+                    foreach ($itemsData as $itemData) {
+                        if (!empty($itemData['product_id']) && (float) $itemData['quantity'] > 0) {
+                            try {
+                                \App\Services\InventoryService::deductStock(
+                                    $companyId,
+                                    $itemData['product_id'],
+                                    (float) $itemData['quantity'],
+                                    (float) $itemData['unit_price'],
+                                    \App\Models\InventoryMovement::TYPE_SALE,
+                                    null,
+                                    ['type' => 'fbr_pos_transaction', 'id' => $transaction->id, 'number' => $invoiceNumber],
+                                    null,
+                                    Auth::guard('fbrpos')->id()
+                                );
+                            } catch (\Throwable $stockEx) {
+                                // Stock failure must NEVER kill a sale — log and move on.
+                                Log::warning('FBR POS stock deduct failed', ['tx' => $transaction->id, 'err' => $stockEx->getMessage()]);
+                            }
+                        }
+                    }
                 }
 
                 return $transaction;
@@ -2973,12 +3032,14 @@ class FbrPosController extends Controller
             'sku' => 'nullable|string|max:64',
             'tax_type' => 'required|in:taxable,exempt,custom',
             'default_tax_rate' => 'nullable|numeric|min:0|max:100',
+            'opening_stock' => 'nullable|numeric|min:0',
+            'min_stock_level' => 'nullable|numeric|min:0',
         ]);
 
         $taxType = $request->tax_type;
         $taxRate = $taxType === 'taxable' ? 18 : ($taxType === 'exempt' ? 0 : ($request->default_tax_rate ?? 0));
 
-        Product::create([
+        $product = Product::create([
             'company_id' => app('currentCompanyId'),
             'name' => $request->name,
             'barcode' => $request->barcode ?: null,
@@ -2990,6 +3051,9 @@ class FbrPosController extends Controller
             'tax_type' => $taxType,
             'default_tax_rate' => $taxRate,
         ]);
+
+        // Retail Core (Aug 2026): optional opening stock + low-stock threshold.
+        $this->applyProductStockFields($request, $product);
 
         return redirect()->route('fbrpos.products')->with('success', __('pos.product_created_success'));
     }
@@ -3017,6 +3081,8 @@ class FbrPosController extends Controller
             'sku' => 'nullable|string|max:64',
             'tax_type' => 'required|in:taxable,exempt,custom',
             'default_tax_rate' => 'nullable|numeric|min:0|max:100',
+            'opening_stock' => 'nullable|numeric|min:0',
+            'min_stock_level' => 'nullable|numeric|min:0',
         ]);
 
         $taxType = $request->tax_type;
@@ -3034,7 +3100,54 @@ class FbrPosController extends Controller
             'default_tax_rate' => $taxRate,
         ]);
 
+        // Retail Core (Aug 2026): optional opening stock + low-stock threshold.
+        $this->applyProductStockFields($request, $product);
+
         return redirect()->route('fbrpos.products')->with('success', __('pos.product_updated_success'));
+    }
+
+    /**
+     * Retail Core (Aug 2026): apply the optional stock fields from the product
+     * form. min_stock_level always saves (it's just a threshold). opening_stock
+     * adds an OPENING movement — only when a value > 0 is supplied AND the
+     * product has no opening movement yet (never duplicates on edit re-save).
+     */
+    private function applyProductStockFields(Request $request, Product $product): void
+    {
+        $companyId = app('currentCompanyId');
+
+        if ($request->filled('min_stock_level')) {
+            $stock = \App\Models\InventoryStock::firstOrCreate(
+                ['company_id' => $companyId, 'product_id' => $product->id, 'branch_id' => null],
+                ['quantity' => 0, 'min_stock_level' => 0, 'avg_purchase_price' => 0, 'last_purchase_price' => 0]
+            );
+            $stock->update(['min_stock_level' => (float) $request->min_stock_level]);
+        }
+
+        $opening = (float) ($request->opening_stock ?? 0);
+        if ($opening > 0) {
+            $alreadyHasOpening = \App\Models\InventoryMovement::where('company_id', $companyId)
+                ->where('product_id', $product->id)
+                ->where('type', \App\Models\InventoryMovement::TYPE_OPENING)
+                ->exists();
+            if (!$alreadyHasOpening) {
+                try {
+                    \App\Services\InventoryService::addStock(
+                        $companyId,
+                        $product->id,
+                        $opening,
+                        0,
+                        \App\Models\InventoryMovement::TYPE_OPENING,
+                        null,
+                        ['type' => 'product_form', 'id' => $product->id, 'number' => null],
+                        'Opening stock (product form)',
+                        Auth::guard('fbrpos')->id()
+                    );
+                } catch (\Throwable $e) {
+                    Log::warning('FBR POS opening stock failed', ['product' => $product->id, 'err' => $e->getMessage()]);
+                }
+            }
+        }
     }
 
     public function toggleProduct($id)
@@ -3271,7 +3384,7 @@ class FbrPosController extends Controller
                     ->orWhereRaw('LOWER(phone) LIKE ?', ['%' . strtolower($q) . '%']);
             })
             ->limit(8)
-            ->get(['id', 'name', 'phone', 'email', 'address']);
+            ->get(['id', 'name', 'phone', 'email', 'address', 'khata_balance']);
 
         $result = [];
         foreach ($customers as $c) {
@@ -3286,6 +3399,8 @@ class FbrPosController extends Controller
                 'name' => $c->name,
                 'phone' => $c->phone,
                 'address' => $c->address,
+                // Retail Core (Aug 2026): udhaar balance shown on the selected-customer card.
+                'khata_balance' => round((float) ($c->khata_balance ?? 0), 2),
                 'stats' => [
                     'total_orders' => $totalOrders,
                     'total_spent' => round((float) ($agg->total ?? 0), 2),

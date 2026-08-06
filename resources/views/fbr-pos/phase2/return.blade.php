@@ -41,6 +41,9 @@
                     <option value="cash">{{ __('pos.cash_refund') }}</option>
                     <option value="card">{{ __('pos.card_bank_refund') }}</option>
                     <option value="store_credit">{{ __('pos.store_credit') }}</option>
+                    @if($original->customer_id)
+                    <option value="khata">{{ __('pos.khata_adjust_option') }}</option>
+                    @endif
                 </select>
             </div>
             <div class="flex items-end">

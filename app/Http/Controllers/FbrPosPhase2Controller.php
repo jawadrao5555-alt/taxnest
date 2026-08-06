@@ -382,8 +382,14 @@ class FbrPosPhase2Controller extends Controller
             'items' => 'required|array|min:1',
             'items.*.item_id' => 'required|integer',
             'items.*.return_qty' => 'required|numeric|min:0',
-            'refund_method' => 'required|in:cash,card,store_credit',
+            // 'khata' (Aug 2026 — Retail Core): refund goes into the customer's
+            // udhaar ledger as a credit (balance DOWN) instead of cash out.
+            'refund_method' => 'required|in:cash,card,store_credit,khata',
         ]);
+
+        if ($r->refund_method === 'khata' && !$original->customer_id) {
+            return back()->with('error', 'Khata refund ke liye bill par customer hona zaroori hai.');
+        }
 
         return DB::transaction(function () use ($r, $original) {
             $totalSubtotal = 0; $totalTax = 0; $totalDiscount = 0;
@@ -460,6 +466,63 @@ class FbrPosPhase2Controller extends Controller
             foreach ($returnItems as $it) {
                 $it['transaction_id'] = $return->id;
                 FbrPosTransactionItem::create($it);
+            }
+
+            // ── KHATA REFUND (Aug 2026 — Retail Core) ────────────────────────────
+            // Refund credited into the customer's udhaar ledger — balance goes DOWN.
+            if ($r->refund_method === 'khata' && $original->customer_id) {
+                $cust = \App\Models\PosCustomer::lockForUpdate()->find($original->customer_id);
+                if ($cust) {
+                    $newBalance = round((float) $cust->khata_balance - (float) $return->total_amount, 2);
+                    \App\Models\FbrCustomerLedger::create([
+                        'company_id' => $this->companyId(),
+                        'customer_id' => $cust->id,
+                        'entry_type' => 'return_adjust',
+                        'amount' => -1 * (float) $return->total_amount,
+                        'balance_after' => $newBalance,
+                        'transaction_id' => $return->id,
+                        'note' => "Return {$invNum} — khata adjust (bill {$original->invoice_number})",
+                        'created_by' => $this->user()->id,
+                    ]);
+                    $cust->update(['khata_balance' => $newBalance]);
+                }
+            }
+
+            // ── STOCK RESTORE (Aug 2026 — Retail Core) ───────────────────────────
+            // Returned goods go back on the shelf when stock tracking is ON.
+            $company = \App\Models\Company::find($this->companyId());
+            if ($company && $company->inventory_enabled) {
+                foreach ($returnItems as $it) {
+                    if (!empty($it['product_id']) && (float) $it['quantity'] > 0) {
+                        try {
+                            \App\Services\InventoryService::addStock(
+                                $this->companyId(),
+                                $it['product_id'],
+                                (float) $it['quantity'],
+                                (float) $it['unit_price'],
+                                \App\Models\InventoryMovement::TYPE_RETURN_IN,
+                                null,
+                                ['type' => 'fbr_pos_return', 'id' => $return->id, 'number' => $invNum],
+                                null,
+                                $this->user()->id
+                            );
+                        } catch (\Throwable $stockEx) {
+                            \Illuminate\Support\Facades\Log::warning('FBR POS return stock restore failed', ['tx' => $return->id, 'err' => $stockEx->getMessage()]);
+                        }
+                    }
+                }
+            }
+
+            // ── FBR CREDIT NOTE (Aug 2026 — Retail Core) ─────────────────────────
+            // If the ORIGINAL bill was FBR-submitted and reporting is ON, queue this
+            // return for the Desktop Agent exactly like a sale — buildFbrPosPayload
+            // detects transaction_type='return' and emits InvoiceType=3 + RefUSIN +
+            // negative quantities (IMS credit-note model). Without an FBR-numbered
+            // parent the credit note has no RefUSIN, so it stays local.
+            if ($company && $company->fbr_reporting_enabled
+                && !empty($original->fbr_invoice_number)
+                && $company->agentServesFbr() && $company->agent_enabled) {
+                $return->update(['fbr_status' => 'pending']);
             }
 
             return redirect()->route('fbrpos.show', $return->id)

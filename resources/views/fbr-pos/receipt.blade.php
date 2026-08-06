@@ -86,7 +86,8 @@
         .totals-table .tot-value { text-align: right; white-space: nowrap; color: #000; font-weight: bold; }
         .totals-table .grand-total td { font-size: {{ $is58 ? '15px' : '17px' }}; font-weight: 900; padding: 6px 4px; color: #000; border-top: 2.5px solid #000; border-bottom: 2.5px solid #000; letter-spacing: 0.3px; }
 
-        .fbr-badge { border: 2px solid #000; padding: 6px; margin: 6px 0; text-align: center; font-size: 10px; overflow: hidden; color: #000; font-weight: 600; }
+        {{-- Owner (6 Aug 2026): QR box standard/compact size — chhota padding + patla border. --}}
+        .fbr-badge { border: 1.5px solid #000; padding: 4px; margin: 5px 0; text-align: center; font-size: 10px; overflow: hidden; color: #000; font-weight: 600; }
         .fbr-badge .fbr-title { font-size: 12px; font-weight: bold; margin-bottom: 3px; color: #000; }
         .fbr-badge .fbr-number { font-size: 9px; font-weight: bold; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; max-width: 100%; display: block; color: #000; }
         .footer { margin-top: 4px; font-size: 10px; line-height: 1.5; color: #000; font-weight: 600; }
@@ -353,8 +354,8 @@
          yahan se hataye (POS Reg # footer mein pehle se maujood hai). --}}
     @if($transaction->fbr_status === 'submitted' && $transaction->fbr_invoice_number)
     <div class="fbr-badge">
-        <div style="margin: 6px 0;">
-            <img src="{{ $qrUrl }}" alt="FBR QR Code" style="width:100px; height:100px; margin:0 auto; display:block;">
+        <div style="margin: 3px 0;">
+            <img src="{{ $qrUrl }}" alt="FBR QR Code" style="width:{{ $is58 ? '60px' : '70px' }}; height:{{ $is58 ? '60px' : '70px' }}; margin:0 auto; display:block;">
         </div>
         <div class="fbr-number">FBR: {{ $transaction->fbr_invoice_number }}</div>
         <div style="font-size:9px; margin-top:3px;">{{ __('pos.receipt_scan_verify_fbr') }}</div>
@@ -362,8 +363,8 @@
     @elseif(!$fbrRcptTopBadge)
     <div class="fbr-badge" style="border-style: dashed;">
         <div class="fbr-title">⏳ {{ __('pos.rcpt_fbr_pending') }}</div>
-        <div style="margin: 6px 0;">
-            <img src="{{ $qrUrl }}" alt="QR Code" style="width:100px; height:100px; margin:0 auto; display:block;">
+        <div style="margin: 3px 0;">
+            <img src="{{ $qrUrl }}" alt="QR Code" style="width:{{ $is58 ? '60px' : '70px' }}; height:{{ $is58 ? '60px' : '70px' }}; margin:0 auto; display:block;">
         </div>
         <div>POS: {{ $transaction->invoice_number }}</div>
         <div style="font-size:10px; margin-top:3px;">{{ __('pos.rcpt_will_retry') }}</div>
@@ -372,7 +373,7 @@
     {{-- Owner (22 Jul 2026): SALE RECEIPT / PROVISIONAL bills also carry a QR at the
          bottom — same as PRA finals — so every bill is scannable. --}}
     <div style="text-align: center; margin: 4px 0;">
-        <img src="{{ $qrUrl }}" alt="QR Code" style="width:{{ $is58 ? '85px' : '100px' }}; height:{{ $is58 ? '85px' : '100px' }}; margin:0 auto; display:block;">
+        <img src="{{ $qrUrl }}" alt="QR Code" style="width:{{ $is58 ? '60px' : '70px' }}; height:{{ $is58 ? '60px' : '70px' }}; margin:0 auto; display:block;">
         <div style="font-size:9px; margin-top:2px;">{{ __('pos.receipt_scan_details') }}</div>
     </div>
     @endif

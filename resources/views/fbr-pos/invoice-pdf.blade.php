@@ -72,7 +72,7 @@
         .grand-total-box .lbl { display: table-cell; text-align: left; font-size: 16px; font-weight: bold; color: #ffffff; vertical-align: middle; }
         .grand-total-box .val { display: table-cell; text-align: right; font-size: 16px; font-weight: bold; color: #ffffff; vertical-align: middle; }
 
-        .fbr-box { border: 2px solid #1e3a5f; padding: 8px; margin: 6px 0; text-align: center; }
+        .fbr-box { border: 1.5px solid #1e3a5f; padding: 6px; margin: 6px 0; text-align: center; }
         .fbr-box .title { font-size: 11px; font-weight: bold; color: #1e3a5f; margin-bottom: 3px; letter-spacing: 0.5px; text-transform: uppercase; }
         .fbr-box .num { font-size: 10px; font-weight: bold; color: #000000; }
         .fbr-box div { color: #000000; font-size: 10px; }
@@ -239,7 +239,7 @@
         @php $fbrQr = \App\Support\QrImage::dataUri($transaction->fbr_invoice_number); @endphp
         <div class="fbr-box">
             @if($fbrQr)
-            <img src="{{ $fbrQr }}" alt="FBR QR" style="width: 110px; height: 110px; margin: 4px auto; display: block;">
+            <img src="{{ $fbrQr }}" alt="FBR QR" style="width: 80px; height: 80px; margin: 3px auto; display: block;">
             @endif
             <div class="num">FBR: {{ $transaction->fbr_invoice_number }}</div>
             <div style="font-size:9px; margin-top:3px;">{{ __('pos.receipt_scan_verify_fbr') }}</div>

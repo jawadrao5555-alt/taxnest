@@ -222,24 +222,14 @@
         <div class="tb-title">{{ $fbrRcptTopProvisional ? __('pos.receipt_provisional_bill') : __('pos.receipt_sale_receipt') }}</div>
         <div class="tb-serial">{{ $transaction->invoice_number }}</div>
     </div>
-    @else
-    <div class="invoice-numbers">
-        <table class="inv-table">
-            <tr>
-                <td class="inv-label">{{ __('pos.receipt_pos_invoice') }}:</td>
-                <td class="inv-value">{{ $transaction->invoice_number }}</td>
-            </tr>
-            @if($transaction->fbr_invoice_number)
-            <tr>
-                <td class="inv-label">{{ __('pos.receipt_fbr_invoice') }}:</td>
-                <td class="inv-value">{{ $transaction->fbr_invoice_number }}</td>
-            </tr>
-            @endif
-        </table>
-    </div>
     @endif
+    {{-- Owner (6 Aug 2026): POS/FBR invoice-numbers ka boxed table hata diya —
+         FBR number neeche QR box mein hai, POS invoice number ab details mein. --}}
 
     <table class="info-table">
+        @if(!$fbrRcptTopBadge)
+        <tr><td class="info-label">{{ __('pos.receipt_pos_invoice') }}:</td><td class="info-value">{{ $transaction->invoice_number }}</td></tr>
+        @endif
         <tr><td class="info-label">{{ __('pos.receipt_date') }}:</td><td class="info-value">{{ $transaction->created_at->format('d/m/Y h:i A') }}</td></tr>
         @if($transaction->customer_name)
         <tr><td class="info-label">{{ __('pos.receipt_customer') }}:</td><td class="info-value">{{ $transaction->customer_name }}</td></tr>
@@ -255,9 +245,7 @@
         @if($rd['show_cashier'] && $transaction->creator)
         <tr><td class="info-label">{{ __('pos.receipt_cashier') }}:</td><td class="info-value">{{ $transaction->creator->name }}</td></tr>
         @endif
-        @if($company->fbr_pos_id)
-        <tr><td class="info-label">{{ __('pos.rcpt_pos_reg_hash') }}:</td><td class="info-value">{{ $company->fbr_pos_id }}</td></tr>
-        @endif
+        {{-- Owner (6 Aug 2026): POS Reg # kisi jagah nahi dikhana. --}}
     </table>
 
     <div class="separator"></div>
@@ -379,9 +367,6 @@
         </div>
         <div>POS: {{ $transaction->invoice_number }}</div>
         <div style="font-size:10px; margin-top:3px;">{{ __('pos.rcpt_will_retry') }}</div>
-        @if($company->fbr_pos_id)
-        <div style="font-size:9px; margin-top:3px;">{{ __('pos.rcpt_pos_reg_hash') }}: {{ $company->fbr_pos_id }}</div>
-        @endif
     </div>
     @else
     {{-- Owner (22 Jul 2026): SALE RECEIPT / PROVISIONAL bills also carry a QR at the
@@ -400,10 +385,11 @@
         @endif
         @endif
         @if($company->fbr_pos_id)
-        <p style="font-weight:bold;">{{ __('pos.rcpt_fbr_integrated') }} | {{ __('pos.rcpt_reg_hash') }}: {{ $company->fbr_pos_id }}</p>
+        <p style="font-weight:bold;">{{ __('pos.rcpt_fbr_integrated') }}</p>
         @endif
         <p>{{ __('pos.dcp_powered_taxnest_fbr') }}</p>
-        <p>{{ now()->format('d/m/Y h:i:s A') }}</p>
+        {{-- Owner (6 Aug 2026): print-time timestamp hataya — Date upar details
+             mein pehle se hai (do jaga date/time confusion khatam). --}}
     </div>
     </div>{{-- /.receipt-wrap --}}
 </body>

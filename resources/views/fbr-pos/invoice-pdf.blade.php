@@ -126,18 +126,8 @@
                 <div class="lbl">{{ __('pos.receipt_pos_invoice') }}:</div>
                 <div class="val">{{ $transaction->invoice_number }}</div>
             </div>
-            @if($transaction->fbr_invoice_number)
-            <div class="invoice-row">
-                <div class="lbl">{{ __('pos.receipt_fbr_invoice') }}:</div>
-                <div class="val">{{ $transaction->fbr_invoice_number }}</div>
-            </div>
-            @endif
-            @if($company->fbr_pos_id)
-            <div class="invoice-row">
-                <div class="lbl">{{ __('pos.rcpt_pos_registration_hash') }}:</div>
-                <div class="val">{{ $company->fbr_pos_id }}</div>
-            </div>
-            @endif
+            {{-- Owner (6 Aug 2026): FBR invoice number sirf neeche QR box mein;
+                 POS Reg # kisi jagah nahi. --}}
         </div>
 
         <div class="info-section">
@@ -302,10 +292,10 @@
             @endif
             @endif
             @if($company->fbr_pos_id)
-            <p style="font-weight:bold; color:#1e3a5f;">{{ __('pos.rcpt_fbr_integrated') }} | {{ __('pos.rcpt_reg_hash') }}: {{ $company->fbr_pos_id }}</p>
+            <p style="font-weight:bold; color:#1e3a5f;">{{ __('pos.rcpt_fbr_integrated') }}</p>
             @endif
             <div class="brand">{{ __('pos.dcp_powered_taxnest_fbr') }}</div>
-            <p>{{ now()->format('d/m/Y h:i:s A') }}</p>
+            {{-- Owner (6 Aug 2026): print-time timestamp hataya — Date info mein hai. --}}
         </div>
     </div>
 </body>

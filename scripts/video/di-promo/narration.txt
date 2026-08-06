@@ -1,0 +1,39 @@
+# DI Promo — 12-segment Urdu narration (ElevenLabs TTS source)
+# Voice: v1PxIIJZSZzAub07hKLn  Model: eleven_v3
+# Each line is one segment (seg01..seg12). Blank lines ignored by di-tts.sh.
+# ─────────────────────────────────────────────────────────────────────────────
+# seg01 — hook card (~4.2s)
+کیا آپ کا کاروبار FBR registered ہے؟ ہر invoice قانونی ہونا ضروری ہے۔
+
+# seg02 — brand card (~4.1s)
+TaxNest کا Digital Invoice — آسان، تیز، اور مکمل FBR invoicing solution۔
+
+# seg03 — register form (~4.3s)
+رجسٹریشن صرف چند منٹوں میں — اپنا کاروبار آج ہی شروع کریں۔
+
+# seg04 — dashboard (~4.3s)
+آپ کا dashboard — invoices، compliance score، اور revenue ایک نظر میں۔
+
+# seg05 — invoice create (~5.6s)
+نیا invoice بنانا بالکل آسان ہے — buyer کی details اور items درج کریں، باقی ہم سنبھال لیتے ہیں۔
+
+# seg06 — submit modal (~4.1s)
+ایک click سے FBR کو invoice submit کریں — real-time confirmation۔
+
+# seg07 — invoice show QR+FBR number (~5.0s)
+FBR production number اور QR code فوری مل جاتے ہیں — buyer کو share کریں۔
+
+# seg08 — compliance card (~3.7s)
+ہر بل FBR compliant — risk score، smart mode، integrity check کے ساتھ۔
+
+# seg09 — invoice list + dashboard (~4.1s)
+تمام submitted invoices ایک جگہ — production status، FBR numbers، اور exports۔
+
+# seg10 — features card (~4.7s)
+Invoice، FBR reporting، PDF، email، QR code، اور AI reader — سب ایک platform پر۔
+
+# seg11 — CTA card (~3.3s)
+آج ہی مفت trial شروع کریں۔
+
+# seg12 — end card (~2.3s)
+taxnest.com.pk

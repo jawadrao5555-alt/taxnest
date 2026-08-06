@@ -3777,6 +3777,14 @@ return [
     'tutorials_sub' => 'چھوٹی چھوٹی اردو ویڈیوز — ہر فیچر آرام سے دیکھ کر سیکھیں۔',
     'tutorials_more_soon' => 'مزید ویڈیوز جلد آ رہی ہیں۔',
     'tutorials_watch_public' => 'یہ ویڈیوز ہماری ویب سائٹ پر بھی ہیں — اپنی ٹیم کو لنک بھیجیں۔',
+    'tutorials_pub_hero_h1' => 'NestPOS اور FBR POS چلانا سیکھیں',
+    'tutorials_pub_hero_sub' => 'چھوٹی چھوٹی اردو ویڈیوز — اکاؤنٹ بنانے سے لے کر بل، کسٹمرز اور رپورٹس تک۔ ہر پروڈکٹ کا اپنا سیکشن، ہر فیچر آرام سے سیکھیں۔',
+    'tutorials_pub_empty' => 'ویڈیوز جلد اسی پیج پر آئیں گی — تھوڑی دیر بعد پھر کھولیے۔',
+    'tutorials_pub_more_title' => 'اور ویڈیوز جلد اسی پیج پر',
+    'tutorials_pub_more_sub' => 'پروڈکٹس، انوینٹری، رپورٹس، ریستوران اور ڈے کلوز — ہر فیچر کی الگ ویڈیو، سب اسی پیج پر۔',
+    'tutorials_pub_offline' => 'آف لائن بلنگ بھی NestPOS کا حصہ ہے — بجلی یا انٹرنیٹ بند، بلنگ پھر بھی چلتی ہے۔ اس کی ویڈیو جلد۔',
+    'tutorials_pub_cta' => 'مفت ٹرائل — آج ہی شروع کریں',
+    'tutorials_pub_ask' => 'سوال پوچھیں',
 
     // Deliveries board tabs + date filter (owner, 4 Aug 2026)
     'del_tab_pending_sub' => 'تفویض و روانہ',

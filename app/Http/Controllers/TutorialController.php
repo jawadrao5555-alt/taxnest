@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Company;
 use App\Models\TutorialVideo;
+use Illuminate\Support\Facades\App;
 
 /**
  * Urdu tutorial video library (owner request, 2-3 Aug 2026):
@@ -45,6 +46,10 @@ class TutorialController extends Controller
                 ];
             }
         }
+
+        // Public marketing page is always Roman Urdu for Pakistani visitors.
+        // Setting locale here ensures __() calls in the view resolve correctly.
+        App::setLocale('rur');
 
         return view('tutorials', ['products' => $products]);
     }

@@ -3776,6 +3776,14 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'tutorials_sub' => 'Chhoti chhoti Urdu videos — har feature aaram se dekh kar seekhein.',
     'tutorials_more_soon' => 'Aur videos jald aa rahi hain.',
     'tutorials_watch_public' => 'Yeh videos hamari website par bhi hain — apni team ko link bhejein.',
+    'tutorials_pub_hero_h1' => 'NestPOS aur FBR POS chalana seekhein',
+    'tutorials_pub_hero_sub' => 'Chhoti chhoti Urdu videos — account banane se le kar bill, customers aur reports tak. Har product ka apna section, har feature aaram se seekhein.',
+    'tutorials_pub_empty' => 'Videos jald isi page par aayengi — thodi der baad phir kholiye.',
+    'tutorials_pub_more_title' => 'Aur videos jald isi page par',
+    'tutorials_pub_more_sub' => 'Products, inventory, reports, restaurant aur day close — har feature ki alag video, sab isi page par.',
+    'tutorials_pub_offline' => 'Offline billing bhi NestPOS ka hissa — bijli ya internet band, billing phir bhi chalti. Is ki video jald.',
+    'tutorials_pub_cta' => 'Muft Trial — aaj hi shuru',
+    'tutorials_pub_ask' => 'Sawal poochein',
 
     // Deliveries board tabs + date filter (owner, 4 Aug 2026)
     'del_tab_pending_sub' => 'Assigned aur dispatched',

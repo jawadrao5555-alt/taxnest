@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#052730">
-    <title>Video Tutorials — NestPOS chalana seekhein | TaxNest</title>
+    <title>Video Tutorials — NestPOS aur FBR POS | TaxNest</title>
     <meta name="description" content="Chhoti chhoti Urdu videos — account banane se le kar bill, customers, products aur reports tak, NestPOS ka har feature aaram se seekhein.">
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap" rel="stylesheet">
@@ -42,7 +42,7 @@
                     <a href="/" class="text-sm font-medium text-gray-600 hover:text-gray-900">Home</a>
                     <a href="/pos" class="hidden sm:inline text-sm font-medium text-gray-600 hover:text-gray-900">NestPOS</a>
                     <a href="/pos/login" class="text-sm font-medium text-gray-600 hover:text-gray-900">Log In</a>
-                    <a href="/pos/register" class="text-sm font-semibold text-white px-4 py-2 rounded-lg" style="background: var(--teal-main);">Muft Trial</a>
+                    <a href="/pos/register" class="text-sm font-semibold text-white px-4 py-2 rounded-lg" style="background: var(--teal-main);">{{ __('pos.tutorials_pub_cta') }}</a>
                 </div>
             </div>
         </div>
@@ -52,8 +52,8 @@
     <header class="pt-16" style="background: linear-gradient(160deg, var(--teal-dark) 0%, var(--teal-main) 100%);">
         <div class="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-16 text-center">
             <p class="text-xs sm:text-sm font-bold uppercase tracking-widest mb-3" style="color: var(--gold);">Video Tutorials</p>
-            <h1 class="text-3xl sm:text-5xl font-bold text-white mb-4">NestPOS aur FBR POS chalana seekhein</h1>
-            <p class="text-sm sm:text-base text-gray-200 max-w-2xl mx-auto">Chhoti chhoti Urdu videos — account banane se le kar bill, customers aur reports tak. Har product ka alag section — sab features aasani se seekhein.</p>
+            <h1 class="text-3xl sm:text-5xl font-bold text-white mb-4">{{ __('pos.tutorials_pub_hero_h1') }}</h1>
+            <p class="text-sm sm:text-base text-gray-200 max-w-2xl mx-auto">{{ __('pos.tutorials_pub_hero_sub') }}</p>
         </div>
     </header>
 
@@ -91,17 +91,17 @@
             @endforeach
         </section>
         @empty
-        <p class="text-center text-gray-500 py-16">Videos jald isi page par aayengi — thodi der baad phir kholiye.</p>
+        <p class="text-center text-gray-500 py-16">{{ __('pos.tutorials_pub_empty') }}</p>
         @endforelse
 
         <!-- More coming + help strip -->
         <div class="rounded-2xl border border-gray-200 bg-white p-6 sm:p-8 text-center">
-            <p class="text-sm sm:text-base font-semibold text-gray-900 mb-1">Aur videos jald isi page par</p>
-            <p class="text-xs sm:text-sm text-gray-500 mb-1">Products, inventory, reports, restaurant aur day close — har feature ki alag video, sab isi page par.</p>
-            <p class="text-xs sm:text-sm text-gray-500 mb-4">Offline billing bhi NestPOS ka hissa — bijli ya internet band, billing phir bhi chalti. Is ki video jald.</p>
+            <p class="text-sm sm:text-base font-semibold text-gray-900 mb-1">{{ __('pos.tutorials_pub_more_title') }}</p>
+            <p class="text-xs sm:text-sm text-gray-500 mb-1">{{ __('pos.tutorials_pub_more_sub') }}</p>
+            <p class="text-xs sm:text-sm text-gray-500 mb-4">{{ __('pos.tutorials_pub_offline') }}</p>
             <div class="flex flex-wrap items-center justify-center gap-3">
-                <a href="/pos/register" class="text-sm font-semibold text-white px-5 py-2.5 rounded-lg" style="background: var(--teal-main);">Muft Trial — aaj hi shuru</a>
-                <a href="/contact" class="text-sm font-semibold px-5 py-2.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">Sawal poochein</a>
+                <a href="/pos/register" class="text-sm font-semibold text-white px-5 py-2.5 rounded-lg" style="background: var(--teal-main);">{{ __('pos.tutorials_pub_cta') }}</a>
+                <a href="/contact" class="text-sm font-semibold px-5 py-2.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">{{ __('pos.tutorials_pub_ask') }}</a>
             </div>
         </div>
     </main>

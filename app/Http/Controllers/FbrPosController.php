@@ -1805,45 +1805,6 @@ class FbrPosController extends Controller
         return view('fbr-pos.settings', compact('company', 'fbrLogs', 'maskedPosToken', 'maskedAccessCode', 'hasSandboxFallback', 'hasProductionFallback'));
     }
 
-    /**
-     * FBR POS receipt print-style settings (bold + logo position).
-     * Stored in invoice_display_prefs['pos_style'] — same key as PRA, so
-     * posReceiptStyle() reads changes here immediately on the FBR receipt.
-     * logo_finals_only is deliberately omitted: FBR POS has no local-bill flow.
-     */
-    public function fbrReceiptSettings(Request $request)
-    {
-        $companyId = app('currentCompanyId');
-        $company   = Company::find($companyId);
-        $user      = Auth::guard('fbrpos')->user();
-
-        if ($user->role !== 'company_admin') {
-            abort(403);
-        }
-
-        if ($request->isMethod('post')) {
-            $request->validate([
-                'rp_style_bold'  => 'nullable|in:1',
-                'rp_logo_style'  => 'required|in:side,center',
-            ]);
-
-            $prefs = $company->invoice_display_prefs ?? [];
-            $style = is_array($prefs['pos_style'] ?? null) ? $prefs['pos_style'] : [];
-
-            // Preserve keys we don't touch on this page (show_logo, logo_finals_only,
-            // show_menu_qr, pdf_paper) so saving here never clobbers PRA settings.
-            $style['bold'] = $request->has('rp_style_bold');
-            $style['logo'] = $request->input('rp_logo_style', 'center');
-
-            $prefs['pos_style'] = $style;
-            $company->update(['invoice_display_prefs' => $prefs]);
-
-            return back()->with('success', __('pos.receipt_style_saved'));
-        }
-
-        return view('fbr-pos.receipt-settings', compact('company'));
-    }
-
     public function testConnection()
     {
         $companyId = app('currentCompanyId');

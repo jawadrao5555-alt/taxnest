@@ -10,8 +10,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.os.Message
-import android.view.View
-import android.widget.FrameLayout
 import android.webkit.CookieManager
 import android.webkit.DownloadListener
 import android.webkit.URLUtil
@@ -25,24 +23,25 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 
 /**
- * TaxNest DI (Digital Invoicing) — thin WebView shell around https://taxnest.com.pk.
+ * TaxNest POS (PRA) — thin WebView shell around https://taxnest.com.pk.
  *
  * Deliberately "dumb": ALL product logic lives on the server, so web deploys
  * update the app instantly and this APK almost never needs a re-release.
- * Every DI user logs in with their normal web credentials and lands on their
- * own role-based screen — server-side routing decides, not the app.
+ * Every POS role logs in with their normal web credentials — owner, admin,
+ * cashier, waiter, kitchen, rider — and lands on their own role-based screen,
+ * exactly like the website (server-side routing decides, not the app).
  *
  * What the shell DOES handle natively:
  *  - keeping navigation inside taxnest.com.pk (everything else → system apps:
  *    tel:, WhatsApp, external sites)
- *  - target=_blank popups (invoice PDFs etc.) routed back into the same view
+ *  - target=_blank popups (receipt PDFs etc.) routed back into the same view
  *  - file downloads (PDF/Excel exports) via DownloadManager WITH session
  *    cookies (authenticated URLs)
  *  - file uploads (product photos, payment proofs) via the system picker
  *  - hardware back = web history back (never accidental exit)
  *  - offline error page in Urdu with a retry button
  *  - rotation survives without reloading (configChanges in the manifest) so
- *    a half-built invoice is never lost
+ *    a half-built bill is never lost
  */
 class MainActivity : Activity() {
 
@@ -55,12 +54,6 @@ class MainActivity : Activity() {
     private lateinit var web: WebView
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private var lastMainFrameUrl: String = START_URL
-
-    // Fullscreen <video> support: tutorial videos ka fullscreen button WebView
-    // mein tab hi chalta hai jab shell onShowCustomView de. Video ek overlay
-    // view ban kar aata hai.
-    private var customVideoView: View? = null
-    private var customViewCallback: WebChromeClient.CustomViewCallback? = null
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -109,40 +102,6 @@ class MainActivity : Activity() {
         }
 
         web.webChromeClient = object : WebChromeClient() {
-            // Fullscreen video: bina in overrides ke video ka fullscreen button
-            // dabane par kuch NAHI hota (WebView default = unsupported). Video
-            // view decor par overlay hota hai, system bars chhup jaati hain;
-            // back/exit par sab waisa hi wapas.
-            override fun onShowCustomView(view: View, callback: CustomViewCallback) {
-                if (customVideoView != null) { callback.onCustomViewHidden(); return }
-                customVideoView = view
-                customViewCallback = callback
-                web.visibility = View.GONE
-                (window.decorView as FrameLayout).addView(
-                    view,
-                    FrameLayout.LayoutParams(
-                        FrameLayout.LayoutParams.MATCH_PARENT,
-                        FrameLayout.LayoutParams.MATCH_PARENT
-                    )
-                )
-                @Suppress("DEPRECATION")
-                window.decorView.systemUiVisibility =
-                    View.SYSTEM_UI_FLAG_FULLSCREEN or
-                    View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-            }
-
-            override fun onHideCustomView() {
-                val v = customVideoView ?: return
-                (window.decorView as FrameLayout).removeView(v)
-                customVideoView = null
-                customViewCallback?.onCustomViewHidden()
-                customViewCallback = null
-                web.visibility = View.VISIBLE
-                @Suppress("DEPRECATION")
-                window.decorView.systemUiVisibility = 0
-            }
-
             override fun onShowFileChooser(
                 view: WebView,
                 callback: ValueCallback<Array<Uri>>,
@@ -164,7 +123,7 @@ class MainActivity : Activity() {
                 }
             }
 
-            // target=_blank (invoice PDFs, share pages): capture the URL via a
+            // target=_blank (receipt PDFs, share pages): capture the URL via a
             // throwaway transport WebView, then route it like any other link.
             override fun onCreateWindow(
                 view: WebView,
@@ -262,12 +221,12 @@ class MainActivity : Activity() {
             <!doctype html><html><head><meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <style>
-              body{font-family:sans-serif;background:#059669;color:#fff;display:flex;
+              body{font-family:sans-serif;background:#0A4D5C;color:#fff;display:flex;
                    align-items:center;justify-content:center;height:95vh;margin:0;text-align:center}
               .card{padding:24px}
               h2{margin:0 0 8px;font-size:22px}
               p{margin:0 0 24px;opacity:.85;font-size:15px;line-height:1.6}
-              button{background:#E7BF3B;color:#064E3B;border:0;border-radius:10px;
+              button{background:#E7BF3B;color:#0A4D5C;border:0;border-radius:10px;
                      padding:14px 34px;font-size:16px;font-weight:bold}
             </style></head><body><div class="card">
               <h2>${getString(R.string.offline_title)}</h2>
@@ -303,12 +262,6 @@ class MainActivity : Activity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        // Fullscreen video chal rahi ho to back pehle usse band kare —
-        // web history ya app se bahar nahi.
-        if (customVideoView != null) {
-            web.webChromeClient?.onHideCustomView()
-            return
-        }
         if (web.canGoBack()) web.goBack() else moveTaskToBack(true)
     }
 

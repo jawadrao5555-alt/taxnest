@@ -41,7 +41,7 @@ class PosRiderTrackingController extends Controller
 
     // Bump on each Android release; APK hosted on OUR server (never a GitHub
     // release — desktop agents auto-update from this repo's releases/latest).
-    private const APP_LATEST_VERSION = '1.3.0';
+    private const APP_LATEST_VERSION = '1.2.0';
     private const APP_DOWNLOAD_URL = 'https://taxnest.com.pk/downloads/taxnest-rider.apk';
 
     // ─── Shared gates ───────────────────────────────────────────────────────
@@ -162,14 +162,9 @@ class PosRiderTrackingController extends Controller
     {
         $rider = $this->riderFromToken($request);
 
-        // v1.3.0+: per-point duty enforcement replaces the old upfront global
-        // 409 gate.  Fresh points (no `at` field, or server-computed lag <
-        // OFFLINE_HEURISTIC_MINUTES) still require duty=ON — a fresh fix while
-        // off-duty is rejected.  Buffered past-timestamp points (is_offline=true)
-        // are accepted regardless of duty status so that an offline route
-        // recorded during a duty session is preserved even when the rider
-        // ends duty before connectivity returns.
-        $dutyOn = (bool) $rider->on_duty;
+        if (!$rider->on_duty) {
+            return response()->json(['ok' => false, 'error' => 'duty_off'], 409);
+        }
 
         $points = $request->input('points');
         if (!is_array($points) || !count($points)) {
@@ -177,10 +172,9 @@ class PosRiderTrackingController extends Controller
         }
         $points = array_slice($points, 0, 240);
 
-        $rows      = [];
-        $newestLive = null; // newest fresh (non-offline) point — drives regression guard
+        $rows = [];
+        $newest = null;
         $oldestAccepted = now()->subDays(self::POINT_MAX_AGE_DAYS);
-
         foreach ($points as $p) {
             $lat = isset($p['lat']) ? (float) $p['lat'] : null;
             $lng = isset($p['lng']) ? (float) $p['lng'] : null;
@@ -208,7 +202,6 @@ class PosRiderTrackingController extends Controller
                     continue; // stale offline buffer — beyond accepted window
                 }
             }
-
             // Stamp is_offline at insert time so trail() never has to rely on a
             // clock-skew-sensitive heuristic for new points.
             // A point is offline when its recorded_at is 5+ minutes older than
@@ -222,13 +215,7 @@ class PosRiderTrackingController extends Controller
             $isOffline = (now()->timestamp - $at->timestamp)
                 >= (self::OFFLINE_HEURISTIC_MINUTES * 60);
 
-            // Per-point duty gate: fresh points require duty=ON; buffered past
-            // points (is_offline) are accepted regardless of duty status.
-            if (!$isOffline && !$dutyOn) {
-                continue; // fresh GPS fix while rider is off-duty — skip
-            }
-
-            $row = [
+            $rows[] = [
                 'company_id'   => $rider->company_id,
                 'rider_id'     => $rider->id,
                 'lat'          => round($lat, 7),
@@ -240,15 +227,9 @@ class PosRiderTrackingController extends Controller
                 'is_offline'   => $isOffline,  // stamped server-side at insert
                 'created_at'   => now(),
             ];
-            $rows[] = $row;
-
-            // Regression guard tracks only LIVE (non-offline) points.
-            // Drain batches of past-buffered points must not overwrite the
-            // rider's current last-known live position on the admin map.
-            if (!$isOffline) {
-                if ($newestLive === null || $row['recorded_at'] > $newestLive['recorded_at']) {
-                    $newestLive = $row;
-                }
+            $lastRow = $rows[count($rows) - 1];
+            if ($newest === null || $lastRow['recorded_at'] > $newest['recorded_at']) {
+                $newest = $lastRow;
             }
         }
 
@@ -259,22 +240,18 @@ class PosRiderTrackingController extends Controller
                 DB::table('pos_rider_locations')->insertOrIgnore($chunk);
             }
 
-            // Regression guard: only advance last_lat/lng/located_at from a
-            // LIVE (non-offline) fix that is strictly newer than what is stored.
-            // Buffered past-timestamp drain batches are stored for trail history
-            // but do not touch the denormalized position fields — a drain of
-            // yesterday's route must not overwrite today's live rider position.
-            if ($newestLive !== null) {
-                $currentLocatedAt = $rider->last_located_at
-                    ? $rider->last_located_at->format('Y-m-d H:i:s')
-                    : null;
-                if ($currentLocatedAt === null || $newestLive['recorded_at'] > $currentLocatedAt) {
-                    $rider->update([
-                        'last_lat'        => $newestLive['lat'],
-                        'last_lng'        => $newestLive['lng'],
-                        'last_located_at' => $newestLive['recorded_at'],
-                    ]);
-                }
+            // Regression guard: only advance last_lat/lng/located_at when the
+            // incoming batch carries a strictly newer fix than what is stored.
+            // NULL stored = always update (first ever fix for this rider).
+            $currentLocatedAt = $rider->last_located_at
+                ? $rider->last_located_at->format('Y-m-d H:i:s')
+                : null;
+            if ($currentLocatedAt === null || $newest['recorded_at'] > $currentLocatedAt) {
+                $rider->update([
+                    'last_lat'        => $newest['lat'],
+                    'last_lng'        => $newest['lng'],
+                    'last_located_at' => $newest['recorded_at'],
+                ]);
             }
         }
 
@@ -286,25 +263,6 @@ class PosRiderTrackingController extends Controller
                 ->limit(3000)->delete();
         }
 
-        // Backward-compat 409 for v1.2.0 clients (and v1.3.0 TrackingService):
-        // When duty is OFF and no rows were accepted (stored==0), the batch
-        // contained only fresh points (lag < OFFLINE_HEURISTIC_MINUTES, skipped
-        // by the per-point duty gate) or permanently-invalid points (bad coords /
-        // beyond 7-day window).  Returning 200 here would leave a v1.2.0
-        // TrackingService running indefinitely after an admin duty-off — it relies
-        // on 409 as its only server-side stop signal when backgrounded (the
-        // MainActivity /me poll is paused while the app is not in the foreground).
-        // v1.3.0 QueueDrain handles 409 gracefully (keeps queue, retries later).
-        // When duty is OFF but stored > 0, at least one buffered past-timestamp
-        // point was accepted — return 200 so the client trims those from the queue.
-        if (!$dutyOn && count($rows) === 0) {
-            return response()->json(['ok' => false, 'error' => 'duty_off'], 409);
-        }
-
-        // Return exact stored count so the app can trim its queue precisely.
-        // count($rows) = points that passed all validation (lat/lng/age/duty
-        // gate); insertOrIgnore may write fewer on duplicate replay, but the
-        // client should remove all validated rows — duplicates are safe to drop.
         return response()->json(['ok' => true, 'stored' => count($rows)]);
     }
 

@@ -1590,12 +1590,7 @@ class FbrService
                 'ItemCode'    => (string) ($item->product_id ?: ('IT-' . $index)),
                 'ItemName'    => $this->sanitizeForFbr($item->item_name),
                 'Quantity'    => (float) $quantity,
-                // PCTCode is COMPULSORY in the FBR IMS invoice model (FBR help article,
-                // varchar(8)) — the local FBRIMS component rejects an empty string with
-                // "Model validation failed." (proven live, X-WAY SHOES Aug 2026). Products
-                // without an HS code fall back to the all-zeros code, exactly like the
-                // proven-working PRA fiscal-device payload ('00000000').
-                'PCTCode'     => $this->sanitizePctCode($item->hs_code ?? '') ?: '00000000',
+                'PCTCode'     => $this->sanitizePctCode($item->hs_code ?? ''),
                 'TaxRate'     => (float) $taxRate,
                 'SaleValue'   => (float) $saleValue,
                 'TotalAmount' => (float) $totalAmount,

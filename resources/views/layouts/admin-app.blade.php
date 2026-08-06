@@ -245,17 +245,17 @@
                 <h1 class="text-sm font-bold admin-accent-text">TaxNest Admin</h1>
             </header>
 
-            <main class="flex-1 overflow-y-auto overflow-x-hidden">
+            <main class="flex-1 overflow-y-auto">
                 @if(isset($header))
                 <div class="bg-gray-900 border-b border-gray-800 px-6 py-4 hidden lg:block">
                     {{ $header }}
                 </div>
                 @endif
                 @if(session('success'))
-                <div class="mx-4 mt-4 bg-emerald-900/30 border border-emerald-700 text-emerald-300 rounded-lg px-4 py-3 text-sm break-words">{{ session('success') }}</div>
+                <div class="mx-4 mt-4 bg-emerald-900/30 border border-emerald-700 text-emerald-300 rounded-lg px-4 py-3 text-sm">{{ session('success') }}</div>
                 @endif
                 @if(session('error'))
-                <div class="mx-4 mt-4 bg-red-900/30 border border-red-700 text-red-300 rounded-lg px-4 py-3 text-sm break-words">{{ session('error') }}</div>
+                <div class="mx-4 mt-4 bg-red-900/30 border border-red-700 text-red-300 rounded-lg px-4 py-3 text-sm">{{ session('error') }}</div>
                 @endif
                 @if($errors->any())
                 <div class="mx-4 mt-4 bg-red-900/30 border border-red-700 text-red-300 rounded-lg px-4 py-3 text-sm">

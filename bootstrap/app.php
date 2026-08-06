@@ -1,10 +1,8 @@
 <?php
 
-use App\Support\DatabaseDown;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use Illuminate\Database\QueryException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -19,9 +17,6 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
-        // Slow-request telemetry: near-zero overhead on fast requests; logs
-        // >2s requests to storage/logs/slow-requests-*.log in terminate().
-        $middleware->append(\App\Http\Middleware\SlowRequestLogger::class);
         $middleware->validateCsrfTokens(except: [
             'pos/*',
             'api/agent/*',
@@ -59,27 +54,6 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        // ── DB unreachable (shared-host MySQL blips) → friendly fail-fast page ──
-        // ONLY connection failures are intercepted (DatabaseDown gate); every
-        // ordinary query error returns null here and keeps default handling.
-        // The db-down view is fully self-contained — NO auth()/session/DB calls
-        // (the DB is down while it renders). 503 + Retry-After so clients and
-        // crawlers treat it as temporary.
-        $dbDownResponse = function (\Throwable $e, $request) {
-            if (! DatabaseDown::isConnectionFailure($e)) {
-                return null;
-            }
-            if ($request->expectsJson()) {
-                return response()->json([
-                    'error' => __('pos.db_down_title') . ' — ' . __('pos.db_down_body'),
-                    'db_down' => true,
-                ], 503, ['Retry-After' => '15']);
-            }
-            return response()->view('errors.db-down', [], 503, ['Retry-After' => '15']);
-        };
-        $exceptions->renderable(fn (QueryException $e, $request) => $dbDownResponse($e, $request));
-        $exceptions->renderable(fn (\PDOException $e, $request) => $dbDownResponse($e, $request));
-
         $exceptions->renderable(function (NotFoundHttpException $e, $request) {
             if ($request->expectsJson()) {
                 return response()->json(['error' => 'Resource not found.'], 404);

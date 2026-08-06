@@ -117,4 +117,3 @@ rider-app/app/build/outputs/apk/release/app-release.apk
 | 1.0.0   | 1           | Initial release |
 | 1.1.0   | 2           | Delivery list + maps links + /me improvements |
 | 1.2.0   | 3           | **Offline route buffering** — buffer cap 5000 pts (~27h), 401 preserves queue (token-only evict), backend dedupe on (rider_id, client_ts_ms) |
-| 1.3.0   | 4           | **Offline buffering hardened** — drain outside duty (onResume + login + NetworkCallback); offline end-duty queued + reconciled on reconnect; server accepts past-timestamp buffered points when duty=OFF (per-point gate); removeFirst(stored) precise trim; regression guard restricted to live (non-offline) points only |

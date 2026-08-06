@@ -3,7 +3,7 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
-// Signing: keystore path/password from env (same stable key as the rider/pos apps —
+// Signing: keystore path/password from env (same stable key as the rider app —
 // .local/rider-signing/, gitignored; repo is PUBLIC, never commit a keystore).
 def ciKeystore = System.getenv("RIDER_KS")
 def ciKeystorePass = System.getenv("RIDER_KS_PASS")

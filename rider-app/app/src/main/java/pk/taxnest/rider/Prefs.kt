@@ -28,14 +28,6 @@ object Prefs {
     fun lastSync(c: Context): Long = sp(c).getLong("last_sync", 0L)
     fun setLastSync(c: Context, v: Long) = sp(c).edit().putLong("last_sync", v).apply()
 
-    // ── Pending duty-off flag ──────────────────────────────────────────────
-    // Set before the /duty {on:false} network call; cleared only on success.
-    // Survives process death so that an offline end-duty is reconciled with
-    // the server on the next network contact (refreshMe / app-open / login).
-    fun pendingDutyOff(c: Context): Boolean = sp(c).getBoolean("pending_duty_off", false)
-    fun setPendingDutyOff(c: Context, v: Boolean) =
-        sp(c).edit().putBoolean("pending_duty_off", v).apply()
-
     /**
      * Token-only eviction — used when the server returns 401 (token rotated by
      * another device login).  The GPS point queue is intentionally preserved so

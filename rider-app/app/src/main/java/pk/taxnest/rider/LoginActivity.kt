@@ -44,10 +44,6 @@ class LoginActivity : AppCompatActivity() {
                             Prefs.setRiderName(this, rider?.optString("name") ?: "")
                             Prefs.setCompanyName(this, rider?.optString("company") ?: "")
                             Prefs.setDuty(this, body.optBoolean("duty", false))
-                            // Drain any buffered offline points from previous duty
-                            // sessions.  Fires even if duty is now OFF so points
-                            // captured before a 401 eviction are not stranded.
-                            QueueDrain.drainAsync(this)
                             goMain()
                         }
                         code == 403 && body?.optString("error") == "plan_locked" -> {

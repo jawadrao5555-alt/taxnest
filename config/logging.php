@@ -73,17 +73,6 @@ return [
             'replace_placeholders' => true,
         ],
 
-        // Slow-request telemetry (SlowRequestLogger middleware): one dedicated
-        // daily file so "loading" complaints can be answered with exact
-        // route + duration + DB-time evidence. Rotates independently.
-        'slow_requests' => [
-            'driver' => 'daily',
-            'path' => storage_path('logs/slow-requests.log'),
-            'level' => 'info',
-            'days' => env('LOG_DAILY_DAYS', 14),
-            'replace_placeholders' => true,
-        ],
-
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),

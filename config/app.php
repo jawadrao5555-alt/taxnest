@@ -17,18 +17,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Slow-request telemetry threshold (ms)
-    |--------------------------------------------------------------------------
-    |
-    | Requests slower than this are logged to the `slow_requests` channel by
-    | App\Http\Middleware\SlowRequestLogger. 0 disables the telemetry.
-    |
-    */
-
-    'slow_request_ms' => (int) env('SLOW_REQUEST_MS', 2000),
-
-    /*
-    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |

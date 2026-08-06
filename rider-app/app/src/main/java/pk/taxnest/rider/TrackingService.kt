@@ -135,16 +135,10 @@ class TrackingService : Service(), LocationListener {
         val batch = PointQueue.peekBatch(this, 100)
         if (batch.length() == 0) return
 
-        val (code, body) = ApiClient.post("/locations", JSONObject().put("points", batch), token)
+        val (code, _) = ApiClient.post("/locations", JSONObject().put("points", batch), token)
         when {
             code in 200..299 -> {
-                // Use the server's `stored` count to trim the queue precisely.
-                // If stored==0 (all points rejected as too-old or bad coords),
-                // remove the full batch to avoid an infinite retry of permanently-
-                // invalid points.
-                val stored = body?.optInt("stored", 0) ?: 0
-                val toRemove = if (stored > 0) stored else batch.length()
-                PointQueue.removeFirst(this, toRemove)
+                PointQueue.removeFirst(this, batch.length())
                 Prefs.setLastSync(this, System.currentTimeMillis())
             }
             code == 401 -> {
@@ -154,13 +148,11 @@ class TrackingService : Service(), LocationListener {
                 Prefs.clearToken(this)
                 stopSelf()
             }
-            code == 403 -> {
-                // Plan downgraded — stop cleanly; keep queue so it can drain
-                // via QueueDrain if the plan is later restored.
+            code == 403 -> { // plan downgraded — stop cleanly, keep session
                 Prefs.setDuty(this, false)
                 stopSelf()
             }
-            code == 409 -> { // server says duty off — align local state
+            code == 409 -> { // server says duty off — align
                 Prefs.setDuty(this, false)
                 stopSelf()
             }
@@ -172,14 +164,7 @@ class TrackingService : Service(), LocationListener {
         running = false
         try { locationManager?.removeUpdates(this) } catch (e: Exception) {}
         netHandler.removeCallbacks(flushLoop)
-        // Only attempt a final flush if the service is being destroyed while
-        // duty is still ON (e.g. process killed by OEM).  If duty is already
-        // OFF the service stopped intentionally (409/403/manual end-duty) and
-        // remaining queue points will be picked up by QueueDrain on next
-        // app-open or connectivity event — firing flush here just gets a 409.
-        if (Prefs.duty(this)) {
-            netHandler.post { flush() }
-        }
+        netHandler.post { flush() } // best-effort final drain
         netThread.quitSafely()
         super.onDestroy()
     }

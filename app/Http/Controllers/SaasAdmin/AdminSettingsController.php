@@ -27,7 +27,6 @@ class AdminSettingsController extends Controller
         'payment_iban',
         'payment_instructions',
         'pos_app_latest_version',
-        'di_app_latest_version',
     ];
 
     public function index()
@@ -70,11 +69,6 @@ class AdminSettingsController extends Controller
             // installs (UA "TaxNestPOSApp/<ver>") see an update banner when
             // their version is lower. Digits and dots only; empty = banner off.
             'pos_app_latest_version' => ['nullable', 'string', 'max:20', 'regex:/^\d+(\.\d+)*$/'],
-            // Latest released Android DI APK version (e.g. 1.0.0). Old app
-            // installs (UA "TaxNestDIApp/<ver>") see an update banner when
-            // their version is lower. Also gates the downloads-page DI card and
-            // in-panel nudge — leave empty until owner has phone-tested the APK.
-            'di_app_latest_version'  => ['nullable', 'string', 'max:20', 'regex:/^\d+(\.\d+)*$/'],
         ]);
 
         // Normalise the WhatsApp number to digits only (country code + number, no +).

@@ -6,8 +6,8 @@
 
     <application
         android:label="@string/app_name"
-        android:icon="@drawable/ic_di"
-        android:theme="@style/Theme.TaxNestDi"
+        android:icon="@drawable/ic_pos"
+        android:theme="@style/Theme.TaxNestPos"
         android:supportsRtl="true"
         android:usesCleartextTraffic="false">
 

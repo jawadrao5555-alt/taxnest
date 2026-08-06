@@ -343,14 +343,20 @@
     <div class="separator"></div>
 
     @php
-        $qrData = json_encode([
-            'pos' => $transaction->invoice_number,
-            'fbr' => $transaction->fbr_invoice_number ?? '',
-            'ntn' => $company->ntn ?? '',
-            'date' => $transaction->created_at->format('d/m/Y'),
-            'total' => number_format($transaction->total_amount, 2, '.', ''),
-            'reg' => $company->fbr_pos_id ?? '',
-        ]);
+        // TaxAsaan "POS Invoice Verification" QR scan expects ONLY the FBR fiscal
+        // invoice number (X-WAY test, 6 Aug 2026: JSON blob in the QR pasted
+        // garbage into the app's field and verify failed). Fiscalized bill =
+        // bare FBR number; non-fiscalized bills (pending/provisional) keep the
+        // details-JSON QR — wahan verify karne ko FBR number hai hi nahi.
+        $qrData = $transaction->fbr_invoice_number
+            ? $transaction->fbr_invoice_number
+            : json_encode([
+                'pos' => $transaction->invoice_number,
+                'ntn' => $company->ntn ?? '',
+                'date' => $transaction->created_at->format('d/m/Y'),
+                'total' => number_format($transaction->total_amount, 2, '.', ''),
+                'reg' => $company->fbr_pos_id ?? '',
+            ]);
         $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' . urlencode($qrData);
     @endphp
 

@@ -147,6 +147,67 @@ class PlanLimitService
     }
 
     /**
+     * FBR POS monthly bill quota (strict plan mapping, Aug 2026). Counts
+     * fbr_pos_transactions rows at CREATION time regardless of invoice_mode
+     * (provisional 'local' rows included — the day-close/finalize sweep and
+     * F10 promote then consume NO extra quota, exactly as documented on
+     * finalizeFbrProvisionalsAtDayClose). Returns are never counted and are
+     * never blocked (refunds must always work).
+     */
+    public static function canCreateFbrPosBill(int $companyId): array
+    {
+        $company = \App\Models\Company::find($companyId);
+        if ($company && $company->is_internal_account) {
+            return ['allowed' => true, 'internal' => true];
+        }
+
+        $monthlyCount = function () use ($companyId): int {
+            return \App\Models\FbrPosTransaction::where('company_id', $companyId)
+                ->where('status', 'completed')
+                ->where('transaction_type', 'sale')
+                ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])
+                ->count();
+        };
+
+        // Admin override wins (interpreted as bills/month, same as PRA POS).
+        if ($company && $company->invoice_limit_override !== null) {
+            if ((int) $company->invoice_limit_override === -1) {
+                return ['allowed' => true, 'unlimited' => true];
+            }
+            $limit = (int) $company->invoice_limit_override;
+            $count = $monthlyCount();
+            if ($count >= $limit) {
+                return ['allowed' => false, 'reason' => "Monthly bill limit reached ({$count}/{$limit} this month). Please contact admin."];
+            }
+            return ['allowed' => true, 'remaining' => $limit - $count];
+        }
+
+        $sub = self::getActiveSubscription($companyId);
+        if (!$sub || !$sub->pricingPlan) {
+            // Access/subscription gating is owned by SubscriptionAccessService —
+            // don't double-block here.
+            return ['allowed' => true];
+        }
+
+        $plan = $sub->pricingPlan;
+        if ($plan->is_trial) {
+            return ['allowed' => true]; // trial cap handled by SubscriptionAccessService
+        }
+
+        $limit = (int) ($plan->invoice_limit ?? -1);
+        if ($limit === -1 || $limit <= 0) {
+            return ['allowed' => true];
+        }
+
+        $count = $monthlyCount();
+        if ($count >= $limit) {
+            return ['allowed' => false, 'reason' => "Monthly bill limit reached ({$count}/{$limit} bills this month on the {$plan->name} plan). Please upgrade your plan to keep billing."];
+        }
+
+        return ['allowed' => true, 'remaining' => $limit - $count];
+    }
+
+    /**
      * PRA POS team-account quota: plan user_limit counts ADDED team accounts
      * only (pos_manager + pos_cashier). The company owner's pos_admin account
      * is EXEMPT (owner rule, Jul 2026) — Starter 1 = owner + 1 team account.

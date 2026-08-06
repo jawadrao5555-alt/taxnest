@@ -10,9 +10,22 @@ use App\Models\PosTerminal;
 use App\Models\User;
 use App\Models\Product;
 use App\Services\SubscriptionAccessService;
+use App\Services\PlanLimitService;
 
 class CheckPlanLimit
 {
+    /**
+     * Per-process memo for the fbr_pos_transactions.offline_uuid column probe
+     * (schema-drift guard on the hot sale path — the column can only ever
+     * APPEAR, and deploys restart PHP, so caching false is safe too).
+     */
+    protected static ?bool $fbrOfflineUuidColumn = null;
+
+    protected static function fbrOfflineUuidColumnExists(): bool
+    {
+        return self::$fbrOfflineUuidColumn ??= \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'offline_uuid');
+    }
+
     public function handle(Request $request, Closure $next, string $resource = '')
     {
         if (empty($resource)) {
@@ -55,6 +68,7 @@ class CheckPlanLimit
         $plan = $subscription->pricingPlan;
         $exceeded = false;
         $limitName = '';
+        $customReason = null;
 
         // Limit convention (matches PlanLimitService + the admin plan builder,
         // which validates min:-1): NULL or any negative value = UNLIMITED.
@@ -100,18 +114,59 @@ class CheckPlanLimit
                 }
                 break;
             case 'inventory':
-                if (!$plan->inventory_enabled) {
+                // DISABLE is always allowed: a downgraded company with the
+                // inventory column still ON must be able to turn it OFF
+                // (otherwise sales keep auto-deducting stock they can't manage).
+                // Only requests that keep/turn the feature ON are gated.
+                if ($request->has('enabled') && !$request->boolean('enabled')) {
+                    break;
+                }
+                // Active trial evaluates everything (owner rule) — only paid
+                // plans without the inventory feature are blocked.
+                if (!$plan->inventory_enabled && !$plan->is_trial) {
                     $exceeded = true;
                     $limitName = 'inventory (not included in your plan)';
+                }
+                break;
+            case 'invoices':
+                // Product-aware bill/invoice quota (strict plan mapping, Aug 2026):
+                // fbrpos = monthly FBR POS final-bill quota; pos = NO middleware
+                // check (PRA quota lives in-controller on the four FINAL paths
+                // only — provisionals are quota-free there, a middleware block
+                // here would wrongly stop provisional saves at quota-full);
+                // di / legacy NULL product rows = lifetime DI invoice count.
+                $productType = $plan->product_type ?? 'di';
+                if ($productType === 'fbrpos') {
+                    // REPLAY GUARD BEFORE QUOTA (offline-first invariant): a retry
+                    // of an already-saved bill (same offline_uuid) must reach the
+                    // controller's replay guard and get the saved bill back — never
+                    // a quota error for a bill that already exists.
+                    $offlineUuid = trim((string) $request->input('offline_uuid', ''));
+                    if ($offlineUuid !== ''
+                        && self::fbrOfflineUuidColumnExists()
+                        && \App\Models\FbrPosTransaction::where('company_id', $companyId)->where('offline_uuid', $offlineUuid)->exists()) {
+                        break;
+                    }
+                    $check = PlanLimitService::canCreateFbrPosBill($companyId);
+                } elseif ($productType === 'pos') {
+                    break; // PRA POS: in-controller quota only (provisional-aware)
+                } else {
+                    $check = PlanLimitService::canCreateInvoice($companyId);
+                }
+                if (!($check['allowed'] ?? true)) {
+                    $exceeded = true;
+                    $limitName = 'invoices';
+                    $customReason = $check['reason'] ?? null;
                 }
                 break;
         }
 
         if ($exceeded) {
+            $msg = $customReason ?: "Plan limit exceeded for {$limitName}. Please upgrade your subscription.";
             if ($request->expectsJson()) {
-                return response()->json(['error' => "Plan limit exceeded for {$limitName}. Please upgrade your subscription."], 403);
+                return response()->json(['error' => $msg, 'message' => $msg], 403);
             }
-            return back()->with('error', "Plan limit exceeded for {$limitName}. Please upgrade your subscription.");
+            return back()->with('error', $msg);
         }
 
         return $next($request);

@@ -58,10 +58,10 @@ class RetryFbrPosSubmissionJob implements ShouldQueue
                 $svc = new \App\Services\PushNotificationService();
                 $svc->sendToCompany(
                     $transaction->company_id,
-                    'fbrpos',
                     'FBR Submission Successful',
                     "Invoice {$transaction->invoice_number} accepted. FBR #: " . ($result['fbr_invoice_number'] ?? '—'),
-                    ['url' => route('fbrpos.show', $transaction->id)]
+                    ['url' => route('fbrpos.show', $transaction->id)],
+                    'fbrpos' // scope: FBR POS subscribers only — never POS/DI devices
                 );
             } catch (\Throwable $e) {
                 Log::warning("Push notify failed: " . $e->getMessage());
@@ -87,10 +87,10 @@ class RetryFbrPosSubmissionJob implements ShouldQueue
                 $svc = new \App\Services\PushNotificationService();
                 $svc->sendToCompany(
                     $transaction->company_id,
-                    'fbrpos',
                     'FBR Auto-Retry Exhausted',
                     "Invoice {$transaction->invoice_number} could not be submitted after 3 attempts. Manual retry required.",
-                    ['url' => route('fbrpos.failQueue')]
+                    ['url' => route('fbrpos.failQueue')],
+                    'fbrpos' // scope: FBR POS subscribers only — never POS/DI devices
                 );
             } catch (\Throwable $e) {
                 Log::warning("Push notify failed: " . $e->getMessage());

@@ -53,7 +53,7 @@
         <div class="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-16 text-center">
             <p class="text-xs sm:text-sm font-bold uppercase tracking-widest mb-3" style="color: var(--gold);">Video Tutorials</p>
             <h1 class="text-3xl sm:text-5xl font-bold text-white mb-4">NestPOS aur FBR POS chalana seekhein</h1>
-            <p class="text-sm sm:text-base text-gray-200 max-w-2xl mx-auto">Chhoti chhoti Urdu videos — account banane se le kar bill, customers aur reports tak. Har product ka apna section, har feature aaram se seekhein.</p>
+            <p class="text-sm sm:text-base text-gray-200 max-w-2xl mx-auto">Chhoti chhoti Urdu videos — account banane se le kar bill, customers aur reports tak. Har product ka alag section — sab features aasani se seekhein.</p>
         </div>
     </header>
 

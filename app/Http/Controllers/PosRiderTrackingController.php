@@ -399,10 +399,54 @@ class PosRiderTrackingController extends Controller
         // "Pakistan ke map ko focus kiya jaye"); IP-lookup sirf fallback hai.
         $companyCity = trim((string) ($company->city ?? ''));
 
+        // Task #320 (ZFC): dukan ki saved location — set ho to map isi par
+        // khulta hai aur distinct shop marker dikhta hai. hasColumn guard:
+        // prod par migration se pehle page 500 na ho.
+        $shopLat = $shopLng = null;
+        if (Schema::hasColumn('companies', 'shop_lat') && $company->shop_lat !== null && $company->shop_lng !== null) {
+            $shopLat = (float) $company->shop_lat;
+            $shopLng = (float) $company->shop_lng;
+        }
+
         return view('pos.rider-tracking', [
             'locked' => $locked,
             'riders' => $riders,
             'companyCity' => $companyCity,
+            'shopLat' => $shopLat,
+            'shopLng' => $shopLng,
+        ]);
+    }
+
+    /**
+     * POST /pos/riders/tracking/shop-location — Task #320 (ZFC, Aug 2026):
+     * admin map par pin rakh kar dukan ki location save karta hai.
+     * PosAdminOnly route group; Pakistan-bounds validation (map PK-locked hai).
+     */
+    public function saveShopLocation(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        if (!PosFeatureService::planAllows($company, 'riders_enabled')
+            || !PosFeatureService::planAllows($company, 'rider_tracking_enabled')) {
+            return response()->json(['ok' => false, 'error' => 'plan_locked'], 403);
+        }
+        if (!Schema::hasColumn('companies', 'shop_lat') || !Schema::hasColumn('companies', 'shop_lng')) {
+            return response()->json(['ok' => false, 'error' => 'schema_not_ready'], 503);
+        }
+
+        $data = $request->validate([
+            'lat' => 'required|numeric|between:22.8,37.5',
+            'lng' => 'required|numeric|between:60.4,77.6',
+        ]);
+
+        $company->shop_lat = round((float) $data['lat'], 7);
+        $company->shop_lng = round((float) $data['lng'], 7);
+        $company->save();
+
+        return response()->json([
+            'ok' => true,
+            'lat' => (float) $company->shop_lat,
+            'lng' => (float) $company->shop_lng,
         ]);
     }
 

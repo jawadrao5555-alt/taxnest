@@ -2872,6 +2872,12 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'rt_open_deliveries' => 'Zair-e-tarseel bill',
     'rt_plan_locked_api' => 'Live tracking aapke package mein shamil nahi — admin se Unlimited upgrade ka kahein.',
     'rt_search_no_results' => 'Koi jagah nahi mili — hijje badal kar dobara talash karein.',
+    // Task #320 (ZFC): shop location pin on the tracking map
+    'rt_set_shop' => 'Dukan ki location',
+    'rt_shop_label' => 'Dukan',
+    'rt_shop_hint' => 'Map par wahan tap karein jahan aap ki dukan hai, phir Save dabayen.',
+    'rt_shop_saved' => 'Dukan ki location save ho gayi.',
+    'rt_shop_error' => 'Save nahi ho saki — dobara koshish karein.',
     'rt_search_placeholder' => 'Jagah talash karein… (maslan Lodhran)',
     'rt_title' => 'Rider live tracking',
     'rt_trail' => 'Aaj ka rasta',

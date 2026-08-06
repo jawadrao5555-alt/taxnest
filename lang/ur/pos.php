@@ -2872,6 +2872,12 @@ return [
     'rt_open_deliveries' => 'زیرِ ترسیل بل',
     'rt_plan_locked_api' => 'لائیو ٹریکنگ آپ کے پیکج میں شامل نہیں — ایڈمن سے Unlimited اپ گریڈ کا کہیں۔',
     'rt_search_no_results' => 'کوئی جگہ نہیں ملی — ہجے بدل کر دوبارہ تلاش کریں۔',
+    // Task #320 (ZFC): shop location pin on the tracking map
+    'rt_set_shop' => 'دکان کی لوکیشن',
+    'rt_shop_label' => 'دکان',
+    'rt_shop_hint' => 'نقشے پر وہاں ٹیپ کریں جہاں آپ کی دکان ہے، پھر محفوظ کریں دبائیں۔',
+    'rt_shop_saved' => 'دکان کی لوکیشن محفوظ ہو گئی۔',
+    'rt_shop_error' => 'محفوظ نہیں ہو سکی — دوبارہ کوشش کریں۔',
     'rt_search_placeholder' => 'جگہ تلاش کریں… (مثلاً لودھراں)',
     'rt_title' => 'رائیڈر لائیو ٹریکنگ',
     'rt_trail' => 'آج کا راستہ',

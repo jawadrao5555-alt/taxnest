@@ -40,7 +40,14 @@
         'dataUrl' => route('pos.riders.tracking.data'),
         'trailUrlBase' => url('/pos/riders/tracking/trail'),
         'companyCity' => $companyCity ?? '',
+        'shopLat' => $shopLat,
+        'shopLng' => $shopLng,
+        'shopSaveUrl' => route('pos.riders.tracking.shop'),
         'i18n' => [
+            'shop_label' => __('pos.rt_shop_label'),
+            'shop_hint' => __('pos.rt_shop_hint'),
+            'shop_saved' => __('pos.rt_shop_saved'),
+            'shop_error' => __('pos.rt_shop_error'),
             'on_duty' => __('pos.rt_on_duty'),
             'off_duty' => __('pos.rt_off_duty'),
             'last_seen' => __('pos.rt_last_seen'),
@@ -67,7 +74,26 @@
                 <button type="button" @click="load()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200">
                     ⟳ {{ __('pos.refresh') }}
                 </button>
+                {{-- Task #320 (ZFC): dukan ki location pin-on-map --}}
+                <button type="button" @click="toggleSetShop()"
+                        class="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                        :class="settingShop ? 'bg-amber-500 text-white' : 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200'">
+                    🏪 {{ __('pos.rt_set_shop') }}
+                </button>
             </div>
+        </div>
+
+        {{-- Shop pin mode: hint + Save/Cancel bar --}}
+        <div x-show="settingShop" x-cloak class="mb-3 flex flex-wrap items-center gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl px-3 py-2">
+            <span class="text-xs text-amber-800 dark:text-amber-200 flex-1 min-w-[180px]">{{ __('pos.rt_shop_hint') }}</span>
+            <button type="button" @click="saveShop()" :disabled="!pendingShop || shopBusy"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40">
+                {{ __('pos.save') }}
+            </button>
+            <button type="button" @click="cancelSetShop()"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200">
+                {{ __('pos.cancel') }}
+            </button>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -155,6 +181,13 @@
             searchDone: false,
             userCentered: false,
             cityCentered: false,
+            // Task #320: dukan ki location (ZFC)
+            shopLat: (cfg.shopLat !== null && isFinite(cfg.shopLat)) ? cfg.shopLat : null,
+            shopLng: (cfg.shopLng !== null && isFinite(cfg.shopLng)) ? cfg.shopLng : null,
+            shopMarker: null,
+            settingShop: false,
+            pendingShop: null,
+            shopBusy: false,
             init() {
                 // PAKISTAN-LOCKED map (owner, Aug 2026: "Pakistan ke map ko focus
                 // kiya jaye" — map kabhi India/duniya par bhatak na sake):
@@ -175,9 +208,23 @@
                     subdomains: 'abcd',
                     attribution: '© OpenStreetMap © CARTO'
                 }).addTo(this.map);
+                // Task #320: pin-mode click — dukan ki jagah chunna
+                this.map.on('click', (e) => {
+                    if (!this.settingShop) return;
+                    this.pendingShop = { lat: e.latlng.lat, lng: e.latlng.lng };
+                    this.renderShopMarker(this.pendingShop.lat, this.pendingShop.lng, true);
+                });
                 this.load();
-                this.cityCenter();
-                this.ipCenter();
+                // Dukan set ho to map SIDHA dukan par khule (ZFC request) —
+                // city/IP centering ki zaroorat hi nahi.
+                if (this.shopLat !== null && this.shopLng !== null) {
+                    this.renderShopMarker(this.shopLat, this.shopLng, false);
+                    this.cityCentered = true; // late ipCenter() must not override
+                    this.map.setView([this.shopLat, this.shopLng], 14);
+                } else {
+                    this.cityCenter();
+                    this.ipCenter();
+                }
                 this.timer = setInterval(() => this.load(), 20000);
                 document.addEventListener('visibilitychange', () => {
                     if (!document.hidden) this.load();
@@ -229,8 +276,64 @@
                 });
                 if (!this.didFit && bounds.length) {
                     this.didFit = true;
+                    // Dukan set ho to woh bhi frame mein rahe (rider start point).
+                    if (this.shopLat !== null && this.shopLng !== null) bounds.push([this.shopLat, this.shopLng]);
                     this.map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
                 }
+            },
+            // ---- Task #320: dukan ki location (ZFC) ----
+            renderShopMarker(lat, lng, isPending) {
+                const html = '<div style="font-size:26px; line-height:1; filter: drop-shadow(0 1px 2px rgba(0,0,0,.35));'
+                    + (isPending ? ' opacity:.75;' : '') + '">🏪</div>';
+                const icon = L.divIcon({ className: '', html: html, iconSize: [26, 26], iconAnchor: [13, 24] });
+                if (this.shopMarker) {
+                    this.shopMarker.setLatLng([lat, lng]);
+                    this.shopMarker.setIcon(icon);
+                } else {
+                    this.shopMarker = L.marker([lat, lng], { icon: icon, zIndexOffset: 500 })
+                        .addTo(this.map).bindPopup('<b>' + this.esc(this.i18n.shop_label) + '</b>');
+                }
+            },
+            toggleSetShop() {
+                if (this.settingShop) { this.cancelSetShop(); return; }
+                this.settingShop = true;
+                this.pendingShop = null;
+            },
+            cancelSetShop() {
+                this.settingShop = false;
+                this.pendingShop = null;
+                // Pin wapis saved jagah par (ya hata do agar kabhi save hi nahi hui)
+                if (this.shopLat !== null && this.shopLng !== null) {
+                    this.renderShopMarker(this.shopLat, this.shopLng, false);
+                } else if (this.shopMarker) {
+                    this.shopMarker.remove();
+                    this.shopMarker = null;
+                }
+            },
+            saveShop() {
+                if (!this.pendingShop || this.shopBusy) return;
+                this.shopBusy = true;
+                fetch(cfg.shopSaveUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
+                    },
+                    body: JSON.stringify({ lat: this.pendingShop.lat, lng: this.pendingShop.lng }),
+                })
+                    .then(r => r.json().then(j => ({ ok: r.ok, j })))
+                    .then(({ ok, j }) => {
+                        this.shopBusy = false;
+                        if (!ok || !j || !j.ok) { alert(this.i18n.shop_error); return; }
+                        this.shopLat = j.lat;
+                        this.shopLng = j.lng;
+                        this.settingShop = false;
+                        this.pendingShop = null;
+                        this.renderShopMarker(this.shopLat, this.shopLng, false);
+                        this.statusLine = this.i18n.shop_saved;
+                    })
+                    .catch(() => { this.shopBusy = false; alert(this.i18n.shop_error); });
             },
             selectRider(r) {
                 this.selected = r;

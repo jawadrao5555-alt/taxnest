@@ -41,7 +41,7 @@
                     <option value="cash">{{ __('pos.cash_refund') }}</option>
                     <option value="card">{{ __('pos.card_bank_refund') }}</option>
                     <option value="store_credit">{{ __('pos.store_credit') }}</option>
-                    @if($original->customer_id)
+                    @if($original->customer_id && $original->payment_method === 'credit')
                     <option value="khata">{{ __('pos.khata_adjust_option') }}</option>
                     @endif
                 </select>

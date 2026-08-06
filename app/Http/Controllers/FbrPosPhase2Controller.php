@@ -390,8 +390,20 @@ class FbrPosPhase2Controller extends Controller
         if ($r->refund_method === 'khata' && !$original->customer_id) {
             return back()->with('error', 'Khata refund ke liye bill par customer hona zaroori hai.');
         }
+        // Khata refund only makes sense for udhaar bills — the customer never
+        // paid cash, so the "refund" is a ledger reversal, not money out.
+        if ($r->refund_method === 'khata' && $original->payment_method !== 'credit') {
+            return back()->with('error', 'Khata adjust sirf udhaar (khata) bill par ho sakta hai — cash/card bill par cash ya store credit refund karein.');
+        }
 
-        return DB::transaction(function () use ($r, $original) {
+        return DB::transaction(function () use ($r, $id) {
+            // Re-fetch UNDER LOCK — concurrent returns of the same bill must
+            // serialize here or both see the same remaining quantities and
+            // double-refund/double-restock.
+            $original = FbrPosTransaction::where('company_id', $this->companyId())
+                ->lockForUpdate()->findOrFail($id);
+            $original->load('items');
+
             $totalSubtotal = 0; $totalTax = 0; $totalDiscount = 0;
             $returnItems = [];
 
@@ -437,6 +449,27 @@ class FbrPosPhase2Controller extends Controller
                 return back()->with('error', 'No items selected for return');
             }
 
+            // ── PARENT BILL-LEVEL DISCOUNT PRORATION ─────────────────────────────
+            // Item subtotals are already net of ITEM discounts, but a bill-level
+            // discount (manual/promotion) reduced what the customer actually paid.
+            // Refund must carry its proportional share or we refund more than was
+            // ever collected. The return row's discount_amount holds ONLY this
+            // bill-level share (mirrors the sale row — payload subtracts it once).
+            $billDiscShare = 0.0;
+            $parentBillDisc = round((float) ($original->discount_amount ?? 0), 2);
+            $parentGoods = round((float) $original->subtotal + (float) $original->tax_amount, 2);
+            if ($parentBillDisc > 0 && $parentGoods > 0) {
+                $ratio = ($totalSubtotal + $totalTax) / $parentGoods;
+                $billDiscShare = round($parentBillDisc * min($ratio, 1), 2);
+                // Across multiple partial returns, never refund more bill discount
+                // than the parent ever had.
+                $alreadyShared = round((float) FbrPosTransaction::where('parent_transaction_id', $original->id)
+                    ->where('transaction_type', 'return')->sum('discount_amount'), 2);
+                $billDiscShare = max(0.0, min($billDiscShare, round($parentBillDisc - $alreadyShared, 2)));
+                $billDiscShare = min($billDiscShare, round($totalSubtotal + $totalTax, 2));
+            }
+            $refundTotal = round($totalSubtotal + $totalTax - $billDiscShare, 2);
+
             $shift = $this->currentShift();
             $invNum = 'RET-' . date('ymd') . '-' . strtoupper(Str::random(5));
 
@@ -453,11 +486,11 @@ class FbrPosPhase2Controller extends Controller
                 'customer_ntn' => $original->customer_ntn,
                 'customer_id' => $original->customer_id,
                 'subtotal' => $totalSubtotal,
-                'discount_amount' => $totalDiscount,
+                'discount_amount' => $billDiscShare,
                 'tax_amount' => $totalTax,
-                'total_amount' => $totalSubtotal + $totalTax,
+                'total_amount' => $refundTotal,
                 'payment_method' => $r->refund_method,
-                'payment_breakdown' => [['method' => $r->refund_method, 'amount' => $totalSubtotal + $totalTax]],
+                'payment_breakdown' => [['method' => $r->refund_method, 'amount' => $refundTotal]],
                 'status' => 'completed',
                 'fbr_status' => 'local',
                 'created_by' => $this->user()->id,
@@ -471,7 +504,9 @@ class FbrPosPhase2Controller extends Controller
             // ── KHATA REFUND (Aug 2026 — Retail Core) ────────────────────────────
             // Refund credited into the customer's udhaar ledger — balance goes DOWN.
             if ($r->refund_method === 'khata' && $original->customer_id) {
-                $cust = \App\Models\PosCustomer::lockForUpdate()->find($original->customer_id);
+                $cust = \App\Models\PosCustomer::lockForUpdate()
+                    ->where('company_id', $this->companyId())
+                    ->find($original->customer_id);
                 if ($cust) {
                     $newBalance = round((float) $cust->khata_balance - (float) $return->total_amount, 2);
                     \App\Models\FbrCustomerLedger::create([
@@ -492,8 +527,15 @@ class FbrPosPhase2Controller extends Controller
             // Returned goods go back on the shelf when stock tracking is ON.
             $company = \App\Models\Company::find($this->companyId());
             if ($company && $company->inventory_enabled) {
+                // Symmetry guard: only restore products the ORIGINAL sale actually
+                // deducted — if tracking was OFF at sale time there is no deduct
+                // movement, and restoring would mint stock out of thin air.
+                $deductedProductIds = \App\Models\InventoryMovement::where('company_id', $this->companyId())
+                    ->where('reference_type', 'fbr_pos_transaction')
+                    ->where('reference_id', $original->id)
+                    ->pluck('product_id')->map(fn ($v) => (int) $v)->all();
                 foreach ($returnItems as $it) {
-                    if (!empty($it['product_id']) && (float) $it['quantity'] > 0) {
+                    if (!empty($it['product_id']) && in_array((int) $it['product_id'], $deductedProductIds, true) && (float) $it['quantity'] > 0) {
                         try {
                             \App\Services\InventoryService::addStock(
                                 $this->companyId(),

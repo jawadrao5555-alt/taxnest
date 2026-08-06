@@ -19,8 +19,21 @@ class FbrPosKhataController extends Controller
     private function user() { return Auth::guard('fbrpos')->user(); }
     private function companyId(): int { return (int) $this->user()->company_id; }
 
+    /**
+     * Khata is owner/manager territory — cashiers and viewers must not see
+     * outstanding balances or record wasooli (financial mutation).
+     */
+    private function assertNotCashier(): void
+    {
+        $u = $this->user();
+        if (in_array($u->pos_role ?? '', ['pos_cashier', 'local_viewer'], true)) {
+            abort(403, 'Sirf admin/manager khata dekh sakte hain.');
+        }
+    }
+
     public function index(Request $request)
     {
+        $this->assertNotCashier();
         $companyId = $this->companyId();
 
         $customers = PosCustomer::where('company_id', $companyId)
@@ -45,6 +58,7 @@ class FbrPosKhataController extends Controller
 
     public function ledger($customerId)
     {
+        $this->assertNotCashier();
         $companyId = $this->companyId();
         $customer = PosCustomer::where('company_id', $companyId)->findOrFail($customerId);
 
@@ -77,6 +91,7 @@ class FbrPosKhataController extends Controller
 
     public function wasooli(Request $request)
     {
+        $this->assertNotCashier();
         $request->validate([
             'customer_id' => 'required|integer',
             'amount' => 'required|numeric|min:0.01',
@@ -91,7 +106,20 @@ class FbrPosKhataController extends Controller
                 ->findOrFail($request->customer_id);
 
             $amount = round((float) $request->amount, 2);
-            $newBalance = round((float) $customer->khata_balance - $amount, 2);
+            $outstanding = round((float) $customer->khata_balance, 2);
+
+            // Overpay guard: wasooli can never exceed the outstanding balance —
+            // otherwise the khata goes negative and the ledger loses meaning.
+            if ($outstanding <= 0) {
+                return redirect()->route('fbrpos.khata')
+                    ->with('error', "{$customer->name} par koi udhaar baqi nahi.");
+            }
+            if ($amount > $outstanding) {
+                return redirect()->route('fbrpos.khata')
+                    ->with('error', "Wasooli Rs " . number_format($amount, 2) . " outstanding Rs " . number_format($outstanding, 2) . " se zyada hai — pehle amount theek karein.");
+            }
+
+            $newBalance = round($outstanding - $amount, 2);
 
             FbrCustomerLedger::create([
                 'company_id' => $companyId,

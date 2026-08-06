@@ -32,8 +32,21 @@ class FbrPosStockController extends Controller
     private function user() { return Auth::guard('fbrpos')->user(); }
     private function companyId(): int { return (int) $this->user()->company_id; }
 
+    /**
+     * Stock & purchase is owner/manager territory — cashiers and viewers must
+     * not toggle tracking, receive stock, or edit suppliers/min levels.
+     */
+    private function assertNotCashier(): void
+    {
+        $u = $this->user();
+        if (in_array($u->pos_role ?? '', ['pos_cashier', 'local_viewer'], true)) {
+            abort(403, 'Sirf admin/manager stock manage kar sakte hain.');
+        }
+    }
+
     public function index()
     {
+        $this->assertNotCashier();
         $companyId = $this->companyId();
         $company = Company::find($companyId);
 
@@ -86,6 +99,7 @@ class FbrPosStockController extends Controller
     /** Toggle stock tracking for the company (owner/admin action). */
     public function toggle(Request $request)
     {
+        $this->assertNotCashier();
         $company = Company::find($this->companyId());
         $company->update(['inventory_enabled' => (bool) $request->boolean('enabled')]);
         return redirect()->route('fbrpos.stock')
@@ -94,6 +108,7 @@ class FbrPosStockController extends Controller
 
     public function storeSupplier(Request $request)
     {
+        $this->assertNotCashier();
         $request->validate([
             'name' => 'required|string|max:150',
             'phone' => 'nullable|string|max:30',
@@ -120,6 +135,7 @@ class FbrPosStockController extends Controller
      */
     public function storePurchase(Request $request)
     {
+        $this->assertNotCashier();
         $request->validate([
             'supplier_id' => 'nullable|integer',
             'items' => 'required|array|min:1',
@@ -197,6 +213,7 @@ class FbrPosStockController extends Controller
     /** Inline update of a product's min stock level (alert threshold). */
     public function updateMinLevel(Request $request)
     {
+        $this->assertNotCashier();
         $request->validate([
             'product_id' => 'required|integer',
             'min_stock_level' => 'required|numeric|min:0',

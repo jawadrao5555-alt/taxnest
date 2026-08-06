@@ -947,6 +947,18 @@ class FbrPosController extends Controller
                         'customer_id' => 'Udhaar bill ke liye customer chunna zaroori hai.',
                     ]);
                 }
+                // Tenant guard: the chosen customer must belong to THIS company —
+                // a foreign customer_id must never create a ledger row or mutate
+                // another tenant's khata balance.
+                if ($request->payment_method === 'credit') {
+                    $khataOwnerOk = \App\Models\PosCustomer::where('company_id', $companyId)
+                        ->where('id', $request->customer_id)->exists();
+                    if (!$khataOwnerOk) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'customer_id' => 'Customer nahi mila — dobara select karein.',
+                        ]);
+                    }
+                }
 
                 // Cash received & change
                 $cashReceived = (float) ($request->cash_received ?? 0);
@@ -1048,7 +1060,8 @@ class FbrPosController extends Controller
 
                 // Update customer loyalty + stats
                 if ($request->customer_id) {
-                    $customer = \App\Models\PosCustomer::find($request->customer_id);
+                    $customer = \App\Models\PosCustomer::where('company_id', $companyId)
+                        ->find($request->customer_id);
                     if ($customer) {
                         $netPoints = $loyaltyPointsEarned - $loyaltyPointsRedeemed;
                         $customer->loyalty_points = max(0, (int) $customer->loyalty_points + $netPoints);
@@ -1085,7 +1098,16 @@ class FbrPosController extends Controller
                 // Same DB transaction as the sale: ledger row + cached balance move
                 // together or not at all.
                 if ($request->payment_method === 'credit' && $request->customer_id) {
-                    $khataCustomer = \App\Models\PosCustomer::lockForUpdate()->find($request->customer_id);
+                    $khataCustomer = \App\Models\PosCustomer::lockForUpdate()
+                        ->where('company_id', $companyId)
+                        ->find($request->customer_id);
+                    if (!$khataCustomer) {
+                        // Customer vanished between guard and lock — abort the whole
+                        // sale rather than booking a credit bill with no ledger row.
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'customer_id' => 'Customer nahi mila — udhaar bill cancel.',
+                        ]);
+                    }
                     if ($khataCustomer) {
                         $newBalance = round((float) $khataCustomer->khata_balance + $totalAmount, 2);
                         \App\Models\FbrCustomerLedger::create([

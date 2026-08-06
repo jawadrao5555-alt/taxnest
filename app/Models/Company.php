@@ -51,6 +51,8 @@ class Company extends Model
         'registration_no',
         'mobile',
         'city',
+        'shop_lat',
+        'shop_lng',
         'website',
         'inventory_enabled',
         'pos_restock_on_void',

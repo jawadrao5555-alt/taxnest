@@ -135,6 +135,10 @@ return new class extends Migration
                 $add('manager_override_pin', fn ($t) => $t->string('manager_override_pin')->nullable());
                 $add('cashier_discount_limit', fn ($t) => $t->decimal('cashier_discount_limit', 5, 2)->default(10.00));
                 $add('manager_discount_limit', fn ($t) => $t->decimal('manager_discount_limit', 5, 2)->default(50.00));
+
+                // --- Rider tracking shop pin (ZFC, Aug 2026) ---
+                $add('shop_lat', fn ($t) => $t->decimal('shop_lat', 10, 7)->nullable());
+                $add('shop_lng', fn ($t) => $t->decimal('shop_lng', 10, 7)->nullable());
             });
         }
 

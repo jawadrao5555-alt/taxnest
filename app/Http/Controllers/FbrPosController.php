@@ -497,7 +497,11 @@ class FbrPosController extends Controller
             // Card bucket includes stored aliases (debit/credit card) so card sales
             // never silently land in "Other" — mirrors the PRA POS day-close fix.
             'card_amount' => $transactions->whereIn('payment_method', ['card', 'debit_card', 'credit_card'])->sum('total_amount'),
-            'other_amount' => $transactions->whereNotIn('payment_method', ['cash', 'card', 'debit_card', 'credit_card'])->sum('total_amount'),
+            // Udhaar (credit/khata) is its own bucket — excluded from cash counting.
+            // 'credit' bills are never in the cash drawer so the recon stays clean.
+            'udhaar_amount' => $transactions->where('payment_method', 'credit')->sum('total_amount'),
+            // "Other" = every method that is not cash, card alias, or udhaar.
+            'other_amount' => $transactions->whereNotIn('payment_method', ['cash', 'card', 'debit_card', 'credit_card', 'credit'])->sum('total_amount'),
             'first_invoice_number' => $transactions->first()->invoice_number ?? null,
             'last_invoice_number' => $transactions->last()->invoice_number ?? null,
             'first_invoice_time' => $transactions->first()->created_at ?? null,
@@ -1061,18 +1065,23 @@ class FbrPosController extends Controller
 
                 // Update shift totals
                 if ($shift) {
-                    $cashTotal = 0; $cardTotal = 0; $otherTotal = 0;
+                    $cashTotal = 0; $cardTotal = 0; $udhaarTotal = 0; $otherTotal = 0;
                     foreach ($paymentBreakdown as $pb) {
                         $m = strtolower($pb['method'] ?? '');
                         $a = (float) ($pb['amount'] ?? 0);
                         if ($m === 'cash') $cashTotal += $a;
                         elseif (in_array($m, ['card','credit_card','debit_card'])) $cardTotal += $a;
+                        elseif ($m === 'credit') $udhaarTotal += $a; // Udhaar/Khata — not in the cash drawer
                         else $otherTotal += $a;
                     }
                     $shift->sales_count = (int) $shift->sales_count + 1;
                     $shift->total_sales = (float) $shift->total_sales + $totalAmount;
                     $shift->total_cash = (float) $shift->total_cash + $cashTotal;
                     $shift->total_card = (float) $shift->total_card + $cardTotal;
+                    // total_udhaar column guarded: silently no-ops on old schema until migration lands.
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_shifts', 'total_udhaar')) {
+                        $shift->total_udhaar = (float) $shift->total_udhaar + $udhaarTotal;
+                    }
                     $shift->total_other = (float) $shift->total_other + $otherTotal;
                     $shift->save();
                 }
@@ -2787,7 +2796,10 @@ class FbrPosController extends Controller
             // Card bucket includes stored aliases (debit/credit card) so card sales
             // never silently land in "Other" — mirrors the PRA POS day-close fix.
             'card_amount' => $transactions->whereIn('payment_method', ['card', 'debit_card', 'credit_card'])->sum('total_amount'),
-            'other_amount' => $transactions->whereNotIn('payment_method', ['cash', 'card', 'debit_card', 'credit_card'])->sum('total_amount'),
+            // Udhaar (credit/khata) is its own bucket — excluded from cash counting.
+            'udhaar_amount' => $transactions->where('payment_method', 'credit')->sum('total_amount'),
+            // "Other" = every method that is not cash, card alias, or udhaar.
+            'other_amount' => $transactions->whereNotIn('payment_method', ['cash', 'card', 'debit_card', 'credit_card', 'credit'])->sum('total_amount'),
             'first_invoice' => $transactions->first(),
             'last_invoice' => $transactions->last(),
         ];
@@ -3003,9 +3015,25 @@ class FbrPosController extends Controller
 
         $analytics = $this->buildFbrDayCloseAnalytics($companyId, $report->report_date->toDateString(), $transactions);
 
+        // Historical reports: derive udhaar at read time (render-time derivation per
+        // decision 2 — never rewrite frozen snapshot rows).
+        // New rows have udhaar_amount stored explicitly; old rows default to 0.
+        // Either way we re-derive from transactions so old reports display correctly.
+        $derivedUdhaarAmount = (float) $transactions->where('payment_method', 'credit')->sum('total_amount');
+        // If the stored snapshot already has a non-zero udhaar_amount trust it (it
+        // was subtracted from other_amount at write time); otherwise fall back to the
+        // derived figure and subtract it from stored other_amount for display.
+        $hasUdhaarColumn = \Illuminate\Support\Facades\Schema::hasColumn('fbr_day_close_reports', 'udhaar_amount');
+        $displayUdhaar = $hasUdhaarColumn && (float) $report->udhaar_amount > 0
+            ? (float) $report->udhaar_amount
+            : $derivedUdhaarAmount;
+        $displayOther  = $hasUdhaarColumn && (float) $report->udhaar_amount > 0
+            ? (float) $report->other_amount
+            : max(0.0, (float) $report->other_amount - $derivedUdhaarAmount);
+
         return $this->renderReportPdf(
             'fbr-pos.day-close-pdf',
-            compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics'),
+            compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'displayUdhaar', 'displayOther'),
             "Day-Close-{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf"
         );
     }
@@ -3036,7 +3064,17 @@ class FbrPosController extends Controller
 
         $analytics = $this->buildFbrDayCloseAnalytics($companyId, $report->report_date->toDateString(), $transactions);
 
-        return view('fbr-pos.day-close-thermal', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics'));
+        // Historical reports: render-time derivation (same logic as dayCloseReportPdf).
+        $derivedUdhaarAmount = (float) $transactions->where('payment_method', 'credit')->sum('total_amount');
+        $hasUdhaarColumn = \Illuminate\Support\Facades\Schema::hasColumn('fbr_day_close_reports', 'udhaar_amount');
+        $displayUdhaar = $hasUdhaarColumn && (float) $report->udhaar_amount > 0
+            ? (float) $report->udhaar_amount
+            : $derivedUdhaarAmount;
+        $displayOther  = $hasUdhaarColumn && (float) $report->udhaar_amount > 0
+            ? (float) $report->other_amount
+            : max(0.0, (float) $report->other_amount - $derivedUdhaarAmount);
+
+        return view('fbr-pos.day-close-thermal', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'displayUdhaar', 'displayOther'));
     }
 
     public function products(Request $request)

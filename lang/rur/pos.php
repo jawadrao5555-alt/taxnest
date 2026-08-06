@@ -876,6 +876,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'dc_opening_float' => 'Subah ka Opening Cash',
     'dc_order_types' => 'Order ki Qismein',
     'dc_other' => 'Deegar',
+    'dc_udhaar' => 'Udhaar / Khata',
+    'dc_udhaar_not_in_drawer' => 'Cash mein nahi',
     'dc_over' => '(ZYADA)',
     'dc_payments' => 'Payments',
     'dc_pending' => 'Pending',

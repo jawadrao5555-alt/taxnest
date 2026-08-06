@@ -104,6 +104,20 @@
                     </div>
                     <span class="font-bold text-gray-900 dark:text-white">PKR {{ number_format($stats->card_amount, 2) }}</span>
                 </div>
+                @if($stats->udhaar_amount > 0)
+                <div class="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                        </div>
+                        <div>
+                            <span class="font-medium text-gray-900 dark:text-white">{{ __('pos.dc_udhaar') }}</span>
+                            <p class="text-xs text-orange-600 dark:text-orange-400">{{ __('pos.dc_udhaar_not_in_drawer') }}</p>
+                        </div>
+                    </div>
+                    <span class="font-bold text-orange-700 dark:text-orange-400">PKR {{ number_format($stats->udhaar_amount, 2) }}</span>
+                </div>
+                @endif
                 @if($stats->other_amount > 0)
                 <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                     <div class="flex items-center gap-2">

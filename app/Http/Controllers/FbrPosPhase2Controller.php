@@ -278,7 +278,7 @@ class FbrPosPhase2Controller extends Controller
         }, 0);
         $expectedCash = $shift->opening_cash + $totals['cash'] + $cashMovements - $totals['returns_cash'];
 
-        $shift->update([
+        $updateData = [
             'closed_at' => now(),
             'closing_cash' => $r->closing_cash,
             'expected_cash' => $expectedCash,
@@ -292,7 +292,12 @@ class FbrPosPhase2Controller extends Controller
             'returns_count' => $totals['returns_count'],
             'notes' => $r->notes,
             'status' => 'closed',
-        ]);
+        ];
+        // total_udhaar is schema-guarded: col added by Aug 2026 migration; skip on old schema.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_shifts', 'total_udhaar')) {
+            $updateData['total_udhaar'] = $totals['udhaar'];
+        }
+        $shift->update($updateData);
         return redirect()->route('fbrpos.phase2.shift.report', $shift->id)
             ->with('success', 'Shift closed. Variance: Rs ' . number_format($shift->variance, 2));
     }
@@ -338,13 +343,15 @@ class FbrPosPhase2Controller extends Controller
             ->where('transaction_type', 'return')
             ->where('status', 'completed')->get();
 
-        $cash = $card = $other = $returnsCash = 0;
+        $cash = $card = $udhaar = $other = $returnsCash = 0;
         foreach ($sales as $s) {
             $bd = is_array($s->payment_breakdown) ? $s->payment_breakdown : [['method' => $s->payment_method, 'amount' => $s->total_amount]];
             foreach ($bd as $p) {
                 $amt = (float) ($p['amount'] ?? 0);
-                if (($p['method'] ?? '') === 'cash') $cash += $amt;
-                elseif (in_array($p['method'] ?? '', ['card', 'credit_card', 'debit_card'])) $card += $amt;
+                $m = (string) ($p['method'] ?? '');
+                if ($m === 'cash') $cash += $amt;
+                elseif (in_array($m, ['card', 'credit_card', 'debit_card'])) $card += $amt;
+                elseif ($m === 'credit') $udhaar += $amt; // Udhaar/Khata — never in the cash drawer
                 else $other += $amt;
             }
         }
@@ -356,6 +363,7 @@ class FbrPosPhase2Controller extends Controller
             'sales' => $sales->sum('total_amount'),
             'cash' => $cash,
             'card' => $card,
+            'udhaar' => $udhaar,
             'other' => $other,
             'returns' => $returns->sum('total_amount'),
             'returns_cash' => $returnsCash,

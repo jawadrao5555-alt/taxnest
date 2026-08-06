@@ -9,7 +9,7 @@ class FbrPosShift extends Model
     protected $fillable = [
         'company_id', 'terminal_id', 'user_id', 'opened_at', 'closed_at',
         'opening_cash', 'expected_cash', 'closing_cash', 'variance',
-        'total_sales', 'total_cash', 'total_card', 'total_other', 'total_returns',
+        'total_sales', 'total_cash', 'total_card', 'total_other', 'total_udhaar', 'total_returns',
         'sales_count', 'returns_count', 'notes', 'status',
     ];
 
@@ -24,6 +24,7 @@ class FbrPosShift extends Model
         'total_cash' => 'decimal:2',
         'total_card' => 'decimal:2',
         'total_other' => 'decimal:2',
+        'total_udhaar' => 'decimal:2',
         'total_returns' => 'decimal:2',
     ];
 

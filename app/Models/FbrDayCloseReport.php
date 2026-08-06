@@ -10,7 +10,7 @@ class FbrDayCloseReport extends Model
         'company_id', 'report_date', 'report_number',
         'total_invoices', 'fbr_invoices', 'local_invoices', 'failed_invoices',
         'gross_sales', 'total_discount', 'net_sales', 'total_tax', 'total_fbr_fee', 'total_amount',
-        'cash_amount', 'card_amount', 'other_amount',
+        'cash_amount', 'card_amount', 'other_amount', 'udhaar_amount',
         'first_invoice_number', 'last_invoice_number',
         'first_invoice_time', 'last_invoice_time',
         'closed_by', 'notes', 'hash',

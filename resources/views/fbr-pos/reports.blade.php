@@ -352,14 +352,36 @@
 
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <h3 class="font-semibold text-gray-900 dark:text-white mb-4">{{ __('pos.payment_methods') }}</h3>
+            @php
+            // Payment-method label lookup — translate raw DB values to human labels.
+            // 'credit' = Udhaar/Khata; card aliases normalised; others prettified.
+            $pmLabels = [
+                'cash'        => __('pos.cash_word'),
+                'debit_card'  => __('pos.card_word') . ' (Debit)',
+                'credit_card' => __('pos.card_word') . ' (Credit)',
+                'card'        => __('pos.card_word'),
+                'credit'      => __('pos.dc_udhaar'),        // Udhaar / Khata
+                'bank_transfer' => 'Bank Transfer',
+                'online'      => 'Online',
+                'qr_payment'  => 'QR Payment',
+            ];
+            @endphp
             <div class="space-y-3">
                 @forelse($paymentBreakdown as $pm)
-                <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                @php
+                    $pmKey = $pm->payment_method ?? '';
+                    $pmLabel = $pmLabels[$pmKey] ?? ucwords(str_replace('_', ' ', $pmKey));
+                    $isUdhaar = $pmKey === 'credit';
+                @endphp
+                <div class="flex items-center justify-between p-3 {{ $isUdhaar ? 'bg-orange-50 dark:bg-orange-900/20' : 'bg-gray-50 dark:bg-gray-800' }} rounded-lg">
                     <div>
-                        <p class="font-medium text-gray-900 dark:text-white">{{ ucwords(str_replace('_', ' ', $pm->payment_method)) }}</p>
+                        <p class="font-medium {{ $isUdhaar ? 'text-orange-800 dark:text-orange-300' : 'text-gray-900 dark:text-white' }}">{{ $pmLabel }}</p>
                         <p class="text-xs text-gray-500">{{ __('pos.n_transactions', ['count' => $pm->count]) }}</p>
+                        @if($isUdhaar)
+                        <p class="text-xs text-orange-600 dark:text-orange-400">{{ __('pos.dc_udhaar_not_in_drawer') }}</p>
+                        @endif
                     </div>
-                    <p class="font-bold text-gray-900 dark:text-white">PKR {{ number_format($pm->revenue, 2) }}</p>
+                    <p class="font-bold {{ $isUdhaar ? 'text-orange-700 dark:text-orange-400' : 'text-gray-900 dark:text-white' }}">PKR {{ number_format($pm->revenue, 2) }}</p>
                 </div>
                 @empty
                 <p class="text-center text-gray-400 py-6">{{ __('pos.no_payment_data') }}</p>

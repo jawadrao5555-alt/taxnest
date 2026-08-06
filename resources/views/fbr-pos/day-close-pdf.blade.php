@@ -187,10 +187,16 @@
                 <td>{{ __('pos.dc_card') }}</td>
                 <td class="r">{{ number_format($report->card_amount, 2) }}</td>
             </tr>
-            @if($report->other_amount > 0)
+            @if($displayUdhaar > 0)
+            <tr>
+                <td>{{ __('pos.dc_udhaar') }} <span style="font-size:8px;color:#b45309;">({{ __('pos.dc_udhaar_not_in_drawer') }})</span></td>
+                <td class="r" style="color:#b45309;">{{ number_format($displayUdhaar, 2) }}</td>
+            </tr>
+            @endif
+            @if($displayOther > 0)
             <tr>
                 <td>{{ __('pos.dc_other') }}</td>
-                <td class="r">{{ number_format($report->other_amount, 2) }}</td>
+                <td class="r">{{ number_format($displayOther, 2) }}</td>
             </tr>
             @endif
         </tbody>

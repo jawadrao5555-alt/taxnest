@@ -876,6 +876,8 @@ return [
     'dc_opening_float' => 'اوپننگ فلوٹ',
     'dc_order_types' => 'آرڈر ٹائپس',
     'dc_other' => 'دیگر',
+    'dc_udhaar' => 'ادھار / کھاتہ',
+    'dc_udhaar_not_in_drawer' => 'نقد میں شامل نہیں',
     'dc_over' => '(اوور)',
     'dc_payments' => 'پیمنٹس',
     'dc_pending' => 'پینڈنگ',

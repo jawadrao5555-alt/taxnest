@@ -175,6 +175,7 @@ class FbrPosDayCloseAutoFinalizeTest extends TestCase
             $table->decimal('total_amount', 14, 2)->default(0);
             $table->decimal('cash_amount', 14, 2)->default(0);
             $table->decimal('card_amount', 14, 2)->default(0);
+            $table->decimal('udhaar_amount', 14, 2)->default(0);
             $table->decimal('other_amount', 14, 2)->default(0);
             $table->string('first_invoice_number')->nullable();
             $table->string('last_invoice_number')->nullable();

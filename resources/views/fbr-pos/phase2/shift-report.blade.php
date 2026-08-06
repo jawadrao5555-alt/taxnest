@@ -30,6 +30,15 @@
             <table class="w-full text-sm table-cards">
                 <tr><td class="py-1 dark:text-gray-300">{{ __('pos.th_cash') }}</td><td class="text-right font-semibold dark:text-white">Rs {{ number_format($shift->total_cash, 2) }}</td></tr>
                 <tr><td class="py-1 dark:text-gray-300">{{ __('pos.card_word') }}</td><td class="text-right font-semibold dark:text-white">Rs {{ number_format($shift->total_card, 2) }}</td></tr>
+                @if(isset($shift->total_udhaar) && (float) $shift->total_udhaar > 0)
+                <tr>
+                    <td class="py-1 text-orange-600 dark:text-orange-400">
+                        {{ __('pos.dc_udhaar') }}
+                        <span class="block text-[10px] text-gray-400">{{ __('pos.dc_udhaar_not_in_drawer') }}</span>
+                    </td>
+                    <td class="text-right font-semibold text-orange-600 dark:text-orange-400">Rs {{ number_format($shift->total_udhaar, 2) }}</td>
+                </tr>
+                @endif
                 <tr><td class="py-1 dark:text-gray-300">{{ __('pos.other_word') }}</td><td class="text-right font-semibold dark:text-white">Rs {{ number_format($shift->total_other, 2) }}</td></tr>
             </table>
         </div>

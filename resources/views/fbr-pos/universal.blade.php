@@ -778,24 +778,17 @@ window.addEventListener('popstate', function() {
             <span x-show="heldOrders.length > 0" class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="heldOrders.length"></span>
         </button>
 
+        {{-- Toolbar Hold F5 / Pay F8 buttons REMOVED (owner, 6 Aug 2026): cart footer
+             already has Hold F5 + PAY F8 — top copies were duplicates. F5/F8 keyboard
+             shortcuts unchanged (global keydown handler). Send to Kitchen stays (KOT). --}}
+        @if($features->kot ?? false)
         <div class="hidden md:flex items-center gap-1.5">
-            <button @click="holdOrder()" :disabled="cart.length === 0 || submitting || hasManualItems()" :title="hasManualItems() ? window.TXT.ti_manual_pay_first_hold : window.TXT.ti_hold_this_order" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
-                <svg x-show="submitting" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                <span x-show="!submitting" class="text-[10px] bg-amber-400/30 px-1 rounded">F5</span> <span x-text="submitting ? window.TXT.holding_ellipsis : window.TXT.hold_word"></span>
-            </button>
-
-            {{-- Phase 5 — Send to Kitchen (visible only when feature.kot is on) --}}
-            @if($features->kot ?? false)
             <button @click="sendToKitchen()" :disabled="cart.length === 0 || submitting || hasManualItems()" :title="hasManualItems() ? window.TXT.ti_manual_pay_first_cart : window.TXT.ti_kot_saves_no_payment" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
                 <span class="text-base leading-none">🍳</span>
                 <span x-text="submitting ? window.TXT.sending_ellipsis : window.TXT.send_to_kitchen"></span>
             </button>
-            @endif
-
-            <button @click="showPayModal = true" :disabled="cart.length === 0 || submitting" class="flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold bg-green-600 hover:bg-green-700 text-white disabled:opacity-40 shadow-sm transition">
-                <span x-show="!submitting" class="text-[10px] bg-green-500/30 px-1 rounded">F8</span> {{ __('pos.pay') }}
-            </button>
         </div>
+        @endif
     </div>{{-- /ROW 2 --}}
     </div>{{-- /flex-col action bar --}}
 

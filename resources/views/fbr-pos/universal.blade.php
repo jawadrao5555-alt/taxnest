@@ -355,9 +355,12 @@ window.addEventListener('popstate', function() {
     </div>
     @endif
 
-    {{-- flex-wrap: on narrow displays the action buttons wrap to a second row instead of
-         being clipped off-screen (overflow-hidden root swallows anything past the edge). --}}
-    <div class="flex flex-wrap items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0 shadow-sm">
+    {{-- 2-ROW ACTION BAR (Retail Fast Billing — Aug 2026)
+         Row 1: Customer · order type · utils · nav shortcuts
+         Row 2: Category dropdown + WIDE barcode/scan search + Hold F5 --}}
+    <div class="flex flex-col bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0 shadow-sm">
+    {{-- ── ROW 1 ── --}}
+    <div class="flex flex-wrap items-center gap-2 px-3 py-2">
 
         <div class="relative flex-shrink-0" style="min-width:180px;max-width:220px;">
             <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
@@ -428,6 +431,11 @@ window.addEventListener('popstate', function() {
 
         <div class="w-px h-6 bg-gray-200 dark:bg-gray-700 hidden sm:block flex-shrink-0"></div>
 
+    </div>{{-- /ROW 1 --}}
+
+    {{-- ── ROW 2: Category + WIDE scan search + Hold ── --}}
+    <div class="flex items-center gap-2 px-3 pb-2 pt-0">
+
         {{-- CATEGORY DROPDOWN (optional filter) — same activeCategory as the grid pills, so the two
              stay in sync. Default "All Categories" = old behavior, byte-identical. Unlike the pills
              it is ALWAYS visible (even when the grid is hidden), so a chosen category is never an
@@ -446,8 +454,9 @@ window.addEventListener('popstate', function() {
         </div>
 
         <div class="flex-1 relative" style="min-width:170px;">
-            <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input type="search" x-ref="searchInput" x-model="searchQuery" @input="onSearchInput()" @keydown.arrow-down.prevent="moveHighlight(1)" @keydown.arrow-up.prevent="moveHighlight(-1)" @keydown.enter.prevent.stop="addHighlightedItem($event)" @keydown.tab="if(flowStep === 'type'){ $event.preventDefault(); } else if(!searchQuery && cart.length > 0){ $event.preventDefault(); enterCartMode('last'); }" @focus="if(searchQuery) showSearchDropdown = true" @click.away="showSearchDropdown = false" placeholder="{{ __('pos.ph_search_products') }}" class="search-glow w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400 transition shadow-sm" autocomplete="one-time-code" name="pos_product_search_nofill" data-lpignore="true" data-form-type="other" role="combobox">
+            {{-- Barcode/scan icon (retail fast-billing Aug 2026) --}}
+            <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h1v12H4zm3 0h1v12H7zm3 0h2v12h-2zm4 0h1v12h-1zm3 0h1v12h-1zM2 4h20v2H2zm0 14h20v2H2z"/></svg>
+            <input type="search" x-ref="searchInput" x-model="searchQuery" @input="onSearchInput()" @keydown.arrow-down.prevent="moveHighlight(1)" @keydown.arrow-up.prevent="moveHighlight(-1)" @keydown.enter.prevent.stop="addHighlightedItem($event)" @keydown.tab="if(flowStep === 'type'){ $event.preventDefault(); } else if(!searchQuery && cart.length > 0){ $event.preventDefault(); enterCartMode('last'); }" @focus="if(searchQuery) showSearchDropdown = true" @click.away="showSearchDropdown = false" placeholder="Barcode / Article # scan karein — ya naam ka pehla harf likhein (Ctrl+S)" class="search-glow w-full pl-10 pr-10 py-2.5 rounded-xl text-sm border-2 border-blue-200 dark:border-blue-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400 transition shadow-sm" autocomplete="one-time-code" name="pos_product_search_nofill" data-lpignore="true" data-form-type="other" role="combobox">
             <kbd x-show="!searchQuery" class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 font-mono">Ctrl+S</kbd>
             <button x-show="searchQuery" @click="searchQuery = ''; showSearchDropdown = false; filterProducts(); $refs.searchInput.focus()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -586,6 +595,17 @@ window.addEventListener('popstate', function() {
             <span class="hidden sm:inline">{{ __('pos.new_word') }}</span>
         </button>
 
+        {{-- REPRINT Alt+R — reprints the last finalized bill instantly (no modal).
+             Stays hidden until a bill has been processed in this session. --}}
+        <button x-show="recentBills.length > 0 || lastTransactionId" x-cloak
+                @click="const last = recentBills[0]; if(last) { _printViaIframe('print-receipt-frame', '/fbr-pos/transaction/' + last.id + '/receipt?auto_print=1', 'width=400,height=700'); showToast('Reprinting #' + last.invoice_number, 'info'); } else if(lastTransactionId) { printReceipt(); }"
+                class="flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition flex-shrink-0"
+                title="Reprint last bill (Alt+R)">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+            <span class="hidden lg:inline">Reprint</span>
+            <kbd class="text-[8px] font-mono bg-gray-200 dark:bg-gray-700 px-1 rounded hidden sm:inline">Alt+R</kbd>
+        </button>
+
         {{-- ── PROVISIONAL BILLS (Local) — header shortcut. Same pattern as Held. ── --}}
         {{-- 🟢/🟡/🔴 Auto-Sync status pill — live network + pending-bill indicator --}}
         <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition"
@@ -648,7 +668,8 @@ window.addEventListener('popstate', function() {
                 <span x-show="!submitting" class="text-[10px] bg-green-500/30 px-1 rounded">F8</span> {{ __('pos.pay') }}
             </button>
         </div>
-    </div>
+    </div>{{-- /ROW 2 --}}
+    </div>{{-- /flex-col action bar --}}
 
     {{-- Wide-cart (Variant A) port from PRA screen (owner, 30 Jul 2026): Products OFF
          + desktop = body row flips to column, grid hides, cart goes wide LEFT with a
@@ -768,6 +789,25 @@ window.addEventListener('popstate', function() {
                         </button>
                     </div>
                 </template>
+            </div>
+
+            {{-- ── AKHRI BILLS STRIP (Aug 2026 — Retail Fast Billing) ─────────────────────
+                 One-click reprint chips for the last 5 finalized bills in this session.
+                 Hidden until at least one bill is done. Alt+R always reprints recentBills[0]. --}}
+            <div x-show="recentBills.length > 0" x-cloak class="hidden md:flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
+                <span class="text-[9px] font-black uppercase tracking-wider text-gray-300 dark:text-gray-600 whitespace-nowrap flex-shrink-0">AKHRI BILLS</span>
+                <div class="flex items-center gap-1.5 overflow-x-auto hide-scrollbar">
+                    <template x-for="(b, bi) in recentBills" :key="b.id">
+                        <button @click="_printViaIframe('print-receipt-frame', '/fbr-pos/transaction/' + b.id + '/receipt?auto_print=1', 'width=400,height=700'); showToast('Reprinting #' + b.invoice_number, 'info')"
+                                class="flex-shrink-0 flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 transition"
+                                :title="'Reprint ' + b.invoice_number + ' — Rs. ' + Number(b.total).toLocaleString()">
+                            <svg class="w-3 h-3 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                            <span class="text-[10px] font-semibold text-gray-700 dark:text-gray-300" x-text="b.invoice_number"></span>
+                            <span class="text-[9px] text-gray-400" x-text="'Rs.' + Number(b.total).toLocaleString()"></span>
+                            <span x-show="bi === 0" class="text-[8px] font-bold text-blue-500 ml-0.5">Alt+R</span>
+                        </button>
+                    </template>
+                </div>
             </div>
 
             <div class="md:hidden flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
@@ -960,7 +1000,8 @@ window.addEventListener('popstate', function() {
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                             </button>
                         </div>
-                        <div class="flex items-center gap-1.5 mt-1.5 justify-end">
+                        {{-- Cart rows v3 (Aug 2026): TAX/Disc/FBR only visible on active row — cart stays clean --}}
+                        <div class="flex items-center gap-1.5 mt-1.5 justify-end" x-show="activeCartIndex === index || item.is_tax_exempt || (item.item_discount_value || 0) > 0 || item.showFbrPanel || item.hs_code">
                             <button @click.stop="item.is_tax_exempt = !item.is_tax_exempt" class="text-[11px] font-extrabold px-2 py-1 rounded-md transition whitespace-nowrap ring-1" :class="item.is_tax_exempt ? 'bg-green-500 text-white ring-green-600 shadow-sm' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 ring-gray-300 dark:ring-gray-600 hover:ring-green-500 hover:text-green-600'" :title="item.is_tax_exempt ? window.TXT.ti_tax_exempt_toggle : window.TXT.ti_tax_toggle_hint" x-text="item.is_tax_exempt ? window.TXT.no_tax_t : window.TXT.tax_t"></button>
                             <button @click.stop="item.showItemDiscount = !item.showItemDiscount" class="text-[9px] font-bold px-1.5 py-1 rounded-md transition whitespace-nowrap" :class="(item.item_discount_value || 0) > 0 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-orange-500'" x-text="(item.item_discount_value || 0) > 0 ? ((item.item_discount_type || 'percentage') === 'percentage' ? '-' + item.item_discount_value + '%' : '-Rs.' + item.item_discount_value) : 'Disc'"></button>
                             <button @click.stop="item.showFbrPanel = !item.showFbrPanel" title="{{ __('pos.ti_fbr_compliance') }}" class="text-[9px] font-bold px-1.5 py-1 rounded-md transition whitespace-nowrap" :class="item.showFbrPanel ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : ((item.hs_code || (item.uom && item.uom !== 'U')) ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/20 dark:text-blue-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-blue-500')">FBR</button>
@@ -2160,46 +2201,8 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
-    {{-- Smart Upsell — non-blocking floating card, bottom-right.
-         Enter = accept · Esc = skip · auto-dismiss after 8s · session memory --}}
-    <div x-show="currentUpsell" x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0 translate-y-4"
-         x-transition:enter-end="opacity-100 translate-y-0"
-         x-transition:leave="transition ease-in duration-200"
-         x-transition:leave-start="opacity-100 translate-y-0"
-         x-transition:leave-end="opacity-0 translate-y-4"
-         class="fixed bottom-4 right-4 z-40 w-[300px]" style="display:none">
-        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-blue-200 dark:border-blue-800 overflow-hidden ring-2 ring-blue-500/20">
-            <div class="px-3 py-2 bg-blue-600 text-white flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                <span class="text-[11px] font-bold uppercase tracking-wider">Suggested Add-on</span>
-                <button @click="dismissUpsell(true)" class="ml-auto text-white/80 hover:text-white" aria-label="Skip">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-            </div>
-            <div class="p-3">
-                <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                    {{ __('pos.add_word') }} <span class="font-semibold text-blue-600 dark:text-blue-400" x-text="currentUpsell?.suggest?.name"></span> {{ __('pos.with_this_q') }}
-                </p>
-                <p class="text-[10px] text-gray-400 dark:text-gray-500 mb-3">
-                    {{ __('pos.goes_great_with') }} <span x-text="currentUpsell?.trigger?.name"></span>
-                </p>
-                <div class="flex items-center justify-between gap-2">
-                    <span class="text-sm font-bold tabular-nums text-gray-900 dark:text-white">
-                        Rs. <span x-text="Number(currentUpsell?.suggest?.price || 0).toLocaleString()"></span>
-                    </span>
-                    <div class="flex items-center gap-1.5">
-                        <button @click="dismissUpsell(true)" class="px-3 py-1.5 text-[11px] font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition">
-                            Skip <span class="text-[9px] opacity-60 ml-0.5">Esc</span>
-                        </button>
-                        <button @click="acceptUpsell()" class="px-3 py-1.5 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition shadow-sm">
-                            {{ __('pos.add_btn') }} <span class="text-[9px] opacity-80 ml-0.5">⏎</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    {{-- Smart Upsell — DISABLED for retail FBR POS (Aug 2026: plain retail, distraction removed).
+         Logic functions kept intact (triggerUpsell/acceptUpsell/dismissUpsell) for future opt-in. --}}
 
     {{-- Low Stock Alert Popup — strictly gated by isInventoryEnabled().
          Even if some downstream code flips showLowStockPopup, this guard keeps it hidden. --}}
@@ -2468,6 +2471,10 @@ function restaurantPos() {
         _syncTimer: null,
         _autoSyncBusy: false,
         showReceipt: false,
+        // ── AKHRI BILLS strip (Aug 2026 — Retail Fast Billing) ───────────────
+        // Last 5 finalized bills pushed here on every successful payment.
+        // Shown as one-click reprint chips below the product grid.
+        recentBills: [],
         showShortcuts: false,
         // Quick Type Mode — type free-form lines like "chai 2, samosa 1" → cart
         showQuickType: false,
@@ -2852,6 +2859,24 @@ function restaurantPos() {
                 // cashier can search a saved product and add it to the cart. No catalog
                 // match falls through to the inline "Create" prompt (inventory-OFF only).
                 if (q.length > 0) {
+                    // ── BARCODE / ARTICLE # EXACT MATCH (Aug 2026 — Retail Fast Billing) ──
+                    // If the query is an exact (case-insensitive) match of a product's barcode
+                    // or sku, add it directly and clear the search — no dropdown, no Enter needed.
+                    // Strict-prefix guard: only fire when query has no spaces (raw scanner input).
+                    if (!q.includes(' ') && q.length >= 3) {
+                        const barcodeHit = this.allProducts.find(p =>
+                            p.barcode && p.barcode.toString().toLowerCase() === q
+                        ) || this.allProducts.find(p =>
+                            p.sku && p.sku.toString().toLowerCase() === q
+                        );
+                        if (barcodeHit) {
+                            this.searchQuery = '';
+                            this.showSearchDropdown = false;
+                            this.filterProducts();
+                            this.quickAddItem(barcodeHit);
+                            return;
+                        }
+                    }
                     // CATEGORY DROPDOWN: a chosen category narrows the suggestion pool to it.
                     // "all" = whole catalog (old behavior, byte-identical).
                     let all;
@@ -3645,6 +3670,13 @@ function restaurantPos() {
             if (e.key === 'F9') { e.preventDefault(); this.saveProvisionalDirect(); return; }
             // Alt+P → focus customer phone (was F7)
             if (e.altKey && (e.key === 'p' || e.key === 'P')) { e.preventDefault(); this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); return; }
+            // ── RETAIL FAST BILLING shortcuts (Aug 2026) ──────────────────────────
+            // Alt+1 / Alt+2 — one-tap CASH / CARD: skip modal entirely when cart has items.
+            // Mirrors the mock-up (PRA-aligned): no confirmation step for simple retail sales.
+            if (e.altKey && e.key === '1') { e.preventDefault(); if (this.cart.length > 0 && !this.submitting && !this.showPayModal) { this.submitting = false; this.saveAsProvisional = false; this.processPayment('cash'); } return; }
+            if (e.altKey && e.key === '2') { e.preventDefault(); if (this.cart.length > 0 && !this.submitting && !this.showPayModal) { this.submitting = false; this.saveAsProvisional = false; this.processPayment('card'); } return; }
+            // Alt+R — Reprint last bill (Akhri Bills top entry).
+            if (e.altKey && (e.key === 'r' || e.key === 'R')) { e.preventDefault(); const last = this.recentBills[0]; if (last) { this._printViaIframe('print-receipt-frame', '/fbr-pos/transaction/' + last.id + '/receipt?auto_print=1', 'width=400,height=700'); this.showToast('Reprinting #' + last.invoice_number, 'info'); } else if (this.lastTransactionId) { this.printReceipt(); this.showToast('Reprinting last bill...', 'info'); } else { this.showToast('Koi bill nahi mila reprint ke liye', 'warning'); } return; }
             if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
             if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); if (this.cart.length > 0) { this.enterCartMode(); this.mobileView = 'cart'; } return; }
             // ═══════════════════════════════════════════════════════════════
@@ -4659,6 +4691,10 @@ function restaurantPos() {
                 this.lastFbrStatus = data.fbr_status || '';
                 this.lastItemsCount = (this.cart || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
                 this.lastSaleAt = Date.now();
+                // ── Push to Akhri Bills strip (keep last 5) ──────────────────
+                if (data.transaction_id && data.invoice_number) {
+                    this.recentBills = [{ id: data.transaction_id, invoice_number: data.invoice_number, total: savedTotal, method }].concat(this.recentBills).slice(0, 5);
+                }
                 // store() returns a `warning` when the sale saved but FBR submission is
                 // pending/queued (auto-retry engine) — surface it without blocking the flow.
                 if (data.warning) { this.showToast(data.warning, 'error'); }
@@ -5103,6 +5139,10 @@ function restaurantPos() {
                     this.lastFbrNumber = data.fbr_invoice_number || ''; this.lastFbrStatus = data.fbr_status || '';
                     this.lastItemsCount = (this.cart || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
                     this.lastSaleAt = Date.now();
+                    // ── Push to Akhri Bills strip ────────────────────────────────────────
+                    if (data.transaction_id && data.invoice_number) {
+                        this.recentBills = [{ id: data.transaction_id, invoice_number: data.invoice_number, total: savedTotal, method }].concat(this.recentBills).slice(0, 5);
+                    }
                     this.showReceipt = true;
                     this.scheduleReceiptAutoClose();
                     this.$nextTick(() => { setTimeout(() => this.triggerConfetti(), 300); });
@@ -5122,11 +5162,15 @@ function restaurantPos() {
             }
         },
 
-        // Persistent receipt popup — auto-dismiss disabled. Popup stays open until the cashier
-        // explicitly closes via X / Close / New Sale buttons. Functions kept as no-ops so any
-        // legacy call-sites continue to work without throwing.
+        // Receipt auto-close (Aug 2026 — Retail Fast Billing): 10-second countdown then
+        // startNewAfterPayment. Cashier can close manually anytime via Esc / Close / Enter.
+        // receiptAutoCloseTimer and _receiptAutoCloseSecs both kept for cancel support.
         scheduleReceiptAutoClose() {
             if (this.receiptAutoCloseTimer) { clearTimeout(this.receiptAutoCloseTimer); this.receiptAutoCloseTimer = null; }
+            this.receiptAutoCloseTimer = setTimeout(() => {
+                if (this.showReceipt) { this.startNewAfterPayment(); }
+                this.receiptAutoCloseTimer = null;
+            }, 10000);
         },
 
         cancelReceiptAutoClose() {

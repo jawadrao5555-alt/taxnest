@@ -107,6 +107,7 @@ class FbrPosProvisionalDeliveryOnlyTest extends TestCase
             $table->string('uom')->nullable();
             $table->decimal('quantity', 12, 4)->default(1);
             $table->decimal('unit_price', 12, 2)->default(0);
+            $table->decimal('cost_price', 12, 4)->nullable();
             $table->decimal('subtotal', 12, 2)->default(0);
             $table->decimal('discount', 12, 2)->nullable();
             $table->decimal('item_discount', 12, 2)->nullable();

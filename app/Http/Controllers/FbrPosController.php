@@ -784,6 +784,18 @@ class FbrPosController extends Controller
 
                 $defaultTaxRate = 18;
 
+                // ── COST SNAPSHOT (Munafa report, Aug 2026) ──────────────────────
+                // Freeze the purchase cost per line at SALE time so later purchase
+                // rate changes never rewrite profit history. avg first, last as
+                // fallback; manual items (no product_id) stay NULL = cost unknown.
+                $costProductIds = collect($request->items)->pluck('product_id')->filter()->unique()->values();
+                $costMap = $costProductIds->isEmpty() ? collect() :
+                    \App\Models\InventoryStock::where('company_id', $companyId)
+                        ->whereNull('branch_id')
+                        ->whereIn('product_id', $costProductIds)
+                        ->get(['product_id', 'avg_purchase_price', 'last_purchase_price'])
+                        ->keyBy('product_id');
+
                 foreach ($request->items as $item) {
                     $price = (float) $item['unit_price'];
                     $uom = strtoupper($item['uom'] ?? 'U');
@@ -873,6 +885,13 @@ class FbrPosController extends Controller
                         'product_id' => $item['product_id'] ?? null,
                         'quantity' => $qty,
                         'unit_price' => $price,
+                        'cost_price' => (function () use ($item, $costMap) {
+                            $s = !empty($item['product_id']) ? $costMap->get($item['product_id']) : null;
+                            if (!$s) { return null; }
+                            $avg = (float) $s->avg_purchase_price;
+                            $last = (float) $s->last_purchase_price;
+                            return $avg > 0 ? $avg : ($last > 0 ? $last : null);
+                        })(),
                         'discount' => 0,
                         'item_discount' => $itemDiscount,
                         'tax_rate' => $taxRate,

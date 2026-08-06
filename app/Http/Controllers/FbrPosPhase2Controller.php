@@ -433,6 +433,7 @@ class FbrPosPhase2Controller extends Controller
                     'uom' => $orig->uom,
                     'quantity' => $qty,
                     'unit_price' => $orig->unit_price,
+                    'cost_price' => $orig->cost_price,
                     'item_discount' => $disc,
                     'tax_rate' => $orig->tax_rate,
                     'tax_amount' => $tax,

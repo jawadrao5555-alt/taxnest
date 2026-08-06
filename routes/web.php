@@ -1274,6 +1274,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/stock/supplier', [\App\Http\Controllers\FbrPosStockController::class, 'storeSupplier'])->name('fbrpos.stock.supplier');
     Route::post('/stock/purchase', [\App\Http\Controllers\FbrPosStockController::class, 'storePurchase'])->name('fbrpos.stock.purchase');
     Route::post('/stock/min-level', [\App\Http\Controllers\FbrPosStockController::class, 'updateMinLevel'])->name('fbrpos.stock.minlevel');
+    Route::get('/munafa', [\App\Http\Controllers\FbrPosStockController::class, 'munafa'])->name('fbrpos.munafa');
 });
 
 Route::get('/setup-migrate-xK9mP2', function () {

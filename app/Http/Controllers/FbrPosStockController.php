@@ -230,4 +230,94 @@ class FbrPosStockController extends Controller
 
         return response()->json(['success' => true]);
     }
+
+    /**
+     * Munafa (profit) report — Aug 2026.
+     * Product-wise: sale value (ex-tax, net of item discounts) minus purchase
+     * cost. Cost basis = cost_price SNAPSHOT stored on each sold line at sale
+     * time; older lines (pre-snapshot) fall back to the CURRENT avg purchase
+     * price; products never purchased show as cost-unknown. Returns subtract.
+     */
+    public function munafa(Request $request)
+    {
+        $this->assertNotCashier();
+        $companyId = $this->companyId();
+
+        $from = $request->input('from') ?: now()->startOfMonth()->toDateString();
+        $to = $request->input('to') ?: now()->toDateString();
+        try {
+            $fromDt = \Carbon\Carbon::parse($from)->startOfDay();
+            $toDt = \Carbon\Carbon::parse($to)->endOfDay();
+        } catch (\Throwable $e) {
+            $fromDt = now()->startOfMonth();
+            $toDt = now()->endOfDay();
+            $from = $fromDt->toDateString();
+            $to = $toDt->toDateString();
+        }
+        if ($fromDt->gt($toDt)) {
+            [$fromDt, $toDt] = [$toDt->copy()->startOfDay(), $fromDt->copy()->endOfDay()];
+            [$from, $to] = [$to, $from];
+        }
+
+        $sign = "CASE WHEN t.transaction_type = 'return' THEN -1 ELSE 1 END";
+
+        $rows = DB::table('fbr_pos_transaction_items as i')
+            ->join('fbr_pos_transactions as t', 't.id', '=', 'i.transaction_id')
+            ->leftJoin('inventory_stocks as s', function ($j) use ($companyId) {
+                $j->on('s.product_id', '=', 'i.product_id')
+                  ->where('s.company_id', '=', $companyId)
+                  ->whereNull('s.branch_id');
+            })
+            ->where('t.company_id', $companyId)
+            ->where('t.status', 'completed')
+            ->whereBetween('t.created_at', [$fromDt, $toDt])
+            ->groupBy('i.product_id', 'i.item_name')
+            ->selectRaw("
+                i.product_id,
+                i.item_name,
+                SUM(({$sign}) * i.quantity) as qty,
+                SUM(({$sign}) * i.subtotal) as sale_value,
+                SUM(({$sign}) * i.quantity * COALESCE(i.cost_price, s.avg_purchase_price, 0)) as cost_value,
+                MAX(CASE WHEN i.cost_price IS NULL AND COALESCE(s.avg_purchase_price, 0) = 0 THEN 1 ELSE 0 END) as cost_unknown
+            ")
+            ->orderByDesc('sale_value')
+            ->get()
+            ->map(function ($r) {
+                $r->qty = round((float) $r->qty, 3);
+                $r->sale_value = round((float) $r->sale_value, 2);
+                $r->cost_value = round((float) $r->cost_value, 2);
+                $r->cost_unknown = (bool) $r->cost_unknown;
+                $r->profit = round($r->sale_value - $r->cost_value, 2);
+                $r->margin = $r->sale_value > 0 ? round($r->profit / $r->sale_value * 100, 1) : null;
+                return $r;
+            })
+            ->filter(fn ($r) => abs($r->qty) > 0.0001 || abs($r->sale_value) > 0.009)
+            ->values();
+
+        // Bill-level discounts (manual/promotion) reduce what was actually
+        // collected — net profit subtracts their signed sum for the range.
+        $billDiscounts = round((float) \App\Models\FbrPosTransaction::where('company_id', $companyId)
+            ->where('status', 'completed')
+            ->whereBetween('created_at', [$fromDt, $toDt])
+            ->selectRaw("COALESCE(SUM(CASE WHEN transaction_type = 'return' THEN -discount_amount ELSE discount_amount END), 0) as d")
+            ->value('d'), 2);
+
+        $revenue = round($rows->sum('sale_value'), 2);
+        $cost = round($rows->sum('cost_value'), 2);
+        $grossProfit = round($revenue - $cost, 2);
+        $netProfit = round($grossProfit - $billDiscounts, 2);
+        $unknownCount = $rows->where('cost_unknown', true)->count();
+
+        return view('fbr-pos.munafa', [
+            'rows' => $rows,
+            'from' => $fromDt->toDateString(),
+            'to' => $toDt->toDateString(),
+            'revenue' => $revenue,
+            'cost' => $cost,
+            'grossProfit' => $grossProfit,
+            'billDiscounts' => $billDiscounts,
+            'netProfit' => $netProfit,
+            'unknownCount' => $unknownCount,
+        ]);
+    }
 }

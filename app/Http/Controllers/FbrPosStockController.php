@@ -258,6 +258,10 @@ class FbrPosStockController extends Controller
             [$fromDt, $toDt] = [$toDt->copy()->startOfDay(), $fromDt->copy()->endOfDay()];
             [$from, $to] = [$to, $from];
         }
+        // Cap range at 1 year — protects prod DB from unbounded full-history scans.
+        if ($fromDt->diffInDays($toDt) > 366) {
+            $fromDt = $toDt->copy()->subDays(366)->startOfDay();
+        }
 
         $sign = "CASE WHEN t.transaction_type = 'return' THEN -1 ELSE 1 END";
 
@@ -294,18 +298,25 @@ class FbrPosStockController extends Controller
             ->filter(fn ($r) => abs($r->qty) > 0.0001 || abs($r->sale_value) > 0.009)
             ->values();
 
-        // Bill-level discounts (manual/promotion) reduce what was actually
-        // collected — net profit subtracts their signed sum for the range.
-        $billDiscounts = round((float) \App\Models\FbrPosTransaction::where('company_id', $companyId)
+        // Header-level reductions (bill discounts + loyalty point redemptions)
+        // reduce what was actually collected — net profit subtracts their
+        // signed sums for the range. Product rows stay gross of these (they
+        // are bill-level, not attributable to a single line).
+        $header = \App\Models\FbrPosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
             ->whereBetween('created_at', [$fromDt, $toDt])
-            ->selectRaw("COALESCE(SUM(CASE WHEN transaction_type = 'return' THEN -discount_amount ELSE discount_amount END), 0) as d")
-            ->value('d'), 2);
+            ->selectRaw("
+                COALESCE(SUM(CASE WHEN transaction_type = 'return' THEN -discount_amount ELSE discount_amount END), 0) as d,
+                COALESCE(SUM(CASE WHEN transaction_type = 'return' THEN -loyalty_redemption_amount ELSE loyalty_redemption_amount END), 0) as l
+            ")
+            ->first();
+        $billDiscounts = round((float) ($header->d ?? 0), 2);
+        $loyaltyRedemptions = round((float) ($header->l ?? 0), 2);
 
         $revenue = round($rows->sum('sale_value'), 2);
         $cost = round($rows->sum('cost_value'), 2);
         $grossProfit = round($revenue - $cost, 2);
-        $netProfit = round($grossProfit - $billDiscounts, 2);
+        $netProfit = round($grossProfit - $billDiscounts - $loyaltyRedemptions, 2);
         $unknownCount = $rows->where('cost_unknown', true)->count();
 
         return view('fbr-pos.munafa', [
@@ -316,6 +327,7 @@ class FbrPosStockController extends Controller
             'cost' => $cost,
             'grossProfit' => $grossProfit,
             'billDiscounts' => $billDiscounts,
+            'loyaltyRedemptions' => $loyaltyRedemptions,
             'netProfit' => $netProfit,
             'unknownCount' => $unknownCount,
         ]);

@@ -39,7 +39,7 @@
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 border-l-4 border-emerald-500">
             <p class="text-xs font-bold uppercase tracking-wider text-gray-400">{{ __('pos.munafa_gross') }}</p>
             <p class="text-2xl font-extrabold {{ $grossProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400' }} mt-1">Rs {{ number_format($grossProfit, 0) }}</p>
-            <p class="text-xs text-gray-400 mt-0.5">{{ __('pos.munafa_bill_disc') }}: Rs {{ number_format($billDiscounts, 0) }}</p>
+            <p class="text-xs text-gray-400 mt-0.5">{{ __('pos.munafa_bill_disc') }}: Rs {{ number_format($billDiscounts, 0) }}@if($loyaltyRedemptions != 0) · {{ __('pos.munafa_loyalty') }}: Rs {{ number_format($loyaltyRedemptions, 0) }}@endif</p>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 border-l-4 border-green-600">
             <p class="text-xs font-bold uppercase tracking-wider text-gray-400">{{ __('pos.munafa_net') }}</p>

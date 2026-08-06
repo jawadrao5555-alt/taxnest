@@ -56,12 +56,38 @@ class TutorialController extends Controller
         $user = auth('pos')->user();
         $company = $user?->company ?: Company::find(app()->bound('currentCompanyId') ? app('currentCompanyId') : null);
 
+        // NestPOS panel sirf apne product ki videos dikhaye (owner, 6 Aug 2026:
+        // "NestPOS ki alag, FBR POS ki alag") — NULL product = legacy nestpos rows.
         $videos = TutorialVideo::published()
+            ->where(fn ($q) => $q->where('product', 'nestpos')->orWhereNull('product'))
             ->orderBy('sort')->orderBy('id')->get()
             ->filter(fn (TutorialVideo $v) => $v->visibleToCompany($company) && $v->visibleToRole($user))
             ->values();
 
         return view('pos.tutorials', [
+            'groups' => TutorialVideo::groupedFrom($videos),
+        ]);
+    }
+
+    /**
+     * FBR POS panel ki apni tutorials page (owner, 6 Aug 2026) — sirf 'fbrpos'
+     * product ki videos. Same precedent as posIndex: auth only, NO
+     * company.approval (pending companies may learn while they wait).
+     */
+    public function fbrIndex()
+    {
+        TutorialVideo::applyOwnerControls();
+
+        $user = auth('fbrpos')->user();
+        $company = $user?->company ?: Company::find(app()->bound('currentCompanyId') ? app('currentCompanyId') : null);
+
+        $videos = TutorialVideo::published()
+            ->where('product', 'fbrpos')
+            ->orderBy('sort')->orderBy('id')->get()
+            ->filter(fn (TutorialVideo $v) => $v->visibleToCompany($company) && $v->visibleToRole($user))
+            ->values();
+
+        return view('fbr-pos.tutorials', [
             'groups' => TutorialVideo::groupedFrom($videos),
         ]);
     }

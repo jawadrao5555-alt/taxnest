@@ -565,6 +565,10 @@ Route::middleware(['pos.auth'])->prefix('pos/madadgar')->group(function () {
 // PosAccessService so custom-access members can always reach it.
 Route::middleware(['pos.auth'])->get('/pos/tutorials', [\App\Http\Controllers\TutorialController::class, 'posIndex'])->name('pos.tutorials');
 
+// FBR POS panel ki apni tutorials page (owner, 6 Aug 2026) — fbrpos.auth ONLY,
+// NO company.approval (same precedent as /pos/tutorials): sirf fbrpos videos.
+Route::middleware(['fbrpos.auth'])->get('/fbr-pos/tutorials', [\App\Http\Controllers\TutorialController::class, 'fbrIndex'])->name('fbrpos.tutorials');
+
 // Per-user sale-grid visibility (owner, 25 Jul 2026) — pos.auth ONLY, NO
 // company.approval (personal display pref; same precedent as Madadgar).
 // ALL POS roles allowed, including cashiers and waiters (owner explicit).

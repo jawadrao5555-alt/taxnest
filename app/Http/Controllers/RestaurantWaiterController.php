@@ -146,11 +146,19 @@ class RestaurantWaiterController extends Controller
         $companyId = app('currentCompanyId');
         RestaurantTable::releaseStaleReservations($companyId);
 
+        // Two separate eager-loads:
+        //   activeOrders  — all non-completed/cancelled (for active_orders count +
+        //                   order_id/order_number used by shift/append logic).
+        //   heldOrders.items — held-only with full item rows (for the read-only
+        //                   items view on the waiter table-picker; prod-lazy-loading-
+        //                   safe: no relation is accessed without an eager load).
         $tables = RestaurantTable::where('company_id', $companyId)
             ->where('is_active', true)
-            // 'items' eager-loaded for the read-only table preview (ZFC, 6 Aug
-            // 2026) — production has lazy-loading disabled, never lean on lazy.
-            ->with(['floor', 'activeOrders' => fn($q) => $q->withCount('items')->with('items')])
+            // 'items' eager-loaded on BOTH relations for the read-only table
+            // previews (ZFC, 6 Aug 2026) — production has lazy-loading disabled,
+            // never lean on lazy: orders_preview reads activeOrders->items,
+            // held_orders reads heldOrders->items.
+            ->with(['floor', 'activeOrders.items', 'heldOrders.items'])
             ->get()
             ->map(fn($t) => [
                 'id' => $t->id,
@@ -158,19 +166,27 @@ class RestaurantWaiterController extends Controller
                 'floor' => $t->floor->name,
                 'seats' => $t->seats,
                 'status' => $t->status,
+                // active_orders still counts ALL non-completed/cancelled orders
+                // (held + preparing + ready) — shiftFreeTables() on the waiter
+                // tablet uses this to gate which tables are shift targets.
                 'active_orders' => $t->activeOrders->count(),
                 // Table Shift from picker (Aug 2026): the shiftable order = a HELD
                 // one (shiftTable rejects preparing/ready). No held order → tile
                 // stays un-tappable instead of advertising a shift that would fail.
-                'order_id' => optional($t->activeOrders->firstWhere('status', 'held'))->id,
-                'order_number' => optional($t->activeOrders->firstWhere('status', 'held'))->order_number,
-                // Multi-order shift (Task 104, Aug 2026): saare HELD orders ki
-                // list — 1 se zyada hon to waiter tablet order-selection step
-                // dikhata hai (order number + items count) phir shift modal.
-                'held_orders' => $t->activeOrders->where('status', 'held')->values()->map(fn($o) => [
+                'order_id' => optional($t->heldOrders->first())->id,
+                'order_number' => optional($t->heldOrders->first())->order_number,
+                // Multi-order shift/append + read-only items view (ZFC task, Aug 2026):
+                // saare HELD orders ki list with full item rows for the waiter
+                // table-picker read-only display.
+                'held_orders' => $t->heldOrders->values()->map(fn($o) => [
                     'id' => $o->id,
                     'order_number' => $o->order_number,
-                    'items_count' => (int) ($o->items_count ?? 0),
+                    'items_count' => $o->items->count(),
+                    'total_amount' => (float) $o->total_amount,
+                    'items' => $o->items->map(fn($i) => [
+                        'name' => $i->item_name,
+                        'quantity' => (float) $i->quantity,
+                    ])->values(),
                 ])->all(),
                 // Read-only table preview (ZFC, 6 Aug 2026): jab order counter/
                 // desktop se punch ho to waiter ko sirf OCCUPIED dikhta tha —

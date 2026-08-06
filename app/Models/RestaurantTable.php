@@ -40,6 +40,13 @@ class RestaurantTable extends Model
             ->whereNotIn('status', ['completed', 'cancelled']);
     }
 
+    /** Held-only subset — used by the waiter table-picker to eager-load items. */
+    public function heldOrders()
+    {
+        return $this->hasMany(RestaurantOrder::class, 'table_id')
+            ->where('status', 'held');
+    }
+
     public function isLocked()
     {
         if (!$this->locked_by_user_id) return false;

@@ -3239,6 +3239,8 @@ return [
     'table_status_reserved' => 'ریزروڈ',
     'table_t_colon' => 'ٹیبل: T-',
     'table_t_prefix2' => 'ٹیبل T-',
+    'table_current_order_items' => 'موجودہ آرڈر کے آئٹمز',
+    'table_no_items_found' => 'کوئی آئٹم نہیں ملا',
     'table_unavailable' => 'ٹیبل دستیاب نہیں',
     'table_view' => 'ٹیبل ویو',
     'table_word' => 'ٹیبل',

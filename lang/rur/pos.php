@@ -3238,6 +3238,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'table_status_reserved' => 'Reserved',
     'table_t_colon' => 'Table: T-',
     'table_t_prefix2' => 'Table T-',
+    'table_current_order_items' => 'Mojuda Order ke Items',
+    'table_no_items_found' => 'Koi item nahi mila',
     'table_unavailable' => 'Table available nahi hai',
     'table_view' => 'Table view',
     'table_word' => 'Table',

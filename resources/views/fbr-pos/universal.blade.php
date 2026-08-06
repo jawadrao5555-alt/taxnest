@@ -966,36 +966,36 @@ window.addEventListener('popstate', function() {
                 <button @click="mobileView = 'menu'" class="md:hidden p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                 </button>
-                <svg class="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
+                <svg class="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
                 <span class="text-sm font-bold text-gray-900 dark:text-white flex-1">{{ __('pos.current_order') }}</span>
                 <button x-show="cart.length > 0" @click="enterCartMode()" class="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-all"
-                    :style="cartMode ? 'background:#2563eb; color:white; box-shadow:0 2px 8px rgba(37,99,235,0.3);' : 'background:#dbeafe; color:#2563eb;'"
+                    :style="cartMode ? 'background:#7c3aed; color:white; box-shadow:0 2px 8px rgba(124,58,237,0.3);' : 'background:#f3e8ff; color:#7c3aed;'"
                     :title="cartMode ? window.TXT.ti_cart_mode_on : window.TXT.ti_enter_cart_mode">
                     <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     <span x-text="cartMode ? window.TXT.editing_word : window.TXT.edit"></span>
                 </button>
                 <template x-if="priorityOrder"><span class="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold">URGENT</span></template>
-                <span class="text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-semibold" x-text="orderType.replace('_', ' ').toUpperCase()"></span>
+                <span class="text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full font-semibold" x-text="orderType.replace('_', ' ').toUpperCase()"></span>
                 <template x-if="selectedTable">
-                    <span class="text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-semibold" x-text="'T-' + selectedTable.table_number"></span>
+                    <span class="text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full font-semibold" x-text="'T-' + selectedTable.table_number"></span>
                 </template>
             </div>
 
             <template x-if="selectedCustomer">
-                <div class="px-3 py-2 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/20 flex items-start gap-2">
-                    <div class="w-8 h-8 rounded-full bg-blue-200 dark:bg-blue-800 flex items-center justify-center flex-shrink-0 mt-0.5"><span class="text-xs font-bold text-blue-700 dark:text-blue-300" x-text="selectedCustomer.name.charAt(0)"></span></div>
+                <div class="px-3 py-2 bg-purple-50 dark:bg-purple-900/10 border-b border-purple-100 dark:border-purple-900/20 flex items-start gap-2">
+                    <div class="w-8 h-8 rounded-full bg-purple-200 dark:bg-purple-800 flex items-center justify-center flex-shrink-0 mt-0.5"><span class="text-xs font-bold text-purple-700 dark:text-purple-300" x-text="selectedCustomer.name.charAt(0)"></span></div>
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-1.5">
-                            <p class="text-xs font-semibold text-blue-800 dark:text-blue-200 truncate" x-text="selectedCustomer.name"></p>
+                            <p class="text-xs font-semibold text-purple-800 dark:text-purple-200 truncate" x-text="selectedCustomer.name"></p>
                             <template x-if="customerStats && customerStats.is_frequent"><span class="freq-badge">VIP</span></template>
                         </div>
-                        <p class="text-[10px] text-blue-600 dark:text-blue-400" x-text="selectedCustomer.phone || window.TXT.no_phone"></p>
+                        <p class="text-[10px] text-purple-600 dark:text-purple-400" x-text="selectedCustomer.phone || window.TXT.no_phone"></p>
                         {{-- Retail Core (Aug 2026): udhaar balance badge — cashier sees baqaya at a glance --}}
                         <p x-show="(selectedCustomer.khata_balance || 0) > 0" x-cloak class="text-[10px] font-black text-red-600 dark:text-red-400">
                             Udhaar: Rs <span x-text="Number(selectedCustomer.khata_balance || 0).toLocaleString()"></span>
                         </p>
                         <template x-if="selectedCustomer.address">
-                            <p class="text-[10px] text-blue-500 dark:text-blue-400 truncate" x-text="'📍 ' + selectedCustomer.address"></p>
+                            <p class="text-[10px] text-purple-500 dark:text-purple-400 truncate" x-text="'📍 ' + selectedCustomer.address"></p>
                         </template>
                         {{-- Task 163 (PRA parity): delivery-address picker — Delivery orders only.
                              Saved addresses (address #1 + extras) in a dropdown; "+ New" saves an
@@ -1003,33 +1003,33 @@ window.addEventListener('popstate', function() {
                         <template x-if="orderType === 'delivery'">
                             <div class="mt-1 space-y-1">
                                 <div class="flex items-center gap-1">
-                                    <select x-model="selectedDeliveryAddress" class="flex-1 min-w-0 text-sm font-medium rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
+                                    <select x-model="selectedDeliveryAddress" class="flex-1 min-w-0 text-sm font-medium rounded-md border-purple-200 dark:border-purple-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-purple-500 focus:border-purple-400">
                                         <option value="">{{ __('pos.delivery_address_divider') }}</option>
                                         <template x-for="(a, ai) in customerAddresses" :key="a.id ?? ('t' + ai)">
                                             <option :value="a.address" x-text="(a.label ? a.label + ': ' : '') + a.address"></option>
                                         </template>
                                     </select>
                                     <button x-show="selectedDeliveryAddress && customerAddresses.some(a => a.address === selectedDeliveryAddress)" @click="deleteSelectedAddress()" title="{{ __('pos.ti_delete_address') }}" class="text-xs font-bold text-red-500 dark:text-red-400 px-2 py-1.5 rounded-md border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/30 whitespace-nowrap">✕</button>
-                                    <button @click="showAddrNew = !showAddrNew; if (showAddrNew) $nextTick(() => document.getElementById('tnNewAddrInput')?.focus())" class="text-xs font-bold text-blue-600 dark:text-blue-300 px-2 py-1.5 rounded-md border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 whitespace-nowrap">{{ __('pos.new_short') }}</button>
+                                    <button @click="showAddrNew = !showAddrNew; if (showAddrNew) $nextTick(() => document.getElementById('tnNewAddrInput')?.focus())" class="text-xs font-bold text-purple-600 dark:text-purple-300 px-2 py-1.5 rounded-md border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/30 whitespace-nowrap">{{ __('pos.new_short') }}</button>
                                 </div>
                                 <div x-show="showAddrNew" x-cloak class="flex items-center gap-1">
-                                    <input id="tnNewAddrLabel" type="text" x-model="newAddrLabel" @keydown.enter.prevent="saveNewAddress()" @keydown.escape.prevent="showAddrNew = false" placeholder="{{ __('pos.ph_addr_label') }}" autocomplete="off" name="pos_new_addr_label_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-24 flex-none text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
-                                    <input id="tnNewAddrInput" type="text" x-model="newAddrText" @keydown.enter.prevent="saveNewAddress()" @keydown.escape.prevent="showAddrNew = false" placeholder="{{ __('pos.ph_full_delivery_address') }}" autocomplete="off" name="pos_new_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="flex-1 min-w-0 text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
-                                    <button @click="saveNewAddress()" class="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-2 py-1.5 rounded-md">{{ __('pos.save_btn') }}</button>
+                                    <input id="tnNewAddrLabel" type="text" x-model="newAddrLabel" @keydown.enter.prevent="saveNewAddress()" @keydown.escape.prevent="showAddrNew = false" placeholder="{{ __('pos.ph_addr_label') }}" autocomplete="off" name="pos_new_addr_label_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-24 flex-none text-sm rounded-md border-purple-200 dark:border-purple-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-purple-500 focus:border-purple-400">
+                                    <input id="tnNewAddrInput" type="text" x-model="newAddrText" @keydown.enter.prevent="saveNewAddress()" @keydown.escape.prevent="showAddrNew = false" placeholder="{{ __('pos.ph_full_delivery_address') }}" autocomplete="off" name="pos_new_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="flex-1 min-w-0 text-sm rounded-md border-purple-200 dark:border-purple-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-purple-500 focus:border-purple-400">
+                                    <button @click="saveNewAddress()" class="text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 px-2 py-1.5 rounded-md">{{ __('pos.save_btn') }}</button>
                                 </div>
                             </div>
                         </template>
                         <template x-if="customerStats">
                             <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
                                 {{-- Clickable (owner request, 1 Aug 2026 — matches PRA universal): opens the customer history modal --}}
-                                <button type="button" @click="if (selectedCustomer?.id) loadCustomerHistory(selectedCustomer.id)" class="text-[10px] font-semibold text-blue-700 dark:text-blue-300 underline decoration-dotted underline-offset-2 hover:text-blue-900 dark:hover:text-blue-100" x-text="(customerStats.total_orders || 0) + window.TXT.sfx_orders" title="{{ __('pos.ti_view_history') }}"></button>
+                                <button type="button" @click="if (selectedCustomer?.id) loadCustomerHistory(selectedCustomer.id)" class="text-[10px] font-semibold text-purple-700 dark:text-purple-300 underline decoration-dotted underline-offset-2 hover:text-purple-900 dark:hover:text-purple-100" x-text="(customerStats.total_orders || 0) + window.TXT.sfx_orders" title="{{ __('pos.ti_view_history') }}"></button>
                                 <span class="text-[10px] text-gray-400">•</span>
-                                <span class="text-[10px] font-semibold text-blue-700 dark:text-blue-300" x-text="'Rs. ' + Number(customerStats.total_spent || 0).toLocaleString() + window.TXT.sfx_spent"></span>
+                                <span class="text-[10px] font-semibold text-purple-700 dark:text-purple-300" x-text="'Rs. ' + Number(customerStats.total_spent || 0).toLocaleString() + window.TXT.sfx_spent"></span>
                                 <template x-if="customerStats.last_order_date">
                                     <span class="text-[10px] text-gray-400">•</span>
                                 </template>
                                 <template x-if="customerStats.last_order_date">
-                                    <span class="text-[10px] text-blue-600 dark:text-blue-400" x-text="window.TXT.last_colon + customerStats.last_order_date"></span>
+                                    <span class="text-[10px] text-purple-600 dark:text-purple-400" x-text="window.TXT.last_colon + customerStats.last_order_date"></span>
                                 </template>
                             </div>
                         </template>
@@ -1040,24 +1040,24 @@ window.addEventListener('popstate', function() {
             {{-- Task 163: walk-in delivery (no selected customer) — plain one-off
                  address input; snapshots on the bill without saving anywhere. --}}
             <template x-if="orderType === 'delivery' && !selectedCustomer">
-                <div class="px-3 py-2 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/20 flex items-center gap-2">
+                <div class="px-3 py-2 bg-purple-50 dark:bg-purple-900/10 border-b border-purple-100 dark:border-purple-900/20 flex items-center gap-2">
                     <span class="text-xs flex-shrink-0">📍</span>
-                    <input type="text" x-model="selectedDeliveryAddress" placeholder="{{ __('pos.ph_full_delivery_address') }}" autocomplete="off" name="pos_walkin_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="flex-1 min-w-0 text-sm rounded-md border-blue-200 dark:border-blue-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-blue-500 focus:border-blue-400">
+                    <input type="text" x-model="selectedDeliveryAddress" placeholder="{{ __('pos.ph_full_delivery_address') }}" autocomplete="off" name="pos_walkin_addr_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore class="flex-1 min-w-0 text-sm rounded-md border-purple-200 dark:border-purple-800 dark:bg-gray-800 dark:text-white py-1.5 px-2 focus:ring-purple-500 focus:border-purple-400">
                 </div>
             </template>
 
             <div class="flex-1 min-h-0 overflow-y-auto" x-ref="cartList">
                 <template x-if="cart.length === 0">
                     <div class="tn-empty flex flex-col items-center justify-center h-full text-gray-400 py-16 px-6 text-center">
-                        <div class="tn-empty-icon w-24 h-24 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center mb-5">
-                            <svg class="w-12 h-12 text-blue-400 dark:text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
+                        <div class="tn-empty-icon w-24 h-24 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center mb-5">
+                            <svg class="w-12 h-12 text-purple-400 dark:text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
                         </div>
                         <p class="text-base font-bold text-gray-700 dark:text-gray-200">{{ __('pos.your_cart_is_empty') }}</p>
                         <p class="text-xs mt-1.5 text-gray-400 dark:text-gray-500 max-w-[220px]">{{ __('pos.tap_product_hint') }}</p>
                     </div>
                 </template>
                 <template x-if="cartMode && cart.length > 0">
-                    <div style="background:linear-gradient(90deg,#2563eb,#6d28d9); padding:6px 12px; display:flex; align-items:center; gap:8px;">
+                    <div style="background:linear-gradient(90deg,#7c3aed,#6d28d9); padding:6px 12px; display:flex; align-items:center; gap:8px;">
                         <svg class="w-3.5 h-3.5" style="color:white; flex-shrink:0;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                         <span style="color:rgba(255,255,255,0.9); font-size:10px; font-weight:600;">{{ __('pos.cart_keys_hint') }}</span>
                     </div>
@@ -1071,7 +1071,7 @@ window.addEventListener('popstate', function() {
                                 <p class="text-sm font-bold text-gray-900 dark:text-white truncate flex items-center gap-1.5">
                                     <span x-text="item.item_name"></span>
                                     <template x-if="item._isQuickCreated">
-                                        <span class="text-[8px] font-bold uppercase tracking-wider text-blue-700 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 px-1.5 py-0.5 rounded">{{ __('pos.no_recipe') }}</span>
+                                        <span class="text-[8px] font-bold uppercase tracking-wider text-purple-700 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 px-1.5 py-0.5 rounded">{{ __('pos.no_recipe') }}</span>
                                     </template>
                                 </p>
                                 {{-- Inline price editor — only shown when this row needs a price set (quick-created or zero-price).
@@ -1085,7 +1085,7 @@ window.addEventListener('popstate', function() {
                                             @keydown.escape.prevent="cancelQuickPrice()"
                                             @blur="saveQuickPrice(index)"
                                             placeholder="{{ __('pos.ph_enter_price') }}"
-                                            class="w-24 text-xs font-bold bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-md px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                            class="w-24 text-xs font-bold bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-300 dark:border-purple-700 rounded-md px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:outline-none">
                                         <span class="text-[9px] text-gray-400">{{ __('pos.save_esc_hint') }}</span>
                                     </div>
                                 </template>
@@ -1093,7 +1093,7 @@ window.addEventListener('popstate', function() {
                                     <p class="text-[11px] text-gray-400 mt-0.5">
                                         <span x-text="'Rs. ' + Number(item.unit_price).toLocaleString() + window.TXT.per_unit_sfx"></span>
                                         <template x-if="item._isQuickCreated && Number(item.unit_price) === 0">
-                                            <button @click.stop="openQuickPrice(item)" class="ml-1 text-blue-600 hover:underline font-semibold">{{ __('pos.set_price') }}</button>
+                                            <button @click.stop="openQuickPrice(item)" class="ml-1 text-purple-600 hover:underline font-semibold">{{ __('pos.set_price') }}</button>
                                         </template>
                                     </p>
                                 </template>
@@ -1113,7 +1113,7 @@ window.addEventListener('popstate', function() {
                                     @keydown="onQtyKeydown(index, $event)"
                                     @input.stop="onQtyInput(index, $event)"
                                     @blur="onQtyBlur(index, $event)"
-                                    class="w-16 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-blue-500 shadow-inner px-1">
+                                    class="w-16 h-10 text-center text-lg font-extrabold bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-0 rounded-lg focus:ring-2 focus:ring-purple-500 shadow-inner px-1">
                                 <button @click.stop="updateQty(index, 1)" class="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition active:scale-90 shadow-sm hover:shadow">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" d="M12 4v16m8-8H4"/></svg>
                                 </button>
@@ -1137,13 +1137,13 @@ window.addEventListener('popstate', function() {
                             <button @click.stop="item.showFbrPanel = !item.showFbrPanel" title="{{ __('pos.ti_fbr_compliance') }}" class="text-[9px] font-bold px-1.5 py-1 rounded-md transition whitespace-nowrap" :class="item.showFbrPanel ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : ((item.hs_code || (item.uom && item.uom !== 'U')) ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/20 dark:text-blue-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-blue-500')">FBR</button>
                         </div>
                         <div x-show="item.showItemDiscount" x-transition class="mt-1 flex items-center gap-1">
-                            <button @click.stop="item.item_discount_type = 'percentage'" class="text-[9px] font-bold px-1.5 py-0.5 rounded transition" :class="(item.item_discount_type || 'percentage') === 'percentage' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'">%</button>
-                            <button @click.stop="item.item_discount_type = 'amount'" class="text-[9px] font-bold px-1.5 py-0.5 rounded transition" :class="item.item_discount_type === 'amount' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'">Rs</button>
+                            <button @click.stop="item.item_discount_type = 'percentage'" class="text-[9px] font-bold px-1.5 py-0.5 rounded transition" :class="(item.item_discount_type || 'percentage') === 'percentage' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400'">%</button>
+                            <button @click.stop="item.item_discount_type = 'amount'" class="text-[9px] font-bold px-1.5 py-0.5 rounded transition" :class="item.item_discount_type === 'amount' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400'">Rs</button>
                             <input type="number" x-model.lazy.number="item.item_discount_value" :data-discount-input="index"
                                 @click.stop
                                 @keydown.enter.prevent.stop="$event.target.blur()"
                                 @keydown.escape.prevent.stop="$event.target.blur()"
-                                min="0" step="any" placeholder="0" class="dense-input w-14 text-[10px] bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 text-gray-900 dark:text-white focus:ring-blue-500">
+                                min="0" step="any" placeholder="0" class="dense-input w-14 text-[10px] bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 text-gray-900 dark:text-white focus:ring-purple-500">
                             <button @click.stop="item.item_discount_value = 0; item.showItemDiscount = false" class="text-[9px] text-red-400 hover:text-red-600 px-1">X</button>
                         </div>
                         {{-- 🧾 FBR compliance drawer — HS code / UoM / tax % per line (store() field names) --}}
@@ -1255,7 +1255,7 @@ window.addEventListener('popstate', function() {
                             <kbd x-show="!submitting" class="text-[8px] bg-amber-200/50 dark:bg-amber-800/30 px-1 rounded ml-0.5 font-mono">F5</kbd>
                         </button>
                         <button @click="showHeldOrders = !showHeldOrders" class="relative py-2 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition flex items-center justify-center gap-0.5">
-                            {{ __('pos.recall') }} <kbd class="text-[8px] bg-blue-200/50 dark:bg-blue-800/30 px-1 rounded font-mono">F3</kbd>
+                            {{ __('pos.recall') }} <kbd class="text-[8px] bg-purple-200/50 dark:bg-purple-800/30 px-1 rounded font-mono">F3</kbd>
                             <span x-show="heldOrders.length > 0" class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center held-badge-pulse shadow-sm" x-text="heldOrders.length"></span>
                         </button>
                     </div>

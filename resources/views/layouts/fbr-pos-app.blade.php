@@ -290,11 +290,21 @@
 
                         <div class="h-5 w-px bg-white/10 hidden md:block"></div>
 
+                        @php
+                            // Universal sale screen (Aug 2026 PRA-parity redesign): its own
+                            // teleported pills (+New / F10 Local / F11 Failed / Reprint / Held /
+                            // sync / Switches) land in #tn-nav-sale-tools — hide the layout's
+                            // duplicate New Sale link + Local/Failed buttons on THAT page only.
+                            // Classic create screen (universal OFF) keeps the layout buttons.
+                            $tnOnUniversalSale = request()->routeIs('fbrpos.create') && (bool) ($fbrCompany->fbr_universal_enabled ?? false);
+                        @endphp
                         <nav class="hidden md:flex items-center gap-1">
+                            @unless($tnOnUniversalSale)
                             <a href="{{ route('fbrpos.create') }}"
                                class="nav-pill px-3 py-1.5 rounded-lg text-xs font-semibold {{ request()->routeIs('fbrpos.create') ? 'active text-white' : 'text-white/90' }}">
                                 {{ __('pos.new_sale') }}
                             </a>
+                            @endunless
                         </nav>
 
                         <div class="hidden md:block ml-1">
@@ -313,16 +323,18 @@
                         <x-pwa-install-menu-item color="blue" app-name="Nest FBR POS" :label="__('pos.download_app')" item-class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/20 transition" />
                         <x-pwa-refresh-btn color="blue" />
 
-                        {{-- 🟦 Local Bills (F10) — Provisional / Saved bills --}}
-                        <button @click="openLocal()" type="button" class="relative hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/20 transition" title="{{ __('pos.ti_local_bills_f10') }}">
+                        {{-- 🟦 Local Bills (F10) — Provisional / Saved bills.
+                             Hidden on the universal sale screen (its own teleported F10 pill lives there). --}}
+                        <button @click="openLocal()" type="button" class="relative {{ ($tnOnUniversalSale ?? false) ? 'hidden' : 'hidden sm:inline-flex' }} items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/20 transition" title="{{ __('pos.ti_local_bills_f10') }}">
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
                             <span>{{ __('pos.local_word') }}</span>
                             <span x-show="localCount > 0" x-cloak x-text="localCount" class="ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-amber-400 text-amber-950 text-[10px] font-black"></span>
                             <span class="hidden md:inline text-[9px] opacity-70 ml-1">F10</span>
                         </button>
 
-                        {{-- 🟥 Failed Bills (Shift+F11) — F11 plain stays for browser fullscreen --}}
-                        <button @click="openFailed()" type="button" class="relative hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-red-600/85 hover:bg-red-600 ring-1 ring-red-300/40 transition" title="{{ __('pos.ti_failed_bills_f11') }}">
+                        {{-- 🟥 Failed Bills (Shift+F11) — F11 plain stays for browser fullscreen.
+                             Hidden on the universal sale screen (its own teleported F11 pill lives there). --}}
+                        <button @click="openFailed()" type="button" class="relative {{ ($tnOnUniversalSale ?? false) ? 'hidden' : 'hidden sm:inline-flex' }} items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide text-white bg-red-600/85 hover:bg-red-600 ring-1 ring-red-300/40 transition" title="{{ __('pos.ti_failed_bills_f11') }}">
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/></svg>
                             <span>{{ __('pos.failed_word') }}</span>
                             <span x-show="failedCount > 0" x-cloak x-text="failedCount" class="ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-white text-red-700 text-[10px] font-black animate-pulse"></span>

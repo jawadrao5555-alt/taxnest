@@ -261,6 +261,61 @@ window.addEventListener('popstate', function() {
          toggles strip below stays as the MOBILE fallback (md:hidden) — same state, same handlers. --}}
     <template x-teleport="#tn-nav-sale-tools">
         <div class="flex items-center gap-1.5 mx-auto flex-shrink-0" x-data="{ switchesOpen: false, swTop: 0, swRight: 0 }">
+
+            {{-- + New Sale — replaces the static nav link on this page (action = clear & restart) --}}
+            <button @click="newSale()" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-emerald-600/90 hover:bg-emerald-600 ring-1 ring-emerald-300/40 shadow-sm transition flex-shrink-0">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                <span class="hidden lg:inline">{{ __('pos.new_word') }}</span>
+            </button>
+
+            {{-- Local (provisional) bills — F10 (page modal: Edit / Delete / Make Final inline) --}}
+            <button @click="openLocalBills()" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/15 transition flex-shrink-0" title="{{ __('pos.ti_provisional_f10_fbr') }}">
+                <span class="text-[9px] bg-blue-400/30 px-1 rounded">F10</span>
+                <span class="hidden lg:inline">{{ __('pos.local_word') }}</span>
+                <span x-show="localBills.length > 0" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-blue-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold" x-text="localBills.length"></span>
+            </button>
+
+            {{-- Pending Deliveries (Task 122) — appears only when something IS pending --}}
+            <button x-show="pendingDeliveryBills().length > 0" x-cloak @click="openPendingDeliveries()" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-amber-500/85 hover:bg-amber-500 ring-1 ring-amber-300/40 transition flex-shrink-0" title="{{ __('pos.pending_deliveries_hint') }}">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+                <span class="hidden lg:inline">{{ __('pos.pending_deliveries') }}</span>
+                <span class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-amber-600 text-white text-[9px] rounded-full flex items-center justify-center font-bold" x-text="pendingDeliveryBills().length"></span>
+            </button>
+
+            {{-- Failed FBR bills — F11 (page modal: Retry / Edit / Delete inline) --}}
+            <button @click="openFailedBills()" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-red-600/85 hover:bg-red-600 ring-1 ring-red-300/40 transition flex-shrink-0" title="{{ __('pos.ti_failed_fbr_f11') }}">
+                <span class="text-[9px] bg-red-400/40 px-1 rounded">F11</span>
+                <span class="hidden lg:inline">{{ __('pos.failed_word_html') }}</span>
+                <span x-show="failedBills.length > 0" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-700 text-white text-[9px] rounded-full flex items-center justify-center font-bold animate-pulse" x-text="failedBills.length"></span>
+            </button>
+
+            {{-- Reprint last bill — Alt+R. Hidden until a bill exists this session. --}}
+            <button x-show="recentBills.length > 0 || lastTransactionId" x-cloak
+                    @click="const last = recentBills[0]; if(last) { _printViaIframe('print-receipt-frame', '/fbr-pos/transaction/' + last.id + '/receipt?auto_print=1', 'width=400,height=700'); showToast('Reprinting #' + last.invoice_number, 'info'); } else if(lastTransactionId) { printReceipt(); }"
+                    class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/15 transition flex-shrink-0" title="Reprint last bill (Alt+R)">
+                <span class="text-[9px] bg-teal-400/30 px-1 rounded">Alt+R</span>
+                <span class="hidden lg:inline">{{ __('pos.reprint') }}</span>
+            </button>
+
+            {{-- Held orders — F3 --}}
+            <button @click="activeHeldIndex = 0; showHeldOrders = !showHeldOrders" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/15 transition flex-shrink-0" title="{{ __('pos.held') }} (F3)">
+                <span class="text-[9px] bg-amber-400/30 px-1 rounded">F3</span>
+                <span class="hidden lg:inline">{{ __('pos.held') }}</span>
+                <span x-show="heldOrders.length > 0" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold" x-text="heldOrders.length"></span>
+            </button>
+
+            {{-- 🟢/🟡/🔴 Auto-Sync status pill — same logic as the mobile copy --}}
+            <div class="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-bold border transition flex-shrink-0"
+                 :class="syncStatus === 'online' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : (syncStatus === 'syncing' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800')"
+                 :title="syncStatus === 'online' ? (window.TXT.ti_auto_sync_online + (failedBills.length ? ' · ' + failedBills.length + ' pending' : '')) : (syncStatus === 'syncing' ? window.TXT.ti_syncing_pending_fbr : window.TXT.ti_offline_auto_sync_fbr)">
+                <span class="w-2 h-2 rounded-full"
+                      :class="syncStatus === 'online' ? 'bg-emerald-500' : (syncStatus === 'syncing' ? 'bg-amber-500 animate-pulse' : 'bg-red-500 animate-pulse')"></span>
+                <span class="hidden xl:inline" x-text="syncStatus === 'online' ? window.TXT.online : (syncStatus === 'syncing' ? window.TXT.syncing_word : window.TXT.offline)"></span>
+                <span x-show="failedBills.length > 0" class="px-1.5 rounded-full text-[9px] font-black"
+                      :class="syncStatus === 'online' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'"
+                      x-text="failedBills.length"></span>
+            </div>
+
             {{-- Switches dropdown trigger. NOTE: panel is position:fixed (anchored to the
                  button rect on open) so it escapes the overflow-x-auto clipping of
                  #tn-nav-sale-tools and stays attached to its trigger. --}}
@@ -663,7 +718,7 @@ window.addEventListener('popstate', function() {
             </button>
         </template>
 
-        <button @click="newSale()" class="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 hover:bg-green-100 transition">
+        <button @click="newSale()" class="flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 hover:bg-green-100 transition">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
             <span class="hidden sm:inline">{{ __('pos.new_word') }}</span>
         </button>
@@ -672,7 +727,7 @@ window.addEventListener('popstate', function() {
              Stays hidden until a bill has been processed in this session. --}}
         <button x-show="recentBills.length > 0 || lastTransactionId" x-cloak
                 @click="const last = recentBills[0]; if(last) { _printViaIframe('print-receipt-frame', '/fbr-pos/transaction/' + last.id + '/receipt?auto_print=1', 'width=400,height=700'); showToast('Reprinting #' + last.invoice_number, 'info'); } else if(lastTransactionId) { printReceipt(); }"
-                class="flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition flex-shrink-0"
+                class="flex md:hidden items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition flex-shrink-0"
                 title="Reprint last bill (Alt+R)">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
             <span class="hidden lg:inline">Reprint</span>
@@ -681,7 +736,7 @@ window.addEventListener('popstate', function() {
 
         {{-- ── PROVISIONAL BILLS (Local) — header shortcut. Same pattern as Held. ── --}}
         {{-- 🟢/🟡/🔴 Auto-Sync status pill — live network + pending-bill indicator --}}
-        <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition"
+        <div class="flex md:hidden items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition"
              :class="syncStatus === 'online' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' : (syncStatus === 'syncing' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800')"
              :title="syncStatus === 'online' ? (window.TXT.ti_auto_sync_online + (failedBills.length ? ' · ' + failedBills.length + ' pending' : '')) : (syncStatus === 'syncing' ? window.TXT.ti_syncing_pending_fbr : window.TXT.ti_offline_auto_sync_fbr)">
             <span class="w-2 h-2 rounded-full"
@@ -692,7 +747,7 @@ window.addEventListener('popstate', function() {
                   x-text="failedBills.length"></span>
         </div>
         {{-- Click → modal with Edit / Delete / Make Final actions inline. F10 shortcut. --}}
-        <button @click="openLocalBills()" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition" title="{{ __('pos.ti_provisional_f10_fbr') }}">
+        <button @click="openLocalBills()" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition" title="{{ __('pos.ti_provisional_f10_fbr') }}">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
             <span class="text-[10px] bg-blue-400/30 px-1 rounded">F10</span>
             <span class="hidden sm:inline">Local</span>
@@ -701,7 +756,7 @@ window.addEventListener('popstate', function() {
 
         {{-- Pending Deliveries (Task 122, FBR port of PRA Task 114) — today's delivery
              provisionals, one-click Final (Cash/Card). Badge auto-hides when empty. --}}
-        <button x-show="pendingDeliveryBills().length > 0" x-cloak @click="openPendingDeliveries()" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition" title="{{ __('pos.pending_deliveries_hint') }}">
+        <button x-show="pendingDeliveryBills().length > 0" x-cloak @click="openPendingDeliveries()" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition" title="{{ __('pos.pending_deliveries_hint') }}">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
             <span class="hidden sm:inline">{{ __('pos.pending_deliveries') }}</span>
             <span class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-amber-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="pendingDeliveryBills().length"></span>
@@ -709,14 +764,14 @@ window.addEventListener('popstate', function() {
 
         {{-- ── FAILED BILLS — header shortcut. F11. Red theme = needs attention. ── --}}
         {{-- Click → modal with Retry / Edit / Delete actions inline. --}}
-        <button @click="openFailedBills()" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 transition" title="{{ __('pos.ti_failed_fbr_f11') }}">
+        <button @click="openFailedBills()" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 transition" title="{{ __('pos.ti_failed_fbr_f11') }}">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
             <span class="text-[10px] bg-red-400/30 px-1 rounded">F11</span>
             <span class="hidden sm:inline">{{ __('pos.failed_word_html') }}</span>
             <span x-show="failedBills.length > 0" class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-red-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold animate-pulse" x-text="failedBills.length"></span>
         </button>
 
-        <button @click="activeHeldIndex = 0; showHeldOrders = !showHeldOrders" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition">
+        <button @click="activeHeldIndex = 0; showHeldOrders = !showHeldOrders" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             <span class="text-[10px] bg-amber-400/30 px-1 rounded">F3</span>
             <span class="hidden sm:inline">{{ __('pos.held') }}</span>

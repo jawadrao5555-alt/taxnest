@@ -347,6 +347,14 @@ window.addEventListener('popstate', function() {
                 <span class="text-[9px] font-mono bg-white/20 px-1 rounded">F7</span>
             </button>
 
+            {{-- Manual item (moved from Row 1, owner 6 Aug 2026) — Simple Mode only --}}
+            <template x-if="!isInventoryEnabled()">
+                <button @click="openManualItem()" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-emerald-500/80 hover:bg-emerald-500 ring-1 ring-emerald-300/40 transition flex-shrink-0" title="{{ __('pos.ti_add_manual_item') }}">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                    <span class="hidden lg:inline">{{ __('pos.manual') }}</span>
+                </button>
+            </template>
+
             {{-- Switches dropdown trigger. NOTE: panel is position:fixed (anchored to the
                  button rect on open) so it escapes the overflow-x-auto clipping of
                  #tn-nav-sale-tools and stays attached to its trigger. --}}
@@ -521,7 +529,7 @@ window.addEventListener('popstate', function() {
     {{-- ── ROW 1 ── --}}
     <div class="flex flex-wrap items-center gap-2 px-3 py-2">
 
-        <div class="relative flex-shrink-0" style="min-width:300px;max-width:400px;">
+        <div class="relative flex-1" style="min-width:300px;">
             <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
             <input type="search" x-ref="customerPhoneInput" x-model="customerPhoneQuery" @input="onCustomerPhoneInput()" @keydown.enter.prevent="if(!$event.repeat) onCustomerPhoneEnter()" @keydown.down.prevent="custNav(1)" @keydown.up.prevent="custNav(-1)" @keydown.escape.prevent="customerPhoneDropdown = false" @keydown.tab.prevent="$refs.searchInput?.focus()" @click.away="customerPhoneDropdown = false" placeholder="{{ __('pos.ph_customer_name_mobile') }}" class="w-full pl-9 pr-7 py-2.5 rounded-xl text-sm border-2 transition shadow-sm" :class="selectedCustomer ? 'font-bold border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200' : 'font-medium border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400'" autocomplete="one-time-code" name="pos_customer_phone_nofill" data-lpignore="true" data-form-type="other">
             <kbd x-show="!customerPhoneQuery && !selectedCustomer && !customerSearching" class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded font-mono">Alt+P</kbd>
@@ -602,14 +610,7 @@ window.addEventListener('popstate', function() {
             </button>
         </div>
         @endif
-        {{-- Manual item: moved here from Row 2 (owner, 6 Aug 2026) --}}
-        <template x-if="!isInventoryEnabled()">
-            <button @click="openManualItem()" class="flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 hover:border-emerald-300 transition flex-shrink-0" title="{{ __('pos.ti_add_manual_item') }}">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-                <span class="hidden lg:inline">{{ __('pos.manual') }}</span>
-            </button>
-        </template>
-        <div class="w-px h-6 bg-gray-200 dark:bg-gray-700 hidden sm:block flex-shrink-0"></div>
+        {{-- Manual button moved to top-nav teleport (owner, 6 Aug 2026) — Row 1 = customer (full width, matches Row 2 scan box) + delivery toggle only --}}
 
     </div>{{-- /ROW 1 --}}
 

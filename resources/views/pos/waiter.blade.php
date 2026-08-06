@@ -239,8 +239,11 @@
                     <template x-for="t in tables" :key="t.id">
                         {{-- Occupied tiles (ZFC, 1 Aug 2026): ab tap-able — tap par us
                              table ka order KHALI table par SHIFT hota hai (cashier ke
-                             lagaye orders bhi). Compose ke liye ab bhi sirf khali/reserved. --}}
-                        <button @click="t.status === 'occupied' ? (tableActionFor = t) : pickTable(t)" :disabled="t.status === 'occupied' && !t.order_id"
+                             lagaye orders bhi). Compose ke liye ab bhi sirf khali/reserved.
+                             ZFC 6 Aug 2026: occupied tile AB HAMESHA tap-able — held
+                             order na bhi ho to action modal khul kar table ke maujooda
+                             items READ-ONLY dikhata hai (counter/desktop ke orders bhi). --}}
+                        <button @click="t.status === 'occupied' ? (tableActionFor = t) : pickTable(t)"
                                 :class="t.status === 'occupied' ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-500 dark:text-red-300' : (t.status === 'reserved' ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300' : 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:border-emerald-500')"
                                 class="rounded-xl border-2 p-3 text-center transition">
                             <span class="block text-base font-black" x-text="'T-' + t.table_number"></span>
@@ -255,17 +258,47 @@
         </div>
     </div>
 
-    {{-- ── Occupied-table action chooser (ZFC, 1 Aug 2026): Add Items ya Shift ── --}}
+    {{-- ── Occupied-table action chooser (ZFC, 1 Aug 2026): Add Items ya Shift ──
+         ZFC 6 Aug 2026: upar READ-ONLY preview — table ke saare active orders ke
+         items (counter/desktop ke lagaye bhi) taake waiter ko pata ho table par
+         kya chal raha hai. Add/Shift buttons sirf HELD order par (pehle jaisa). --}}
     <div x-show="tableActionFor" x-cloak class="fixed inset-0 z-[60] flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-black/60" @click="tableActionFor = null"></div>
-        <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden">
+        <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm max-h-[80vh] flex flex-col overflow-hidden">
             <div class="px-5 py-4 bg-teal-600 flex items-center justify-between">
-                <h3 class="text-white font-bold" x-text="tableActionFor ? ('T-' + tableActionFor.table_number + ' — ' + (tableActionFor.order_number || '')) : ''"></h3>
+                <h3 class="text-white font-bold" x-text="tableActionFor ? ('T-' + tableActionFor.table_number + (tableActionFor.order_number ? ' — ' + tableActionFor.order_number : '')) : ''"></h3>
                 <button @click="tableActionFor = null" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/25 text-white font-black">×</button>
             </div>
-            <div class="p-4 space-y-2.5">
-                <button @click="startAppendFromTable(tableActionFor)" class="w-full py-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-sm">{{ __('pos.add_items') }} +</button>
-                <button @click="startShiftFromTable(tableActionFor); tableActionFor = null" class="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm">{{ __('pos.shift_word') }} ⇄</button>
+            <div class="flex-1 overflow-y-auto p-4 space-y-2.5">
+                <template x-if="tableActionFor && (tableActionFor.orders_preview || []).length > 0">
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1.5">{{ __('pos.already_on_table') }}</p>
+                        <div class="space-y-2">
+                            <template x-for="o in tableActionFor.orders_preview" :key="'tprev' + o.id">
+                                <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 p-2.5">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="font-mono text-xs font-bold text-gray-800 dark:text-gray-100" x-text="o.order_number"></span>
+                                        <span class="flex items-center gap-1.5">
+                                            <span class="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300" x-text="o.status"></span>
+                                            <span class="text-xs font-black text-gray-900 dark:text-white" x-text="'Rs ' + Math.round(o.total_amount || 0).toLocaleString()"></span>
+                                        </span>
+                                    </div>
+                                    <div class="mt-1 text-[11px] text-gray-600 dark:text-gray-300 leading-relaxed">
+                                        <template x-for="(it, ix) in o.items" :key="'tprevit' + o.id + '-' + ix"><span><span x-text="it.quantity + '× ' + it.name"></span><span x-show="ix < o.items.length - 1"> · </span></span></template>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+                {{-- Held order na ho (preparing/ready) to Add/Shift possible nahi —
+                     buttons chhupa kar sirf preview; warna waiter dead-tap khata. --}}
+                <template x-if="tableActionFor && tableActionFor.order_id">
+                    <div class="space-y-2.5">
+                        <button @click="startAppendFromTable(tableActionFor)" class="w-full py-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-sm">{{ __('pos.add_items') }} +</button>
+                        <button @click="startShiftFromTable(tableActionFor); tableActionFor = null" class="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm">{{ __('pos.shift_word') }} ⇄</button>
+                    </div>
+                </template>
             </div>
         </div>
     </div>

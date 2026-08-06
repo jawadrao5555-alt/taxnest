@@ -50,6 +50,7 @@ return [
     'add_ingredient_btn' => '+ Ingredient add karein',
     'add_item' => 'Item add karein',
     'add_items' => 'Items add karein',
+    'already_on_table' => 'Table par pehle se laga hua',
     'add_items_to_order' => 'ORDER MEIN ITEMS ADD KAREIN',
     'add_member_btn' => '+ Member add karein',
     'add_new_counter_plus' => '+ Naya counter add karein',

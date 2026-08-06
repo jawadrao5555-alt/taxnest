@@ -50,6 +50,7 @@ return [
     'add_ingredient_btn' => '+ Add Ingredient',
     'add_item' => 'Add Item',
     'add_items' => 'Add Items',
+    'already_on_table' => 'Already on this table',
     'add_items_to_order' => 'ADD ITEMS TO ORDER',
     'add_member_btn' => '+ Add Member',
     'add_new_counter_plus' => '+ Add New Counter',

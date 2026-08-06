@@ -221,6 +221,55 @@ class PosWaiterMultiOrderPickerTest extends TestCase
         $this->assertSame($o1, $t['order_id']);
     }
 
+    // ── Read-only table preview (ZFC, 6 Aug 2026) ────────────────────────
+    // Counter/desktop-punched orders were invisible to the waiter — the
+    // occupied tile only advertised SHIFT. orders_preview must expose EVERY
+    // active order (held AND preparing/ready, any creator) with its items,
+    // and never the settled ones.
+
+    public function test_tables_api_orders_preview_lists_all_active_orders_with_items(): void
+    {
+        [$companyId, $tableId] = $this->seedCompanyAndTable();
+
+        $held = $this->makeOrder($companyId, $tableId, 'W-501', 'held', 2, 100);
+        // Non-held ACTIVE order (e.g. counter-punched, already preparing) —
+        // excluded from held_orders but MUST appear in the preview.
+        $prep = $this->makeOrder($companyId, $tableId, 'W-502', 'preparing', 3, 50);
+        // Settled — invisible.
+        $this->makeOrder($companyId, $tableId, 'W-503', 'completed', 1);
+
+        $t = $this->tablesJson()[0];
+
+        $this->assertArrayHasKey('orders_preview', $t);
+        $this->assertSame([$held, $prep], array_column($t['orders_preview'], 'id'),
+            'preview must list ALL active orders (held + preparing), never completed');
+        $this->assertSame(['held', 'preparing'], array_column($t['orders_preview'], 'status'));
+        $this->assertSame(['W-501', 'W-502'], array_column($t['orders_preview'], 'order_number'));
+        $this->assertEquals([200.0, 150.0], array_column($t['orders_preview'], 'total_amount'));
+
+        // Items ride each preview entry (name + quantity — the read-only list).
+        $prepItems = $t['orders_preview'][1]['items'];
+        $this->assertCount(3, $prepItems);
+        $this->assertSame('Item 1', $prepItems[0]['name']);
+        $this->assertEquals(1.0, $prepItems[0]['quantity']);
+
+        // held_orders stays held-only (shift/append safety unchanged).
+        $this->assertSame([$held], array_column($t['held_orders'], 'id'));
+    }
+
+    public function test_blade_occupied_tile_always_tappable_and_preview_wired(): void
+    {
+        $blade = file_get_contents(resource_path('views/pos/waiter.blade.php'));
+
+        // Preview renders from tableActionFor.orders_preview.
+        $this->assertStringContainsString('tableActionFor.orders_preview', $blade);
+        // Occupied tile must NOT be disabled when there is no held order —
+        // the waiter can always open the modal to VIEW the table.
+        $this->assertStringNotContainsString('t.status === \'occupied\' && !t.order_id', $blade);
+        // Add/Shift buttons stay gated on a held order being present.
+        $this->assertStringContainsString('tableActionFor && tableActionFor.order_id', $blade);
+    }
+
     // ── 3: append hits ONLY the chosen order ─────────────────────────────
 
     public function test_append_items_targets_only_the_chosen_order(): void

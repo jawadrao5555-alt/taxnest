@@ -50,6 +50,7 @@ return [
     'add_ingredient_btn' => '+ انگریڈینٹ ایڈ کریں',
     'add_item' => 'آئٹم ایڈ کریں',
     'add_items' => 'آئٹمز ایڈ کریں',
+    'already_on_table' => 'میز پر پہلے سے موجود',
     'add_items_to_order' => 'آرڈر میں آئٹمز ایڈ کریں',
     'add_member_btn' => '+ ممبر ایڈ کریں',
     'add_new_counter_plus' => '+ نیا کاؤنٹر ایڈ کریں',

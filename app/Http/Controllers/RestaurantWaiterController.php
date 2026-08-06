@@ -148,7 +148,9 @@ class RestaurantWaiterController extends Controller
 
         $tables = RestaurantTable::where('company_id', $companyId)
             ->where('is_active', true)
-            ->with(['floor', 'activeOrders' => fn($q) => $q->withCount('items')])
+            // 'items' eager-loaded for the read-only table preview (ZFC, 6 Aug
+            // 2026) — production has lazy-loading disabled, never lean on lazy.
+            ->with(['floor', 'activeOrders' => fn($q) => $q->withCount('items')->with('items')])
             ->get()
             ->map(fn($t) => [
                 'id' => $t->id,
@@ -169,6 +171,20 @@ class RestaurantWaiterController extends Controller
                     'id' => $o->id,
                     'order_number' => $o->order_number,
                     'items_count' => (int) ($o->items_count ?? 0),
+                ])->all(),
+                // Read-only table preview (ZFC, 6 Aug 2026): jab order counter/
+                // desktop se punch ho to waiter ko sirf OCCUPIED dikhta tha —
+                // ab occupied tile par tap se table ke SAARE active orders ke
+                // items dikhte hain (kisi ne bhi lagaye hon), sirf dekhne ke liye.
+                'orders_preview' => $t->activeOrders->values()->map(fn($o) => [
+                    'id' => $o->id,
+                    'order_number' => $o->order_number,
+                    'status' => $o->status,
+                    'total_amount' => (float) ($o->total_amount ?? 0),
+                    'items' => $o->items->map(fn($i) => [
+                        'name' => $i->item_name,
+                        'quantity' => (float) $i->quantity,
+                    ])->all(),
                 ])->all(),
             ]);
 

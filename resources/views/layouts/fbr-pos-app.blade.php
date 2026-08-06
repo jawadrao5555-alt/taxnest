@@ -249,6 +249,10 @@
             body:not([data-theme="blue"]) .bg-blue-500\/20 { background-color: hsla(var(--accent-h), var(--accent-s), 55%, 0.2) !important; }
             body:not([data-theme="blue"]) .bg-blue-600\/20 { background-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.2) !important; }
             body:not([data-theme="blue"]) .bg-blue-600\/30 { background-color: hsla(var(--accent-h), var(--accent-s), var(--accent-l), 0.3) !important; }
+            /* Sale-screen nav tools anchor (Aug 2026, PRA parity): universal.blade.php
+               teleports its Switches dropdown here — scrollable, never spills. */
+            #tn-nav-sale-tools { scrollbar-width: none; -ms-overflow-style: none; align-self: stretch; }
+            #tn-nav-sale-tools::-webkit-scrollbar { display: none; }
         </style>
         {{-- PWA service worker (FBR POS scope) --}}
         <script>
@@ -297,6 +301,12 @@
                             <x-branch-switcher color="blue" />
                         </div>
                     </div>
+
+                    {{-- Sale-screen tools anchor (Aug 2026, PRA parity): fbr-pos/universal.blade.php
+                         teleports its Switches dropdown (FBR Reporting / Auto-Print / Auto-KOT) here
+                         via x-teleport so it keeps the restaurantPos() Alpine scope.
+                         Empty and harmless on every other FBR POS page. --}}
+                    <div id="tn-nav-sale-tools" class="hidden md:flex items-center gap-1.5 min-w-0 flex-1 px-2 overflow-x-auto"></div>
 
                     <div class="flex items-center gap-2">
                         {{-- Prominent nav-level Download App button — native prompt first, instructions fallback, installed state --}}

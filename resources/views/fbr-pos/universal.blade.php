@@ -254,10 +254,83 @@ window.addEventListener('popstate', function() {
      a /zoom-compensated px height so the sale screen renders correctly on ANY display.
      Auto mode picks the zoom from viewport size; manual % saved per device. --}}
 <div x-data="restaurantPos()" @wheel="handleGlobalWheel($event)" class="flex flex-col h-[calc(100vh-48px)] overflow-hidden bg-gray-50 dark:bg-gray-950" :style="fitStyleStr">
-    {{-- FBR Reporting + Auto-Print toggles strip (visible to admin + cashier).
+    {{-- ═══════════ NAV SWITCHES (Aug 2026, PRA parity — owner request) ═══════════
+         Desktop (md+): FBR Reporting / Auto-Print / Auto-KOT live INSIDE the blue top-nav
+         as a "Switches" dropdown — teleported into #tn-nav-sale-tools (fbr-pos-app.blade.php)
+         via x-teleport so they KEEP this restaurantPos() Alpine scope. The old in-page
+         toggles strip below stays as the MOBILE fallback (md:hidden) — same state, same handlers. --}}
+    <template x-teleport="#tn-nav-sale-tools">
+        <div class="flex items-center gap-1.5 mx-auto flex-shrink-0" x-data="{ switchesOpen: false, swTop: 0, swRight: 0 }">
+            {{-- Switches dropdown trigger. NOTE: panel is position:fixed (anchored to the
+                 button rect on open) so it escapes the overflow-x-auto clipping of
+                 #tn-nav-sale-tools and stays attached to its trigger. --}}
+            <div class="flex-shrink-0">
+                <button type="button" x-ref="swBtn" @click="switchesOpen = !switchesOpen; if (switchesOpen) { var r = $refs.swBtn.getBoundingClientRect(); swTop = r.bottom + 8; swRight = Math.max(8, window.innerWidth - r.right); }" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/15 transition" title="{{ __('pos.switches') }}">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    <span class="hidden lg:inline">{{ __('pos.switches') }}</span>
+                    <svg class="w-3 h-3 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div x-show="switchesOpen" x-cloak @click.outside="switchesOpen = false" x-transition
+                     :style="'top:' + swTop + 'px; right:' + swRight + 'px;'"
+                     class="fixed bg-white dark:bg-gray-900 rounded-xl shadow-2xl shadow-black/20 border border-gray-200/80 dark:border-gray-700/80 p-3 z-[100] w-64 space-y-3">
+
+                    {{-- FBR Reporting — same handler as the mobile strip (root fbrEnabled/fbrLoading) --}}
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-[10px] uppercase tracking-wider font-extrabold text-blue-700 dark:text-blue-300">{{ __('pos.fbr_reporting') }}</span>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button"
+                                @click="fbrLoading = true; fetch('{{ route('fbrpos.api.toggle-fbr-reporting') }}', { method:'POST', headers:{ 'X-CSRF-TOKEN':'{{ csrf_token() }}', 'Content-Type':'application/json', 'Accept':'application/json' } }).then(r => r.json()).then(d => { fbrEnabled = !!d.enabled; fbrLoading = false; window.tnNotify && window.tnNotify(window.TXT.fbr_reporting, fbrEnabled ? window.TXT.enabled_word : window.TXT.disabled_word); }).catch(() => { fbrLoading = false; alert(window.TXT.toggle_failed); })"
+                                :disabled="fbrLoading"
+                                :class="fbrEnabled ? 'bg-blue-600' : 'bg-gray-400 dark:bg-gray-600'"
+                                class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out shadow-inner">
+                                <span :class="fbrEnabled ? 'translate-x-5' : 'translate-x-0.5'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5"></span>
+                            </button>
+                            <span x-text="fbrEnabled ? 'ON' : 'OFF'" :class="fbrEnabled ? 'text-blue-700 dark:text-blue-300' : 'text-gray-500 dark:text-gray-400'" class="text-[10px] font-black w-7"></span>
+                            <span x-show="fbrLoading" class="text-[10px] text-blue-500 animate-pulse">…</span>
+                        </div>
+                    </div>
+
+                    {{-- Auto-Print — device-level localStorage pref, same handler as the mobile strip --}}
+                    <div class="flex items-center justify-between gap-2" title="{{ __('pos.ti_auto_print_hint') }}">
+                        <span class="text-[10px] uppercase tracking-wider font-extrabold text-emerald-700 dark:text-emerald-300">{{ __('pos.auto_print_label') }}</span>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button"
+                                @click="autoPrintEnabled = !autoPrintEnabled; kitchenSettings.print_on_pay = autoPrintEnabled; try { localStorage.setItem('fbrpos_auto_print', autoPrintEnabled ? '1' : '0'); } catch(e) {} window.tnNotify && window.tnNotify(window.TXT.auto_print_receipt, autoPrintEnabled ? window.TXT.enabled_word : window.TXT.disabled_word)"
+                                :class="autoPrintEnabled ? 'bg-emerald-600' : 'bg-gray-400 dark:bg-gray-600'"
+                                class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out shadow-inner">
+                                <span :class="autoPrintEnabled ? 'translate-x-5' : 'translate-x-0.5'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5"></span>
+                            </button>
+                            <span x-text="autoPrintEnabled ? 'ON' : 'OFF'" :class="autoPrintEnabled ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-500 dark:text-gray-400'" class="text-[10px] font-black w-7"></span>
+                        </div>
+                    </div>
+
+                    @if($features->kot ?? false)
+                    {{-- Auto-KOT — same handler as the mobile strip (root autoKotEnabled) --}}
+                    <div class="flex items-center justify-between gap-2" title="{{ __('pos.ti_auto_kot_hint') }}" x-data="{ autoKotLoading: false }">
+                        <span class="text-[10px] uppercase tracking-wider font-extrabold text-orange-700 dark:text-orange-300">{{ __('pos.auto_kot_label') }}</span>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button"
+                                @click="autoKotLoading = true; fetch('{{ route('pos.api.toggle-auto-kot') }}', { method:'POST', headers:{ 'X-CSRF-TOKEN':'{{ csrf_token() }}', 'Content-Type':'application/json', 'Accept':'application/json' } }).then(r => r.json()).then(d => { if (d.success) { autoKotEnabled = !!d.enabled; window.tnNotify && window.tnNotify(window.TXT.auto_kot, autoKotEnabled ? window.TXT.enabled_word : window.TXT.disabled_word); } else { alert(d.message || window.TXT.toggle_failed); } autoKotLoading = false; }).catch(() => { autoKotLoading = false; alert(window.TXT.toggle_failed); })"
+                                :disabled="autoKotLoading"
+                                :class="autoKotEnabled ? 'bg-orange-600' : 'bg-gray-400 dark:bg-gray-600'"
+                                class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out shadow-inner">
+                                <span :class="autoKotEnabled ? 'translate-x-5' : 'translate-x-0.5'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5"></span>
+                            </button>
+                            <span x-text="autoKotEnabled ? 'ON' : 'OFF'" :class="autoKotEnabled ? 'text-orange-700 dark:text-orange-300' : 'text-gray-500 dark:text-gray-400'" class="text-[10px] font-black w-7"></span>
+                            <span x-show="autoKotLoading" class="text-[10px] text-orange-500 animate-pulse">…</span>
+                        </div>
+                    </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </template>
+
+    {{-- FBR Reporting + Auto-Print toggles strip — MOBILE FALLBACK ONLY (md:hidden) since the
+         Aug 2026 PRA-parity redesign moved these switches into the top-nav dropdown on desktop.
          autoPrintEnabled lives on the parent restaurantPos() scope (mirrors kitchenSettings.print_on_pay)
          so toggling immediately updates the receipt-iframe URL on the very next sale, no refresh needed. --}}
-    <div class="flex items-center justify-end gap-4 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/30 flex-shrink-0"
+    <div class="flex md:hidden items-center justify-end gap-4 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/30 flex-shrink-0"
          x-data="{
             autoPrintLoading: false,
             autoKotLoading: false

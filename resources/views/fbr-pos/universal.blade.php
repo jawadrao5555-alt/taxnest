@@ -2541,6 +2541,11 @@ function restaurantPos() {
         submitting: false,
         cartAnimating: false,
         stockError: '',
+        // Idempotency key — one UUID per bill attempt, reused across retries of the
+        // SAME bill (same cart, response lost), regenerated only after confirmed
+        // success / clearCart(). Server replay-guard uses this to return the existing
+        // bill instead of creating a duplicate on a double-submit or network retry.
+        billUuid: null,
         mobileView: 'menu',
         priorityOrder: false,
         recalledOrderId: null,
@@ -2661,9 +2666,21 @@ function restaurantPos() {
         },
         fitLabel() { return this.screenFit === 'auto' ? 'Fit' : Math.round(this.screenFit * 100) + '%'; },
 
+        // Generate a fresh idempotency UUID for a new bill. Falls back to a
+        // timestamp+random string on older browsers that lack crypto.randomUUID.
+        _newBillUuid() {
+            try {
+                if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+            } catch (e) {}
+            return 'fbr-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 11);
+        },
+
         init() {
             if (this._inited) return;
             this._inited = true;
+            // Seed the first bill UUID — regenerated on every clearCart() so each
+            // new bill gets a fresh key while retries of the SAME bill reuse it.
+            this.billUuid = this._newBillUuid();
             this.initFit();
             // Honor the saved "hide products" preference ONLY in inventory-OFF mode.
             // Inventory mode must always show the catalog (no manual on-the-fly create).
@@ -4046,7 +4063,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.customerNtn = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.pendingAddrRestore = null; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.fixCartIndex(); this.clearCartStorage(); },
+        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.customerNtn = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.pendingAddrRestore = null; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.fixCartIndex(); this.clearCartStorage(); this.billUuid = this._newBillUuid(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm(window.TXT.current_order_has + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast(window.TXT.new_sale_started, 'success');
@@ -4706,6 +4723,10 @@ function restaurantPos() {
                     // Task 163: cashier-picked/typed address snapshot; falls back to the
                     // customer's saved address if the picker was never touched/loaded.
                     delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || (this.selectedCustomer?.address || '').trim() || null) : null,
+                    // Idempotency key — same UUID reused on every retry of this bill;
+                    // regenerated only after clearCart() (confirmed success or void).
+                    // Server replay-guard returns the existing bill if UUID matches.
+                    offline_uuid: this.billUuid || (this.billUuid = this._newBillUuid()),
                 };
                 const res = await fetch('{{ route("fbrpos.store") }}', {
                     method: 'POST',

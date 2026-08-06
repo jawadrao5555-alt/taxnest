@@ -20,6 +20,9 @@ class FbrPosTransaction extends Model
         'cash_received', 'change_due', 'payment_breakdown',
         // Task 156: order-type + delivery-address snapshot (Pending Deliveries panel)
         'order_type', 'delivery_address',
+        // Aug 2026: idempotency key — client-generated UUID riding on every submit attempt
+        // so the server replay-guard can return the existing bill on a lost-response retry.
+        'offline_uuid',
     ];
 
     protected $casts = [

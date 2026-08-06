@@ -741,6 +741,43 @@ class FbrPosController extends Controller
             throw $ve;
         }
 
+        // ── IDEMPOTENCY REPLAY GUARD (Aug 2026) ──────────────────────────────────
+        // Mirrors PosController::store() offline_uuid pattern. The client generates
+        // one UUID per bill attempt and sends it on EVERY submit — online and any
+        // retry after a lost response. If a transaction with this UUID already exists
+        // for this company, return the existing bill's success payload immediately,
+        // BEFORE quota checks, ledger writes, or stock deductions. This is the
+        // primary protection against double-submit / network-retry duplicates.
+        //
+        // Schema guard: the column may not exist yet on a not-yet-migrated PROD.
+        // In that window the guard is simply skipped — no crash, no duplicate
+        // protection until the migration lands (consistent with PRA pattern).
+        $offlineUuid = trim((string) $request->input('offline_uuid', ''));
+        $offlineUuidColumnExists = $offlineUuid !== '' && \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'offline_uuid');
+        if ($offlineUuidColumnExists) {
+            $existing = FbrPosTransaction::where('company_id', $companyId)
+                ->where('offline_uuid', $offlineUuid)
+                ->first();
+            if ($existing) {
+                $replayMsg = __('pos.invoice_already_synced', ['number' => $existing->invoice_number]);
+                if ($request->wantsJson()) {
+                    return response()->json([
+                        'success'          => true,
+                        'replayed'         => true,
+                        'transaction_id'   => $existing->id,
+                        'invoice_number'   => $existing->invoice_number,
+                        'total_amount'     => (float) $existing->total_amount,
+                        'fbr_invoice_number' => $existing->fbr_invoice_number,
+                        'fbr_status'       => $existing->fbr_status,
+                        'invoice_mode'     => $existing->invoice_mode,
+                        'change_due'       => (float) $existing->change_due,
+                        'message'          => $replayMsg,
+                    ]);
+                }
+                return redirect()->route('fbrpos.show', $existing->id)->with('success', $replayMsg);
+            }
+        }
+
         $fbrEnabled = (bool) $company->fbr_reporting_enabled;
         // 💾 SAVE AS PROVISIONAL (universal sale screen) — cashier explicitly asked
         // for a local bill (no FBR submission now). Same semantics as a local-mode
@@ -781,7 +818,7 @@ class FbrPosController extends Controller
         }
 
         try {
-            $transaction = DB::transaction(function () use ($request, $companyId, $company, $invoiceMode, $initialFbrStatus) {
+            $transaction = DB::transaction(function () use ($request, $companyId, $company, $invoiceMode, $initialFbrStatus, $offlineUuid, $offlineUuidColumnExists) {
                 $subtotal = 0;
                 $totalTax = 0;
                 $itemsData = [];
@@ -1024,7 +1061,13 @@ class FbrPosController extends Controller
                         : null,
                 ] : [];
 
-                $transaction = FbrPosTransaction::create($orderTypeFields + [
+                // Pass the validated offline_uuid into the row only when the column exists.
+                // use() captures the outer-scope values (set before the DB::transaction closure).
+                $offlineUuidField = ($offlineUuidColumnExists && $offlineUuid !== '')
+                    ? ['offline_uuid' => $offlineUuid]
+                    : [];
+
+                $transaction = FbrPosTransaction::create($orderTypeFields + $offlineUuidField + [
                     'company_id' => $companyId,
                     'branch_id' => app()->bound('currentBranchId') ? app('currentBranchId') : null,
                     'terminal_id' => $request->terminal_id,
@@ -1330,6 +1373,54 @@ class FbrPosController extends Controller
             // Re-throw before the generic Exception catch swallows it. (wantsJson requests
             // automatically get a 422 JSON error bag from the framework.)
             throw $ve;
+        } catch (\Illuminate\Database\QueryException $qe) {
+            // ── RACE-LOSER RECOVERY (concurrent identical submits) ──────────────────
+            // When two requests carrying the same offline_uuid hit store() at the same
+            // instant, both pass the app-level replay guard (neither row exists yet),
+            // and both enter DB::transaction. One wins the INSERT; the other gets a
+            // MySQL 1062 Duplicate Entry on the unique(company_id, offline_uuid) index.
+            // Without this catch, the loser would surface as a 500 that the client
+            // cannot distinguish from a real failure — the cashier would see an error
+            // popup and possibly try to ring up the bill again.
+            //
+            // Recovery: detect the 1062 on our index, re-lookup the winner's row, and
+            // return its success payload — exactly the same shape as the app-level
+            // replay path above. The client sees a transparent success.
+            $isUniqueViolation = $qe->getCode() == 23000        // SQLSTATE: integrity constraint
+                && str_contains($qe->getMessage(), '1062')      // MySQL: Duplicate entry
+                && str_contains($qe->getMessage(), 'fbr_txn_offline_uuid_unique');
+
+            if ($isUniqueViolation && $offlineUuidColumnExists) {
+                $winner = FbrPosTransaction::where('company_id', $companyId)
+                    ->where('offline_uuid', $offlineUuid)
+                    ->first();
+                if ($winner) {
+                    $raceMsg = __('pos.invoice_already_synced', ['number' => $winner->invoice_number]);
+                    Log::info('FBR POS race-loser recovered', ['company' => $companyId, 'uuid' => $offlineUuid, 'winner_id' => $winner->id]);
+                    if ($request->wantsJson()) {
+                        return response()->json([
+                            'success'            => true,
+                            'replayed'           => true,
+                            'transaction_id'     => $winner->id,
+                            'invoice_number'     => $winner->invoice_number,
+                            'total_amount'       => (float) $winner->total_amount,
+                            'fbr_invoice_number' => $winner->fbr_invoice_number,
+                            'fbr_status'         => $winner->fbr_status,
+                            'invoice_mode'       => $winner->invoice_mode,
+                            'change_due'         => (float) $winner->change_due,
+                            'message'            => $raceMsg,
+                        ]);
+                    }
+                    return redirect()->route('fbrpos.show', $winner->id)->with('success', $raceMsg);
+                }
+            }
+
+            // Any other QueryException (real DB error) falls through to the generic handler.
+            Log::error('FBR POS Store Error', ['error' => $qe->getMessage()]);
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => __('pos.failed_create_sale', ['error' => $qe->getMessage()])], 500);
+            }
+            return back()->withInput()->with('error', __('pos.failed_create_sale', ['error' => $qe->getMessage()]));
         } catch (\Exception $e) {
             Log::error('FBR POS Store Error', ['error' => $e->getMessage()]);
             if ($request->wantsJson()) {

@@ -316,6 +316,37 @@ window.addEventListener('popstate', function() {
                       x-text="failedBills.length"></span>
             </div>
 
+            {{-- Screen Fit (moved from toolbar Row 2, owner 6 Aug 2026) --}}
+            <div class="relative flex-shrink-0" @click.away="showFitMenu = false">
+                <button @click="showFitMenu = !showFitMenu" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/15 transition" title="{{ __('pos.ti_screen_fit') }}">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V5a1 1 0 011-1h3m8 0h3a1 1 0 011 1v3m0 8v3a1 1 0 01-1 1h-3m-8 0H5a1 1 0 01-1-1v-3"/></svg>
+                    <span class="hidden xl:inline" x-text="fitLabel()"></span>
+                </button>
+                <div x-show="showFitMenu" x-cloak x-transition class="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden">
+                    <p class="px-3 pt-2 pb-1 text-[9px] font-bold uppercase tracking-wider text-gray-400">{{ __('pos.screen_fit') }}</p>
+                    <button @click="setFit('auto')" class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold hover:bg-purple-50 dark:hover:bg-purple-900/20 transition" :class="screenFit === 'auto' ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700' : 'text-gray-700 dark:text-gray-200'"><span>{{ __('pos.fit_auto_recommended') }}</span><span x-show="screenFit === 'auto'" class="text-purple-600">✓</span></button>
+                    <button @click="setFit(0.8)" class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold hover:bg-purple-50 dark:hover:bg-purple-900/20 transition" :class="screenFit === 0.8 ? 'bg-purple-50 text-purple-700' : 'text-gray-700 dark:text-gray-200'"><span>{{ __('pos.fit_80_compact') }}</span><span x-show="screenFit === 0.8" class="text-purple-600">✓</span></button>
+                    <button @click="setFit(0.9)" class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold hover:bg-purple-50 dark:hover:bg-purple-900/20 transition" :class="screenFit === 0.9 ? 'bg-purple-50 text-purple-700' : 'text-gray-700 dark:text-gray-200'"><span>90%</span><span x-show="screenFit === 0.9" class="text-purple-600">✓</span></button>
+                    <button @click="setFit(1)" class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold hover:bg-purple-50 dark:hover:bg-purple-900/20 transition" :class="screenFit === 1 ? 'bg-purple-50 text-purple-700' : 'text-gray-700 dark:text-gray-200'"><span>{{ __('pos.fit_100_standard') }}</span><span x-show="screenFit === 1" class="text-purple-600">✓</span></button>
+                    <button @click="setFit(1.1)" class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold hover:bg-purple-50 dark:hover:bg-purple-900/20 transition" :class="screenFit === 1.1 ? 'bg-purple-50 text-purple-700' : 'text-gray-700 dark:text-gray-200'"><span>110%</span><span x-show="screenFit === 1.1" class="text-purple-600">✓</span></button>
+                    <button @click="setFit(1.25)" class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold hover:bg-purple-50 dark:hover:bg-purple-900/20 transition" :class="screenFit === 1.25 ? 'bg-purple-50 text-purple-700' : 'text-gray-700 dark:text-gray-200'"><span>{{ __('pos.fit_125_large') }}</span><span x-show="screenFit === 1.25" class="text-purple-600">✓</span></button>
+                </div>
+            </div>
+
+            {{-- Keys F1 (moved from toolbar Row 2, owner 6 Aug 2026) --}}
+            <button @click="showShortcuts = true" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/15 transition flex-shrink-0" title="{{ __('pos.ti_keyboard_shortcuts_f1') }}">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3C6.5 3 2 6.58 2 11c0 2.24 1.12 4.27 2.94 5.72L4 21l4.28-2.55c1.15.35 2.4.55 3.72.55 5.5 0 10-3.58 10-8s-4.5-8-10-8z"/></svg>
+                <span class="hidden lg:inline">{{ __('pos.keys') }}</span>
+                <span class="text-[9px] font-mono bg-white/20 px-1 rounded">F1</span>
+            </button>
+
+            {{-- Quick F7 (moved from toolbar Row 2, owner 6 Aug 2026) --}}
+            <button @click="openQuickType()" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-sky-500/70 hover:bg-sky-500/90 ring-1 ring-sky-300/40 transition flex-shrink-0" title="{{ __('pos.ti_quick_type_f7') }}">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                <span class="hidden lg:inline">Quick</span>
+                <span class="text-[9px] font-mono bg-white/20 px-1 rounded">F7</span>
+            </button>
+
             {{-- Switches dropdown trigger. NOTE: panel is position:fixed (anchored to the
                  button rect on open) so it escapes the overflow-x-auto clipping of
                  #tn-nav-sale-tools and stays attached to its trigger. --}}
@@ -490,7 +521,7 @@ window.addEventListener('popstate', function() {
     {{-- ── ROW 1 ── --}}
     <div class="flex flex-wrap items-center gap-2 px-3 py-2">
 
-        <div class="relative flex-shrink-0" style="min-width:180px;max-width:220px;">
+        <div class="relative flex-shrink-0" style="min-width:230px;max-width:310px;">
             <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
             <input type="search" x-ref="customerPhoneInput" x-model="customerPhoneQuery" @input="onCustomerPhoneInput()" @keydown.enter.prevent="if(!$event.repeat) onCustomerPhoneEnter()" @keydown.down.prevent="custNav(1)" @keydown.up.prevent="custNav(-1)" @keydown.escape.prevent="customerPhoneDropdown = false" @keydown.tab.prevent="$refs.searchInput?.focus()" @click.away="customerPhoneDropdown = false" placeholder="{{ __('pos.ph_customer_name_mobile') }}" class="w-full pl-9 pr-7 py-2.5 rounded-xl text-sm border-2 transition shadow-sm" :class="selectedCustomer ? 'font-bold border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200' : 'font-medium border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400'" autocomplete="one-time-code" name="pos_customer_phone_nofill" data-lpignore="true" data-form-type="other">
             <kbd x-show="!customerPhoneQuery && !selectedCustomer && !customerSearching" class="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded font-mono">Alt+P</kbd>
@@ -557,6 +588,27 @@ window.addEventListener('popstate', function() {
             </div>
         </div>
 
+        {{-- Delivery-only order-type toggle (6 Aug 2026): TAKEAWAY is the default/silent mode;
+             only show a badge + toggle when delivery feature is on OR when delivery is active.
+             Manual item button lives here too (moved from Row 2). --}}
+        @if($features->delivery ?? false)
+        <div class="flex items-center gap-1 flex-shrink-0">
+            <button @click="orderType = (orderType === 'delivery' ? 'takeaway' : 'delivery')"
+                    class="flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold border transition"
+                    :class="orderType === 'delivery' ? 'bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300' : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'"
+                    title="{{ __('pos.delivery') }} / {{ __('pos.takeaway') }} (F2)">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+                <span x-text="orderType === 'delivery' ? '{{ __('pos.delivery') }}' : '{{ __('pos.takeaway') }}'"></span>
+            </button>
+        </div>
+        @endif
+        {{-- Manual item: moved here from Row 2 (owner, 6 Aug 2026) --}}
+        <template x-if="!isInventoryEnabled()">
+            <button @click="openManualItem()" class="flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 hover:border-emerald-300 transition flex-shrink-0" title="{{ __('pos.ti_add_manual_item') }}">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                <span class="hidden lg:inline">{{ __('pos.manual') }}</span>
+            </button>
+        </template>
         <div class="w-px h-6 bg-gray-200 dark:bg-gray-700 hidden sm:block flex-shrink-0"></div>
 
     </div>{{-- /ROW 1 --}}
@@ -661,62 +713,9 @@ window.addEventListener('popstate', function() {
         </button>
         @endif
 
-        <div class="flex items-center rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden flex-shrink-0" title="{{ __('pos.ti_press_f2_cycle') }}">
-            @if($features->tables)
-            <button @click="orderType = 'dine_in'" class="px-2 py-1.5 text-[10px] font-bold transition-all" :class="orderType === 'dine_in' ? 'bg-blue-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">{{ __('pos.dine_in') }}</button>
-            @endif
-            <button @click="orderType = 'takeaway'" class="px-2 py-1.5 text-[10px] font-bold transition-all border-x border-gray-200 dark:border-gray-700" :class="orderType === 'takeaway' ? 'bg-blue-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">{{ __('pos.takeaway') }}</button>
-            @if($features->delivery)
-            <button @click="orderType = 'delivery'" class="px-2 py-1.5 text-[10px] font-bold transition-all" :class="orderType === 'delivery' ? 'bg-blue-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100'">{{ __('pos.delivery') }}</button>
-            @endif
-            <span class="px-1.5 py-1.5 text-[8px] font-mono text-gray-400 bg-gray-50 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700">F2</span>
-        </div>
-
-        <div class="w-px h-6 bg-gray-200 dark:bg-gray-700 hidden sm:block flex-shrink-0"></div>
-
-        <button @click="priorityOrder = !priorityOrder" class="hidden sm:flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-semibold border transition" :class="priorityOrder ? 'bg-red-50 dark:bg-red-900/20 border-red-300 text-red-600' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-50'">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            <span>{{ __('pos.rush_title') }}</span>
-        </button>
-
-        {{-- Screen Fit control (Jul 2026): cashier picks Auto or a fixed % for THIS display; saved per device. --}}
-        <div class="relative block flex-shrink-0" @click.away="showFitMenu = false">
-            <button @click="showFitMenu = !showFitMenu" class="flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 transition" title="{{ __('pos.ti_screen_fit') }}">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V5a1 1 0 011-1h3m8 0h3a1 1 0 011 1v3m0 8v3a1 1 0 01-1 1h-3m-8 0H5a1 1 0 01-1-1v-3"/></svg>
-                <span class="hidden lg:inline" x-text="fitLabel()"></span>
-            </button>
-            <div x-show="showFitMenu" x-cloak x-transition class="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
-                <p class="px-3 pt-2 pb-1 text-[9px] font-bold uppercase tracking-wider text-gray-400">{{ __('pos.screen_fit') }}</p>
-                <button @click="setFit('auto')" class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold hover:bg-blue-50 dark:hover:bg-blue-900/20 transition" :class="screenFit === 'auto' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-200'"><span>{{ __('pos.fit_auto_recommended') }}</span><span x-show="screenFit === 'auto'" class="text-blue-600 dark:text-blue-400">✓</span></button>
-                <button @click="setFit(0.8)" class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold hover:bg-blue-50 dark:hover:bg-blue-900/20 transition" :class="screenFit === 0.8 ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-200'"><span>{{ __('pos.fit_80_compact') }}</span><span x-show="screenFit === 0.8" class="text-blue-600 dark:text-blue-400">✓</span></button>
-                <button @click="setFit(0.9)" class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold hover:bg-blue-50 dark:hover:bg-blue-900/20 transition" :class="screenFit === 0.9 ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-200'"><span>90%</span><span x-show="screenFit === 0.9" class="text-blue-600 dark:text-blue-400">✓</span></button>
-                <button @click="setFit(1)" class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold hover:bg-blue-50 dark:hover:bg-blue-900/20 transition" :class="screenFit === 1 ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-200'"><span>{{ __('pos.fit_100_standard') }}</span><span x-show="screenFit === 1" class="text-blue-600 dark:text-blue-400">✓</span></button>
-                <button @click="setFit(1.1)" class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold hover:bg-blue-50 dark:hover:bg-blue-900/20 transition" :class="screenFit === 1.1 ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-200'"><span>110%</span><span x-show="screenFit === 1.1" class="text-blue-600 dark:text-blue-400">✓</span></button>
-                <button @click="setFit(1.25)" class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold hover:bg-blue-50 dark:hover:bg-blue-900/20 transition" :class="screenFit === 1.25 ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'text-gray-700 dark:text-gray-200'"><span>{{ __('pos.fit_125_large') }}</span><span x-show="screenFit === 1.25" class="text-blue-600 dark:text-blue-400">✓</span></button>
-            </div>
-        </div>
-
-        <button @click="showShortcuts = true" class="flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 transition flex-shrink-0" title="{{ __('pos.ti_keyboard_shortcuts_f1') }}">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3C6.5 3 2 6.58 2 11c0 2.24 1.12 4.27 2.94 5.72L4 21l4.28-2.55c1.15.35 2.4.55 3.72.55 5.5 0 10-3.58 10-8s-4.5-8-10-8z"/></svg>
-            <span class="hidden lg:inline">{{ __('pos.keys') }}</span>
-            <span class="text-[8px] font-mono bg-gray-200 dark:bg-gray-700 px-1 rounded hidden sm:inline">F1</span>
-        </button>
-
-        <button @click="openQuickType()" class="flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 hover:border-sky-300 transition flex-shrink-0" title="{{ __('pos.ti_quick_type_f7') }}">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            <span class="hidden lg:inline">Quick</span>
-            <span class="text-[8px] font-mono bg-sky-200 dark:bg-sky-800/50 px-1 rounded hidden sm:inline">F7</span>
-        </button>
-
-        {{-- Manual Item — only when inventory mode is OFF (Simple Mode).
-             Lets the cashier bill an ad-hoc item that isn't in the product list.
-             Optional checkbox in the modal also persists it to /pos/products. --}}
-        <template x-if="!isInventoryEnabled()">
-            <button @click="openManualItem()" class="flex items-center gap-1 px-2 py-2 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 hover:border-emerald-300 transition flex-shrink-0" title="{{ __('pos.ti_add_manual_item') }}">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-                <span class="hidden lg:inline">{{ __('pos.manual') }}</span>
-            </button>
-        </template>
+        {{-- Order-type cluster removed from Row 2 (owner, 6 Aug 2026): delivery toggle in Row 1.
+             Fit, Keys F1, Quick F7 moved to top-nav teleport.
+             Urgent (rush) removed. Manual moved to Row 1. Order-type cluster removed. --}}
 
         <button @click="newSale()" class="flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 hover:bg-green-100 transition">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>

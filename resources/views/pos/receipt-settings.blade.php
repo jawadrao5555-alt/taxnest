@@ -170,6 +170,31 @@
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.paper_size_hint') }}</p>
         </div>
 
+        {{-- Order Matching (owner request 06 Aug 2026, customer voice notes): the
+             sale receipt and the kitchen KOT carried DIFFERENT numbers (L-107 vs
+             ORD-…), so counter staff couldn't pair a ready order with a bill.
+             Per-company choice: Daily Token (easy to call out) or Unique Code
+             (random — outsiders can't trace daily order volume). --}}
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-6">
+            @php $omPref = in_array($company->order_match_style ?? 'off', ['off','token','code'], true) ? ($company->order_match_style ?? 'off') : 'off'; @endphp
+            <label class="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-1">🔢 {{ __('pos.order_match_title') }} <span class="text-xs font-normal text-gray-500 dark:text-gray-400">{{ __('pos.order_match_scope') }}</span></label>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ __('pos.order_match_intro') }}</p>
+            <div class="space-y-2">
+                <label class="flex items-start gap-2 cursor-pointer">
+                    <input type="radio" name="rp_order_match" value="off" {{ $omPref === 'off' ? 'checked' : '' }} class="mt-0.5 text-purple-600 focus:ring-purple-500">
+                    <span class="text-sm text-gray-800 dark:text-gray-200">{{ __('pos.order_match_off') }} <span class="block text-xs text-gray-500 dark:text-gray-400">{{ __('pos.order_match_off_hint') }}</span></span>
+                </label>
+                <label class="flex items-start gap-2 cursor-pointer">
+                    <input type="radio" name="rp_order_match" value="token" {{ $omPref === 'token' ? 'checked' : '' }} class="mt-0.5 text-purple-600 focus:ring-purple-500">
+                    <span class="text-sm text-gray-800 dark:text-gray-200">{{ __('pos.order_match_token') }} <span class="block text-xs text-gray-500 dark:text-gray-400">{{ __('pos.order_match_token_hint') }}</span></span>
+                </label>
+                <label class="flex items-start gap-2 cursor-pointer">
+                    <input type="radio" name="rp_order_match" value="code" {{ $omPref === 'code' ? 'checked' : '' }} class="mt-0.5 text-purple-600 focus:ring-purple-500">
+                    <span class="text-sm text-gray-800 dark:text-gray-200">{{ __('pos.order_match_code') }} <span class="block text-xs text-gray-500 dark:text-gray-400">{{ __('pos.order_match_code_hint') }}</span></span>
+                </label>
+            </div>
+        </div>
+
         {{-- PDF Download Paper (customer video Jul 2026): downloaded PDFs printed on
              regular office printers came out shifted to the right edge and clipped —
              PDF viewers center the narrow thermal page on the driver's A4 canvas. --}}

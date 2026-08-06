@@ -15,6 +15,7 @@ class RestaurantOrder extends Model
         'kot_sent_at', 'kot_print_count',
         'kitchen_status', 'kitchen_started_at', 'kitchen_ready_at', 'kitchen_cleared_at',
         'assigned_cashier_id', 'source',
+        'token_no',
     ];
 
     protected $casts = [

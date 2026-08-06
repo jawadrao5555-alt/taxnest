@@ -411,9 +411,16 @@ class RestaurantPosController extends Controller
                 }
             }
 
+            // Order Matching (Aug 2026): Daily Token allocated company-centrally
+            // at ORDER birth — add-ons/KOT reprints/final bill all keep this token.
+            $tokenNo = ($company->order_match_style ?? 'off') === 'token'
+                ? \App\Services\OrderTokenService::nextToken($companyId)
+                : null;
+
             $order = RestaurantOrder::create([
                 'company_id' => $companyId,
                 'order_number' => $orderNumber,
+                'token_no' => $tokenNo,
                 'table_id' => $request->table_id,
                 'order_type' => $request->order_type,
                 'status' => 'held',

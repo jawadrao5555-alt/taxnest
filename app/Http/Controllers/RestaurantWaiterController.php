@@ -277,7 +277,7 @@ class RestaurantWaiterController extends Controller
         $orderType = $validated['order_type'] ?? 'dine_in';
         $tableId = $orderType === 'dine_in' ? ($validated['table_id'] ?? null) : null;
 
-        return DB::transaction(function () use ($companyId, $validated, $cashier, $orderType, $tableId, $user) {
+        return DB::transaction(function () use ($companyId, $validated, $cashier, $orderType, $tableId, $user, $company) {
             if ($tableId) {
                 $table = RestaurantTable::where('company_id', $companyId)
                     ->where('id', $tableId)->where('is_active', true)
@@ -301,9 +301,16 @@ class RestaurantWaiterController extends Controller
             // Whole-rupee total per POS rounding convention.
             $total = round($subtotal);
 
+            // Order Matching (Aug 2026): waiter-created orders join the SAME
+            // company-central daily token series as counter orders.
+            $waiterTokenNo = ($company->order_match_style ?? 'off') === 'token'
+                ? \App\Services\OrderTokenService::nextToken($companyId)
+                : null;
+
             $order = RestaurantOrder::create([
                 'company_id' => $companyId,
                 'order_number' => 'ORD-' . date('ymd') . '-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 5)),
+                'token_no' => $waiterTokenNo,
                 'table_id' => $tableId,
                 'order_type' => $orderType,
                 'status' => 'held',

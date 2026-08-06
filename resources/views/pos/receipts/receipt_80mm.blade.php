@@ -362,6 +362,40 @@
     </div>
     @endif
 
+    {{-- Order Matching (Aug 2026): print the SAME identifier the kitchen KOT
+         carries so counter staff can pair a ready order with this bill.
+         'token' = daily token number; 'code' = short unique ORD code.
+         Guarded by Schema::hasColumn (PROD drift self-heal convention) and
+         restricted to restaurant bills (order_type present). --}}
+    @php
+        $omRcptStyle = $company->order_match_style ?? 'off';
+        $omRcptToken = null;
+        $omRcptCode = null;
+        if ($rcptOrderType && in_array($omRcptStyle, ['token', 'code'], true)
+            && \Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'token_no')) {
+            $omRcptOrder = \App\Models\RestaurantOrder::where('company_id', $transaction->company_id)
+                ->where('pos_transaction_id', $transaction->id)
+                ->orderByDesc('id')
+                ->first();
+            if ($omRcptOrder) {
+                if ($omRcptStyle === 'token' && !empty($omRcptOrder->token_no)) {
+                    $omRcptToken = (int) $omRcptOrder->token_no;
+                } elseif ($omRcptStyle === 'code') {
+                    $omRcptCode = \App\Services\OrderTokenService::shortCode($omRcptOrder->order_number);
+                }
+            }
+        }
+    @endphp
+    @if($omRcptToken)
+    <div style="text-align:center; padding:2px 0 3px;">
+        <span style="display:inline-block; border:2px solid #000; padding:2px 14px; font-size:16px; font-weight:900;">{{ __('pos.order_match_token_label') }} {{ $omRcptToken }}</span>
+    </div>
+    @elseif($omRcptCode)
+    <div style="text-align:center; padding:2px 0 3px;">
+        <span style="display:inline-block; border:2px solid #000; padding:2px 14px; font-size:14px; font-weight:900; letter-spacing:2px;">{{ $omRcptCode }}</span>
+    </div>
+    @endif
+
     <table class="info-table">
         <tr><td class="info-label">{{ __('pos.receipt_date') }}:</td><td class="info-value">{{ $transaction->created_at->format('d/m/Y h:i A') }}</td></tr>
         @if($transaction->terminal)

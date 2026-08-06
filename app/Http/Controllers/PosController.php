@@ -231,6 +231,7 @@ class PosController extends Controller
                 'rp_printer_size' => 'nullable|in:80mm,58mm',
                 'rp_logo_style' => 'nullable|in:side,center',
                 'rp_pdf_paper' => 'nullable|in:thermal,a4',
+                'rp_order_match' => 'nullable|in:off,token,code',
             ]);
             $prefs = $company->invoice_display_prefs ?? [];
             // PRA (fiscal) receipt set — legacy 'pos' key, backward compatible.
@@ -278,7 +279,7 @@ class PosController extends Controller
                 // Menu QR nor the invoice JSON fallback QR prints. PRA fiscal QR unaffected.
                 'show_menu_qr' => $request->has('rp_show_menu_qr'),
             ];
-            $company->update([
+            $companyUpdates = [
                 'invoice_display_prefs' => $prefs,
                 // Owner decision (Jul 2026): tax display toggle lives HERE (receipt
                 // customization), not on the Features page. OFF = customer copy
@@ -288,7 +289,15 @@ class PosController extends Controller
                 // Paper size (owner request Jul 2026): same column PRA Settings writes —
                 // last save from either page wins. Missing/invalid input keeps 80mm default.
                 'receipt_printer_size' => $request->input('rp_printer_size', $company->receipt_printer_size ?? '80mm'),
-            ]);
+            ];
+            // Order Matching (Aug 2026): same number on receipt + kitchen KOT.
+            // off = nothing extra; token = daily token; code = unique ORD short code.
+            // hasColumn guard: PROD drift self-heal convention + minimal test schemas.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'order_match_style')
+                && in_array($request->input('rp_order_match'), ['off', 'token', 'code'], true)) {
+                $companyUpdates['order_match_style'] = $request->input('rp_order_match');
+            }
+            $company->update($companyUpdates);
             return redirect()->route('pos.receipt-settings')->with('success', __('pos.receipt_display_settings_saved'));
         }
 

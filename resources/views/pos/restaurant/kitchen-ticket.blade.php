@@ -218,6 +218,23 @@
         @endif
         <p class="text-xl bold mt-1">*** {{ strtoupper($stationLabel ?? __('pos.kot_kitchen')) }} ***</p>
         <p class="text-lg bold mt-1">{{ $order->order_number }}</p>
+        {{-- Order Matching (Aug 2026): same number on KOT + customer receipt so
+             counter staff can pair a ready order with the customer's bill.
+             'token' = daily token; 'code' = short unique code (last ORD segment).
+             Shim (transaction) KOTs skip the code box — their big header is
+             already the bill number, which the receipt carries anyway. --}}
+        @php
+            $omStyle = $company->order_match_style ?? 'off';
+            $omToken = ($omStyle === 'token' && !empty($order->token_no)) ? (int) $order->token_no : null;
+            $omCode = ($omStyle === 'code' && $order->exists && !empty($order->order_number))
+                ? \App\Services\OrderTokenService::shortCode($order->order_number)
+                : null;
+        @endphp
+        @if($omToken)
+            <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 14px; font-size:20px; font-weight:900; color:#000;">{{ __('pos.order_match_token_label') }} {{ $omToken }}</span></p>
+        @elseif($omCode)
+            <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 14px; font-size:18px; font-weight:900; letter-spacing:2px; color:#000;">{{ $omCode }}</span></p>
+        @endif
         {{-- Item #6: stable per-print-batch number — delta tickets get their own KOT #
              so the kitchen can reference "KOT #2 of table 5" (stamped, not counted). --}}
         @if(!empty($kotBatchNo))

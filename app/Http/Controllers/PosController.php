@@ -20,6 +20,7 @@ use App\Models\RestaurantTable;
 use App\Models\RestaurantOrder;
 use App\Models\ProductRecipe;
 use App\Models\Ingredient;
+use App\Services\AuditLogService;
 use App\Services\PraIntegrationService;
 use App\Services\PosFeatureService;
 use App\Support\PosPaymentBuckets;
@@ -5506,7 +5507,20 @@ class PosController extends Controller
                 $newUserData['pra_reporting_enabled'] = false;
             }
         }
-        User::create($newUserData);
+        $newUser = User::create($newUserData);
+
+        // Audit: billing scope set at creation (null → value).
+        if (!empty($newUserData['pos_billing_scope'])) {
+            AuditLogService::log(
+                'pos_billing_scope_set',
+                'User',
+                $newUser->id,
+                null,
+                ['pos_billing_scope' => $newUserData['pos_billing_scope'], 'target_name' => $newUser->name],
+                $companyId,
+                auth('pos')->id()
+            );
+        }
 
         $roleLabel = ['pos_manager' => __('pos.role_manager'), 'pos_kitchen' => __('pos.role_kitchen'), 'pos_waiter' => __('pos.role_waiter'), 'pos_delivery' => __('pos.role_delivery_manager')][$newRole] ?? __('pos.role_cashier');
         return back()->with('success', __('pos.account_created_success', ['role' => $roleLabel]));
@@ -5533,11 +5547,24 @@ class PosController extends Controller
         if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'billing_scope_admin_enabled')) {
             return back()->with('error', __('pos.unknown_error'));
         }
-        $company = Company::find(app('currentCompanyId'));
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
         // Direct assignment + save (pos_custom_access pattern): update() on a
         // non-$fillable column silently drops.
-        $company->billing_scope_admin_enabled = $request->boolean('enabled');
+        $oldEnabled = (bool) $company->billing_scope_admin_enabled;
+        $newEnabled = $request->boolean('enabled');
+        $company->billing_scope_admin_enabled = $newEnabled;
         $company->save();
+        // Audit: always log the toggle (permission grant/revoke is security-relevant).
+        AuditLogService::log(
+            'pos_billing_scope_permission_toggled',
+            'Company',
+            $companyId,
+            ['billing_scope_admin_enabled' => $oldEnabled],
+            ['billing_scope_admin_enabled' => $newEnabled],
+            $companyId,
+            auth('pos')->id()
+        );
         return back()->with('success', __('pos.billing_scope_perm_saved'));
     }
 
@@ -5675,6 +5702,7 @@ class PosController extends Controller
             && in_array($cashier->pos_role, ['pos_cashier', 'pos_manager'], true)
             && in_array($request->input('pos_billing_scope'), ['both', 'local', 'pra'], true)) {
             $newScope = $request->input('pos_billing_scope');
+            $oldScope = $cashier->pos_billing_scope;
             $cashier->pos_billing_scope = $newScope;
             // Scope ↔ reporting alignment: 'pra' lock forces reporting ON,
             // 'local' lock forces it OFF — otherwise the scope guard on the
@@ -5685,6 +5713,18 @@ class PosController extends Controller
                 $cashier->pra_reporting_enabled = false;
             }
             $cashier->save();
+            // Audit: only log when the scope value actually changed.
+            if ($oldScope !== $newScope) {
+                AuditLogService::log(
+                    'pos_billing_scope_changed',
+                    'User',
+                    $cashier->id,
+                    ['pos_billing_scope' => $oldScope, 'target_name' => $cashier->name],
+                    ['pos_billing_scope' => $newScope, 'target_name' => $cashier->name],
+                    $companyId,
+                    auth('pos')->id()
+                );
+            }
         }
 
         if ($request->filled('password')) {

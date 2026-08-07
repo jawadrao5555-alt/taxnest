@@ -6,10 +6,12 @@
     // inputs is pinned OFF here. The markup they gate stays in the file
     // (compiles fine, never renders) so future diffs against the PRA source
     // remain reviewable. DO NOT delete these pins — undefined vars = 500.
-    // DIVERGENCE NOTE (24 Jul 2026): the PRA source received a sale-screen
-    // redesign (nav sale-tools teleport, compact grid, Akhri Bills strip,
-    // bada total band, one-tap CASH/CARD). This port is intentionally FROZEN
-    // pre-redesign until the owner approves porting it.
+    // DIVERGENCE NOTE (updated 7 Aug 2026): the 24 Jul PRA sale-screen redesign
+    // (compact grid rows, notes+discount one-row chips, bada total band, one-tap
+    // CASH/CARD Alt+1/2) is NOW PORTED here — owner approved via video note.
+    // FBR differences kept on purpose: blue chrome (theme engine remaps blue-*),
+    // per-item tax (no cash/card method hint), no gridEditMode / per-user grid
+    // prefs, Fit menu uses fixed-position anchoring (nav overflow clipping).
     $features = (object) [
         'tables' => false, 'delivery' => false,
         // Order Matching (Aug 2026): unpin kot — gate on kitchen_printer_enabled so
@@ -321,12 +323,16 @@ window.addEventListener('popstate', function() {
             </div>
 
             {{-- Screen Fit (moved from toolbar Row 2, owner 6 Aug 2026) --}}
-            <div class="relative flex-shrink-0" @click.away="showFitMenu = false">
-                <button @click="showFitMenu = !showFitMenu" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/15 transition" title="{{ __('pos.ti_screen_fit') }}">
+            {{-- NOTE (7 Aug 2026, owner video complaint "boxes neeche chhup rahe hain"): panel
+                 is position:fixed (anchored to the button rect on open, same pattern as the
+                 Switches dropdown below) so it escapes the overflow-x-auto clipping of
+                 #tn-nav-sale-tools. --}}
+            <div class="flex-shrink-0" @click.away="showFitMenu = false" x-data="{ fitTop: 0, fitRight: 0 }">
+                <button type="button" x-ref="fitBtn" @click="showFitMenu = !showFitMenu; if (showFitMenu) { var r = $refs.fitBtn.getBoundingClientRect(); fitTop = r.bottom + 8; fitRight = Math.max(8, window.innerWidth - r.right); }" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/15 transition" title="{{ __('pos.ti_screen_fit') }}">
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V5a1 1 0 011-1h3m8 0h3a1 1 0 011 1v3m0 8v3a1 1 0 01-1 1h-3m-8 0H5a1 1 0 01-1-1v-3"/></svg>
                     <span class="hidden xl:inline" x-text="fitLabel()"></span>
                 </button>
-                <div x-show="showFitMenu" x-cloak x-transition class="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden">
+                <div x-show="showFitMenu" x-cloak x-transition :style="'top:' + fitTop + 'px; right:' + fitRight + 'px;'" class="fixed w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden">
                     <p class="px-3 pt-2 pb-1 text-[9px] font-bold uppercase tracking-wider text-gray-400">{{ __('pos.screen_fit') }}</p>
                     <button @click="setFit('auto')" class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold hover:bg-purple-50 dark:hover:bg-purple-900/20 transition" :class="screenFit === 'auto' ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700' : 'text-gray-700 dark:text-gray-200'"><span>{{ __('pos.fit_auto_recommended') }}</span><span x-show="screenFit === 'auto'" class="text-purple-600">✓</span></button>
                     <button @click="setFit(0.8)" class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-semibold hover:bg-purple-50 dark:hover:bg-purple-900/20 transition" :class="screenFit === 0.8 ? 'bg-purple-50 text-purple-700' : 'text-gray-700 dark:text-gray-200'"><span>{{ __('pos.fit_80_compact') }}</span><span x-show="screenFit === 0.8" class="text-purple-600">✓</span></button>
@@ -833,64 +839,44 @@ window.addEventListener('popstate', function() {
             <div x-ref="gridContainer" tabindex="0" @keydown.arrow-right.prevent="moveGridFocus(1)" @keydown.arrow-left.prevent="moveGridFocus(-1)" @keydown.arrow-down.prevent="moveGridFocus(gridCols)" @keydown.arrow-up.prevent="moveGridFocus(-gridCols)" @keydown.enter.prevent="addGridFocusedItem()" class="flex-1 overflow-y-auto p-3 outline-none">
 
                 <template x-if="loading">
-                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                        <template x-for="i in 12"><div class="rounded-2xl overflow-hidden"><div class="skeleton aspect-square"></div><div class="p-2.5 space-y-2"><div class="skeleton h-3 rounded w-3/4"></div><div class="skeleton h-4 rounded w-1/2"></div></div></div></template>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                        <template x-for="i in 12"><div class="rounded-xl overflow-hidden flex items-center gap-2 px-2.5 py-2.5 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800"><div class="skeleton w-8 h-8 rounded-lg flex-shrink-0"></div><div class="flex-1 space-y-1.5"><div class="skeleton h-3 rounded w-3/4"></div><div class="skeleton h-2.5 rounded w-1/3"></div></div></div></template>
                     </div>
                 </template>
 
+                {{-- ═══ COMPACT PRODUCT LIST (7 Aug 2026 — PRA universal redesign port, owner
+                     approved via video note: "cards naye apply nahi hue... update karo") ═══
+                     Big image cards replaced by dense 2-column text rows: tiny thumb (only when a
+                     real image exists), name + badges, price, cart-qty badge, + button. Same
+                     handleProductClick / gridFocus / stock-out semantics — calcGridCols reads the
+                     rendered grid so arrow-key navigation adapts automatically. Class names
+                     .prod-card / .price-badge / .cart-qty-badge / .quick-add / .stock-out kept
+                     (CSS + tests rely on them). No gridEditMode (PRA-only per-user grid prefs). --}}
                 <template x-if="!loading">
-                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                         <template x-for="(item, idx) in displayItems" :key="item.id + '-' + item.type">
-                            <div :id="'grid-item-' + idx" class="prod-card bg-white dark:bg-gray-900 rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-800 shadow-sm fade-in" :class="[gridFocusMode && gridFocusIndex === idx ? 'ring-2 ring-blue-500 shadow-blue-200 dark:shadow-blue-900' : '', item.stockStatus === 'out' && blockOutOfStock ? 'stock-out' : (item.stockStatus === 'out' && !blockOutOfStock ? 'stock-out allow-add' : '')]" @click="handleProductClick(item)">
-                                {{-- IMAGE CARD: only render the big image area when a real uploaded image exists. --}}
+                            <div :id="'grid-item-' + idx" class="prod-card flex items-center gap-2.5 px-2.5 py-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm fade-in cursor-pointer hover:border-blue-300 dark:hover:border-blue-700 transition" :class="[gridFocusMode && gridFocusIndex === idx ? 'ring-2 ring-blue-500' : '', item.stockStatus === 'out' && blockOutOfStock ? 'stock-out' : (item.stockStatus === 'out' && !blockOutOfStock ? 'stock-out allow-add' : '')]" @click="handleProductClick(item)">
                                 <template x-if="item.image">
-                                    <div class="relative aspect-[4/3] bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-900 flex items-center justify-center overflow-hidden">
-                                        <img :src="item.image" :alt="item.name" class="w-full h-full object-cover" loading="lazy" onerror="this.style.display='none';">
-                                        @if($company->inventory_enabled)
-                                        <div class="absolute top-1.5 left-1.5 flex flex-col gap-1">
-                                            <template x-if="item.stockStatus === 'low'"><span class="stock-dot stock-low" title="{{ __('pos.ti_low_stock') }}"></span></template>
-                                            <template x-if="item.stockStatus === 'out'"><span class="px-1.5 py-0.5 bg-red-500/90 text-white text-[8px] font-bold rounded-md">OUT</span></template>
-                                        </div>
-                                        @endif
-                                        <div class="absolute top-1.5 right-1.5 flex flex-col gap-1">
-                                            @if($company->inventory_enabled)
-                                            <template x-if="item.hasRecipe"><span class="px-1.5 py-0.5 bg-orange-500/90 text-white text-[8px] font-bold rounded-md flex items-center gap-0.5"><span class="text-[9px]">&#x1F373;</span> {{ __('pos.recipe') }}</span></template>
-                                            @endif
-                                            <template x-if="item.is_tax_exempt"><span class="px-1.5 py-0.5 bg-green-500/90 text-white text-[8px] font-bold rounded-md">NO TAX</span></template>
-                                        </div>
-                                        <button @click.stop="handleProductClick(item)" class="quick-add absolute bottom-2 right-2 w-9 h-9 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-sm flex items-center justify-center transition-all">
-                                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-                                        </button>
-                                    </div>
+                                    <img :src="item.image" :alt="item.name" class="w-9 h-9 rounded-lg object-cover flex-shrink-0" loading="lazy" onerror="this.style.display='none';">
                                 </template>
-                                {{-- TEXT-ONLY ROW: when no image, render a compact name+price list row — no placeholder, no letter badge. --}}
-                                <template x-if="!item.image">
-                                    <div class="relative flex items-center justify-end gap-1 px-3 pt-2.5 min-h-[26px]">
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-1.5 min-w-0">
+                                        <p class="text-sm font-bold text-gray-900 dark:text-white truncate leading-tight" x-text="item.name"></p>
                                         @if($company->inventory_enabled)
-                                        <template x-if="item.stockStatus === 'low'"><span class="stock-dot stock-low" title="{{ __('pos.ti_low_stock') }}"></span></template>
-                                        <template x-if="item.stockStatus === 'out'"><span class="px-1.5 py-0.5 bg-red-500/90 text-white text-[8px] font-bold rounded-md">OUT</span></template>
-                                        <template x-if="item.hasRecipe"><span class="px-1.5 py-0.5 bg-orange-500/90 text-white text-[8px] font-bold rounded-md flex items-center gap-0.5"><span class="text-[9px]">&#x1F373;</span> {{ __('pos.recipe') }}</span></template>
+                                        <template x-if="item.stockStatus === 'low'"><span class="stock-dot stock-low flex-shrink-0" title="{{ __('pos.ti_low_stock') }}"></span></template>
+                                        <template x-if="item.stockStatus === 'out'"><span class="px-1.5 py-0.5 bg-red-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">OUT</span></template>
+                                        <template x-if="item.hasRecipe"><span class="text-[10px] flex-shrink-0" title="Recipe">&#x1F373;</span></template>
                                         @endif
-                                        <template x-if="item.is_tax_exempt"><span class="px-1.5 py-0.5 bg-green-500/90 text-white text-[8px] font-bold rounded-md">NO TAX</span></template>
-                                    </div>
-                                </template>
-                                <div class="px-3 py-2.5">
-                                    <p class="font-bold text-gray-900 dark:text-white truncate leading-tight" :class="item.image ? 'text-xs' : 'text-sm'" x-text="item.name"></p>
-                                    <div class="flex items-center justify-between mt-1.5 gap-2">
-                                        <span class="price-badge text-sm font-extrabold text-blue-600 dark:text-blue-400" x-text="'Rs. ' + Number(item.price).toLocaleString()"></span>
-                                        <div class="flex items-center gap-2">
-                                            <template x-if="getCartQty(item) > 0">
-                                                <span class="cart-qty-badge text-[10px] bg-gradient-to-br from-blue-500 to-blue-700 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold shadow-sm" x-text="getCartQty(item)"></span>
-                                            </template>
-                                            {{-- Inline + button for the no-image text row (image cards already have the floating quick-add). --}}
-                                            <template x-if="!item.image">
-                                                <button @click.stop="handleProductClick(item)" class="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-sm transition-all">
-                                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-                                                </button>
-                                            </template>
-                                        </div>
+                                        <template x-if="item.is_tax_exempt"><span class="px-1.5 py-0.5 bg-green-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">NO TAX</span></template>
                                     </div>
                                 </div>
+                                <span class="price-badge text-sm font-extrabold text-blue-600 dark:text-blue-400 flex-shrink-0" x-text="'Rs. ' + Number(item.price).toLocaleString()"></span>
+                                <template x-if="getCartQty(item) > 0">
+                                    <span class="cart-qty-badge text-[10px] bg-gradient-to-br from-blue-500 to-blue-700 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold shadow-sm flex-shrink-0" x-text="getCartQty(item)"></span>
+                                </template>
+                                <button @click.stop="handleProductClick(item)" class="quick-add w-7 h-7 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-sm transition-all flex-shrink-0">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                                </button>
                             </div>
                         </template>
                     </div>
@@ -1185,24 +1171,30 @@ window.addEventListener('popstate', function() {
             </div>{{-- closes .tn-cart-main --}}
 
             <div class="tn-cart-side border-t border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-sm">
-                <div class="px-3 py-1.5">
-                    <textarea x-model="kitchenNotes" x-ref="orderNotesInput" rows="1"
+                {{-- 7 Aug 2026 — PRA universal redesign port (owner video note): always-open
+                     notes textarea + inline discount strip replaced by one slim Note/Discount
+                     chip row; both panels collapsible. kitchenNotes model unchanged. --}}
+                <div class="px-3 py-1 flex items-center justify-end gap-1.5">
+                    <button @click="showCartNote = !showCartNote; if (showCartNote) $nextTick(() => { const el = $refs.orderNotesInput; if (el) el.focus(); })" class="shrink-0 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="(kitchenNotes || '').length > 0 ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:bg-gray-200'">
+                        <span x-text="(kitchenNotes || '').length > 0 ? '\u270E Note \u2713' : '\u270E Note'"></span>
+                    </button>
+                    <button @click="showDiscount = !showDiscount" class="shrink-0 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="discountAmount > 0 ? 'bg-orange-100 dark:bg-orange-900/20 text-orange-600 border-orange-200 dark:border-orange-800' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:bg-gray-200'">
+                        <span x-text="discountAmount > 0 ? window.TXT.discount_minus_rs + Number(discountAmount).toLocaleString() : window.TXT.plus_discount"></span>
+                    </button>
+                    <span class="text-[8px] text-gray-400" x-text="window.TXT.limit_colon + effectiveDiscountLimit + '%'"></span>
+                    <button x-show="!managerOverrideActive && hasManagerPin && posRole !== 'pos_admin'" @click="requestManagerOverride()" class="text-[8px] font-bold text-blue-600 hover:text-blue-800 px-1">{{ __('pos.override') }}</button>
+                    <span x-show="managerOverrideActive" class="text-[8px] font-bold text-green-600 px-1">{{ __('pos.unlocked') }}</span>
+                </div>
+                <div class="px-3 pb-1.5" x-show="showCartNote" x-transition x-cloak>
+                    <textarea x-model="kitchenNotes" x-ref="orderNotesInput" rows="2"
                         autocomplete="off" name="pos_order_notes_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                         @keydown.enter.prevent.stop="$event.target.blur()"
-                        @keydown.escape.prevent.stop="$event.target.blur()"
+                        @keydown.escape.prevent.stop="showCartNote = false"
                         placeholder="{{ __('pos.ph_order_notes_n') }}"
-                        class="w-full text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-purple-500 focus:border-purple-500 resize-none placeholder-gray-400"></textarea>
+                        class="w-full text-xs bg-amber-50/60 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-lg px-2.5 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-amber-400 focus:border-amber-400 resize-y placeholder-gray-400"></textarea>
                 </div>
-                <div class="px-3 py-1.5">
-                    <div class="flex items-center gap-1.5">
-                        <button @click="showDiscount = !showDiscount" class="text-[10px] font-semibold px-2 py-0.5 rounded-lg transition" :class="discountAmount > 0 ? 'bg-orange-100 dark:bg-orange-900/20 text-orange-600' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200'">
-                            <span x-text="discountAmount > 0 ? window.TXT.discount_minus_rs + Number(discountAmount).toLocaleString() : window.TXT.plus_discount"></span>
-                        </button>
-                        <span class="text-[8px] text-gray-400" x-text="window.TXT.limit_colon + effectiveDiscountLimit + '%'"></span>
-                        <button x-show="!managerOverrideActive && hasManagerPin && posRole !== 'pos_admin'" @click="requestManagerOverride()" class="text-[8px] font-bold text-blue-600 hover:text-blue-800 px-1">{{ __('pos.override') }}</button>
-                        <span x-show="managerOverrideActive" class="text-[8px] font-bold text-green-600 px-1">{{ __('pos.unlocked') }}</span>
-                    </div>
-                    <div x-show="showDiscount" x-transition class="mt-1.5 p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl space-y-1.5">
+                <div class="px-3 pb-1.5">
+                    <div x-show="showDiscount" x-transition class="p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl space-y-1.5">
                         <div class="flex gap-1">
                             <button @click="discountType = 'percentage'" class="flex-1 text-[10px] font-bold py-1 rounded-lg transition" :class="discountType === 'percentage' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-500'">%</button>
                             <button @click="discountType = 'amount'" class="flex-1 text-[10px] font-bold py-1 rounded-lg transition" :class="discountType === 'amount' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-500'">Rs.</button>
@@ -1223,34 +1215,60 @@ window.addEventListener('popstate', function() {
                         </div>
                     </div>
                 </div>
-                <div class="px-3 py-2 space-y-1">
-                    <div class="flex justify-between text-xs text-gray-500"><span>{{ __('pos.subtotal') }}</span><span x-text="'Rs. ' + Number(subtotal).toLocaleString()"></span></div>
-                    <div x-show="itemDiscountsTotal > 0" class="flex justify-between text-xs text-orange-500">
-                        <span>{{ __('pos.item_discounts') }}</span>
-                        <span x-text="'-Rs. ' + Number(itemDiscountsTotal).toLocaleString()"></span>
+                {{-- 7 Aug 2026 PRA redesign port: BADA TOTAL BAND — solid brand band (bg-blue-900;
+                     the FBR theme engine remaps blue-* per company theme), big white total,
+                     items·qty pill. All original rows kept. FBR = per-item tax (method-independent),
+                     so no cash/card method hint — the band total IS the charge for either button. --}}
+                <div class="tn-total-band px-3 py-2 bg-blue-900">
+                    <div class="flex items-end justify-between gap-2">
+                        <div class="min-w-0 space-y-0.5 text-[11px] leading-tight text-white/75">
+                            <div class="flex gap-2"><span>{{ __('pos.subtotal') }}</span><span x-text="'Rs. ' + Number(subtotal).toLocaleString()"></span></div>
+                            <div x-show="itemDiscountsTotal > 0" class="flex gap-2 text-orange-300">
+                                <span>{{ __('pos.item_discounts') }}</span>
+                                <span x-text="'-Rs. ' + Number(itemDiscountsTotal).toLocaleString()"></span>
+                            </div>
+                            <div x-show="discountAmount > 0" class="flex gap-2 text-orange-300">
+                                <span x-text="discountType === 'percentage' ? window.TXT.order_discount_paren + discountValue + '%)' : 'Order Discount'"></span>
+                                <span x-text="'-Rs. ' + Number(discountAmount).toLocaleString()"></span>
+                            </div>
+                            <div x-show="exemptAmount > 0" class="flex gap-2 text-green-300"><span>{{ __('pos.tax_exempt') }}</span><span x-text="'-Rs. ' + Number(exemptAmount).toLocaleString()"></span></div>
+                            <div class="flex gap-2"><span x-text="window.TXT.tax_paren + taxRate + '%)'"></span><span x-text="'Rs. ' + Number(taxAmount).toLocaleString()"></span></div>
+                            <div x-show="Math.abs(roundOff) > 0.001" class="flex gap-2 text-white/60">
+                                <span>{{ __('pos.round_off') }}</span>
+                                <span x-text="(roundOff >= 0 ? '+ Rs. ' : '− Rs. ') + Math.abs(roundOff).toFixed(2)"></span>
+                            </div>
+                            <div class="pt-0.5">
+                                <span class="inline-flex items-center rounded-full bg-white/15 px-2 py-0.5 text-[9px] font-bold text-white" x-text="cart.length + window.TXT.sfx_items_mid + Number(cartQtyCount.toFixed(2)).toLocaleString() + window.TXT.sfx_qty"></span>
+                            </div>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <div class="text-[9px] font-bold tracking-widest text-white/60 uppercase">{{ __('pos.total_word') }}</div>
+                            <div class="total-animate total-line text-3xl font-black text-white leading-none" x-text="'Rs. ' + Number(roundedTotal).toLocaleString()" :class="cartAnimating ? 'cart-pop' : ''"></div>
+                        </div>
                     </div>
-                    <div x-show="discountAmount > 0" class="flex justify-between text-xs text-orange-600 dark:text-orange-400">
-                        <span x-text="discountType === 'percentage' ? window.TXT.order_discount_paren + discountValue + '%)' : 'Order Discount'"></span>
-                        <span x-text="'-Rs. ' + Number(discountAmount).toLocaleString()"></span>
-                    </div>
-                    <div x-show="exemptAmount > 0" class="flex justify-between text-xs text-green-600 dark:text-green-400"><span>{{ __('pos.tax_exempt') }}</span><span x-text="'-Rs. ' + Number(exemptAmount).toLocaleString()"></span></div>
-                    <div class="flex justify-between text-xs text-gray-500"><span x-text="window.TXT.tax_paren + taxRate + '%)'"></span><span x-text="'Rs. ' + Number(taxAmount).toLocaleString()"></span></div>
-                    <div x-show="Math.abs(roundOff) > 0.001" class="flex justify-between text-xs text-purple-500 dark:text-purple-400">
-                        <span>{{ __('pos.round_off') }}</span>
-                        <span x-text="(roundOff >= 0 ? '+ Rs. ' : '− Rs. ') + Math.abs(roundOff).toFixed(2)"></span>
-                    </div>
-                    <div class="flex items-baseline justify-between pt-2 mt-1 border-t tn-hairline">
-                        <span class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ __('pos.total_word') }}</span>
-                        <span class="total-animate total-line text-2xl font-black text-gray-900 dark:text-white" x-text="'Rs. ' + Number(roundedTotal).toLocaleString()" :class="cartAnimating ? 'cart-pop' : ''" :style="roundedTotal > 0 ? 'color: #059669' : ''"></span>
-                    </div>
-                    <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] text-gray-400 pt-0.5">
+                    <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] text-white/50 pt-1">
                         <span>{{ __('pos.est_cost') }}</span><span x-text="'Rs. ' + r2(getCartCost()).toLocaleString()"></span>
                     </div>
-                    <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] font-semibold" :class="(totalAmount - getCartCost()) >= 0 ? 'text-green-600' : 'text-red-500'">
+                    <div x-show="posRole === 'pos_admin' && getCartCost() > 0" class="flex justify-between text-[10px] font-semibold" :class="(totalAmount - getCartCost()) >= 0 ? 'text-green-300' : 'text-red-300'">
                         <span>{{ __('pos.est_profit') }}</span><span x-text="'Rs. ' + r2(totalAmount - getCartCost()).toLocaleString()"></span>
                     </div>
                 </div>
-                <div class="px-3 pb-3 space-y-2 mobile-sticky-pay">
+                <div class="px-3 pb-3 pt-2 space-y-2 mobile-sticky-pay">
+                    {{-- ONE-TAP method buttons (PRA parity, 7 Aug 2026): CASH/CARD finalize
+                         DIRECTLY with that method — same guards + sequence as the existing
+                         Alt+1/Alt+2 keyboard shortcut handler. FBR tax is per-item, so the
+                         charge equals the band total for either method. PAY (F8) keeps the
+                         modal (method choice + buyer NTN etc.). --}}
+                    <div class="grid grid-cols-2 gap-2">
+                        <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 0; processPayment('cash')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
+                            <span class="flex items-center gap-1.5 text-xs font-extrabold leading-none"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>CASH</span>
+                            <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(roundedTotal).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+1</kbd></span>
+                        </button>
+                        <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 1; processPayment('card')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-gray-700 hover:bg-gray-800 dark:bg-gray-600 dark:hover:bg-gray-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
+                            <span class="flex items-center gap-1.5 text-xs font-extrabold leading-none"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>CARD</span>
+                            <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(roundedTotal).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+2</kbd></span>
+                        </button>
+                    </div>
                     <div class="grid grid-cols-3 gap-2">
                         <button @click="if(cart.length && confirm(window.TXT.clear_entire_cart)) { clearCart(); }" :disabled="cart.length === 0" class="py-2 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-30 transition flex items-center justify-center gap-0.5">{{ __('pos.clear') }} <kbd class="text-[8px] bg-red-200/50 dark:bg-red-800/30 px-1 rounded font-mono">F4</kbd></button>
                         <button @click="holdOrder()" :disabled="cart.length === 0 || submitting || hasManualItems()" :title="hasManualItems() ? window.TXT.ti_manual_pay_first : ''" class="py-2 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-30 disabled:cursor-not-allowed transition flex items-center justify-center gap-1">
@@ -1263,21 +1281,23 @@ window.addEventListener('popstate', function() {
                             <span x-show="heldOrders.length > 0" class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center held-badge-pulse shadow-sm" x-text="heldOrders.length"></span>
                         </button>
                     </div>
-                    <!-- ─── SAVE PROVISIONAL — separate from Pay (no modal, no payment) ─── -->
-                    <button @click="saveProvisionalDirect()" :disabled="cart.length === 0 || submitting" class="w-full py-2.5 mb-2 rounded-xl text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-30 shadow-sm transition flex items-center justify-center gap-2">
-                        <svg x-show="!submitting" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
-                        <svg x-show="submitting" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                        <span>{{ __('pos.save_provisional') }}</span>
-                        <kbd class="text-[9px] bg-amber-700/40 px-1.5 py-0.5 rounded font-mono">F9</kbd>
-                    </button>
-                    <button @click="showPayModal = true" :disabled="cart.length === 0 || submitting" class="pay-btn-premium btn-ripple w-full py-4 rounded-2xl text-base font-extrabold text-white disabled:opacity-30">
-                        <span class="flex items-center justify-center gap-2">
-                            <svg x-show="submitting" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                            <svg x-show="!submitting" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                            {{ __('pos.pay_rs') }} <span x-text="Number(roundedTotal).toLocaleString()"></span>
-                            <kbd x-show="!submitting" class="text-[9px] bg-green-500/30 px-1.5 rounded font-mono">F8</kbd>
-                        </span>
-                    </button>
+                    <!-- ─── SAVE PROVISIONAL + PAY on ONE line (PRA redesign port) ─── -->
+                    <div class="grid grid-cols-5 gap-2">
+                        <button @click="saveProvisionalDirect()" :disabled="cart.length === 0 || submitting" class="col-span-2 py-3 rounded-xl text-xs font-bold text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-30 shadow-sm transition flex items-center justify-center gap-1.5">
+                            <svg x-show="!submitting" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                            <svg x-show="submitting" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                            <span>{{ __('pos.save_provisional') }}</span>
+                            <kbd class="text-[8px] bg-amber-700/40 px-1 py-0.5 rounded font-mono">F9</kbd>
+                        </button>
+                        <button @click="showPayModal = true" :disabled="cart.length === 0 || submitting" class="pay-btn-premium btn-ripple col-span-3 py-3 rounded-xl text-sm font-extrabold text-white disabled:opacity-30">
+                            <span class="flex items-center justify-center gap-1.5">
+                                <svg x-show="submitting" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                                <svg x-show="!submitting" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                                {{ __('pos.pay_rs') }} <span x-text="Number(roundedTotal).toLocaleString()"></span>
+                                <kbd x-show="!submitting" class="text-[9px] bg-green-500/30 px-1.5 rounded font-mono">F8</kbd>
+                            </span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2696,6 +2716,7 @@ function restaurantPos() {
         lastHoldTime: 0,
         lastPayTime: 0,
         showDiscount: false,
+        showCartNote: false,
         discountType: 'percentage',
         discountValue: 0,
         discountAmount: 0,
@@ -2713,6 +2734,8 @@ function restaurantPos() {
 
         r2(v) { return Math.round((v + Number.EPSILON) * 100) / 100; },
         _safeQty(q) { const n = Number(q); return Number.isFinite(n) && n > 0 ? n : 1; },
+        // Total cart quantity for the items·qty pill in the total band (PRA redesign port).
+        get cartQtyCount() { return this.cart.reduce((s, i) => s + this._safeQty(i.quantity), 0); },
         // Retail Core (Aug 2026): weight/measure units sell in fractions (0.5 KG,
         // 1.25 LTR, 2.5 MTR) — min qty 0.001 for these; count units stay min 1.
         _isFractionalUom(item) { return ['KG','GM','LTR','ML','MTR','SQM','FT','IN','YDS'].includes(String(item?.uom || '').toUpperCase()); },
@@ -3988,6 +4011,7 @@ function restaurantPos() {
                 if (shouldFocus) {
                     e.preventDefault();
                     e.stopPropagation();
+                    this.showCartNote = true; // note panel is collapsible since the Aug 2026 redesign port
                     this.$nextTick(() => {
                         const el = this.$refs.orderNotesInput;
                         if (el) {

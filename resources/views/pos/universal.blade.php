@@ -1,9 +1,10 @@
 <x-pos-layout>
-{{-- DIVERGENCE NOTE (24 Jul 2026): sale-screen redesign applied HERE only —
-     nav sale-tools teleport, compact grid rows, Akhri Bills strip, notes+discount
-     one-row, bada total band, one-tap CASH/CARD (Alt+1/2). The FBR universal port
-     (fbr-pos/universal.blade.php) is intentionally FROZEN on the pre-redesign
-     layout until the owner approves porting — diff against it accordingly. --}}
+{{-- DIVERGENCE NOTE (updated 7 Aug 2026): the 24 Jul sale-screen redesign (nav
+     sale-tools teleport, compact grid rows, Akhri Bills strip, notes+discount
+     one-row, bada total band, one-tap CASH/CARD Alt+1/2) is now ALSO ported to
+     the FBR universal (fbr-pos/universal.blade.php) — owner approved via video
+     note. Keep the two footers/grids in sync going forward (FBR = blue chrome,
+     per-item tax, no method hint, no gridEditMode). --}}
 @php
     $isSaaf = ($company->pos_dashboard_style ?? 'default') === 'saaf';
 @endphp

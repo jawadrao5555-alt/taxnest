@@ -249,6 +249,9 @@
                             <span class="block text-base font-black" x-text="'T-' + t.table_number"></span>
                             <span class="block text-[10px] font-bold mt-0.5" x-text="t.floor + ' · ' + t.seats + {{ Js::from(__('pos.sfx_seats')) }}"></span>
                             <span class="block text-[10px] font-bold uppercase mt-0.5" x-text="t.status"></span>
+                            {{-- Occupied timer (owner, 7 Aug 2026) — desktop picker
+                                 parity: kitni der se table chal raha hai. --}}
+                            <span x-show="t.status === 'occupied' && elapsedSince(t.occupied_since)" class="block text-[10px] font-bold mt-0.5 text-red-500 dark:text-red-300" x-text="'⏱ ' + elapsedSince(t.occupied_since)"></span>
                             <span x-show="t.status === 'occupied' && t.order_id" class="block text-[10px] font-black uppercase mt-1 px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300">{{ __('pos.shift_word') }} ⇄</span>
                         </button>
                     </template>
@@ -459,6 +462,8 @@ function waiterApp() {
         // kar ke naya deploy pakarte hain.
         appVersion: @json($appVersion ?? 'unknown'),
         updateAvailable: false,
+        // Occupied-timer tick (7 Aug 2026): elapsedSince() labels refresh live.
+        nowTick: Date.now(),
 
         init() {
             this.categories = [...new Set(this.products.map(p => p.category))].sort();
@@ -466,6 +471,8 @@ function waiterApp() {
             this.initDayCashier();
             this.loadMyOrders();
             setInterval(() => { if (!document.hidden) this.loadMyOrders(); }, 30000);
+            // Occupied-timer tick (7 Aug 2026): 30s refresh for elapsedSince labels.
+            setInterval(() => { this.nowTick = Date.now(); }, 30000);
             // Version check: every 2 min + whenever the phone comes back to the tab.
             setInterval(() => this.checkVersion(), 120000);
             document.addEventListener('visibilitychange', () => { if (!document.hidden) this.checkVersion(); });
@@ -644,6 +651,17 @@ function waiterApp() {
             return Math.round(taxable * this.cashTaxRate / 100);
         },
 
+        // Elapsed label since a timestamp — "3m" / "1h 20m" / "just now".
+        // (Universal sale-screen picker parity; reads nowTick for live refresh.)
+        elapsedSince(ts) {
+            if (!ts) return '';
+            const ms = this.nowTick - new Date(ts).getTime();
+            if (isNaN(ms) || ms < 0) return '';
+            const mins = Math.floor(ms / 60000);
+            if (mins < 1) return 'just now';
+            const h = Math.floor(mins / 60), m = mins % 60;
+            return h > 0 ? (h + 'h ' + m + 'm') : (m + 'm');
+        },
         async openTables() {
             this.showTables = true;
             this.tablesLoading = true;

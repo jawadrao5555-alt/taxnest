@@ -170,6 +170,10 @@ class RestaurantWaiterController extends Controller
                 // (held + preparing + ready) — shiftFreeTables() on the waiter
                 // tablet uses this to gate which tables are shift targets.
                 'active_orders' => $t->activeOrders->count(),
+                // Occupied timer on the waiter table-picker (owner, 7 Aug 2026):
+                // desktop picker shows "Occupied • 22h 42m" — waiter/mobile needs
+                // the same so staff know how long a table/order has been running.
+                'occupied_since' => $t->occupied_since,
                 // Table Shift from picker (Aug 2026): the shiftable order = a HELD
                 // one (shiftTable rejects preparing/ready). No held order → tile
                 // stays un-tappable instead of advertising a shift that would fail.

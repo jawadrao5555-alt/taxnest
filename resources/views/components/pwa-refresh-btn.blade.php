@@ -95,6 +95,10 @@ Variants: dark (white-on-dark, default) | light (slate-on-light, for white heade
         busy = true;
         btn.classList.add('tn-spinning');
 
+        // Remember whether the badge promised an update BEFORE we touch state —
+        // decides the stale-badge fallback below (owner report, 7 Aug 2026).
+        const hadBadge = updateAvailable;
+
         const reg = await navigator.serviceWorker.getRegistration().catch(()=>null);
 
         if (updateAvailable && reg && reg.waiting) {
@@ -117,6 +121,14 @@ Variants: dark (white-on-dark, default) | light (slate-on-light, for white heade
                     } else {
                         location.reload();
                     }
+                } else if (hadBadge) {
+                    // Badge said "update available" but no waiting SW exists
+                    // (stale flag — e.g. another tab already applied it, or the
+                    // worker activated silently). The user clicked EXPECTING a
+                    // refresh; pressing again would do nothing forever (owner
+                    // hit this: pressed 2-3x, "refresh nahi hua"). Give a real
+                    // reload so the fresh version actually shows.
+                    location.reload();
                 } else {
                     // No new version — sync stale state, show success flash
                     clearUpdate();

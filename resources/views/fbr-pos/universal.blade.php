@@ -5402,9 +5402,13 @@ function restaurantPos() {
             if (bill._retrying) return;
             bill._retrying = true;
             try {
+                // manual:true signals the server this is a human-initiated retry:
+                //  - resets fbr_auto_retry_count to 0 (no cap check)
+                //  - counter does NOT increment on failure for this call
                 const res = await fetch('{{ url('/fbr-pos/api/failed-bills') }}/' + bill.id + '/retry', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ manual: true }),
                 });
                 const data = await res.json();
                 if (data && data.success) {

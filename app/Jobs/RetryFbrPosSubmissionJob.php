@@ -11,6 +11,18 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Manual-dispatch retry job for a single FBR POS bill.
+ *
+ * Dispatched ONLY from explicit manual triggers (failQueueRetryOne,
+ * failQueueRetryAll). Each dispatch = one "manual attempt": resets the
+ * fbr_auto_retry_count to 0 at the start of handle() so the bill re-enters
+ * the automated scheduler pool after this batch of up to $tries queue-retries.
+ *
+ * Queue retries (up to $tries=3 via Laravel's backoff) each increment
+ * fbr_auto_retry_count on failure — they are automated attempts that count
+ * toward the cap. A successful submission or a fresh manual dispatch resets it.
+ */
 class RetryFbrPosSubmissionJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
@@ -42,16 +54,35 @@ class RetryFbrPosSubmissionJob implements ShouldQueue
             return;
         }
 
+        // config_error = permanent config failure (POSID / token missing).
+        // Even a manual dispatch can't fix it — admin must update FBR Settings first.
+        // The Fail Queue shows these bills with a "Fix Settings" prompt.
+        if ($transaction->fbr_status === 'config_error') {
+            Log::info("RetryFbrPosSubmissionJob: Transaction #{$this->transactionId} is config_error (POSID/token missing), skip — fix FBR Settings first");
+            return;
+        }
+
+        // Manual dispatch = explicit human action → reset the automated retry counter
+        // so this bill re-enters the scheduler pool after this job completes.
+        // Only reset on attempt #1 (not on queue-backoff retries of the same job).
+        $attempt = $this->attempts();
+        if ($attempt === 1) {
+            FbrPosTransaction::where('id', $this->transactionId)
+                ->update(['fbr_auto_retry_count' => 0]);
+        }
+
         $transaction->fbr_submission_hash = null;
         $transaction->save();
 
-        $attempt = $this->attempts();
         Log::info("RetryFbrPosSubmissionJob: Transaction #{$this->transactionId} attempt {$attempt}/{$this->tries}");
 
         $fbr = new FbrService();
         $result = $fbr->submitFbrPosTransaction($transaction);
 
         if (($result['status'] ?? null) === 'success') {
+            // Reset counter on success — the bill is done.
+            FbrPosTransaction::where('id', $this->transactionId)
+                ->update(['fbr_auto_retry_count' => 0]);
             Log::info("RetryFbrPosSubmissionJob: Transaction #{$this->transactionId} submitted successfully on attempt {$attempt}");
 
             try {
@@ -79,8 +110,20 @@ class RetryFbrPosSubmissionJob implements ShouldQueue
             return;
         }
 
+        // config_error set by FbrService (POSID/token missing) — this handles the
+        // edge case where config was missing at job run time even though status
+        // wasn't config_error before. Don't increment counter; status already terminal.
+        if (($result['status'] ?? null) === 'config_error') {
+            Log::info("RetryFbrPosSubmissionJob: Transaction #{$this->transactionId} hit config_error during submit (POSID/token still missing)");
+            return;
+        }
+
         $errors = implode('; ', $result['errors'] ?? ['Unknown error']);
         Log::warning("RetryFbrPosSubmissionJob: Transaction #{$this->transactionId} failed on attempt {$attempt}: {$errors}");
+
+        // Queue-retry attempts count as automated failures → increment persistent counter.
+        FbrPosTransaction::where('id', $this->transactionId)
+            ->increment('fbr_auto_retry_count');
 
         if ($attempt >= $this->tries) {
             try {
@@ -88,7 +131,7 @@ class RetryFbrPosSubmissionJob implements ShouldQueue
                 $svc->sendToCompany(
                     $transaction->company_id,
                     'FBR Auto-Retry Exhausted',
-                    "Invoice {$transaction->invoice_number} could not be submitted after 3 attempts. Manual retry required.",
+                    "Invoice {$transaction->invoice_number} could not be submitted after {$this->tries} attempts. Manual retry required.",
                     ['url' => route('fbrpos.failQueue')],
                     'fbrpos' // scope: FBR POS subscribers only — never POS/DI devices
                 );

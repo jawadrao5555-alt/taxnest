@@ -97,6 +97,8 @@ class FbrPosDayCloseAutoFinalizeTest extends TestCase
             $table->string('payment_method')->nullable();
             $table->decimal('cash_received', 12, 2)->nullable();
             $table->decimal('change_due', 12, 2)->nullable();
+            // Persistent automated-retry counter (added Aug 2026).
+            $table->unsignedTinyInteger('fbr_auto_retry_count')->default(0);
             $table->timestamps();
         });
 

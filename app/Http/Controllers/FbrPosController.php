@@ -3598,10 +3598,49 @@ class FbrPosController extends Controller
      * 🔄 Auto-sync API — retry a single failed FBR POS bill via JSON.
      * Race-safe atomic claim prevents duplicate FBR submissions on
      * double-click / concurrent poller / queued RetryFbrPosSubmissionJob.
+     *
+     * Accepts an optional JSON body flag: { "manual": true }
+     *  - manual=true  → explicit user action (F11 panel Retry button):
+     *      resets fbr_auto_retry_count to 0, no cap check.
+     *  - manual=false (default, auto-sync tick):
+     *      enforces SyncFbrPosOfflineInvoicesJob::MAX_AUTO_RETRY cap;
+     *      increments counter on failure.
      */
     public function apiRetryFailed(Request $request, $id)
     {
         $companyId = app('currentCompanyId');
+        $isManual  = (bool) $request->json('manual', false);
+        $maxRetry  = \App\Jobs\SyncFbrPosOfflineInvoicesJob::MAX_AUTO_RETRY;
+
+        // Auto-sync cap check: if the caller is the automated 30-second loop
+        // (manual=false) and this bill has already exhausted its retry budget,
+        // refuse immediately so the loop can never spin past the cap.
+        if (!$isManual) {
+            $capCheck = FbrPosTransaction::where('company_id', $companyId)
+                ->where('id', $id)
+                ->whereNull('fbr_invoice_number')
+                ->whereIn('fbr_status', ['failed', 'offline', 'pending'])
+                ->where(function ($q) {
+                    $q->whereNull('invoice_mode')->orWhere('invoice_mode', '!=', 'local');
+                })
+                ->first(['fbr_auto_retry_count', 'fbr_status']);
+
+            if ($capCheck && $capCheck->fbr_auto_retry_count >= $maxRetry) {
+                return response()->json([
+                    'success' => false,
+                    'retry_exhausted' => true,
+                    'message' => __('pos.retry_cap_reached'),
+                ], 429);
+            }
+        }
+
+        // Build the update payload for the atomic claim.
+        // Manual retry resets the counter; auto retry leaves it untouched here
+        // (incremented below on failure).
+        $claimUpdate = ['fbr_status' => 'pending', 'fbr_submission_hash' => null];
+        if ($isManual) {
+            $claimUpdate['fbr_auto_retry_count'] = 0;
+        }
 
         // Atomic claim: flip from failed/offline/pending/config_error → pending only if still
         // un-submitted. Conditional UPDATE returns affected-row count;
@@ -3609,14 +3648,21 @@ class FbrPosController extends Controller
         // config_error is included here to allow MANUAL retry after the admin fixes settings
         // (POSID / token). The auto-sync loop never picks up config_error bills (apiFailedBills
         // only returns IN ('failed','offline','pending')), so this path is manual-only.
-        $claimed = FbrPosTransaction::where('company_id', $companyId)
+        $claimQuery = FbrPosTransaction::where('company_id', $companyId)
             ->where('id', $id)
             ->whereNull('fbr_invoice_number')
             ->whereIn('fbr_status', ['failed', 'offline', 'pending', 'config_error'])
             ->where(function ($q) {
                 $q->whereNull('invoice_mode')->orWhere('invoice_mode', '!=', 'local');
-            })
-            ->update(['fbr_status' => 'pending', 'fbr_submission_hash' => null]);
+            });
+
+        // Auto-sync: also enforce cap in the atomic claim to close the race window
+        // between the cap check above and this UPDATE.
+        if (!$isManual) {
+            $claimQuery->where('fbr_auto_retry_count', '<', $maxRetry);
+        }
+
+        $claimed = $claimQuery->update($claimUpdate);
 
         if ($claimed === 0) {
             $tx = FbrPosTransaction::where('company_id', $companyId)->where('id', $id)->first();
@@ -3632,14 +3678,19 @@ class FbrPosController extends Controller
             if ($tx->invoice_mode === 'local') {
                 return response()->json(['success' => false, 'message' => __('pos.local_bill_not_submitted_design')], 422);
             }
+            // Could be cap-blocked (auto-sync raced with another tick).
+            if (!$isManual && $tx->fbr_auto_retry_count >= $maxRetry) {
+                return response()->json([
+                    'success' => false,
+                    'retry_exhausted' => true,
+                    'message' => __('pos.retry_cap_reached'),
+                ], 429);
+            }
             return response()->json([
                 'success' => false,
                 'message' => __('pos.cannot_retry_status_changed', ['status' => $tx->fbr_status]),
             ], 409);
         }
-
-
-
 
         $transaction = FbrPosTransaction::where('company_id', $companyId)
             ->where('id', $id)
@@ -3652,6 +3703,8 @@ class FbrPosController extends Controller
             $transaction->refresh();
 
             if (($result['status'] ?? '') === 'success') {
+                // Reset counter on success (belt-and-suspenders: FbrService may have already done it).
+                FbrPosTransaction::where('id', $id)->update(['fbr_auto_retry_count' => 0]);
                 return response()->json([
                     'success'   => true,
                     'submitted' => true,
@@ -3661,11 +3714,20 @@ class FbrPosController extends Controller
                 ]);
             }
 
+            // Automated call: increment counter on failure so the cap is enforced
+            // over time even if page refreshes reset the session-level 3-strike cap.
+            if (!$isManual) {
+                FbrPosTransaction::where('id', $id)->increment('fbr_auto_retry_count');
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => __('pos.fbr_retry_failed_errors', ['error' => implode(', ', $result['errors'] ?? [__('pos.unknown_error')])]),
             ], 422);
         } catch (\Throwable $e) {
+            if (!$isManual) {
+                FbrPosTransaction::where('id', $id)->increment('fbr_auto_retry_count');
+            }
             return response()->json([
                 'success' => false,
                 'message' => __('pos.exception_error', ['error' => $e->getMessage()]),

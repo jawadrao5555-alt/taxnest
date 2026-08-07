@@ -3968,9 +3968,16 @@ return [
     'th_days_present'           => 'دن',
     'th_total_duty'             => 'کُل ڈیوٹی',
     'payroll_generated_at'      => 'بنایا گیا',
-    'ti_waiter_style'   => 'اسکرین کا انداز — آپ کی اپنی پسند (دکان کی ترتیب نہیں بدلتی)',
-    'style_saaf_word'   => 'سادہ',
-    'style_full_word'   => 'مکمل',
+    'ti_waiter_style'        => 'اسکرین کا انداز — آپ کی اپنی پسند (دکان کی ترتیب نہیں بدلتی)',
+    'style_saaf_word'        => 'سادہ',
+    'style_full_word'        => 'مکمل',
+    'style_buttons_word'     => 'بٹن',
+    // Buttons style — waiter home screen (Task #340, Aug 2026)
+    'waiter_buttons_parcel'       => 'پارسل',
+    'waiter_buttons_new_parcel'   => '+ نیا پارسل آرڈر',
+    'waiter_buttons_free_note'    => 'کوئی میز ترتیب نہیں۔ آپ پھر بھی پارسل آرڈر لے سکتے ہیں۔',
+    'waiter_buttons_back'         => '← واپس',
+    'waiter_buttons_loading'      => 'میزیں لوڈ ہو رہی ہیں…',
 
     // DB-down friendly page (Aug 2026) — rendered when MySQL is unreachable
     'db_down_title' => 'سرور تھوڑی دیر کے لیے مصروف ہے',

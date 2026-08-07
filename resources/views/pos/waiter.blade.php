@@ -5,7 +5,7 @@
     // WAITER-ONLY: admins/managers previewing this tablet keep the company style.
     $waiterIsWaiterRole = (auth('pos')->user()->pos_role ?? null) === 'pos_waiter';
     $waiterOwnStyle = $waiterIsWaiterRole ? (auth('pos')->user()->pos_personal_style ?? null) : null;
-    $waiterEffStyle = in_array($waiterOwnStyle, ['default', 'saaf'], true)
+    $waiterEffStyle = in_array($waiterOwnStyle, ['default', 'saaf', 'buttons'], true)
         ? $waiterOwnStyle
         : (optional(\App\Models\Company::find(app('currentCompanyId')))->pos_dashboard_style ?? 'default');
 @endphp
@@ -32,12 +32,16 @@
                  dukan ki setting ko haath nahi lagta. Waiter-only (403 on server). --}}
             @if($waiterIsWaiterRole)
             <div class="flex items-center rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden" title="{{ __('pos.ti_waiter_style') }}">
+                <button type="button" @click="saveStyle('buttons')" :disabled="styleBusy"
+                        class="px-3 py-2 text-xs font-bold transition disabled:opacity-50 {{ $waiterEffStyle === 'buttons' ? 'bg-teal-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700' }}">
+                    {{ __('pos.style_buttons_word') }}
+                </button>
                 <button type="button" @click="saveStyle('saaf')" :disabled="styleBusy"
                         class="px-3 py-2 text-xs font-bold transition disabled:opacity-50 {{ $waiterEffStyle === 'saaf' ? 'bg-teal-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700' }}">
                     {{ __('pos.style_saaf_word') }}
                 </button>
                 <button type="button" @click="saveStyle('default')" :disabled="styleBusy"
-                        class="px-3 py-2 text-xs font-bold transition disabled:opacity-50 {{ $waiterEffStyle !== 'saaf' ? 'bg-teal-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700' }}">
+                        class="px-3 py-2 text-xs font-bold transition disabled:opacity-50 {{ $waiterEffStyle === 'default' ? 'bg-teal-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700' }}">
                     {{ __('pos.style_full_word') }}
                 </button>
             </div>
@@ -78,41 +82,113 @@
              punched ORDER shows on TOP, search/grid below — waiter had to scroll
              after every item; desktop stays picker-left / order-right) ──────── --}}
         <div class="lg:col-span-2 order-2 lg:order-1">
-            <input type="text" x-model="search" @input="filterProducts()"
-                   autocomplete="off" name="waiter_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
-                   placeholder="{{ __('pos.ph_search_items') }}"
-                   class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-base px-4 py-3 focus:ring-teal-500 focus:border-teal-500 mb-3">
-            <div class="flex gap-2 overflow-x-auto pb-2 mb-2" x-show="categories.length > 1">
-                <button @click="activeCategory = 'all'; filterProducts()" :class="activeCategory === 'all' ? 'bg-teal-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'" class="px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition">{{ __('pos.all_word') }}</button>
-                <template x-for="c in categories" :key="c">
-                    <button @click="activeCategory = c; filterProducts()" :class="activeCategory === c ? 'bg-teal-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'" class="px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition" x-text="c"></button>
-                </template>
-            </div>
-            {{-- PER-USER grid visibility (owner, 25 Jul 2026): waiter tarteeb apni
-                 tablet ke liye — edit mode mein tile tap = chhupao/dikhao. --}}
-            <div class="flex items-center gap-2 mb-2">
-                <button type="button" @click="gridEditMode = !gridEditMode; filterProducts()"
-                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition"
-                        :class="gridEditMode ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'">
-                    <svg x-show="!gridEditMode" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                    <svg x-show="gridEditMode" x-cloak class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                    <span x-text="gridEditMode ? {{ Js::from(__('pos.done_word')) }} : {{ Js::from(__('pos.grid_arrange')) }}"></span>
-                </button>
-                <button type="button" x-show="gridEditMode && hiddenPrefCount > 0" x-cloak @click="resetGridPrefs()" :disabled="gridPrefBusy"
-                        class="px-3 py-1.5 rounded-full text-xs font-bold border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 transition disabled:opacity-50">
-                    {{ __('pos.show_all_again') }}
-                </button>
-                <span x-show="gridEditMode" x-cloak class="text-[11px] font-semibold text-teal-700 dark:text-teal-300">{{ __('pos.tap_item_hide_show') }}</span>
-            </div>
-            <div class="tn-waiter-grid grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2.5 max-h-[60vh] overflow-y-auto pr-1">
-                <template x-for="p in filtered" :key="p.id">
-                    <button @click="gridEditMode ? toggleItemVisibility(p) : addToCart(p)" class="rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-teal-500 dark:hover:border-teal-500 p-3 text-left transition active:scale-95" :class="gridEditMode && !isItemVisible(p) ? 'opacity-40' : ''">
-                        <span class="block text-sm font-bold text-gray-800 dark:text-gray-100 leading-snug" x-text="p.name"></span>
-                        <span class="block mt-1 text-xs font-black text-teal-700 dark:text-teal-400" x-text="'Rs ' + p.price.toLocaleString()"></span>
-                        <span x-show="gridEditMode" x-cloak class="block mt-1 text-[10px] font-bold" :class="isItemVisible(p) ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'" x-text="isItemVisible(p) ? {{ Js::from(__('pos.visible_word')) }} : {{ Js::from(__('pos.hidden_word')) }}"></span>
+
+@if($waiterEffStyle === 'buttons')
+            {{-- ── BUTTONS HOME (Task #340, Aug 2026): big tap targets for each
+                 table + a Parcel button. Replaces the product grid on first load.
+                 Tables are fetched eagerly on init and polled every 30 s. ──── --}}
+            <div x-show="buttonsView && !appendOrderId" class="space-y-2.5">
+
+                {{-- Loading state --}}
+                <div x-show="tablesLoading && tables.length === 0" class="text-center py-10 text-sm text-gray-400">
+                    {{ __('pos.waiter_buttons_loading') }}
+                </div>
+
+                {{-- Occupied tables (running orders) — red, timer + count badge --}}
+                <template x-for="t in tablesOccupied()" :key="'bocc-' + t.id">
+                    <button @click="selectButtonTable(t)"
+                            class="w-full flex items-center justify-between rounded-2xl bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-700 px-5 py-4 text-left transition active:scale-[.98]">
+                        <span class="text-lg font-black text-red-700 dark:text-red-300"
+                              x-text="'{{ __('pos.table_t_prefix2') }}' + t.table_number + ' · ' + t.floor"></span>
+                        <span class="flex items-center gap-3">
+                            <span x-show="elapsedSince(t.occupied_since)"
+                                  class="text-sm font-bold text-red-400 dark:text-red-400"
+                                  x-text="'⏱ ' + elapsedSince(t.occupied_since)"></span>
+                            <span x-show="t.active_orders > 0"
+                                  class="min-w-[28px] h-7 px-2 rounded-full bg-red-600 text-white text-sm font-black flex items-center justify-center"
+                                  x-text="t.active_orders"></span>
+                        </span>
                     </button>
                 </template>
-                <div x-show="filtered.length === 0" class="col-span-full text-center py-8 text-sm text-gray-400">{{ __('pos.no_items_match') }}</div>
+
+                {{-- Free / reserved tables — green --}}
+                <template x-for="t in tablesAvailable()" :key="'bfree-' + t.id">
+                    <button @click="selectButtonTable(t)"
+                            class="w-full flex items-center justify-between rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-300 dark:border-emerald-700 px-5 py-4 text-left transition active:scale-[.98]">
+                        <span class="text-lg font-black text-emerald-700 dark:text-emerald-300"
+                              x-text="'{{ __('pos.table_t_prefix2') }}' + t.table_number + ' · ' + t.floor"></span>
+                        <span class="text-xs font-bold uppercase text-emerald-500 dark:text-emerald-400" x-text="t.status"></span>
+                    </button>
+                </template>
+
+                {{-- No tables note (shown once loading is done and list is empty) --}}
+                <p x-show="!tablesLoading && tables.length === 0"
+                   class="text-center text-sm text-gray-400 py-4">
+                    {{ __('pos.waiter_buttons_free_note') }}
+                </p>
+
+                {{-- Parcel button — amber, badge = my open takeaway/delivery orders --}}
+                <button @click="selectButtonParcel()"
+                        class="w-full flex items-center justify-between rounded-2xl bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-400 dark:border-amber-600 px-5 py-4 transition active:scale-[.98]">
+                    <span class="text-lg font-black text-amber-700 dark:text-amber-300">
+                        📦 {{ __('pos.waiter_buttons_parcel') }}
+                    </span>
+                    <span x-show="myOrders.filter(o => o.order_type !== 'dine_in').length > 0"
+                          class="min-w-[28px] h-7 px-2 rounded-full bg-amber-500 text-white text-sm font-black flex items-center justify-center"
+                          x-text="myOrders.filter(o => o.order_type !== 'dine_in').length"></span>
+                </button>
+            </div>
+
+            {{-- Back button (buttons mode — shown when grid is active, not in append) --}}
+            <div x-show="!buttonsView && !appendOrderId" x-cloak class="mb-3">
+                <button @click="buttonsView = true"
+                        class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-teal-400 transition">
+                    {{ __('pos.waiter_buttons_back') }}
+                </button>
+            </div>
+
+            {{-- Product grid — hidden until a table/parcel is chosen (or in append mode) --}}
+            <div x-show="!buttonsView || appendOrderId" x-cloak>
+@else
+            {{-- Non-buttons styles: product grid always visible --}}
+            <div>
+@endif
+                <input type="text" x-model="search" @input="filterProducts()"
+                       autocomplete="off" name="waiter_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                       placeholder="{{ __('pos.ph_search_items') }}"
+                       class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-base px-4 py-3 focus:ring-teal-500 focus:border-teal-500 mb-3">
+                <div class="flex gap-2 overflow-x-auto pb-2 mb-2" x-show="categories.length > 1">
+                    <button @click="activeCategory = 'all'; filterProducts()" :class="activeCategory === 'all' ? 'bg-teal-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'" class="px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition">{{ __('pos.all_word') }}</button>
+                    <template x-for="c in categories" :key="c">
+                        <button @click="activeCategory = c; filterProducts()" :class="activeCategory === c ? 'bg-teal-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'" class="px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition" x-text="c"></button>
+                    </template>
+                </div>
+                {{-- PER-USER grid visibility (owner, 25 Jul 2026): waiter tarteeb apni
+                     tablet ke liye — edit mode mein tile tap = chhupao/dikhao. --}}
+                <div class="flex items-center gap-2 mb-2">
+                    <button type="button" @click="gridEditMode = !gridEditMode; filterProducts()"
+                            class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition"
+                            :class="gridEditMode ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'">
+                        <svg x-show="!gridEditMode" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                        <svg x-show="gridEditMode" x-cloak class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        <span x-text="gridEditMode ? {{ Js::from(__('pos.done_word')) }} : {{ Js::from(__('pos.grid_arrange')) }}"></span>
+                    </button>
+                    <button type="button" x-show="gridEditMode && hiddenPrefCount > 0" x-cloak @click="resetGridPrefs()" :disabled="gridPrefBusy"
+                            class="px-3 py-1.5 rounded-full text-xs font-bold border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 transition disabled:opacity-50">
+                        {{ __('pos.show_all_again') }}
+                    </button>
+                    <span x-show="gridEditMode" x-cloak class="text-[11px] font-semibold text-teal-700 dark:text-teal-300">{{ __('pos.tap_item_hide_show') }}</span>
+                </div>
+                <div class="tn-waiter-grid grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2.5 max-h-[60vh] overflow-y-auto pr-1">
+                    <template x-for="p in filtered" :key="p.id">
+                        <button @click="gridEditMode ? toggleItemVisibility(p) : addToCart(p)" class="rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-teal-500 dark:hover:border-teal-500 p-3 text-left transition active:scale-95" :class="gridEditMode && !isItemVisible(p) ? 'opacity-40' : ''">
+                            <span class="block text-sm font-bold text-gray-800 dark:text-gray-100 leading-snug" x-text="p.name"></span>
+                            <span class="block mt-1 text-xs font-black text-teal-700 dark:text-teal-400" x-text="'Rs ' + p.price.toLocaleString()"></span>
+                            <span x-show="gridEditMode" x-cloak class="block mt-1 text-[10px] font-bold" :class="isItemVisible(p) ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'" x-text="isItemVisible(p) ? {{ Js::from(__('pos.visible_word')) }} : {{ Js::from(__('pos.hidden_word')) }}"></span>
+                        </button>
+                    </template>
+                    <div x-show="filtered.length === 0" class="col-span-full text-center py-8 text-sm text-gray-400">{{ __('pos.no_items_match') }}</div>
+                </div>
             </div>
         </div>
 
@@ -458,6 +534,15 @@ function waiterApp() {
         showTables: false,
         tables: [],
         tablesLoading: false,
+        // Buttons style (Task #340, Aug 2026): home button list vs product grid.
+        // true = show the home button list; false = show the product grid.
+        // Starts true only in buttons mode (PHP-baked); in other styles never used.
+        buttonsView: {{ $waiterEffStyle === 'buttons' ? 'true' : 'false' }},
+        // PHP-baked JS boolean (Task #340). Lets init() and send() branch on mode
+        // using plain JS — no Blade directives needed inside the script block.
+        // The test double-brace stripper replaces this with 0, so buttons branches
+        // are skipped harmlessly in the node --check harness.
+        _buttonsMode: {{ $waiterEffStyle === 'buttons' ? 'true' : 'false' }},
         showMyOrders: false,
         myOrders: [],
         myOrdersLoading: false,
@@ -491,6 +576,14 @@ function waiterApp() {
             setInterval(() => this.checkVersion(), 120000);
             document.addEventListener('visibilitychange', () => { if (!document.hidden) this.checkVersion(); });
             this.checkVersion();
+            // Buttons style (Task #340, Aug 2026): eagerly fetch tables on boot so
+            // the home button list is populated immediately. Poll every 30 s (same
+            // cadence as the sale-screen table board) to keep counts + timers live.
+            // _buttonsMode is PHP-baked — plain JS branch, no Blade directive needed.
+            if (this._buttonsMode) {
+                this.reloadTablesQuiet();
+                setInterval(() => { if (!document.hidden) this.reloadTablesQuiet(); }, 30000);
+            }
         },
 
         async checkVersion() {
@@ -842,11 +935,62 @@ function waiterApp() {
                     this.orderType = 'dine_in'; this.moreOpen = false;
                     this.appendOrderId = null; this.appendOrderNumber = '';
                     this.loadMyOrders();
+                    // Buttons style (Task #340, Aug 2026): after send, return to the
+                    // home button list and silently refresh table counts/timers.
+                    // _buttonsMode is PHP-baked — plain JS branch, no Blade directive needed.
+                    if (this._buttonsMode) {
+                        this.buttonsView = true;
+                        this.reloadTablesQuiet();
+                    }
                 }
             } catch (e) {
                 this.showToast(@js(__('pos.network_error_try_again')), 'error');
             }
             this.sending = false;
+        },
+
+        // ── Buttons style helpers (Task #340, Aug 2026) ─────────────────────────
+
+        // Sorted subsets used by the x-for templates on the buttons home screen.
+        // occupied first (by table_number numerically), then available/reserved.
+        tablesOccupied() {
+            return this.tables
+                .filter(t => t.status === 'occupied')
+                .sort((a, b) => String(a.table_number).localeCompare(String(b.table_number), undefined, { numeric: true }));
+        },
+        tablesAvailable() {
+            return this.tables
+                .filter(t => t.status !== 'occupied')
+                .sort((a, b) => String(a.table_number).localeCompare(String(b.table_number), undefined, { numeric: true }));
+        },
+
+        // Tap an occupied table → open the existing action modal (Add Items / Shift).
+        // Tap a free/reserved table → pre-select it and reveal the product grid.
+        selectButtonTable(t) {
+            if (t.status === 'occupied') {
+                // Reuse the exact same occupied-tile action flow as the table picker.
+                this.tableActionFor = t;
+            } else {
+                this.pickTable(t);   // sets selectedTable, closes picker (showTables)
+            }
+            // In both cases reveal the product grid so the waiter can add items.
+            this.buttonsView = false;
+        },
+
+        // Tap the Parcel button → set takeaway order type and reveal the product grid.
+        selectButtonParcel() {
+            this.orderType = 'takeaway';
+            this.selectedTable = null;
+            this.buttonsView = false;
+        },
+
+        // Silent background table refresh — updates this.tables without opening the
+        // showTables modal (used by the buttons-style poll and post-send reset).
+        async reloadTablesQuiet() {
+            try {
+                const res = await fetch('/pos/waiter/api/tables', { headers: { 'Accept': 'application/json' } });
+                if (res.ok) this.tables = await res.json();
+            } catch (e) { /* network blip — stale data stays until next poll */ }
         },
 
         showToast(msg, type = 'success') {

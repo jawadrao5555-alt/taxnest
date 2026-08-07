@@ -3967,9 +3967,16 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'th_days_present'           => 'Din',
     'th_total_duty'             => 'Kul Duty',
     'payroll_generated_at'      => 'Banaya gaya',
-    'ti_waiter_style'   => 'Screen ka style — aap ki apni pasand (dukan ki setting nahi badalti)',
-    'style_saaf_word'   => 'Saaf',
-    'style_full_word'   => 'Full',
+    'ti_waiter_style'        => 'Screen ka style — aap ki apni pasand (dukan ki setting nahi badalti)',
+    'style_saaf_word'        => 'Saaf',
+    'style_full_word'        => 'Full',
+    'style_buttons_word'     => 'Buttons',
+    // Buttons style — waiter home screen (Task #340, Aug 2026)
+    'waiter_buttons_parcel'       => 'Parcel',
+    'waiter_buttons_new_parcel'   => '+ Naya Parcel Order',
+    'waiter_buttons_free_note'    => 'Koi table configure nahi. Aap phir bhi parcel order le sakte hain.',
+    'waiter_buttons_back'         => '← Wapas',
+    'waiter_buttons_loading'      => 'Tables load ho rahi hain…',
 
     // DB-down friendly page (Aug 2026) — rendered when MySQL is unreachable
     'db_down_title' => 'Server thori der ke liye masroof hai',

@@ -557,7 +557,14 @@ class PosBillingScopeGuardsTest extends TestCase
 
     private function seedTodayBills(int $cid): array
     {
-        $today = now()->toDateString();
+        // Use PosBusinessDay::current() — NOT now()->toDateString() — so the seeded
+        // business_date matches exactly what apiTodaysBills queries. The controller
+        // filters on PosBusinessDay::current($companyId), which returns yesterday
+        // when the Karachi clock is before the 06:00 cutoff and yesterday isn't
+        // day-closed. Using now()->toDateString() caused a time-of-day mismatch
+        // (pre-existing failure on origin/main; proved by 0-line git diff on all
+        // three affected files between fd6aadc and HEAD).
+        $today = \App\Services\PosBusinessDay::current($cid);
         // Local bill: invoice_mode='local', pra_status='local'
         $localId = $this->makeTxn($cid, ['business_date' => $today]);
         // PRA bill: invoice_mode='pra', pra_status='pending'

@@ -13,7 +13,7 @@
     $posOwnStyleLayout = (($posUserLayout->pos_role ?? null) === 'pos_waiter')
         ? ($posUserLayout->pos_personal_style ?? null)
         : null;
-    $posEffStyleLayout = in_array($posOwnStyleLayout, ['default', 'saaf'], true)
+    $posEffStyleLayout = in_array($posOwnStyleLayout, ['default', 'saaf', 'buttons'], true)
         ? $posOwnStyleLayout
         : ($companyLayout->pos_dashboard_style ?? 'default');
     // Restaurant nav features (Tables, KDS, Ingredients, Recipes) gate.

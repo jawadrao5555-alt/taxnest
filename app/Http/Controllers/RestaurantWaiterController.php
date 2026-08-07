@@ -40,7 +40,7 @@ class RestaurantWaiterController extends Controller
      */
     public function saveStyle(Request $request)
     {
-        $request->validate(['style' => 'required|in:default,saaf']);
+        $request->validate(['style' => 'required|in:default,saaf,buttons']);
         $user = auth('pos')->user();
         // Waiter-only (architect review): admins/managers can OPEN the tablet,
         // but the personal-style override is scoped to waiters — everyone else

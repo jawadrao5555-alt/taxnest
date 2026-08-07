@@ -1241,11 +1241,18 @@ class RestaurantPosController extends Controller
             return response()->json(['customers' => []]);
         }
 
+        // Pizza Master (Aug 2026): cashiers type numbers with dashes/spaces (03001-1234567)
+        // and old rows may be STORED with separators too — match on digits-only both sides.
+        // Phone-only grammar gate (same as client isPhoneLike): letters = name search, never phone.
+        $digits = preg_match('/^[0-9+()\s\-]+$/', trim($q)) ? preg_replace('/\D+/', '', $q) : '';
         $customers = PosCustomer::where('company_id', $companyId)
             ->where('is_active', true)
-            ->where(function ($query) use ($q) {
+            ->where(function ($query) use ($q, $digits) {
                 $query->whereRaw('LOWER(name) LIKE ?', ['%' . strtolower($q) . '%'])
                     ->orWhereRaw('LOWER(phone) LIKE ?', ['%' . strtolower($q) . '%']);
+                if (strlen($digits) >= 4) {
+                    $query->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(phone,''),'-',''),' ',''),'(',''),')',''),'+','') LIKE ?", ['%' . $digits . '%']);
+                }
             })
             ->limit(8)
             ->get(['id', 'name', 'phone', 'email', 'address']);

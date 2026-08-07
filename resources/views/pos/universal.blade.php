@@ -6731,7 +6731,7 @@ function restaurantPos() {
             if (this.customerLookupTimer) clearTimeout(this.customerLookupTimer);
             if (this.pickerSearchTimer) clearTimeout(this.pickerSearchTimer);
             const phone = this.customerSearch.trim();
-            if (phone.length >= 4 && /^\d+$/.test(phone)) {
+            if (this.isPhoneLike(phone)) {
                 this.customerLookupTimer = setTimeout(() => this.lookupCustomerByPhone(phone), 400);
             } else {
                 this.customerLookupResult = null;
@@ -6856,8 +6856,9 @@ function restaurantPos() {
                     // matches from the baked (possibly partial) list instead of
                     // blanking the dropdown the local pre-filter already opened.
                     const lq = q.toLowerCase();
+                    const qd = this.phoneDigits(q);
                     this.customerPhoneResults = (this.allCustomers || [])
-                        .filter(c => (c.name && c.name.toLowerCase().includes(lq)) || (c.phone && String(c.phone).includes(q)))
+                        .filter(c => (c.name && c.name.toLowerCase().includes(lq)) || (c.phone && String(c.phone).includes(q)) || (qd.length >= 4 && c.phone && this.phoneDigits(c.phone).includes(qd)))
                         .slice(0, 8);
                     this.customerPhoneDropdown = this.customerPhoneResults.length > 0;
                 }
@@ -6875,7 +6876,7 @@ function restaurantPos() {
             //   - no match   → open the inline new-customer form (full keyboard: name → Enter
             //     → address → Enter saves & moves to items). No mouse needed. Esc = skip.
             if (this.guidedFlow) {
-                const validPhone = q.length >= 4 && /^\d+$/.test(q);
+                const validPhone = this.isPhoneLike(q);
                 // Enter must ALWAYS resolve to a decision (attach existing OR open the new-
                 // customer form) — never a silent no-op. Previously an in-flight search made
                 // Enter `return` and do nothing, forcing the cashier to grab the mouse.
@@ -6911,17 +6912,26 @@ function restaurantPos() {
             }
             if (this.customerPhoneResults.length > 0) {
                 this.selectCustomerFromPhone(this.customerPhoneResults[this.custHiIndex] || this.customerPhoneResults[0]);
-            } else if (q.length >= 4 && /^\d+$/.test(q)) {
+            } else if (this.isPhoneLike(q)) {
                 this.openInlineNewCustomer();
             } else {
                 this.showToast(window.TXT.enter_valid_mobile, 'error');
             }
         },
 
+        // Pizza Master (Aug 2026): cashiers type numbers WITH dashes/spaces (03001-1234567).
+        // The digits-only /^\d+$/ gate silently refused to open the new-customer form (so the
+        // address field "never appeared"). Accept separator characters, store digits only.
+        phoneDigits(q) { return String(q || '').replace(/\D/g, ''); },
+        isPhoneLike(q) {
+            const s = String(q || '').trim();
+            return s !== '' && /^[0-9+()\s-]+$/.test(s) && this.phoneDigits(s).length >= 4;
+        },
+
         openInlineNewCustomer() {
             const q = this.customerPhoneQuery.trim();
-            if (q.length < 4 || !/^\d+$/.test(q)) { this.showToast(window.TXT.enter_valid_mobile, 'error'); return; }
-            this.newCustomerPhone = q;
+            if (!this.isPhoneLike(q)) { this.showToast(window.TXT.enter_valid_mobile, 'error'); return; }
+            this.newCustomerPhone = this.phoneDigits(q);
             this.newCustomerName = '';
             this.newCustomerAddress = '';
             this.showNewCustomerInline = true;

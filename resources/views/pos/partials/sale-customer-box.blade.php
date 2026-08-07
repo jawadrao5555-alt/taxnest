@@ -42,7 +42,7 @@
             </div>
 
             {{-- Inline "no match → quick add" hint (NO popup, INLINE only) --}}
-            <div x-show="customerPhoneDropdown && !showNewCustomerInline && customerPhoneResults.length === 0 && customerPhoneQuery.length >= 4 && /^[0-9]+$/.test(customerPhoneQuery.trim()) && !customerSearching" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-800 rounded-xl shadow-2xl z-50 overflow-hidden" style="min-width:280px;">
+            <div x-show="customerPhoneDropdown && !showNewCustomerInline && customerPhoneResults.length === 0 && isPhoneLike(customerPhoneQuery) && !customerSearching" x-transition class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-800 rounded-xl shadow-2xl z-50 overflow-hidden" style="min-width:280px;">
                 <button @click="openInlineNewCustomer()" class="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 transition">
                     <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
                         <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>

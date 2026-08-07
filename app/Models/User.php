@@ -25,6 +25,7 @@ class User extends Authenticatable
         'language', // PosLocale: 'en' English / 'rur' Roman Urdu / 'ur' Urdu script; NULL = company default
         'pra_reporting_enabled',
         'pos_team_password_enc',
+        'pos_billing_scope',  // stream lock (07 Aug 2026); must be fillable so storeCashier User::create() persists it
     ];
 
     /**
@@ -53,15 +54,14 @@ class User extends Authenticatable
      */
     public function posBillingScope(): string
     {
-        static $columnReady = null;
-        if ($columnReady === null) {
+        if (self::$_scopeColumnReady === null) {
             try {
-                $columnReady = \Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_billing_scope');
+                self::$_scopeColumnReady = \Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_billing_scope');
             } catch (\Throwable $e) {
-                $columnReady = false;
+                self::$_scopeColumnReady = false;
             }
         }
-        if (!$columnReady) {
+        if (!self::$_scopeColumnReady) {
             return 'both';
         }
         if (!in_array($this->pos_role, ['pos_cashier', 'pos_manager'], true)) {
@@ -69,6 +69,17 @@ class User extends Authenticatable
         }
         $scope = $this->getAttributeValue('pos_billing_scope');
         return in_array($scope, ['local', 'pra'], true) ? $scope : 'both';
+    }
+
+    /** @var bool|null — class-level cache for pos_billing_scope column existence.
+     *  Stored as a static class property (not a method-level static) so tests
+     *  can reset it between runs via flushScopeColumnCache(). */
+    private static ?bool $_scopeColumnReady = null;
+
+    /** Reset the pos_billing_scope column-existence cache (test helper). */
+    public static function flushScopeColumnCache(): void
+    {
+        self::$_scopeColumnReady = null;
     }
 
     /**

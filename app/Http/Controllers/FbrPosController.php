@@ -1061,13 +1061,25 @@ class FbrPosController extends Controller
                         : null,
                 ] : [];
 
+                // Order Matching (Aug 2026) — token_no / order_code from held sale.
+                // hasColumn-guarded: silently skipped on a not-yet-migrated PROD schema.
+                $omFields = [];
+                if (\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'token_no')) {
+                    $inTokenNo = $request->input('token_no');
+                    $omFields['token_no'] = $inTokenNo !== null ? (int) $inTokenNo : null;
+                }
+                if (\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'order_code')) {
+                    $inOrderCode = trim((string) ($request->input('order_code', '') ?? ''));
+                    $omFields['order_code'] = $inOrderCode !== '' ? strtoupper(substr($inOrderCode, 0, 10)) : null;
+                }
+
                 // Pass the validated offline_uuid into the row only when the column exists.
                 // use() captures the outer-scope values (set before the DB::transaction closure).
                 $offlineUuidField = ($offlineUuidColumnExists && $offlineUuid !== '')
                     ? ['offline_uuid' => $offlineUuid]
                     : [];
 
-                $transaction = FbrPosTransaction::create($orderTypeFields + $offlineUuidField + [
+                $transaction = FbrPosTransaction::create($orderTypeFields + $omFields + $offlineUuidField + [
                     'company_id' => $companyId,
                     'branch_id' => app()->bound('currentBranchId') ? app('currentBranchId') : null,
                     'terminal_id' => $request->terminal_id,
@@ -2023,8 +2035,9 @@ class FbrPosController extends Controller
 
         if ($request->isMethod('post')) {
             $request->validate([
-                'rp_style_bold'  => 'nullable|in:1',
-                'rp_logo_style'  => 'required|in:side,center',
+                'rp_style_bold'   => 'nullable|in:1',
+                'rp_logo_style'   => 'required|in:side,center',
+                'rp_order_match'  => 'nullable|in:off,token,code',
             ]);
 
             $prefs = $company->invoice_display_prefs ?? [];
@@ -2036,12 +2049,88 @@ class FbrPosController extends Controller
             $style['logo'] = $request->input('rp_logo_style', 'center');
 
             $prefs['pos_style'] = $style;
-            $company->update(['invoice_display_prefs' => $prefs]);
+            $company->invoice_display_prefs = $prefs;
+
+            // Order Matching style — stored directly on the companies row (shared with PRA).
+            // hasColumn guard: silently no-ops on a not-yet-migrated PROD schema.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'order_match_style')) {
+                $company->order_match_style = $request->input('rp_order_match', 'off');
+            }
+
+            $company->save();
 
             return back()->with('success', __('pos.receipt_style_saved'));
         }
 
         return view('fbr-pos.receipt-settings', compact('company'));
+    }
+
+    /**
+     * FBR KOT — kitchen ticket for a held sale.
+     * GET /fbr-pos/held/{id}/kitchen-ticket
+     */
+    public function kotTicket(int $id)
+    {
+        $companyId = app('currentCompanyId');
+        $company   = Company::find($companyId);
+        $held      = \App\Models\FbrPosHeldSale::where('company_id', $companyId)->findOrFail($id);
+
+        $cartData  = $held->cart_data ?? [];
+        $items     = is_array($cartData['items'] ?? null) ? $cartData['items'] : [];
+        $tokenNo   = isset($held->token_no)   ? (int)  $held->token_no   : (isset($cartData['token_no'])   ? (int)  $cartData['token_no']   : null);
+        $orderCode = isset($held->order_code) ? (string) $held->order_code : (isset($cartData['order_code']) ? (string) $cartData['order_code'] : null);
+        $customerName = $held->customer_name ?? ($cartData['customer_name'] ?? null);
+        $kitchenNotes = $cartData['kitchen_notes'] ?? null;
+        $now = now();
+
+        $autoPrint = request()->boolean('auto_print');
+
+        return view('fbr-pos.kitchen-ticket', compact(
+            'company', 'held', 'items', 'tokenNo', 'orderCode',
+            'customerName', 'kitchenNotes', 'now', 'autoPrint'
+        ));
+    }
+
+    /**
+     * FBR KOT — kitchen ticket reprinted from a completed transaction.
+     * GET /fbr-pos/transaction/{id}/kot-reprint
+     */
+    public function kotReprint(int $id)
+    {
+        $companyId = app('currentCompanyId');
+        $company   = Company::find($companyId);
+
+        $transaction = \App\Models\FbrPosTransaction::with('items')
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
+
+        $tokenNo   = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'token_no')
+            ? ($transaction->token_no ? (int) $transaction->token_no : null)
+            : null;
+        $orderCode = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'order_code')
+            ? ($transaction->order_code ?: null)
+            : null;
+
+        // Build a simple items array from the transaction lines (KOT only needs name+qty).
+        $items = $transaction->items->map(function ($it) {
+            return [
+                'item_name'     => $it->item_name,
+                'quantity'      => (float) $it->quantity,
+                'special_notes' => null,
+            ];
+        })->all();
+
+        $customerName = $transaction->customer_name;
+        $kitchenNotes = null;
+        $now = $transaction->created_at ?? now();
+        $held = null; // not a held sale — template branches on this
+
+        $autoPrint = request()->boolean('auto_print');
+
+        return view('fbr-pos.kitchen-ticket', compact(
+            'company', 'held', 'items', 'tokenNo', 'orderCode',
+            'customerName', 'kitchenNotes', 'now', 'autoPrint'
+        ));
     }
 
     public function testConnection()
@@ -2163,6 +2252,53 @@ class FbrPosController extends Controller
             'success' => true,
             'enabled' => $company->fbr_reporting_enabled,
             'message' => $company->fbr_reporting_enabled ? __('pos.fbr_reporting_enabled_msg') : __('pos.fbr_reporting_disabled_msg'),
+        ]);
+    }
+
+    /**
+     * 🍽️ Toggle Auto-KOT for FBR POS (admin-only, company-scoped).
+     *
+     * FBR equivalent of PosController::toggleAutoKot.  Persists in
+     * companies.auto_print_kot (same column as PRA); a hasColumn guard
+     * keeps the site alive if the migration has not yet run on a given
+     * deployment.
+     *
+     * Gate: kitchen_printer_enabled must be ON (FBR uses this column
+     * instead of PosFeatureService's features->kot which always returns
+     * false for FBR companies).
+     */
+    public function toggleAutoKot()
+    {
+        if (Auth::guard('fbrpos')->user()->role !== 'company_admin') {
+            return response()->json(['success' => false, 'message' => __('pos.only_company_admin_toggle_fbr')], 403);
+        }
+
+        $companyId = app('currentCompanyId');
+        $company   = Company::findOrFail($companyId);
+
+        if (!$company->kitchen_printer_enabled) {
+            return response()->json([
+                'success' => false,
+                'message' => __('pos.auto_kot_requires_feature'),
+            ], 422);
+        }
+
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'auto_print_kot')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Schema not ready — run migrations first.',
+            ], 503);
+        }
+
+        $company->auto_print_kot = !(bool) $company->auto_print_kot;
+        $company->save();
+
+        return response()->json([
+            'success' => true,
+            'enabled' => (bool) $company->auto_print_kot,
+            'message' => $company->auto_print_kot
+                ? __('pos.auto_kot_enabled')
+                : __('pos.auto_kot_disabled'),
         ]);
     }
 

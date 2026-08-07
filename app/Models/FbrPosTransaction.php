@@ -23,6 +23,9 @@ class FbrPosTransaction extends Model
         // Aug 2026: idempotency key — client-generated UUID riding on every submit attempt
         // so the server replay-guard can return the existing bill on a lost-response retry.
         'offline_uuid',
+        // Order Matching (Aug 2026): token/code copied from held sale at billing time;
+        // stored permanently so receipt reprints always carry the correct match identifier.
+        'token_no', 'order_code',
     ];
 
     protected $casts = [

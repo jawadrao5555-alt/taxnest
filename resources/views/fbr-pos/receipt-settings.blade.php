@@ -47,6 +47,30 @@
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.logo_style_hint') }}</p>
         </div>
 
+        {{-- Order Matching (Aug 2026) — mirrors PRA receipt-settings placement.
+             Applies to receipt AND to KOT (when kitchen_printer_enabled is on). --}}
+        @if(\Illuminate\Support\Facades\Schema::hasColumn('companies', 'order_match_style'))
+        @php $omPref = in_array($company->order_match_style ?? 'off', ['off','token','code'], true) ? ($company->order_match_style ?? 'off') : 'off'; @endphp
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
+            <label class="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-1">🔢 {{ __('pos.order_match_title') }}</label>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ __('pos.order_match_intro') }}</p>
+            <div class="space-y-2">
+                <label class="flex items-start gap-2 cursor-pointer">
+                    <input type="radio" name="rp_order_match" value="off" {{ $omPref === 'off' ? 'checked' : '' }} class="mt-0.5 text-blue-600 focus:ring-blue-500">
+                    <span class="text-sm text-gray-800 dark:text-gray-200">{{ __('pos.order_match_off') }} <span class="block text-xs text-gray-500 dark:text-gray-400">{{ __('pos.order_match_off_hint') }}</span></span>
+                </label>
+                <label class="flex items-start gap-2 cursor-pointer">
+                    <input type="radio" name="rp_order_match" value="token" {{ $omPref === 'token' ? 'checked' : '' }} class="mt-0.5 text-blue-600 focus:ring-blue-500">
+                    <span class="text-sm text-gray-800 dark:text-gray-200">{{ __('pos.order_match_token') }} <span class="block text-xs text-gray-500 dark:text-gray-400">{{ __('pos.order_match_token_hint') }}</span></span>
+                </label>
+                <label class="flex items-start gap-2 cursor-pointer">
+                    <input type="radio" name="rp_order_match" value="code" {{ $omPref === 'code' ? 'checked' : '' }} class="mt-0.5 text-blue-600 focus:ring-blue-500">
+                    <span class="text-sm text-gray-800 dark:text-gray-200">{{ __('pos.order_match_code') }} <span class="block text-xs text-gray-500 dark:text-gray-400">{{ __('pos.order_match_code_hint') }}</span></span>
+                </label>
+            </div>
+        </div>
+        @endif
+
         <div class="flex items-center justify-between gap-3 pt-1">
             <a href="{{ route('fbrpos.customize') }}"
                class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition">

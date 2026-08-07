@@ -74,17 +74,68 @@ class FbrPosPhase2Controller extends Controller
             'hold_name' => 'required|string|max:100',
             'cart_data' => 'required|array',
         ]);
-        $held = FbrPosHeldSale::create([
-            'company_id' => $this->companyId(),
-            'terminal_id' => $r->terminal_id,
-            'user_id' => $this->user()->id,
-            'hold_name' => $r->hold_name,
+
+        $companyId = $this->companyId();
+
+        // ── ORDER MATCHING TOKEN ALLOCATION ──────────────────────────────────
+        // Token/code assigned ONCE at first hold; re-holds (add items then re-park)
+        // must carry the original value — check cart_data first.
+        // hasColumn guards: silently skip on a not-yet-migrated PROD schema.
+        $tokenNo   = null;
+        $orderCode = null;
+        $tokenColOk = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_held_sales', 'token_no');
+        $codeColOk  = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_held_sales', 'order_code');
+
+        if ($tokenColOk || $codeColOk) {
+            $company = \App\Models\Company::find($companyId);
+            $style = $company->order_match_style ?? 'off';
+
+            if ($style === 'token' && $tokenColOk) {
+                // Existing token from a re-hold (recalled cart already had one)?
+                $existingToken = $r->input('cart_data.token_no');
+                $tokenNo = $existingToken ? (int) $existingToken
+                    : \App\Services\OrderTokenService::nextToken($companyId);
+            } elseif ($style === 'code' && $codeColOk) {
+                $existingCode = $r->input('cart_data.order_code');
+                $orderCode = $existingCode ?: strtoupper(\Illuminate\Support\Str::random(5));
+            }
+        }
+
+        // Embed token/code into cart_data so recall returns them to the JS cart state,
+        // enabling a re-hold to recognise the existing identifier (same-token invariant).
+        $cartData = $r->cart_data;
+        if ($tokenNo !== null) {
+            $cartData['token_no'] = $tokenNo;
+        }
+        if ($orderCode !== null) {
+            $cartData['order_code'] = $orderCode;
+        }
+
+        $createData = [
+            'company_id'    => $companyId,
+            'terminal_id'   => $r->terminal_id,
+            'user_id'       => $this->user()->id,
+            'hold_name'     => $r->hold_name,
             'customer_name' => $r->customer_name,
-            'customer_phone' => $r->customer_phone,
-            'cart_data' => $r->cart_data,
-            'notes' => $r->notes,
+            'customer_phone'=> $r->customer_phone,
+            'cart_data'     => $cartData,
+            'notes'         => $r->notes,
+        ];
+        if ($tokenColOk && $tokenNo !== null) {
+            $createData['token_no'] = $tokenNo;
+        }
+        if ($codeColOk && $orderCode !== null) {
+            $createData['order_code'] = $orderCode;
+        }
+
+        $held = FbrPosHeldSale::create($createData);
+
+        return response()->json([
+            'success'    => true,
+            'id'         => $held->id,
+            'token_no'   => $tokenNo,
+            'order_code' => $orderCode,
         ]);
-        return response()->json(['success' => true, 'id' => $held->id]);
     }
 
     public function listHeld()

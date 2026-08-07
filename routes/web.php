@@ -1158,6 +1158,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/test-connection', [FbrPosController::class, 'testConnection'])->name('fbrpos.testConnection');
     Route::post('/api/toggle-fbr-reporting', [FbrPosController::class, 'toggleFbrReporting'])->name('fbrpos.api.toggle-fbr-reporting');
     Route::post('/api/toggle-universal', [FbrPosController::class, 'toggleUniversal'])->name('fbrpos.api.toggle-universal');
+    Route::post('/api/toggle-auto-kot', [FbrPosController::class, 'toggleAutoKot'])->name('fbrpos.api.toggle-auto-kot');
     Route::post('/settings/dashboard-style', [FbrPosController::class, 'updateDashboardStyle'])->name('fbrpos.settings.dashboard-style');
     Route::post('/settings/theme', [FbrPosController::class, 'updateTheme'])->name('fbrpos.settings.theme');
     Route::post('/settings/guided-flow', [FbrPosController::class, 'updateGuidedFlow'])->name('fbrpos.settings.guided-flow');
@@ -1195,6 +1196,9 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::match(['get', 'post'], '/business-profile', [FbrPosController::class, 'businessProfile'])->name('fbrpos.business-profile');
     Route::match(['get', 'post'], '/my-profile', [FbrPosController::class, 'myProfile'])->name('fbrpos.my-profile');
     Route::get('/transaction/{id}/receipt', [FbrPosController::class, 'receipt'])->name('fbrpos.receipt');
+    // Order Matching (Aug 2026) — FBR KOT print endpoints
+    Route::get('/held/{id}/kitchen-ticket', [FbrPosController::class, 'kotTicket'])->name('fbrpos.held.kot');
+    Route::get('/transaction/{id}/kot-reprint', [FbrPosController::class, 'kotReprint'])->name('fbrpos.transaction.kot-reprint');
     Route::get('/transaction/{id}/pdf', [FbrPosController::class, 'downloadPdf'])->name('fbrpos.pdf');
     Route::get('/transaction/{id}/pdf-preview', [FbrPosController::class, 'previewPdf'])->name('fbrpos.pdf.preview');
     Route::get('/day-close', [FbrPosController::class, 'dayCloseReport'])->name('fbrpos.day-close');

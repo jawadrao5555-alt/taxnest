@@ -209,6 +209,33 @@
 
     <div class="separator"></div>
 
+    {{-- Order Matching (Aug 2026): same bold-box style as PRA receipt_80mm/58mm.
+         Reads directly from transaction columns — covers BOTH paper widths because
+         FBR uses one template with $is58 switching font-size / padding. --}}
+    @php
+        $omRcptStyle = $company->order_match_style ?? 'off';
+        $omRcptToken = null;
+        $omRcptCode  = null;
+        if ($omRcptStyle === 'token'
+            && \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'token_no')
+            && !empty($transaction->token_no)) {
+            $omRcptToken = (int) $transaction->token_no;
+        } elseif ($omRcptStyle === 'code'
+            && \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'order_code')
+            && !empty($transaction->order_code)) {
+            $omRcptCode = strtoupper((string) $transaction->order_code);
+        }
+    @endphp
+    @if($omRcptToken)
+    <div style="text-align:center; margin:5px 0 3px;">
+        <span style="display:inline-block; border:2px solid #000; padding:2px {{ $is58 ? '10px' : '14px' }}; font-size:{{ $is58 ? '14px' : '16px' }}; font-weight:900; color:#000;">{{ __('pos.order_match_token_label') }} {{ $omRcptToken }}</span>
+    </div>
+    @elseif($omRcptCode)
+    <div style="text-align:center; margin:5px 0 3px;">
+        <span style="display:inline-block; border:2px solid #000; padding:2px {{ $is58 ? '10px' : '14px' }}; font-size:{{ $is58 ? '13px' : '15px' }}; font-weight:900; letter-spacing:2px; color:#000;">{{ $omRcptCode }}</span>
+    </div>
+    @endif
+
     @php
         // Serial box at TOP (owner, 22 Jul 2026 — mirrors PRA receipts):
         // bills NOT going to FBR (reporting-OFF finals fbr/NULL + legacy 'local'

@@ -11,7 +11,11 @@
     // bada total band, one-tap CASH/CARD). This port is intentionally FROZEN
     // pre-redesign until the owner approves porting it.
     $features = (object) [
-        'tables' => false, 'delivery' => false, 'kot' => false,
+        'tables' => false, 'delivery' => false,
+        // Order Matching (Aug 2026): unpin kot — gate on kitchen_printer_enabled so
+        // FBR restaurant companies can use the KOT + Order Matching flow.
+        // D1 decision: reuse kitchen_printer_enabled (already loaded, no new column).
+        'kot' => (bool)($company->kitchen_printer_enabled ?? false),
         'kitchen' => false, 'recipes' => false, 'inventory' => false,
         'kitchen_notes' => false,
     ];
@@ -404,7 +408,7 @@ window.addEventListener('popstate', function() {
                         <span class="text-[10px] uppercase tracking-wider font-extrabold text-orange-700 dark:text-orange-300">{{ __('pos.auto_kot_label') }}</span>
                         <div class="flex items-center gap-1.5">
                             <button type="button"
-                                @click="autoKotLoading = true; fetch('{{ route('pos.api.toggle-auto-kot') }}', { method:'POST', headers:{ 'X-CSRF-TOKEN':'{{ csrf_token() }}', 'Content-Type':'application/json', 'Accept':'application/json' } }).then(r => r.json()).then(d => { if (d.success) { autoKotEnabled = !!d.enabled; window.tnNotify && window.tnNotify(window.TXT.auto_kot, autoKotEnabled ? window.TXT.enabled_word : window.TXT.disabled_word); } else { alert(d.message || window.TXT.toggle_failed); } autoKotLoading = false; }).catch(() => { autoKotLoading = false; alert(window.TXT.toggle_failed); })"
+                                @click="autoKotLoading = true; fetch('{{ route('fbrpos.api.toggle-auto-kot') }}', { method:'POST', headers:{ 'X-CSRF-TOKEN':'{{ csrf_token() }}', 'Content-Type':'application/json', 'Accept':'application/json' } }).then(r => r.json()).then(d => { if (d.success) { autoKotEnabled = !!d.enabled; window.tnNotify && window.tnNotify(window.TXT.auto_kot, autoKotEnabled ? window.TXT.enabled_word : window.TXT.disabled_word); } else { alert(d.message || window.TXT.toggle_failed); } autoKotLoading = false; }).catch(() => { autoKotLoading = false; alert(window.TXT.toggle_failed); })"
                                 :disabled="autoKotLoading"
                                 :class="autoKotEnabled ? 'bg-orange-600' : 'bg-gray-400 dark:bg-gray-600'"
                                 class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out shadow-inner">
@@ -468,7 +472,7 @@ window.addEventListener('popstate', function() {
         <div class="flex items-center gap-2" title="{{ __('pos.ti_auto_kot_hint') }}">
             <span class="text-[10px] uppercase tracking-wider font-extrabold text-orange-700 dark:text-orange-300">{{ __('pos.auto_kot_label') }}</span>
             <button type="button"
-                @click="autoKotLoading = true; fetch('{{ route('pos.api.toggle-auto-kot') }}', { method:'POST', headers:{ 'X-CSRF-TOKEN':'{{ csrf_token() }}', 'Content-Type':'application/json', 'Accept':'application/json' } }).then(r => r.json()).then(d => { if (d.success) { autoKotEnabled = !!d.enabled; window.tnNotify && window.tnNotify(window.TXT.auto_kot, autoKotEnabled ? window.TXT.enabled_word : window.TXT.disabled_word); } else { alert(d.message || window.TXT.toggle_failed); } autoKotLoading = false; }).catch(() => { autoKotLoading = false; alert(window.TXT.toggle_failed); })"
+                @click="autoKotLoading = true; fetch('{{ route('fbrpos.api.toggle-auto-kot') }}', { method:'POST', headers:{ 'X-CSRF-TOKEN':'{{ csrf_token() }}', 'Content-Type':'application/json', 'Accept':'application/json' } }).then(r => r.json()).then(d => { if (d.success) { autoKotEnabled = !!d.enabled; window.tnNotify && window.tnNotify(window.TXT.auto_kot, autoKotEnabled ? window.TXT.enabled_word : window.TXT.disabled_word); } else { alert(d.message || window.TXT.toggle_failed); } autoKotLoading = false; }).catch(() => { autoKotLoading = false; alert(window.TXT.toggle_failed); })"
                 :disabled="autoKotLoading"
                 :class="autoKotEnabled ? 'bg-orange-600' : 'bg-gray-400 dark:bg-gray-600'"
                 class="relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out shadow-inner">
@@ -1449,7 +1453,10 @@ window.addEventListener('popstate', function() {
                         <div class="flex gap-2 mt-2 ml-7">
                             <button @click="recallOrder(order)" class="flex-1 py-2 text-xs font-bold text-blue-600 border border-blue-300 rounded-xl hover:bg-blue-50 transition">{{ __('pos.recall') }}</button>
                             @if($features->kot)
-                            <a :href="'/pos/restaurant/orders/' + order.id + '/kitchen-ticket'" target="_blank" title="{{ __('pos.ti_view_print_kot') }}" class="py-2 px-2 text-xs font-bold text-center text-orange-600 border border-orange-300 rounded-xl hover:bg-orange-50 transition">KOT</a>
+                            {{-- Order Matching (Aug 2026): FBR held sales live in fbr_pos_held_sales,
+                                 NOT pos_restaurant_orders. Use FBR KOT endpoints — never the PRA
+                                 /pos/restaurant/... routes which 404 for all FBR companies. --}}
+                            <a :href="'/fbr-pos/held/' + order.id + '/kitchen-ticket'" target="_blank" title="{{ __('pos.ti_view_print_kot') }}" class="py-2 px-2 text-xs font-bold text-center text-orange-600 border border-orange-300 rounded-xl hover:bg-orange-50 transition">KOT</a>
                             <button @click="resendKitchen(order)" title="{{ __('pos.ti_resend_kitchen_updated') }}" class="py-2 px-2 text-xs font-bold text-orange-700 border border-orange-400 rounded-xl bg-orange-50 hover:bg-orange-100 transition">{{ __('pos.resend_short') }}</button>
                             @endif
                             <button @click="payHeldOrder(order.id)" class="flex-1 py-2 text-xs font-bold text-white bg-green-600 rounded-xl hover:bg-green-700 transition">{{ __('pos.pay') }}</button>
@@ -2633,8 +2640,10 @@ function restaurantPos() {
         // Auto-Print receipt on successful sale — FBR POS persists this per-browser
         // (localStorage 'fbrpos_auto_print'), NOT via a server column. Default ON.
         autoPrintEnabled: (function(){ try { return localStorage.getItem('fbrpos_auto_print') !== '0'; } catch(e) { return true; } })(),
-        // Kitchen ticket auto-print — restaurant-only, permanently OFF in FBR POS.
-        autoKotEnabled: false,
+        // Kitchen ticket auto-print — persisted server-side in companies.auto_print_kot.
+        // Gated on kitchen_printer_enabled; read at page boot so the toggle survives
+        // a refresh. hasColumn guard keeps the site alive if migration has not run yet.
+        autoKotEnabled: {{ (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'auto_print_kot') && ($company->kitchen_printer_enabled ?? false) && ($company->auto_print_kot ?? false)) ? 'true' : 'false' }},
         // Phase 5+ — auto-dismiss timer for the success modal so cashiers can chain sales hands-free
         receiptAutoCloseTimer: null,
         // Print-chain session tracker — bumping the epoch invalidates in-flight iframe.onload /
@@ -2648,6 +2657,16 @@ function restaurantPos() {
         lastInvoiceNumber: '',
         lastTransactionId: null,
         lastOrderId: null,
+        // Order Matching (Aug 2026) — FBR: token/code that lives with the current
+        // cart. Set at first holdOrder() from server response; preserved on re-hold
+        // by embedding in cartData before the POST (same-token invariant).
+        // Cleared on clearCart() / newSale(). Written into billing payload so the
+        // FBR transaction row carries the same identifier as the KOT.
+        currentTokenNo: null,
+        currentOrderCode: null,
+        // ID of the most-recently created FbrPosHeldSale row — used to build the
+        // FBR KOT URL after sendToKitchen() (held row must still exist at print time).
+        lastHeldId: null,
         lastTotal: 0,
         lastPaymentMethod: '',
         // Success-popup extras: item count + sale timestamp + FBR copy state.
@@ -4184,7 +4203,10 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.customerNtn = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.pendingAddrRestore = null; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.fixCartIndex(); this.clearCartStorage(); this.billUuid = this._newBillUuid(); },
+        clearCart() { this.cart = []; this.kitchenNotes = ''; this.selectedTable = null; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.customerNtn = ''; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.pendingAddrRestore = null; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.fixCartIndex(); this.clearCartStorage(); this.billUuid = this._newBillUuid();
+            // Order Matching (Aug 2026): reset token/code so a brand-new sale
+            // never inherits an identifier from the previous order.
+            this.currentTokenNo = null; this.currentOrderCode = null; this.lastHeldId = null; },
         newSale() {
             if (this.cart.length > 0) { if (!confirm(window.TXT.current_order_has + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast(window.TXT.new_sale_started, 'success');
@@ -4635,6 +4657,13 @@ function restaurantPos() {
                     // Snapshot of the FINAL payable total (discounts + per-item tax
                     // + Rs1 FBR charge) so the F3 held list shows the real figure.
                     total_amount: this.totalAmount,
+                    // Order Matching (Aug 2026) — same-token invariant: embed the
+                    // current token/code so a re-hold sends them back to the server,
+                    // which recognises the existing identifier and does NOT call
+                    // OrderTokenService::nextToken() again. A fresh hold (null) lets
+                    // the server assign the very first token.
+                    token_no: this.currentTokenNo || null,
+                    order_code: this.currentOrderCode || null,
                 };
                 const res = await fetch('{{ route("fbrpos.phase2.hold") }}', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
@@ -4642,8 +4671,18 @@ function restaurantPos() {
                 });
                 const data = await res.json();
                 if (res.ok && data.success) {
+                    // Order Matching: capture the server-assigned token/code (first hold
+                    // assigns it; re-holds echo back the same value).
+                    if (data.token_no != null)   this.currentTokenNo   = data.token_no;
+                    if (data.order_code != null)  this.currentOrderCode = data.order_code;
+                    this.lastHeldId = data.id;
                     this.showToast(opts.successMessage || window.TXT.order_held_recall_f3, 'success');
                     this.heldOrders.unshift({ id: data.id, order_number: holdName, customer_name: this.selectedCustomer?.name || null, status: 'held', total_amount: this.totalAmount, items: cartData.items, cart_data: cartData });
+                    // Order Matching: forcePrintKot = "Send to Kitchen" — print KOT
+                    // immediately using the FBR KOT endpoint (held row still alive).
+                    if (opts.forcePrintKot && data.id) {
+                        this.printKitchenTicket(data.id, null, true /* isFbrHeld */);
+                    }
                     this.clearCart();
                     this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
                     result = data;
@@ -4679,25 +4718,21 @@ function restaurantPos() {
             await this.holdOrder({ forcePrintKot: true, successMessage: 'Order sent to kitchen' });
         },
 
-        // Phase 5 — re-send an existing held order. Server bumps kot_print_count
-        // so the printed ticket is marked "*** UPDATED ***".
+        // Phase 5 — re-send an existing held order's KOT to the kitchen.
+        //
+        // FBR held sales live in fbr_pos_held_sales (JSON carts) — they have no
+        // pos_restaurant_orders record and no kot_print_count counter.
+        // Re-sending is simply re-printing via the FBR KOT endpoint:
+        //   GET /fbr-pos/held/{id}/kitchen-ticket
+        //
+        // The PRA path (pos.restaurant.orders.resend-kitchen POST) must NOT be
+        // used here — it 404s for every FBR company because the order id is from
+        // fbr_pos_held_sales, not pos_restaurant_orders.
         async resendKitchen(order) {
             if (!order || !order.id) return;
-            try {
-                const res = await fetch('/pos/restaurant/orders/' + order.id + '/resend-kitchen', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                });
-                const data = await res.json();
-                if (data.success) {
-                    this.showToast(window.TXT.resent_to_kitchen_prefix + data.kot_print_count + ')', 'success');
-                    window.open('/pos/restaurant/orders/' + order.id + '/kitchen-ticket?auto_print=1', '_blank', 'width=380,height=620');
-                } else {
-                    this.showToast(data.message || window.TXT.resend_failed, 'error');
-                }
-            } catch (e) {
-                this.showToast(window.TXT.network_error, 'error');
-            }
+            // Re-print the FBR KOT. No POST needed — no print-count tracking on FBR held carts.
+            this.printKitchenTicket(order.id, null, /* isFbrHeld */ true);
+            this.showToast(window.TXT.resent_to_kitchen_prefix ? window.TXT.resent_to_kitchen_prefix + '1)' : 'KOT re-sent', 'success');
         },
 
         // ─── SAVE PROVISIONAL DIRECT — fully isolated from Pay modal ─────
@@ -4828,6 +4863,12 @@ function restaurantPos() {
                     customer_phone: this.selectedCustomer?.phone || null,
                     // 🧾 Buyer NTN (optional B2B) — typed in the Pay modal, max 30 chars server-side.
                     customer_ntn: (this.customerNtn || '').trim() || null,
+                    // Order Matching (Aug 2026): ride the token/code on the billing
+                    // payload so fbr_pos_transactions.token_no / order_code are
+                    // populated even when the cashier bills directly after recall
+                    // (never re-held, so the token only lives in currentTokenNo).
+                    token_no: this.currentTokenNo || null,
+                    order_code: this.currentOrderCode || null,
                     // Cash Received / Wapsi (Jul 2026): send the cashier's entered amount
                     // when it covers the total (server stores change_due for the receipt);
                     // otherwise fall back to exact total so the server cash-guard passes.
@@ -4874,7 +4915,10 @@ function restaurantPos() {
                 console.log('[storeInvoice] isRestaurantMode=', this.isRestaurantMode, 'transaction_id=', data.transaction_id);
                 this.lastInvoiceNumber = data.invoice_number || '';
                 this.lastTransactionId = data.transaction_id || null;
-                this.lastOrderId = null; // no restaurant order for manual carts
+                // Order Matching (Aug 2026): set lastOrderId to the transaction id so
+                // the post-pay KOT button (K key) can trigger printKitchenTicket →
+                // /fbr-pos/transaction/{id}/kot-reprint. isFbrHeld=false path used.
+                this.lastOrderId = data.transaction_id || null;
                 this.lastTotal = savedTotal || data.total_amount || 0;
                 this.lastPaymentMethod = method;
                 this.lastFbrNumber = data.fbr_invoice_number || '';
@@ -4893,9 +4937,11 @@ function restaurantPos() {
                 this.showReceipt = true;
                 this.scheduleReceiptAutoClose();
                 this.$nextTick(() => { setTimeout(() => this.triggerConfetti(), 300); });
-                // Auto-print receipt for manual-cart bills too (parity with held-order pay).
-                // Manual carts don't have a restaurant order so KOT is a no-op — receipt only.
-                this.runAutoPrintChain(null);
+                // Auto-print receipt + KOT for FBR bills.
+                // Held row is deleted on recall, so post-pay KOT uses the TRANSACTION
+                // reprint endpoint (isFbrHeld=false). Passing the transaction_id (not null)
+                // lets autoKotEnabled=true fire when kitchen_printer is on.
+                this.runAutoPrintChain(data.transaction_id || null, /* isFbrHeld= */ false);
                 this.clearCart();
                 this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
                 // Refresh provisional badge count if this save was provisional.
@@ -5020,10 +5066,28 @@ function restaurantPos() {
         },
 
         // Silent KOT print via hidden iframe — no popup window blocks the cashier screen.
-        printKitchenTicket(orderId, onAfterPrint) {
+        // isFbrHeld=true  → orderId is an FbrPosHeldSale id → use FBR held-KOT URL.
+        // isFbrHeld=false + lastOrderId set → post-pay reprint from transaction.
+        // Falls back to PRA /pos/restaurant/... URL only for PRA restaurant companies
+        // (not reached in FBR POS since isRestaurantMode is always false there).
+        printKitchenTicket(orderId, onAfterPrint, isFbrHeld) {
+            if (isFbrHeld) {
+                // FBR held-sale KOT (Send to Kitchen / F5 → hold → print).
+                const id = orderId;
+                if (!id) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
+                const url = '/fbr-pos/held/' + id + '/kitchen-ticket?auto_print=1';
+                this._printViaIframe('print-kot-frame', url, 'width=350,height=600', onAfterPrint);
+                return;
+            }
             const id = orderId || this.lastOrderId;
             if (!id) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
-            const url = '/pos/restaurant/orders/' + id + '/kitchen-ticket?auto_print=1';
+            // FBR post-payment KOT reprint (K key / post-pay button): lastOrderId is
+            // set to the transaction id after billing (see processPaymentManual).
+            // Use /fbr-pos/transaction/{id}/kot-reprint when in FBR context.
+            const isFbrReprint = !this.isRestaurantMode;
+            const url = isFbrReprint
+                ? '/fbr-pos/transaction/' + id + '/kot-reprint?auto_print=1'
+                : '/pos/restaurant/orders/' + id + '/kitchen-ticket?auto_print=1';
             this._printViaIframe('print-kot-frame', url, 'width=350,height=600', onAfterPrint);
         },
 
@@ -5037,25 +5101,28 @@ function restaurantPos() {
         //
         // ✅ FIX (May-07): Tightened gap between receipt-finish → KOT-start (300ms → 80ms)
         // and initial chain start (400ms → 150ms) to feel snappier on thermal printers.
-        runAutoPrintChain(orderId) {
+        runAutoPrintChain(orderId, isFbrHeld) {
             // MASTER GATE — auto-print OFF means NOTHING fires automatically.
             if (!this.autoPrintEnabled) return;
             const hasReceipt = !!this.lastTransactionId;
             const wantsKot = !!this.autoKotEnabled && !!orderId;
             const wantsReceipt = hasReceipt;
             if (!wantsReceipt && !wantsKot) return;
+            // isFbrHeld distinguishes held-sale KOT (uses /fbr-pos/held/{id}/kitchen-ticket)
+            // from completed-transaction reprint (uses /fbr-pos/transaction/{id}/kot-reprint).
+            // Always pass explicitly so printKitchenTicket never guesses the ID type.
             this.$nextTick(() => {
                 if (wantsReceipt && wantsKot) {
                     this.queuePrintTimer(() => {
                         this.printReceipt(() => {
-                            this.queuePrintTimer(() => this.printKitchenTicket(orderId), 80);
+                            this.queuePrintTimer(() => this.printKitchenTicket(orderId, null, isFbrHeld), 80);
                         });
                     }, 150);
                 } else if (wantsReceipt) {
                     this.queuePrintTimer(() => this.printReceipt(), 150);
                 } else if (wantsKot) {
                     // Pathological case: no transaction (so no receipt possible) but KOT requested.
-                    this.queuePrintTimer(() => this.printKitchenTicket(orderId), 150);
+                    this.queuePrintTimer(() => this.printKitchenTicket(orderId, null, isFbrHeld), 150);
                 }
             });
         },
@@ -5340,7 +5407,7 @@ function restaurantPos() {
                     // Uses postMessage-chained engine — KOT never fires before the receipt
                     // print dialog is dismissed (was a race in the old setTimeout(200/1800) impl
                     // on slow networks where KOT iframe loaded before receipt iframe).
-                    this.runAutoPrintChain(orderId);
+                    this.runAutoPrintChain(orderId, /* isFbrHeld= */ false); // PRA restaurant order ID
                     // Refresh provisional badge count when this save was provisional.
                     if (provisional) { this.loadLocalBills(); }
                     // Refresh failed badge so cashier sees pending/failed state in real time.
@@ -5393,6 +5460,11 @@ function restaurantPos() {
                 if (cd.order_type) this.orderType = cd.order_type;
                 const heldAddr = (cd.delivery_address || '').trim();
                 if (cd.order_type === 'delivery' && heldAddr) { this.pendingAddrRestore = heldAddr; this.selectedDeliveryAddress = heldAddr; }
+                // Order Matching (Aug 2026) — restore token/code from recalled cart_data.
+                // A recalled cart billed directly (never re-held) must still write the
+                // token to fbr_pos_transactions via processPaymentManual's payload.
+                this.currentTokenNo   = cd.token_no   ? Number(cd.token_no)         : null;
+                this.currentOrderCode = cd.order_code ? String(cd.order_code).toUpperCase() : null;
                 this.heldOrders = this.heldOrders.filter(o => o.id !== order.id); this.showHeldOrders = false; this.showToast(window.TXT.order_recalled_for_editing, 'success');
                 return true;
             } catch (e) { console.error('recallOrder', e); this.showToast(window.TXT.network_error, 'error'); return false; }

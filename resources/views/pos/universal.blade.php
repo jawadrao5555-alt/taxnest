@@ -1327,28 +1327,15 @@ window.addEventListener('popstate', function() {
                         <div class="flex items-center gap-2.5">
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-bold text-gray-900 dark:text-white truncate flex items-center gap-1.5">
-                                    <span x-text="item.item_name"></span>
+                                    <span class="truncate" x-text="item.item_name"></span>
                                     <template x-if="item._isQuickCreated">
-                                        <span class="text-[8px] font-bold uppercase tracking-wider text-purple-700 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 px-1.5 py-0.5 rounded">{{ __('pos.no_recipe') }}</span>
+                                        <span class="flex-shrink-0 whitespace-nowrap text-[8px] font-bold uppercase tracking-wider text-purple-700 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 px-1.5 py-0.5 rounded">{{ __('pos.no_recipe') }}</span>
                                     </template>
                                 </p>
-                                {{-- Inline price editor — only shown when this row needs a price set (quick-created or zero-price).
-                                     Enter / blur saves to backend, updates cart unit_price + master allProducts. --}}
-                                <template x-if="quickPriceCartUid === item.cart_uid">
-                                    <div class="flex items-center gap-1.5 mt-1" @click.stop>
-                                        <span class="text-[10px] text-gray-500">Rs.</span>
-                                        <input type="number" min="0" step="any" x-ref="quickPriceInput" data-quick-price-input
-                                            x-model.number="quickPriceValue"
-                                            @keydown.enter.prevent="saveQuickPrice(index, true)"
-                                            @keydown.escape.prevent="cancelQuickPrice()"
-                                            @blur="saveQuickPrice(index)"
-                                            placeholder="{{ __('pos.ph_enter_price') }}"
-                                            class="w-24 text-xs font-bold bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-300 dark:border-purple-700 rounded-md px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:outline-none">
-                                        <span class="text-[9px] text-gray-400">{{ __('pos.save_esc_hint') }}</span>
-                                    </div>
-                                </template>
+                                {{-- Inline price editor moved OUT of this narrow column to a full-width
+                                     panel below the flex row (Aug 2026 overlap fix) — see below. --}}
                                 <template x-if="quickPriceCartUid !== item.cart_uid">
-                                    <p class="text-[11px] text-gray-400 mt-0.5">
+                                    <p class="text-[11px] text-gray-400 mt-0.5 truncate">
                                         <span x-text="'Rs. ' + Number(item.unit_price).toLocaleString() + window.TXT.per_unit_sfx"></span>
                                         <template x-if="item._isQuickCreated && Number(item.unit_price) === 0">
                                             <button @click.stop="openQuickPrice(item)" class="ml-1 text-purple-600 hover:underline font-semibold">{{ __('pos.set_price') }}</button>
@@ -1398,6 +1385,22 @@ window.addEventListener('popstate', function() {
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                             </button>
                         </div>
+                        {{-- Inline price editor (quick-created / zero-price row) — FULL-WIDTH panel (Aug 2026):
+                             inside the narrow name column the Rs. input + hint collided with qty/total on
+                             small widths & zoomed screens ("words mix ho rahe"). Same handlers/refs as before. --}}
+                        <template x-if="quickPriceCartUid === item.cart_uid">
+                            <div class="flex items-center gap-2 mt-1.5 px-2 py-1.5 rounded-lg bg-purple-50 dark:bg-purple-900/20" @click.stop>
+                                <span class="text-[11px] font-bold text-purple-700 dark:text-purple-300 whitespace-nowrap">Rs.</span>
+                                <input type="number" min="0" step="any" x-ref="quickPriceInput" data-quick-price-input
+                                    x-model.number="quickPriceValue"
+                                    @keydown.enter.prevent="saveQuickPrice(index, true)"
+                                    @keydown.escape.prevent="cancelQuickPrice()"
+                                    @blur="saveQuickPrice(index)"
+                                    placeholder="{{ __('pos.ph_enter_price') }}"
+                                    class="w-24 flex-shrink-0 text-sm font-bold bg-white dark:bg-gray-800 border-2 border-purple-300 dark:border-purple-700 rounded-md px-2 py-1 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                                <span class="text-[10px] text-gray-400 truncate min-w-0">{{ __('pos.save_esc_hint') }}</span>
+                            </div>
+                        </template>
                         {{-- Read-only chips for values carried in from recalled/edited bills or the
                              T/Alt+T tax shortcut (no per-item editors any more, but the cashier must
                              still SEE the state — NO TAX chip is the only exempt indicator now). --}}

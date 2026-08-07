@@ -453,6 +453,10 @@
                                     <p class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ $companyName }}</p>
                                 </div>
 
+                                {{-- SCROLLABLE middle (Aug 2026): the menu is taller than short/zoomed screens —
+                                     without max-h + overflow the bottom links (FBR Settings etc.) were unreachable.
+                                     Mirrors pos-app.blade.php's max-h-[65vh] pattern. Logout stays pinned below. --}}
+                                <div class="max-h-[65vh] overflow-y-auto">
                                 <div class="py-1">
                                     <p class="px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ __('pos.navigation') }}</p>
                                     <a href="{{ route('fbrpos.dashboard') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
@@ -557,6 +561,7 @@
                                     {{-- PWA install — always visible --}}
                                     <x-pwa-install-menu-item color="blue" app-name="Nest FBR POS" :label="__('pos.install_app_device')" item-class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300" />
                                 </div>
+                                </div>{{-- /scrollable middle --}}
 
                                 <div class="border-t border-gray-100 dark:border-gray-700 py-1">
                                     <form method="POST" action="{{ route('fbrpos.logout') }}">

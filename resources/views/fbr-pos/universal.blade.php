@@ -1677,10 +1677,10 @@ window.addEventListener('popstate', function() {
                 <div class="border-t-2 border-orange-200 dark:border-orange-800 bg-orange-50/60 dark:bg-orange-900/10">
                     <div class="px-4 pt-3 pb-1 flex items-center gap-2">
                         <svg class="w-4 h-4 text-orange-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                        <span class="text-xs font-bold text-orange-700 dark:text-orange-400">Settings Error — Auto-retry band hai</span>
+                        <span class="text-xs font-bold text-orange-700 dark:text-orange-400">{{ __('pos.config_error_autoretry_off') }}</span>
                         <span class="ml-auto text-[10px] text-orange-600 dark:text-orange-500 font-semibold" x-text="'(' + configErrorBills.length + ' bill)'"></span>
                     </div>
-                    <p class="text-[10px] text-orange-600 dark:text-orange-500 px-4 pb-2">FBR Settings mein POSID/Token set karein, phir manually Retry dabayein.</p>
+                    <p class="text-[10px] text-orange-600 dark:text-orange-500 px-4 pb-2">{{ __('pos.fq_set_then_retry') }}</p>
                     <template x-for="bill in configErrorBills" :key="'ce_' + bill.id">
                         <div class="px-4 py-2 border-b border-orange-100 dark:border-orange-900/30 flex items-center justify-between gap-2">
                             <div>
@@ -1688,7 +1688,7 @@ window.addEventListener('popstate', function() {
                                 <span class="ml-1 text-[10px] text-gray-500" x-text="'Rs. ' + Number(bill.total_amount).toLocaleString()"></span>
                                 <span class="ml-1 text-[9px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 font-bold">Settings Error</span>
                             </div>
-                            <button @click="retryFailed(bill)" :disabled="bill._retrying" title="Settings theek karne ke baad manually retry karein"
+                            <button @click="retryFailed(bill)" :disabled="bill._retrying" title="{{ __('pos.retry_after_fix_title') }}"
                                 class="shrink-0 px-2.5 py-1 text-[10px] font-bold text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition disabled:opacity-40 flex items-center gap-1">
                                 <svg x-show="!bill._retrying" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                                 <svg x-show="bill._retrying" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
@@ -1697,7 +1697,7 @@ window.addEventListener('popstate', function() {
                         </div>
                     </template>
                     <div class="px-4 py-2">
-                        <a href="{{ route('fbrpos.settings') }}" class="text-[10px] text-orange-600 hover:underline font-bold">→ FBR Settings kholein</a>
+                        <a href="{{ route('fbrpos.settings') }}" class="text-[10px] text-orange-600 hover:underline font-bold">→ {{ __('pos.open_fbr_settings') }}</a>
                     </div>
                 </div>
             </template>

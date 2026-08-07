@@ -26,6 +26,11 @@ class FbrPosTransaction extends Model
         // Order Matching (Aug 2026): token/code copied from held sale at billing time;
         // stored permanently so receipt reprints always carry the correct match identifier.
         'token_no', 'order_code',
+        // Persistent automated-retry counter — incremented by every automated retry path
+        // (SyncFbrPosOfflineInvoicesJob, RetryFbrPosSubmissionJob queue-retries,
+        // apiRetryFailed auto-sync calls) on failure. Reset to 0 on explicit manual retry
+        // or successful submission. Scheduler skips bills at >= MAX_AUTO_RETRY (5).
+        'fbr_auto_retry_count',
     ];
 
     protected $casts = [
@@ -42,6 +47,7 @@ class FbrPosTransaction extends Model
         'change_due' => 'decimal:2',
         'loyalty_redemption_amount' => 'decimal:2',
         'payment_breakdown' => 'array',
+        'fbr_auto_retry_count' => 'integer',
     ];
 
     public function company()

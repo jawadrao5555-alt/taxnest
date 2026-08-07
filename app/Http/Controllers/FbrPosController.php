@@ -1827,8 +1827,11 @@ class FbrPosController extends Controller
     {
         $companyId = app('currentCompanyId');
 
+        // config_error bills are included in the Fail Queue page (but NOT in the
+        // auto-retry pool on the sale screen). They get a distinct visual treatment
+        // and a "Fix Settings" note so the admin knows what to do.
         $query = FbrPosTransaction::where('company_id', $companyId)
-            ->whereIn('fbr_status', ['failed', 'pending'])
+            ->whereIn('fbr_status', ['failed', 'pending', 'config_error'])
             ->where(function ($q) {
                 $q->where('invoice_mode', 'fbr')->orWhereNull('invoice_mode');
             })
@@ -1854,7 +1857,8 @@ class FbrPosController extends Controller
                 SUM(CASE WHEN fbr_status = 'failed' THEN 1 ELSE 0 END) as failed_count,
                 SUM(CASE WHEN fbr_status = 'pending' THEN 1 ELSE 0 END) as pending_count,
                 SUM(CASE WHEN fbr_status = 'submitted' THEN 1 ELSE 0 END) as submitted_count,
-                SUM(CASE WHEN fbr_status = 'failed' THEN total_amount ELSE 0 END) as failed_amount
+                SUM(CASE WHEN fbr_status IN ('failed','config_error') THEN total_amount ELSE 0 END) as failed_amount,
+                SUM(CASE WHEN fbr_status = 'config_error' THEN 1 ELSE 0 END) as config_error_count
             ")
             ->first();
 
@@ -1888,7 +1892,7 @@ class FbrPosController extends Controller
     }
 
     /**
-     * Schedule retry job for a single failed invoice
+     * Schedule retry job for a single failed invoice (also accepts config_error bills).
      */
     public function failQueueRetryOne($id)
     {
@@ -1899,7 +1903,12 @@ class FbrPosController extends Controller
             return back()->with('error', __('pos.already_submitted_fbr_short'));
         }
 
+        // config_error bills may be manually retried from the Fail Queue page after
+        // the admin has fixed the FBR Settings (POSID / token). Reset to 'pending' so
+        // the job can attempt submission; if config is still broken it will re-land as
+        // 'config_error' (not 'failed') and stay out of the auto-retry pool.
         $tx->fbr_submission_hash = null;
+        $tx->fbr_status = 'pending';
         $tx->save();
         \App\Jobs\RetryFbrPosSubmissionJob::dispatch($tx->id)->delay(now()->addSeconds(5));
 
@@ -3541,32 +3550,47 @@ class FbrPosController extends Controller
     public function apiFailedBills(Request $request)
     {
         $companyId = app('currentCompanyId');
-        $bills = FbrPosTransaction::where('company_id', $companyId)
-            ->whereIn('fbr_status', ['failed', 'offline', 'pending'])
+
+        $baseQuery = FbrPosTransaction::where('company_id', $companyId)
             ->whereNull('fbr_invoice_number')
             ->where(function ($q) {
                 $q->whereNull('invoice_mode')->orWhere('invoice_mode', '!=', 'local');
-            })
+            });
+
+        // Auto-retry pool: failed/offline/pending only — config_error intentionally excluded
+        // so the 30-second auto-sync loop never picks up permanently-misconfigured bills.
+        $bills = (clone $baseQuery)
+            ->whereIn('fbr_status', ['failed', 'offline', 'pending'])
             ->orderBy('id', 'desc')
             ->limit(100)
             ->get(['id', 'invoice_number', 'customer_name', 'total_amount', 'fbr_status', 'created_at']);
 
-        $data = $bills->map(function ($b) {
-            return [
-                'id'             => $b->id,
-                'invoice_number' => $b->invoice_number,
-                'customer_name'  => $b->customer_name,
-                'total_amount'   => (float) $b->total_amount,
-                'fbr_status'     => $b->fbr_status,
-                'created_human'  => $b->created_at?->diffForHumans(),
-                'created_at'     => $b->created_at?->toDateTimeString(),
-            ];
-        });
+        $mapBill = fn ($b) => [
+            'id'             => (int) $b->id,
+            'invoice_number' => $b->invoice_number,
+            'customer_name'  => $b->customer_name,
+            'total_amount'   => (float) $b->total_amount,
+            'fbr_status'     => $b->fbr_status,
+            'created_human'  => $b->created_at?->diffForHumans(),
+            'created_at'     => $b->created_at?->toDateTimeString(),
+        ];
+
+        $data = $bills->map($mapBill);
+
+        // Config-error bills: shown separately in the F11 panel with a "Fix Settings" note.
+        // These are NOT in the auto-retry pool but ARE manually retryable (apiRetryFailed accepts them).
+        $configErrorBills = (clone $baseQuery)
+            ->where('fbr_status', 'config_error')
+            ->orderBy('id', 'desc')
+            ->limit(20)
+            ->get(['id', 'invoice_number', 'customer_name', 'total_amount', 'fbr_status', 'created_at'])
+            ->map($mapBill);
 
         return response()->json([
-            'success' => true,
-            'count'   => $data->count(),
-            'bills'   => $data,
+            'success'            => true,
+            'count'              => $data->count(),
+            'bills'              => $data,
+            'config_error_bills' => $configErrorBills,
         ]);
     }
 
@@ -3574,22 +3598,71 @@ class FbrPosController extends Controller
      * 🔄 Auto-sync API — retry a single failed FBR POS bill via JSON.
      * Race-safe atomic claim prevents duplicate FBR submissions on
      * double-click / concurrent poller / queued RetryFbrPosSubmissionJob.
+     *
+     * Accepts an optional JSON body flag: { "manual": true }
+     *  - manual=true  → explicit user action (F11 panel Retry button):
+     *      resets fbr_auto_retry_count to 0, no cap check.
+     *  - manual=false (default, auto-sync tick):
+     *      enforces SyncFbrPosOfflineInvoicesJob::MAX_AUTO_RETRY cap;
+     *      increments counter on failure.
      */
     public function apiRetryFailed(Request $request, $id)
     {
         $companyId = app('currentCompanyId');
+        $isManual  = (bool) $request->json('manual', false);
+        $maxRetry  = \App\Jobs\SyncFbrPosOfflineInvoicesJob::MAX_AUTO_RETRY;
 
-        // Atomic claim: flip from failed/offline → pending only if still
+        // Auto-sync cap check: if the caller is the automated 30-second loop
+        // (manual=false) and this bill has already exhausted its retry budget,
+        // refuse immediately so the loop can never spin past the cap.
+        if (!$isManual) {
+            $capCheck = FbrPosTransaction::where('company_id', $companyId)
+                ->where('id', $id)
+                ->whereNull('fbr_invoice_number')
+                ->whereIn('fbr_status', ['failed', 'offline', 'pending'])
+                ->where(function ($q) {
+                    $q->whereNull('invoice_mode')->orWhere('invoice_mode', '!=', 'local');
+                })
+                ->first(['fbr_auto_retry_count', 'fbr_status']);
+
+            if ($capCheck && $capCheck->fbr_auto_retry_count >= $maxRetry) {
+                return response()->json([
+                    'success' => false,
+                    'retry_exhausted' => true,
+                    'message' => __('pos.retry_cap_reached'),
+                ], 429);
+            }
+        }
+
+        // Build the update payload for the atomic claim.
+        // Manual retry resets the counter; auto retry leaves it untouched here
+        // (incremented below on failure).
+        $claimUpdate = ['fbr_status' => 'pending', 'fbr_submission_hash' => null];
+        if ($isManual) {
+            $claimUpdate['fbr_auto_retry_count'] = 0;
+        }
+
+        // Atomic claim: flip from failed/offline/pending/config_error → pending only if still
         // un-submitted. Conditional UPDATE returns affected-row count;
         // 0 = another caller already claimed it.
-        $claimed = FbrPosTransaction::where('company_id', $companyId)
+        // config_error is included here to allow MANUAL retry after the admin fixes settings
+        // (POSID / token). The auto-sync loop never picks up config_error bills (apiFailedBills
+        // only returns IN ('failed','offline','pending')), so this path is manual-only.
+        $claimQuery = FbrPosTransaction::where('company_id', $companyId)
             ->where('id', $id)
             ->whereNull('fbr_invoice_number')
-            ->whereIn('fbr_status', ['failed', 'offline', 'pending'])
+            ->whereIn('fbr_status', ['failed', 'offline', 'pending', 'config_error'])
             ->where(function ($q) {
                 $q->whereNull('invoice_mode')->orWhere('invoice_mode', '!=', 'local');
-            })
-            ->update(['fbr_status' => 'pending', 'fbr_submission_hash' => null]);
+            });
+
+        // Auto-sync: also enforce cap in the atomic claim to close the race window
+        // between the cap check above and this UPDATE.
+        if (!$isManual) {
+            $claimQuery->where('fbr_auto_retry_count', '<', $maxRetry);
+        }
+
+        $claimed = $claimQuery->update($claimUpdate);
 
         if ($claimed === 0) {
             $tx = FbrPosTransaction::where('company_id', $companyId)->where('id', $id)->first();
@@ -3604,6 +3677,14 @@ class FbrPosController extends Controller
             }
             if ($tx->invoice_mode === 'local') {
                 return response()->json(['success' => false, 'message' => __('pos.local_bill_not_submitted_design')], 422);
+            }
+            // Could be cap-blocked (auto-sync raced with another tick).
+            if (!$isManual && $tx->fbr_auto_retry_count >= $maxRetry) {
+                return response()->json([
+                    'success' => false,
+                    'retry_exhausted' => true,
+                    'message' => __('pos.retry_cap_reached'),
+                ], 429);
             }
             return response()->json([
                 'success' => false,
@@ -3622,6 +3703,8 @@ class FbrPosController extends Controller
             $transaction->refresh();
 
             if (($result['status'] ?? '') === 'success') {
+                // Reset counter on success (belt-and-suspenders: FbrService may have already done it).
+                FbrPosTransaction::where('id', $id)->update(['fbr_auto_retry_count' => 0]);
                 return response()->json([
                     'success'   => true,
                     'submitted' => true,
@@ -3631,11 +3714,20 @@ class FbrPosController extends Controller
                 ]);
             }
 
+            // Automated call: increment counter on failure so the cap is enforced
+            // over time even if page refreshes reset the session-level 3-strike cap.
+            if (!$isManual) {
+                FbrPosTransaction::where('id', $id)->increment('fbr_auto_retry_count');
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => __('pos.fbr_retry_failed_errors', ['error' => implode(', ', $result['errors'] ?? [__('pos.unknown_error')])]),
             ], 422);
         } catch (\Throwable $e) {
+            if (!$isManual) {
+                FbrPosTransaction::where('id', $id)->increment('fbr_auto_retry_count');
+            }
             return response()->json([
                 'success' => false,
                 'message' => __('pos.exception_error', ['error' => $e->getMessage()]),

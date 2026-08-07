@@ -21,7 +21,7 @@
     @endif
 
     {{-- Stats Cards --}}
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-red-200 dark:border-red-900/40 p-4 shadow-sm">
             <div class="text-[11px] uppercase tracking-wider text-red-600 font-bold">{{ __('pos.failed_word') }}</div>
             <div class="text-3xl font-black text-red-700 dark:text-red-400 mt-1">{{ (int)($stats->failed_count ?? 0) }}</div>
@@ -29,6 +29,10 @@
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-yellow-200 dark:border-yellow-900/40 p-4 shadow-sm">
             <div class="text-[11px] uppercase tracking-wider text-yellow-600 font-bold">{{ __('pos.pending_word') }}</div>
             <div class="text-3xl font-black text-yellow-700 dark:text-yellow-400 mt-1">{{ (int)($stats->pending_count ?? 0) }}</div>
+        </div>
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-orange-200 dark:border-orange-900/40 p-4 shadow-sm">
+            <div class="text-[11px] uppercase tracking-wider text-orange-600 font-bold">Settings Error</div>
+            <div class="text-3xl font-black text-orange-700 dark:text-orange-400 mt-1">{{ (int)($stats->config_error_count ?? 0) }}</div>
         </div>
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-emerald-200 dark:border-emerald-900/40 p-4 shadow-sm">
             <div class="text-[11px] uppercase tracking-wider text-emerald-600 font-bold">{{ __('pos.submitted_word') }}</div>
@@ -39,6 +43,21 @@
             <div class="text-2xl font-black text-gray-900 dark:text-white mt-1">Rs {{ number_format((float)($stats->failed_amount ?? 0), 0) }}</div>
         </div>
     </div>
+
+    {{-- Config-error alert (shown only when there are config_error bills) --}}
+    @if(($stats->config_error_count ?? 0) > 0)
+    <div class="mb-4 p-4 rounded-xl bg-orange-50 dark:bg-orange-900/20 border border-orange-300 dark:border-orange-700 flex items-start gap-3">
+        <svg class="w-5 h-5 text-orange-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <div>
+            <div class="font-bold text-orange-800 dark:text-orange-300">{{ (int)($stats->config_error_count ?? 0) }} {{ Str::plural('bill', (int)($stats->config_error_count ?? 0)) }} blocked — FBR Settings incomplete</div>
+            <p class="text-xs text-orange-700 dark:text-orange-400 mt-0.5">
+                Yeh bills FBR mein submit nahi hue kyunki <strong>POSID ya Token</strong> configure nahi hai.
+                Pehle <a href="{{ route('fbrpos.settings') }}" class="underline font-bold">FBR Settings</a> mein POSID aur Token set karein,
+                phir neeche "Retry" button dabayein. Yeh bills auto-retry pool mein nahi jate jab tak manually retry na karein.
+            </p>
+        </div>
+    </div>
+    @endif
 
     {{-- Action Bar --}}
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 mb-4 shadow-sm">
@@ -90,7 +109,7 @@
                 </thead>
                 <tbody class="divide-y divide-gray-200 dark:divide-gray-800" x-data="{ online: navigator.onLine }" x-init="window.addEventListener('online', () => online = true); window.addEventListener('offline', () => online = false);">
                     @forelse($transactions as $tx)
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40">
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40 {{ $tx->fbr_status === 'config_error' ? 'bg-orange-50/40 dark:bg-orange-900/10' : '' }}">
                         <td class="px-4 py-3 text-sm">
                             <a href="{{ route('fbrpos.show', $tx->id) }}" class="font-bold text-blue-600 hover:underline">{{ $tx->invoice_number }}</a>
                         </td>
@@ -104,32 +123,47 @@
                                 <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-xs font-bold"><span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> {{ __('pos.failed_word') }}</span>
                             @elseif($tx->fbr_status === 'pending')
                                 <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 text-xs font-bold"><span class="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse"></span> {{ __('pos.pending_word') }}</span>
+                            @elseif($tx->fbr_status === 'config_error')
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 text-xs font-bold"><span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span> Settings Error</span>
                             @endif
                         </td>
                         <td class="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 max-w-xs">
-                            @php $lastLog = $tx->fbrLogs->first(); @endphp
-                            @if($lastLog && $lastLog->error_message)
-                                <span title="{{ $lastLog->error_message }}">{{ \Illuminate\Support\Str::limit($lastLog->error_message, 80) }}</span>
+                            @if($tx->fbr_status === 'config_error')
+                                <span class="text-orange-600 dark:text-orange-400 font-medium">FBR Settings mein POSID/Token set karein, phir Retry dabayein.</span>
                             @else
-                                <span class="text-gray-400 italic">{{ __('pos.no_error_log') }}</span>
+                                @php $lastLog = $tx->fbrLogs->first(); @endphp
+                                @if($lastLog && $lastLog->error_message)
+                                    <span title="{{ $lastLog->error_message }}">{{ \Illuminate\Support\Str::limit($lastLog->error_message, 80) }}</span>
+                                @else
+                                    <span class="text-gray-400 italic">{{ __('pos.no_error_log') }}</span>
+                                @endif
                             @endif
                         </td>
                         <td class="px-4 py-3 text-xs text-gray-500">{{ $tx->created_at->format('d M H:i') }}</td>
                         <td class="px-4 py-3 text-right">
                             <div class="flex items-center justify-end gap-2">
+                                @if($tx->fbr_status !== 'config_error')
                                 <a href="{{ route('fbrpos.editFailed', $tx->id) }}"
                                    class="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-sm flex items-center gap-1"
                                    title="{{ __('pos.ti_edit_line_items_retry') }}">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                     {{ __('pos.edit') }}
                                 </a>
+                                @else
+                                <a href="{{ route('fbrpos.settings') }}"
+                                   class="px-3 py-1.5 rounded-lg text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white shadow-sm flex items-center gap-1"
+                                   title="FBR Settings mein POSID aur Token configure karein">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                    Fix Settings
+                                </a>
+                                @endif
                                 <form method="POST" action="{{ route('fbrpos.failQueue.retryOne', $tx->id) }}" class="inline">
                                     @csrf
                                     <button type="submit"
                                         :disabled="!online"
                                         :class="online ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'"
                                         class="px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm flex items-center gap-1"
-                                        title="{{ __('pos.ti_retry_as_is') }}">
+                                        title="{{ $tx->fbr_status === 'config_error' ? 'Settings theek karne ke baad retry karein' : __('pos.ti_retry_as_is') }}">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                                         {{ __('pos.retry_word') }}
                                     </button>
@@ -160,6 +194,7 @@
             <li>{{ __('pos.auto_retry_bullet_2') }}</li>
             <li>{{ __('pos.auto_retry_bullet_3') }}</li>
             <li>{{ __('pos.auto_retry_bullet_4') }}</li>
+            <li>Bills jinka status <strong>Settings Error</strong> hai woh auto-retry mein nahi jate — pehle FBR Settings mein POSID/Token set karein.</li>
         </ul>
     </div>
 </div>

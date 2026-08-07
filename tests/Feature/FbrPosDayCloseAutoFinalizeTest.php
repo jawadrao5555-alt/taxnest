@@ -97,6 +97,8 @@ class FbrPosDayCloseAutoFinalizeTest extends TestCase
             $table->string('payment_method')->nullable();
             $table->decimal('cash_received', 12, 2)->nullable();
             $table->decimal('change_due', 12, 2)->nullable();
+            // Persistent automated-retry counter (added Aug 2026).
+            $table->unsignedTinyInteger('fbr_auto_retry_count')->default(0);
             $table->timestamps();
         });
 
@@ -409,8 +411,10 @@ class FbrPosDayCloseAutoFinalizeTest extends TestCase
 
         $tx = $this->tx($bill);
         // FINAL + Fail-Queue retryable — the bill is never lost, never deleted.
+        // fbr_status = 'config_error': permanent config failure (POSID missing) →
+        // terminal state that escapes the auto-retry loop; manually retryable once settings fixed.
         $this->assertSame('fbr', $tx->invoice_mode);
-        $this->assertSame('failed', $tx->fbr_status);
+        $this->assertSame('config_error', $tx->fbr_status);
         $this->assertNull($tx->fbr_invoice_number);
         $this->assertSame('L-0001', $tx->invoice_number);
         $this->assertSame(200.0, (float) $tx->subtotal);

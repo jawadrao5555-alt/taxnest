@@ -1828,6 +1828,10 @@ class FbrService
         $payload = $this->buildFbrPosPayload($transaction);
 
         // IMS mandatory-field guards — fail with a clear message instead of an opaque FBR rejection.
+        // These are PERMANENT config errors (not transient network failures): set fbr_status =
+        // 'config_error' so the auto-retry loop never picks them up again. The bill stays
+        // retryable via MANUAL retry (apiRetryFailed accepts config_error) once the admin
+        // fixes the settings.
         if (empty($payload['POSID'])) {
             $clearHashOnFailure();
             \App\Models\FbrPosLog::create([
@@ -1837,9 +1841,9 @@ class FbrService
                 'status' => 'failed',
                 'error_message' => 'FBR POS Registration ID (POSID) not configured. Set it in FBR Settings.',
             ]);
-            $transaction->update(['fbr_status' => 'failed']);
+            $transaction->update(['fbr_status' => 'config_error']);
             return [
-                'status' => 'failed',
+                'status' => 'config_error',
                 'errors' => ['FBR POS Registration ID not set. Add it in FBR Settings before submitting.'],
             ];
         }
@@ -1870,9 +1874,10 @@ class FbrService
                 'status' => 'failed',
                 'error_message' => 'FBR token not configured. Set up FBR credentials in company settings.',
             ]);
-            $transaction->update(['fbr_status' => 'failed']);
+            // Permanent config error — same terminal-state logic as POSID missing above.
+            $transaction->update(['fbr_status' => 'config_error']);
             return [
-                'status' => 'failed',
+                'status' => 'config_error',
                 'errors' => ['FBR token not configured for this company.'],
             ];
         }

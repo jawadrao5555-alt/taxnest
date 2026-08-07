@@ -271,6 +271,9 @@ class PosRiderController extends Controller
         // view par nazar hi nahi aate thay. Pending ab HAR tareekh ke khule bills
         // dikhata hai (oldest first — sab se purana sab se upar). Delivered/Returned
         // tabs din ke hisaab se hi rehte hain (read-only history).
+        // rider_assigned_at is an incremental column — schema-guard (PROD drift).
+        $assignedTsExpr = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_assigned_at')
+            ? 'COALESCE(rider_assigned_at, created_at)' : 'created_at';
         $openBillsAll = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->where(function ($q) {
@@ -279,7 +282,7 @@ class PosRiderController extends Controller
             ->whereIn('status', ['completed'])
             ->whereIn('delivery_status', ['assigned', 'dispatched'])
             ->with('rider')
-            ->orderBy(DB::raw('COALESCE(rider_assigned_at, created_at)'))
+            ->orderBy(DB::raw($assignedTsExpr))
             ->get();
 
         // Tab counts (computed on the collections — single DB round-trip each).
@@ -355,7 +358,7 @@ class PosRiderController extends Controller
             ->whereIn('rider_id', $riders->pluck('id'))
             ->whereNull('rider_settlement_id')
             ->whereIn('delivery_status', ['assigned', 'dispatched'])
-            ->selectRaw('rider_id, MIN(COALESCE(rider_assigned_at, created_at)) as oldest')
+            ->selectRaw("rider_id, MIN({$assignedTsExpr}) as oldest")
             ->groupBy('rider_id')
             ->pluck('oldest', 'rider_id')
             ->map(function ($ts) {

@@ -464,7 +464,9 @@ class PosRiderTrackingController extends Controller
             ->where('company_id', $companyId)
             ->whereNotNull('rider_id')
             ->whereIn('delivery_status', ['assigned', 'dispatched'])
-            ->selectRaw('rider_id, COUNT(*) AS c, MIN(COALESCE(rider_assigned_at, created_at)) AS oldest')
+            ->selectRaw('rider_id, COUNT(*) AS c, MIN(' .
+                (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_assigned_at')
+                    ? 'COALESCE(rider_assigned_at, created_at)' : 'created_at') . ') AS oldest')
             ->groupBy('rider_id')->get()->keyBy('rider_id');
 
         $riders = PosRider::where('company_id', $companyId)

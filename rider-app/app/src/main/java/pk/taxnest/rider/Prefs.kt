@@ -53,6 +53,7 @@ object Prefs {
     fun clearToken(c: Context) =
         sp(c).edit()
             .remove("token").remove("rider_name").remove("company_name")
+            .remove("seen_deliveries") // fresh login must re-alert still-open bills
             .putBoolean("duty", false)
             .apply()
 

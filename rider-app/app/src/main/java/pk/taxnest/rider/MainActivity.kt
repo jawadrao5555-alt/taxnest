@@ -447,11 +447,25 @@ class MainActivity : AppCompatActivity() {
             val (code, body) = ApiClient.get("/version")
             if (code in 200..299 && body != null) {
                 val latest = body.optString("latest", "")
-                if (latest.isNotBlank() && latest != BuildConfig.VERSION_NAME) {
+                // Only prompt when the server version is strictly NEWER — a beta
+                // build ahead of the server must not see a bogus update banner.
+                if (latest.isNotBlank() && isNewerVersion(latest, BuildConfig.VERSION_NAME)) {
                     runOnUiThread { updateRow.visibility = View.VISIBLE }
                 }
             }
         }
+    }
+
+    /** Numeric dot-segment compare: true when [latest] > [current]. */
+    private fun isNewerVersion(latest: String, current: String): Boolean {
+        val l = latest.split(".")
+        val c = current.split(".")
+        for (i in 0 until maxOf(l.size, c.size)) {
+            val li = l.getOrNull(i)?.trim()?.toIntOrNull() ?: 0
+            val ci = c.getOrNull(i)?.trim()?.toIntOrNull() ?: 0
+            if (li != ci) return li > ci
+        }
+        return false
     }
 
     private fun sessionExpired() {

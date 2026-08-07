@@ -266,9 +266,25 @@ class PosRiderController extends Controller
 
         $allBills = $billQuery->get();
 
-        // Tab counts (computed on the collection — single DB round-trip).
+        // Owner (7 Aug 2026, Touseef case): purane atke bills GHAYAB thay — pending
+        // tab date-filtered thi, 3-4 din pehle ke assigned/dispatched bills default
+        // view par nazar hi nahi aate thay. Pending ab HAR tareekh ke khule bills
+        // dikhata hai (oldest first — sab se purana sab se upar). Delivered/Returned
+        // tabs din ke hisaab se hi rehte hain (read-only history).
+        $openBillsAll = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->where(function ($q) {
+                $q->where('order_type', 'delivery')->orWhereNotNull('rider_id');
+            })
+            ->whereIn('status', ['completed'])
+            ->whereIn('delivery_status', ['assigned', 'dispatched'])
+            ->with('rider')
+            ->orderBy(DB::raw('COALESCE(rider_assigned_at, created_at)'))
+            ->get();
+
+        // Tab counts (computed on the collections — single DB round-trip each).
         $tabCounts = [
-            'pending'   => $allBills->whereIn('delivery_status', ['assigned', 'dispatched'])->count(),
+            'pending'   => $openBillsAll->count(),
             'delivered' => $allBills->where('delivery_status', 'delivered')->count(),
             'returned'  => $allBills->where('delivery_status', 'returned')->count(),
         ];
@@ -280,7 +296,7 @@ class PosRiderController extends Controller
             $activeTab = 'pending';
         }
         if ($activeTab === 'pending') {
-            $bills = $allBills->whereIn('delivery_status', ['assigned', 'dispatched'])->values();
+            $bills = $openBillsAll->values();
         } elseif ($activeTab === 'delivered') {
             $bills = $allBills->where('delivery_status', 'delivered')->values();
         } else {
@@ -331,6 +347,22 @@ class PosRiderController extends Controller
             ->groupBy('rider_id')
             ->pluck('c', 'rider_id');
 
+        // Oldest open delivery per rider (owner, 7 Aug 2026): card par numayan ho
+        // ke kis rider ka bill kitne DIN se latka hua hai. COALESCE: pre-migration
+        // rows may lack rider_assigned_at.
+        $openDeliveryOldest = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->whereIn('rider_id', $riders->pluck('id'))
+            ->whereNull('rider_settlement_id')
+            ->whereIn('delivery_status', ['assigned', 'dispatched'])
+            ->selectRaw('rider_id, MIN(COALESCE(rider_assigned_at, created_at)) as oldest')
+            ->groupBy('rider_id')
+            ->pluck('oldest', 'rider_id')
+            ->map(function ($ts) {
+                // Carbon 3 signed diffs — abs() or a past timestamp goes negative.
+                return (int) floor(abs(now()->diffInHours(\Carbon\Carbon::parse($ts))) / 24);
+            });
+
         // Per-rider day summary — derived from the already-loaded $allBills collection
         // (zero extra DB queries). Groups by rider_id and counts by delivery_status bucket.
         // Bills with no rider_id are skipped (unassigned deliveries go into the total only).
@@ -352,7 +384,7 @@ class PosRiderController extends Controller
         $currentRole = auth('pos')->user()->pos_role ?? null;
         $isAdminOrManager = in_array($currentRole, ['pos_admin', 'pos_manager'], true);
 
-        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager'));
+        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'openDeliveryOldest', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager'));
     }
 
     /** Assign / reassign / unassign a rider on a delivery bill. */

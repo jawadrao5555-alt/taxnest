@@ -61,10 +61,15 @@
                 </div>
                 {{-- Owner (3 Aug 2026): "pehle se kitne order bahar" numaya ho —
                      assign karte waqt cashier ko ek nazar mein dikhe. --}}
+                @php $oldestDays = (int) ($openDeliveryOldest[$rider->id] ?? 0); @endphp
                 @if($openDel > 0)
-                <span class="flex-shrink-0 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">{{ __('pos.rider_out_pill', ['count' => $openDel]) }}</span>
+                {{-- Purana atka bill = LAAL pill (owner, 7 Aug 2026 — Touseef case) --}}
+                <span class="flex-shrink-0 px-2 py-0.5 rounded-full text-[11px] font-extrabold {{ $oldestDays >= 1 ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' }}">{{ __('pos.rider_out_pill', ['count' => $openDel]) }}</span>
                 @endif
             </div>
+            @if($openDel > 0 && $oldestDays >= 1)
+            <div class="text-[11px] font-bold text-red-600 dark:text-red-400 mb-1">{{ __('pos.del_oldest_days', ['days' => $oldestDays]) }}</div>
+            @endif
             @if($rider->phone)<div class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{{ $rider->phone }}</div>@endif
             @if($owed > 0)
                 <div class="text-lg font-bold text-amber-600 dark:text-amber-400">Rs. {{ number_format($owed) }}</div>
@@ -259,7 +264,13 @@
                     <tr data-delrow data-search="{{ Str::lower(($b->invoice_number ?: ('#' . $b->id)) . ' ' . ($b->customer_name ?? '') . ' ' . ($b->customer_phone ?? '') . ' ' . ($b->delivery_address ?? '') . ' ' . ($b->rider->name ?? '') . ' ' . ($b->delivery_status ?? '')) }}">
                         <td class="px-4 py-3">
                             <div class="font-semibold text-gray-900 dark:text-white">{{ $b->invoice_number ?: ('#' . $b->id) }}</div>
-                            <div class="text-[11px] text-gray-400">{{ $b->created_at->format('h:i A') }}</div>
+                            {{-- Pending tab ab HAR tareekh ke khule bills dikhata hai (7 Aug 2026) —
+                                 purane bill par tareekh + "X din se pending" ka laal chip. --}}
+                            @php $billAgeDays = (int) floor(abs(now()->diffInHours(\Carbon\Carbon::parse($b->rider_assigned_at ?: $b->created_at))) / 24); @endphp
+                            <div class="text-[11px] text-gray-400">{{ $billAgeDays >= 1 ? $b->created_at->format('d M · h:i A') : $b->created_at->format('h:i A') }}</div>
+                            @if($activeTab === 'pending' && $billAgeDays >= 1)
+                                <span class="inline-flex mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold {{ $billAgeDays >= 2 ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' }}">{{ __('pos.del_age_days', ['days' => $billAgeDays]) }}</span>
+                            @endif
                         </td>
                         <td class="px-4 py-3">
                             <div class="text-gray-700 dark:text-gray-300">{{ $b->customer_name ?: __('pos.walk_in') }}</div>

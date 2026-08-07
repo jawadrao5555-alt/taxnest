@@ -464,8 +464,8 @@ class PosRiderTrackingController extends Controller
             ->where('company_id', $companyId)
             ->whereNotNull('rider_id')
             ->whereIn('delivery_status', ['assigned', 'dispatched'])
-            ->selectRaw('rider_id, COUNT(*) AS c')
-            ->groupBy('rider_id')->pluck('c', 'rider_id');
+            ->selectRaw('rider_id, COUNT(*) AS c, MIN(COALESCE(rider_assigned_at, created_at)) AS oldest')
+            ->groupBy('rider_id')->get()->keyBy('rider_id');
 
         $riders = PosRider::where('company_id', $companyId)
             ->where('is_active', true)
@@ -482,7 +482,11 @@ class PosRiderTrackingController extends Controller
                 'located_at' => optional($r->last_located_at)->toIso8601String(),
                 'seconds_ago' => $r->last_located_at
                     ? (int) abs(now()->diffInSeconds($r->last_located_at)) : null,
-                'open_deliveries' => (int) ($open[$r->id] ?? 0),
+                'open_deliveries' => (int) ($open[$r->id]->c ?? 0),
+                // Kitne DIN se sab se purana bill atka hai (owner, 7 Aug 2026) —
+                // Carbon 3 signed diff, abs() zaroori.
+                'oldest_open_days' => (isset($open[$r->id]) && $open[$r->id]->oldest)
+                    ? (int) floor(abs(now()->diffInHours(\Carbon\Carbon::parse($open[$r->id]->oldest))) / 24) : 0,
             ])->values();
 
         return response()->json(['ok' => true, 'riders' => $riders, 'server_time' => now()->toIso8601String()]);

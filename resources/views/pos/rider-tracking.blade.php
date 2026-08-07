@@ -53,6 +53,7 @@
             'last_seen' => __('pos.rt_last_seen'),
             'no_location' => __('pos.rt_no_location'),
             'open_deliveries' => __('pos.rt_open_deliveries'),
+            'days_short' => __('pos.rt_days_short'),
             'trail' => __('pos.rt_trail'),
             'min_ago' => __('pos.rt_min_ago'),
             'just_now' => __('pos.rt_just_now'),
@@ -115,7 +116,7 @@
                         <div class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
                             <span x-text="r.on_duty ? i18n.on_duty : i18n.off_duty"></span>
                             <template x-if="r.open_deliveries > 0">
-                                <span> · <span x-text="r.open_deliveries"></span> {{ __('pos.rt_bills_short') }}</span>
+                                <span :class="r.oldest_open_days >= 1 ? 'text-red-600 dark:text-red-400 font-bold' : ''"> · <span x-text="r.open_deliveries"></span> {{ __('pos.rt_bills_short') }}<span x-show="r.oldest_open_days >= 1" x-text="' · ' + r.oldest_open_days + ' ' + i18n.days_short"></span></span>
                             </template>
                         </div>
                         <div class="text-[11px] text-gray-400 dark:text-gray-500" x-text="agoText(r)"></div>

@@ -1394,7 +1394,9 @@ window.addEventListener('popstate', function() {
          Unknown search/scan now asks for FULL details (name, price, UoM, tax, HS code,
          barcode) instead of instantly creating a Rs.0 product. A scanned NUMERIC code
          pre-fills only the BARCODE field — digits can never become a product name. --}}
-    <div x-show="qcModal" x-cloak x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="qcCancel()" @keydown.escape.prevent.stop="qcCancel()">
+    {{-- STICKY modal (owner, Aug 2026): click OUTSIDE must NOT dismiss — the form stands
+         until Cancel/Esc or Save ("side par click karne se band na ho"). No @click.self. --}}
+    <div x-show="qcModal" x-cloak x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @keydown.escape.prevent.stop="qcCancel()">
         <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
             <div class="flex items-center justify-between px-4 py-3 bg-blue-600">
                 <h3 class="text-sm font-bold text-white">{{ __('pos.qc_modal_title') }}</h3>
@@ -1404,7 +1406,8 @@ window.addEventListener('popstate', function() {
             </div>
             <div class="p-4 space-y-3" style="max-height:70vh; overflow-y:auto;">
                 <p x-show="qcFromScan" class="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 rounded-lg px-3 py-2 font-medium">{{ __('pos.qc_scanned_hint') }}</p>
-                <p x-show="!qcFromScan" class="text-xs text-gray-500 dark:text-gray-400">{{ __('pos.qc_typed_hint') }}</p>
+                <p x-show="!qcFromScan && !qcExistingId" class="text-xs text-gray-500 dark:text-gray-400">{{ __('pos.qc_typed_hint') }}</p>
+                <p x-show="qcExistingId" x-cloak class="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 rounded-lg px-3 py-2 font-medium">{{ __('pos.qc_existing_hint') }}</p>
                 <div>
                     <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">{{ __('pos.qc_name_label') }} <span class="text-red-500">*</span></label>
                     <input type="text" id="qc-name-input" x-model="qcName"
@@ -3303,9 +3306,14 @@ function restaurantPos() {
                 // re-creates the same product forever (Aug 2026 scanner bug).
                 const existing = [...this.allProducts, ...this.allServices].find(it => it.name && it.name.trim().toLowerCase() === nameQ);
                 if (existing) {
+                    // Unpriced PRODUCT match: open the FULL popup prefilled (owner, Aug 2026 —
+                    // "cart mein jaakar nahi"); it joins the cart only after Save. Priced rows
+                    // and services keep the instant-add (+ inline editor for unpriced services).
+                    if (!(parseFloat(existing.price) > 0) && (existing.type || 'product') === 'product') {
+                        this.qcOpenForExisting(existing);
+                        return;
+                    }
                     this.quickAddItem(existing);
-                    // Zero-price catalog row: reopen the inline price editor on its cart row
-                    // so the cashier can set the price — same UX as a fresh quick-create.
                     if (!(parseFloat(existing.price) > 0)) {
                         const row = [...this.cart].reverse().find(c => c.item_id === existing.id && c.item_type === (existing.type || 'product'));
                         if (row) this.openQuickPrice(row);
@@ -3750,6 +3758,7 @@ function restaurantPos() {
         qcModal: false,
         qcSaving: false,
         qcFromScan: false,
+        qcExistingId: null,   // set = popup is EDITING an existing unpriced product (update, not create)
         qcName: '', qcBarcode: '', qcPrice: '', qcUom: 'U', qcTaxMode: 'standard', qcTaxRate: '', qcHsCode: '',
         quickPriceCartUid: null,    // cart_uid of row currently in price-edit mode
         quickPriceValue: '',        // bound to the inline price input
@@ -3763,17 +3772,24 @@ function restaurantPos() {
             if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
             // ZERO-PRICE BARCODE RESCUE: the Enter fast path only takes price>0 matches,
             // so an exact barcode/SKU hit at ANY price must never fall through to the
-            // create modal — add it and reopen the inline price editor on its cart row
-            // (mirrors the name duplicate guard in addHighlightedItem).
+            // create-fresh path. Priced hit = add instantly. Unpriced PRODUCT hit = open the
+            // FULL popup prefilled (owner, Aug 2026: "cart mein jaakar nahi" — details modal,
+            // not the in-cart editor); item joins the cart only after Save. Services keep the
+            // old inline-editor path (quick-create update covers products only).
             const codeHit = [...this.allProducts, ...this.allServices].find(it => this.isExactCodeMatch(it, typed.toLowerCase()));
             if (codeHit) {
-                this.quickAddItem(codeHit);
-                if (!(parseFloat(codeHit.price) > 0)) {
-                    const row = [...this.cart].reverse().find(c => c.item_id === codeHit.id && c.item_type === (codeHit.type || 'product'));
-                    if (row) this.openQuickPrice(row);
+                if (parseFloat(codeHit.price) > 0 || (codeHit.type || 'product') !== 'product') {
+                    this.quickAddItem(codeHit);
+                    if (!(parseFloat(codeHit.price) > 0)) {
+                        const row = [...this.cart].reverse().find(c => c.item_id === codeHit.id && c.item_type === (codeHit.type || 'product'));
+                        if (row) this.openQuickPrice(row);
+                    }
+                    return;
                 }
+                this.qcOpenForExisting(codeHit);
                 return;
             }
+            this.qcExistingId = null;
             // A numeric code (6+ digits) is a BARCODE, never a product name.
             this.qcFromScan = /^[0-9]{6,}$/.test(typed);
             this.qcName = this.qcFromScan ? '' : typed;
@@ -3788,8 +3804,29 @@ function restaurantPos() {
                 if (el) el.focus();
             });
         },
+        // Open the SAME full-details popup for an EXISTING unpriced catalog product —
+        // prefilled with everything we already know; Save UPDATES the product server-side
+        // (price + missing details) and only then adds it to the cart. Cancel = no cart change.
+        qcOpenForExisting(prod) {
+            if (this.qcModal || this.qcSaving) return;
+            if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
+            this.qcExistingId = prod.id;
+            this.qcFromScan = false;
+            this.qcName = prod.name || '';
+            this.qcBarcode = prod.barcode || '';
+            this.qcPrice = parseFloat(prod.price) > 0 ? prod.price : '';
+            this.qcUom = prod.uom || 'U';
+            const tr = parseFloat(prod.tax_rate);
+            this.qcTaxMode = prod.is_tax_exempt ? 'exempt' : ((isNaN(tr) || tr === 18) ? 'standard' : 'custom');
+            this.qcTaxRate = this.qcTaxMode === 'custom' ? tr : '';
+            this.qcHsCode = prod.hs_code || '';
+            this.showSearchDropdown = false;
+            this.qcModal = true;
+            this.$nextTick(() => { const el = document.getElementById('qc-price-input'); if (el) el.focus(); });
+        },
         qcCancel() {
             this.qcModal = false;
+            this.qcExistingId = null;
             this.searchQuery = '';
             this.searchSuggestions = [];
             this.showSearchDropdown = false;
@@ -3826,6 +3863,7 @@ function restaurantPos() {
                         tax_mode: this.qcTaxMode,
                         tax_rate: this.qcTaxMode === 'custom' ? (parseFloat(this.qcTaxRate) || 0) : null,
                         hs_code: (this.qcHsCode || '').trim() || null,
+                        existing_id: this.qcExistingId,
                     }),
                 });
                 const data = await res.json();
@@ -3836,7 +3874,11 @@ function restaurantPos() {
                 const p = data.product;
                 // Server may DEDUPE (same name OR same barcode already exists) — never push a
                 // twin entry into the local catalog or the duplicate guard stops finding it.
-                if (!this.allProducts.some(x => x.id === p.id)) this.allProducts.push(p);
+                // Existing entry: MERGE the returned fields (price may have just been set via
+                // the edit-mode popup — a stale Rs.0 here would reopen the popup on every scan).
+                const qcIdx = this.allProducts.findIndex(x => x.id === p.id);
+                if (qcIdx === -1) this.allProducts.push(p);
+                else this.allProducts[qcIdx] = { ...this.allProducts[qcIdx], ...p };
                 const pPrice = parseFloat(p.price) || 0;
                 this.addToCart({ id: p.id, type: 'product', name: p.name, price: pPrice, is_tax_exempt: !!p.is_tax_exempt, tax_rate: p.tax_rate, hs_code: p.hs_code, uom: p.uom });
                 // Zero-price row (deliberate Rs.0, or dedupe returned an unpriced product):
@@ -3853,6 +3895,7 @@ function restaurantPos() {
                 // GUIDED FLOW (opt-in): first quick-created item moves the indicator off "customer".
                 if (this.guidedFlow && this.flowStep === 'customer') this.flowStep = 'items';
                 this.qcModal = false;
+                this.qcExistingId = null;
                 this.searchQuery = '';
                 this.searchSuggestions = [];
                 this.showSearchDropdown = false;

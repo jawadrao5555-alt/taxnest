@@ -2623,6 +2623,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'qc_tax_label' => 'Tax',
     'qc_tax_standard' => 'Standard — 18%',
     'qc_typed_hint' => 'Yeh product maujood nahi — details bhar kar banayein.',
+    'qc_existing_hint' => 'Is product ki qeemat abhi set nahi — tafseel mukammal kar ke save karein.',
     'qty' => 'Qty',
     'qty_needed' => 'Qty Needed',
     'qty_needed_per_product' => 'Zaroori qty (fi 1 product)',

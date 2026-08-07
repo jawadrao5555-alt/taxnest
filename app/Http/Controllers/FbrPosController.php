@@ -3966,6 +3966,9 @@ class FbrPosController extends Controller
             'tax_mode' => 'nullable|in:standard,exempt,custom',
             'tax_rate' => 'nullable|required_if:tax_mode,custom|numeric|min:0|max:100',
             'hs_code'  => 'nullable|string|max:50',
+            // Edit-mode (owner, Aug 2026): the popup reopens for an EXISTING unpriced
+            // product — Save updates that row instead of creating/deduping a twin.
+            'existing_id' => 'nullable|integer',
         ]);
         $name = trim($data['name']);
         if ($name === '') {
@@ -3997,16 +4000,59 @@ class FbrPosController extends Controller
             // runs; behavior degrades to the pre-lock check-then-insert, never blocks a sale.
         }
         try {
-            $existing = Product::where('company_id', $companyId)
-                ->where('is_active', true)
-                ->where(function ($q) use ($name, $barcode) {
-                    $q->whereRaw('LOWER(name) = ?', [mb_strtolower($name)]);
-                    if ($barcode !== null) {
-                        $q->orWhere('barcode', $barcode);
-                    }
-                })
-                ->first();
+            // Edit-mode: an explicit existing_id (popup reopened for an unpriced row) wins
+            // over name/barcode dedupe — company-scoped, never cross-tenant.
+            $existing = null;
+            $viaId    = false;
+            if (!empty($data['existing_id'])) {
+                $existing = Product::where('company_id', $companyId)
+                    ->where('is_active', true)
+                    ->find((int) $data['existing_id']);
+                $viaId = $existing !== null;
+            }
+            if (!$existing) {
+                $existing = Product::where('company_id', $companyId)
+                    ->where('is_active', true)
+                    ->where(function ($q) use ($name, $barcode) {
+                        $q->whereRaw('LOWER(name) = ?', [mb_strtolower($name)]);
+                        if ($barcode !== null) {
+                            $q->orWhere('barcode', $barcode);
+                        }
+                    })
+                    ->first();
+            }
             if ($existing) {
+                // OWNER (Aug 2026): an UNPRICED (Rs.0) row saved from the full-details popup
+                // gets UPDATED — price always; missing barcode/hs filled; uom/tax taken over.
+                // Priced rows are returned untouched (dedupe semantics unchanged).
+                if ((float) $existing->default_price <= 0 && isset($data['price']) && (float) $data['price'] > 0) {
+                    $existing->default_price    = (float) $data['price'];
+                    if ($barcode !== null && !$existing->barcode) {
+                        $existing->barcode = $barcode;
+                    }
+                    if (!empty($data['uom'])) {
+                        $existing->uom = $data['uom'];
+                    }
+                    $existing->tax_type         = $taxType;
+                    $existing->default_tax_rate = $taxRate;
+                    $hsIn = isset($data['hs_code']) ? (trim((string) $data['hs_code']) ?: null) : null;
+                    if ($hsIn !== null && !$existing->hs_code) {
+                        $existing->hs_code = $hsIn;
+                    }
+                    // Name correction only in explicit edit-mode, and only when it doesn't
+                    // collide with another active product (dedupe key stays trustworthy).
+                    if ($viaId && $name !== '' && mb_strtolower($name) !== mb_strtolower($existing->name)) {
+                        $nameClash = Product::where('company_id', $companyId)
+                            ->where('is_active', true)
+                            ->where('id', '!=', $existing->id)
+                            ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
+                            ->exists();
+                        if (!$nameClash) {
+                            $existing->name = $name;
+                        }
+                    }
+                    $existing->save();
+                }
                 return response()->json([
                     'ok' => true,
                     'product' => [

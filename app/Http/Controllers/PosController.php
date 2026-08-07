@@ -5490,7 +5490,10 @@ class PosController extends Controller
         }
         // Billing Scope (07 Aug 2026): cashier/manager accounts can be locked to
         // one stream at creation. NULL/both = no lock (default, legacy behaviour).
+        // Owner-only rule (07 Aug 2026): sirf owner (ya owner ka allow kiya hua
+        // admin) hi scope set kar sakta hai — baqi sab ka input silently ignore.
         if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_billing_scope')
+            && $user->canManageBillingScope()
             && in_array($newRole, ['pos_cashier', 'pos_manager'], true)
             && in_array($request->input('pos_billing_scope'), ['both', 'local', 'pra'], true)) {
             $newUserData['pos_billing_scope'] = $request->input('pos_billing_scope');
@@ -5515,6 +5518,29 @@ class PosController extends Controller
      * sets each cashier Online (PRA reporting) or Offline here. Managers/admins
      * keep their own sale-screen toggle, so this endpoint covers cashiers only.
      */
+    /**
+     * Billing Scope permission switch (owner request 07 Aug 2026): scope ka
+     * ikhtiyar by default sirf company OWNER ke paas hai; yeh switch ON karke
+     * owner apne managers/admins ko bhi Billing Scope dene deta hai. Sirf
+     * owner (base role company_admin) hi is switch ko chhoo sakta hai.
+     */
+    public function setBillingScopePermission(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (($user->role ?? null) !== 'company_admin') {
+            abort(403);
+        }
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'billing_scope_admin_enabled')) {
+            return back()->with('error', __('pos.unknown_error'));
+        }
+        $company = Company::find(app('currentCompanyId'));
+        // Direct assignment + save (pos_custom_access pattern): update() on a
+        // non-$fillable column silently drops.
+        $company->billing_scope_admin_enabled = $request->boolean('enabled');
+        $company->save();
+        return back()->with('success', __('pos.billing_scope_perm_saved'));
+    }
+
     public function setCashierPra(Request $request, $id)
     {
         $companyId = app('currentCompanyId');
@@ -5642,7 +5668,10 @@ class PosController extends Controller
         // Billing Scope (07 Aug 2026): stream lock is editable from the team edit
         // row — cashier + manager only. Direct assignment (pos_custom_access
         // pattern): update() on a non-$fillable column silently drops.
+        // Owner-only rule (07 Aug 2026): sirf owner (ya owner ka allow kiya hua
+        // admin) hi scope badal sakta hai — baqi sab ka input silently ignore.
         if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_billing_scope')
+            && (auth('pos')->user()?->canManageBillingScope() ?? false)
             && in_array($cashier->pos_role, ['pos_cashier', 'pos_manager'], true)
             && in_array($request->input('pos_billing_scope'), ['both', 'local', 'pra'], true)) {
             $newScope = $request->input('pos_billing_scope');

@@ -71,6 +71,35 @@ class User extends Authenticatable
         return in_array($scope, ['local', 'pra'], true) ? $scope : 'both';
     }
 
+    /**
+     * Billing Scope MANAGEMENT permission (owner request 07 Aug 2026): by
+     * default sirf company OWNER (base role company_admin) hi staff ka scope
+     * set/dekh sakta hai. Owner Team page ke switch se apne managers/admins
+     * (isPosAdmin) ko bhi ijazat de sakta hai
+     * (companies.billing_scope_admin_enabled). Missing-column safe.
+     */
+    public function canManageBillingScope($company = null): bool
+    {
+        if ($this->role === 'company_admin') {
+            return true;
+        }
+        if (!$this->isPosAdmin()) {
+            return false;
+        }
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'billing_scope_admin_enabled')) {
+                return false;
+            }
+        } catch (\Throwable $e) {
+            return false;
+        }
+        if (!$company) {
+            $cid = app()->bound('currentCompanyId') ? app('currentCompanyId') : $this->company_id;
+            $company = $cid ? \App\Models\Company::find($cid) : null;
+        }
+        return (bool) ($company->billing_scope_admin_enabled ?? false);
+    }
+
     public function isSuperAdmin()
     {
         return $this->role === 'super_admin';

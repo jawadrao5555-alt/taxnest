@@ -1,8 +1,14 @@
 <x-pos-layout>
 @php
+    $tnTeamUser = auth('pos')->user();
+    $tnTeamCompany = \App\Models\Company::find(app('currentCompanyId'));
     // Plan gate (Aug 2026): Custom Access is Unlimited-only.
     $customAccessPlanAllowed = \App\Services\PosFeatureService::planAllows(
-        \App\Models\Company::find(app('currentCompanyId')), 'custom_access_enabled');
+        $tnTeamCompany, 'custom_access_enabled');
+    // Billing Scope visibility (owner rule 07 Aug 2026): by default sirf OWNER
+    // ko dikhta hai; owner neeche wale switch se admins ko bhi ijazat de sakta hai.
+    $scopeManageAllowed = $tnTeamUser?->canManageBillingScope($tnTeamCompany) ?? false;
+    $scopeAdminEnabled = (bool) ($tnTeamCompany->billing_scope_admin_enabled ?? false);
 @endphp
 <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     <a href="{{ route('pos.customize') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition mb-3">
@@ -64,7 +70,9 @@
                 </select>
             </div>
             {{-- Billing Scope (07 Aug 2026): lock a cashier/manager to one billing
-                 stream. Server ignores it for confined roles (kitchen/waiter/delivery). --}}
+                 stream. Server ignores it for confined roles (kitchen/waiter/delivery).
+                 Owner rule: sirf owner (ya allowed admin) ko dikhta hai. --}}
+            @if($scopeManageAllowed)
             <div>
                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.billing_scope_label') }}</label>
                 <select name="pos_billing_scope" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
@@ -74,11 +82,31 @@
                 </select>
                 <p class="text-[10px] text-gray-400 dark:text-gray-500 mt-1">{{ __('pos.billing_scope_hint_role') }}</p>
             </div>
+            @endif
             <div class="sm:col-span-2">
                 <button type="submit" class="px-6 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition font-semibold">{{ __('pos.create_account') }}</button>
             </div>
         </form>
     </div>
+
+    {{-- Billing Scope permission switch (owner rule 07 Aug 2026): SIRF owner ko
+         nazar aata hai — ON karne se managers/admins bhi Billing Scope set kar
+         sakte hain; OFF (default) = sirf owner. --}}
+    @if(($tnTeamUser->role ?? null) === 'company_admin')
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+            <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.billing_scope_perm_title') }}</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.billing_scope_perm_hint') }}</p>
+        </div>
+        <form method="POST" action="{{ route('pos.team.scope-permission') }}" class="shrink-0">
+            @csrf
+            <input type="hidden" name="enabled" value="{{ $scopeAdminEnabled ? 0 : 1 }}">
+            <button type="submit" class="text-xs font-semibold px-3 py-1.5 rounded-lg transition {{ $scopeAdminEnabled ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300' }}">
+                {{ $scopeAdminEnabled ? __('pos.billing_scope_perm_on') : __('pos.billing_scope_perm_off') }}
+            </button>
+        </form>
+    </div>
+    @endif
 
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md overflow-hidden">
         <div class="overflow-x-auto">
@@ -149,8 +177,8 @@
                             @else
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">{{ __('pos.role_cashier') }}</span>
                             @endif
-                            {{-- Billing Scope badge (07 Aug 2026): stream-locked accounts wear it openly --}}
-                            @if(in_array($member->pos_role, ['pos_cashier', 'pos_manager'], true) && $member->posBillingScope() !== 'both')
+                            {{-- Billing Scope badge (07 Aug 2026): owner (ya allowed admin) ko hi dikhta hai --}}
+                            @if($scopeManageAllowed && in_array($member->pos_role, ['pos_cashier', 'pos_manager'], true) && $member->posBillingScope() !== 'both')
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide mt-1 {{ $member->posBillingScope() === 'local' ? 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300' }}" title="{{ __('pos.billing_scope_label') }}">
                                 {{ $member->posBillingScope() === 'local' ? __('pos.billing_scope_badge_local') : __('pos.billing_scope_badge_pra') }}
                             </span>
@@ -209,8 +237,8 @@
                                              Setting a new password also refreshes the admin-viewable
                                              encrypted copy shown in the Password column. --}}
                                         <input form="edit-{{ $member->id }}" type="password" name="password" placeholder="{{ __('pos.ph_new_password_optional') }}" autocomplete="new-password" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-36 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1.5 focus:ring-purple-500 focus:border-purple-500">
-                                        {{-- Billing Scope (07 Aug 2026): cashier + manager only --}}
-                                        @if(in_array($member->pos_role, ['pos_cashier', 'pos_manager'], true))
+                                        {{-- Billing Scope (07 Aug 2026): cashier + manager only; owner (ya allowed admin) hi dekh sakta hai --}}
+                                        @if($scopeManageAllowed && in_array($member->pos_role, ['pos_cashier', 'pos_manager'], true))
                                         <select form="edit-{{ $member->id }}" name="pos_billing_scope" title="{{ __('pos.billing_scope_label') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1.5 focus:ring-purple-500 focus:border-purple-500">
                                             <option value="both" {{ $member->posBillingScope() === 'both' ? 'selected' : '' }}>{{ __('pos.billing_scope_both') }}</option>
                                             <option value="local" {{ $member->posBillingScope() === 'local' ? 'selected' : '' }}>{{ __('pos.billing_scope_local') }}</option>

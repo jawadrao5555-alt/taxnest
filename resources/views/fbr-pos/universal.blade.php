@@ -3242,7 +3242,12 @@ function restaurantPos() {
                     const pref = [], other = [];
                     for (let i = 0; i < all.length && pref.length < 12; i++) {
                         const it = all[i];
-                        if (!it.name || !(parseFloat(it.price) > 0)) continue;
+                        if (!it.name) continue;
+                        // Unpriced PRODUCTS stay visible on inventory-OFF companies: picking
+                        // one opens the full details popup (central routing in quickAddItem,
+                        // owner Aug 2026) instead of dropping a Rs.0 row. Unpriced services
+                        // and inventory-ON rows stay hidden (old behavior).
+                        if (!(parseFloat(it.price) > 0) && ((it.type || 'product') !== 'product' || this.isInventoryEnabled())) continue;
                         if (it.name.toLowerCase().includes(q)) {
                             if (it.name.toLowerCase().startsWith(q)) pref.push(it);
                             else if (other.length < 12) other.push(it);
@@ -3336,6 +3341,15 @@ function restaurantPos() {
             // Kill any in-flight debounced search so it can't repopulate the dropdown
             // under the now-cleared search box after we add the item.
             if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
+            // CENTRAL unpriced-product routing (owner, Aug 2026): EVERY selection path —
+            // suggestion click, dropdown Enter, exact-match fast path, barcode auto-add —
+            // funnels through here, so an UNPRICED product always opens the full details
+            // popup instead of dropping a Rs.0 row in the cart. Inventory-OFF only (the
+            // popup's endpoint 403s on inventory-ON); services keep instant-add.
+            if (!(parseFloat(item.price) > 0) && (item.type || 'product') === 'product' && !this.isInventoryEnabled()) {
+                this.qcOpenForExisting(item);
+                return;
+            }
             this.handleProductClick(item);
             // GUIDED FLOW (opt-in): first added item moves the indicator off "customer".
             if (this.guidedFlow && this.flowStep === 'customer') this.flowStep = 'items';

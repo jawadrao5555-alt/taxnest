@@ -65,7 +65,7 @@ Isolated POS (own auth/layouts/models); PRA integration with offline billing + a
 
 ## FBR POS
 - Isolated FBR-integrated POS (`fbrpos` guard): FBR IMS submission, provisional + payment-confirm flow, PIN system, Edit & Retry. → `fbr-pos-ims-fiscalization.md`
-- **Universal sale screen (opt-in port of PRA screen, keep diffable; FROZEN pre-redesign)**: per-company `fbr_universal_enabled`; SHIM `@php` pins — do NOT delete. → `fbr-universal-sale-screen.md`
+- **Universal sale screen = the ONLY FBR sale screen (classic create screen RETIRED 7 Aug 2026)**: `/fbr-pos/create` always renders `fbr-pos/universal.blade.php` (24 Jul redesign ported); `fbr_universal_enabled` no longer consulted; `fbr-pos/create.blade.php` = DEAD file on disk; SHIM `@php` pins — do NOT delete. → `fbr-universal-sale-screen.md`
 
 ## UI / PWA
 - Responsive sidebar layout, dark/light modes, emerald-600 primary; DI dashboard premium gradient banners + KPI cards.

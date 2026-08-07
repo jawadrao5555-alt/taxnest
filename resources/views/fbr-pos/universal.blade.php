@@ -665,7 +665,7 @@ window.addEventListener('popstate', function() {
                         </div>
                         <div class="flex-1 min-w-0">
                             <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.create_q_prefix') }}<span x-text="searchQuery"></span>"</p>
-                            <p class="text-[10px] text-gray-400">{{ __('pos.adds_instantly_set_price') }}</p>
+                            <p class="text-[10px] text-gray-400">{{ __('pos.qc_fill_details_hint') }}</p>
                         </div>
                         <span class="text-[9px] font-mono bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800">⏎</span>
                     </button>
@@ -1383,6 +1383,91 @@ window.addEventListener('popstate', function() {
             </div>
             <div class="p-4 pt-2">
                 <button @click="showPayModal = false" :disabled="submitting" class="w-full py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:text-gray-700 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition disabled:opacity-50">{{ __('pos.cancel') }} <span class="text-[9px] text-gray-400 font-mono ml-1">ESC</span></button>
+            </div>
+        </div>
+    </div>
+
+    {{-- ─────────── QUICK-CREATE PRODUCT modal (Aug 2026, owner request) ───────────
+         Unknown search/scan now asks for FULL details (name, price, UoM, tax, HS code,
+         barcode) instead of instantly creating a Rs.0 product. A scanned NUMERIC code
+         pre-fills only the BARCODE field — digits can never become a product name. --}}
+    <div x-show="qcModal" x-cloak x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="qcCancel()" @keydown.escape.prevent.stop="qcCancel()">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-3 bg-blue-600">
+                <h3 class="text-sm font-bold text-white">{{ __('pos.qc_modal_title') }}</h3>
+                <button type="button" @click="qcCancel()" class="text-white hover:bg-blue-700 rounded-lg p-1" title="{{ __('pos.cancel') }} (Esc)">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="p-4 space-y-3" style="max-height:70vh; overflow-y:auto;">
+                <p x-show="qcFromScan" class="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 rounded-lg px-3 py-2 font-medium">{{ __('pos.qc_scanned_hint') }}</p>
+                <p x-show="!qcFromScan" class="text-xs text-gray-500 dark:text-gray-400">{{ __('pos.qc_typed_hint') }}</p>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">{{ __('pos.qc_name_label') }} <span class="text-red-500">*</span></label>
+                    <input type="text" id="qc-name-input" x-model="qcName"
+                        @keydown.enter.prevent.stop="document.getElementById('qc-price-input').focus()"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                        autocomplete="one-time-code" name="qc_product_name_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">{{ __('pos.qc_price_label') }} <span class="text-red-500">*</span></label>
+                        <input type="number" id="qc-price-input" x-model="qcPrice" min="0" step="0.01" inputmode="decimal"
+                            @keydown.enter.prevent.stop="qcSave()"
+                            class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            autocomplete="off" name="qc_price_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">{{ __('pos.uom_label') }}</label>
+                        <select x-model="qcUom" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            @php
+                                // KEEP IN SYNC with product-form.blade.php $uomList
+                                $qcUomList = ['U'=>'Units','PCS'=>'Pieces','KG'=>'Kilogram','GM'=>'Gram','LTR'=>'Liter','ML'=>'Milliliter','MTR'=>'Meter','SQM'=>'Square Meter','FT'=>'Feet','IN'=>'Inch','YDS'=>'Yards','PKT'=>'Packet','DOZ'=>'Dozen','BOX'=>'Box','CTN'=>'Carton','BAG'=>'Bag','BTL'=>'Bottle','TIN'=>'Tin','CAN'=>'Can','BUN'=>'Bundle','ROL'=>'Roll','SET'=>'Set'];
+                            @endphp
+                            @foreach($qcUomList as $code => $label)
+                                <option value="{{ $code }}">{{ $code }} — {{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">{{ __('pos.qc_tax_label') }}</label>
+                        <select x-model="qcTaxMode" class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="standard">{{ __('pos.qc_tax_standard') }}</option>
+                            <option value="exempt">{{ __('pos.tax_exempt_tax_free') }}</option>
+                            <option value="custom">{{ __('pos.qc_tax_custom') }}</option>
+                        </select>
+                    </div>
+                    <div x-show="qcTaxMode === 'custom'">
+                        <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">%</label>
+                        <input type="number" x-model="qcTaxRate" min="0" max="100" step="0.01" inputmode="decimal"
+                            @keydown.enter.prevent.stop="qcSave()"
+                            class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            autocomplete="off" name="qc_tax_rate_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">{{ __('pos.barcode_label') }} <span class="text-gray-400 font-normal">({{ __('pos.optional_lc') }})</span></label>
+                        <input type="text" x-model="qcBarcode" @keydown.enter.prevent.stop="qcSave()"
+                            class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 font-mono"
+                            autocomplete="one-time-code" name="qc_barcode_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">{{ __('pos.hs_code_col') }} <span class="text-gray-400 font-normal">({{ __('pos.optional_lc') }})</span></label>
+                        <input type="text" x-model="qcHsCode" @keydown.enter.prevent.stop="qcSave()" placeholder="{{ __('pos.ph_hs_code') }}"
+                            class="w-full rounded-lg border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            autocomplete="one-time-code" name="qc_hs_code_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore>
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-2 px-4 py-3 bg-gray-50 dark:bg-gray-900/40 border-t border-gray-100 dark:border-gray-700">
+                <button type="button" @click="qcCancel()" class="flex-1 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition">{{ __('pos.cancel') }}</button>
+                <button type="button" @click="qcSave()" :disabled="qcSaving" class="flex-1 py-2 rounded-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 transition">
+                    <span x-show="!qcSaving">{{ __('pos.qc_save_btn') }}</span>
+                    <span x-show="qcSaving">{{ __('pos.creating_q_prefix') }}<span x-text="qcName"></span>"…</span>
+                </button>
             </div>
         </div>
     </div>
@@ -3397,7 +3482,7 @@ function restaurantPos() {
             this.manualItemSubmitting = true;
             try {
                 if (this.manualItemSavePermanent) {
-                    const res = await fetch('{{ route("fbrpos.api.products.quick-create") }}', {
+                    const res = await fetch('{{ route("fbrpos.api.products.quick-create", [], false) }}', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -3654,24 +3739,91 @@ function restaurantPos() {
         //   guard (refuses 422 when inventory is on) — defense in depth.
         // - Inventory ON path shows "Open Products" link instead.
         // ──────────────────────────────────────────────────────────────
-        quickCreating: false,
+        quickCreating: false,       // spinner flag while the create POST is in flight
+        // QUICK-CREATE MODAL (Aug 2026, owner request): unknown items now ask for FULL
+        // details (name, price, UoM, tax, HS code, barcode) instead of instantly creating
+        // a Rs.0 product. A scanned NUMERIC code pre-fills only the BARCODE field — the
+        // digits can never become a product name.
+        qcModal: false,
+        qcSaving: false,
+        qcFromScan: false,
+        qcName: '', qcBarcode: '', qcPrice: '', qcUom: 'U', qcTaxMode: 'standard', qcTaxRate: '', qcHsCode: '',
         quickPriceCartUid: null,    // cart_uid of row currently in price-edit mode
         quickPriceValue: '',        // bound to the inline price input
-        async quickCreateProduct() {
+        quickCreateProduct() {
             if (this.isInventoryEnabled()) return; // belt + suspenders
-            const name = (this.searchQuery || '').trim();
-            if (!name || this.quickCreating) return;
-            this.quickCreating = true;
-            // Kill any in-flight debounced search NOW: searchQuery stays set until the fetch
-            // below resolves, so the pending 60ms callback would otherwise fire mid-fetch and
-            // (via its exact-barcode auto-add) add a SECOND item on top of this quick-create —
-            // the "TUX + barcode row from one scan" double-add (Aug 2026).
+            const typed = (this.searchQuery || '').trim();
+            if (!typed || this.qcModal || this.qcSaving) return;
+            // Kill any in-flight debounced search NOW: searchQuery stays set while the modal
+            // is open, so the pending 60ms callback would otherwise fire and (via its exact-
+            // barcode auto-add) add an item behind the modal (Aug 2026 double-add family).
             if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
+            // ZERO-PRICE BARCODE RESCUE: the Enter fast path only takes price>0 matches,
+            // so an exact barcode/SKU hit at ANY price must never fall through to the
+            // create modal — add it and reopen the inline price editor on its cart row
+            // (mirrors the name duplicate guard in addHighlightedItem).
+            const codeHit = [...this.allProducts, ...this.allServices].find(it => this.isExactCodeMatch(it, typed.toLowerCase()));
+            if (codeHit) {
+                this.quickAddItem(codeHit);
+                if (!(parseFloat(codeHit.price) > 0)) {
+                    const row = [...this.cart].reverse().find(c => c.item_id === codeHit.id && c.item_type === (codeHit.type || 'product'));
+                    if (row) this.openQuickPrice(row);
+                }
+                return;
+            }
+            // A numeric code (6+ digits) is a BARCODE, never a product name.
+            this.qcFromScan = /^[0-9]{6,}$/.test(typed);
+            this.qcName = this.qcFromScan ? '' : typed;
+            this.qcBarcode = this.qcFromScan ? typed : '';
+            this.qcPrice = ''; this.qcUom = 'U'; this.qcTaxMode = 'standard'; this.qcTaxRate = ''; this.qcHsCode = '';
+            this.showSearchDropdown = false;
+            this.qcModal = true;
+            // Focus the missing piece: scanned code needs a NAME first, typed name needs a PRICE.
+            // Root-scope $refs don't reach x-if/x-for subtrees reliably — use getElementById.
+            this.$nextTick(() => {
+                const el = document.getElementById(this.qcFromScan ? 'qc-name-input' : 'qc-price-input');
+                if (el) el.focus();
+            });
+        },
+        qcCancel() {
+            this.qcModal = false;
+            this.searchQuery = '';
+            this.searchSuggestions = [];
+            this.showSearchDropdown = false;
+            this.filterProducts();
+            this.$nextTick(() => { const s = document.querySelector('input[name=pos_product_search_nofill]'); if (s) s.focus(); });
+        },
+        async qcSave() {
+            if (this.qcSaving) return;
+            const name = (this.qcName || '').trim();
+            if (!name) {
+                this.showToast(window.TXT.qc_name_required, 'error');
+                const el = document.getElementById('qc-name-input'); if (el) el.focus();
+                return;
+            }
+            const priceNum = parseFloat(this.qcPrice);
+            if (this.qcPrice === '' || isNaN(priceNum) || priceNum < 0) {
+                this.showToast(window.TXT.qc_price_required, 'error');
+                const el = document.getElementById('qc-price-input'); if (el) el.focus();
+                return;
+            }
+            this.qcSaving = true;
+            this.quickCreating = true;
             try {
-                const res = await fetch('{{ route('fbrpos.api.products.quick-create') }}', {
+                // Relative URL on purpose: route() emits an absolute https URL (forceScheme)
+                // which breaks in plain-http dev/test browsing; same-origin relative works everywhere.
+                const res = await fetch('{{ route('fbrpos.api.products.quick-create', [], false) }}', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: JSON.stringify({ name, price: 0 }),
+                    body: JSON.stringify({
+                        name,
+                        price: priceNum,
+                        barcode: (this.qcBarcode || '').trim() || null,
+                        uom: this.qcUom || 'U',
+                        tax_mode: this.qcTaxMode,
+                        tax_rate: this.qcTaxMode === 'custom' ? (parseFloat(this.qcTaxRate) || 0) : null,
+                        hs_code: (this.qcHsCode || '').trim() || null,
+                    }),
                 });
                 const data = await res.json();
                 if (!res.ok || !data.ok) {
@@ -3679,29 +3831,34 @@ function restaurantPos() {
                     return;
                 }
                 const p = data.product;
-                // Server may DEDUPE (return an existing same-name product) — never push a twin
-                // entry into the local catalog or the duplicate guard stops finding it.
+                // Server may DEDUPE (same name OR same barcode already exists) — never push a
+                // twin entry into the local catalog or the duplicate guard stops finding it.
                 if (!this.allProducts.some(x => x.id === p.id)) this.allProducts.push(p);
-                // Add to cart at the SERVER's price (a dedupe return can carry a real price —
-                // e.g. the product was created on another terminal moments ago). Only a
-                // zero-price row is treated as quick-created (inline price editor opens).
                 const pPrice = parseFloat(p.price) || 0;
-                this.addToCart({ id: p.id, type: 'product', name: p.name, price: pPrice, is_tax_exempt: !!p.is_tax_exempt });
-                const cartItem = this.cart[this.cart.length - 1];
-                if (cartItem && pPrice <= 0) {
-                    cartItem._isQuickCreated = true;
-                    cartItem._productId = p.id;
-                    this.openQuickPrice(cartItem);
+                this.addToCart({ id: p.id, type: 'product', name: p.name, price: pPrice, is_tax_exempt: !!p.is_tax_exempt, tax_rate: p.tax_rate, hs_code: p.hs_code, uom: p.uom });
+                // Zero-price row (deliberate Rs.0, or dedupe returned an unpriced product):
+                // still offer the inline price editor on the actual cart row (dedupe of an
+                // item already in cart increments qty — the LAST row may not be it).
+                if (pPrice <= 0) {
+                    const row = [...this.cart].reverse().find(c => c.item_id === p.id && c.item_type === 'product');
+                    if (row) {
+                        row._isQuickCreated = true;
+                        row._productId = p.id;
+                        this.openQuickPrice(row);
+                    }
                 }
                 // GUIDED FLOW (opt-in): first quick-created item moves the indicator off "customer".
                 if (this.guidedFlow && this.flowStep === 'customer') this.flowStep = 'items';
+                this.qcModal = false;
                 this.searchQuery = '';
                 this.searchSuggestions = [];
                 this.showSearchDropdown = false;
                 this.filterProducts();
+                this.$nextTick(() => { const s = document.querySelector('input[name=pos_product_search_nofill]'); if (s) s.focus(); });
             } catch (e) {
                 this.showToast(window.TXT.network_error, 'error');
             } finally {
+                this.qcSaving = false;
                 this.quickCreating = false;
             }
         },

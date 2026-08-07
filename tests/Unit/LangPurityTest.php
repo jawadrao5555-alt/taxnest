@@ -26,6 +26,9 @@ class LangPurityTest extends TestCase
         'Nest','ABC','SHA','IDs','Unlimited','Business','Premium','Plus','Basic','Standard','Lite',
         'DELIVERED','RETURNED','OPEN','FINAL','OFFLINE','ONLINE','ACTIVE','NEW','UPDATED','CASH','CARD','LOCAL','PENDING','PAID',
         'Sahulat','Asaan','App','Rider','Riders','Clover','Microsoft','Edge','ngrok','Ngrok','johndoe123','T001','OEM','SKU','EAN','UPC','IMEI','IRIS','PRAL','POSID','HTTP','PostData','SHIFT','TAX','EXEMPT','DONE','CERTIFIED','INTEGRATED','WITH','CLEAR','TABLE','OFF',
+        // Literal UI/status labels referenced verbatim inside Urdu guidance text
+        // (FBR settings field "Token", fail-queue status "Settings Error", "Retry" button):
+        'Token','Error','Settings','Retry',
         'Direct','Fiscal','Device','Submission','Mode','Hold','Deals','Update','Bill','Bills','Add','Customer','Product','Arrow','keys','More','Large','Order','Developed','Powered','chai','samosa','Preparing','Ready','Cleared','Report','Madadgar','series','Desktop','Agent','Sync','Retry','Edit','Recall','Pay','Delete','Close','Print','Set','default','New','Shortcut','Settings','devices','Printers','Label','free','app','xxxx','pos','products','Needed','Qty',
         'Pro','Max','SSL','zip','Cloud','Code','XXXXXXX','Letter','Registration','Point','Sale','Tax','Rate','Exempt',
     ];

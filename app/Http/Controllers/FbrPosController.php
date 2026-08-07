@@ -3950,31 +3950,61 @@ class FbrPosController extends Controller
     public function apiQuickCreateProduct(Request $request)
     {
         $companyId = app('currentCompanyId');
+        // SERVER-SIDE GATE: quick-create exists ONLY for inventory-OFF companies (the UI
+        // hides it when inventory is ON, but a direct POST must be refused too — otherwise
+        // stock-tracked catalogs grow rows that bypass opening-stock / movement bookkeeping).
+        $gateCompany = Company::find($companyId);
+        if ($gateCompany && $gateCompany->inventory_enabled) {
+            return response()->json(['ok' => false, 'error' => 'Quick-create is disabled while inventory tracking is ON. Use the Products page.'], 403);
+        }
         $data = $request->validate([
-            'name'  => 'required|string|max:255',
-            'price' => 'nullable|numeric|min:0',
+            'name'     => 'required|string|max:255',
+            'price'    => 'required|numeric|min:0',
+            'barcode'  => 'nullable|string|max:64',
+            // KEEP IN SYNC with product-form.blade.php $uomList (same codes).
+            'uom'      => 'nullable|string|in:U,PCS,KG,GM,LTR,ML,MTR,SQM,FT,IN,YDS,PKT,DOZ,BOX,CTN,BAG,BTL,TIN,CAN,BUN,ROL,SET',
+            'tax_mode' => 'nullable|in:standard,exempt,custom',
+            'tax_rate' => 'nullable|required_if:tax_mode,custom|numeric|min:0|max:100',
+            'hs_code'  => 'nullable|string|max:50',
         ]);
         $name = trim($data['name']);
         if ($name === '') {
             return response()->json(['ok' => false, 'error' => 'Name required'], 422);
         }
+        $barcode = isset($data['barcode']) ? (trim((string) $data['barcode']) ?: null) : null;
+        // Tax mapping mirrors storeProduct: standard => taxable 18%, exempt => 0%, custom => given rate.
+        $taxMode = $data['tax_mode'] ?? 'standard';
+        $taxType = $taxMode === 'standard' ? 'taxable' : $taxMode;
+        $taxRate = $taxMode === 'exempt' ? 0 : ($taxMode === 'custom' ? (float) ($data['tax_rate'] ?? 0) : 18);
         // DEDUPE (Aug 2026 scanner bug): repeated scanner Enters were quick-creating the
         // same barcode-named product on every scan. An active same-name (case-insensitive)
         // product is returned as-is instead of creating a twin row.
         // ATOMIC across concurrent requests (two terminals scanning the same unknown code
-        // at the same instant): a MySQL named lock scoped to company+name makes the
-        // check-then-insert a critical section — no unique-index schema change needed
-        // (legit same-name products may already exist historically). MySQL-only; the
-        // sqlite test env skips the lock (single-connection, no real concurrency).
-        $lockName  = 'qc_prod_' . $companyId . '_' . md5(mb_strtolower($name));
+        // at the same instant): a MySQL named lock makes the check-then-insert a critical
+        // section — no unique-index schema change needed (legit same-name products may
+        // already exist historically). Scoped to the COMPANY (not company+name): dedupe
+        // matches by name OR barcode, and two terminals scanning the same unknown barcode
+        // with different typed names would otherwise take different per-name locks and
+        // both insert. Quick-create is rare enough that a per-company section is free.
+        // MySQL-only; the sqlite test env skips the lock (single-connection).
+        $lockName  = 'qc_prod_' . $companyId;
         $usingLock = DB::getDriverName() === 'mysql';
+        $gotLock   = false;
         if ($usingLock) {
-            DB::selectOne('SELECT GET_LOCK(?, 3) AS l', [$lockName]);
+            $lockRow = DB::selectOne('SELECT GET_LOCK(?, 3) AS l', [$lockName]);
+            $gotLock = (int) ($lockRow->l ?? 0) === 1;
+            // Timed out waiting (l=0): proceed best-effort — the dedupe read below still
+            // runs; behavior degrades to the pre-lock check-then-insert, never blocks a sale.
         }
         try {
             $existing = Product::where('company_id', $companyId)
                 ->where('is_active', true)
-                ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
+                ->where(function ($q) use ($name, $barcode) {
+                    $q->whereRaw('LOWER(name) = ?', [mb_strtolower($name)]);
+                    if ($barcode !== null) {
+                        $q->orWhere('barcode', $barcode);
+                    }
+                })
                 ->first();
             if ($existing) {
                 return response()->json([
@@ -3990,6 +4020,8 @@ class FbrPosController extends Controller
                         'tax_rate'      => (float) ($existing->default_tax_rate ?? 0),
                         'hs_code'       => $existing->hs_code,
                         'uom'           => $existing->uom ?? 'U',
+                        'barcode'       => $existing->barcode,
+                        'sku'           => $existing->sku,
                         'hasRecipe'     => false,
                         'stockStatus'   => null,
                         'isQuickCreated'=> true,
@@ -3999,10 +4031,12 @@ class FbrPosController extends Controller
             $product = Product::create([
                 'company_id'       => $companyId,
                 'name'             => $name,
+                'barcode'          => $barcode,
                 'default_price'    => $data['price'] ?? 0,
-                'default_tax_rate' => 18,
-                'tax_type'         => 'standard',
-                'uom'              => 'U',
+                'default_tax_rate' => $taxRate,
+                'tax_type'         => $taxType,
+                'uom'              => $data['uom'] ?? 'U',
+                'hs_code'          => isset($data['hs_code']) ? (trim((string) $data['hs_code']) ?: null) : null,
                 'sku'              => 'QC-' . substr((string) time(), -6) . '-' . strtoupper(substr(uniqid(), -3)),
                 'is_price_editable'=> true,
                 'is_active'        => true,
@@ -4016,17 +4050,19 @@ class FbrPosController extends Controller
                     'category'      => 'Quick',
                     'type'          => 'product',
                     'image'         => null,
-                    'is_tax_exempt' => false,
-                    'tax_rate'      => 18.0,
-                    'hs_code'       => null,
-                    'uom'           => 'U',
+                    'is_tax_exempt' => $taxType === 'exempt',
+                    'tax_rate'      => (float) $taxRate,
+                    'hs_code'       => $product->hs_code,
+                    'uom'           => $product->uom ?? 'U',
+                    'barcode'       => $product->barcode,
+                    'sku'           => $product->sku,
                     'hasRecipe'     => false,
                     'stockStatus'   => null,
                     'isQuickCreated'=> true,
                 ],
             ]);
         } finally {
-            if ($usingLock) {
+            if ($usingLock && $gotLock) {
                 DB::selectOne('SELECT RELEASE_LOCK(?) AS r', [$lockName]);
             }
         }

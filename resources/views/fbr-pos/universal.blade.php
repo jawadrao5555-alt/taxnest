@@ -1672,9 +1672,38 @@ window.addEventListener('popstate', function() {
                     </div>
                 </template>
             </div>
-            <div x-show="failedBills.length > 0" class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-[11px] text-gray-500 flex items-center justify-between">
+            {{-- Config-error bills section — shown below the retryable list --}}
+            <template x-if="configErrorBills.length > 0">
+                <div class="border-t-2 border-orange-200 dark:border-orange-800 bg-orange-50/60 dark:bg-orange-900/10">
+                    <div class="px-4 pt-3 pb-1 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-orange-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        <span class="text-xs font-bold text-orange-700 dark:text-orange-400">Settings Error — Auto-retry band hai</span>
+                        <span class="ml-auto text-[10px] text-orange-600 dark:text-orange-500 font-semibold" x-text="'(' + configErrorBills.length + ' bill)'"></span>
+                    </div>
+                    <p class="text-[10px] text-orange-600 dark:text-orange-500 px-4 pb-2">FBR Settings mein POSID/Token set karein, phir manually Retry dabayein.</p>
+                    <template x-for="bill in configErrorBills" :key="'ce_' + bill.id">
+                        <div class="px-4 py-2 border-b border-orange-100 dark:border-orange-900/30 flex items-center justify-between gap-2">
+                            <div>
+                                <span class="text-xs font-bold text-gray-800 dark:text-gray-200" x-text="bill.invoice_number"></span>
+                                <span class="ml-1 text-[10px] text-gray-500" x-text="'Rs. ' + Number(bill.total_amount).toLocaleString()"></span>
+                                <span class="ml-1 text-[9px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 font-bold">Settings Error</span>
+                            </div>
+                            <button @click="retryFailed(bill)" :disabled="bill._retrying" title="Settings theek karne ke baad manually retry karein"
+                                class="shrink-0 px-2.5 py-1 text-[10px] font-bold text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition disabled:opacity-40 flex items-center gap-1">
+                                <svg x-show="!bill._retrying" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                <svg x-show="bill._retrying" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                <span x-text="bill._retrying ? '...' : 'Retry'"></span>
+                            </button>
+                        </div>
+                    </template>
+                    <div class="px-4 py-2">
+                        <a href="{{ route('fbrpos.settings') }}" class="text-[10px] text-orange-600 hover:underline font-bold">→ FBR Settings kholein</a>
+                    </div>
+                </div>
+            </template>
+            <div x-show="failedBills.length > 0 || configErrorBills.length > 0" class="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-[11px] text-gray-500 flex items-center justify-between">
                 <span>{{ __('pos.failed_tip_fbr') }}</span>
-                <a href="{{ route('fbrpos.transactions') }}?tab=failed" class="text-red-600 hover:underline font-semibold">{{ __('pos.open_full_page') }}</a>
+                <a href="{{ route('fbrpos.failQueue') }}" class="text-red-600 hover:underline font-semibold">{{ __('pos.open_full_page') }}</a>
             </div>
         </div>
     </div>
@@ -2629,6 +2658,9 @@ function restaurantPos() {
         // Lazy-loaded list of all bills with fbr_status IN (failed,offline,pending)
         // that have NOT received a fbr_invoice_number yet. Auto-refresh on mount.
         failedBills: [],
+        // config_error bills: POSID/token missing — shown separately in F11 panel,
+        // never touched by the auto-sync loop. Manually retryable after fixing settings.
+        configErrorBills: [],
         showFailedBills: false,
         activeFailedIndex: 0,
         failedBillsLoading: false,
@@ -2637,9 +2669,12 @@ function restaurantPos() {
         // _syncTimer fires every 30 sec; pings count endpoint then silently
         // retries one bill per tick (no FBR hammering on long outages).
         // _autoSyncBusy = re-entrancy guard.
+        // _autoSyncStrikes: Map<billId, count> — 3-strike session cap so a
+        // bill that keeps failing (e.g. FBR API down) doesn't loop forever.
         syncStatus: navigator.onLine ? 'online' : 'offline',
         _syncTimer: null,
         _autoSyncBusy: false,
+        _autoSyncStrikes: new Map(),
         showReceipt: false,
         // ── AKHRI BILLS strip (Aug 2026 — Retail Fast Billing) ───────────────
         // Last 5 finalized bills pushed here on every successful payment.
@@ -2912,8 +2947,14 @@ function restaurantPos() {
                 await this.loadFailedBills();
                 if (!this.fbrEnabled) { this.syncStatus = 'online'; this._autoSyncBusy = false; return; }
                 if (this.failedBills.length === 0) { this.syncStatus = 'online'; this._autoSyncBusy = false; return; }
-                // Pick OLDEST not-currently-retrying bill and submit silently.
-                const candidate = [...this.failedBills].reverse().find(b => !b._retrying);
+                // Pick OLDEST not-currently-retrying bill that has fewer than 3 strikes
+                // this session. The 3-strike cap prevents an infinite loop when a bill
+                // permanently fails (e.g. FBR API down or a config error that somehow
+                // still has fbr_status='failed'). config_error bills are excluded from
+                // failedBills by the server and never reach this path.
+                const candidate = [...this.failedBills].reverse().find(b =>
+                    !b._retrying && (this._autoSyncStrikes.get(b.id) || 0) < 3
+                );
                 if (!candidate) { this.syncStatus = 'online'; this._autoSyncBusy = false; return; }
                 this.syncStatus = 'syncing';
                 candidate._retrying = true;
@@ -2924,9 +2965,13 @@ function restaurantPos() {
                 const data = await res.json().catch(() => ({}));
                 if (data && data.success) {
                     this.failedBills = this.failedBills.filter(b => b.id !== candidate.id);
+                    this._autoSyncStrikes.delete(candidate.id); // clean up on success
                     // Mini toast — non-intrusive (existing showToast auto-dismisses).
                     this.showToast(window.TXT.auto_synced_prefix + (candidate.invoice_number || '#' + candidate.id) + ' to FBR', 'success');
                 } else {
+                    // Increment strike count. After 3 failures this session the bill is
+                    // skipped by the auto-sync but remains manually retryable in F11.
+                    this._autoSyncStrikes.set(candidate.id, (this._autoSyncStrikes.get(candidate.id) || 0) + 1);
                     candidate._retrying = false;
                 }
                 this.syncStatus = 'online';
@@ -5336,6 +5381,9 @@ function restaurantPos() {
                 const data = await res.json();
                 if (data && data.success) {
                     this.failedBills = data.bills || [];
+                    // config_error bills returned separately — shown in F11 panel with
+                    // "Fix FBR Settings" note; never touched by auto-sync loop.
+                    this.configErrorBills = data.config_error_bills || [];
                     if (this.activeFailedIndex >= this.failedBills.length) {
                         this.activeFailedIndex = Math.max(0, this.failedBills.length - 1);
                     }

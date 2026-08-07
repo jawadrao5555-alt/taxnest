@@ -1827,8 +1827,11 @@ class FbrPosController extends Controller
     {
         $companyId = app('currentCompanyId');
 
+        // config_error bills are included in the Fail Queue page (but NOT in the
+        // auto-retry pool on the sale screen). They get a distinct visual treatment
+        // and a "Fix Settings" note so the admin knows what to do.
         $query = FbrPosTransaction::where('company_id', $companyId)
-            ->whereIn('fbr_status', ['failed', 'pending'])
+            ->whereIn('fbr_status', ['failed', 'pending', 'config_error'])
             ->where(function ($q) {
                 $q->where('invoice_mode', 'fbr')->orWhereNull('invoice_mode');
             })
@@ -1854,7 +1857,8 @@ class FbrPosController extends Controller
                 SUM(CASE WHEN fbr_status = 'failed' THEN 1 ELSE 0 END) as failed_count,
                 SUM(CASE WHEN fbr_status = 'pending' THEN 1 ELSE 0 END) as pending_count,
                 SUM(CASE WHEN fbr_status = 'submitted' THEN 1 ELSE 0 END) as submitted_count,
-                SUM(CASE WHEN fbr_status = 'failed' THEN total_amount ELSE 0 END) as failed_amount
+                SUM(CASE WHEN fbr_status IN ('failed','config_error') THEN total_amount ELSE 0 END) as failed_amount,
+                SUM(CASE WHEN fbr_status = 'config_error' THEN 1 ELSE 0 END) as config_error_count
             ")
             ->first();
 
@@ -1888,7 +1892,7 @@ class FbrPosController extends Controller
     }
 
     /**
-     * Schedule retry job for a single failed invoice
+     * Schedule retry job for a single failed invoice (also accepts config_error bills).
      */
     public function failQueueRetryOne($id)
     {
@@ -1899,7 +1903,12 @@ class FbrPosController extends Controller
             return back()->with('error', __('pos.already_submitted_fbr_short'));
         }
 
+        // config_error bills may be manually retried from the Fail Queue page after
+        // the admin has fixed the FBR Settings (POSID / token). Reset to 'pending' so
+        // the job can attempt submission; if config is still broken it will re-land as
+        // 'config_error' (not 'failed') and stay out of the auto-retry pool.
         $tx->fbr_submission_hash = null;
+        $tx->fbr_status = 'pending';
         $tx->save();
         \App\Jobs\RetryFbrPosSubmissionJob::dispatch($tx->id)->delay(now()->addSeconds(5));
 
@@ -3541,32 +3550,47 @@ class FbrPosController extends Controller
     public function apiFailedBills(Request $request)
     {
         $companyId = app('currentCompanyId');
-        $bills = FbrPosTransaction::where('company_id', $companyId)
-            ->whereIn('fbr_status', ['failed', 'offline', 'pending'])
+
+        $baseQuery = FbrPosTransaction::where('company_id', $companyId)
             ->whereNull('fbr_invoice_number')
             ->where(function ($q) {
                 $q->whereNull('invoice_mode')->orWhere('invoice_mode', '!=', 'local');
-            })
+            });
+
+        // Auto-retry pool: failed/offline/pending only — config_error intentionally excluded
+        // so the 30-second auto-sync loop never picks up permanently-misconfigured bills.
+        $bills = (clone $baseQuery)
+            ->whereIn('fbr_status', ['failed', 'offline', 'pending'])
             ->orderBy('id', 'desc')
             ->limit(100)
             ->get(['id', 'invoice_number', 'customer_name', 'total_amount', 'fbr_status', 'created_at']);
 
-        $data = $bills->map(function ($b) {
-            return [
-                'id'             => $b->id,
-                'invoice_number' => $b->invoice_number,
-                'customer_name'  => $b->customer_name,
-                'total_amount'   => (float) $b->total_amount,
-                'fbr_status'     => $b->fbr_status,
-                'created_human'  => $b->created_at?->diffForHumans(),
-                'created_at'     => $b->created_at?->toDateTimeString(),
-            ];
-        });
+        $mapBill = fn ($b) => [
+            'id'             => (int) $b->id,
+            'invoice_number' => $b->invoice_number,
+            'customer_name'  => $b->customer_name,
+            'total_amount'   => (float) $b->total_amount,
+            'fbr_status'     => $b->fbr_status,
+            'created_human'  => $b->created_at?->diffForHumans(),
+            'created_at'     => $b->created_at?->toDateTimeString(),
+        ];
+
+        $data = $bills->map($mapBill);
+
+        // Config-error bills: shown separately in the F11 panel with a "Fix Settings" note.
+        // These are NOT in the auto-retry pool but ARE manually retryable (apiRetryFailed accepts them).
+        $configErrorBills = (clone $baseQuery)
+            ->where('fbr_status', 'config_error')
+            ->orderBy('id', 'desc')
+            ->limit(20)
+            ->get(['id', 'invoice_number', 'customer_name', 'total_amount', 'fbr_status', 'created_at'])
+            ->map($mapBill);
 
         return response()->json([
-            'success' => true,
-            'count'   => $data->count(),
-            'bills'   => $data,
+            'success'            => true,
+            'count'              => $data->count(),
+            'bills'              => $data,
+            'config_error_bills' => $configErrorBills,
         ]);
     }
 
@@ -3579,13 +3603,16 @@ class FbrPosController extends Controller
     {
         $companyId = app('currentCompanyId');
 
-        // Atomic claim: flip from failed/offline → pending only if still
+        // Atomic claim: flip from failed/offline/pending/config_error → pending only if still
         // un-submitted. Conditional UPDATE returns affected-row count;
         // 0 = another caller already claimed it.
+        // config_error is included here to allow MANUAL retry after the admin fixes settings
+        // (POSID / token). The auto-sync loop never picks up config_error bills (apiFailedBills
+        // only returns IN ('failed','offline','pending')), so this path is manual-only.
         $claimed = FbrPosTransaction::where('company_id', $companyId)
             ->where('id', $id)
             ->whereNull('fbr_invoice_number')
-            ->whereIn('fbr_status', ['failed', 'offline', 'pending'])
+            ->whereIn('fbr_status', ['failed', 'offline', 'pending', 'config_error'])
             ->where(function ($q) {
                 $q->whereNull('invoice_mode')->orWhere('invoice_mode', '!=', 'local');
             })
@@ -3610,6 +3637,9 @@ class FbrPosController extends Controller
                 'message' => __('pos.cannot_retry_status_changed', ['status' => $tx->fbr_status]),
             ], 409);
         }
+
+
+
 
         $transaction = FbrPosTransaction::where('company_id', $companyId)
             ->where('id', $id)

@@ -409,8 +409,10 @@ class FbrPosDayCloseAutoFinalizeTest extends TestCase
 
         $tx = $this->tx($bill);
         // FINAL + Fail-Queue retryable — the bill is never lost, never deleted.
+        // fbr_status = 'config_error': permanent config failure (POSID missing) →
+        // terminal state that escapes the auto-retry loop; manually retryable once settings fixed.
         $this->assertSame('fbr', $tx->invoice_mode);
-        $this->assertSame('failed', $tx->fbr_status);
+        $this->assertSame('config_error', $tx->fbr_status);
         $this->assertNull($tx->fbr_invoice_number);
         $this->assertSame('L-0001', $tx->invoice_number);
         $this->assertSame(200.0, (float) $tx->subtotal);

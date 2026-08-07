@@ -257,6 +257,9 @@ class RestaurantWaiterController extends Controller
             'customer_name' => 'nullable|string|max:100',
             'customer_phone' => 'nullable|string|max:30',
             'kitchen_notes' => 'nullable|string|max:500',
+            // Urgent/Rush (owner, 7 Aug 2026) — same flag the cashier sale
+            // screen sets; KDS badge + KOT *** URGENT *** read order->priority.
+            'priority' => 'nullable|boolean',
         ]);
 
         // Cashier pick is OPTIONAL (customer feedback, 23 Jul 2026). No pick =
@@ -324,6 +327,7 @@ class RestaurantWaiterController extends Controller
                 'tax_amount' => 0,
                 'total_amount' => $total,
                 'kitchen_notes' => $validated['kitchen_notes'] ?? null,
+                'priority' => (bool) ($validated['priority'] ?? false),
                 'created_by' => $user->id,
                 'assigned_cashier_id' => $cashier?->id,
                 'source' => 'waiter',

@@ -182,6 +182,18 @@
                            autocomplete="off" name="waiter_customer_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                            class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm px-3 py-2.5 focus:ring-teal-500 focus:border-teal-500">
 
+                    {{-- Urgent/Rush toggle (owner voice note, 7 Aug 2026): waiter ke
+                         paas yeh option tha hi nahi — woh nav ka ⚡ logo dabate rahe.
+                         Ab wazeh ON/OFF: ON = solid red + ✓ badge, OFF = gray. Sale
+                         screen ke priorityOrder jaisa hi flag → KDS badge + KOT
+                         *** URGENT *** block khud chalte hain. --}}
+                    <button type="button" @click="priority = !priority"
+                            class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-black border-2 transition"
+                            :class="priority ? 'bg-red-600 border-red-600 text-white shadow-md' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400'">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        <span x-text="priority ? ('✓ ' + {{ Js::from(__('pos.rush_badge')) }}) : {{ Js::from(__('pos.rush_title')) }}"></span>
+                    </button>
+
                     <button type="button" @click="moreOpen = !moreOpen" title="{{ __('pos.ti_more_options') }}"
                             class="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-teal-400 transition">
                         <span x-text="(moreOpen ? '▾ ' : '▸ ') + {{ Js::from(__('pos.waiter_more_label')) }}"></span>
@@ -439,6 +451,8 @@ function waiterApp() {
         customerName: '',
         customerPhone: '',
         kitchenNotes: '',
+        // Urgent/Rush order (owner, 7 Aug 2026) — KDS + KOT priority flag.
+        priority: false,
         cashierId: '',
         sending: false,
         showTables: false,
@@ -805,6 +819,7 @@ function waiterApp() {
                 customer_name: this.customerName || null,
                 customer_phone: this.customerPhone || null,
                 kitchen_notes: this.kitchenNotes || null,
+                priority: this.priority,
             };
             try {
                 const res = await fetch(url, {
@@ -820,6 +835,7 @@ function waiterApp() {
                     this.cart = [];
                     this.customerName = ''; this.customerPhone = ''; this.kitchenNotes = '';
                     this.selectedTable = null;
+                    this.priority = false;
                     // SADA MODE: agla order phir dine-in se, fold band — screen
                     // khud "naya order" halat par wapas (cashier ka intikhab
                     // din bhar qaim rehta hai, jaan boojh kar reset NahiN).

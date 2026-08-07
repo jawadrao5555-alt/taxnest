@@ -3961,59 +3961,75 @@ class FbrPosController extends Controller
         // DEDUPE (Aug 2026 scanner bug): repeated scanner Enters were quick-creating the
         // same barcode-named product on every scan. An active same-name (case-insensitive)
         // product is returned as-is instead of creating a twin row.
-        $existing = Product::where('company_id', $companyId)
-            ->where('is_active', true)
-            ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
-            ->first();
-        if ($existing) {
+        // ATOMIC across concurrent requests (two terminals scanning the same unknown code
+        // at the same instant): a MySQL named lock scoped to company+name makes the
+        // check-then-insert a critical section — no unique-index schema change needed
+        // (legit same-name products may already exist historically). MySQL-only; the
+        // sqlite test env skips the lock (single-connection, no real concurrency).
+        $lockName  = 'qc_prod_' . $companyId . '_' . md5(mb_strtolower($name));
+        $usingLock = DB::getDriverName() === 'mysql';
+        if ($usingLock) {
+            DB::selectOne('SELECT GET_LOCK(?, 3) AS l', [$lockName]);
+        }
+        try {
+            $existing = Product::where('company_id', $companyId)
+                ->where('is_active', true)
+                ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
+                ->first();
+            if ($existing) {
+                return response()->json([
+                    'ok' => true,
+                    'product' => [
+                        'id'            => $existing->id,
+                        'name'          => $existing->name,
+                        'price'         => (float) $existing->default_price,
+                        'category'      => 'Quick',
+                        'type'          => 'product',
+                        'image'         => null,
+                        'is_tax_exempt' => $existing->tax_type === 'exempt',
+                        'tax_rate'      => (float) ($existing->default_tax_rate ?? 0),
+                        'hs_code'       => $existing->hs_code,
+                        'uom'           => $existing->uom ?? 'U',
+                        'hasRecipe'     => false,
+                        'stockStatus'   => null,
+                        'isQuickCreated'=> true,
+                    ],
+                ]);
+            }
+            $product = Product::create([
+                'company_id'       => $companyId,
+                'name'             => $name,
+                'default_price'    => $data['price'] ?? 0,
+                'default_tax_rate' => 18,
+                'tax_type'         => 'standard',
+                'uom'              => 'U',
+                'sku'              => 'QC-' . substr((string) time(), -6) . '-' . strtoupper(substr(uniqid(), -3)),
+                'is_price_editable'=> true,
+                'is_active'        => true,
+            ]);
             return response()->json([
                 'ok' => true,
                 'product' => [
-                    'id'            => $existing->id,
-                    'name'          => $existing->name,
-                    'price'         => (float) $existing->default_price,
+                    'id'            => $product->id,
+                    'name'          => $product->name,
+                    'price'         => (float) $product->default_price,
                     'category'      => 'Quick',
                     'type'          => 'product',
                     'image'         => null,
-                    'is_tax_exempt' => $existing->tax_type === 'exempt',
-                    'tax_rate'      => (float) ($existing->default_tax_rate ?? 0),
-                    'hs_code'       => $existing->hs_code,
-                    'uom'           => $existing->uom ?? 'U',
+                    'is_tax_exempt' => false,
+                    'tax_rate'      => 18.0,
+                    'hs_code'       => null,
+                    'uom'           => 'U',
                     'hasRecipe'     => false,
                     'stockStatus'   => null,
                     'isQuickCreated'=> true,
                 ],
             ]);
+        } finally {
+            if ($usingLock) {
+                DB::selectOne('SELECT RELEASE_LOCK(?) AS r', [$lockName]);
+            }
         }
-        $product = Product::create([
-            'company_id'       => $companyId,
-            'name'             => $name,
-            'default_price'    => $data['price'] ?? 0,
-            'default_tax_rate' => 18,
-            'tax_type'         => 'standard',
-            'uom'              => 'U',
-            'sku'              => 'QC-' . substr((string) time(), -6) . '-' . strtoupper(substr(uniqid(), -3)),
-            'is_price_editable'=> true,
-            'is_active'        => true,
-        ]);
-        return response()->json([
-            'ok' => true,
-            'product' => [
-                'id'            => $product->id,
-                'name'          => $product->name,
-                'price'         => (float) $product->default_price,
-                'category'      => 'Quick',
-                'type'          => 'product',
-                'image'         => null,
-                'is_tax_exempt' => false,
-                'tax_rate'      => 18.0,
-                'hs_code'       => null,
-                'uom'           => 'U',
-                'hasRecipe'     => false,
-                'stockStatus'   => null,
-                'isQuickCreated'=> true,
-            ],
-        ]);
     }
 
     public function apiQuickUpdatePrice(Request $request, $id)

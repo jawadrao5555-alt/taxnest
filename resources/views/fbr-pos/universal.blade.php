@@ -3682,10 +3682,13 @@ function restaurantPos() {
                 // Server may DEDUPE (return an existing same-name product) — never push a twin
                 // entry into the local catalog or the duplicate guard stops finding it.
                 if (!this.allProducts.some(x => x.id === p.id)) this.allProducts.push(p);
-                // Add directly to cart, then mark row + open inline price editor
-                this.addToCart({ id: p.id, type: 'product', name: p.name, price: 0, is_tax_exempt: false });
+                // Add to cart at the SERVER's price (a dedupe return can carry a real price —
+                // e.g. the product was created on another terminal moments ago). Only a
+                // zero-price row is treated as quick-created (inline price editor opens).
+                const pPrice = parseFloat(p.price) || 0;
+                this.addToCart({ id: p.id, type: 'product', name: p.name, price: pPrice, is_tax_exempt: !!p.is_tax_exempt });
                 const cartItem = this.cart[this.cart.length - 1];
-                if (cartItem) {
+                if (cartItem && pPrice <= 0) {
                     cartItem._isQuickCreated = true;
                     cartItem._productId = p.id;
                     this.openQuickPrice(cartItem);

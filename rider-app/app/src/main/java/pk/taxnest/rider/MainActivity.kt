@@ -35,6 +35,9 @@ class MainActivity : AppCompatActivity() {
     private val REQ_FINE = 11
     private val REQ_BG = 12
     private val REQ_NOTIF = 13
+    // App-open notification ask (v1.4.0) — result is a no-op, must NOT fall
+    // into the duty-chain REQ_NOTIF branch (that one continues to battery ask).
+    private val REQ_NOTIF_OPEN = 14
 
     private lateinit var dutyBtn: Button
     private lateinit var statusText: TextView
@@ -101,12 +104,25 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.logoutBtn).setOnClickListener {
             thread { ApiClient.post("/logout", JSONObject(), Prefs.token(this)) }
             stopService(Intent(this, TrackingService::class.java))
+            DeliveryCheckWorker.cancel(this)
             Prefs.clearSession(this)
             startActivity(Intent(this, LoginActivity::class.java)); finish()
         }
 
         findViewById<Button>(R.id.updateBtn).setOnClickListener {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ApiClient.DOWNLOAD_PAGE)))
+        }
+
+        // v1.4.0: background delivery check — notification even when the app
+        // is closed / duty off (Touseef case). KEEP policy = idempotent.
+        DeliveryCheckWorker.schedule(this)
+
+        // Ask for notification permission on open (Android 13+) so alerts work
+        // even for riders who never start duty from this screen.
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+            != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQ_NOTIF_OPEN)
         }
     }
 
@@ -273,6 +289,7 @@ class MainActivity : AppCompatActivity() {
                 beginDutyChain() else showMsg(getString(R.string.perm_location_needed))
             REQ_BG -> afterBackgroundPerm()
             REQ_NOTIF -> askBatteryThenStart()
+            REQ_NOTIF_OPEN -> { /* app-open ask — no chain to continue */ }
         }
     }
 
@@ -305,6 +322,9 @@ class MainActivity : AppCompatActivity() {
                 val deliveries = body.optInt("open_deliveries", 0)
                 val khata = body.optDouble("khata_owed", 0.0)
                 val deliveriesArr = body.optJSONArray("deliveries") ?: JSONArray()
+                // Nayi assigned delivery → phone par awaz ke saath ittila
+                // (background thread — notifications are thread-safe).
+                DeliveryNotifier.process(this, deliveriesArr)
                 runOnUiThread {
                     // Server is the boss for duty state.
                     if (Prefs.duty(this) != serverDuty) {
@@ -436,6 +456,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun sessionExpired() {
         stopService(Intent(this, TrackingService::class.java))
+        DeliveryCheckWorker.cancel(this)
         Prefs.clearSession(this)
         showMsg(getString(R.string.session_expired))
         startActivity(Intent(this, LoginActivity::class.java)); finish()

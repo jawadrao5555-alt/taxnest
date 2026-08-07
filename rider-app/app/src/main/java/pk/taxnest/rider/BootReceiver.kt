@@ -16,5 +16,9 @@ class BootReceiver : BroadcastReceiver() {
                 // FGS-from-boot blocked on some OEMs — rider reopens the app.
             }
         }
+        // v1.4.0: delivery-check job survives reboot as long as rider is logged in.
+        if (Prefs.token(context) != null) {
+            DeliveryCheckWorker.schedule(context)
+        }
     }
 }

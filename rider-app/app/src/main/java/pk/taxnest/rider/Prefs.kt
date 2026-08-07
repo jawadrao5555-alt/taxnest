@@ -28,6 +28,14 @@ object Prefs {
     fun lastSync(c: Context): Long = sp(c).getLong("last_sync", 0L)
     fun setLastSync(c: Context, v: Long) = sp(c).edit().putLong("last_sync", v).apply()
 
+    // ── Seen delivery ids (notification dedupe, v1.4.0) ───────────────────
+    // Always copy into a fresh HashSet on write — mutating the set returned by
+    // getStringSet is undefined behaviour in SharedPreferences.
+    fun seenDeliveryIds(c: Context): Set<String> =
+        sp(c).getStringSet("seen_deliveries", emptySet()) ?: emptySet()
+    fun setSeenDeliveryIds(c: Context, v: Set<String>) =
+        sp(c).edit().putStringSet("seen_deliveries", HashSet(v)).apply()
+
     // ── Pending duty-off flag ──────────────────────────────────────────────
     // Set before the /duty {on:false} network call; cleared only on success.
     // Survives process death so that an offline end-duty is reconciled with
@@ -56,6 +64,7 @@ object Prefs {
     fun clearSession(c: Context) =
         sp(c).edit()
             .remove("token").remove("rider_name").remove("company_name")
+            .remove("seen_deliveries")
             .putBoolean("duty", false).putString("queue", "[]")
             .apply()
 }

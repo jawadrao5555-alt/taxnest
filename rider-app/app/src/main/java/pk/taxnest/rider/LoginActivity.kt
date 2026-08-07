@@ -48,6 +48,8 @@ class LoginActivity : AppCompatActivity() {
                             // sessions.  Fires even if duty is now OFF so points
                             // captured before a 401 eviction are not stranded.
                             QueueDrain.drainAsync(this)
+                            // v1.4.0: start the 15-min background delivery check.
+                            DeliveryCheckWorker.schedule(this)
                             goMain()
                         }
                         code == 403 && body?.optString("error") == "plan_locked" -> {

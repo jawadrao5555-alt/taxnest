@@ -47,4 +47,9 @@
     <string name="pm_cash">نقد</string>
     <string name="pm_card">کارڈ</string>
     <string name="pm_online">آن لائن</string>
+
+    <!-- New-delivery notifications (v1.4.0) -->
+    <string name="notif_deliveries_channel">نئے آرڈر کی اطلاع</string>
+    <string name="notif_new_delivery_one">نیا آرڈر آیا ہے — ڈیلیوری کے لیے!</string>
+    <string name="notif_new_delivery_many">%1$d نئے آرڈر آئے ہیں — ڈیلیوری کے لیے!</string>
 </resources>

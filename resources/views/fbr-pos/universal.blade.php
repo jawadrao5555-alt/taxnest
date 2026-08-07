@@ -3096,6 +3096,18 @@ function restaurantPos() {
             return found ? found.quantity : 0;
         },
 
+        // BARCODE SCAN support (ported from PRA universal, Aug 2026): true when the typed
+        // query EXACTLY equals a product's barcode or SKU (case-insensitive). Scanners
+        // "type" the code then send Enter — often faster than the 60ms search debounce.
+        isExactCodeMatch(it, q) {
+            return (it.barcode && String(it.barcode).toLowerCase() === q)
+                || (it.sku && String(it.sku).toLowerCase() === q);
+        },
+        findExactCodeItem(q) {
+            if (!q) return null;
+            const all = [...this.allProducts, ...this.allServices];
+            return all.find(it => it.name && parseFloat(it.price) > 0 && this.isExactCodeMatch(it, q)) || null;
+        },
         _searchDebounceTimer: null,
         onSearchInput() {
             // Toggle dropdown synchronously so empty-state hides instantly (no flicker).
@@ -3176,6 +3188,21 @@ function restaurantPos() {
             // forward Enter to the prompt's confirm — never re-run search logic
             // behind the modal (same forwarding pattern as the type step above).
             if (this.tableSwitchPrompt) { if (!e?.repeat) this.confirmTableSwitch(this.tableSwitchIndex === 1 ? 'discard' : 'move'); return; }
+            // BARCODE SCAN fast path (ported from PRA universal — Aug 2026 scanner bug):
+            // scanner's Enter can arrive BEFORE the 60ms search debounce fills the dropdown —
+            // an exact barcode/SKU match must add instantly here, or (inventory-OFF) the scan
+            // falls through to quick-CREATE a bogus product named after the barcode digits.
+            // Skipped when the cashier has ARROWED to a suggestion (highlightIndex > 0):
+            // their explicit pick wins over an accidental short-SKU collision.
+            const scanQ = this.searchQuery.trim().toLowerCase();
+            if (scanQ.length > 0 && this.highlightIndex === 0) {
+                const exact = this.findExactCodeItem(scanQ);
+                if (exact) {
+                    if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
+                    this.quickAddItem(exact);
+                    return;
+                }
+            }
             if (this.showSearchDropdown && this.searchSuggestions.length > 0) { this.quickAddItem(this.searchSuggestions[this.highlightIndex]); return; }
             // No catalog match: in SIMPLE (inventory-OFF) mode, Enter creates the typed item on the fly.
             if (!this.isInventoryEnabled() && this.searchQuery.trim().length > 0 && !this.quickCreating) {
@@ -3183,8 +3210,20 @@ function restaurantPos() {
                 // hidden included) for an exact NAME match — an active category filter must never
                 // cause a second 'Quick' copy of a product that already exists elsewhere.
                 const nameQ = this.searchQuery.trim().toLowerCase();
-                const existing = [...this.allProducts, ...this.allServices].find(it => it.name && parseFloat(it.price) > 0 && it.name.trim().toLowerCase() === nameQ);
-                if (existing) { this.quickAddItem(existing); return; }
+                // ANY price matches here (no price>0 gate): a zero-price product (quick-created,
+                // price never set) must still be found, or every scan/Enter of the same text
+                // re-creates the same product forever (Aug 2026 scanner bug).
+                const existing = [...this.allProducts, ...this.allServices].find(it => it.name && it.name.trim().toLowerCase() === nameQ);
+                if (existing) {
+                    this.quickAddItem(existing);
+                    // Zero-price catalog row: reopen the inline price editor on its cart row
+                    // so the cashier can set the price — same UX as a fresh quick-create.
+                    if (!(parseFloat(existing.price) > 0)) {
+                        const row = [...this.cart].reverse().find(c => c.item_id === existing.id && c.item_type === (existing.type || 'product'));
+                        if (row) this.openQuickPrice(row);
+                    }
+                    return;
+                }
                 this.quickCreateProduct(); return;
             }
             // GUIDED FLOW (opt-in): Enter on an EMPTY search box advances the chain.
@@ -3623,6 +3662,11 @@ function restaurantPos() {
             const name = (this.searchQuery || '').trim();
             if (!name || this.quickCreating) return;
             this.quickCreating = true;
+            // Kill any in-flight debounced search NOW: searchQuery stays set until the fetch
+            // below resolves, so the pending 60ms callback would otherwise fire mid-fetch and
+            // (via its exact-barcode auto-add) add a SECOND item on top of this quick-create —
+            // the "TUX + barcode row from one scan" double-add (Aug 2026).
+            if (this._searchDebounceTimer) clearTimeout(this._searchDebounceTimer);
             try {
                 const res = await fetch('{{ route('fbrpos.api.products.quick-create') }}', {
                     method: 'POST',
@@ -3635,7 +3679,9 @@ function restaurantPos() {
                     return;
                 }
                 const p = data.product;
-                this.allProducts.push(p);
+                // Server may DEDUPE (return an existing same-name product) — never push a twin
+                // entry into the local catalog or the duplicate guard stops finding it.
+                if (!this.allProducts.some(x => x.id === p.id)) this.allProducts.push(p);
                 // Add directly to cart, then mark row + open inline price editor
                 this.addToCart({ id: p.id, type: 'product', name: p.name, price: 0, is_tax_exempt: false });
                 const cartItem = this.cart[this.cart.length - 1];

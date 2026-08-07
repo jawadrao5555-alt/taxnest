@@ -3958,6 +3958,33 @@ class FbrPosController extends Controller
         if ($name === '') {
             return response()->json(['ok' => false, 'error' => 'Name required'], 422);
         }
+        // DEDUPE (Aug 2026 scanner bug): repeated scanner Enters were quick-creating the
+        // same barcode-named product on every scan. An active same-name (case-insensitive)
+        // product is returned as-is instead of creating a twin row.
+        $existing = Product::where('company_id', $companyId)
+            ->where('is_active', true)
+            ->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
+            ->first();
+        if ($existing) {
+            return response()->json([
+                'ok' => true,
+                'product' => [
+                    'id'            => $existing->id,
+                    'name'          => $existing->name,
+                    'price'         => (float) $existing->default_price,
+                    'category'      => 'Quick',
+                    'type'          => 'product',
+                    'image'         => null,
+                    'is_tax_exempt' => $existing->tax_type === 'exempt',
+                    'tax_rate'      => (float) ($existing->default_tax_rate ?? 0),
+                    'hs_code'       => $existing->hs_code,
+                    'uom'           => $existing->uom ?? 'U',
+                    'hasRecipe'     => false,
+                    'stockStatus'   => null,
+                    'isQuickCreated'=> true,
+                ],
+            ]);
+        }
         $product = Product::create([
             'company_id'       => $companyId,
             'name'             => $name,

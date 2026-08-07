@@ -65,7 +65,12 @@ Schedule::call(function () {
     }
 })->everyFifteenMinutes()->name('heartbeat-watchdog');
 
-Schedule::job(new NightlyComplianceCronJob)->daily()->at('02:00');
+// Fix C: withoutOverlapping(120) — prevents a second queue:work from picking up a
+// new dispatch while the job is still running (live cache store = database, which
+// supports locks via cache_locks table, so no Redis needed).
+// Fix D: moved from 02:00 to 02:30 to separate from the hourly pos:auto-dayclose
+// (02:00) and CheckTrialExpiryJob (03:00), reducing concurrent connection load.
+Schedule::job(new NightlyComplianceCronJob)->daily()->at('02:30')->withoutOverlapping(120);
 Schedule::job(new CheckFbrTokenExpiryJob)->daily()->at('06:00');
 Schedule::job(new SyncPosOfflineInvoicesJob)->everyTwoMinutes();
 Schedule::job(new SyncFbrPosOfflineInvoicesJob)->everyTwoMinutes();

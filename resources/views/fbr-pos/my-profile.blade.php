@@ -1,5 +1,6 @@
 <x-fbr-pos-layout>
 <div class="max-w-3xl mx-auto">
+    @include('fbr-pos.partials.back-link')
     <div class="mb-6">
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.my_profile') }}</h1>
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.my_profile_desc') }}</p>

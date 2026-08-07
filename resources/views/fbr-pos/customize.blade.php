@@ -70,6 +70,7 @@
             guidedOn: {{ ($company->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }}, savingGuided: false
          }"
          class="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
+    @include('fbr-pos.partials.back-link')
 
         {{-- ═══════════ HERO ═══════════ --}}
         <div class="rounded-2xl bg-blue-600 p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">

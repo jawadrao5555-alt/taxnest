@@ -9,6 +9,7 @@
     cartTotal(){ return this.items.reduce((s, it) => s + this.lineTotal(it), 0); },
     fmt(n){ return Number(n).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 }">
+    @include('fbr-pos.partials.back-link')
 
     {{-- 🔴 Header with prominent failure reason --}}
     <div class="mb-6 p-5 rounded-xl bg-gradient-to-r from-red-50 to-amber-50 dark:from-red-900/30 dark:to-amber-900/30 border-2 border-red-300 dark:border-red-700 shadow-md">

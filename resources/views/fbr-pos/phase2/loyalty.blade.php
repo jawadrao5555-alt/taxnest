@@ -1,5 +1,6 @@
 <x-fbr-pos-layout>
 <div class="max-w-3xl mx-auto">
+    @include('fbr-pos.partials.back-link')
     <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-1">{{ __('pos.loyalty_program') }}</h1>
     <p class="text-sm text-gray-500 mb-6">{{ __('pos.loyalty_program_desc') }}</p>
 

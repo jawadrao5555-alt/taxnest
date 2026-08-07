@@ -1,5 +1,6 @@
 <x-fbr-pos-layout>
 <div class="max-w-7xl mx-auto">
+    @include('fbr-pos.partials.back-link')
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.transactions') }}</h1>

@@ -1,5 +1,6 @@
 <x-fbr-pos-layout>
 <div class="max-w-3xl mx-auto" x-data="fbrProductForm()">
+    @include('fbr-pos.partials.back-link')
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ isset($product) ? __('pos.edit_product') : __('pos.new_product') }}</h1>

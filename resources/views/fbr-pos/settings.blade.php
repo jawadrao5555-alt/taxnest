@@ -1,5 +1,6 @@
 <x-fbr-pos-layout>
 <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    @include('fbr-pos.partials.back-link')
     <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">{{ __('pos.fbr_integration_settings') }}</h1>
 
     @if(session('success'))

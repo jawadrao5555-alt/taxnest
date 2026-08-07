@@ -1,5 +1,6 @@
 <x-fbr-pos-layout>
 <div class="p-4 sm:p-6 max-w-7xl mx-auto">
+    @include('fbr-pos.partials.back-link')
     <div class="mb-6 flex items-start justify-between gap-3">
         <div>
             <h1 class="text-xl font-bold text-gray-900 dark:text-white">{{ __('pos.tutorials_title_fbr') }}</h1>

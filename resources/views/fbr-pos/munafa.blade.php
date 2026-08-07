@@ -1,5 +1,6 @@
 <x-fbr-pos-layout>
 <div class="max-w-6xl mx-auto" id="munafaPage">
+    @include('fbr-pos.partials.back-link')
     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.munafa_report') }}</h1>

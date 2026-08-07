@@ -109,7 +109,7 @@
         }
     </style>
 </head>
-<body x-data="{ scrolled: false, mobileOpen: false, showLoginModal: false }" @scroll.window="scrolled = (window.pageYOffset > 20)">
+<body x-data="{ scrolled: false, mobileOpen: false, showLoginModal: {{ ($errors->any() || old('login')) ? 'true' : 'false' }} }" @scroll.window="scrolled = (window.pageYOffset > 20)">
 
     <!-- Login Modal -->
     <div x-show="showLoginModal" x-cloak 

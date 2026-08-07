@@ -1,3 +1,4 @@
+{{-- ⚰️ DEAD FILE (Aug 2026): classic FBR create screen RETIRED — FbrPosController::create ALWAYS renders fbr-pos/universal.blade.php now. Kept on disk per PRA convention (reviewable diffs); NEVER wire it back without owner approval. --}}
 <x-fbr-pos-layout>
 <style>
 /* ═══════════════════════════════════════════════

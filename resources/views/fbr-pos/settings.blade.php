@@ -264,40 +264,6 @@
                 </form>
             </div>
 
-            {{-- 🌐 Universal Sale Screen toggle (Phase 1) — classic create screen stays the fallback --}}
-            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5"
-                 x-data="{ on: {{ ($company->fbr_universal_enabled ?? false) ? 'true' : 'false' }}, busy: false, msg: '',
-                    flip() {
-                        if (this.busy) return; this.busy = true; this.msg = '';
-                        fetch('{{ route('fbrpos.api.toggle-universal') }}', {
-                            method: 'POST',
-                            headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' }
-                        })
-                        .then(r => r.json())
-                        .then(d => { if (d.success) { this.on = d.enabled; this.msg = d.message; } else { this.msg = d.message || @js(__('pos.failed_to_update_dot')); } })
-                        .catch(() => { this.msg = @js(__('pos.network_error_please_try_again')); })
-                        .finally(() => { this.busy = false; });
-                    } }">
-                <div class="flex items-start justify-between gap-4">
-                    <div>
-                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                            {{ __('pos.universal_sale_screen') }}
-                            <span class="text-[9px] px-1.5 py-0.5 bg-blue-600 text-white rounded font-bold uppercase tracking-wider">{{ __('pos.new_badge') }}</span>
-                        </h3>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            {{ __('pos.universal_sale_screen_desc_fbr') }}
-                        </p>
-                        <p class="text-xs mt-2 font-medium" :class="on ? 'text-blue-600' : 'text-gray-400'" x-show="msg" x-text="msg" x-cloak></p>
-                    </div>
-                    <button type="button" @click="flip()" :disabled="busy"
-                            :class="on ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-700'"
-                            class="relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition disabled:opacity-50"
-                            role="switch" :aria-checked="on.toString()" aria-label="{{ __('pos.toggle_universal_sale_screen') }}">
-                        <span :class="on ? 'translate-x-6' : 'translate-x-1'" class="inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition"></span>
-                    </button>
-                </div>
-            </div>
-
             {{-- 📋 Pending Bills at Day Close — FBR mirror of the PRA 'Khud Final' policy (Aug 2026) --}}
             @php $pendingPolicy = ($company->pos_dayclose_provisional_action === 'finalize') ? 'finalize' : 'carry'; @endphp
             <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">

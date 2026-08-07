@@ -647,12 +647,11 @@ class FbrPosController extends Controller
         $activePromos = \App\Models\FbrPosPromotion::where('company_id', $companyId)
             ->where('is_active', true)->orderByDesc('id')->limit(20)->get();
 
-        // 🌐 FBR Universal sale screen (per-company opt-in, Phase 1 toggle).
-        // Falls back to the classic create screen until the universal view ships
-        // AND the company has explicitly enabled it — zero risk to existing flow.
-        $viewName = ((bool) ($company->fbr_universal_enabled ?? false) && view()->exists('fbr-pos.universal'))
-            ? 'fbr-pos.universal'
-            : 'fbr-pos.create';
+        // 🌐 Classic create screen RETIRED (Aug 2026, owner order): the universal
+        // screen is the ONLY FBR sale screen — fbr_universal_enabled no longer
+        // consulted. fbr-pos/create.blade.php kept on disk as a DEAD file (PRA
+        // convention: keep legacy views for reviewable diffs, never render them).
+        $viewName = 'fbr-pos.universal';
 
         // Universal screen needs the customer list for its phone-lookup bar.
         // Task 100 (Aug 2026): never bake thousands of customers — over the cap
@@ -2303,8 +2302,10 @@ class FbrPosController extends Controller
     }
 
     /**
-     * 🌐 Toggle the FBR Universal sale screen (admin-only).
-     * Classic create screen remains the fallback whenever this is OFF.
+     * 🌐 Universal sale screen toggle — RETIRED (Aug 2026).
+     * The classic create screen is gone; /fbr-pos/create always serves the
+     * universal screen. Endpoint kept so stale cached settings/customize pages
+     * don't 404 — it now only force-enables and reports ON, never disables.
      */
     public function toggleUniversal()
     {
@@ -2312,17 +2313,12 @@ class FbrPosController extends Controller
             return response()->json(['success' => false, 'message' => __('pos.only_company_admin_toggle_universal')], 403);
         }
 
-        $companyId = app('currentCompanyId');
-        $company = Company::find($companyId);
-        $company->fbr_universal_enabled = !$company->fbr_universal_enabled;
-        $company->save();
+        Company::where('id', app('currentCompanyId'))->update(['fbr_universal_enabled' => true]);
 
         return response()->json([
             'success' => true,
-            'enabled' => (bool) $company->fbr_universal_enabled,
-            'message' => $company->fbr_universal_enabled
-                ? __('pos.universal_enabled')
-                : __('pos.universal_disabled'),
+            'enabled' => true,
+            'message' => __('pos.universal_enabled'),
         ]);
     }
 

@@ -296,7 +296,8 @@
                             // sync / Switches) land in #tn-nav-sale-tools — hide the layout's
                             // duplicate New Sale link + Local/Failed buttons on THAT page only.
                             // Classic create screen (universal OFF) keeps the layout buttons.
-                            $tnOnUniversalSale = request()->routeIs('fbrpos.create') && (bool) ($fbrCompany->fbr_universal_enabled ?? false);
+                            // Classic create screen retired Aug 2026 — fbrpos.create ALWAYS renders the universal screen now.
+                            $tnOnUniversalSale = request()->routeIs('fbrpos.create');
                         @endphp
                         <nav class="hidden md:flex items-center gap-1">
                             @unless($tnOnUniversalSale)

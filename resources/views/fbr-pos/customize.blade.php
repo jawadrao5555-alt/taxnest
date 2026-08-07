@@ -1,6 +1,5 @@
 <x-fbr-pos-layout>
     @php
-        $universalOn = (bool) ($company->fbr_universal_enabled ?? false);
         $fbrOn       = (bool) ($company->fbr_pos_enabled ?? false);
         $reportingOn = (bool) ($company->fbr_reporting_enabled ?? false);
 
@@ -68,8 +67,7 @@
     <div x-data="{
             currentTheme: '{{ $company->pos_theme ?? 'blue' }}',
             currentStyle: '{{ $company->pos_dashboard_style ?? 'default' }}',
-            guidedOn: {{ ($company->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }}, savingGuided: false,
-            universalOn: {{ $universalOn ? 'true' : 'false' }}, savingUniversal: false, uniMsg: ''
+            guidedOn: {{ ($company->pos_guided_flow_enabled ?? true) ? 'true' : 'false' }}, savingGuided: false
          }"
          class="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
 
@@ -131,26 +129,6 @@
                         @click="guidedOn=!guidedOn; savingGuided=true; fetch('{{ route('fbrpos.settings.guided-flow') }}', {method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},body:JSON.stringify({enabled:guidedOn})}).then(r=>r.json()).catch(()=>{}).finally(()=>{ savingGuided=false; })"
                         class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200" :class="guidedOn ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'">
                         <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="guidedOn && 'translate-x-6'"></span>
-                    </button>
-                </div>
-
-                {{-- Universal sale screen toggle --}}
-                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex items-center justify-center shrink-0">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
-                    </div>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                            {{ __('pos.universal_sale_screen') }}
-                            <span class="text-[9px] px-1.5 py-0.5 bg-blue-600 text-white rounded font-bold uppercase tracking-wider">{{ __('pos.new_badge') }}</span>
-                        </p>
-                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.universal_screen_desc') }}</p>
-                        <p class="text-[11px] mt-1 font-medium" :class="universalOn ? 'text-blue-600' : 'text-gray-400'" x-show="uniMsg" x-text="uniMsg" x-cloak></p>
-                    </div>
-                    <button type="button" :disabled="savingUniversal"
-                        @click="savingUniversal=true; uniMsg=''; fetch('{{ route('fbrpos.api.toggle-universal') }}', {method:'POST',headers:{'X-CSRF-TOKEN':'{{ csrf_token() }}','Accept':'application/json'}}).then(r=>r.json()).then(d=>{ if(d.success){ universalOn=d.enabled; uniMsg=d.message; } else { uniMsg=d.message||@js(__('pos.failed_to_update_dot')); } }).catch(()=>{ uniMsg=@js(__('pos.network_error_please_try_again')); }).finally(()=>{ savingUniversal=false; })"
-                        class="relative inline-flex shrink-0 w-12 h-6 rounded-full transition-colors duration-200 disabled:opacity-50" :class="universalOn ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'">
-                        <span class="absolute w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style="top:2px; left:2px;" :class="universalOn && 'translate-x-6'"></span>
                     </button>
                 </div>
 

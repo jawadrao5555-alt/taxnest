@@ -175,10 +175,35 @@
             {{-- Non-buttons styles: product grid always visible --}}
             <div>
 @endif
-                <input type="text" x-model="search" @input="filterProducts()"
-                       autocomplete="off" name="waiter_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
-                       placeholder="{{ __('pos.ph_search_items') }}"
-                       class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-base px-4 py-3 focus:ring-teal-500 focus:border-teal-500 mb-3">
+                {{-- SEARCH + SUGGESTION DROPDOWN (Pizza Master waiter request, 8 Aug
+                     2026): jaise hi type karein, milte-julte items ki list SEEDHI
+                     search box ke neeche — tap = cart mein. Grid neeche pehle ki
+                     tarah filter hota rehta hai; yeh sirf scroll bachata hai.
+                     Enter = pehla suggestion add (scanner/keyboard waiters).
+                     Inline styles jaan-boojh kar: arbitrary Tailwind classes bina
+                     `npm run build` ke invisible ho jati hain (memory). --}}
+                <div class="relative mb-3" @click.outside="searchDropOpen = false">
+                    <input type="text" x-model="search" @input="searchDropOpen = true; filterProducts()"
+                           @focus="if (search.trim()) searchDropOpen = true"
+                           @keydown.enter.prevent="pickFirstSuggestion()"
+                           @keydown.escape="searchDropOpen = false"
+                           autocomplete="off" name="waiter_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                           placeholder="{{ __('pos.ph_search_items') }}"
+                           class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-base px-4 py-3 focus:ring-teal-500 focus:border-teal-500">
+                    <div x-show="searchDropOpen && search.trim() !== '' && !gridEditMode" x-cloak
+                         style="position:absolute; left:0; right:0; top:100%; margin-top:4px; z-index:40; max-height:45vh; overflow-y:auto;"
+                         class="rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg">
+                        <template x-for="(p, si) in suggestions" :key="p.id">
+                            <button type="button" @click="pickSuggestion(p)"
+                                    class="w-full flex items-center justify-between gap-3 px-4 py-3 text-left border-b border-gray-100 dark:border-gray-700 hover:bg-teal-50 dark:hover:bg-teal-900/20 transition"
+                                    :class="si === 0 ? 'bg-teal-50/60 dark:bg-teal-900/10' : ''">
+                                <span class="text-sm font-bold text-gray-800 dark:text-gray-100 leading-snug" x-text="p.name"></span>
+                                <span class="text-xs font-black text-teal-700 dark:text-teal-400 whitespace-nowrap" x-text="'Rs ' + p.price.toLocaleString()"></span>
+                            </button>
+                        </template>
+                        <div x-show="suggestions.length === 0" class="px-4 py-3 text-sm text-gray-400">{{ __('pos.no_items_match') }}</div>
+                    </div>
+                </div>
                 <div class="flex gap-2 overflow-x-auto pb-2 mb-2" x-show="categories.length > 1">
                     <button @click="activeCategory = 'all'; filterProducts()" :class="activeCategory === 'all' ? 'bg-teal-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'" class="px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition">{{ __('pos.all_word') }}</button>
                     <template x-for="c in categories" :key="c">
@@ -568,6 +593,26 @@ function waiterApp() {
         categories: [],
         search: '',
         activeCategory: 'all',
+        // Suggestion dropdown under the search box (Pizza Master waiter, 8 Aug 2026).
+        searchDropOpen: false,
+        get suggestions() { return this.filtered.slice(0, 8); },
+        pickSuggestion(p) {
+            if (this.gridEditMode) return;
+            this.addToCart(p);
+            this.search = '';
+            this.searchDropOpen = false;
+            this.filterProducts();
+            // $refs from inside x-for sees only the row's refs (memory) — grab the
+            // live input by name so the waiter can type the next item fori
+            // (foran) — pick, type, pick — bina dobara tap kiye.
+            const el = document.querySelector('input[name="waiter_search_nofill"]');
+            if (el) el.focus();
+        },
+        pickFirstSuggestion() {
+            if (!this.search.trim()) return;
+            const first = this.suggestions[0];
+            if (first) this.pickSuggestion(first);
+        },
         cart: [],
         orderType: 'dine_in',
         // SADA MODE (owner, 4 Aug 2026): Takeaway/phone/note/cashier "Mazeed"

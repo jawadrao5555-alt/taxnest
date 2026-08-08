@@ -42,6 +42,29 @@
             </div>
         </div>
 
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <h2 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9.75 3v2.25M14.25 3v2.25M9.75 18.75V21M14.25 18.75V21M3 9.75h2.25M3 14.25h2.25M18.75 9.75H21M18.75 14.25H21M7.5 6h9A1.5 1.5 0 0118 7.5v9a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 016 16.5v-9A1.5 1.5 0 017.5 6z"/></svg>
+                AI Reader Models
+            </h2>
+            <div class="mb-4">
+                <label class="block text-xs font-medium text-gray-400 mb-1">AI Reader Model</label>
+                <input type="text" name="ai_reader_model" value="{{ old('ai_reader_model', $settings['ai_reader_model']) }}"
+                       placeholder="e.g. gpt-4o-mini (empty = built-in default)"
+                       class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
+                <p class="text-[11px] text-gray-500 mt-1">Vision model used to read invoice photos / scanned PDFs. Leave empty to use the built-in default (gpt-4o-mini). Model id only — letters, digits, dots, dashes.</p>
+                @error('ai_reader_model') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-400 mb-1">Strong Retry Model</label>
+                <input type="text" name="ai_reader_model_strong" value="{{ old('ai_reader_model_strong', $settings['ai_reader_model_strong']) }}"
+                       placeholder="e.g. gpt-4o (empty = retry escalation OFF)"
+                       class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
+                <p class="text-[11px] text-gray-500 mt-1">Stronger (costlier) model used for ONE automatic retry when a blurry photo/scan reads with low confidence. <strong class="text-amber-400">Leave empty to switch the strong retry off</strong> — set a model id to switch it on.</p>
+                @error('ai_reader_model_strong') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
+            </div>
+        </div>
+
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
             <h2 class="text-sm font-semibold text-white flex items-center gap-2">
                 <svg class="w-5 h-5 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>

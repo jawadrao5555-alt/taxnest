@@ -5,7 +5,7 @@
             <h1 class="text-2xl font-bold text-white">Support Inbox</h1>
             <p class="text-xs text-gray-500 dark:text-gray-400">support@taxnest.com.pk — emails yahin parhein aur jawab dein</p>
         </div>
-        <button @click="compose = !compose" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium">Nayi Email Likhein</button>
+        <button @click="compose = !compose" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium">Compose Email</button>
     </div>
 
     @if($error)
@@ -24,7 +24,7 @@
                       class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2">{{ old('body') }}</textarea>
             <div class="flex items-center justify-between gap-3">
                 <input type="file" name="attachment" class="text-xs text-gray-400" />
-                <button type="submit" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium">Bhejein</button>
+                <button type="submit" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium">Send</button>
             </div>
             @error('to') <p class="text-xs text-red-400">{{ $message }}</p> @enderror
             @error('subject') <p class="text-xs text-red-400">{{ $message }}</p> @enderror

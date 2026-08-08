@@ -1348,7 +1348,7 @@ class FbrPosController extends Controller
 
             $fbrErrors = implode(', ', $fbrResult['errors'] ?? ['Unknown error']);
 
-            // ============ AUTO-RETRY ENGINE ============
+            // ==== AUTO-RETRY ENGINE ====
             // For transient failures (curl/network/empty 200/timeout), schedule auto-retry job (10s, 20s, 30s, max 3 tries)
             // For hard failures (token missing, validation), no retry — manual fix needed
             $errorString = strtolower($fbrErrors);

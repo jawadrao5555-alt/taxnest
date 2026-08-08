@@ -67,7 +67,7 @@
 
     @if($box === 'inbox')
         <div class="mt-4">
-            <button @click="reply = !reply" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium">Reply Karein</button>
+            <button @click="reply = !reply" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium">Reply</button>
 
             <div x-show="reply" x-cloak class="bg-gray-900 border border-gray-800 rounded-xl p-5 mt-3">
                 <form method="POST" action="{{ route('saas.admin.support-inbox.send') }}" enctype="multipart/form-data" class="space-y-3">
@@ -88,15 +88,15 @@
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-400 mb-1">Jawab</label>
-                        <textarea name="body" rows="7" required placeholder="Apna jawab likhein..."
+                        <textarea name="body" rows="7" required placeholder="Write your reply..."
                                   class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2">{{ old('body') }}</textarea>
                     </div>
                     <div class="flex items-center justify-between gap-3">
                         <div>
                             <input type="file" name="attachments[]" multiple class="text-xs text-gray-400" />
-                            <p class="text-[11px] text-gray-500 mt-1">Multiple files select kar sakte hain — har file max 10 MB.</p>
+                            <p class="text-[11px] text-gray-500 mt-1">You can select multiple files — max 10 MB each.</p>
                         </div>
-                        <button type="submit" class="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium">Reply Bhejein</button>
+                        <button type="submit" class="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium">Send Reply</button>
                     </div>
                     @error('to') <p class="text-xs text-red-400">{{ $message }}</p> @enderror
                     @error('subject') <p class="text-xs text-red-400">{{ $message }}</p> @enderror

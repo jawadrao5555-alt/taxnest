@@ -188,6 +188,18 @@
             </div>
             <input type="hidden" name="default_tax_rate" :value="taxType === 'taxable' ? 18 : (taxType === 'exempt' ? 0 : taxRate)">
 
+            {{-- Third Schedule (SRO third-schedule items: tax already paid by manufacturer at retail price).
+                 Matches the PRA products design: blue checkbox that auto-flips tax type to Exempt. --}}
+            <label class="flex items-center gap-2 mb-4 cursor-pointer select-none">
+                <input type="checkbox" name="is_third_schedule" value="1" x-model="thirdSchedule"
+                       @change="if(thirdSchedule){ taxType = 'exempt'; }"
+                       class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                <span class="text-xs font-bold uppercase tracking-wider"
+                      :class="thirdSchedule ? 'text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400'">
+                    {{ __('pos.third_schedule_label') }}
+                </span>
+            </label>
+
             <div class="p-4 rounded-xl border transition"
                 :class="effectiveRate > 0 ? 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800' : 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800'">
                 <div class="grid grid-cols-3 gap-4 text-center">
@@ -223,6 +235,7 @@ function fbrProductForm() {
         taxRate: '{{ old("default_tax_rate", $product->default_tax_rate ?? 18) }}',
         price: '{{ old("default_price", $product->default_price ?? 0) }}',
         isPriceEditable: {{ old('is_price_editable', isset($product) ? ($product->is_price_editable ? 'true' : 'false') : 'true') }},
+        thirdSchedule: {{ old('is_third_schedule', ($product->is_third_schedule ?? false)) ? 'true' : 'false' }},
 
         get effectiveRate() {
             if (this.taxType === 'exempt') return 0;

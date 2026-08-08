@@ -748,6 +748,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::match(['get', 'post'], '/printer-settings', [PosController::class, 'printerSettings'])->name('pos.printer-settings');
         Route::post('/products', [PosController::class, 'storeProduct'])->name('pos.products.store')->middleware('plan.limit:pos_products');
         Route::get('/products/template', [PosController::class, 'downloadProductTemplate'])->name('pos.products.template');
+        // NO plan.limit middleware here on purpose: at-cap shops must still be
+        // able to run UPDATE-only imports (the middleware would 403 the whole
+        // request at cap). Access + per-row plan cap are enforced inside
+        // importProducts (SubscriptionAccessService gate + remaining allowance).
         Route::post('/products/import', [PosController::class, 'importProducts'])->name('pos.products.import');
         Route::post('/products/bulk', [PosController::class, 'bulkProductAction'])->name('pos.products.bulk');
         Route::put('/products/{id}', [PosController::class, 'updateProduct'])->name('pos.products.update');
@@ -1213,9 +1217,12 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/products', [FbrPosController::class, 'products'])->name('fbrpos.products');
     Route::get('/products/create', [FbrPosController::class, 'createProduct'])->name('fbrpos.products.create');
     // 📦 Excel export/template + bulk import (FBR mirror of pos.products.template/import).
-    // Import is plan-gated like single product create (plan.limit:products).
+    // NO plan.limit middleware on import (Task 361): at-cap shops must still be
+    // able to run UPDATE-only imports (the middleware 403s the whole request at
+    // cap). Access + per-row plan cap are enforced inside importProducts
+    // (SubscriptionAccessService gate + remaining allowance).
     Route::get('/products/template', [FbrPosController::class, 'downloadProductTemplate'])->name('fbrpos.products.template');
-    Route::post('/products/import', [FbrPosController::class, 'importProducts'])->name('fbrpos.products.import')->middleware('plan.limit:products');
+    Route::post('/products/import', [FbrPosController::class, 'importProducts'])->name('fbrpos.products.import');
     Route::post('/products', [FbrPosController::class, 'storeProduct'])->name('fbrpos.products.store')->middleware('plan.limit:products');
     Route::get('/products/{id}/edit', [FbrPosController::class, 'editProduct'])->name('fbrpos.products.edit');
     Route::put('/products/{id}', [FbrPosController::class, 'updateProduct'])->name('fbrpos.products.update');

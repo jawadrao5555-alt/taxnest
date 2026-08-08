@@ -1418,6 +1418,7 @@ return [
     'import_more_suffix' => '…اور :count مزید۔',
     'import_new_products_added' => ':count نئی پروڈکٹس شامل کی گئیں',
     'import_no_rows' => 'فائل میں کوئی امپورٹ کے قابل قطار نہیں ملی۔',
+    'import_plan_limit_skipped' => ':count قطاریں آپ کے پلان کی پروڈکٹ حد کی وجہ سے چھوڑ دی گئیں — مزید پروڈکٹس شامل کرنے کے لیے پلان اپ گریڈ کریں',
     'import_required_columns_note' => '<strong>نام</strong> اور <strong>قیمت</strong> لازمی ہیں — اگر چاہیں تو باقی کالمز (تفصیل، کیٹیگری، SKU، بارکوڈ، ٹیکس ریٹ %، UoM) بھریں، ورنہ خالی چھوڑ دیں۔',
     'import_rows_skipped' => ':count قطاریں چھوڑ دی گئیں',
     'import_sample_rows_skipped' => ':count سیمپل قطاریں چھوڑ دی گئیں',

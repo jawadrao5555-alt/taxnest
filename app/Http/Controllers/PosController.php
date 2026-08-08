@@ -6377,6 +6377,24 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
 
+        // Subscription access gate (Task 361 review): this route deliberately has
+        // no plan.limit middleware (an at-cap shop must still be able to run an
+        // UPDATE-only import), so the middleware's Step-1 access check is applied
+        // here instead — suspended/expired/trial-ended shops are blocked before
+        // any row is written. Per-row plan cap is enforced in the loop below.
+        // FAIL CLOSED: no exception swallowing — an access-evaluation failure
+        // aborts the request. The only pass-through is the narrow schema-compat
+        // guard for minimal test schemas without a subscriptions table.
+        if (\Illuminate\Support\Facades\Schema::hasTable('subscriptions')) {
+            $accessCompany = Company::find($companyId);
+            if ($accessCompany) {
+                $access = \App\Services\SubscriptionAccessService::hasAccess($accessCompany);
+                if (!$access['allowed']) {
+                    return back()->with('error', $access['reason']);
+                }
+            }
+        }
+
         $request->validate([
             'csv_file' => 'required|file|mimes:csv,txt,xlsx,xls|max:5120',
         ], [
@@ -6427,6 +6445,14 @@ class PosController extends Controller
         // Third Schedule column (Aug 2026): round-trip Yes/No.
         $thirdIdx = $this->findColumn($header, ['third schedule (yes/no)', 'third schedule', 'third_schedule', 'is_third_schedule', 'third']);
 
+        // 🔒 ATOMIC QUOTA ADMISSION (Task 361 review): the whole catalog read +
+        // allowance computation + row writes run in ONE transaction under a
+        // company-row lock, so two simultaneous imports serialize — the second
+        // recounts AFTER the first commits and can never double-spend the cap.
+        DB::beginTransaction();
+        try {
+        Company::where('id', $companyId)->lockForUpdate()->get();
+
         // Preload the whole catalog ONCE (bounded per company) — match precedence
         // barcode → SKU → name. Maps updated after each create so a duplicate row
         // in the same file updates instead of double-creating.
@@ -6437,6 +6463,13 @@ class PosController extends Controller
             if (trim((string) $p->sku) !== '') $bySku[strtolower(trim($p->sku))] = $p;
             $byName[strtolower(trim($p->name))] = $p;
         }
+
+        // Plan product cap (Task 361): the route middleware only gates ENTRY —
+        // a shop 1 under its cap could still land 5,000 rows over. Creation
+        // stops at the remaining allowance; UPDATES to existing products always
+        // apply. null = unlimited.
+        $planRemaining = \App\Services\PlanLimitService::remainingProductAllowance((int) $companyId, 'pos');
+        $planSkipped = 0;
 
         $added = 0; $updated = 0; $skipped = 0; $samplesSkipped = 0;
         $errors = [];
@@ -6542,6 +6575,12 @@ class PosController extends Controller
                 $updated++;
                 $product = $existing;
             } else {
+                // Plan cap: stop CREATING once remaining allowance is used up
+                // (updates above still apply; skipped rows counted for the flash).
+                if ($planRemaining !== null && $planRemaining <= 0) {
+                    $planSkipped++;
+                    continue;
+                }
                 $createData = [
                     'company_id' => $companyId,
                     'name' => $name,
@@ -6561,6 +6600,7 @@ class PosController extends Controller
                 }
                 $product = PosProduct::create($createData);
                 $added++;
+                if ($planRemaining !== null) { $planRemaining--; }
             }
 
             // Keep maps fresh so later rows in the same file match this product.
@@ -6569,11 +6609,18 @@ class PosController extends Controller
             $byName[strtolower($name)] = $product;
         }
 
+        DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            throw $e;
+        }
+
         $parts = [];
         if ($added > 0) $parts[] = __('pos.import_new_products_added', ['count' => $added]);
         if ($updated > 0) $parts[] = __('pos.import_updated', ['count' => $updated]);
         if ($samplesSkipped > 0) $parts[] = __('pos.import_sample_rows_skipped', ['count' => $samplesSkipped]);
         if ($skipped > 0) $parts[] = __('pos.import_rows_skipped', ['count' => $skipped]);
+        if ($planSkipped > 0) $parts[] = __('pos.import_plan_limit_skipped', ['count' => $planSkipped]);
         $msg = $parts ? implode(', ', $parts) . '.' : __('pos.import_no_rows');
         if (!empty($errors)) $msg .= __('pos.import_issues', ['issues' => implode('; ', array_slice($errors, 0, 5))]) . (count($errors) > 5 ? __('pos.import_more_suffix', ['count' => count($errors) - 5]) : '');
 

@@ -1418,6 +1418,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'import_more_suffix' => ' …aur :count mazeed.',
     'import_new_products_added' => ':count naye products add hue',
     'import_no_rows' => 'File mein koi import karne wali row nahi mili.',
+    'import_plan_limit_skipped' => ':count rows plan ki product limit ki wajah se skip hui — mazeed products add karne ke liye plan upgrade karein',
     'import_required_columns_note' => '<strong>Name</strong> aur <strong>Price</strong> — baqi columns (Description, Category, SKU, Barcode, Tax Rate %, Unit) chahein to bharein, warna khali chhor dein.',
     'import_rows_skipped' => ':count rows skip hui',
     'import_sample_rows_skipped' => ':count sample rows skip hui',

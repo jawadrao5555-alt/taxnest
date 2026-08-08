@@ -561,6 +561,71 @@ class AgentController extends Controller
     {
         $company = $request->attributes->get('agent_company');
 
+        // Housekeeping (stale requeue + purge) is throttled to once per 30s per
+        // company — with long-polling agents this endpoint runs far more often
+        // and the maintenance queries must not run on every pass.
+        if (\Illuminate\Support\Facades\Cache::add('print_jobs_housekeeping_' . $company->id, 1, 30)) {
+            $this->printJobsHousekeeping($company);
+        }
+
+        // Long-poll (agent v1.6.2+, ZFC "instant print" request Aug 2026):
+        // ?wait=N holds this request up to N seconds (capped) checking for
+        // pending jobs every 250ms, so a job enqueued mid-hold is claimed near
+        // instantly instead of waiting out a fixed poll interval. Older agents
+        // send no wait param and behave exactly as before. `held` in the
+        // response tells the new agent whether the server actually waited —
+        // if not (old server / instant answer), the agent adds its own delay
+        // so it never tight-loops.
+        $wait = min(max((int) $request->query('wait', 0), 0), 8);
+        $held = false;
+        $pendingExists = fn () => DB::table('pos_print_jobs')
+            ->where('company_id', $company->id)
+            ->where('status', 'pending')
+            ->exists();
+        $hasPending = $pendingExists();
+        if ($wait > 0 && !$hasPending) {
+            $held = true;
+            $deadline = microtime(true) + $wait;
+            while (microtime(true) < $deadline) {
+                usleep(250000);
+                if ($hasPending = $pendingExists()) {
+                    break;
+                }
+            }
+        }
+
+        if (!$hasPending) {
+            return response()->json(['ok' => true, 'jobs' => [], 'count' => 0, 'held' => $held]);
+        }
+
+        $token = (string) \Illuminate\Support\Str::uuid();
+        DB::table('pos_print_jobs')
+            ->where('company_id', $company->id)
+            ->where('status', 'pending')
+            ->orderBy('id')
+            ->limit(10)
+            ->update([
+                'status' => 'printing',
+                'claim_token' => $token,
+                'attempts' => DB::raw('attempts + 1'),
+                'updated_at' => now(),
+            ]);
+
+        $jobs = DB::table('pos_print_jobs')
+            ->where('company_id', $company->id)
+            ->where('claim_token', $token)
+            ->orderBy('id')
+            ->get(['id', 'type', 'target_printer', 'transaction_id', 'restaurant_order_id', 'render_query']);
+
+        return response()->json(['ok' => true, 'jobs' => $jobs, 'count' => $jobs->count(), 'held' => $held]);
+    }
+
+    /**
+     * Print-job table maintenance — stale-claim requeue + old-row purge.
+     * Called from claimPrintJobs, throttled to once per 30s per company.
+     */
+    private function printJobsHousekeeping($company): void
+    {
         // Stale-claim requeue: a job stuck 'printing' >2 min means the agent
         // died mid-print. Retry up to 3 attempts, then park as failed.
         DB::table('pos_print_jobs')
@@ -601,27 +666,6 @@ class AgentController extends Controller
                 throw $e;
             }
         }
-
-        $token = (string) \Illuminate\Support\Str::uuid();
-        DB::table('pos_print_jobs')
-            ->where('company_id', $company->id)
-            ->where('status', 'pending')
-            ->orderBy('id')
-            ->limit(10)
-            ->update([
-                'status' => 'printing',
-                'claim_token' => $token,
-                'attempts' => DB::raw('attempts + 1'),
-                'updated_at' => now(),
-            ]);
-
-        $jobs = DB::table('pos_print_jobs')
-            ->where('company_id', $company->id)
-            ->where('claim_token', $token)
-            ->orderBy('id')
-            ->get(['id', 'type', 'target_printer', 'transaction_id', 'restaurant_order_id', 'render_query']);
-
-        return response()->json(['ok' => true, 'jobs' => $jobs, 'count' => $jobs->count()]);
     }
 
     /**

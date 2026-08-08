@@ -1,5 +1,12 @@
 # TaxNest PRA Sync Agent — Changelog
 
+## v1.6.2 (2026-08-08)
+**Instant silent printing (long-poll)**
+
+- Print-job polling switched from a fixed 2s interval to a **long-poll loop**: the server holds each poll open (up to 8s) and answers the moment a receipt/KOT job is enqueued, so printing starts about a quarter-second after the cashier hits Print (ZFC request — "thora instant karwa dein").
+- Fully backward/forward compatible: old agents on the new server behave exactly as before; the new agent on an old server falls back to a 1.5s poll (never tight-loops).
+
+
 ## v1.6.0 (2026-07-29)
 **FBR POS window + print-bridge hardening (GA prep)**
 

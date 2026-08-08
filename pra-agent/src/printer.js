@@ -174,15 +174,29 @@ async function reportJobResult(jobId, success, error) {
   }
 }
 
+// Long-poll (v1.6.2, ZFC "instant print" request Aug 2026): ?wait=8 asks the
+// server to HOLD the request up to 8s and answer the moment a job is enqueued
+// (checked server-side every 250ms) — jobs start printing ~quarter-second
+// after the cashier hits Print instead of waiting out a fixed poll interval.
+// Returns the suggested delay (ms) before the next poll:
+//   - jobs were printed            → 0   (more may follow in a rush)
+//   - server held the request      → 0   (server already did the waiting)
+//   - instant empty answer         → 1500 (old server / no hold — never tight-loop)
+//   - network/server error         → 3000
 async function pollPrintJobs() {
-  if (!cfg || printing) return; // one batch at a time — receipts must not interleave
+  if (!cfg || printing) return 1500; // one batch at a time — receipts must not interleave
   printing = true;
+  let nextDelay = 1500;
   try {
-    const res = await axios.get(`${cfg.serverUrl}/print-jobs`, {
+    // timeout must comfortably exceed the server's max hold (8s).
+    const res = await axios.get(`${cfg.serverUrl}/print-jobs?wait=8`, {
       headers: { Authorization: `Bearer ${cfg.apiKey}` },
-      timeout: 10000,
+      timeout: 15000,
     });
     const jobs = (res.data && res.data.jobs) || [];
+    if (jobs.length > 0 || (res.data && res.data.held)) {
+      nextDelay = 0;
+    }
     for (const job of jobs) {
       try {
         const contentRes = await axios.get(
@@ -216,9 +230,34 @@ async function pollPrintJobs() {
     }
   } catch (e) {
     // Poll failure is quiet — heartbeat already tracks connectivity.
+    nextDelay = 3000;
   } finally {
     printing = false;
   }
+  return nextDelay;
+}
+
+// Self-scheduling poll loop — replaces the old fixed setInterval so the next
+// long-poll opens IMMEDIATELY after the previous one answers (no dead gap
+// between polls where a fresh job would sit unnoticed).
+let pollLoopStop = null;
+function startPollLoop() {
+  let stopped = false;
+  let timer = null;
+  pollLoopStop = () => { stopped = true; if (timer) { clearTimeout(timer); timer = null; } };
+  const tick = async () => {
+    if (stopped) return;
+    let delay = 1500;
+    try {
+      delay = await pollPrintJobs();
+    } catch (e) {
+      delay = 3000; // pollPrintJobs never throws, but never let the loop die
+    }
+    if (stopped) return;
+    if (typeof delay !== 'number' || !isFinite(delay) || delay < 0) delay = 1500;
+    timer = setTimeout(tick, delay);
+  };
+  tick();
 }
 
 function startPrinting(config) {
@@ -229,13 +268,13 @@ function startPrinting(config) {
 
   reportPrinters();
   printersInterval = setInterval(reportPrinters, 5 * 60 * 1000);
-  // 2s poll (ZFC 28 Jul 2026: "KOT 15-20 sec late aata hai") — 5s poll + settle
-  // + sequential batch made worst-case KOT latency feel like forever in a rush.
-  jobsInterval = setInterval(pollPrintJobs, 2000);
+  // v1.6.2: long-poll loop (was fixed 2s setInterval) — near-instant prints.
+  startPollLoop();
 }
 
 function stopPrinting() {
   if (printersInterval) { clearInterval(printersInterval); printersInterval = null; }
+  if (pollLoopStop) { pollLoopStop(); pollLoopStop = null; }
   if (jobsInterval) { clearInterval(jobsInterval); jobsInterval = null; }
   if (printWindow && !printWindow.isDestroyed()) {
     try { printWindow.destroy(); } catch (e) {}

@@ -22,14 +22,32 @@ class SupportMailHealth
 {
     private const FAILURE_KEY = 'support_mail_health_failure';
     private const SUCCESS_KEY = 'support_mail_health_last_success_at';
+    private const NOTIFIED_KEY = 'support_mail_health_last_notified_at';
+
+    /** Failure must be at least this old before the admin email alert fires. */
+    public const ALERT_AFTER_HOURS = 6;
 
     public static function recordFailure(\Throwable $e): void
     {
         try {
-            $count = (int) (self::current()['count'] ?? 0) + 1;
+            $existing = self::current();
+            $count = (int) ($existing['count'] ?? 0) + 1;
+
+            // Preserve the ORIGINAL outage-start timestamp while a failure is
+            // already active: every 15-min probe re-records the failure, and
+            // overwriting 'at' would keep the outage looking "fresh" forever,
+            // so the 6h+ admin email alert would never fire.
+            $at = null;
+            if (!empty($existing['at'])) {
+                try {
+                    $at = Carbon::parse($existing['at'])->toIso8601String();
+                } catch (\Throwable $ignored) {
+                    // Malformed stored timestamp — restart the clock below.
+                }
+            }
 
             SystemSetting::set(self::FAILURE_KEY, json_encode([
-                'at' => now()->toIso8601String(),
+                'at' => $at ?? now()->toIso8601String(),
                 'error' => mb_substr((string) $e->getMessage(), 0, 300),
                 'count' => $count,
             ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: '', 'Support mailbox IMAP failure tracker (auto-managed)');
@@ -45,6 +63,13 @@ class SupportMailHealth
 
             if ((string) SystemSetting::get(self::FAILURE_KEY, '') !== '') {
                 SystemSetting::set(self::FAILURE_KEY, '', 'Support mailbox IMAP failure tracker (auto-managed)');
+            }
+
+            // Mailbox healthy again — reset the alert throttle so the NEXT
+            // prolonged outage emails admins immediately once it crosses the
+            // age threshold, instead of waiting out a stale 12h window.
+            if ((string) SystemSetting::get(self::NOTIFIED_KEY, '') !== '') {
+                SystemSetting::set(self::NOTIFIED_KEY, '', 'Last time the support-mailbox watchdog emailed admins (auto-managed).');
             }
         } catch (\Throwable $ignored) {
             // Health bookkeeping must never break the calling path.
@@ -83,5 +108,49 @@ class SupportMailHealth
             'error' => (string) ($data['error'] ?? ''),
             'count' => max(1, (int) ($data['count'] ?? 1)),
         ];
+    }
+
+    /**
+     * Whether the prolonged-outage admin email may fire now: the recorded
+     * failure must be at least ALERT_AFTER_HOURS old, and the last alert
+     * (if any) more than 12h ago.
+     */
+    public static function shouldNotify(): bool
+    {
+        try {
+            $failure = self::current();
+            if (!$failure || empty($failure['at'])) {
+                return false;
+            }
+
+            $failedAt = Carbon::parse($failure['at']);
+            if ($failedAt->gt(now()->subHours(self::ALERT_AFTER_HOURS))) {
+                return false;
+            }
+
+            $rawLast = SystemSetting::get(self::NOTIFIED_KEY, '');
+            if (is_string($rawLast) && trim($rawLast) !== '') {
+                $last = Carbon::parse($rawLast);
+                if ($last->gt(now()->subHours(12))) {
+                    return false;
+                }
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    public static function markNotified(): void
+    {
+        try {
+            SystemSetting::set(
+                self::NOTIFIED_KEY,
+                now()->toDateTimeString(),
+                'Last time the support-mailbox watchdog emailed admins (auto-managed).'
+            );
+        } catch (\Throwable $ignored) {
+        }
     }
 }

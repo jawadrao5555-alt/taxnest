@@ -80,6 +80,52 @@ Schedule::call(function () {
     }
 })->everyFifteenMinutes()->name('support-mail-health-probe');
 
+// Support-mailbox prolonged-outage watchdog: if the support@ IMAP mailbox has
+// been failing for 6h+ (banner alone only helps admins who open the panel),
+// email every admin synchronously via the noreply SMTP (no queue dependency).
+// Throttled to once per 12h; throttle resets when the mailbox recovers.
+Schedule::call(function () {
+    try {
+        if (!\App\Services\SupportMailHealth::shouldNotify()) {
+            return;
+        }
+
+        $failure = \App\Services\SupportMailHealth::current();
+        if (!$failure) {
+            return;
+        }
+
+        $emails = \App\Models\AdminUser::whereNotNull('email')
+            ->where('email', '!=', '')
+            ->pluck('email')->unique()->values();
+        if ($emails->isEmpty()) {
+            return;
+        }
+
+        $since = $failure['at']
+            ? \Illuminate\Support\Carbon::parse($failure['at'])->format('Y-m-d H:i') . ' (' . ($failure['ago'] ?? '') . ')'
+            : 'unknown';
+        $body = "The support@ mailbox (IMAP) on the live server has been unreachable for several hours.\n\n"
+            . "Failing since: {$since}\n"
+            . "Consecutive failed checks: {$failure['count']}\n"
+            . 'Last error: ' . ($failure['error'] !== '' ? $failure['error'] : 'n/a') . "\n\n"
+            . "New customer support emails are NOT reaching the Support Inbox until this is fixed.\n"
+            . "Most common cause: the cPanel mailbox password changed (update SUPPORT_MAIL_PASSWORD) or the mail server is down.\n"
+            . 'Support inbox: ' . route('saas.admin.support-inbox') . "\n\n"
+            . 'TaxNest';
+
+        \Illuminate\Support\Facades\Mail::raw($body, function ($m) use ($emails) {
+            $m->to($emails->all())->subject('WARNING: TaxNest support mailbox has been down for hours');
+        });
+
+        \App\Services\MailHealth::recordSuccess();
+        \App\Services\SupportMailHealth::markNotified();
+    } catch (\Throwable $e) {
+        \Illuminate\Support\Facades\Log::warning('Support-mailbox watchdog email failed', ['error' => $e->getMessage()]);
+        \App\Services\MailHealth::recordFailure('Support-mailbox outage alert', $e);
+    }
+})->everyFifteenMinutes()->name('support-mail-watchdog');
+
 // Fix C: withoutOverlapping(120) — prevents a second queue:work from picking up a
 // new dispatch while the job is still running (live cache store = database, which
 // supports locks via cache_locks table, so no Redis needed).

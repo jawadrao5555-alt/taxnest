@@ -127,16 +127,43 @@
                     {{ __('pos.waiter_buttons_free_note') }}
                 </p>
 
-                {{-- Parcel button — amber, badge = my open takeaway/delivery orders --}}
+                {{-- Parcel button — amber, badge = my open takeaway/delivery orders.
+                     Task #342 (Aug 2026): tap = inline sub-list of open parcel orders
+                     (tap to append, tables jaisa flow) + "+ Naya Parcel Order". --}}
                 <button @click="selectButtonParcel()"
                         class="w-full flex items-center justify-between rounded-2xl bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-400 dark:border-amber-600 px-5 py-4 transition active:scale-[.98]">
                     <span class="text-lg font-black text-amber-700 dark:text-amber-300">
                         📦 {{ __('pos.waiter_buttons_parcel') }}
                     </span>
-                    <span x-show="myOrders.filter(o => o.order_type !== 'dine_in').length > 0"
-                          class="min-w-[28px] h-7 px-2 rounded-full bg-amber-500 text-white text-sm font-black flex items-center justify-center"
-                          x-text="myOrders.filter(o => o.order_type !== 'dine_in').length"></span>
+                    <span class="flex items-center gap-2">
+                        <span x-show="parcelOrders().length > 0"
+                              class="min-w-[28px] h-7 px-2 rounded-full bg-amber-500 text-white text-sm font-black flex items-center justify-center"
+                              x-text="parcelOrders().length"></span>
+                        <span x-show="parcelOrders().length > 0" x-cloak
+                              class="text-amber-500 dark:text-amber-400 text-sm font-black"
+                              x-text="parcelListOpen ? '▲' : '▼'"></span>
+                    </span>
                 </button>
+
+                {{-- Inline open-parcel-orders sub-list (Task #342) --}}
+                <div x-show="parcelListOpen" x-cloak class="space-y-2 pl-3 border-l-4 border-amber-300 dark:border-amber-700 ml-2">
+                    <template x-for="o in parcelOrders()" :key="'bparcel-' + o.id">
+                        <button @click="startAppendParcel(o)"
+                                class="w-full flex items-center justify-between rounded-2xl bg-white dark:bg-gray-800 border-2 border-amber-200 dark:border-amber-800 px-4 py-3 text-left transition active:scale-[.98]">
+                            <span class="min-w-0">
+                                <span class="block font-mono text-sm font-black text-amber-700 dark:text-amber-300" x-text="o.order_number"></span>
+                                <span class="block text-xs text-gray-500 dark:text-gray-400 truncate"
+                                      x-text="o.items.map(it => it.quantity + '× ' + it.name).join(' · ')"></span>
+                            </span>
+                            <span class="text-sm font-black text-gray-900 dark:text-white whitespace-nowrap pl-2"
+                                  x-text="'Rs ' + Math.round(o.total_amount).toLocaleString()"></span>
+                        </button>
+                    </template>
+                    <button @click="startNewParcel()"
+                            class="w-full rounded-2xl bg-amber-500 hover:bg-amber-600 text-white px-4 py-3 text-sm font-black transition active:scale-[.98]">
+                        {{ __('pos.waiter_buttons_new_parcel') }}
+                    </button>
+                </div>
             </div>
 
             {{-- Back button (buttons mode — shown when grid is active, not in append) --}}
@@ -548,6 +575,7 @@ function waiterApp() {
         myOrdersLoading: false,
         appendOrderId: null,
         appendOrderNumber: '',
+        parcelListOpen: false,   // Task #342: inline parcel sub-list on buttons home
         tableActionFor: null,    // occupied-tile chooser (Add Items / Shift)
         shiftFor: null,          // Table Shift (26 Jul 2026): order being shifted
         shiftPickFor: null,      // Multi-order shift (Task 104): table whose held order is being chosen
@@ -977,11 +1005,37 @@ function waiterApp() {
             this.buttonsView = false;
         },
 
-        // Tap the Parcel button → set takeaway order type and reveal the product grid.
+        // My open parcel (takeaway/delivery) orders — used by the Parcel button
+        // badge and its inline sub-list (Task #342, Aug 2026).
+        parcelOrders() {
+            return this.myOrders.filter(o => o.order_type !== 'dine_in');
+        },
+
+        // Tap the Parcel button (Task #342): agar khule parcel orders hain to
+        // inline sub-list toggle karo (tap = append, tables jaisa flow); warna
+        // seedha naya parcel order shuru.
         selectButtonParcel() {
+            if (this.parcelOrders().length > 0) {
+                this.parcelListOpen = !this.parcelListOpen;
+                return;
+            }
+            this.startNewParcel();
+        },
+
+        // "+ Naya Parcel Order" → set takeaway order type and reveal the product grid.
+        startNewParcel() {
+            this.parcelListOpen = false;
             this.orderType = 'takeaway';
             this.selectedTable = null;
             this.buttonsView = false;
+        },
+
+        // Tap an open parcel order in the sub-list → append items to that order
+        // (reuses the exact My Orders append flow; grid opens via appendOrderId).
+        startAppendParcel(o) {
+            this.parcelListOpen = false;
+            this.startAppend(o);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         },
 
         // Silent background table refresh — updates this.tables without opening the

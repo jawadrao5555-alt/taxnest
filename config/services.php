@@ -39,6 +39,12 @@ return [
         ],
     ],
 
+    'pra' => [
+        // Shared secret for the nestpay PRA relay (X-Relay-Token header).
+        // Actual value lives ONLY in live .env / relay host env — never in the repo.
+        'relay_token' => env('PRA_RELAY_TOKEN', ''),
+    ],
+
     'vapid' => [
         'public'  => env('VAPID_PUBLIC_KEY'),
         'private' => env('VAPID_PRIVATE_KEY'),

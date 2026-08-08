@@ -890,7 +890,30 @@ class FbrPosController extends Controller
                         ]);
                     }
 
+                    // ─── Third Schedule: resolve from DB FIRST (authoritative) ───────────
+                    // Must happen before $isExempt / $taxRate so that Third-Schedule
+                    // products always get 0-tax regardless of what the client sent.
+                    // For product-backed lines: DB is the only truth — client payload
+                    // is ignored to prevent tax-spoofing via crafted requests.
+                    // For manual lines (no product_id): flag is always false (cashier
+                    // cannot manually create a Third-Schedule ad-hoc line).
+                    $fbrProdId = $item['product_id'] ?? null;
+                    $fbrIsThirdSchedule = false;
+                    $fbrDbLookupDone = false;
+                    if ($fbrProdId && \Illuminate\Support\Facades\Schema::hasColumn('products', 'is_third_schedule')) {
+                        // Scoped to current company — prevents cross-company flag injection
+                        $fbrProd = \App\Models\Product::where('company_id', $companyId)->find($fbrProdId);
+                        $fbrIsThirdSchedule = $fbrProd ? (bool) $fbrProd->is_third_schedule : false;
+                        $fbrDbLookupDone = true;
+                    }
+                    // Client payload is authoritative ONLY when the product has no catalog
+                    // entry (e.g. barcode-scanned item that was never persisted); for all
+                    // catalog-backed lines the DB flag wins unconditionally.
+                    // (No fallback: manual/custom lines default to false above.)
+
                     $isExempt = !empty($item['is_tax_exempt']);
+                    // Third Schedule overrides exempt (belt-and-suspenders)
+                    if ($fbrIsThirdSchedule) { $isExempt = true; }
                     $taxRate = $isExempt ? 0 : (float) ($item['tax_rate'] ?? $defaultTaxRate);
                     $itemDiscount = round((float) ($item['item_discount'] ?? 0), 2);
 
@@ -918,7 +941,7 @@ class FbrPosController extends Controller
                     $subtotal += $lineSubtotal;
                     $totalTax += $lineTax;
 
-                    $itemsData[] = [
+                    $itemDataRow = [
                         'item_name' => $item['item_name'],
                         'hs_code' => $item['hs_code'] ?? null,
                         'uom' => $uom,
@@ -940,6 +963,10 @@ class FbrPosController extends Controller
                         'total' => $lineTotal,
                         'is_tax_exempt' => $isExempt,
                     ];
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transaction_items', 'is_third_schedule')) {
+                        $itemDataRow['is_third_schedule'] = $fbrIsThirdSchedule;
+                    }
+                    $itemsData[] = $itemDataRow;
                 }
 
                 $discountType = $request->discount_type;
@@ -3349,8 +3376,10 @@ class FbrPosController extends Controller
 
         $taxType = $request->tax_type;
         $taxRate = $taxType === 'taxable' ? 18 : ($taxType === 'exempt' ? 0 : ($request->default_tax_rate ?? 0));
+        $isThirdScheduleFbr = $request->boolean('is_third_schedule');
+        if ($isThirdScheduleFbr) { $taxType = 'exempt'; $taxRate = 0; }
 
-        $product = Product::create([
+        $createFbrData = [
             'company_id' => app('currentCompanyId'),
             'name' => $request->name,
             'barcode' => $request->barcode ?: null,
@@ -3361,7 +3390,11 @@ class FbrPosController extends Controller
             'uom' => $request->uom ?? 'U',
             'tax_type' => $taxType,
             'default_tax_rate' => $taxRate,
-        ]);
+        ];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('products', 'is_third_schedule')) {
+            $createFbrData['is_third_schedule'] = $isThirdScheduleFbr;
+        }
+        $product = Product::create($createFbrData);
 
         // Retail Core (Aug 2026): optional opening stock + low-stock threshold.
         $this->applyProductStockFields($request, $product);
@@ -3398,8 +3431,10 @@ class FbrPosController extends Controller
 
         $taxType = $request->tax_type;
         $taxRate = $taxType === 'taxable' ? 18 : ($taxType === 'exempt' ? 0 : ($request->default_tax_rate ?? 0));
+        $isThirdScheduleFbrUpd = $request->boolean('is_third_schedule');
+        if ($isThirdScheduleFbrUpd) { $taxType = 'exempt'; $taxRate = 0; }
 
-        $product->update([
+        $updateFbrData = [
             'name' => $request->name,
             'barcode' => $request->barcode ?: null,
             'sku' => $request->sku ?: null,
@@ -3409,7 +3444,11 @@ class FbrPosController extends Controller
             'uom' => $request->uom ?? 'U',
             'tax_type' => $taxType,
             'default_tax_rate' => $taxRate,
-        ]);
+        ];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('products', 'is_third_schedule')) {
+            $updateFbrData['is_third_schedule'] = $isThirdScheduleFbrUpd;
+        }
+        $product->update($updateFbrData);
 
         // Retail Core (Aug 2026): optional opening stock + low-stock threshold.
         $this->applyProductStockFields($request, $product);

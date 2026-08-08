@@ -186,9 +186,13 @@
                     <div class="summary-label">{{ __('pos.tr_sum_taxable') }}</div>
                     <div class="summary-value">PKR {{ number_format($summary->total_taxable, 2) }}</div>
                 </div>
+                <div class="summary-item" style="border-left:3px solid #2563eb;">
+                    <div class="summary-label" style="color:#1d4ed8;">{{ __('pos.kpi_third_schedule') }}</div>
+                    <div class="summary-value" style="color:#1d4ed8;">PKR {{ number_format($summary->total_third_schedule ?? 0, 2) }}</div>
+                </div>
                 <div class="summary-item">
-                    <div class="summary-label">{{ __('pos.tr_sum_exempt') }}</div>
-                    <div class="summary-value" style="color:#d97706;">PKR {{ number_format($summary->total_exempt ?? 0, 2) }}</div>
+                    <div class="summary-label">{{ __('pos.kpi_tax_exempt_other') }}</div>
+                    <div class="summary-value" style="color:#d97706;">PKR {{ number_format($summary->total_exempt_other ?? max(0, ($summary->total_exempt ?? 0) - ($summary->total_third_schedule ?? 0)), 2) }}</div>
                 </div>
                 <div class="summary-item">
                     <div class="summary-label">{{ __('pos.tr_sum_tax') }}</div>

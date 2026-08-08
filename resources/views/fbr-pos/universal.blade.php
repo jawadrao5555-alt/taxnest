@@ -2546,6 +2546,7 @@ $productsJson = $products->map(function($p) {
         'show_on_sale' => (bool) ($p->show_on_sale ?? true),
         'cost_price' => 0.0,
         'is_tax_exempt' => ($p->tax_type ?? 'standard') === 'exempt',
+            'is_third_schedule' => $p->is_third_schedule ?? false,
         'tax_rate' => (float) ($p->default_tax_rate ?? 18),
         'hs_code' => $p->hs_code,
         'uom' => $p->uom ?: 'U',
@@ -3446,7 +3447,7 @@ function restaurantPos() {
                 const src = (item.type === 'product' && item.id) ? this.allProducts.find(p => p.id === item.id) : null;
                 const rate = (item.tax_rate === 0 || item.tax_rate) ? parseFloat(item.tax_rate)
                     : ((src && (src.tax_rate === 0 || src.tax_rate)) ? parseFloat(src.tax_rate) : 18);
-                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: item.id, item_type: item.type, item_name: item.name, quantity: 1, unit_price: parseFloat(item.price), special_notes: '', is_tax_exempt: item.is_tax_exempt || false, hs_code: item.hs_code ?? (src ? src.hs_code : null) ?? null, uom: item.uom ?? (src ? src.uom : null) ?? 'U', tax_rate: rate, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false, showFbrPanel: false });
+                this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: item.id, item_type: item.type, item_name: item.name, quantity: 1, unit_price: parseFloat(item.price), special_notes: '', is_tax_exempt: (item.is_tax_exempt || item.is_third_schedule) || false, is_third_schedule: item.is_third_schedule || false, hs_code: item.hs_code ?? (src ? src.hs_code : null) ?? null, uom: item.uom ?? (src ? src.uom : null) ?? 'U', tax_rate: (item.is_third_schedule) ? 0 : rate, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false, showFbrPanel: false });
                 this.activeCartIndex = this.cart.length - 1;
             }
             this.cartAnimating = true; setTimeout(() => this.cartAnimating = false, 300);
@@ -3526,11 +3527,11 @@ function restaurantPos() {
                     this.allProducts.push({
                         id: p.id, name: p.name, price: parseFloat(p.price) || 0,
                         category: p.category || 'Quick', type: 'product', image: null,
-                        is_tax_exempt: false, hasRecipe: false, stockStatus: null,
+                        is_tax_exempt: false, is_third_schedule: false, hasRecipe: false, stockStatus: null,
                     });
                     this.addToCart({
                         id: p.id, type: 'product', name: p.name,
-                        price: parseFloat(p.price) || 0, is_tax_exempt: false,
+                        price: parseFloat(p.price) || 0, is_tax_exempt: false, is_third_schedule: false,
                     });
                     window.tnNotify && window.tnNotify(window.TXT.saved_added, p.name);
                 } else {
@@ -3544,6 +3545,7 @@ function restaurantPos() {
                         unit_price: price,
                         special_notes: '',
                         is_tax_exempt: false,
+                        is_third_schedule: false,
                         item_discount_type: 'percentage',
                         item_discount_value: 0,
                         showItemDiscount: false,
@@ -3617,7 +3619,7 @@ function restaurantPos() {
                 // Honour the same stock-out gate as handleProductClick — Quick Type
                 // must NOT bypass blockOutOfStock on inventory-enabled companies.
                 if (inv && p.match.stockStatus === 'out' && this.blockOutOfStock) { skipped++; return; }
-                const item = { id: p.match.id, type: p.match._type || p.match.type || 'product', name: p.match.name, price: p.match.price, is_tax_exempt: p.match.is_tax_exempt };
+                const item = { id: p.match.id, type: p.match._type || p.match.type || 'product', name: p.match.name, price: p.match.price, is_tax_exempt: (p.match.is_tax_exempt || p.match.is_third_schedule) || false, is_third_schedule: p.match.is_third_schedule || false };
                 for (let i = 0; i < p.qty; i++) { this.addToCart(item); added++; }
             });
             // Push synthetic manual lines (no DB write — backend storeInvoice()
@@ -3671,7 +3673,7 @@ function restaurantPos() {
             });
             if (pool.length === 0) { this.showToast(window.TXT.no_products_available, 'error'); return; }
             const pick = pool[Math.floor(Math.random() * pool.length)];
-            this.addToCart({ id: pick.id, type: pick._type || pick.type || 'product', name: pick.name, price: pick.price, is_tax_exempt: pick.is_tax_exempt });
+            this.addToCart({ id: pick.id, type: pick._type || pick.type || 'product', name: pick.name, price: pick.price, is_tax_exempt: pick.is_tax_exempt || pick.is_third_schedule || false, is_third_schedule: pick.is_third_schedule || false });
             this.showToast(window.TXT.random_prefix + pick.name, 'success');
         },
 
@@ -3727,7 +3729,7 @@ function restaurantPos() {
                 if (match) {
                     this.currentUpsell = {
                         trigger: { id: triggerItem.id, name: triggerItem.name },
-                        suggest: { id: match.id, type: match.type || 'product', name: match.name, price: match.price, is_tax_exempt: match.is_tax_exempt || false }
+                        suggest: { id: match.id, type: match.type || 'product', name: match.name, price: match.price, is_tax_exempt: (match.is_tax_exempt || match.is_third_schedule) || false, is_third_schedule: match.is_third_schedule || false }
                     };
                     // Auto-dismiss after 8s if cashier ignores it (no spam build-up)
                     if (this._upsellTimer) clearTimeout(this._upsellTimer);
@@ -3744,7 +3746,7 @@ function restaurantPos() {
             this.currentUpsell = null;
             if (this._upsellTimer) { clearTimeout(this._upsellTimer); this._upsellTimer = null; }
             // Add the suggested item — reuse existing addToCart (will skip its own upsell since item already in cart)
-            this.addToCart({ id: s.id, type: s.type, name: s.name, price: s.price, is_tax_exempt: s.is_tax_exempt });
+            this.addToCart({ id: s.id, type: s.type, name: s.name, price: s.price, is_tax_exempt: s.is_tax_exempt || s.is_third_schedule || false, is_third_schedule: s.is_third_schedule || false });
             this.showToast(window.TXT.added_prefix + s.name, 'success');
         },
         dismissUpsell(record = true) {
@@ -3894,7 +3896,7 @@ function restaurantPos() {
                 if (qcIdx === -1) this.allProducts.push(p);
                 else this.allProducts[qcIdx] = { ...this.allProducts[qcIdx], ...p };
                 const pPrice = parseFloat(p.price) || 0;
-                this.addToCart({ id: p.id, type: 'product', name: p.name, price: pPrice, is_tax_exempt: !!p.is_tax_exempt, tax_rate: p.tax_rate, hs_code: p.hs_code, uom: p.uom });
+                this.addToCart({ id: p.id, type: 'product', name: p.name, price: pPrice, is_tax_exempt: !!(p.is_tax_exempt || p.is_third_schedule), is_third_schedule: !!p.is_third_schedule, tax_rate: p.is_third_schedule ? 0 : p.tax_rate, hs_code: p.hs_code, uom: p.uom });
                 // Zero-price row (deliberate Rs.0, or dedupe returned an unpriced product):
                 // still offer the inline price editor on the actual cart row (dedupe of an
                 // item already in cart increments qty — the LAST row may not be it).
@@ -5884,7 +5886,7 @@ function restaurantPos() {
             for (const item of order.items) {
                 const existing = this.cart.find(c => c.item_id === item.item_id && c.item_type === item.item_type);
                 if (existing) { existing.quantity += item.qty; } else {
-                    this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: item.item_id, item_type: item.item_type, item_name: item.name, quantity: item.qty, unit_price: item.price, special_notes: '', is_tax_exempt: false, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false, showFbrPanel: false });
+                    this.cart.push({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: item.item_id, item_type: item.item_type, item_name: item.name, quantity: item.qty, unit_price: item.price, special_notes: '', is_tax_exempt: item.is_tax_exempt || false, is_third_schedule: item.is_third_schedule || false, item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false, showFbrPanel: false });
                 }
             }
             this.showCustomerHistory = false; this.showToast(window.TXT.items_added_to_cart, 'success');

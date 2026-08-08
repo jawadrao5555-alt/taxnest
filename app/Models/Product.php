@@ -24,12 +24,14 @@ class Product extends Model
         'is_price_editable',
         'is_active',
         'show_on_sale',
+        'is_third_schedule',
     ];
 
     protected $casts = [
         'is_price_editable' => 'boolean',
         'is_active' => 'boolean',
         'show_on_sale' => 'boolean',
+        'is_third_schedule' => 'boolean',
     ];
 
     protected static function booted()

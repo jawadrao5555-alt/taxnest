@@ -127,7 +127,7 @@
         </div>
     </div>
     @else
-    <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
+    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.kpi_total_invoices') }}</p>
             <p class="text-xl font-bold text-gray-900 dark:text-white">{{ number_format($summary->total_invoices) }}</p>
@@ -144,10 +144,23 @@
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.kpi_total_taxable') }}</p>
             <p class="text-xl font-bold text-gray-900 dark:text-white">PKR {{ number_format($summary->total_taxable, 2) }}</p>
         </div>
+        {{-- Third Schedule (Aug 2026): manufacturer-paid tax items — shown in no-filter view only --}}
+        @if(!isset($taxRateFilter) || !$taxRateFilter)
+        <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-700 shadow-md p-4 text-center">
+            <p class="text-xs text-blue-600 dark:text-blue-400 mb-1 font-semibold">{{ __('pos.kpi_third_schedule') }}</p>
+            <p class="text-xl font-bold text-blue-700 dark:text-blue-300">PKR {{ number_format($summary->total_third_schedule ?? 0, 2) }}</p>
+        </div>
+        <div class="bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-700 shadow-md p-4 text-center">
+            <p class="text-xs text-amber-600 dark:text-amber-400 mb-1 font-semibold">{{ __('pos.kpi_tax_exempt_other') }}</p>
+            <p class="text-xl font-bold text-amber-600">PKR {{ number_format($summary->total_exempt_other ?? max(0, ($summary->total_exempt ?? 0) - ($summary->total_third_schedule ?? 0)), 2) }}</p>
+        </div>
+        @else
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.kpi_tax_exempt') }}</p>
             <p class="text-xl font-bold text-amber-600">PKR {{ number_format($summary->total_exempt ?? 0, 2) }}</p>
         </div>
+        <div class="hidden lg:block"></div>{{-- spacer --}}
+        @endif
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 text-center">
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.kpi_total_tax') }}</p>
             <p class="text-xl font-bold text-purple-600">PKR {{ number_format($summary->total_tax, 2) }}</p>

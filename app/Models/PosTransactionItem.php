@@ -10,7 +10,7 @@ class PosTransactionItem extends Model
         'transaction_id', 'item_type', 'item_id', 'item_name',
         'special_notes', 'deal_snapshot',
         'quantity', 'unit_price', 'subtotal',
-        'is_tax_exempt', 'tax_rate', 'tax_amount',
+        'is_tax_exempt', 'is_third_schedule', 'tax_rate', 'tax_amount',
         'item_discount_type', 'item_discount_value', 'item_discount_amount',
     ];
 
@@ -20,6 +20,7 @@ class PosTransactionItem extends Model
         'unit_price' => 'decimal:2',
         'subtotal' => 'decimal:2',
         'is_tax_exempt' => 'boolean',
+        'is_third_schedule' => 'boolean',
         'tax_rate' => 'decimal:2',
         'tax_amount' => 'decimal:2',
         'item_discount_value' => 'decimal:2',

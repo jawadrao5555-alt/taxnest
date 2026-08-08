@@ -87,7 +87,7 @@
     </div>
 
     <div id="addProductForm" class="hidden mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-md p-5"
-         x-data="{ exempt: false, price: '', cost: '' }">
+         x-data="{ exempt: false, thirdSchedule: false, price: '', cost: '' }">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">{{ __('pos.add_new_product') }}</h3>
 
         {{-- PRA POS tax model helper: keeps UX simple per Pakistan PRA flow --}}
@@ -165,6 +165,15 @@
                             <span class="text-xs font-bold uppercase tracking-wider"
                                   :class="exempt ? 'text-amber-700 dark:text-amber-300' : 'text-gray-600 dark:text-gray-400'">
                                 {{ __('pos.tax_exempt_tax_free') }}
+                            </span>
+                        </label>
+                        <label class="flex items-center gap-2 mt-1.5 cursor-pointer select-none">
+                            <input type="checkbox" name="is_third_schedule" value="1" x-model="thirdSchedule"
+                                   @change="if(thirdSchedule){ exempt = true; }"
+                                   class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span class="text-xs font-bold uppercase tracking-wider"
+                                  :class="thirdSchedule ? 'text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400'">
+                                {{ __('pos.third_schedule_label') }}
                             </span>
                         </label>
                     </div>
@@ -441,6 +450,7 @@
                 'cost_price' => (float) ($p->cost_price ?? 0),
                 'tax_rate' => (float) $p->tax_rate,
                 'is_tax_exempt' => (bool) $p->is_tax_exempt,
+                'is_third_schedule' => (bool) ($p->is_third_schedule ?? false),
                 'category' => $p->category,
                 'sku' => $p->sku,
                 'barcode' => $p->barcode,
@@ -559,6 +569,8 @@
             <button @click="doBulk('price_percent')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">{{ __('pos.price_pct_plus_minus') }}</button>
             <button @click="doBulk('exempt_on')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">{{ __('pos.tax_exempt_on') }}</button>
             <button @click="doBulk('exempt_off')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">{{ __('pos.tax_exempt_off') }}</button>
+            <button @click="doBulk('third_on')" class="px-3 py-1.5 rounded-lg bg-blue-500/80 hover:bg-blue-600/80 text-xs font-semibold">{{ __('pos.third_schedule_on') }}</button>
+            <button @click="doBulk('third_off')" class="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold">{{ __('pos.third_schedule_off') }}</button>
             <button @click="doBulk('delete')" class="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-xs font-semibold">{{ __('pos.delete') }}</button>
             <button @click="clearSelect()" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold">{{ __('pos.clear') }}</button>
         </div>
@@ -708,6 +720,10 @@
                                 <label class="flex items-center gap-1.5 mt-1 cursor-pointer select-none">
                                     <input type="checkbox" name="is_tax_exempt" value="1" x-model="editing.is_tax_exempt" class="w-3.5 h-3.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
                                     <span class="text-[10px] font-bold uppercase tracking-wider" :class="editing.is_tax_exempt ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500'">{{ __('pos.tax_exempt_label') }}</span>
+                                </label>
+                                <label class="flex items-center gap-1.5 mt-0.5 cursor-pointer select-none">
+                                    <input type="checkbox" name="is_third_schedule" value="1" x-model="editing.is_third_schedule" @change="if(editing.is_third_schedule){ editing.is_tax_exempt = true; }" class="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                    <span class="text-[10px] font-bold uppercase tracking-wider" :class="editing.is_third_schedule ? 'text-blue-700 dark:text-blue-300' : 'text-gray-500'">{{ __('pos.third_schedule_label') }}</span>
                                 </label>
                             </div>
                             <label class="rounded-lg border-2 p-2.5 flex items-center gap-2 cursor-pointer select-none transition-all" :class="editing.show_on_sale ? 'border-emerald-300 bg-emerald-50 dark:bg-emerald-900/20' : 'border-gray-300 bg-gray-50 dark:bg-gray-800'">
@@ -919,6 +935,8 @@
                     }
                     if (action === 'exempt_on' && !confirm(@js(__('pos.js_confirm_exempt_on')).replace(':count', this.selected.length))) return;
                     if (action === 'exempt_off' && !confirm(@js(__('pos.js_confirm_exempt_off')).replace(':count', this.selected.length))) return;
+                    if (action === 'third_on' && !confirm(@js(__('pos.js_confirm_third_on')).replace(':count', this.selected.length))) return;
+                    if (action === 'third_off' && !confirm(@js(__('pos.js_confirm_third_off')).replace(':count', this.selected.length))) return;
                     this.postForm(this.bulkUrl, fields);
                 },
                 doBulkSale(action) {

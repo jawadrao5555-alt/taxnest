@@ -9,7 +9,7 @@ class FbrPosTransactionItem extends Model
     protected $fillable = [
         'transaction_id', 'product_id', 'item_name', 'hs_code', 'uom',
         'quantity', 'unit_price', 'cost_price', 'discount', 'item_discount', 'tax_rate',
-        'tax_amount', 'subtotal', 'total', 'is_tax_exempt',
+        'tax_amount', 'subtotal', 'total', 'is_tax_exempt', 'is_third_schedule',
         'returned_quantity', 'parent_item_id', 'promotion_discount',
     ];
 
@@ -24,6 +24,7 @@ class FbrPosTransactionItem extends Model
         'subtotal' => 'decimal:2',
         'total' => 'decimal:2',
         'is_tax_exempt' => 'boolean',
+        'is_third_schedule' => 'boolean',
     ];
 
     public function transaction()

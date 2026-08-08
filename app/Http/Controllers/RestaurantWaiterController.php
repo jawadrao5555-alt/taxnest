@@ -86,6 +86,7 @@ class RestaurantWaiterController extends Controller
                 'barcode' => $p->barcode ?: null,
                 'show_on_sale' => (bool) ($p->show_on_sale ?? true),
                 'is_tax_exempt' => (bool) ($p->is_tax_exempt ?? false),
+                'is_third_schedule' => \Illuminate\Support\Facades\Schema::hasColumn('pos_products', 'is_third_schedule') ? (bool) ($p->is_third_schedule ?? false) : false,
             ])
             ->values();
 
@@ -630,6 +631,7 @@ class RestaurantWaiterController extends Controller
                 'unit_price' => (float) $i->unit_price,
                 'special_notes' => $i->special_notes,
                 'is_tax_exempt' => (bool) $i->is_tax_exempt,
+                'is_third_schedule' => \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'is_third_schedule') ? (bool) ($i->is_third_schedule ?? false) : false,
                 'printed' => $i->kot_printed_at !== null,
             ])->values(),
             'created_at' => $o->created_at->format('H:i'),

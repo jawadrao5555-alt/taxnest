@@ -2023,7 +2023,8 @@ class PosController extends Controller
                     ? \App\Services\PosTaxMath::inclusiveLineTax((float) $itemTaxableAmount, (float) $itemTaxRate, $menuRate)
                     : round($itemTaxableAmount * $itemTaxRate / 100, 2);
 
-                PosTransactionItem::create([
+                $thirdSchemaExists = \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'is_third_schedule');
+                PosTransactionItem::create(array_merge([
                     'transaction_id' => $transaction->id,
                     'item_type' => $ri['type'],
                     'item_id' => $ri['item_id'],
@@ -2036,7 +2037,7 @@ class PosController extends Controller
                     'is_tax_exempt' => $ri['isExempt'],
                     'tax_rate' => $itemTaxRate,
                     'tax_amount' => $itemTaxAmount,
-                ]);
+                ], $thirdSchemaExists ? ['is_third_schedule' => $ri['isThirdSchedule'] ?? false] : []));
             }
 
             PosPayment::create([
@@ -2359,7 +2360,8 @@ class PosController extends Controller
                     ? \App\Services\PosTaxMath::inclusiveLineTax((float) $itemTaxableAmount, (float) $itemTaxRate, $editMenuRate)
                     : round($itemTaxableAmount * $itemTaxRate / 100, 2);
 
-                PosTransactionItem::create([
+                $thirdSchemaExistsEdit = \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'is_third_schedule');
+                PosTransactionItem::create(array_merge([
                     'transaction_id' => $transaction->id,
                     'item_type' => $ri['type'],
                     'item_id' => $ri['item_id'],
@@ -2372,7 +2374,7 @@ class PosController extends Controller
                     'is_tax_exempt' => $ri['isExempt'],
                     'tax_rate' => $itemTaxRate,
                     'tax_amount' => $itemTaxAmount,
-                ]);
+                ], $thirdSchemaExistsEdit ? ['is_third_schedule' => $ri['isThirdSchedule'] ?? false] : []));
             }
 
             $transaction->payments()->delete();
@@ -4398,12 +4400,19 @@ class PosController extends Controller
                 ->where('pos_transaction_items.tax_rate', $rate);
         }
 
+        $hasThirdCol = \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'is_third_schedule');
+        $thirdExpr = $hasThirdCol
+            ? "COALESCE(SUM(CASE WHEN pos_transaction_items.is_third_schedule = 1 OR pos_transaction_items.is_third_schedule = true THEN {$base} ELSE 0 END), 0) as total_third_schedule,"
+            : "0 as total_third_schedule,";
+
         return $itemQuery->selectRaw("
             COUNT(DISTINCT pos_transaction_items.transaction_id) as total_invoices,
             COALESCE(SUM({$base}), 0) as total_sales,
             COALESCE(SUM(pos_transaction_items.tax_amount), 0) as total_tax,
-            COALESCE(SUM(CASE WHEN pos_transaction_items.is_tax_exempt = true THEN {$base} ELSE 0 END), 0) as total_exempt,
-            COALESCE(SUM(CASE WHEN pos_transaction_items.is_tax_exempt = false THEN {$base} ELSE 0 END), 0) as total_taxable
+            COALESCE(SUM(CASE WHEN pos_transaction_items.is_tax_exempt = 1 OR pos_transaction_items.is_tax_exempt = true THEN {$base} ELSE 0 END), 0) as total_exempt,
+            COALESCE(SUM(CASE WHEN pos_transaction_items.is_tax_exempt = 0 OR pos_transaction_items.is_tax_exempt = false THEN {$base} ELSE 0 END), 0) as total_taxable,
+            {$thirdExpr}
+            0 as _dummy
         ")->first();
     }
 
@@ -4455,6 +4464,7 @@ class PosController extends Controller
 
             $summary = $this->buildItemLevelSummary($allIds, $taxRateFilter);
             $summary->total_discount = 0;
+            $summary->total_third_schedule = $summary->total_third_schedule ?? 0;
 
             $itemValues = $this->getItemLevelValuesForTransactions($transactions, $taxRateFilter);
         } else {
@@ -4467,6 +4477,25 @@ class PosController extends Controller
                 COALESCE(SUM(tax_amount), 0) as total_tax,
                 COALESCE(SUM(exempt_amount), 0) as total_exempt
             ')->first();
+
+            // Third Schedule breakdown (Aug 2026): item-level query so we can
+            // split exempt into Third Schedule vs regular exempt for monthly return.
+            $thirdScheduleTotal = 0;
+            if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'is_third_schedule')) {
+                $allIds = $this->buildTaxReportQuery($request, $tab, true)->pluck('id')->toArray();
+                if (!empty($allIds)) {
+                    $base = $this->itemBaseSqlExpr();
+                    $thirdScheduleTotal = (float) (\App\Models\PosTransactionItem::query()
+                        ->join('pos_transactions', 'pos_transactions.id', '=', 'pos_transaction_items.transaction_id')
+                        ->whereIn('pos_transaction_items.transaction_id', $allIds)
+                        ->where('pos_transaction_items.is_third_schedule', true)
+                        ->selectRaw("COALESCE(SUM({$base}), 0) as ts_total")
+                        ->value('ts_total') ?? 0);
+                }
+            }
+            $summary->total_third_schedule = $thirdScheduleTotal;
+            // Exempt (other) = exempt_amount minus Third Schedule portion
+            $summary->total_exempt_other = max(0, (float) ($summary->total_exempt ?? 0) - $thirdScheduleTotal);
         }
 
         $dateLabel = $this->getReportDateLabel($request);
@@ -4609,12 +4638,31 @@ class PosController extends Controller
                 }
 
                 fputcsv($file, []);
-                fputcsv($file, ['SUMMARY']);
+                // Third Schedule breakdown for CSV summary
+                $csvThirdTotal = 0;
+                if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'is_third_schedule')) {
+                    $csvAllIds = $transactions->pluck('id')->toArray();
+                    if (!empty($csvAllIds)) {
+                        $base2 = $this->itemBaseSqlExpr();
+                        $csvThirdTotal = (float) (\App\Models\PosTransactionItem::query()
+                            ->join('pos_transactions', 'pos_transactions.id', '=', 'pos_transaction_items.transaction_id')
+                            ->whereIn('pos_transaction_items.transaction_id', $csvAllIds)
+                            ->where('pos_transaction_items.is_third_schedule', true)
+                            ->selectRaw("COALESCE(SUM({$base2}), 0) as ts_total")
+                            ->value('ts_total') ?? 0);
+                    }
+                }
+                $csvTotalExempt = $transactions->sum('exempt_amount');
+                $csvExemptOther = max(0, $csvTotalExempt - $csvThirdTotal);
+
+                fputcsv($file, ['SUMMARY — Monthly Return Breakup']);
                 fputcsv($file, ['Total Invoices', $transactions->count()]);
                 fputcsv($file, ['Total Sales Amount (PKR)', number_format($transactions->sum('total_amount'), 2, '.', '')]);
                 fputcsv($file, ['Total Discount Amount (PKR)', number_format($transactions->sum('discount_amount'), 2, '.', '')]);
-                fputcsv($file, ['Total Taxable Amount (PKR)', number_format($transactions->sum(fn($t) => $t->subtotal - $t->discount_amount - ($t->exempt_amount ?? 0)), 2, '.', '')]);
-                fputcsv($file, ['Total Tax Exempt Amount (PKR)', number_format($transactions->sum('exempt_amount'), 2, '.', '')]);
+                fputcsv($file, ['Taxable Sales (PKR)', number_format($transactions->sum(fn($t) => $t->subtotal - $t->discount_amount - ($t->exempt_amount ?? 0)), 2, '.', '')]);
+                fputcsv($file, ['Third Schedule Sales (PKR)', number_format($csvThirdTotal, 2, '.', '')]);
+                fputcsv($file, ['Exempt Sales — Other (PKR)', number_format($csvExemptOther, 2, '.', '')]);
+                fputcsv($file, ['Total Tax Exempt Amount (PKR)', number_format($csvTotalExempt, 2, '.', '')]);
                 fputcsv($file, ['Total Tax Amount (PKR)', number_format($transactions->sum('tax_amount'), 2, '.', '')]);
             }
 
@@ -4655,6 +4703,23 @@ class PosController extends Controller
                 COALESCE(SUM(tax_amount), 0) as total_tax,
                 COALESCE(SUM(exempt_amount), 0) as total_exempt
             ')->first();
+
+            // Third Schedule breakdown for PDF
+            $pdfThirdTotal = 0;
+            if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'is_third_schedule')) {
+                $pdfAllIds = $transactions->pluck('id')->toArray();
+                if (!empty($pdfAllIds)) {
+                    $base3 = $this->itemBaseSqlExpr();
+                    $pdfThirdTotal = (float) (\App\Models\PosTransactionItem::query()
+                        ->join('pos_transactions', 'pos_transactions.id', '=', 'pos_transaction_items.transaction_id')
+                        ->whereIn('pos_transaction_items.transaction_id', $pdfAllIds)
+                        ->where('pos_transaction_items.is_third_schedule', true)
+                        ->selectRaw("COALESCE(SUM({$base3}), 0) as ts_total")
+                        ->value('ts_total') ?? 0);
+                }
+            }
+            $summary->total_third_schedule = $pdfThirdTotal;
+            $summary->total_exempt_other = max(0, (float) ($summary->total_exempt ?? 0) - $pdfThirdTotal);
         }
 
         $dateLabel = $this->getReportDateLabel($request);
@@ -6052,6 +6117,9 @@ class PosController extends Controller
         }
 
         $isExempt = $request->has('is_tax_exempt');
+        $isThirdSchedule = $request->has('is_third_schedule');
+        // Third Schedule → always tax-free (also marks exempt)
+        if ($isThirdSchedule) { $isExempt = true; }
         $data = [
             'company_id' => $companyId,
             'name' => $request->name,
@@ -6060,13 +6128,14 @@ class PosController extends Controller
             'cost_price' => $request->filled('cost_price') ? $request->cost_price : 0,
             'stock_quantity' => $request->filled('stock_quantity') ? (int) $request->stock_quantity : null,
             'low_stock_threshold' => $request->filled('low_stock_threshold') ? (int) $request->low_stock_threshold : 10,
-            // Backend hardening: exempt MUST persist tax_rate=0 regardless of what (if anything) UI submitted
+            // Backend hardening: exempt/third-schedule MUST persist tax_rate=0
             'tax_rate' => $isExempt ? 0 : ($request->tax_rate ?? 0),
             'category' => $request->category,
             'sku' => $request->sku,
             'barcode' => $request->barcode,
             'uom' => $request->uom ?? 'NOS',
             'is_tax_exempt' => $isExempt,
+            'is_third_schedule' => $isThirdSchedule,
             'show_on_sale' => $request->has('show_on_sale'),
             'image' => $imageName,
             'prescription_required' => $request->has('prescription_required'),
@@ -6232,13 +6301,13 @@ class PosController extends Controller
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Products');
 
-        $headers = ['Name', 'Price', 'Description', 'Category', 'SKU', 'Barcode', 'Tax Rate %', 'Unit (UOM)', 'Tax Exempt (Yes/No)'];
+        $headers = ['Name', 'Price', 'Description', 'Category', 'SKU', 'Barcode', 'Tax Rate %', 'Unit (UOM)', 'Tax Exempt (Yes/No)', 'Third Schedule (Yes/No)'];
         $sheet->fromArray($headers, null, 'A1');
-        $sheet->getStyle('A1:I1')->getFont()->setBold(true);
-        $sheet->getStyle('A1:I1')->getFill()
+        $sheet->getStyle('A1:J1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:J1')->getFill()
             ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
             ->getStartColor()->setRGB('E9D5FF');
-        foreach (['A' => 32, 'B' => 10, 'C' => 32, 'D' => 16, 'E' => 14, 'F' => 18, 'G' => 11, 'H' => 12, 'I' => 18] as $col => $w) {
+        foreach (['A' => 32, 'B' => 10, 'C' => 32, 'D' => 16, 'E' => 14, 'F' => 18, 'G' => 11, 'H' => 12, 'I' => 18, 'J' => 20] as $col => $w) {
             $sheet->getColumnDimension($col)->setWidth($w);
         }
         // SKU + Barcode columns forced to TEXT so Excel never converts long codes
@@ -6254,6 +6323,8 @@ class PosController extends Controller
                 ['Naan', 30, 'Tandoori naan', 'Food', 'NAN-001', '', 0, 'NOS', 'Yes'],
             ];
             foreach ($samples as $s) {
+                // Pad to 10 elements (9=exempt, 10=third_schedule)
+                if (count($s) < 10) { $s[] = 'No'; }
                 $this->writeProductRow($sheet, $rowNum++, $s);
             }
         } else {
@@ -6268,6 +6339,7 @@ class PosController extends Controller
                     (float) ($p->tax_rate ?? 0),
                     $p->uom ?? 'NOS',
                     !empty($p->is_tax_exempt) ? 'Yes' : 'No',
+                    !empty($p->is_third_schedule) ? 'Yes' : 'No',
                 ]);
             }
         }
@@ -6286,7 +6358,7 @@ class PosController extends Controller
 
     private function writeProductRow($sheet, int $rowNum, array $vals): void
     {
-        // A..I = Name, Price, Description, Category, SKU, Barcode, Tax %, UOM, Tax Exempt.
+        // A..J = Name, Price, Description, Category, SKU, Barcode, Tax %, UOM, Tax Exempt, Third Schedule.
         // SKU/Barcode written as EXPLICIT strings (Excel would otherwise turn
         // 8901234567890 into 8.90123E+12 the moment the file is opened).
         $sheet->setCellValue('A' . $rowNum, $vals[0]);
@@ -6298,6 +6370,7 @@ class PosController extends Controller
         $sheet->setCellValue('G' . $rowNum, $vals[6]);
         $sheet->setCellValue('H' . $rowNum, $vals[7]);
         $sheet->setCellValue('I' . $rowNum, $vals[8] ?? 'No');
+        $sheet->setCellValue('J' . $rowNum, $vals[9] ?? 'No');
     }
 
     public function importProducts(Request $request)
@@ -6351,6 +6424,8 @@ class PosController extends Controller
         // exempting via Excel works. Older files without the column keep the
         // existing flag untouched.
         $exemptIdx = $this->findColumn($header, ['tax exempt (yes/no)', 'tax exempt', 'exempt (yes/no)', 'exempt', 'tax_exempt', 'is_tax_exempt']);
+        // Third Schedule column (Aug 2026): round-trip Yes/No.
+        $thirdIdx = $this->findColumn($header, ['third schedule (yes/no)', 'third schedule', 'third_schedule', 'is_third_schedule', 'third']);
 
         // Preload the whole catalog ONCE (bounded per company) — match precedence
         // barcode → SKU → name. Maps updated after each create so a duplicate row
@@ -6391,6 +6466,15 @@ class PosController extends Controller
             $cat = $catIdx !== false ? trim((string) ($data[$catIdx] ?? '')) : '';
             $tax = $taxIdx !== false ? $this->cleanImportNumber($data[$taxIdx] ?? '') : null;
             $uom = $uomIdx !== false ? strtoupper(trim((string) ($data[$uomIdx] ?? ''))) : '';
+
+            // Third Schedule cell: Yes/No (tolerant); blank = leave flag as-is.
+            $thirdSchedule = null;
+            if ($thirdIdx !== false) {
+                $tsRaw = strtolower(trim((string) ($data[$thirdIdx] ?? '')));
+                if ($tsRaw !== '') {
+                    $thirdSchedule = in_array($tsRaw, ['yes', 'y', '1', 'true', 'haan', 'han'], true);
+                }
+            }
 
             // Exempt cell: Yes/No (tolerant); blank = leave existing flag as-is
             // (new products default No). Unrecognized value → clear warning, not
@@ -6436,22 +6520,29 @@ class PosController extends Controller
             if (!$existing && $sku !== null && isset($bySku[strtolower($sku)])) $existing = $bySku[strtolower($sku)];
             if (!$existing && isset($byName[strtolower($name)])) $existing = $byName[strtolower($name)];
 
+            // Third Schedule implies exempt
+            if ($thirdSchedule === true) { $exempt = true; }
+
             if ($existing) {
-                $existing->update([
+                $updateData = [
                     'name' => $name,
                     'price' => $price,
                     'description' => $desc !== '' ? $desc : $existing->description,
                     'category' => $cat !== '' ? $cat : $existing->category,
                     'sku' => $sku !== null ? $sku : $existing->sku,
                     'barcode' => $barcode !== null ? $barcode : $existing->barcode,
-                    'tax_rate' => $tax !== null ? $tax : $existing->tax_rate,
+                    'tax_rate' => ($exempt === true) ? 0 : ($tax !== null ? $tax : $existing->tax_rate),
                     'uom' => $uom !== '' ? $uom : $existing->uom,
                     'is_tax_exempt' => $exempt !== null ? $exempt : (bool) $existing->is_tax_exempt,
-                ]);
+                ];
+                if (\Illuminate\Support\Facades\Schema::hasColumn('pos_products', 'is_third_schedule')) {
+                    $updateData['is_third_schedule'] = $thirdSchedule !== null ? $thirdSchedule : (bool) $existing->is_third_schedule;
+                }
+                $existing->update($updateData);
                 $updated++;
                 $product = $existing;
             } else {
-                $product = PosProduct::create([
+                $createData = [
                     'company_id' => $companyId,
                     'name' => $name,
                     'price' => $price,
@@ -6460,11 +6551,15 @@ class PosController extends Controller
                     'category' => $cat !== '' ? $cat : null,
                     'sku' => $sku,
                     'barcode' => $barcode,
-                    'tax_rate' => $tax !== null ? $tax : 0,
+                    'tax_rate' => ($exempt === true) ? 0 : ($tax !== null ? $tax : 0),
                     'uom' => $uom !== '' ? $uom : 'NOS',
                     'is_tax_exempt' => $exempt === true,
                     'is_active' => true,
-                ]);
+                ];
+                if (\Illuminate\Support\Facades\Schema::hasColumn('pos_products', 'is_third_schedule')) {
+                    $createData['is_third_schedule'] = $thirdSchedule === true;
+                }
+                $product = PosProduct::create($createData);
                 $added++;
             }
 
@@ -6606,15 +6701,19 @@ class PosController extends Controller
         ]);
 
         $isExempt = $request->has('is_tax_exempt');
+        $isThirdSchedule = $request->has('is_third_schedule');
+        // Third Schedule → always tax-free (also marks exempt)
+        if ($isThirdSchedule) { $isExempt = true; }
         $data = array_merge(
             $request->only(['name', 'description', 'price', 'category', 'sku', 'barcode', 'uom']),
             [
                 'cost_price' => $request->filled('cost_price') ? $request->cost_price : 0,
                 'stock_quantity' => $request->filled('stock_quantity') ? (int) $request->stock_quantity : null,
                 'low_stock_threshold' => $request->filled('low_stock_threshold') ? (int) $request->low_stock_threshold : ($product->low_stock_threshold ?? 10),
-                // Backend hardening: exempt MUST force tax_rate=0; otherwise honor submitted value (or keep current if absent)
+                // Backend hardening: exempt/third-schedule MUST force tax_rate=0
                 'tax_rate' => $isExempt ? 0 : ($request->has('tax_rate') ? $request->tax_rate : $product->tax_rate),
                 'is_tax_exempt' => $isExempt,
+                'is_third_schedule' => $isThirdSchedule,
                 'show_on_sale' => $request->has('show_on_sale'),
                 'prescription_required' => $request->has('prescription_required'),
                 'weight_based' => $request->has('weight_based'),
@@ -6810,7 +6909,7 @@ class PosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $request->validate([
-            'action' => 'required|string|in:activate,deactivate,delete,category,price,price_percent,exempt_on,exempt_off',
+            'action' => 'required|string|in:activate,deactivate,delete,category,price,price_percent,exempt_on,exempt_off,third_on,third_off',
             'ids' => 'required|array|min:1',
             'ids.*' => 'integer',
             'category_value' => 'nullable|string|max:100',
@@ -6865,6 +6964,20 @@ class PosController extends Controller
             case 'exempt_off':
                 $query->update(['is_tax_exempt' => false]);
                 $msg = __('pos.products_tax_exempt_off', ['count' => $count]);
+                break;
+            case 'third_on':
+                // Third Schedule ON → also force is_tax_exempt=true (tax_rate untouched).
+                // Schema guard: column may not exist yet on prod before migration runs.
+                if (\Illuminate\Support\Facades\Schema::hasColumn('pos_products', 'is_third_schedule')) {
+                    $query->update(['is_third_schedule' => true, 'is_tax_exempt' => true]);
+                }
+                $msg = __('pos.products_third_on', ['count' => $count]);
+                break;
+            case 'third_off':
+                if (\Illuminate\Support\Facades\Schema::hasColumn('pos_products', 'is_third_schedule')) {
+                    $query->update(['is_third_schedule' => false]);
+                }
+                $msg = __('pos.products_third_off', ['count' => $count]);
                 break;
             case 'delete':
                 // Clean up images before delete
@@ -7681,6 +7794,30 @@ class PosController extends Controller
                 }
             }
 
+            // Third Schedule snapshot: DB is the ONLY source of truth for
+            // product-backed lines — never trust the client payload, which can
+            // be crafted to force 0-tax on non-Third-Schedule items.
+            // For manual lines (no item_id), the flag is always false; cashiers
+            // cannot self-exempt manual ad-hoc lines via this flag.
+            $isThirdSchedule = false;
+            if ($itemId && $itemType === 'product') {
+                // Company-scoped lookup prevents cross-company flag injection
+                $dbProduct = PosProduct::where('company_id', $companyId)->where('id', $itemId)->first();
+                if ($dbProduct) {
+                    // Schema guard: column may not exist on prod before migration
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('pos_products', 'is_third_schedule')) {
+                        $isThirdSchedule = (bool) $dbProduct->is_third_schedule;
+                    }
+                    // DB lookup succeeded — do NOT fall through to client payload
+                }
+                // If product not found in DB (deleted/cross-company): flag stays false
+            }
+            // No client-payload fallback: for any product-backed line, DB wins.
+            // For manual lines (itemId null), $isThirdSchedule stays false.
+
+            // Third Schedule implies exempt (belt-and-suspenders at billing time)
+            if ($isThirdSchedule) { $isExempt = true; }
+
             $resolved[] = [
                 'type' => $itemType,
                 'item_id' => $itemId,
@@ -7689,6 +7826,7 @@ class PosController extends Controller
                 'quantity' => $qty,
                 'lineTotal' => round($qty * $itemPrice, 2),
                 'isExempt' => $isExempt,
+                'isThirdSchedule' => $isThirdSchedule,
                 'notes' => isset($item['special_notes']) ? (string) $item['special_notes'] : null,
                 'deal_snapshot' => $dealSnapshot,
             ];

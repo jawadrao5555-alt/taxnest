@@ -17,6 +17,7 @@ class PosProduct extends Model
         'service_duration', 'staff_assignment',
         'vehicle_make', 'vehicle_model', 'part_number',
         'custom_order', 'box_type',
+        'is_third_schedule',
     ];
 
     protected $casts = [
@@ -28,6 +29,7 @@ class PosProduct extends Model
         'is_active' => 'boolean',
         'show_on_sale' => 'boolean',
         'is_tax_exempt' => 'boolean',
+        'is_third_schedule' => 'boolean',
         'prescription_required' => 'boolean',
         'weight_based' => 'boolean',
         'custom_order' => 'boolean',

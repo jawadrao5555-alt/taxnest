@@ -35,6 +35,21 @@ class AiInvoiceReaderService
 {
     public const MODEL = 'gpt-4o-mini';
 
+    /**
+     * Active model — admin can override via SystemSetting 'ai_reader_model'
+     * (e.g. bump to a stronger vision model without a deploy). Falls back to
+     * the hardcoded default on any read problem (dev MySQL cold-start etc.).
+     */
+    public static function model(): string
+    {
+        try {
+            $m = trim((string) \App\Models\SystemSetting::get('ai_reader_model', ''));
+            return $m !== '' ? $m : self::MODEL;
+        } catch (\Throwable $e) {
+            return self::MODEL;
+        }
+    }
+
     public const MAX_FILE_BYTES = 5 * 1024 * 1024; // keep in sync with controller validation + view copy
     public const MAX_PDF_PAGES = 4;
     /** Scanned-PDF vision cap: each rasterized page costs ~26-38k vision tokens. */
@@ -154,7 +169,7 @@ class AiInvoiceReaderService
             'source_type' => $sourceType,
             'original_filename' => $filename,
             'payload_json' => $payload,
-            'model' => self::MODEL,
+            'model' => self::model(),
             'total_tokens' => $tokens,
         ]);
     }
@@ -322,12 +337,30 @@ class AiInvoiceReaderService
         }
         $mime = $file->getMimeType() ?: 'image/jpeg';
 
-        // Downscale large photos (bounded vision cost). GD is web-only on
-        // live — parses run as web requests, but guard anyway.
+        // Downscale large photos (bounded vision cost) + honor EXIF rotation:
+        // phone photos often upload sideways/upside-down, which tanks reading
+        // accuracy. GD is web-only on live — parses run as web requests, but
+        // guard anyway.
         if (function_exists('imagecreatefromstring')) {
             try {
                 $img = @imagecreatefromstring($bytes);
                 if ($img !== false) {
+                    $dirty = false;
+
+                    // EXIF orientation (JPEG only — PNG/WebP carry none).
+                    if ($mime === 'image/jpeg' && function_exists('exif_read_data')) {
+                        $exif = @exif_read_data((string) $file->getRealPath());
+                        $deg = [3 => 180, 6 => -90, 8 => 90][(int) ($exif['Orientation'] ?? 1)] ?? 0;
+                        if ($deg !== 0) {
+                            $rot = @imagerotate($img, $deg, 0);
+                            if ($rot !== false) {
+                                imagedestroy($img);
+                                $img = $rot;
+                                $dirty = true;
+                            }
+                        }
+                    }
+
                     $w = imagesx($img);
                     $h = imagesy($img);
                     $max = 1600;
@@ -339,10 +372,15 @@ class AiInvoiceReaderService
                         $white = imagecolorallocate($resized, 255, 255, 255);
                         imagefill($resized, 0, 0, $white); // PNG transparency -> white, not black
                         imagecopyresampled($resized, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
+                        imagedestroy($img);
+                        $img = $resized;
+                        $dirty = true;
+                    }
+
+                    if ($dirty) {
                         ob_start();
-                        imagejpeg($resized, null, 82);
+                        imagejpeg($img, null, 82);
                         $jpeg = (string) ob_get_clean();
-                        imagedestroy($resized);
                         if ($jpeg !== '') {
                             $bytes = $jpeg;
                             $mime = 'image/jpeg';
@@ -461,17 +499,30 @@ class AiInvoiceReaderService
         }
 
         try {
+            // One automatic retry on transient trouble (connection drop, 429
+            // rate-limit, 5xx) — a second attempt a moment later usually
+            // succeeds and saves the user a manual re-upload. throw:false =
+            // a final bad status falls through to the !successful() branch.
             $response = Http::timeout(90)->connectTimeout(10)
+                ->retry(2, 1500, function ($exception) {
+                    if ($exception instanceof \Illuminate\Http\Client\ConnectionException) {
+                        return true;
+                    }
+                    return $exception instanceof \Illuminate\Http\Client\RequestException
+                        && in_array($exception->response->status(), [429, 500, 502, 503, 529], true);
+                }, throw: false)
                 ->withToken($key)
                 ->post('https://api.openai.com/v1/chat/completions', [
-                    'model' => self::MODEL,
+                    'model' => self::model(),
                     'messages' => [
                         ['role' => 'system', 'content' => self::systemPrompt()],
                         ['role' => 'user', 'content' => $userContent],
                     ],
                     'response_format' => ['type' => 'json_object'],
                     'temperature' => 0.1,
-                    'max_tokens' => 2500,
+                    // 30 items ka poora JSON aana chahiye — 2500 par lambi
+                    // invoices ka JSON kat jata tha (invalid JSON = fail).
+                    'max_tokens' => 4000,
                 ]);
         } catch (\Throwable $e) {
             Log::warning('AI invoice reader OpenAI unreachable', ['err' => mb_substr($e->getMessage(), 0, 200)]);
@@ -522,6 +573,7 @@ Schema:
       "line_total": number|null,
       "tax_rate": number|null,        // percent, only if shown
       "tax_amount": number|null,      // sales tax amount for this line, only if shown
+      "mrp": number|null,             // printed retail price (MRP/RP) per unit, ONLY if printed on the document
       "uom": string|null,
       "confidence": "high"|"medium"|"low"
     }
@@ -537,6 +589,10 @@ Rules:
 - If quantity or price is unreadable, use your best reading and lower the confidence.
 - Do not invent items, HS codes, or tax rates that are not on the document.
 - destination_province: infer from the buyer address city if obvious, else null.
+- Documents may be in English, Urdu, or a mix — including HANDWRITTEN bills. Read Urdu and handwriting carefully; write extracted names/descriptions in clear Latin script (transliterate Urdu words, e.g. چینی -> "Cheeni (Sugar)").
+- Dates: Pakistani documents write DD/MM/YYYY or DD-MM-YYYY — when ambiguous, the DAY comes first (05/03/2026 = 5 March).
+- If a line shows a discount, unit_price = the net per-unit price actually charged after the discount.
+- mrp: only when a retail/maximum price is printed for that item (common on 3rd Schedule goods like beverages, packaged foods); never guess it.
 PROMPT;
     }
 
@@ -652,6 +708,12 @@ PROMPT;
             $qty = round($qty, 2);
             $price = round($price, 2);
 
+            // Printed retail price (MRP) — 3rd Schedule goods. Only a sane
+            // positive document value is kept; anything else stays blank for
+            // the user to fill (never guessed).
+            $aiMrp = self::num($itRaw['mrp'] ?? null);
+            $mrp = ($aiMrp !== null && $aiMrp > 0) ? round($aiMrp, 2) : '';
+
             $aiConf = self::confidence($itRaw['confidence'] ?? null);
             $hs = self::cleanHs($itRaw['hs_code'] ?? '');
             $hsSource = $hs !== '' ? 'document' : 'none';
@@ -763,7 +825,7 @@ PROMPT;
                 'schedule_type' => $scheduleType,
                 'sro_schedule_no' => $sro,
                 'serial_no' => $serial,
-                'mrp' => '',
+                'mrp' => $mrp,
                 'default_uom' => $uom,
                 'ai_confidence' => $confStr,
                 'hs_source' => $hsSource, // document | product | none
@@ -781,7 +843,10 @@ PROMPT;
             $warnings[] = 'Items map to different tax schedules (' . implode(', ', $scheduleTypes) . ') — FBR requires one schedule type per invoice; split into separate invoices if needed.';
         }
         if (in_array('3rd_schedule', $scheduleTypes, true)) {
-            $warnings[] = '3rd Schedule item(s) — enter the printed retail price (MRP) before saving.';
+            $mrpMissing = array_filter($items, fn ($i) => $i['schedule_type'] === '3rd_schedule' && $i['mrp'] === '');
+            $warnings[] = !empty($mrpMissing)
+                ? '3rd Schedule item(s) — enter the printed retail price (MRP) before saving.'
+                : '3rd Schedule item(s) — MRP was read from the document; verify it matches the printed retail price.';
         }
         if ($amountMismatch) {
             $warnings[] = "Some line tax amounts don't match their tax rates — document values kept, please verify.";

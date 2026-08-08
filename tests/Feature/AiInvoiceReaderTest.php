@@ -353,6 +353,29 @@ class AiInvoiceReaderTest extends TestCase
         );
     }
 
+    public function test_map_extraction_keeps_printed_mrp_and_blanks_bad_values(): void
+    {
+        $company = $this->makeCompany('Premium');
+
+        $raw = [
+            'is_invoice' => true,
+            'buyer' => ['name' => 'Test Buyer'],
+            'document' => ['document_type' => 'Sale Invoice'],
+            'items' => [
+                ['description' => 'Cola 1.5L', 'quantity' => 10, 'unit_price' => 150, 'mrp' => 180],
+                ['description' => 'Chips',     'quantity' => 5,  'unit_price' => 50,  'mrp' => -3],
+                ['description' => 'Biscuits',  'quantity' => 2,  'unit_price' => 90],
+            ],
+        ];
+
+        $mapped = AiInvoiceReaderService::mapExtraction($raw, $company);
+        [$cola, $chips, $biscuits] = $mapped['items'];
+
+        $this->assertSame(180.0, $cola['mrp'], 'printed MRP must ride into the prefill');
+        $this->assertSame('', $chips['mrp'], 'negative MRP must be discarded');
+        $this->assertSame('', $biscuits['mrp'], 'absent MRP stays blank');
+    }
+
     public function test_map_extraction_exempt_schedule_forces_zero_tax(): void
     {
         $company = $this->makeCompany('Premium');

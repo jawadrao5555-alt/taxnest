@@ -751,6 +751,10 @@
                             schedule_type: it.schedule_type || 'standard',
                             sro_schedule_no: it.sro_schedule_no || '',
                             serial_no: it.serial_no || '',
+                            // AI-read printed MRP (3rd Schedule): mrpManual=true
+                            // so the price->MRP auto-sync never overwrites it.
+                            mrp: it.mrp || '',
+                            mrpManual: !!it.mrp,
                             default_uom: it.default_uom || 'Numbers, pieces, units',
                             ai_confidence: it.ai_confidence || null,
                             ai_needs_hs: !!it.needs_hs,

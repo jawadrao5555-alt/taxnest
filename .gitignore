@@ -30,3 +30,5 @@ pra-agent/dist/
 .agents/
 .local/
 tools/video-pipeline/out/
+.env.*
+!.env.example

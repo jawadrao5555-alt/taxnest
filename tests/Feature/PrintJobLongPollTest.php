@@ -114,7 +114,10 @@ class PrintJobLongPollTest extends TestCase
 
     public function test_concurrency_cap_falls_back_to_instant_short_poll(): void
     {
-        Cache::put('print_jobs_longpoll_holds', 10, 30); // cap is 10
+        // Occupy all 10 slots (atomic Cache::add slot keys on non-mysql).
+        for ($i = 0; $i < 10; $i++) {
+            Cache::add('print_jobs_longpoll_slot_' . $i, 1, 60);
+        }
 
         $start = microtime(true);
         $res = $this->poll('?wait=5');
@@ -122,14 +125,37 @@ class PrintJobLongPollTest extends TestCase
 
         $res->assertOk()->assertJson(['ok' => true, 'count' => 0, 'held' => false]);
         $this->assertLessThan(0.9, $elapsed, 'over the cap the poll must answer instantly');
-        // Slot counter untouched by the short-poll path.
-        $this->assertSame(10, (int) Cache::get('print_jobs_longpoll_holds'));
+    }
+
+    public function test_slot_acquisition_is_bounded_and_atomic(): void
+    {
+        // Acquire slots directly: exactly 10 succeed, the 11th is refused.
+        $controller = app(\App\Http\Controllers\AgentController::class);
+        $m = new \ReflectionMethod($controller, 'acquireLongPollSlot');
+        $m->setAccessible(true);
+
+        $slots = [];
+        for ($i = 0; $i < 11; $i++) {
+            $slots[] = $m->invoke($controller);
+        }
+        $granted = array_filter($slots, fn ($s) => $s !== null);
+        $this->assertCount(10, $granted, 'exactly the cap may hold concurrently');
+        $this->assertCount(10, array_unique($granted), 'each hold gets a DISTINCT slot');
+        $this->assertNull($slots[10], 'the 11th concurrent hold must be refused');
+
+        // Releasing one slot makes it available again.
+        $r = new \ReflectionMethod($controller, 'releaseLongPollSlot');
+        $r->setAccessible(true);
+        $r->invoke($controller, $slots[3]);
+        $this->assertNotNull($m->invoke($controller), 'released slot must be reusable');
     }
 
     public function test_hold_slot_is_released_after_the_hold(): void
     {
         $this->poll('?wait=1')->assertOk()->assertJson(['held' => true]);
-        $this->assertSame(0, (int) Cache::get('print_jobs_longpoll_holds', 0));
+        for ($i = 0; $i < 10; $i++) {
+            $this->assertNull(Cache::get('print_jobs_longpoll_slot_' . $i), "slot $i must be free after the hold");
+        }
     }
 
     public function test_legacy_agent_without_wait_param_is_unchanged(): void
@@ -163,24 +189,64 @@ class PrintJobLongPollTest extends TestCase
         $this->assertSame(1, DB::table('pos_print_jobs')->where('status', 'printing')->count());
     }
 
-    public function test_wake_up_when_job_enqueued_mid_hold(): void
+    public function test_wakes_up_and_claims_job_enqueued_mid_hold(): void
     {
-        // Simulate a job arriving DURING the hold: sqlite + single process can't
-        // run a parallel request, so pre-arm the DB listener path by enqueuing
-        // after 0 checks via a deferred insert through the same connection —
-        // covered indirectly: the hold loop re-checks pendingExists every 250ms,
-        // and test_pending_job_is_claimed_instantly_without_hold covers the
-        // claim path. Here we assert the loop exits EARLY once pending appears:
+        // Bind a controller subclass whose pause hook enqueues a pending job
+        // on the SECOND tick — a real job arriving while the request is held.
+        $this->app->bind(
+            \App\Http\Controllers\AgentController::class,
+            MidHoldEnqueueAgentController::class
+        );
+
+        $start = microtime(true);
+        $res = $this->poll('?wait=5');
+        $elapsed = microtime(true) - $start;
+
+        $res->assertOk()->assertJson(['ok' => true, 'count' => 1, 'held' => true]);
+        $this->assertSame('bill', $res->json('jobs.0.type'));
+        $this->assertLessThan(2.5, $elapsed, 'must wake up on the next 250ms tick, not sit out the full 5s wait');
+        $this->assertSame(1, DB::table('pos_print_jobs')->where('status', 'printing')->count());
+    }
+
+    public function test_done_rows_do_not_end_the_hold(): void
+    {
         DB::table('pos_print_jobs')->insert([
             'company_id' => 1, 'type' => 'bill', 'target_printer' => 'T',
             'transaction_id' => 2, 'status' => 'done', 'attempts' => 1,
             'created_at' => now(), 'updated_at' => now(),
         ]);
-        // 'done' row must NOT satisfy the pending check → still held full wait.
         $start = microtime(true);
         $res = $this->poll('?wait=1');
         $elapsed = microtime(true) - $start;
         $res->assertOk()->assertJson(['count' => 0, 'held' => true]);
         $this->assertGreaterThanOrEqual(0.9, $elapsed);
+    }
+}
+
+/**
+ * Test double: identical to the real controller except the hold-loop pause
+ * hook enqueues a pending print job on its second invocation, simulating a
+ * cashier hitting Print while the agent's long-poll is being held.
+ */
+class MidHoldEnqueueAgentController extends \App\Http\Controllers\AgentController
+{
+    private int $ticks = 0;
+
+    protected function longPollPause(): void
+    {
+        usleep(50000); // faster ticks keep the test quick
+        $this->ticks++;
+        if ($this->ticks === 2) {
+            DB::table('pos_print_jobs')->insert([
+                'company_id' => 1,
+                'type' => 'bill',
+                'target_printer' => 'TestPrinter',
+                'transaction_id' => 99,
+                'status' => 'pending',
+                'attempts' => 0,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
     }
 }

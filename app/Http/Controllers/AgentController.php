@@ -594,37 +594,31 @@ class AgentController extends Controller
             // (sleeping) for up to $wait seconds. Cap concurrent holds so a
             // fleet of agents can never crowd out normal POS traffic — over
             // the cap we answer instantly (held:false) and the agent falls
-            // back to its own 1.5s short-poll delay. The counter is a soft
-            // cap (non-atomic cache read/write is fine here) and self-heals:
-            // every write carries a 30s TTL, so a leaked slot from a killed
-            // request disappears within 30s.
-            $slotKey = 'print_jobs_longpoll_holds';
-            // NOTE: not env() — live runs config:cache, where env() returns
-            // null in the request path and would silently shrink the cap.
-            $maxHolds = 10;
-            $holds = (int) \Illuminate\Support\Facades\Cache::get($slotKey, 0);
-            if ($holds >= $maxHolds) {
+            // back to its own 1.5s short-poll delay. Slot acquisition is
+            // ATOMIC: MySQL GET_LOCK per slot (auto-released if the
+            // connection/worker dies — leak-proof), Cache::add slot keys on
+            // other drivers (tests).
+            $slot = $this->acquireLongPollSlot();
+            if ($slot === null) {
                 // Trip visibility (throttled): if this fires often, the cap /
                 // hold strategy needs revisiting before more shops enable it.
                 if (\Illuminate\Support\Facades\Cache::add('print_jobs_longpoll_cap_log', 1, 60)) {
                     \Log::info('PRINT_LONGPOLL cap reached — answering short-poll', [
-                        'holds' => $holds, 'max' => $maxHolds, 'company_id' => $company->id,
+                        'max' => self::LONGPOLL_MAX_HOLDS, 'company_id' => $company->id,
                     ]);
                 }
             } else {
-                \Illuminate\Support\Facades\Cache::put($slotKey, $holds + 1, 30);
                 try {
                     $held = true;
                     $deadline = microtime(true) + $wait;
                     while (microtime(true) < $deadline) {
-                        usleep(250000);
+                        $this->longPollPause();
                         if ($hasPending = $pendingExists()) {
                             break;
                         }
                     }
                 } finally {
-                    $now = (int) \Illuminate\Support\Facades\Cache::get($slotKey, 0);
-                    \Illuminate\Support\Facades\Cache::put($slotKey, max(0, $now - 1), 30);
+                    $this->releaseLongPollSlot($slot);
                 }
             }
         }
@@ -653,6 +647,66 @@ class AgentController extends Controller
             ->get(['id', 'type', 'target_printer', 'transaction_id', 'restaurant_order_id', 'render_query']);
 
         return response()->json(['ok' => true, 'jobs' => $jobs, 'count' => $jobs->count(), 'held' => $held]);
+    }
+
+    /**
+     * Max concurrent held long-polls across ALL agents. Hardcoded, NOT env()
+     * — live runs config:cache, where env() returns null in the request path
+     * and would silently shrink the cap.
+     */
+    private const LONGPOLL_MAX_HOLDS = 10;
+
+    /**
+     * Atomically acquire one of the LONGPOLL_MAX_HOLDS hold slots.
+     * Returns an opaque slot handle, or null when all slots are taken.
+     *
+     * MySQL: GET_LOCK(name, 0) per slot — atomic across workers, and the
+     * server auto-releases the lock if the holding connection dies, so a
+     * killed request can never leak a slot.
+     * Other drivers (sqlite tests): Cache::add per slot key — atomic within
+     * the store; the 15s TTL self-heals any leak.
+     */
+    protected function acquireLongPollSlot(): ?string
+    {
+        if (DB::connection()->getDriverName() === 'mysql') {
+            for ($i = 0; $i < self::LONGPOLL_MAX_HOLDS; $i++) {
+                $name = 'taxnest_print_longpoll_' . $i;
+                try {
+                    $row = DB::selectOne('SELECT GET_LOCK(?, 0) AS l', [$name]);
+                    if ((int) ($row->l ?? 0) === 1) {
+                        return $name;
+                    }
+                } catch (\Throwable $e) {
+                    return null; // lock machinery unavailable → be conservative, short-poll
+                }
+            }
+            return null;
+        }
+        for ($i = 0; $i < self::LONGPOLL_MAX_HOLDS; $i++) {
+            $key = 'print_jobs_longpoll_slot_' . $i;
+            if (\Illuminate\Support\Facades\Cache::add($key, 1, 15)) {
+                return $key;
+            }
+        }
+        return null;
+    }
+
+    protected function releaseLongPollSlot(string $slot): void
+    {
+        if (str_starts_with($slot, 'taxnest_print_longpoll_')) {
+            try { DB::select('SELECT RELEASE_LOCK(?)', [$slot]); } catch (\Throwable $e) {}
+            return;
+        }
+        \Illuminate\Support\Facades\Cache::forget($slot);
+    }
+
+    /**
+     * One 250ms tick of the hold loop — separated so integration tests can
+     * override it (e.g. enqueue a job mid-hold to prove early wake-up).
+     */
+    protected function longPollPause(): void
+    {
+        usleep(250000);
     }
 
     /**

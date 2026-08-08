@@ -32,3 +32,5 @@ pra-agent/dist/
 tools/video-pipeline/out/
 .env.*
 !.env.example
+attached_assets/*.txt
+attached_assets/Pasted-*

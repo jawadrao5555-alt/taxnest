@@ -191,10 +191,30 @@
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     Support Inbox
                     @php $siUnread = \App\Services\SupportMailService::cachedUnreadCount(); @endphp
-                    @if($siUnread > 0)
-                        <span class="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">{{ $siUnread }}</span>
-                    @endif
+                    <span id="si-unread-badge" class="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold" @if($siUnread <= 0) style="display:none" @endif>{{ $siUnread > 0 ? $siUnread : '' }}</span>
                 </a>
+                <script>
+                (function () {
+                    var badge = document.getElementById('si-unread-badge');
+                    if (!badge) return;
+                    var url = @json(route('saas.admin.support-inbox.unread', [], false));
+                    function refresh() {
+                        fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+                            .then(function (r) { return r.ok ? r.json() : null; })
+                            .then(function (d) {
+                                if (!d || typeof d.unread === 'undefined') return;
+                                var n = parseInt(d.unread, 10) || 0;
+                                if (n > 0) { badge.textContent = n; badge.style.display = ''; }
+                                else { badge.textContent = ''; badge.style.display = 'none'; }
+                            })
+                            .catch(function () {});
+                    }
+                    setInterval(function () {
+                        if (document.hidden) return;
+                        refresh();
+                    }, 60000);
+                })();
+                </script>
                 @endif
 
                 <a href="{{ route('saas.admin.audit') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm {{ $current === 'saas.admin.audit' ? 'admin-active-link font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200' }} transition">

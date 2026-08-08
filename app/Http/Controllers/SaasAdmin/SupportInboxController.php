@@ -22,6 +22,14 @@ class SupportInboxController extends Controller
         abort_unless($u && ($u->role ?? null) === 'super_admin', 403);
     }
 
+    /** Lightweight JSON badge count — cached only, never hits IMAP. */
+    public function unread()
+    {
+        $this->guardSuperAdmin();
+
+        return response()->json(['unread' => SupportMailService::cachedUnreadCount()]);
+    }
+
     public function index(Request $request)
     {
         $this->guardSuperAdmin();

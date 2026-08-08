@@ -314,7 +314,7 @@ class PraIntegrationService
                         'Content-Type: application/json',
                         'Accept: application/json',
                         'Accept-Encoding: gzip, deflate',
-                        'X-Relay-Token: taxnest-pra-relay-2026',
+                        'X-Relay-Token: ' . env('PRA_RELAY_TOKEN', 'taxnest-pra-relay-2026'),
                         'ngrok-skip-browser-warning: true',
                         'Connection: keep-alive',
                     ],

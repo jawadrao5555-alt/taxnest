@@ -867,7 +867,8 @@ window.addEventListener('popstate', function() {
                                         <template x-if="item.stockStatus === 'out'"><span class="px-1.5 py-0.5 bg-red-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">OUT</span></template>
                                         <template x-if="item.hasRecipe"><span class="text-[10px] flex-shrink-0" title="Recipe">&#x1F373;</span></template>
                                         @endif
-                                        <template x-if="item.is_tax_exempt"><span class="px-1.5 py-0.5 bg-green-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">NO TAX</span></template>
+                                        <template x-if="item.is_tax_exempt && !item.is_third_schedule"><span class="px-1.5 py-0.5 bg-green-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">NO TAX</span></template>
+                                        <template x-if="item.is_third_schedule"><span class="px-1.5 py-0.5 bg-blue-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">3rd Sch</span></template>
                                     </div>
                                 </div>
                                 <span class="price-badge text-sm font-extrabold text-blue-600 dark:text-blue-400 flex-shrink-0" x-text="'Rs. ' + Number(item.price).toLocaleString()"></span>
@@ -1155,7 +1156,8 @@ window.addEventListener('popstate', function() {
                                     class="dense-input w-12 text-[10px] bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded px-1.5 py-0.5 text-gray-900 dark:text-white focus:ring-blue-500 disabled:opacity-40">
                                 <span class="text-[9px] text-blue-400 font-bold">%</span>
                             </div>
-                            <span x-show="item.is_tax_exempt" class="text-[8px] text-green-600 font-bold uppercase">{{ __('pos.exempt') }}</span>
+                            <span x-show="item.is_tax_exempt && !item.is_third_schedule" class="text-[8px] text-green-600 font-bold uppercase">{{ __('pos.exempt') }}</span>
+                            <span x-show="item.is_third_schedule" class="text-[8px] text-blue-600 font-bold uppercase">3rd Sch</span>
                         </div>
                         @if($features->kitchen_notes)
                         {{-- Per-item kitchen note (e.g. "no onions") — parity with restaurant screen, gated by kitchen_notes feature --}}

@@ -1113,7 +1113,8 @@ window.addEventListener('popstate', function() {
                                         <template x-if="item.stockStatus === 'out'"><span class="px-1.5 py-0.5 bg-red-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">OUT</span></template>
                                         <template x-if="item.hasRecipe"><span class="text-[10px] flex-shrink-0" title="Recipe">&#x1F373;</span></template>
                                         @endif
-                                        <template x-if="item.is_tax_exempt"><span class="px-1.5 py-0.5 bg-green-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">NO TAX</span></template>
+                                        <template x-if="item.is_tax_exempt && !item.is_third_schedule"><span class="px-1.5 py-0.5 bg-green-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">NO TAX</span></template>
+                                        <template x-if="item.is_third_schedule"><span class="px-1.5 py-0.5 bg-blue-500/90 text-white text-[8px] font-bold rounded-md flex-shrink-0">3rd Sch</span></template>
                                     </div>
                                     <template x-if="item.type === 'deal' && item.components">
                                         <p class="text-[10px] text-gray-500 dark:text-gray-400 truncate mt-0.5" x-text="item.components" :title="item.components"></p>
@@ -1404,8 +1405,9 @@ window.addEventListener('popstate', function() {
                         {{-- Read-only chips for values carried in from recalled/edited bills or the
                              T/Alt+T tax shortcut (no per-item editors any more, but the cashier must
                              still SEE the state — NO TAX chip is the only exempt indicator now). --}}
-                        <div x-show="item.is_tax_exempt || (item.item_discount_value || 0) > 0 || (item.special_notes || '').length > 0" class="mt-0.5 flex items-center gap-1 flex-wrap">
-                            <span x-show="item.is_tax_exempt" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-green-500 text-white">NO TAX</span>
+                        <div x-show="item.is_tax_exempt || item.is_third_schedule || (item.item_discount_value || 0) > 0 || (item.special_notes || '').length > 0" class="mt-0.5 flex items-center gap-1 flex-wrap">
+                            <span x-show="item.is_tax_exempt && !item.is_third_schedule" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-green-500 text-white">NO TAX</span>
+                            <span x-show="item.is_third_schedule" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500 text-white">3rd Sch</span>
                             <span x-show="(item.item_discount_value || 0) > 0" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-600" x-text="(item.item_discount_type || 'percentage') === 'percentage' ? '-' + item.item_discount_value + '%' : '-Rs.' + item.item_discount_value"></span>
                             <span x-show="(item.special_notes || '').length > 0 && !item._showNote" class="text-[9px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300 truncate max-w-[180px]" x-text="item.special_notes"></span>
                         </div>

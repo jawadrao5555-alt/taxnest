@@ -72,7 +72,12 @@ class SupportInboxController extends Controller
         ]);
     }
 
-    public function attachment(string $box, int $uid, int $index)
+    /** MIME types that are safe to render inline (image preview / PDF viewer). */
+    protected const INLINE_SAFE_MIMES = [
+        'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf',
+    ];
+
+    public function attachment(Request $request, string $box, int $uid, int $index)
     {
         $this->guardSuperAdmin();
         abort_unless(in_array($box, ['inbox', 'sent']), 404);
@@ -82,9 +87,15 @@ class SupportInboxController extends Controller
             abort(404, $e->getMessage());
         }
 
+        // inline=1 → preview in browser, but ONLY for whitelisted safe types
+        // (never inline HTML/SVG etc. — XSS via attachment).
+        $inline = $request->query('inline') && in_array(strtolower($att['mime']), self::INLINE_SAFE_MIMES, true);
+        $disposition = ($inline ? 'inline' : 'attachment').'; filename="'.str_replace('"', '', $att['name']).'"';
+
         return response($att['content'], 200, [
             'Content-Type' => $att['mime'],
-            'Content-Disposition' => 'attachment; filename="'.str_replace('"', '', $att['name']).'"',
+            'Content-Disposition' => $disposition,
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 
@@ -100,7 +111,12 @@ class SupportInboxController extends Controller
             'references' => ['nullable', 'string', 'max:5000'],
             'reply_box' => ['nullable', 'in:inbox,sent'],
             'reply_uid' => ['nullable', 'integer'],
-            'attachment' => ['nullable', 'file', 'max:10240'],
+            'attachments' => ['nullable', 'array', 'max:10'],
+            'attachments.*' => ['file', 'max:10240'],
+        ], [
+            'attachments.max' => 'Ek waqt mein zyada se zyada 10 attachments bhej sakte hain.',
+            'attachments.*.max' => 'Har attachment ki size 10 MB se kam honi chahiye.',
+            'attachments.*.file' => 'Attachment upload theek se nahi hui — dobara koshish karein.',
         ]);
 
         $payload = [
@@ -110,9 +126,8 @@ class SupportInboxController extends Controller
             'in_reply_to' => $data['in_reply_to'] ?? null,
             'references' => $data['references'] ?? null,
         ];
-        if ($request->hasFile('attachment')) {
-            $file = $request->file('attachment');
-            $payload['attachment'] = [
+        foreach ($request->file('attachments', []) as $file) {
+            $payload['attachments'][] = [
                 'name' => $file->getClientOriginalName(),
                 'mime' => $file->getMimeType() ?: 'application/octet-stream',
                 'content' => file_get_contents($file->getRealPath()),

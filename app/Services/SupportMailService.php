@@ -237,7 +237,7 @@ class SupportMailService
      * the IMAP Sent folder so it shows in webmail too.
      *
      * $data: to, subject, body (plain text), in_reply_to?, references?,
-     *        attachment? (['name','mime','content'])
+     *        attachments? (array of ['name','mime','content'])
      */
     public function send(array $data): void
     {
@@ -258,8 +258,8 @@ class SupportMailService
             $email->getHeaders()->addTextHeader('In-Reply-To', $data['in_reply_to']);
             $email->getHeaders()->addTextHeader('References', $ref);
         }
-        if (! empty($data['attachment'])) {
-            $email->attach($data['attachment']['content'], $data['attachment']['name'], $data['attachment']['mime']);
+        foreach ($data['attachments'] ?? [] as $att) {
+            $email->attach($att['content'], $att['name'], $att['mime']);
         }
 
         // Implicit TLS (smtps) on 465 — same transport style as the working noreply block.

@@ -1,5 +1,5 @@
 <x-admin-layout>
-<div class="p-4 sm:p-6 max-w-5xl mx-auto" x-data="{ compose: false }">
+<div class="p-4 sm:p-6 max-w-5xl mx-auto" x-data="{ compose: {{ $errors->any() ? 'true' : 'false' }} }">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
             <h1 class="text-2xl font-bold text-white">Support Inbox</h1>
@@ -23,12 +23,17 @@
             <textarea name="body" rows="6" required placeholder="Message..."
                       class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2">{{ old('body') }}</textarea>
             <div class="flex items-center justify-between gap-3">
-                <input type="file" name="attachment" class="text-xs text-gray-400" />
+                <div>
+                    <input type="file" name="attachments[]" multiple class="text-xs text-gray-400" />
+                    <p class="text-[11px] text-gray-500 mt-1">Multiple files select kar sakte hain — har file max 10 MB.</p>
+                </div>
                 <button type="submit" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium">Bhejein</button>
             </div>
             @error('to') <p class="text-xs text-red-400">{{ $message }}</p> @enderror
             @error('subject') <p class="text-xs text-red-400">{{ $message }}</p> @enderror
             @error('body') <p class="text-xs text-red-400">{{ $message }}</p> @enderror
+            @foreach($errors->get('attachments') as $msgs) @foreach((array)$msgs as $m) <p class="text-xs text-red-400">{{ $m }}</p> @endforeach @endforeach
+            @foreach($errors->get('attachments.*') as $msgs) @foreach((array)$msgs as $m) <p class="text-xs text-red-400">{{ $m }}</p> @endforeach @endforeach
         </form>
     </div>
 

@@ -1,0 +1,18 @@
+# Keep the deployment image small (8 GiB limit).
+# The Replit deployment only serves the holding page (replit-holding/),
+# real production runs on cPanel. Exclude all heavy dev-only content.
+.cache/
+.local/
+.agents/
+pra-agent/
+attached_assets/
+storage/
+tools/
+artifacts/
+node_modules/
+rider-app/
+pos-app/
+vendor/
+public/
+screenshots/
+backup.sql

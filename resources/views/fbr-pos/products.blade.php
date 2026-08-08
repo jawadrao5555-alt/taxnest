@@ -16,6 +16,59 @@
         {{ session('success') }}
     </div>
     @endif
+    @if(session('error'))
+    <div class="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 rounded-xl text-sm">
+        {{ session('error') }}
+    </div>
+    @endif
+
+    @if(auth('fbrpos')->user() && auth('fbrpos')->user()->role === 'company_admin')
+    {{-- ═══ EXCEL EXPORT / BULK IMPORT (FBR mirror of the PRA POS round-trip) ═══ --}}
+    <div x-data="{ open: false }" class="mb-6">
+        <button type="button" @click="open = !open"
+                class="inline-flex items-center gap-1.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg text-xs font-semibold shadow-sm hover:shadow transition">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            {{ __('pos.bulk_import_products_excel') }}
+            <svg class="w-3 h-3 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+
+        <div x-show="open" x-cloak class="mt-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-md p-5">
+            <div class="mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg px-4 py-3">
+                <p class="text-xs text-blue-800 dark:text-blue-300"><strong>{{ __('pos.easy_way_label') }}</strong> {{ __('pos.import_easy_way_text') }}</p>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                    <h4 class="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-2">{{ __('pos.import_step1_title') }}</h4>
+                    @if($products->total() > 0)
+                    <p class="text-xs text-gray-500 mb-3">{{ __('pos.import_step1_has_products') }}</p>
+                    @else
+                    <p class="text-xs text-gray-500 mb-3">{{ __('pos.import_step1_empty') }}</p>
+                    @endif
+                    <a href="{{ route('fbrpos.products.template') }}" class="inline-flex items-center gap-1.5 bg-gradient-to-r from-blue-500 to-blue-700 text-white px-5 py-2 rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition no-underline">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        {{ $products->total() > 0 ? __('pos.download_excel_count', ['count' => $products->total()]) : __('pos.download_excel_template') }}
+                    </a>
+                    <div class="mt-3 text-[11px] text-gray-400">
+                        <p class="font-semibold text-gray-500 mb-1">{{ __('pos.only_two_required') }}</p>
+                        <p>{!! __('pos.import_required_columns_note') !!}</p>
+                    </div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                    <h4 class="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-2">{{ __('pos.import_step2_title') }}</h4>
+                    <p class="text-xs text-gray-500 mb-3">{{ __('pos.import_step2_hint') }}</p>
+                    <form method="POST" action="{{ route('fbrpos.products.import') }}" enctype="multipart/form-data" class="space-y-3">
+                        @csrf
+                        <input type="file" name="csv_file" accept=".xlsx,.xls,.csv,.txt" required class="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900/30 dark:file:text-blue-300">
+                        <button type="submit" class="inline-flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-emerald-700 text-white px-5 py-2 rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transition">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                            {{ __('pos.upload_and_import') }}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
 
     <div class="mb-6">
         <form method="GET" action="{{ route('fbrpos.products') }}" class="flex flex-col sm:flex-row gap-3">

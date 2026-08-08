@@ -1212,6 +1212,10 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
 
     Route::get('/products', [FbrPosController::class, 'products'])->name('fbrpos.products');
     Route::get('/products/create', [FbrPosController::class, 'createProduct'])->name('fbrpos.products.create');
+    // 📦 Excel export/template + bulk import (FBR mirror of pos.products.template/import).
+    // Import is plan-gated like single product create (plan.limit:products).
+    Route::get('/products/template', [FbrPosController::class, 'downloadProductTemplate'])->name('fbrpos.products.template');
+    Route::post('/products/import', [FbrPosController::class, 'importProducts'])->name('fbrpos.products.import')->middleware('plan.limit:products');
     Route::post('/products', [FbrPosController::class, 'storeProduct'])->name('fbrpos.products.store')->middleware('plan.limit:products');
     Route::get('/products/{id}/edit', [FbrPosController::class, 'editProduct'])->name('fbrpos.products.edit');
     Route::put('/products/{id}', [FbrPosController::class, 'updateProduct'])->name('fbrpos.products.update');

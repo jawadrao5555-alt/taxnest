@@ -3334,6 +3334,8 @@ return [
     'tax_exempt_on' => 'ٹیکس سے مستثنیٰ آن',
     'tax_exempt_tax_free' => 'ٹیکس سے مستثنیٰ (ٹیکس فری)',
     'third_schedule_label' => 'تھرڈ شیڈول',
+    'third_sch_badge' => 'تھرڈ شیڈول',
+    'third_schedule_only' => 'صرف تھرڈ شیڈول',
     'third_schedule_on' => 'تھرڈ شیڈول آن',
     'third_schedule_off' => 'تھرڈ شیڈول بند',
     'kpi_third_schedule' => 'تھرڈ شیڈول سیلز',

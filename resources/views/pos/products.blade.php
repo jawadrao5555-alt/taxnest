@@ -516,6 +516,7 @@
                 <option value="active">{{ __('pos.active_only') }}</option>
                 <option value="inactive">{{ __('pos.inactive_only') }}</option>
                 <option value="low">{{ __('pos.low_stock') }}</option>
+                <option value="third">{{ __('pos.third_schedule_only') }}</option>
             </select>
             <select x-model="sortKey" class="text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-purple-500">
                 <option value="name">{{ __('pos.name_label') }}</option>
@@ -608,6 +609,7 @@
                                         <div class="min-w-0">
                                             <span class="font-medium text-gray-900 dark:text-white" x-text="p.name"></span>
                                             <span x-show="p.is_tax_exempt" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 ml-1">{{ __('pos.exempt_badge') }}</span>
+                                            <span x-show="p.is_third_schedule" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 ml-1">{{ __('pos.third_sch_badge') }}</span>
                                             <span x-show="!p.show_on_sale" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300 ml-1">{{ __('pos.hidden_badge') }}</span>
                                             <div x-show="p.description" class="text-[10px] text-gray-400 truncate max-w-[180px]" x-text="p.description"></div>
                                         </div>
@@ -860,6 +862,7 @@
                     if (this.statusFilter === 'active') list = list.filter(p => p.is_active);
                     else if (this.statusFilter === 'inactive') list = list.filter(p => !p.is_active);
                     else if (this.statusFilter === 'low') list = list.filter(p => this.isLow(p));
+                    else if (this.statusFilter === 'third') list = list.filter(p => p.is_third_schedule);
                     const dir = this.sortDir === 'asc' ? 1 : -1;
                     const key = this.sortKey;
                     list.sort((a, b) => {

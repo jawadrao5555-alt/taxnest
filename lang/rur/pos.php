@@ -3333,6 +3333,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'tax_exempt_on' => 'Tax exempt chalu hai',
     'tax_exempt_tax_free' => 'Tax exempt (tax-free)',
     'third_schedule_label' => 'Third Schedule',
+    'third_sch_badge' => '3rd Sch',
+    'third_schedule_only' => 'Sirf Third Schedule',
     'third_schedule_on' => 'Third Schedule ON',
     'third_schedule_off' => 'Third Schedule OFF',
     'kpi_third_schedule' => 'Third Schedule Sales',

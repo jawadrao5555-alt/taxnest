@@ -577,6 +577,12 @@ class AgentController extends Controller
         // if not (old server / instant answer), the agent adds its own delay
         // so it never tight-loops.
         $wait = min(max((int) $request->query('wait', 0), 0), 8);
+        // PHP's built-in dev server (artisan serve) handles few/one request(s)
+        // at a time — a held long-poll would block the whole dev site. Keep
+        // holds very short there; production runs PHP-FPM.
+        if ($wait > 0 && PHP_SAPI === 'cli-server') {
+            $wait = min($wait, 2);
+        }
         $held = false;
         $pendingExists = fn () => DB::table('pos_print_jobs')
             ->where('company_id', $company->id)
@@ -584,12 +590,41 @@ class AgentController extends Controller
             ->exists();
         $hasPending = $pendingExists();
         if ($wait > 0 && !$hasPending) {
-            $held = true;
-            $deadline = microtime(true) + $wait;
-            while (microtime(true) < $deadline) {
-                usleep(250000);
-                if ($hasPending = $pendingExists()) {
-                    break;
+            // Bounded admission: each held long-poll occupies one PHP worker
+            // (sleeping) for up to $wait seconds. Cap concurrent holds so a
+            // fleet of agents can never crowd out normal POS traffic — over
+            // the cap we answer instantly (held:false) and the agent falls
+            // back to its own 1.5s short-poll delay. The counter is a soft
+            // cap (non-atomic cache read/write is fine here) and self-heals:
+            // every write carries a 30s TTL, so a leaked slot from a killed
+            // request disappears within 30s.
+            $slotKey = 'print_jobs_longpoll_holds';
+            // NOTE: not env() — live runs config:cache, where env() returns
+            // null in the request path and would silently shrink the cap.
+            $maxHolds = 10;
+            $holds = (int) \Illuminate\Support\Facades\Cache::get($slotKey, 0);
+            if ($holds >= $maxHolds) {
+                // Trip visibility (throttled): if this fires often, the cap /
+                // hold strategy needs revisiting before more shops enable it.
+                if (\Illuminate\Support\Facades\Cache::add('print_jobs_longpoll_cap_log', 1, 60)) {
+                    \Log::info('PRINT_LONGPOLL cap reached — answering short-poll', [
+                        'holds' => $holds, 'max' => $maxHolds, 'company_id' => $company->id,
+                    ]);
+                }
+            } else {
+                \Illuminate\Support\Facades\Cache::put($slotKey, $holds + 1, 30);
+                try {
+                    $held = true;
+                    $deadline = microtime(true) + $wait;
+                    while (microtime(true) < $deadline) {
+                        usleep(250000);
+                        if ($hasPending = $pendingExists()) {
+                            break;
+                        }
+                    }
+                } finally {
+                    $now = (int) \Illuminate\Support\Facades\Cache::get($slotKey, 0);
+                    \Illuminate\Support\Facades\Cache::put($slotKey, max(0, $now - 1), 30);
                 }
             }
         }

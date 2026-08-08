@@ -20,8 +20,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
+// Token comes from the environment — NEVER hardcode it here (this file lives in a public repo).
+$expectedToken = getenv('PRA_RELAY_TOKEN') ?: '';
 $relayToken = $_SERVER['HTTP_X_RELAY_TOKEN'] ?? '';
-if ($relayToken !== 'taxnest-pra-relay-2026') {
+if ($expectedToken === '' || $relayToken !== $expectedToken) {
     http_response_code(403);
     echo json_encode(['error' => 'Invalid relay token']);
     exit;

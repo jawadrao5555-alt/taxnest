@@ -11,8 +11,10 @@ const server = http.createServer((req, res) => {
     if (req.method === 'GET') { res.end(JSON.stringify({status:'ok',time:new Date().toISOString()})); return; }
     if (req.method !== 'POST') { res.writeHead(405); res.end(JSON.stringify({error:'Only POST'})); return; }
 
+    // Token comes from the environment — NEVER hardcode it here (this file lives in a public repo).
+    const RELAY_TOKEN = process.env.PRA_RELAY_TOKEN || '';
     const token = req.headers['x-relay-token'] || '';
-    if (token !== 'taxnest-pra-relay-2026') { res.writeHead(403); res.end(JSON.stringify({error:'Invalid token'})); return; }
+    if (!RELAY_TOKEN || token !== RELAY_TOKEN) { res.writeHead(403); res.end(JSON.stringify({error:'Invalid token'})); return; }
 
     let body = '';
     req.on('data', chunk => body += chunk);

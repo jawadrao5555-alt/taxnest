@@ -40,7 +40,9 @@ class RestaurantWaiterController extends Controller
      */
     public function saveStyle(Request $request)
     {
-        $request->validate(['style' => 'required|in:default,saaf,buttons']);
+        // Allowed styles come from the central catalogue (User::WAITER_STYLES)
+        // so a newly added theme is accepted here without touching this file.
+        $request->validate(['style' => 'required|in:' . implode(',', array_keys(\App\Models\User::WAITER_STYLES))]);
         $user = auth('pos')->user();
         // Waiter-only (architect review): admins/managers can OPEN the tablet,
         // but the personal-style override is scoped to waiters — everyone else

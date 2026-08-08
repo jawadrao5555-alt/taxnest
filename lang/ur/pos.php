@@ -3983,6 +3983,8 @@ return [
     'style_saaf_word'        => 'سادہ',
     'style_full_word'        => 'مکمل',
     'style_buttons_word'     => 'بٹن',
+    'waiter_theme_btn'       => 'تھیم',
+    'waiter_theme_pick_title' => 'اپنی تھیم چنیں',
     // Buttons style — waiter home screen (Task #340, Aug 2026)
     'waiter_buttons_parcel'       => 'پارسل',
     'waiter_buttons_new_parcel'   => '+ نیا پارسل آرڈر',

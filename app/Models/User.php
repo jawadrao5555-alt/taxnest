@@ -10,6 +10,19 @@ class User extends Authenticatable
 {
     use HasFactory, Notifiable;
 
+    /**
+     * Waiter personal-style catalogue — SINGLE SOURCE OF TRUTH (owner, 8 Aug 2026).
+     * key = users.pos_personal_style value, value = lang key for the label.
+     * Add a new waiter theme HERE and it automatically appears in the waiter
+     * tablet's theme picker, passes saveStyle() validation, and resolves in
+     * both layout resolvers (pos-app.blade.php + waiter.blade.php).
+     */
+    public const WAITER_STYLES = [
+        'buttons' => 'pos.style_buttons_word',
+        'saaf'    => 'pos.style_saaf_word',
+        'default' => 'pos.style_full_word',
+    ];
+
     protected $fillable = [
         'name',
         'email',

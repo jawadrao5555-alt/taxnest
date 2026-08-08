@@ -5,7 +5,7 @@
     // WAITER-ONLY: admins/managers previewing this tablet keep the company style.
     $waiterIsWaiterRole = (auth('pos')->user()->pos_role ?? null) === 'pos_waiter';
     $waiterOwnStyle = $waiterIsWaiterRole ? (auth('pos')->user()->pos_personal_style ?? null) : null;
-    $waiterEffStyle = in_array($waiterOwnStyle, ['default', 'saaf', 'buttons'], true)
+    $waiterEffStyle = in_array($waiterOwnStyle, array_keys(\App\Models\User::WAITER_STYLES), true)
         ? $waiterOwnStyle
         : (optional(\App\Models\Company::find(app('currentCompanyId')))->pos_dashboard_style ?? 'default');
 @endphp
@@ -30,21 +30,16 @@
             {{-- Per-waiter style switch (owner, 5 Aug 2026): waiter apni marzi se
                  Saaf/Full chun sake — sirf ISI waiter ki screen badalti hai,
                  dukan ki setting ko haath nahi lagta. Waiter-only (403 on server). --}}
+            {{-- Theme picker button (owner, 8 Aug 2026): purani 3-button patti
+                 hata di — ab ek "Theme" button modal kholta hai jis mein SAB
+                 available themes list hoti hain (User::WAITER_STYLES se), taake
+                 nayi theme banate hi khud-ba-khud yahan aa jaye. --}}
             @if($waiterIsWaiterRole)
-            <div class="flex items-center rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden" title="{{ __('pos.ti_waiter_style') }}">
-                <button type="button" @click="saveStyle('buttons')" :disabled="styleBusy"
-                        class="px-3 py-2 text-xs font-bold transition disabled:opacity-50 {{ $waiterEffStyle === 'buttons' ? 'bg-teal-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700' }}">
-                    {{ __('pos.style_buttons_word') }}
-                </button>
-                <button type="button" @click="saveStyle('saaf')" :disabled="styleBusy"
-                        class="px-3 py-2 text-xs font-bold transition disabled:opacity-50 {{ $waiterEffStyle === 'saaf' ? 'bg-teal-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700' }}">
-                    {{ __('pos.style_saaf_word') }}
-                </button>
-                <button type="button" @click="saveStyle('default')" :disabled="styleBusy"
-                        class="px-3 py-2 text-xs font-bold transition disabled:opacity-50 {{ $waiterEffStyle === 'default' ? 'bg-teal-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700' }}">
-                    {{ __('pos.style_full_word') }}
-                </button>
-            </div>
+            <button type="button" @click="showThemeTab = true" title="{{ __('pos.ti_waiter_style') }}"
+                    class="px-3 py-2 rounded-xl text-xs font-bold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-teal-500 transition flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.098 19.902a3.75 3.75 0 005.304 0l6.401-6.402M6.75 21A3.75 3.75 0 013 17.25V4.125C3 3.504 3.504 3 4.125 3h5.25c.621 0 1.125.504 1.125 1.125v4.072M6.75 21a3.75 3.75 0 003.75-3.75V8.197M6.75 21h13.125c.621 0 1.125-.504 1.125-1.125v-5.25c0-.621-.504-1.125-1.125-1.125h-4.072M10.5 8.197l2.88-2.88c.438-.439 1.15-.439 1.59 0l3.712 3.713c.44.44.44 1.152 0 1.59l-2.879 2.88M6.75 17.25h.008v.008H6.75v-.008z"/></svg>
+                {{ __('pos.waiter_theme_btn') }}
+            </button>
             @endif
             {{-- Waiter APK download (Aug 2026) — cookie-less public static file,
                  same pattern as Rider APK on rider-tracking page. --}}
@@ -457,6 +452,34 @@
         </div>
     </div>
 
+    {{-- ── Theme picker modal (owner, 8 Aug 2026): waiter apni marzi ki theme
+         chune — list User::WAITER_STYLES se render hoti hai (single source of
+         truth), is liye nayi theme add karte hi yahan khud aa jayegi. Sirf ISI
+         waiter ki screen badalti hai (server 403 for non-waiters). ─────────── --}}
+    @if($waiterIsWaiterRole)
+    <div x-show="showThemeTab" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/60" @click="showThemeTab = false"></div>
+        <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm flex flex-col overflow-hidden">
+            <div class="px-5 py-4 bg-teal-600 flex items-center justify-between">
+                <h3 class="text-white font-bold">{{ __('pos.waiter_theme_pick_title') }}</h3>
+                <button @click="showThemeTab = false" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/25 text-white font-black">×</button>
+            </div>
+            <div class="p-4 space-y-2.5">
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.ti_waiter_style') }}</p>
+                @foreach(\App\Models\User::WAITER_STYLES as $wtKey => $wtLangKey)
+                <button type="button" @click="saveStyle('{{ $wtKey }}')" :disabled="styleBusy"
+                        class="w-full flex items-center justify-between rounded-xl border-2 px-4 py-3.5 text-left transition active:scale-[.98] disabled:opacity-50 {{ $waiterEffStyle === $wtKey ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/20' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-teal-300' }}">
+                    <span class="text-sm font-bold {{ $waiterEffStyle === $wtKey ? 'text-teal-700 dark:text-teal-300' : 'text-gray-700 dark:text-gray-200' }}">{{ __($wtLangKey) }}</span>
+                    @if($waiterEffStyle === $wtKey)
+                    <span class="w-6 h-6 rounded-full bg-teal-600 text-white text-xs font-black flex items-center justify-center">✓</span>
+                    @endif
+                </button>
+                @endforeach
+            </div>
+        </div>
+    </div>
+    @endif
+
     {{-- ── Multi-order shift: order-selection step (Task 104, Aug 2026) ──────
          Table par 1 se zyada HELD orders → pehle waiter chune kaunsa order
          shift hoga (order number + items count), phir shift modal. --}}
@@ -571,6 +594,7 @@ function waiterApp() {
         // are skipped harmlessly in the node --check harness.
         _buttonsMode: {{ $waiterEffStyle === 'buttons' ? 'true' : 'false' }},
         showMyOrders: false,
+        showThemeTab: false,
         myOrders: [],
         myOrdersLoading: false,
         appendOrderId: null,

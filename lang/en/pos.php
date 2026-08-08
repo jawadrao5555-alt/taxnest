@@ -3982,6 +3982,8 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'style_saaf_word'        => 'Saaf',
     'style_full_word'        => 'Full',
     'style_buttons_word'     => 'Buttons',
+    'waiter_theme_btn'       => 'Theme',
+    'waiter_theme_pick_title' => 'Choose your theme',
     // Buttons style — waiter home screen (Task #340, Aug 2026)
     'waiter_buttons_parcel'       => 'Parcel',
     'waiter_buttons_new_parcel'   => '+ New Parcel Order',

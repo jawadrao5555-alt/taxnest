@@ -50,6 +50,23 @@ class AiInvoiceReaderService
         }
     }
 
+    /**
+     * Strong escalation model — used for ONE automatic retry when a photo /
+     * scanned-PDF first read comes back low-confidence. Only active when the
+     * admin sets SystemSetting 'ai_reader_model_strong' (e.g. gpt-4o);
+     * unset = no escalation ever (cost control).
+     */
+    public static function strongModel(): ?string
+    {
+        try {
+            $m = trim((string) \App\Models\SystemSetting::get('ai_reader_model_strong', ''));
+
+            return $m !== '' ? $m : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     public const MAX_FILE_BYTES = 5 * 1024 * 1024; // keep in sync with controller validation + view copy
     public const MAX_PDF_PAGES = 4;
     /** Scanned-PDF vision cap: each rasterized page costs ~26-38k vision tokens. */
@@ -129,12 +146,42 @@ class AiInvoiceReaderService
         $sourceType = self::detectSourceType($file);
         $filename = self::cleanString((string) $file->getClientOriginalName(), 200);
 
+        $model = self::model();
+        $escalated = false;
+
         try {
             $content = self::extractContent($file, $sourceType);
-            [$raw, $tokens] = self::callOpenAi($content, $company);
+            [$raw, $tokens] = self::callOpenAi($content, $company, $model);
 
             if (!is_array($raw) || empty($raw['is_invoice'])) {
                 throw new AiReaderException("This file doesn't look like an invoice. Please upload a clear invoice PDF, photo, or Excel file.");
+            }
+
+            // Task 358: blurred photo / scanned-PDF escalation — when the cheap
+            // model's first read is low-confidence (most items low/shaky, or no
+            // items at all), retry ONCE with the admin-set strong vision model
+            // and keep whichever read has more high-confidence items. Vision
+            // sources only (text/Excel gain nothing); still ONE quota parse.
+            $strong = self::strongModel();
+            if ($strong !== null && $strong !== $model
+                && ($content['kind'] ?? '') === 'image'
+                && self::extractionLooksLow($raw)) {
+                try {
+                    [$raw2, $tokens2] = self::callOpenAi($content, $company, $strong);
+                    $escalated = true;
+                    $tokens += $tokens2;
+                    if (is_array($raw2) && !empty($raw2['is_invoice'])
+                        && self::extractionScore($raw2) > self::extractionScore($raw)) {
+                        $raw = $raw2;
+                        $model = $strong;
+                    }
+                } catch (\Throwable $e) {
+                    // Strong retry is best-effort — keep the first read on any trouble.
+                    Log::warning('AI invoice reader strong-model escalation failed', [
+                        'company_id' => $company->id,
+                        'err' => mb_substr($e->getMessage(), 0, 200),
+                    ]);
+                }
             }
 
             $payload = self::mapExtraction($raw, $company, $sourceType, $filename);
@@ -162,6 +209,8 @@ class AiInvoiceReaderService
             throw new AiReaderException($friendly);
         }
 
+        $payload['meta']['escalated'] = $escalated;
+
         return AiInvoiceParse::create([
             'company_id' => $company->id,
             'user_id' => $userId,
@@ -169,9 +218,60 @@ class AiInvoiceReaderService
             'source_type' => $sourceType,
             'original_filename' => $filename,
             'payload_json' => $payload,
-            'model' => self::model(),
+            'model' => $model,
             'total_tokens' => $tokens,
         ]);
+    }
+
+    /**
+     * First-read quality check for escalation: no items at all, or at least
+     * half the items are low-confidence / have an unreadable qty or price.
+     */
+    private static function extractionLooksLow(array $raw): bool
+    {
+        $items = is_array($raw['items'] ?? null)
+            ? array_values(array_filter($raw['items'], 'is_array'))
+            : [];
+        if (empty($items)) {
+            return true;
+        }
+
+        $low = 0;
+        foreach ($items as $it) {
+            $qty = self::num($it['quantity'] ?? null);
+            $price = self::num($it['unit_price'] ?? null);
+            if (($it['confidence'] ?? null) === 'low'
+                || $qty === null || $qty <= 0
+                || $price === null || $price < 0) {
+                $low++;
+            }
+        }
+
+        return $low * 2 >= count($items);
+    }
+
+    /**
+     * Comparable quality score: high-confidence readable items dominate,
+     * total item count breaks ties.
+     */
+    private static function extractionScore(array $raw): int
+    {
+        $items = is_array($raw['items'] ?? null)
+            ? array_values(array_filter($raw['items'], 'is_array'))
+            : [];
+
+        $high = 0;
+        foreach ($items as $it) {
+            $qty = self::num($it['quantity'] ?? null);
+            $price = self::num($it['unit_price'] ?? null);
+            if (($it['confidence'] ?? null) === 'high'
+                && $qty !== null && $qty > 0
+                && $price !== null && $price >= 0) {
+                $high++;
+            }
+        }
+
+        return $high * 1000 + count($items);
     }
 
     private static function storeFailure(int $companyId, ?int $userId, string $sourceType, string $filename, string $error): void
@@ -466,8 +566,9 @@ class AiInvoiceReaderService
     // ------------------------------------------------------------------
 
     /** @return array{0:array|null,1:int} [decoded JSON, total tokens] */
-    private static function callOpenAi(array $content, Company $company): array
+    private static function callOpenAi(array $content, Company $company, ?string $model = null): array
     {
+        $model = $model ?? self::model();
         $key = MadadgarService::apiKey();
         if ($key === null) {
             throw new AiReaderException('AI service is not configured yet. Please contact support.');
@@ -513,7 +614,7 @@ class AiInvoiceReaderService
                 }, throw: false)
                 ->withToken($key)
                 ->post('https://api.openai.com/v1/chat/completions', [
-                    'model' => self::model(),
+                    'model' => $model,
                     'messages' => [
                         ['role' => 'system', 'content' => self::systemPrompt()],
                         ['role' => 'user', 'content' => $userContent],

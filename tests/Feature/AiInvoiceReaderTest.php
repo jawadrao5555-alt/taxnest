@@ -602,6 +602,142 @@ class AiInvoiceReaderTest extends TestCase
         );
     }
 
+    // ---------------------------------------------------- strong-model escalation
+
+    /** Fake OpenAI returning $first, then $second on the next request. */
+    private function fakeOpenAiSequence(array $first, array $second): void
+    {
+        $wrap = fn (array $x) => Http::response([
+            'choices' => [['message' => ['content' => json_encode($x)]]],
+            'usage' => ['total_tokens' => 777],
+        ], 200);
+
+        Http::fake(['api.openai.com/*' => Http::sequence()->pushResponse($wrap($first))->pushResponse($wrap($second))]);
+    }
+
+    private function fakeImageUpload(): UploadedFile
+    {
+        return UploadedFile::fake()->createWithContent('blurry-bill.png', 'not-really-an-image-but-bytes');
+    }
+
+    private function lowConfidenceExtraction(): array
+    {
+        return $this->baseExtraction(['items' => [
+            [
+                'description' => 'Laptop Computer Core i5', 'hs_code' => '8471.3010',
+                'quantity' => null, 'unit_price' => null, 'confidence' => 'low',
+            ],
+            [
+                'description' => 'Mouse', 'hs_code' => '8471.3010',
+                'quantity' => 1, 'unit_price' => 500, 'confidence' => 'low',
+            ],
+        ]]);
+    }
+
+    public function test_low_confidence_image_escalates_once_to_strong_model(): void
+    {
+        $company = $this->makeCompany('Premium');
+        $this->seedHsMaster();
+        DB::table('system_settings')->insert(['key' => 'ai_reader_model_strong', 'value' => 'gpt-4o', 'created_at' => now(), 'updated_at' => now()]);
+        $this->fakeOpenAiSequence($this->lowConfidenceExtraction(), $this->baseExtraction());
+
+        $parse = AiInvoiceReaderService::parseUpload($this->fakeImageUpload(), $company, null);
+
+        $recorded = Http::recorded();
+        $this->assertCount(2, $recorded, 'exactly one escalation retry');
+        $this->assertSame(AiInvoiceReaderService::model(), $recorded[0][0]->data()['model']);
+        $this->assertSame('gpt-4o', $recorded[1][0]->data()['model']);
+
+        // Better (high-confidence) strong read wins; row records final model + flag.
+        $this->assertSame('success', $parse->status);
+        $this->assertSame('gpt-4o', $parse->model);
+        $this->assertTrue($parse->payload_json['meta']['escalated']);
+        $this->assertSame('high', $parse->payload_json['items'][0]['ai_confidence']);
+        $this->assertSame(777 * 2, $parse->total_tokens);
+
+        // Escalation still burns ONE parse of the quota.
+        $this->assertSame(1, AiInvoiceReaderService::usedThisMonth($company->id));
+        $this->assertSame(1, AiInvoiceParse::where('company_id', $company->id)->count());
+    }
+
+    public function test_no_items_on_first_read_escalates_and_recovers(): void
+    {
+        $company = $this->makeCompany('Premium');
+        $this->seedHsMaster();
+        DB::table('system_settings')->insert(['key' => 'ai_reader_model_strong', 'value' => 'gpt-4o', 'created_at' => now(), 'updated_at' => now()]);
+        $this->fakeOpenAiSequence($this->baseExtraction(['items' => []]), $this->baseExtraction());
+
+        $parse = AiInvoiceReaderService::parseUpload($this->fakeImageUpload(), $company, null);
+
+        $this->assertCount(2, Http::recorded());
+        $this->assertSame('gpt-4o', $parse->model);
+        $this->assertCount(1, $parse->payload_json['items']);
+    }
+
+    public function test_worse_strong_read_keeps_first_result_but_flags_escalated(): void
+    {
+        $company = $this->makeCompany('Premium');
+        $this->seedHsMaster();
+        DB::table('system_settings')->insert(['key' => 'ai_reader_model_strong', 'value' => 'gpt-4o', 'created_at' => now(), 'updated_at' => now()]);
+        // First read: 2 items (both low). Strong read: fewer, still no high items.
+        $this->fakeOpenAiSequence($this->lowConfidenceExtraction(), $this->baseExtraction(['items' => [[
+            'description' => 'Mouse', 'hs_code' => '8471.3010',
+            'quantity' => 1, 'unit_price' => 500, 'confidence' => 'low',
+        ]]]));
+
+        $parse = AiInvoiceReaderService::parseUpload($this->fakeImageUpload(), $company, null);
+
+        $this->assertCount(2, Http::recorded());
+        $this->assertSame(AiInvoiceReaderService::model(), $parse->model, 'first read kept when strong is not better');
+        $this->assertTrue($parse->payload_json['meta']['escalated']);
+        $this->assertCount(2, $parse->payload_json['items']);
+    }
+
+    public function test_good_first_read_does_not_escalate(): void
+    {
+        $company = $this->makeCompany('Premium');
+        $this->seedHsMaster();
+        DB::table('system_settings')->insert(['key' => 'ai_reader_model_strong', 'value' => 'gpt-4o', 'created_at' => now(), 'updated_at' => now()]);
+        $this->fakeOpenAi($this->baseExtraction());
+
+        $parse = AiInvoiceReaderService::parseUpload($this->fakeImageUpload(), $company, null);
+
+        $this->assertCount(1, Http::recorded(), 'no retry on a confident first read');
+        $this->assertSame(AiInvoiceReaderService::model(), $parse->model);
+        $this->assertFalse($parse->payload_json['meta']['escalated']);
+    }
+
+    public function test_setting_absent_means_no_escalation(): void
+    {
+        $company = $this->makeCompany('Premium');
+        $this->seedHsMaster();
+        $this->fakeOpenAi($this->lowConfidenceExtraction());
+
+        $parse = AiInvoiceReaderService::parseUpload($this->fakeImageUpload(), $company, null);
+
+        $this->assertCount(1, Http::recorded(), 'no strong model configured = never escalate');
+        $this->assertSame(AiInvoiceReaderService::model(), $parse->model);
+        $this->assertFalse($parse->payload_json['meta']['escalated']);
+    }
+
+    public function test_text_sources_never_escalate_even_when_low_confidence(): void
+    {
+        $company = $this->makeCompany('Premium');
+        $this->seedHsMaster();
+        DB::table('system_settings')->insert(['key' => 'ai_reader_model_strong', 'value' => 'gpt-4o', 'created_at' => now(), 'updated_at' => now()]);
+        $this->fakeOpenAi($this->lowConfidenceExtraction());
+
+        $file = UploadedFile::fake()->createWithContent(
+            'inv.csv',
+            "Invoice,SUP-001\nLaptop Computer Core i5,?,?\nMouse,1,500\n"
+        );
+        $parse = AiInvoiceReaderService::parseUpload($file, $company, null);
+
+        $this->assertCount(1, Http::recorded(), 'vision escalation is image/scan only');
+        $this->assertSame(AiInvoiceReaderService::model(), $parse->model);
+        $this->assertFalse($parse->payload_json['meta']['escalated']);
+    }
+
     // ------------------------------------------------------------- linking
 
     public function test_parse_links_to_one_invoice_only_and_only_same_company(): void

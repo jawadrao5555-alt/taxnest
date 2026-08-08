@@ -321,6 +321,27 @@
                     </div>
                 </div>
                 @endif
+                @php($tnSupportMailFailure = \App\Services\SupportMailHealth::current())
+                @if($tnSupportMailFailure)
+                <div class="mx-4 mt-4 bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-sm">
+                    <div class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                        <div class="min-w-0">
+                            <p class="font-semibold text-red-300">
+                                Support mailbox (support@) is unreachable — {{ $tnSupportMailFailure['count'] }} failed IMAP {{ $tnSupportMailFailure['count'] === 1 ? 'connection' : 'connections' }}@if($tnSupportMailFailure['ago']), last {{ $tnSupportMailFailure['ago'] }}@endif.
+                            </p>
+                            @if($tnSupportMailFailure['error'] !== '')
+                            <p class="text-red-400 mt-1 break-words">{{ $tnSupportMailFailure['error'] }}</p>
+                            @endif
+                            <p class="text-red-300 mt-2">
+                                Check the support@ mailbox password / IMAP on the mail server, then open the
+                                <a href="{{ route('saas.admin.support-inbox') }}" class="underline font-semibold hover:text-red-200">Support Inbox</a>
+                                — this warning clears automatically once the mailbox connects again.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                @endif
                 @php($tnHeartbeatWarn = \App\Services\HeartbeatHealth::warning())
                 @if($tnHeartbeatWarn)
                 <div class="mx-4 mt-4 bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-sm">

@@ -69,8 +69,11 @@ class SupportMailService
         } catch (\Throwable $e) {
             $this->client = null;
             Log::warning('Support inbox IMAP connect failed: '.$e->getMessage());
+            SupportMailHealth::recordFailure($e);
             throw new \RuntimeException('Mail server se rabta nahi ho saka (IMAP). Thori dair baad koshish karein.');
         }
+
+        SupportMailHealth::recordSuccess();
 
         return $this->client;
     }

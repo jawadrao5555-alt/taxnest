@@ -3561,6 +3561,421 @@ class FbrPosController extends Controller
         return redirect()->route('fbrpos.products')->with('success', __('pos.product_deleted_named', ['name' => $name]));
     }
 
+    // ═══════════════════════════════════════════════════════════════════
+    // 📦 Product Excel export/template/import — FBR mirror of the PRA POS
+    // round-trip (PosController::downloadProductTemplate / importProducts).
+    // Real .xlsx (never CSV: barcodes mangle to 8.9E+12), SKU/Barcode written
+    // as EXPLICIT strings, Third Schedule Yes/No round-trip with the
+    // third-schedule-implies-0-tax rule.
+    // ═══════════════════════════════════════════════════════════════════
+
+    // Sample rows shown in the blank template. importFbrProducts() silently skips a
+    // row that still matches one of these EXACTLY (name+price+sku) so an untouched
+    // sample never becomes a real product in the shop's list.
+    private const FBR_IMPORT_SAMPLE_ROWS = [
+        ['Lux Soap 100g', 120.0, 'LUX-100'],
+        ['Pepsi 500ml', 120.0, 'PEP-500'],
+        ['Sugar 1kg', 180.0, 'SUG-001'],
+    ];
+
+    public function downloadProductTemplate()
+    {
+        // Route sits behind fbrpos auth; extra belt-and-braces admin check like the
+        // other product actions (null user = direct/CLI test invocation, allowed).
+        $u = Auth::guard('fbrpos')->user();
+        if ($u && $u->role !== 'company_admin') abort(403, 'Only admin can manage products.');
+
+        $companyId = app('currentCompanyId');
+        $existingProducts = Product::where('company_id', $companyId)->orderBy('name')->get();
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Products');
+
+        // A..I — FBR product columns (no Description/Category on the products table;
+        // HS Code replaces them; the rest mirrors the PRA set incl. Third Schedule).
+        $headers = ['Name', 'Price', 'HS Code', 'SKU', 'Barcode', 'Tax Rate %', 'Unit (UOM)', 'Tax Exempt (Yes/No)', 'Third Schedule (Yes/No)'];
+        $sheet->fromArray($headers, null, 'A1');
+        $sheet->getStyle('A1:I1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:I1')->getFill()
+            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            ->getStartColor()->setRGB('BFDBFE');
+        foreach (['A' => 32, 'B' => 10, 'C' => 16, 'D' => 14, 'E' => 18, 'F' => 11, 'G' => 12, 'H' => 18, 'I' => 20] as $col => $w) {
+            $sheet->getColumnDimension($col)->setWidth($w);
+        }
+        // SKU + Barcode + HS Code columns forced to TEXT so Excel never converts
+        // long codes to scientific notation or strips leading zeros.
+        $sheet->getStyle('C:E')->getNumberFormat()
+            ->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
+
+        $rowNum = 2;
+        if ($existingProducts->isEmpty()) {
+            $samples = [
+                ['Lux Soap 100g', 120, '3401.1100', 'LUX-100', '8964000112345', 18, 'U', 'No', 'Yes'],
+                ['Pepsi 500ml', 120, '2202.1010', 'PEP-500', '8964000154321', 18, 'U', 'No', 'No'],
+                ['Sugar 1kg', 180, '1701.9910', 'SUG-001', '', 0, 'KG', 'Yes', 'No'],
+            ];
+            foreach ($samples as $s) {
+                $this->writeFbrProductRow($sheet, $rowNum++, $s);
+            }
+        } else {
+            foreach ($existingProducts as $p) {
+                $this->writeFbrProductRow($sheet, $rowNum++, [
+                    $p->name,
+                    (float) $p->default_price,
+                    $p->hs_code ?? '',
+                    $p->sku ?? '',
+                    $p->barcode ?? '',
+                    (float) ($p->default_tax_rate ?? 0),
+                    $p->uom ?? 'U',
+                    ($p->tax_type ?? '') === 'exempt' ? 'Yes' : 'No',
+                    !empty($p->is_third_schedule) ? 'Yes' : 'No',
+                ]);
+            }
+        }
+
+        $filename = $existingProducts->isEmpty() ? 'fbr_products_template.xlsx' : 'fbr_products_export.xlsx';
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate',
+            'Pragma' => 'no-cache',
+        ]);
+    }
+
+    private function writeFbrProductRow($sheet, int $rowNum, array $vals): void
+    {
+        // A..I = Name, Price, HS Code, SKU, Barcode, Tax %, UOM, Tax Exempt, Third Schedule.
+        // HS Code/SKU/Barcode written as EXPLICIT strings (Excel would otherwise turn
+        // 8964000112345 into 8.964E+12 the moment the file is opened).
+        $sheet->setCellValue('A' . $rowNum, $vals[0]);
+        $sheet->setCellValue('B' . $rowNum, $vals[1]);
+        $sheet->setCellValueExplicit('C' . $rowNum, (string) $vals[2], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+        $sheet->setCellValueExplicit('D' . $rowNum, (string) $vals[3], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+        $sheet->setCellValueExplicit('E' . $rowNum, (string) $vals[4], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+        $sheet->setCellValue('F' . $rowNum, $vals[5]);
+        $sheet->setCellValue('G' . $rowNum, $vals[6]);
+        $sheet->setCellValue('H' . $rowNum, $vals[7] ?? 'No');
+        $sheet->setCellValue('I' . $rowNum, $vals[8] ?? 'No');
+    }
+
+    public function importProducts(Request $request)
+    {
+        $u = Auth::guard('fbrpos')->user();
+        if ($u && $u->role !== 'company_admin') abort(403, 'Only admin can manage products.');
+
+        $companyId = app('currentCompanyId');
+
+        $request->validate([
+            'csv_file' => 'required|file|mimes:csv,txt,xlsx,xls|max:5120',
+        ], [
+            'csv_file.mimes' => 'File Excel (.xlsx) ya CSV honi chahiye.',
+            'csv_file.max' => 'File 5 MB se choti honi chahiye.',
+        ]);
+
+        $file = $request->file('csv_file');
+        $ext = strtolower($file->getClientOriginalExtension());
+
+        try {
+            $rows = in_array($ext, ['xlsx', 'xls'], true)
+                ? $this->readFbrImportRowsExcel($file->getRealPath())
+                : $this->readFbrImportRowsCsv($file->getRealPath());
+        } catch (\Throwable $e) {
+            Log::error('FBR POS product import parse failed: ' . $e->getMessage());
+            return back()->with('error', __('pos.file_unreadable'));
+        }
+
+        if (count($rows) < 2) {
+            return back()->with('error', __('pos.file_empty_rows'));
+        }
+        if (count($rows) > 5001) {
+            return back()->with('error', __('pos.file_max_products'));
+        }
+
+        $header = array_map(function ($h) {
+            return strtolower(trim(preg_replace('/[\x{FEFF}]/u', '', (string) $h)));
+        }, $rows[0]);
+
+        $nameIdx = $this->findFbrColumn($header, ['name', 'product name', 'product', 'item name', 'item']);
+        $priceIdx = $this->findFbrColumn($header, ['price', 'sale price', 'rate', 'unit price', 'price (rs)', 'price rs', 'default price']);
+
+        if ($nameIdx === false || $priceIdx === false) {
+            return back()->with('error', __('pos.file_missing_name_price'));
+        }
+
+        $hsIdx = $this->findFbrColumn($header, ['hs code', 'hs_code', 'hscode', 'pct code', 'pct']);
+        $skuIdx = $this->findFbrColumn($header, ['sku', 'code', 'item code', 'product code']);
+        $barcodeIdx = $this->findFbrColumn($header, ['barcode', 'bar code', 'ean']);
+        $taxIdx = $this->findFbrColumn($header, ['tax rate %', 'tax rate', 'tax_rate', 'tax', 'tax %']);
+        $uomIdx = $this->findFbrColumn($header, ['unit (uom)', 'unit', 'uom']);
+        $exemptIdx = $this->findFbrColumn($header, ['tax exempt (yes/no)', 'tax exempt', 'exempt (yes/no)', 'exempt', 'tax_exempt', 'is_tax_exempt']);
+        // Third Schedule column: round-trip Yes/No; blank = leave flag as-is.
+        $thirdIdx = $this->findFbrColumn($header, ['third schedule (yes/no)', 'third schedule', 'third_schedule', 'is_third_schedule', 'third']);
+
+        // Preload the whole catalog ONCE — match precedence barcode → SKU → name.
+        // Maps updated after each create so a duplicate row in the same file
+        // updates instead of double-creating.
+        $catalog = Product::where('company_id', $companyId)->get();
+        $byBarcode = []; $bySku = []; $byName = [];
+        foreach ($catalog as $p) {
+            if (trim((string) $p->barcode) !== '') $byBarcode[strtolower(trim($p->barcode))] = $p;
+            if (trim((string) $p->sku) !== '') $bySku[strtolower(trim($p->sku))] = $p;
+            $byName[strtolower(trim($p->name))] = $p;
+        }
+
+        $hasThirdCol = \Illuminate\Support\Facades\Schema::hasColumn('products', 'is_third_schedule');
+
+        $added = 0; $updated = 0; $skipped = 0; $samplesSkipped = 0;
+        $errors = [];
+
+        for ($i = 1; $i < count($rows); $i++) {
+            $data = $rows[$i];
+            $rowNo = $i + 1;
+
+            $name = trim((string) ($data[$nameIdx] ?? ''));
+            $priceRaw = $data[$priceIdx] ?? '';
+            $rowEmpty = true;
+            foreach ($data as $cell) { if (trim((string) $cell) !== '') { $rowEmpty = false; break; } }
+            if ($rowEmpty) continue;
+
+            if ($name === '') { $errors[] = "Row {$rowNo}: naam khali hai"; $skipped++; continue; }
+
+            $price = $this->cleanFbrImportNumber($priceRaw);
+            if ($price === null || $price < 0) {
+                $errors[] = "Row {$rowNo}: '{$name}' ki price samajh nahi aayi (" . trim((string) $priceRaw) . ")";
+                $skipped++;
+                continue;
+            }
+
+            $hsCode = $hsIdx !== false ? $this->cleanFbrImportCode($data[$hsIdx] ?? null) : null;
+            $sku = $skuIdx !== false ? $this->cleanFbrImportCode($data[$skuIdx] ?? null) : null;
+            $barcode = $barcodeIdx !== false ? $this->cleanFbrImportCode($data[$barcodeIdx] ?? null) : null;
+            $tax = $taxIdx !== false ? $this->cleanFbrImportNumber($data[$taxIdx] ?? '') : null;
+            $uom = $uomIdx !== false ? strtoupper(trim((string) ($data[$uomIdx] ?? ''))) : '';
+
+            // Third Schedule cell: Yes/No (tolerant); blank = leave flag as-is.
+            $thirdSchedule = null;
+            if ($thirdIdx !== false) {
+                $tsRaw = strtolower(trim((string) ($data[$thirdIdx] ?? '')));
+                if ($tsRaw !== '') {
+                    $thirdSchedule = in_array($tsRaw, ['yes', 'y', '1', 'true', 'haan', 'han'], true);
+                }
+            }
+
+            // Exempt cell: Yes/No (tolerant); blank = leave existing tax_type as-is
+            // (new products default taxable). Unrecognized value → clear warning.
+            $exempt = null;
+            if ($exemptIdx !== false) {
+                $exRaw = strtolower(trim((string) ($data[$exemptIdx] ?? '')));
+                if ($exRaw !== '') {
+                    if (in_array($exRaw, ['yes', 'y', '1', 'true', 'haan', 'han', 'exempt'], true)) {
+                        $exempt = true;
+                    } elseif (in_array($exRaw, ['no', 'n', '0', 'false', 'nahi'], true)) {
+                        $exempt = false;
+                    } else {
+                        $errors[] = "Row {$rowNo}: '{$name}' ke Tax Exempt column mein '" . trim((string) ($data[$exemptIdx] ?? '')) . "' samajh nahi aaya — Yes ya No likhein (value ignore hui)";
+                    }
+                }
+            }
+            // Tax Rate cell must be a number; 'exempt' written there is understood
+            // (flag ON, rate 0), anything else non-numeric gets a clear warning.
+            if ($taxIdx !== false && $tax === null) {
+                $taxRaw = trim((string) ($data[$taxIdx] ?? ''));
+                if ($taxRaw !== '') {
+                    if (strcasecmp($taxRaw, 'exempt') === 0) {
+                        $exempt = $exempt ?? true;
+                        $tax = 0.0;
+                    } else {
+                        $errors[] = "Row {$rowNo}: '{$name}' ka Tax Rate '{$taxRaw}' samajh nahi aaya — number likhein (masalan 18), exempt ke liye Tax Exempt column mein Yes likhein";
+                    }
+                }
+            }
+
+            // Untouched template sample rows never become real products.
+            foreach (self::FBR_IMPORT_SAMPLE_ROWS as $s) {
+                if (strcasecmp($name, $s[0]) === 0 && abs($price - $s[1]) < 0.001 && strcasecmp((string) $sku, $s[2]) === 0) {
+                    $samplesSkipped++;
+                    continue 2;
+                }
+            }
+
+            $existing = null;
+            if ($barcode !== null && isset($byBarcode[strtolower($barcode)])) $existing = $byBarcode[strtolower($barcode)];
+            if (!$existing && $sku !== null && isset($bySku[strtolower($sku)])) $existing = $bySku[strtolower($sku)];
+            if (!$existing && isset($byName[strtolower($name)])) $existing = $byName[strtolower($name)];
+
+            // Third Schedule implies exempt (which implies 0 tax below) —
+            // mirrors storeProduct/updateProduct's rule.
+            if ($thirdSchedule === true) { $exempt = true; }
+
+            // tax_type/default_tax_rate resolution (FBR model: taxable=18 / exempt=0 / custom=N):
+            //   exempt Yes            → exempt, 0
+            //   rate given, no exempt → 18 = taxable, else custom at that rate
+            //   nothing given         → existing values (update) / taxable 18 (create)
+            $resolveTax = function (?string $curType, $curRate) use ($exempt, $tax) {
+                if ($exempt === true) return ['exempt', 0.0];
+                if ($tax !== null) {
+                    if ($exempt === false && abs($tax) < 0.001) return ['custom', 0.0];
+                    if (abs($tax - 18.0) < 0.001) return ['taxable', 18.0];
+                    if (abs($tax) < 0.001) return ['exempt', 0.0];
+                    return ['custom', (float) $tax];
+                }
+                if ($exempt === false && $curType === 'exempt') {
+                    // Explicit No on a currently-exempt product with no rate → taxable default.
+                    return ['taxable', 18.0];
+                }
+                return [$curType, $curRate];
+            };
+
+            if ($existing) {
+                [$newType, $newRate] = $resolveTax($existing->tax_type, (float) ($existing->default_tax_rate ?? 0));
+                $updateData = [
+                    'name' => $name,
+                    'default_price' => $price,
+                    'hs_code' => $hsCode !== null ? $hsCode : $existing->hs_code,
+                    'sku' => $sku !== null ? $sku : $existing->sku,
+                    'barcode' => $barcode !== null ? $barcode : $existing->barcode,
+                    'uom' => $uom !== '' ? $uom : $existing->uom,
+                    'tax_type' => $newType ?? 'taxable',
+                    'default_tax_rate' => $newRate ?? 0,
+                ];
+                if ($hasThirdCol) {
+                    $updateData['is_third_schedule'] = $thirdSchedule !== null ? $thirdSchedule : (bool) $existing->is_third_schedule;
+                }
+                $existing->update($updateData);
+                $updated++;
+                $product = $existing;
+            } else {
+                [$newType, $newRate] = $resolveTax(null, null);
+                $createData = [
+                    'company_id' => $companyId,
+                    'name' => $name,
+                    'default_price' => $price,
+                    'hs_code' => $hsCode,
+                    'sku' => $sku,
+                    'barcode' => $barcode,
+                    'uom' => $uom !== '' ? $uom : 'U',
+                    'tax_type' => $newType ?? 'taxable',
+                    'default_tax_rate' => $newRate ?? 18,
+                    'is_active' => true,
+                    'show_on_sale' => true, // explicit — never trust the DB default (prod drift)
+                ];
+                if ($hasThirdCol) {
+                    $createData['is_third_schedule'] = $thirdSchedule === true;
+                }
+                $product = Product::create($createData);
+                $added++;
+            }
+
+            // Keep maps fresh so later rows in the same file match this product.
+            if ($barcode !== null) $byBarcode[strtolower($barcode)] = $product;
+            if ($sku !== null) $bySku[strtolower($sku)] = $product;
+            $byName[strtolower($name)] = $product;
+        }
+
+        $parts = [];
+        if ($added > 0) $parts[] = __('pos.import_new_products_added', ['count' => $added]);
+        if ($updated > 0) $parts[] = __('pos.import_updated', ['count' => $updated]);
+        if ($samplesSkipped > 0) $parts[] = __('pos.import_sample_rows_skipped', ['count' => $samplesSkipped]);
+        if ($skipped > 0) $parts[] = __('pos.import_rows_skipped', ['count' => $skipped]);
+        $msg = $parts ? implode(', ', $parts) . '.' : __('pos.import_no_rows');
+        if (!empty($errors)) $msg .= __('pos.import_issues', ['issues' => implode('; ', array_slice($errors, 0, 5))]) . (count($errors) > 5 ? __('pos.import_more_suffix', ['count' => count($errors) - 5]) : '');
+
+        if ($added === 0 && $updated === 0) {
+            return back()->with('error', $msg);
+        }
+        return back()->with('success', $msg);
+    }
+
+    private function readFbrImportRowsExcel(string $path): array
+    {
+        $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($path);
+        $reader->setReadDataOnly(true);
+        $spreadsheet = $reader->load($path);
+        $sheet = $spreadsheet->getActiveSheet();
+
+        // Row-cap BEFORE materializing the sheet — a 5MB xlsx can hold hundreds of
+        // thousands of rows (zip compression); toArray() on that would OOM shared
+        // cPanel PHP before the post-parse count check ever ran.
+        if ($sheet->getHighestDataRow() > 5001) {
+            $spreadsheet->disconnectWorksheets();
+            return array_fill(0, 5002, []); // triggers the friendly >5000 error upstream
+        }
+
+        $rows = $sheet->toArray(null, true, false, false);
+        $spreadsheet->disconnectWorksheets();
+        return $rows;
+    }
+
+    private function readFbrImportRowsCsv(string $path): array
+    {
+        $handle = fopen($path, 'r');
+        if (!$handle) throw new \RuntimeException('Could not open file');
+
+        // Excel (regional settings) sometimes saves CSV with ; or TAB — auto-detect
+        // from the header line instead of assuming comma.
+        $firstLine = fgets($handle) ?: '';
+        $delims = [',' => substr_count($firstLine, ','), ';' => substr_count($firstLine, ';'), "\t" => substr_count($firstLine, "\t")];
+        arsort($delims);
+        $delim = array_key_first($delims);
+        if ($delims[$delim] === 0) $delim = ',';
+        rewind($handle);
+
+        $rows = [];
+        while (($data = fgetcsv($handle, 0, $delim)) !== false) {
+            $rows[] = $data;
+            if (count($rows) > 5002) break;
+        }
+        fclose($handle);
+        return $rows;
+    }
+
+    // "Rs 1,200", "1200.50", "16%" → float; anything non-numeric → null.
+    private function cleanFbrImportNumber($raw): ?float
+    {
+        if (is_int($raw) || is_float($raw)) return (float) $raw;
+        $s = trim((string) $raw);
+        if ($s === '') return null;
+        $s = str_ireplace(['rs.', 'rs', 'pkr', '%'], '', $s);
+        $s = str_replace([',', ' '], '', $s);
+        if (!is_numeric($s)) return null;
+        return (float) $s;
+    }
+
+    // SKU/Barcode/HS-code cleaner: Excel numeric cells arrive as floats
+    // (8964000112345.0) and CSV round-trips arrive as scientific notation
+    // ("8.964E+12") — both restored to plain digit strings. Empty → null
+    // (never overwrite with blank).
+    private function cleanFbrImportCode($raw): ?string
+    {
+        if ($raw === null) return null;
+        if (is_int($raw)) return (string) $raw;
+        if (is_float($raw)) {
+            // Whole number → plain digits (barcodes); fractional → keep decimals
+            // (HS codes like 3401.1100 must never truncate to "3401").
+            return floor($raw) == $raw
+                ? sprintf('%.0f', $raw)
+                : rtrim(rtrim(sprintf('%.4f', $raw), '0'), '.');
+        }
+        $s = trim((string) $raw);
+        if ($s === '') return null;
+        if (preg_match('/^\d+(\.\d+)?E\+?\d+$/i', $s)) return sprintf('%.0f', (float) $s);
+        if (preg_match('/^\d+\.0+$/', $s)) return preg_replace('/\.0+$/', '', $s);
+        return $s;
+    }
+
+    private function findFbrColumn(array $header, array $names): int|false
+    {
+        foreach ($names as $name) {
+            $idx = array_search($name, $header);
+            if ($idx !== false) return $idx;
+        }
+        return false;
+    }
+
     public function searchProducts(Request $request)
     {
         $companyId = app('currentCompanyId');

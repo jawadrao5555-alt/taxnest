@@ -28,6 +28,8 @@ class AdminSettingsController extends Controller
         'payment_instructions',
         'pos_app_latest_version',
         'di_app_latest_version',
+        'ai_reader_model',
+        'ai_reader_model_strong',
     ];
 
     public function index()
@@ -75,6 +77,11 @@ class AdminSettingsController extends Controller
             // their version is lower. Also gates the downloads-page DI card and
             // in-panel nudge — leave empty until owner has phone-tested the APK.
             'di_app_latest_version'  => ['nullable', 'string', 'max:20', 'regex:/^\d+(\.\d+)*$/'],
+            // AI Reader (invoice photo/PDF OCR) model overrides. Empty primary
+            // model = built-in default; empty strong model = auto-retry
+            // escalation disabled. Model ids only (letters/digits . _ -).
+            'ai_reader_model'        => ['nullable', 'string', 'max:100', 'regex:/^[A-Za-z0-9._\-]+$/'],
+            'ai_reader_model_strong' => ['nullable', 'string', 'max:100', 'regex:/^[A-Za-z0-9._\-]+$/'],
         ]);
 
         // Normalise the WhatsApp number to digits only (country code + number, no +).

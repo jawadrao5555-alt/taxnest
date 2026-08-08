@@ -3349,7 +3349,10 @@ class FbrPosController extends Controller
             });
         }
         $products = $query->orderBy('name')->paginate(20);
-        return view('fbr-pos.products', compact('products', 'search'));
+        // Usage-vs-cap banner (Task 362): visibility for shops at/over their
+        // plan's product cap (e.g. after a downgrade). null = unlimited.
+        $productLimitStatus = \App\Services\PlanLimitService::productLimitStatus($companyId, 'fbr');
+        return view('fbr-pos.products', compact('products', 'search', 'productLimitStatus'));
     }
 
     public function createProduct()
@@ -4497,6 +4500,23 @@ class FbrPosController extends Controller
         // with different typed names would otherwise take different per-name locks and
         // both insert. Quick-create is rare enough that a per-company section is free.
         // MySQL-only; the sqlite test env skips the lock (single-connection).
+        // Subscription access gate (Task 362 review): the route deliberately has
+        // no plan.limit middleware (the middleware 403s the whole request at cap,
+        // breaking dedupe/reprice of EXISTING products for at-cap shops), so the
+        // middleware's Step-1 access check is applied here instead — suspended/
+        // expired/trial-ended shops are blocked before ANY write or dedupe read.
+        // FAIL CLOSED: no exception swallowing. The only pass-through is the
+        // narrow schema-compat guard for minimal test schemas.
+        if (\Illuminate\Support\Facades\Schema::hasTable('subscriptions')) {
+            $accessCompany = Company::find($companyId);
+            if ($accessCompany) {
+                $access = \App\Services\SubscriptionAccessService::hasAccess($accessCompany);
+                if (!$access['allowed']) {
+                    return response()->json(['ok' => false, 'error' => $access['reason']], 403);
+                }
+            }
+        }
+
         $lockName  = 'qc_prod_' . $companyId;
         $usingLock = DB::getDriverName() === 'mysql';
         $gotLock   = false;
@@ -4581,19 +4601,41 @@ class FbrPosController extends Controller
                     ],
                 ]);
             }
-            $product = Product::create([
-                'company_id'       => $companyId,
-                'name'             => $name,
-                'barcode'          => $barcode,
-                'default_price'    => $data['price'] ?? 0,
-                'default_tax_rate' => $taxRate,
-                'tax_type'         => $taxType,
-                'uom'              => $data['uom'] ?? 'U',
-                'hs_code'          => isset($data['hs_code']) ? (trim((string) $data['hs_code']) ?: null) : null,
-                'sku'              => 'QC-' . substr((string) time(), -6) . '-' . strtoupper(substr(uniqid(), -3)),
-                'is_price_editable'=> true,
-                'is_active'        => true,
-            ]);
+            // Plan product cap (Task 362): checked HERE — after dedupe/edit-mode —
+            // so an at-cap shop can still scan/reprice EXISTING products via the
+            // quick popup; only a genuinely NEW row is blocked. (The route-level
+            // plan.limit middleware was removed for exactly this reason.)
+            // 🔒 ATOMIC QUOTA ADMISSION (same pattern as importProducts): count +
+            // insert run in ONE transaction under a company-row lock — the named
+            // GET_LOCK above only covers MySQL; this holds on every driver.
+            try {
+                $product = DB::transaction(function () use ($companyId, $name, $barcode, $data, $taxRate, $taxType) {
+                    Company::where('id', $companyId)->lockForUpdate()->get();
+                    $remaining = \App\Services\PlanLimitService::remainingProductAllowance($companyId, 'fbr');
+                    if ($remaining !== null && $remaining <= 0) {
+                        throw new \App\Exceptions\PlanLimitReachedException();
+                    }
+                    return Product::create([
+                        'company_id'       => $companyId,
+                        'name'             => $name,
+                        'barcode'          => $barcode,
+                        'default_price'    => $data['price'] ?? 0,
+                        'default_tax_rate' => $taxRate,
+                        'tax_type'         => $taxType,
+                        'uom'              => $data['uom'] ?? 'U',
+                        'hs_code'          => isset($data['hs_code']) ? (trim((string) $data['hs_code']) ?: null) : null,
+                        'sku'              => 'QC-' . substr((string) time(), -6) . '-' . strtoupper(substr(uniqid(), -3)),
+                        'is_price_editable'=> true,
+                        'is_active'        => true,
+                    ]);
+                });
+            } catch (\App\Exceptions\PlanLimitReachedException $e) {
+                return response()->json([
+                    'ok' => false,
+                    'error' => __('pos.product_limit_reached_error'),
+                    'reason' => 'plan_limit',
+                ], 403);
+            }
             return response()->json([
                 'ok' => true,
                 'product' => [

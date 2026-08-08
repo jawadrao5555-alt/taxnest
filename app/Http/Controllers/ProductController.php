@@ -25,7 +25,10 @@ class ProductController extends Controller
         }
 
         $products = $query->orderBy('name')->paginate(20);
-        return view('products.index', compact('products', 'search'));
+        // Usage-vs-cap banner (Task 362): visibility for companies at/over their
+        // plan's product cap (e.g. after a downgrade). null = unlimited.
+        $productLimitStatus = \App\Services\PlanLimitService::productLimitStatus((int) $companyId, 'fbr');
+        return view('products.index', compact('products', 'search', 'productLimitStatus'));
     }
 
     public function create()
@@ -205,16 +208,46 @@ class ProductController extends Controller
 
         $companyId = app('currentCompanyId');
 
-        $product = Product::create([
-            'company_id' => $companyId,
-            'name' => $request->name,
-            'hs_code' => $request->hs_code,
-            'default_price' => $request->default_price ?? 0,
-            'uom' => $request->uom ?? 'Numbers, pieces, units',
-            'schedule_type' => $request->schedule_type ?? 'standard',
-            'default_tax_rate' => $request->default_tax_rate ?? 18,
-            'is_active' => true,
-        ]);
+        // Subscription access gate (Task 362 review): this route has NO
+        // plan.limit middleware, so the middleware's Step-1 access check is
+        // applied here — suspended/expired/trial-ended companies are blocked.
+        // FAIL CLOSED; the only pass-through is the schema-compat guard.
+        if (\Illuminate\Support\Facades\Schema::hasTable('subscriptions')) {
+            $accessCompany = \App\Models\Company::find($companyId);
+            if ($accessCompany) {
+                $access = \App\Services\SubscriptionAccessService::hasAccess($accessCompany);
+                if (!$access['allowed']) {
+                    return response()->json(['error' => $access['reason'], 'message' => $access['reason']], 403);
+                }
+            }
+        }
+
+        // Plan product cap (Task 362): enforce the same cap as products.store.
+        // 🔒 ATOMIC QUOTA ADMISSION (import pattern): count + insert in ONE
+        // transaction under a company-row lock — concurrent quick-creates at
+        // the last free slot serialize and can never exceed the cap.
+        try {
+            $product = \Illuminate\Support\Facades\DB::transaction(function () use ($companyId, $request) {
+                \App\Models\Company::where('id', $companyId)->lockForUpdate()->get();
+                $remaining = \App\Services\PlanLimitService::remainingProductAllowance($companyId, 'fbr');
+                if ($remaining !== null && $remaining <= 0) {
+                    throw new \App\Exceptions\PlanLimitReachedException();
+                }
+                return Product::create([
+                    'company_id' => $companyId,
+                    'name' => $request->name,
+                    'hs_code' => $request->hs_code,
+                    'default_price' => $request->default_price ?? 0,
+                    'uom' => $request->uom ?? 'Numbers, pieces, units',
+                    'schedule_type' => $request->schedule_type ?? 'standard',
+                    'default_tax_rate' => $request->default_tax_rate ?? 18,
+                    'is_active' => true,
+                ]);
+            });
+        } catch (\App\Exceptions\PlanLimitReachedException $e) {
+            $msg = 'Product limit reached for your plan. Please upgrade your subscription to add more products.';
+            return response()->json(['error' => $msg, 'message' => $msg], 403);
+        }
 
         return response()->json([
             'id' => $product->id,

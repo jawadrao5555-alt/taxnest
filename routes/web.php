@@ -1247,7 +1247,10 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/api/customer-addresses', [PosController::class, 'apiCustomerAddresses'])->name('fbrpos.api.customer-addresses');
     Route::post('/api/customer-addresses', [PosController::class, 'apiStoreCustomerAddress'])->name('fbrpos.api.customer-addresses.store');
     Route::post('/api/customer-addresses/delete', [PosController::class, 'apiDeleteCustomerAddress'])->name('fbrpos.api.customer-addresses.delete');
-    Route::post('/api/products/quick-create', [FbrPosController::class, 'apiQuickCreateProduct'])->name('fbrpos.api.products.quick-create')->middleware('plan.limit:products');
+    // NO plan.limit middleware (Task 362): the middleware would 403 the whole
+    // request at cap, breaking dedupe/barcode-rescue of EXISTING products for
+    // at-cap shops. The controller enforces the cap on genuinely NEW rows only.
+    Route::post('/api/products/quick-create', [FbrPosController::class, 'apiQuickCreateProduct'])->name('fbrpos.api.products.quick-create');
     Route::post('/api/products/{id}/quick-price', [FbrPosController::class, 'apiQuickUpdatePrice'])->name('fbrpos.api.products.quick-price');
 
     // -------------------------------------------------------- Phase 2: Mall-Grade Universal Features --------------------------------------------------------

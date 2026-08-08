@@ -111,18 +111,22 @@ args = "env -u DATABASE_URL -u DB_CONNECTION -u PGHOST -u PGPORT -u PGUSER -u PG
 
 [[ports]]
 localPort = 5000
-externalPort = 80
+externalPort = 5000
 
 [[ports]]
 localPort = 9000
 externalPort = 9000
+
+[[ports]]
+localPort = 23636
+externalPort = 80
 
 [nix]
 channel = "stable-25_05"
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["php", "-S", "0.0.0.0:5000", "replit-holding/server.php"]
+run = ["php", "-S", "0.0.0.0:23636", "replit-holding/server.php"]
 build = ["bash", "-c", "echo 'holding page: no build needed'"]
 
 [postMerge]

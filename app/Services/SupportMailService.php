@@ -78,6 +78,32 @@ class SupportMailService
         return $this->client;
     }
 
+    /**
+     * Scheduled health probe: attempt an IMAP connect so SupportMailHealth is
+     * recorded proactively (banner appears/clears) even when nobody opens the
+     * Support Inbox. client() already calls recordFailure/recordSuccess.
+     * Returns true on successful connect, false on failure. Never throws.
+     */
+    public function probeConnection(): bool
+    {
+        if (! $this->isConfigured()) {
+            return false; // not configured — no health bookkeeping either way
+        }
+        try {
+            $client = $this->client();
+        } catch (\Throwable $e) {
+            return false; // failure already recorded by client()
+        }
+        try {
+            $client->disconnect();
+        } catch (\Throwable $e) {
+            // best-effort cleanup
+        }
+        $this->client = null;
+
+        return true;
+    }
+
     /** Resolve the real IMAP folder for a logical box: 'inbox' or 'sent'. */
     protected function folder(string $box)
     {

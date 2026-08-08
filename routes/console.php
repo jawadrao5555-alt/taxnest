@@ -65,6 +65,21 @@ Schedule::call(function () {
     }
 })->everyFifteenMinutes()->name('heartbeat-watchdog');
 
+// Support-mailbox health probe: try an IMAP connect every 15 min so the admin
+// banner appears/clears proactively even when nobody opens the Support Inbox.
+// Only runs when SUPPORT_MAIL_PASSWORD is configured; the service records
+// SupportMailHealth failure/success internally and this never throws.
+Schedule::call(function () {
+    try {
+        $svc = app(\App\Services\SupportMailService::class);
+        if ($svc->isConfigured()) {
+            $svc->probeConnection();
+        }
+    } catch (\Throwable $e) {
+        \Illuminate\Support\Facades\Log::warning('Support mailbox health probe failed unexpectedly', ['error' => $e->getMessage()]);
+    }
+})->everyFifteenMinutes()->name('support-mail-health-probe');
+
 // Fix C: withoutOverlapping(120) — prevents a second queue:work from picking up a
 // new dispatch while the job is still running (live cache store = database, which
 // supports locks via cache_locks table, so no Redis needed).

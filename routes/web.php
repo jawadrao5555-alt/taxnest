@@ -1104,6 +1104,12 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/settings/smtp', [AdminSettingsController::class, 'updateSmtp'])->name('saas.admin.settings.smtp');
     Route::get('/audit-logs', [AdminAuditController::class, 'index'])->name('saas.admin.audit');
 
+    // Support Inbox — support@taxnest.com.pk (super admin only, guarded in controller)
+    Route::get('/support-inbox', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'index'])->name('saas.admin.support-inbox');
+    Route::post('/support-inbox/send', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'send'])->middleware('throttle:20,1')->name('saas.admin.support-inbox.send');
+    Route::get('/support-inbox/{box}/{uid}', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'show'])->name('saas.admin.support-inbox.show');
+    Route::get('/support-inbox/{box}/{uid}/attachment/{index}', [\App\Http\Controllers\SaasAdmin\SupportInboxController::class, 'attachment'])->name('saas.admin.support-inbox.attachment');
+
     // Payment proof verification queue
     Route::get('/payment-proofs', [AdminPaymentProofController::class, 'index'])->name('saas.admin.payment-proofs');
     Route::get('/payment-proofs/{id}/download', [AdminPaymentProofController::class, 'download'])->name('saas.admin.payment-proofs.download');

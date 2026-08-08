@@ -186,6 +186,17 @@
                     Support &amp; Payment
                 </a>
 
+                @if((auth('admin')->user()->role ?? null) === 'super_admin')
+                <a href="{{ route('saas.admin.support-inbox') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm {{ str_starts_with($current, 'saas.admin.support-inbox') ? 'admin-active-link font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200' }} transition">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    Support Inbox
+                    @php $siUnread = \App\Services\SupportMailService::cachedUnreadCount(); @endphp
+                    @if($siUnread > 0)
+                        <span class="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">{{ $siUnread }}</span>
+                    @endif
+                </a>
+                @endif
+
                 <a href="{{ route('saas.admin.audit') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm {{ $current === 'saas.admin.audit' ? 'admin-active-link font-medium' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200' }} transition">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                     Audit Logs

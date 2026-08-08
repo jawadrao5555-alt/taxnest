@@ -141,14 +141,28 @@ class SupportMailService
 
         return [
             'uid' => $msg->getUid(),
-            'subject' => (string) ($msg->getSubject() ?? '(no subject)'),
-            'from_name' => $from->personal ?? '',
+            'subject' => $this->decodeHeader((string) ($msg->getSubject() ?? '(no subject)')),
+            'from_name' => $this->decodeHeader((string) ($from->personal ?? '')),
             'from_email' => $from->mail ?? '',
             'to_email' => $to->mail ?? '',
             'date' => $date,
             'seen' => $msg->hasFlag('Seen'),
             'has_attachments' => (bool) $msg->hasAttachments(),
         ];
+    }
+
+    /** Decode RFC2047 encoded-word headers (=?UTF-8?B?...?=) to plain UTF-8. */
+    protected function decodeHeader(string $value): string
+    {
+        if ($value === '' || ! str_contains($value, '=?')) {
+            return $value;
+        }
+        try {
+            $decoded = mb_decode_mimeheader($value);
+            return $decoded !== false && $decoded !== '' ? $decoded : $value;
+        } catch (\Throwable $e) {
+            return $value;
+        }
     }
 
     /** Fetch a message by UID or throw a friendly RuntimeException. */

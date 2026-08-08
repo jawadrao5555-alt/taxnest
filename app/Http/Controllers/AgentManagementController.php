@@ -249,6 +249,18 @@ class AgentManagementController extends Controller
             ->sortByDesc('size')
             ->first();
 
+        // Requested type missing on the latest release (e.g. zip-only release,
+        // exe requested)? Serve the OTHER GitHub asset rather than the local
+        // fallback file — the local copy goes stale the moment a new release
+        // ships (it served an old build after v1.6.2, which had no exe).
+        if (!$asset) {
+            $other = $needle === '.exe' ? '.zip' : '.exe';
+            $asset = collect($assets['assets'])
+                ->filter(fn($a) => str_ends_with(strtolower($a['name']), $other))
+                ->sortByDesc('size')
+                ->first();
+        }
+
         if ($asset) {
             return redirect()->away($asset['url']);
         }

@@ -331,6 +331,48 @@ class PlanLimitService
         return ['allowed' => true, 'remaining' => $limit - $count];
     }
 
+    /**
+     * Remaining product-creation allowance for bulk import (Task: Excel import
+     * must not blow past the plan's product cap). Mirrors CheckPlanLimit's
+     * 'products'/'pos_products' semantics exactly:
+     *   - lifetime/temporary/grace overrides → unlimited (middleware bypass)
+     *   - no active subscription / no plan   → unlimited (middleware passes)
+     *   - max_products NULL or negative      → unlimited (-1 convention)
+     *   - else limit − current ACTIVE count (floored at 0)
+     * $catalog: 'pos' counts pos_products, 'fbr' counts products.
+     * Returns null = unlimited, otherwise remaining creates allowed.
+     */
+    public static function remainingProductAllowance(int $companyId, string $catalog): ?int
+    {
+        // Narrow schema-compat guard ONLY (minimal test schemas without plan
+        // tables). Any real evaluation failure below propagates — fail closed,
+        // never a silent "unlimited".
+        if (!\Illuminate\Support\Facades\Schema::hasTable('subscriptions')
+            || !\Illuminate\Support\Facades\Schema::hasTable('pricing_plans')) {
+            return null;
+        }
+
+        $company = \App\Models\Company::find($companyId);
+        if ($company) {
+            $access = \App\Services\SubscriptionAccessService::hasAccess($company);
+            if (in_array($access['override'] ?? null, ['lifetime', 'temporary', 'grace'], true)) {
+                return null;
+            }
+        }
+
+        $sub = self::getActiveSubscription($companyId);
+        $plan = $sub?->pricingPlan;
+        if (!$plan || $plan->max_products === null || (int) $plan->max_products < 0) {
+            return null;
+        }
+
+        $current = $catalog === 'pos'
+            ? \App\Models\PosProduct::where('company_id', $companyId)->where('is_active', true)->count()
+            : \App\Models\Product::where('company_id', $companyId)->where('is_active', true)->count();
+
+        return max(0, (int) $plan->max_products - $current);
+    }
+
     public static function getEffectiveLimits(int $companyId): array
     {
         $company = \App\Models\Company::find($companyId);

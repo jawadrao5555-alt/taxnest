@@ -344,6 +344,23 @@ class PlanLimitService
      */
     public static function remainingProductAllowance(int $companyId, string $catalog): ?int
     {
+        $status = self::productLimitStatus($companyId, $catalog);
+        if ($status === null) {
+            return null;
+        }
+        return max(0, $status['limit'] - $status['used']);
+    }
+
+    /**
+     * Full product usage-vs-cap status for banners + create-path gates
+     * (Task: shops over their cap after a downgrade need visibility and
+     * consistent enforcement). Same semantics as remainingProductAllowance:
+     * null = unlimited (override / no plan / negative-or-NULL max_products);
+     * otherwise ['limit' => cap, 'used' => active count, 'over' => used > cap].
+     * $catalog: 'pos' counts pos_products, 'fbr' counts products.
+     */
+    public static function productLimitStatus(int $companyId, string $catalog): ?array
+    {
         // Narrow schema-compat guard ONLY (minimal test schemas without plan
         // tables). Any real evaluation failure below propagates — fail closed,
         // never a silent "unlimited".
@@ -370,7 +387,11 @@ class PlanLimitService
             ? \App\Models\PosProduct::where('company_id', $companyId)->where('is_active', true)->count()
             : \App\Models\Product::where('company_id', $companyId)->where('is_active', true)->count();
 
-        return max(0, (int) $plan->max_products - $current);
+        return [
+            'limit' => (int) $plan->max_products,
+            'used'  => $current,
+            'over'  => $current > (int) $plan->max_products,
+        ];
     }
 
     public static function getEffectiveLimits(int $companyId): array

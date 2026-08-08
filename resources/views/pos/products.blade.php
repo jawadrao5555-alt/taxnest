@@ -12,6 +12,24 @@
         </div>
     </div>
 
+    {{-- Plan product usage vs cap (Task 362): visibility for at-cap / over-cap shops (e.g. after a downgrade) --}}
+    @if(!empty($productLimitStatus))
+        @if($productLimitStatus['over'])
+        <div class="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-300 rounded-lg px-4 py-3 text-sm">
+            <span class="font-semibold">{{ __('pos.product_limit_usage', ['used' => $productLimitStatus['used'], 'limit' => $productLimitStatus['limit']]) }}</span><br>
+            {{ __('pos.product_limit_over_cap', ['used' => $productLimitStatus['used'], 'limit' => $productLimitStatus['limit']]) }}
+        </div>
+        @elseif($productLimitStatus['used'] >= $productLimitStatus['limit'])
+        <div class="mb-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-amber-800 dark:text-amber-300 rounded-lg px-4 py-3 text-sm">
+            {{ __('pos.product_limit_at_cap', ['used' => $productLimitStatus['used'], 'limit' => $productLimitStatus['limit']]) }}
+        </div>
+        @else
+        <div class="mb-4 text-xs text-gray-500 dark:text-gray-400">
+            {{ __('pos.product_limit_usage', ['used' => $productLimitStatus['used'], 'limit' => $productLimitStatus['limit']]) }}
+        </div>
+        @endif
+    @endif
+
     @if(session('success'))
     <div class="mb-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 rounded-lg px-4 py-3 text-sm">{{ session('success') }}</div>
     @endif

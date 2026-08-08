@@ -5989,7 +5989,10 @@ class PosController extends Controller
             }
             usort($existingRecipes, fn($a, $b) => strcasecmp($a['product_name'], $b['product_name']));
         }
-        return view('pos.products', compact('products', 'posType', 'categoryFields', 'ingredients', 'existingRecipes', 'company'));
+        // Usage-vs-cap banner (Task 362): visibility for shops at/over their
+        // plan's product cap (e.g. after a downgrade). null = unlimited.
+        $productLimitStatus = \App\Services\PlanLimitService::productLimitStatus($companyId, 'pos');
+        return view('pos.products', compact('products', 'posType', 'categoryFields', 'ingredients', 'existingRecipes', 'company', 'productLimitStatus'));
     }
 
     /**
@@ -6025,19 +6028,51 @@ class PosController extends Controller
         if ($name === '') {
             return response()->json(['ok' => false, 'error' => 'Name required'], 422);
         }
-        $product = PosProduct::create([
-            'company_id'    => $companyId,
-            'name'          => $name,
-            'price'         => $data['price'] ?? 0,
-            'cost_price'    => $data['cost_price'] ?? 0,
-            'tax_rate'      => 0,
-            'is_active'     => true,
-            'is_tax_exempt' => false,
-            'show_on_sale'  => true, // explicit — never trust the DB default (prod drift)
-            'category'      => 'Quick',
-            'sku'           => 'QC-' . substr((string) time(), -6) . '-' . strtoupper(substr(uniqid(), -3)),
-            'uom'           => 'NOS',
-        ]);
+        // Subscription access gate (Task 362): this route has NO plan.limit
+        // middleware, so the middleware's Step-1 access check is applied here —
+        // suspended/expired/trial-ended shops are blocked before any write.
+        // FAIL CLOSED; the only pass-through is the schema-compat guard.
+        if (\Illuminate\Support\Facades\Schema::hasTable('subscriptions')) {
+            $access = \App\Services\SubscriptionAccessService::hasAccess($company);
+            if (!$access['allowed']) {
+                return response()->json(['ok' => false, 'error' => $access['reason']], 403);
+            }
+        }
+        // Plan product cap (Task 362): this route has NO plan.limit middleware —
+        // without this gate an at-cap (or over-cap after downgrade) shop could
+        // keep adding products one-by-one from the sale screen.
+        // 🔒 ATOMIC QUOTA ADMISSION (same pattern as importProducts): allowance
+        // count + insert run in ONE transaction under a company-row lock, so two
+        // simultaneous quick-creates at the last free slot serialize — the
+        // second recounts AFTER the first commits and can never exceed the cap.
+        try {
+            $product = DB::transaction(function () use ($companyId, $name, $data) {
+                Company::where('id', $companyId)->lockForUpdate()->get();
+                $remaining = \App\Services\PlanLimitService::remainingProductAllowance($companyId, 'pos');
+                if ($remaining !== null && $remaining <= 0) {
+                    throw new \App\Exceptions\PlanLimitReachedException();
+                }
+                return PosProduct::create([
+                    'company_id'    => $companyId,
+                    'name'          => $name,
+                    'price'         => $data['price'] ?? 0,
+                    'cost_price'    => $data['cost_price'] ?? 0,
+                    'tax_rate'      => 0,
+                    'is_active'     => true,
+                    'is_tax_exempt' => false,
+                    'show_on_sale'  => true, // explicit — never trust the DB default (prod drift)
+                    'category'      => 'Quick',
+                    'sku'           => 'QC-' . substr((string) time(), -6) . '-' . strtoupper(substr(uniqid(), -3)),
+                    'uom'           => 'NOS',
+                ]);
+            });
+        } catch (\App\Exceptions\PlanLimitReachedException $e) {
+            return response()->json([
+                'ok' => false,
+                'error' => __('pos.product_limit_reached_error'),
+                'reason' => 'plan_limit',
+            ], 403);
+        }
         return response()->json([
             'ok' => true,
             'product' => [

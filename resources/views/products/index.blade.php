@@ -14,6 +14,24 @@
                 </div>
             @endif
 
+            {{-- Plan product usage vs cap (Task 362): visibility for at-cap / over-cap companies (e.g. after a downgrade) --}}
+            @if(!empty($productLimitStatus))
+                @if($productLimitStatus['over'])
+                <div class="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 rounded-xl text-sm">
+                    <span class="font-semibold">Products: {{ $productLimitStatus['used'] }} of {{ $productLimitStatus['limit'] }} allowed on your plan.</span><br>
+                    Your account has {{ $productLimitStatus['used'] }} products but your current plan allows {{ $productLimitStatus['limit'] }}. Existing products keep working, but new products cannot be added until you upgrade your plan or deactivate extra products.
+                </div>
+                @elseif($productLimitStatus['used'] >= $productLimitStatus['limit'])
+                <div class="mb-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-amber-800 dark:text-amber-300 rounded-xl text-sm">
+                    You have reached your plan's product limit ({{ $productLimitStatus['used'] }}/{{ $productLimitStatus['limit'] }}). Upgrade your plan to add more products.
+                </div>
+                @else
+                <div class="mb-4 text-xs text-gray-500 dark:text-gray-400">
+                    Products: {{ $productLimitStatus['used'] }} of {{ $productLimitStatus['limit'] }} used on your plan
+                </div>
+                @endif
+            @endif
+
             <div class="mb-6">
                 <form method="GET" action="/products" class="flex flex-col sm:flex-row gap-3">
                     <input type="text" name="search" value="{{ $search }}" placeholder="Search by name, HS code, PCT code, or schedule type..." class="flex-1 rounded-lg bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">

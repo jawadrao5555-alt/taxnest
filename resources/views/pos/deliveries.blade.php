@@ -261,9 +261,14 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                     @forelse($bills as $b)
-                    <tr data-delrow data-search="{{ Str::lower(($b->invoice_number ?: ('#' . $b->id)) . ' ' . ($b->customer_name ?? '') . ' ' . ($b->customer_phone ?? '') . ' ' . ($b->delivery_address ?? '') . ' ' . ($b->rider->name ?? '') . ' ' . ($b->delivery_status ?? '')) }}">
+                    <tr data-delrow data-search="{{ Str::lower(($b->invoice_number ?: ('#' . $b->id)) . ' ' . ($b->customer_name ?? '') . ' ' . ($b->customer_phone ?? '') . ' ' . ($b->delivery_address ?? '') . ' ' . ($b->rider->name ?? '') . ' ' . ($b->delivery_status ?? '') . ' ' . ($b->isLocalBill() ? 'local' : 'pra')) }}">
                         <td class="px-4 py-3">
-                            <div class="font-semibold text-gray-900 dark:text-white">{{ $b->invoice_number ?: ('#' . $b->id) }}</div>
+                            <div class="font-semibold text-gray-900 dark:text-white flex items-center gap-1.5 flex-wrap">
+                                <span>{{ $b->invoice_number ?: ('#' . $b->id) }}</span>
+                                {{-- Task 353 (ZFC): Local vs PRA stream chip — same colors as
+                                     customer-history (amber = local/provisional, blue = PRA). --}}
+                                <span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold {{ $b->isLocalBill() ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' }}">{{ $b->isLocalBill() ? __('pos.local_word') : __('pos.pra_word') }}</span>
+                            </div>
                             {{-- Pending tab ab HAR tareekh ke khule bills dikhata hai (7 Aug 2026) —
                                  purane bill par tareekh + "X din se pending" ka laal chip. --}}
                             @php $billAgeDays = (int) floor(abs(now()->diffInHours(\Carbon\Carbon::parse($b->rider_assigned_at ?: $b->created_at))) / 24); @endphp

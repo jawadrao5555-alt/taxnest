@@ -54,6 +54,54 @@ class PosRiderController extends Controller
         return Schema::hasTable('pos_riders') && Schema::hasColumn('pos_transactions', 'rider_id');
     }
 
+    // ─── Billing Scope stream lock (Task 353) ──────────────────────────────
+    // Stream-locked staff (pos_cashier/pos_manager with pos_billing_scope
+    // 'local' or 'pra') may see and act on ONLY their own stream's delivery
+    // bills. Predicate mirrors PosController::applyReportFilters /
+    // billingScopeAllowsRow exactly: LOCAL = invoice_mode='local' OR
+    // (NULL pra_status AND NULL pra_invoice_number); everything else = PRA.
+    // 'both' (default, owner/admin, pos_delivery) stays stream-agnostic.
+
+    private function billingScope(): string
+    {
+        return auth('pos')->user()?->posBillingScope() ?? 'both';
+    }
+
+    /** Constrain a pos_transactions query to the current user's stream. */
+    private function applyStreamScope($q)
+    {
+        $scope = $this->billingScope();
+        if ($scope === 'local') {
+            $q->where(function ($s) {
+                $s->where('invoice_mode', 'local')
+                  ->orWhere(function ($s2) {
+                      $s2->whereNull('pra_status')->whereNull('pra_invoice_number');
+                  });
+            });
+        } elseif ($scope === 'pra') {
+            $q->where(function ($s) {
+                $s->where(function ($s2) {
+                    $s2->where('invoice_mode', '!=', 'local')->orWhereNull('invoice_mode');
+                })->where(function ($s2) {
+                    $s2->whereNotNull('pra_status')->orWhereNotNull('pra_invoice_number');
+                });
+            });
+        }
+        return $q;
+    }
+
+    /** Row-level guard for single-bill mutations — mirrors billingScopeAllowsRow. */
+    private function streamScopeAllowsTxn(PosTransaction $txn): bool
+    {
+        $scope = $this->billingScope();
+        if ($scope === 'both') {
+            return true;
+        }
+        $isLocal = $txn->invoice_mode === 'local'
+            || ($txn->pra_status === null && $txn->pra_invoice_number === null);
+        return $scope === 'local' ? $isLocal : !$isLocal;
+    }
+
     // ─── Riders CRUD (PosAdminOnly-wrapped routes) ─────────────────────────
 
     public function index()
@@ -256,6 +304,8 @@ class PosRiderController extends Controller
             ->whereIn('status', ['completed'])
             ->with('rider')
             ->orderByDesc('id');
+        // Task 353: stream-locked staff see only their own stream's bills.
+        $this->applyStreamScope($billQuery);
 
         if ($hasBizDate) {
             $billQuery->where('business_date', $businessDate);
@@ -282,8 +332,9 @@ class PosRiderController extends Controller
             ->whereIn('status', ['completed'])
             ->whereIn('delivery_status', ['assigned', 'dispatched'])
             ->with('rider')
-            ->orderBy(DB::raw($assignedTsExpr))
-            ->get();
+            ->orderBy(DB::raw($assignedTsExpr));
+        $this->applyStreamScope($openBillsAll);
+        $openBillsAll = $openBillsAll->get();
 
         // Tab counts (computed on the collections — single DB round-trip each).
         $tabCounts = [
@@ -326,14 +377,17 @@ class PosRiderController extends Controller
             ->orderBy('name')->get();
 
         // Khata per rider — open cash bills (ALL dates, not just the picked day).
-        $khataBills = PosTransaction::withoutGlobalScope('hide_archived')
+        // Task 353: stream-scoped so a stream-locked manager never sees (or
+        // settles) the other stream's cash; owner/admin ('both') sees all —
+        // no rider cash is ever stranded.
+        $khataBills = $this->applyStreamScope(PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->whereIn('rider_id', $riders->pluck('id'))
             ->where('payment_method', 'cash')
             ->whereNull('rider_settlement_id')
             ->where(function ($q) {
                 $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
-            })
+            }))
             ->orderBy('created_at')
             ->get()
             ->groupBy('rider_id');
@@ -341,11 +395,11 @@ class PosRiderController extends Controller
         // Open (assigned/dispatched, unsettled) delivery counts per rider — ALL
         // dates, any payment method — powers the bulk "All Delivered / All
         // Returned" buttons on rider cards (customer request Jul 2026).
-        $openDeliveryCounts = PosTransaction::withoutGlobalScope('hide_archived')
+        $openDeliveryCounts = $this->applyStreamScope(PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->whereIn('rider_id', $riders->pluck('id'))
             ->whereNull('rider_settlement_id')
-            ->whereIn('delivery_status', ['assigned', 'dispatched'])
+            ->whereIn('delivery_status', ['assigned', 'dispatched']))
             ->selectRaw('rider_id, COUNT(*) as c')
             ->groupBy('rider_id')
             ->pluck('c', 'rider_id');
@@ -353,11 +407,11 @@ class PosRiderController extends Controller
         // Oldest open delivery per rider (owner, 7 Aug 2026): card par numayan ho
         // ke kis rider ka bill kitne DIN se latka hua hai. COALESCE: pre-migration
         // rows may lack rider_assigned_at.
-        $openDeliveryOldest = PosTransaction::withoutGlobalScope('hide_archived')
+        $openDeliveryOldest = $this->applyStreamScope(PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->whereIn('rider_id', $riders->pluck('id'))
             ->whereNull('rider_settlement_id')
-            ->whereIn('delivery_status', ['assigned', 'dispatched'])
+            ->whereIn('delivery_status', ['assigned', 'dispatched']))
             ->selectRaw("rider_id, MIN({$assignedTsExpr}) as oldest")
             ->groupBy('rider_id')
             ->pluck('oldest', 'rider_id')
@@ -396,6 +450,11 @@ class PosRiderController extends Controller
         $companyId = app('currentCompanyId');
         $txn = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)->findOrFail($txnId);
+
+        // Task 353: stream-locked staff cannot touch the other stream's bills.
+        if (!$this->streamScopeAllowsTxn($txn)) {
+            abort(403);
+        }
 
         if ($txn->rider_settlement_id) {
             return back()->with('error', 'This bill is already settled — rider cannot be changed.');
@@ -451,6 +510,11 @@ class PosRiderController extends Controller
 
         $txn = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)->whereNotNull('rider_id')->findOrFail($txnId);
+
+        // Task 353: stream-locked staff cannot touch the other stream's bills.
+        if (!$this->streamScopeAllowsTxn($txn)) {
+            abort(403);
+        }
 
         if ($txn->rider_settlement_id) {
             return $this->statusError($request, 'This bill is already settled — status is locked.');
@@ -508,11 +572,12 @@ class PosRiderController extends Controller
         $rider = PosRider::where('company_id', $companyId)->findOrFail($riderId);
         $newStatus = $request->input('delivery_status');
 
-        $count = PosTransaction::withoutGlobalScope('hide_archived')
+        // Task 353: bulk action only touches the current user's own stream.
+        $count = $this->applyStreamScope(PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->where('rider_id', $rider->id)
             ->whereNull('rider_settlement_id')
-            ->whereIn('delivery_status', ['assigned', 'dispatched'])
+            ->whereIn('delivery_status', ['assigned', 'dispatched']))
             ->update(array_merge(
                 ['delivery_status' => $newStatus],
                 // Bulk "All Delivered" bhi duration stamp kare (3 Aug 2026).
@@ -545,14 +610,17 @@ class PosRiderController extends Controller
 
         return DB::transaction(function () use ($request, $rider, $companyId, $settleAll) {
             // Lock + re-verify each bill is genuinely open rider-cash for THIS rider.
-            $query = PosTransaction::withoutGlobalScope('hide_archived')
+            // Task 353: stream-scoped — a stream-locked manager can settle only
+            // his own stream's cash (cross-stream bill_ids silently drop out and
+            // the empty-set guard below rejects the request).
+            $query = $this->applyStreamScope(PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->where('rider_id', $rider->id)
                 ->where('payment_method', 'cash')
                 ->whereNull('rider_settlement_id')
                 ->where(function ($q) {
                     $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
-                });
+                }));
             if (!$settleAll) {
                 $query->whereIn('id', array_map('intval', $request->input('bill_ids')));
             }
@@ -628,6 +696,11 @@ class PosRiderController extends Controller
         $txn = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->findOrFail($txnId);
+
+        // Task 353: stream-locked staff cannot touch the other stream's bills.
+        if (!$this->streamScopeAllowsTxn($txn)) {
+            abort(403);
+        }
 
         // Delivery-context guard — only bills that are actual delivery bills
         // (order_type='delivery' AND rider assigned) may be reclassified.
@@ -725,6 +798,11 @@ class PosRiderController extends Controller
         $txn = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->findOrFail($txnId);
+
+        // Task 353: stream-locked staff cannot touch the other stream's bills.
+        if (!$this->streamScopeAllowsTxn($txn)) {
+            abort(403);
+        }
 
         // Must have been converted via markPrepaid — not an originally prepaid bill.
         if (empty($txn->prepaid_converted_at)) {

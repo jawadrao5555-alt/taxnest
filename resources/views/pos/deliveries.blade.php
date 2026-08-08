@@ -119,7 +119,10 @@
                             <label class="flex items-center gap-3 p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/60 cursor-pointer">
                                 <input type="checkbox" name="bill_ids[]" value="{{ $b->id }}" data-amount="{{ (float) $b->total_amount }}" checked class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
                                 <span class="flex-1 min-w-0">
-                                    <span class="block text-xs font-semibold text-gray-900 dark:text-white truncate">{{ $b->invoice_number ?: ('#' . $b->id) }}</span>
+                                    <span class="flex items-center gap-1.5 min-w-0">
+                                        <span class="block text-xs font-semibold text-gray-900 dark:text-white truncate">{{ $b->invoice_number ?: ('#' . $b->id) }}</span>
+                                        <span class="inline-flex flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold {{ $b->isLocalBill() ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' }}">{{ $b->isLocalBill() ? __('pos.local_word') : __('pos.pra_word') }}</span>
+                                    </span>
                                     <span class="block text-[11px] text-gray-400">{{ $b->created_at->format('d/m h:i A') }}@if($b->customer_name) · {{ $b->customer_name }}@endif</span>
                                 </span>
                                 <span class="text-xs font-bold text-gray-900 dark:text-white">Rs. {{ number_format((float) $b->total_amount) }}</span>

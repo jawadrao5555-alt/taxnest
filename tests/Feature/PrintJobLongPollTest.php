@@ -65,6 +65,9 @@ class PrintJobLongPollTest extends TestCase
         ]);
 
         Cache::flush();
+        // Deployment-tunable cap (config/print.php, default 3 for shared-host
+        // headroom); pin to 10 here so the boundary tests are explicit.
+        config(['print.longpoll_max_holds' => 10, 'print.longpoll_max_wait' => 8]);
     }
 
     private function poll(string $query = ''): \Illuminate\Testing\TestResponse
@@ -148,6 +151,29 @@ class PrintJobLongPollTest extends TestCase
         $r->setAccessible(true);
         $r->invoke($controller, $slots[3]);
         $this->assertNotNull($m->invoke($controller), 'released slot must be reusable');
+    }
+
+    public function test_default_cap_is_conservative_for_shared_hosting(): void
+    {
+        config(['print.longpoll_max_holds' => null]); // fall back to default
+        $controller = app(\App\Http\Controllers\AgentController::class);
+        $m = new \ReflectionMethod($controller, 'acquireLongPollSlot');
+        $m->setAccessible(true);
+        $granted = [];
+        for ($i = 0; $i < 5; $i++) {
+            $granted[] = $m->invoke($controller);
+        }
+        $this->assertCount(3, array_filter($granted), 'default cap must hold at most 3 workers');
+    }
+
+    public function test_wait_zero_config_disables_holding(): void
+    {
+        config(['print.longpoll_max_wait' => 0]);
+        $start = microtime(true);
+        $res = $this->poll('?wait=8');
+        $elapsed = microtime(true) - $start;
+        $res->assertOk()->assertJson(['count' => 0, 'held' => false]);
+        $this->assertLessThan(0.9, $elapsed, 'wait cap 0 must answer instantly (pure short-poll mode)');
     }
 
     public function test_hold_slot_is_released_after_the_hold(): void

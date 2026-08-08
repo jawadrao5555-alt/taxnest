@@ -576,7 +576,7 @@ class AgentController extends Controller
         // response tells the new agent whether the server actually waited —
         // if not (old server / instant answer), the agent adds its own delay
         // so it never tight-loops.
-        $wait = min(max((int) $request->query('wait', 0), 0), 8);
+        $wait = min(max((int) $request->query('wait', 0), 0), max(0, (int) config('print.longpoll_max_wait', 8)));
         // PHP's built-in dev server (artisan serve) handles few/one request(s)
         // at a time — a held long-poll would block the whole dev site. Keep
         // holds very short there; production runs PHP-FPM.
@@ -604,7 +604,7 @@ class AgentController extends Controller
                 // hold strategy needs revisiting before more shops enable it.
                 if (\Illuminate\Support\Facades\Cache::add('print_jobs_longpoll_cap_log', 1, 60)) {
                     \Log::info('PRINT_LONGPOLL cap reached — answering short-poll', [
-                        'max' => self::LONGPOLL_MAX_HOLDS, 'company_id' => $company->id,
+                        'max' => $this->longPollMaxHolds(), 'company_id' => $company->id,
                     ]);
                 }
             } else {
@@ -650,14 +650,22 @@ class AgentController extends Controller
     }
 
     /**
-     * Max concurrent held long-polls across ALL agents. Hardcoded, NOT env()
-     * — live runs config:cache, where env() returns null in the request path
-     * and would silently shrink the cap.
+     * Max concurrent held long-polls across ALL agents — deployment-tunable
+     * via config/print.php (PRINT_LONGPOLL_MAX_HOLDS in .env; read through
+     * config() so it stays correct under config:cache). Default is a very
+     * conservative 3: the shared cPanel host's FPM pool size is not
+     * introspectable, so the cap must sit safely below even small pools and
+     * always leave workers free for normal POS traffic. Agents refused a
+     * hold fall back to a 1.5s short-poll.
      */
-    private const LONGPOLL_MAX_HOLDS = 10;
+    protected function longPollMaxHolds(): int
+    {
+        $v = config('print.longpoll_max_holds', 3);
+        return max(1, is_numeric($v) ? (int) $v : 3);
+    }
 
     /**
-     * Atomically acquire one of the LONGPOLL_MAX_HOLDS hold slots.
+     * Atomically acquire one of the longPollMaxHolds() hold slots.
      * Returns an opaque slot handle, or null when all slots are taken.
      *
      * MySQL: GET_LOCK(name, 0) per slot — atomic across workers, and the
@@ -669,7 +677,7 @@ class AgentController extends Controller
     protected function acquireLongPollSlot(): ?string
     {
         if (DB::connection()->getDriverName() === 'mysql') {
-            for ($i = 0; $i < self::LONGPOLL_MAX_HOLDS; $i++) {
+            for ($i = 0; $i < $this->longPollMaxHolds(); $i++) {
                 $name = 'taxnest_print_longpoll_' . $i;
                 try {
                     $row = DB::selectOne('SELECT GET_LOCK(?, 0) AS l', [$name]);
@@ -682,7 +690,7 @@ class AgentController extends Controller
             }
             return null;
         }
-        for ($i = 0; $i < self::LONGPOLL_MAX_HOLDS; $i++) {
+        for ($i = 0; $i < $this->longPollMaxHolds(); $i++) {
             $key = 'print_jobs_longpoll_slot_' . $i;
             if (\Illuminate\Support\Facades\Cache::add($key, 1, 15)) {
                 return $key;

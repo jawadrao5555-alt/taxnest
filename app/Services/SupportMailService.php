@@ -23,6 +23,14 @@ class SupportMailService
 {
     public const UNREAD_CACHE_KEY = 'support_inbox_unread_count';
 
+    /** Seconds a cached message-list page stays fresh (poll throttle for IMAP). */
+    public const LIST_CACHE_TTL = 45;
+
+    protected static function listCacheKey(string $box, int $page): string
+    {
+        return "support_inbox_list_{$box}_p{$page}";
+    }
+
     protected ?Client $client = null;
 
     public function isConfigured(): bool
@@ -120,12 +128,52 @@ class SupportMailService
             }
         }
 
-        return [
+        $result = [
             'messages' => $rows,
             'total' => $total,
             'page' => $page,
             'last_page' => max(1, (int) ceil($total / $perPage)),
         ];
+
+        // Keep polling cheap: pollers reuse this snapshot instead of re-hitting IMAP.
+        try {
+            Cache::put(self::listCacheKey($box, $page), $result, self::LIST_CACHE_TTL);
+        } catch (\Throwable $e) {
+            // cache is best-effort
+        }
+
+        return $result;
+    }
+
+    /**
+     * Cached wrapper around listMessages() for the auto-refresh poller.
+     * Serves the cached page when fresh (<= LIST_CACHE_TTL seconds old) so
+     * repeated polls do NOT open a new IMAP fetch every time.
+     */
+    public function listMessagesCached(string $box = 'inbox', int $page = 1): array
+    {
+        try {
+            $cached = Cache::get(self::listCacheKey($box, $page));
+        } catch (\Throwable $e) {
+            $cached = null;
+        }
+        if (is_array($cached) && isset($cached['messages'])) {
+            return $cached;
+        }
+
+        return $this->listMessages($box, $page);
+    }
+
+    /** Drop cached list pages for a box so the next poll refetches from IMAP. */
+    public static function forgetListCache(string $box, int $pages = 3): void
+    {
+        try {
+            for ($p = 1; $p <= $pages; $p++) {
+                Cache::forget(self::listCacheKey($box, $p));
+            }
+        } catch (\Throwable $e) {
+            // best-effort
+        }
     }
 
     protected function summarize($msg): array
@@ -200,6 +248,7 @@ class SupportMailService
             try {
                 $msg->setFlag('Seen');
                 Cache::forget(self::UNREAD_CACHE_KEY);
+                self::forgetListCache('inbox');
             } catch (\Throwable $e) {
             }
         }
@@ -295,6 +344,7 @@ class SupportMailService
         } catch (\Throwable $e) {
             Log::warning('Support inbox: could not append to IMAP Sent folder: '.$e->getMessage());
         }
+        self::forgetListCache('sent');
     }
 
     /** Cached unread badge (never hits IMAP from layout/sidebar). */

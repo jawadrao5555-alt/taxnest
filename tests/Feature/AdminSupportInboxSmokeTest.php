@@ -76,6 +76,36 @@ class AdminSupportInboxSmokeTest extends TestCase
         $res->assertOk()->assertSee('Support Inbox')->assertSee('Login masla')->assertSee('Ali Khan');
     }
 
+    public function test_poll_returns_fingerprint_and_list_html(): void
+    {
+        $this->mock(SupportMailService::class, function ($m) {
+            $m->shouldReceive('isConfigured')->andReturn(true);
+            $m->shouldReceive('listMessagesCached')->with('inbox', 1)->andReturn($this->sampleList());
+        });
+
+        $res = $this->actingAsSuperAdmin()->getJson('/admin/support-inbox/poll');
+        $res->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonStructure(['ok', 'fingerprint', 'unread', 'html']);
+        $this->assertStringContainsString('Login masla', $res->json('html'));
+    }
+
+    public function test_poll_returns_503_when_imap_down(): void
+    {
+        $this->mock(SupportMailService::class, function ($m) {
+            $m->shouldReceive('isConfigured')->andReturn(true);
+            $m->shouldReceive('listMessagesCached')->andThrow(new \RuntimeException('IMAP down'));
+        });
+
+        $this->actingAsSuperAdmin()->getJson('/admin/support-inbox/poll')->assertStatus(503);
+    }
+
+    public function test_poll_forbidden_for_non_super_admin(): void
+    {
+        $this->actingAs(AdminUser::where('role', 'viewer')->first(), 'admin')
+            ->getJson('/admin/support-inbox/poll')->assertStatus(403);
+    }
+
     public function test_sent_tab_uses_sent_box(): void
     {
         $this->mock(SupportMailService::class, function ($m) {

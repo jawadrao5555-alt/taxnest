@@ -56,6 +56,44 @@ class SupportInboxController extends Controller
         ]);
     }
 
+    /**
+     * Auto-refresh poll: returns the rendered message list + a fingerprint so
+     * the page only swaps the DOM when something actually changed. Backed by
+     * the service's short list cache — polls do NOT hammer IMAP.
+     */
+    public function poll(Request $request)
+    {
+        $this->guardSuperAdmin();
+        $tab = $request->query('tab') === 'sent' ? 'sent' : 'inbox';
+        $page = max(1, (int) $request->query('page', 1));
+
+        if (! $this->mail->isConfigured()) {
+            return response()->json(['ok' => false], 503);
+        }
+        try {
+            $list = $this->mail->listMessagesCached($tab, $page);
+        } catch (\RuntimeException $e) {
+            // Transient IMAP hiccup — keep the current list on screen.
+            return response()->json(['ok' => false], 503);
+        }
+
+        $fingerprint = md5(json_encode(array_map(
+            fn ($m) => [$m['uid'], (bool) $m['seen']],
+            $list['messages']
+        )).'|'.$list['total']);
+
+        return response()->json([
+            'ok' => true,
+            'fingerprint' => $fingerprint,
+            'unread' => SupportMailService::cachedUnreadCount(),
+            'html' => view('saas-admin.support-inbox._list', [
+                'tab' => $tab,
+                'list' => $list,
+                'error' => null,
+            ])->render(),
+        ]);
+    }
+
     public function show(Request $request, string $box, int $uid)
     {
         $this->guardSuperAdmin();

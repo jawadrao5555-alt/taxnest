@@ -47,26 +47,8 @@
         <a href="{{ route('saas.admin.support-inbox', ['tab' => $tab]) }}" class="ml-auto px-3 py-1.5 rounded-lg text-sm bg-gray-800 text-gray-400 hover:text-gray-200" title="Refresh">&#8635; Refresh</a>
     </div>
 
-    <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-        @forelse($list['messages'] as $m)
-            <a href="{{ route('saas.admin.support-inbox.show', ['box' => $tab, 'uid' => $m['uid']]) }}"
-               class="flex items-center gap-3 px-4 py-3 border-b border-gray-800 last:border-0 hover:bg-gray-800/60 transition {{ (! $m['seen'] && $tab === 'inbox') ? 'bg-gray-800/30' : '' }}">
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2">
-                        <span class="text-sm truncate {{ (! $m['seen'] && $tab === 'inbox') ? 'font-bold text-white' : 'text-gray-300' }}">
-                            {{ $tab === 'sent' ? ($m['to_email'] ?: '(unknown)') : ($m['from_name'] ?: $m['from_email'] ?: '(unknown)') }}
-                        </span>
-                        @if($m['has_attachments'])<span class="text-gray-500 text-xs">&#128206;</span>@endif
-                    </div>
-                    <p class="text-sm truncate {{ (! $m['seen'] && $tab === 'inbox') ? 'font-semibold text-gray-200' : 'text-gray-500' }}">{{ $m['subject'] }}</p>
-                </div>
-                <span class="text-xs text-gray-500 whitespace-nowrap">{{ $m['date'] ? $m['date']->format('d M Y, h:i A') : '' }}</span>
-            </a>
-        @empty
-            <div class="px-4 py-10 text-center text-sm text-gray-500">
-                {{ $error ? 'Mailbox load nahi ho saki.' : 'Koi email nahi.' }}
-            </div>
-        @endforelse
+    <div id="si-message-list" class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+        @include('saas-admin.support-inbox._list', ['tab' => $tab, 'list' => $list, 'error' => $error])
     </div>
 
     @if($list['last_page'] > 1)
@@ -82,5 +64,46 @@
             </div>
         </div>
     @endif
+
+    <script>
+    (function () {
+        var listEl = document.getElementById('si-message-list');
+        if (!listEl) return;
+        @php $siPollUrl = route('saas.admin.support-inbox.poll', ['tab' => $tab, 'page' => $list['page']], false); @endphp
+        var url = {!! json_encode($siPollUrl) !!};
+        var fingerprint = null; // learned from the first poll (server is the source of truth)
+        var inFlight = false;
+
+        function poll() {
+            if (document.hidden || inFlight) return;
+            inFlight = true;
+            fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (d) {
+                    if (!d || !d.ok || !d.fingerprint) return;
+                    if (fingerprint !== null && d.fingerprint !== fingerprint && typeof d.html === 'string') {
+                        listEl.innerHTML = d.html;
+                    }
+                    fingerprint = d.fingerprint;
+                    // Keep the sidebar badge in sync too (same payload, free).
+                    var badge = document.getElementById('si-unread-badge');
+                    if (badge && typeof d.unread !== 'undefined') {
+                        var n = parseInt(d.unread, 10) || 0;
+                        if (n > 0) { badge.textContent = n; badge.style.display = ''; }
+                        else { badge.textContent = ''; badge.style.display = 'none'; }
+                    }
+                })
+                .catch(function () {})
+                .finally(function () { inFlight = false; });
+        }
+
+        setInterval(poll, 30000);
+        // Refresh promptly when the admin returns to the tab.
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) poll();
+        });
+        poll(); // learn the initial fingerprint right away
+    })();
+    </script>
 </div>
 </x-admin-layout>

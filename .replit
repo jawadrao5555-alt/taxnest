@@ -111,15 +111,11 @@ args = "env -u DATABASE_URL -u DB_CONNECTION -u PGHOST -u PGPORT -u PGUSER -u PG
 
 [[ports]]
 localPort = 5000
-externalPort = 5000
+externalPort = 80
 
 [[ports]]
 localPort = 9000
 externalPort = 9000
-
-[[ports]]
-localPort = 23636
-externalPort = 80
 
 [nix]
 channel = "stable-25_05"

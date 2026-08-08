@@ -499,7 +499,7 @@
             @endphp
             <tr>
                 <td class="col-item">
-                    {{ $item->item_name }}@if($showTaxLines && $item->is_tax_exempt)<span class="exempt-tag">NT</span>@endif
+                    {{ $item->item_name }}@if($showTaxLines && $item->is_third_schedule)<span class="exempt-tag">3rd Sch</span>@elseif($showTaxLines && $item->is_tax_exempt)<span class="exempt-tag">NT</span>@endif
                 </td>
                 <td class="col-qty">{{ rtrim(rtrim(number_format($item->quantity, 2, '.', ''), '0'), '.') ?: '0' }}</td>
                 <td class="col-rate">{{ number_format($lineRate, 0) }}</td>

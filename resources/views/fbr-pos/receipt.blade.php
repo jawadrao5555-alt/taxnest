@@ -73,6 +73,7 @@
         .items-table th { font-size: 10px; text-transform: uppercase; border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 3px 1px; text-align: left; font-weight: bold; color: #000; }
         .items-table td { font-size: 11px; padding: 3px 1px; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; color: #000; font-weight: 600; }
         .items-table .col-item { width: 38%; text-align: left; }
+        .tsch-tag { font-size: 0.75em; font-weight: bold; color: #000; border: 1px solid #000; padding: 0 2px; margin-left: 2px; vertical-align: middle; white-space: nowrap; }
         .items-table .col-uom { width: 10%; text-align: center; }
         .items-table .col-qty { width: 10%; text-align: center; }
         .items-table .col-price { width: 20%; text-align: right; }
@@ -297,7 +298,7 @@
             @endphp
             @foreach($transaction->items as $item)
             <tr>
-                <td class="col-item">{{ $item->item_name }}</td>
+                <td class="col-item">{{ $item->item_name }}@if($item->is_third_schedule)<span class="tsch-tag">3rd Sch</span>@endif</td>
                 <td class="col-uom">{{ $item->uom ?? 'U' }}</td>
                 <td class="col-qty">{{ $fmtQty($item->quantity) }}</td>
                 <td class="col-price">{{ number_format($item->unit_price, 0) }}</td>

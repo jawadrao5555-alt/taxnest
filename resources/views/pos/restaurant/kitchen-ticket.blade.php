@@ -215,9 +215,9 @@
                  Banner kept for manual full re-sends (non-delta) only. --}}
             <p class="text-sm bold" style="color:#000; font-weight:900;">{{ __('pos.kot_reprint_banner', ['n' => $order->kot_print_count]) }}</p>
         @endif
-        @if($order->priority ?? false)
-            <p class="priority-badge mt-1">{{ __('pos.kot_rush') }}</p>
-        @endif
+        {{-- 10 Aug 2026 (Pizza Master photo): URGENT top se hata kar neeche footer
+             lines ke saath chhota sa — paper aur kam lage; render site is below,
+             beside the order-by line. --}}
         <p class="text-xl bold mt-1">*** {{ strtoupper($stationLabel ?? __('pos.kot_kitchen')) }} ***</p>
         {{-- Order Matching (Aug 2026): same number on KOT + customer receipt so
              counter staff can pair a ready order with the customer's bill.
@@ -360,6 +360,12 @@
         {{-- 9 Aug 2026 (E-ICEBLUE video): one line instead of two — paper saving. --}}
         <p>{{ __('pos.kot_order_by') }} {{ $order->creator->name ?? __('pos.kot_staff') }} &mdash; {{ __('pos.kot_items_count', ['count' => $kotRows->count()]) }}, {{ __('pos.kot_total_qty') }} {{ $kotQty == intval($kotQty) ? intval($kotQty) : number_format($kotQty, 2) }}</p>
     </div>
+    @endif
+    {{-- URGENT/RUSH (10 Aug 2026, Pizza Master): owner ki explicit farmaish — top ki
+         bajaye NEECHE footer lines ke paas chhota sa. Deliberately OUTSIDE the
+         kot_show_orderby toggle so hiding the order-by line can never hide URGENT. --}}
+    @if($order->priority ?? false)
+    <div class="text-center"><span class="priority-badge">{{ __('pos.kot_rush') }}</span></div>
     @endif
 
     @if($kotShowBarcode)

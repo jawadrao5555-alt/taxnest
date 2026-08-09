@@ -1,0 +1,57 @@
+{
+  "slug": "suggestion-box",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Feature Suggestion Box — Apni Raye Seedha Hum Tak",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": { "heading": "Feature Suggestion Box", "sub": "Apni zaroorat batayen · Zyada demand wala feature pehle banta hai" },
+      "narration": "अस्सलामु अलैकुम! नेस्ट पी ओ एस आप जैसे दुकानदारों के मशवरों से ही बेहतर होता है। अगर आप को कोई feature चाहिए — तो suggestion box में लिख भेजें, बात सीधी हमारी team तक पहुंचती है। आइए देखें कैसे।",
+      "minMs": 5500
+    },
+    {
+      "id": "s02_open_page",
+      "narration": "menu से Suggestions के page पर आएं। ऊपर सादा सा form है — title और तफ़सील। नीचे वो suggestions नज़र आती हैं जो दूसरे दुकानदार भेज चुके हैं।",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 700 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 40 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
+        { "do": "click", "selector": "form[action*='login'] button[type=submit]", "after": 1500 },
+        { "do": "goto", "url": "/pos/suggestions" },
+        { "do": "wait", "ms": 2000 },
+        { "do": "highlight", "selector": "input[name='title']", "after": 2000 }
+      ]
+    },
+    {
+      "id": "s03_write",
+      "narration": "मसलन हमें chahiye के bill पर दुकान का logo भी छपे। title में लिखें — Receipt par logo। तफ़सील में अपनी ज़रूरत खुल कर लिखें — जितनी साफ़ बात, उतना जल्दी अमल।",
+      "actions": [
+        { "do": "type", "selector": "input[name='title']", "text": "Receipt par shop ka logo", "delay": 60, "after": 800 },
+        { "do": "type", "selector": "textarea[name='details']", "text": "Thermal receipt ke top par hamari dukan ka logo print hona chahiye, taake bill professional lagay.", "delay": 30, "after": 1500 }
+      ]
+    },
+    {
+      "id": "s04_submit",
+      "narration": "और भेज दें। बस — आप की बात record हो गई। एक user दिन में दस suggestions तक भेज सकता है।",
+      "actions": [
+        { "do": "click", "selector": "form[action*='suggestions'] button[type=submit]", "after": 3000 },
+        { "do": "wait", "ms": 2000 }
+      ]
+    },
+    {
+      "id": "s05_demand",
+      "narration": "और ये है असल कमाल — जब एक ही जैसी बात कई दुकानदार भेजते हैं, तो वो zyada demand बन जाती है। हमारा उसूल सीधा है — जो feature ज़्यादा دکاندار मांगें, वो पहले बनता है। तो आप की एक suggestion सिर्फ़ आप का नहीं, सब का फ़ायदा करती है।",
+      "actions": [
+        { "do": "scroll", "selector": "body", "after": 1500 },
+        { "do": "wait", "ms": 3000 }
+      ]
+    },
+    {
+      "id": "s06_outro",
+      "card": { "heading": "Shukriya!", "sub": "Aap ki raye = agla feature" },
+      "narration": "तो जब भी काम करते हुए ख़याल आए के — काश ये भी होता — फ़ौरन suggestion box में लिख दें। हो सकता है अगली update में वही feature आप को मिल जाए। शुक्रिया!",
+      "minMs": 5000
+    }
+  ]
+}

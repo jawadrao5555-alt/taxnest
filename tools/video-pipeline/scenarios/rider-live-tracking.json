@@ -1,0 +1,61 @@
+{
+  "slug": "rider-live-tracking",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Rider Live Tracking — Har Rider Naqshay Par",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": { "heading": "Rider Live Tracking", "sub": "Rider naqshay par · Route ka trail · Dukan ka location" },
+      "narration": "अस्सलामु अलैकुम! delivery का order निकल गया — मगर rider कहां पहुंचा? گا ہَک का phone आ रहा है और आप को कुछ पता नहीं। नेस्ट पी ओ एस का live tracking ये मसला हमेशा के लिए हल कर देता है — हर rider नक़्शे पर, आप की आंखों के सामने। आइए देखें।",
+      "minMs": 6500
+    },
+    {
+      "id": "s02_map",
+      "narration": "menu से Rider Tracking खोलें — सामने शहर का नक़्शा, और उस पर आप के riders। कौन duty पर है, आख़िरी location कब आई — सब एक नज़र में।",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 700 },
+        { "do": "type", "selector": "#login", "text": "videoresto@nestpos.pk", "delay": 40 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
+        { "do": "click", "selector": "form[action*='login'] button[type=submit]", "after": 1500 },
+        { "do": "goto", "url": "/pos/riders/tracking" },
+        { "do": "waitFor", "selector": "#rt-map" },
+        { "do": "wait", "ms": 3500 },
+        { "do": "highlight", "selector": "#rt-map", "after": 2500 }
+      ]
+    },
+    {
+      "id": "s03_select_rider",
+      "narration": "बाईं तरफ़ riders की list है। Imran Ali पर click करें — नक़्शा उसी पर focus हो जाता है, और उस का पूरा route trail बन कर नज़र आता है — कहां कहां से गुज़रा, कितनी देर पहले। अब گا ہَک पूछे तो जवाब हाज़िर — भाई, rider बस पहुंचने वाला है।",
+      "actions": [
+        { "do": "highlight", "selector": "button[\\@click=\"selectRider(r)\"] >> nth=0", "after": 2000 },
+        { "do": "click", "selector": "button[\\@click=\"selectRider(r)\"] >> nth=0", "after": 3000 },
+        { "do": "wait", "ms": 3000 },
+        { "do": "highlight", "selector": "#rt-map", "after": 2500 }
+      ]
+    },
+    {
+      "id": "s04_shop_location",
+      "narration": "यहां से आप अपनी dukan का location भी set कर सकते हैं — Set Shop दबाएं और नक़्शे पर अपनी jagah चुन लें। फिर हर rider का फ़ासला दुकान से नापा जाता है।",
+      "actions": [
+        { "do": "click", "selector": "button[\\@click=\"toggleSetShop()\"]", "after": 2500 },
+        { "do": "wait", "ms": 2000 },
+        { "do": "click", "selector": "button[\\@click=\"cancelSetShop()\"]", "after": 1500 }
+      ]
+    },
+    {
+      "id": "s05_how_it_works",
+      "narration": "ये सब चलता कैसे है? riders के mobile में नेस्ट पी ओ एस की rider app होती है — jab rider duty पर हो, app ख़ुद location भेजती रहती है। rider duty ख़त्म करे तो tracking भी बंद — privacy का पूरा ख़याल। ये feature Unlimited plan के साथ मिलता है।",
+      "actions": [
+        { "do": "highlight", "selector": "button[\\@click=\"load()\"]", "after": 2500 },
+        { "do": "wait", "ms": 3500 }
+      ]
+    },
+    {
+      "id": "s06_outro",
+      "card": { "heading": "Shukriya!", "sub": "Delivery Riders ki video bhi zaroor dekhen" },
+      "narration": "तो अब rider कहां है — ये सवाल कभी परेशान नहीं करेगा। delivery riders और khata settlement की video भी ज़रूर देखें। शुक्रिया!",
+      "minMs": 5000
+    }
+  ]
+}

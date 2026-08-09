@@ -1,0 +1,69 @@
+{
+  "slug": "reports-tax-guide",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Reports aur Tax Report — Karobar ki Poori Tasveer",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": { "heading": "Reports aur Tax Report", "sub": "Sale ka tajzia · Category & time trends · Tax ka hisaab" },
+      "narration": "अस्सलामु अलैकुम! आज हम नेस्ट पी ओ एस की reports समझेंगे — कौन सी cheez ज़्यादा बिकती है, किस वक़्त rush होता है, और tax का hisaab कैसे निकलता है। ये वो screen है जो आप के karobar की पूरी तस्वीर दिखाती है।",
+      "minMs": 6000
+    },
+    {
+      "id": "s02_reports_open",
+      "narration": "menu से Reports के page पर आएं। ऊपर तारीख़ चुनने की सहूलत है — आज, पिछले सात दिन, पूरा महीना — जो चाहें। नीचे कुल sale, bill गिनती, और average का ख़ुलासा।",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 700 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 40 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
+        { "do": "click", "selector": "form[action*='login'] button[type=submit]", "after": 1500 },
+        { "do": "goto", "url": "/pos/reports" },
+        { "do": "wait", "ms": 2500 },
+        { "do": "highlight", "selector": "input[name='from']", "after": 2500 }
+      ]
+    },
+    {
+      "id": "s03_category_pie",
+      "narration": "नीचे आएं — ये chart बताता है के किस category ने कितनी sale दी। एक नज़र में पता चल जाता है के दुकान असल में किस cheez से चलती है।",
+      "actions": [
+        { "do": "scroll", "selector": "#raCategoryPie", "after": 2000 },
+        { "do": "highlight", "selector": "#raCategoryPie", "after": 3500 }
+      ]
+    },
+    {
+      "id": "s04_trend_hourly",
+      "narration": "साथ ही रोज़ाना का trend — कौन सा दिन कमज़ोर गया, कौन सा अच्छा। और ये hourly chart तो बड़े काम की cheez है — किस वक़्त rush होता है। staff की duty उसी hisaab से रखें।",
+      "actions": [
+        { "do": "highlight", "selector": "#raDailyTrend", "after": 3000 },
+        { "do": "scroll", "selector": "#raHourly", "after": 1500 },
+        { "do": "highlight", "selector": "#raHourly", "after": 3000 }
+      ]
+    },
+    {
+      "id": "s05_tax_reports",
+      "narration": "अब tax का hisaab — menu से Tax Reports खोलें। यहां हर bill का tax, rate के hisaab से अलग अलग नज़र आता है। ऊपर से period चुनें — मसलन ये महीना — और चाहें तो सिर्फ़ एक tax rate की items देखें।",
+      "actions": [
+        { "do": "goto", "url": "/pos/tax-reports" },
+        { "do": "wait", "ms": 2500 },
+        { "do": "highlight", "selector": "#taxReportForm", "after": 3000 },
+        { "do": "highlight", "selector": "select[name='tax_rate']", "after": 2500 }
+      ]
+    },
+    {
+      "id": "s06_export",
+      "narration": "और सब से ज़रूरी — ये पूरा hisaab CSV या PDF में download हो जाता है। अपने accountant या tax consultant को भेज दें — महीने का record तैयार। और जिन दुकानों पर PRA reporting चालू है, उन्हें यहां PRA bills का अलग tab भी मिलता है।",
+      "actions": [
+        { "do": "scroll", "selector": "a:has-text('CSV')", "after": 1500 },
+        { "do": "highlight", "selector": "a:has-text('CSV')", "after": 2500 },
+        { "do": "wait", "ms": 2000 }
+      ]
+    },
+    {
+      "id": "s07_outro",
+      "card": { "heading": "Shukriya!", "sub": "Roz 2 minute reports dekhen — karobar par grip rakhen" },
+      "narration": "तो ये थीं आप की reports — sale का tajzia भी और tax का hisaab भी। रोज़ सिर्फ़ दो minute reports देख लिया करें, karobar पर grip कभी कमज़ोर नहीं होगी। शुक्रिया!",
+      "minMs": 5500
+    }
+  ]
+}

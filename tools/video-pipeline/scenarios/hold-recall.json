@@ -1,0 +1,74 @@
+{
+  "slug": "hold-recall",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Bill Hold aur Recall — Rukay Huay Bill Sambhalen",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": { "heading": "Bill Hold aur Recall", "sub": "Bill roken · Doosra گاہک nimtayen · Wapas bulayen" },
+      "narration": "अस्सलामु अलैकुम! दुकान पर अक्सर ऐसा होता है — एक گا ہَک का bill बन रहा है और उसे कुछ और सामान याद आ जाता है, या पीछे rush लग जाता है। ऐसे में bill hold कर दें, दूसरे گا ہَک को निमटाएं, और फिर पहला bill वापस बुला लें। आइए देखते हैं।",
+      "minMs": 6000
+    },
+    {
+      "id": "s02_first_bill",
+      "narration": "sale screen पर पहले گا ہَک का bill बन रहा है — cheeni, cooking oil, और doodh। इतने में گا ہَک कहता है — भाई, aata भी लेना है, ज़रा देख कर आता हूं। अब counter ख़ाली नहीं रोक सकते।",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 700 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 40 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
+        { "do": "click", "selector": "form[action*='login'] button[type=submit]", "after": 1500 },
+        { "do": "goto", "url": "/pos/invoice/create" },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "wait", "ms": 1500 },
+        { "do": "click", "selector": ".prod-card:has-text('Cheeni 1kg')", "after": 1000 },
+        { "do": "click", "selector": ".prod-card:has-text('Cooking Oil 1L')", "after": 1000 },
+        { "do": "click", "selector": ".prod-card:has-text('Doodh 1L')", "after": 1500 }
+      ]
+    },
+    {
+      "id": "s03_hold",
+      "narration": "अब Hold का बटन दबाएं — या keyboard से सिर्फ़ F5। bill مح़फ़ूज़ हो गया और screen ख़ाली — अगले گا ہَک के लिए बिल्कुल तैयार।",
+      "actions": [
+        { "do": "highlight", "selector": "button[\\@click=\"holdOrder()\"]", "after": 2000 },
+        { "do": "click", "selector": "button[\\@click=\"holdOrder()\"]", "after": 2500 },
+        { "do": "wait", "ms": 1500 }
+      ]
+    },
+    {
+      "id": "s04_second_customer",
+      "narration": "दूसरा گا ہَک आया — सिर्फ़ एक Pepsi और chips। फटाफट bill बनाएं, CASH दबाएं — और वो अपनी राह लगा।",
+      "actions": [
+        { "do": "click", "selector": ".prod-card:has-text('Pepsi 1.5L')", "after": 1000 },
+        { "do": "click", "selector": ".prod-card:has-text('Lays Chips')", "after": 1500 },
+        { "do": "click", "selector": "button.bg-purple-600:has-text('CASH')", "after": 3000 },
+        { "do": "press", "selector": "body", "key": "Escape", "after": 1200 }
+      ]
+    },
+    {
+      "id": "s05_recall",
+      "narration": "पहला گا ہَک aata ले कर वापस आ गया। ऊपर Held का बटन दबाएं — रुके हुए तमाम bill यहां हैं, वक़्त के साथ। Recall दबाएं — पूरा bill जैसे का तैसा वापस आ गया।",
+      "actions": [
+        { "do": "highlight", "selector": "button[\\@click=\"activeHeldIndex = 0; showHeldOrders = !showHeldOrders\"] >> nth=0", "after": 2000 },
+        { "do": "click", "selector": "button[\\@click=\"activeHeldIndex = 0; showHeldOrders = !showHeldOrders\"] >> nth=0", "after": 2000 },
+        { "do": "wait", "ms": 1500 },
+        { "do": "click", "selector": "div[x-show='showHeldOrders'] button:has-text('Recall')", "after": 2500 }
+      ]
+    },
+    {
+      "id": "s06_finish",
+      "narration": "अब aata भी डाल दें — और CASH। bill मुकम्मल! ना कोई item भूला, ना दोबारा लिखना पड़ा।",
+      "actions": [
+        { "do": "click", "selector": ".prod-card:has-text('Aata 10kg')", "after": 1500 },
+        { "do": "click", "selector": "button.bg-purple-600:has-text('CASH')", "after": 3000 },
+        { "do": "press", "selector": "body", "key": "Escape", "after": 1000 }
+      ]
+    },
+    {
+      "id": "s07_outro",
+      "card": { "heading": "Shukriya!", "sub": "F5 = Hold · Held button = Recall" },
+      "narration": "तो याद रखें — rush में bill hold करें, फ़ारिग़ हो कर recall करें। F5 से hold, और ऊपर Held के बटन से वापसी। keyboard shortcuts की video भी ज़रूर देखें। शुक्रिया!",
+      "minMs": 5000
+    }
+  ]
+}

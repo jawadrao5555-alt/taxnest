@@ -1,0 +1,65 @@
+{
+  "slug": "qr-menu",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "QR Menu — گاہک Khud Menu Dekhe, Apne Mobile Par",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": { "heading": "QR Menu", "sub": "Table par QR lagayen · گاہک mobile par menu dekhe" },
+      "narration": "अस्सलामु अलैकुम! आज कल हर अच्छे restaurant के table पर एक QR code लगा होता है — گا ہَک scan करे और menu उस के mobile पर। नेस्ट पी ओ एस में ये सहूलत built-in है — ना कोई printing का ख़र्चा बार बार, ना पुराने rate की परेशानी। आइए बनाते हैं।",
+      "minMs": 6500
+    },
+    {
+      "id": "s02_profile_page",
+      "narration": "menu से Business Profile खोलें और नीचे आएं — ये है public profile और QR menu का हिस्सा। यहीं से आप की दुकान का अपना web page बनता है।",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 700 },
+        { "do": "type", "selector": "#login", "text": "videoresto@nestpos.pk", "delay": 40 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
+        { "do": "click", "selector": "form[action*='login'] button[type=submit]", "after": 1500 },
+        { "do": "goto", "url": "/pos/business-profile" },
+        { "do": "wait", "ms": 2000 },
+        { "do": "scroll", "selector": "form[action*='public-profile']", "after": 2000 },
+        { "do": "click", "selector": "form[action*='public-profile'] button[type=submit] >> nth=0", "after": 3000 }
+      ]
+    },
+    {
+      "id": "s03_qr_code",
+      "narration": "save करते ही आप का QR code तैयार! यही code print कर के tables पर लगा दें — گا ہَک scan करेगा तो सीधा आप के menu पर पहुंचेगा।",
+      "actions": [
+        { "do": "scroll", "selector": "img[alt*='QR']", "after": 2000 },
+        { "do": "highlight", "selector": "img[alt*='QR']", "after": 3500 }
+      ]
+    },
+    {
+      "id": "s04_menu_selection",
+      "narration": "अब चुनें के menu में क्या क्या दिखाना है — हर item के आगे नन्हा सा check है। जो items चुनेंगे वही گا ہَک को नज़र आएंगे। Save Menu दबा दें।",
+      "actions": [
+        { "do": "scroll", "selector": "button:has-text('Save Menu')", "after": 1500 },
+        { "do": "click", "selector": "input[name='menu_product_ids[]'] >> nth=0", "after": 800 },
+        { "do": "click", "selector": "input[name='menu_product_ids[]'] >> nth=1", "after": 800 },
+        { "do": "click", "selector": "input[name='menu_product_ids[]'] >> nth=2", "after": 800 },
+        { "do": "click", "selector": "input[name='menu_product_ids[]'] >> nth=3", "after": 1200 },
+        { "do": "click", "selector": "button:has-text('Save Menu')", "after": 3000 }
+      ]
+    },
+    {
+      "id": "s05_public_view",
+      "narration": "और अब وہ नज़ारा जो گا ہَک को मिलता है — mobile पर आप का menu, तस्वीर जैसा साफ़ — items, rates, और दुकान की मालूमात। rate बदलें तो menu ख़ुद update — दोबारा printing का कोई ख़र्चा नहीं।",
+      "actions": [
+        { "do": "viewport", "width": 430, "height": 932 },
+        { "do": "eval", "js": "const a = document.querySelector(\"a[href*='/menu/']\"); if (a) location.href = a.href;" },
+        { "do": "wait", "ms": 3000 },
+        { "do": "scroll", "selector": "body", "after": 2000 },
+        { "do": "wait", "ms": 2000 }
+      ]
+    },
+    {
+      "id": "s06_outro",
+      "card": { "heading": "Shukriya!", "sub": "QR print karen, tables par lagayen — bas!" },
+      "narration": "तो बस — QR print करें, tables पर लगाएं, और گا ہَک को modern तजुर्बा दें। ये सहूलत Business Profile के page पर आप का इंतज़ार कर रही है। शुक्रिया!",
+      "minMs": 5000
+    }
+  ]
+}

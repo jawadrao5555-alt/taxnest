@@ -1,0 +1,62 @@
+{
+  "slug": "language-badalna",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Apni Zaban Chunein — English, Roman Urdu, ya Urdu",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": { "heading": "Apni Zaban Chunein", "sub": "English · Roman Urdu · اردو — har user apni pasand" },
+      "narration": "अस्सलामु अलैकुम! नेस्ट पी ओ एस तीन ज़बानों में चलता है — English, Roman Urdu, और ख़ालिस उर्दू rasmul-khat। और सब से अच्छी बात — हर user अपनी अलग ज़बान रख सकता है। आइए देखें।",
+      "minMs": 5500
+    },
+    {
+      "id": "s02_open_menu",
+      "narration": "ऊपर दाईं तरफ़ अपने नाम पर click करें — menu खुलेगा। नीचे Language का हिस्सा है — तीन बटन: Roman Urdu, English, aur Urdu।",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 700 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 40 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
+        { "do": "click", "selector": "form[action*='login'] button[type=submit]", "after": 2000 },
+        { "do": "click", "selector": "button[\\@click=\"profileOpen = !profileOpen; themeOpen = false\"]", "after": 1500 },
+        { "do": "highlight", "selector": "form:has(input[value='rur']) button", "after": 2500 }
+      ]
+    },
+    {
+      "id": "s03_roman_urdu",
+      "narration": "Roman Urdu दबाते ही पूरा system Roman Urdu में — यानी उर्दू के अल्फ़ाज़, English हुरूफ़ में। sale screen देखें — हर बटन, हर label अपनी ज़बान में। नए cashier के लिए ये सब से आसान setting है।",
+      "actions": [
+        { "do": "click", "selector": "form:has(input[value='rur']) button", "after": 2500 },
+        { "do": "goto", "url": "/pos/invoice/create" },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "wait", "ms": 3000 }
+      ]
+    },
+    {
+      "id": "s04_urdu_script",
+      "narration": "और जो साहब ख़ालिस उर्दू पढ़ना पसंद करें — उन के लिए उर्दू rasmul-khat भी है। menu खोल कर اردو का बटन दबाएं — पूरी screen दाएं से बाएं, ख़ूबसूरत उर्दू में।",
+      "actions": [
+        { "do": "goto", "url": "/pos/dashboard" },
+        { "do": "wait", "ms": 1500 },
+        { "do": "click", "selector": "button[\\@click=\"profileOpen = !profileOpen; themeOpen = false\"]", "after": 1500 },
+        { "do": "click", "selector": "form:has(input[value='ur']) button", "after": 2500 },
+        { "do": "wait", "ms": 3000 }
+      ]
+    },
+    {
+      "id": "s05_back_english",
+      "narration": "वापस English पर आना भी उतना ही आसान — वही menu, वही बटन। और याद रहे — ये setting सिर्फ़ आप के अपने login की है। आप English में काम करें, आप का cashier Roman Urdu में — दोनों ख़ुश।",
+      "actions": [
+        { "do": "click", "selector": "button[\\@click=\"profileOpen = !profileOpen; themeOpen = false\"]", "after": 1500 },
+        { "do": "click", "selector": "form:has(input[value='en']) button", "after": 2500 },
+        { "do": "wait", "ms": 2000 }
+      ]
+    },
+    {
+      "id": "s06_outro",
+      "card": { "heading": "Shukriya!", "sub": "Har user apni zaban — apne login se" },
+      "narration": "तो देर किस बात की — अपने नाम पर click करें और अपनी पसंद की ज़बान चुनें। receipt की ज़बान अलग से business settings में मिलती है। शुक्रिया!",
+      "minMs": 5000
+    }
+  ]
+}

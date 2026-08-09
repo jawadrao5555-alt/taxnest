@@ -59,6 +59,10 @@ args = "MySQL Staging"
 task = "workflow.run"
 args = "test"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Video Batch"
+
 [[workflows.workflow]]
 name = "Laravel Server"
 author = "agent"
@@ -103,6 +107,17 @@ isValidation = true
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "env -u DATABASE_URL -u DB_CONNECTION -u PGHOST -u PGPORT -u PGUSER -u PGPASSWORD -u PGDATABASE APP_ENV=testing DB_CONNECTION=sqlite DB_DATABASE=':memory:' CACHE_STORE=array php vendor/bin/phpunit"
+
+[[workflows.workflow]]
+name = "Video Batch"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash tools/video-pipeline/batch-new11.sh"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [[ports]]
 localPort = 5000

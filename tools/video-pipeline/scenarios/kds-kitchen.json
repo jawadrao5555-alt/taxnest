@@ -1,0 +1,79 @@
+{
+  "slug": "kds-kitchen",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Kitchen Display (KDS) — Kitchen ki Apni Screen",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": { "heading": "Kitchen Display — KDS", "sub": "Order seedha kitchen tak · Preparing → Ready · Station filter" },
+      "narration": "अस्सलामु अलैकुम! restaurant में सब से बड़ा मसला — counter से kitchen तक order पहुंचाना। नेस्ट पी ओ एस का Kitchen Display, यानी KDS, ये काम screen पर करता है — ना आवाज़ें, ना परचियों की भाग दौड़। आइए देखें।",
+      "minMs": 6000
+    },
+    {
+      "id": "s02_place_order",
+      "narration": "पहले counter से एक dine-in order लगाते हैं — Dine In चुनें, table T-3, और items — Chicken Tikka और Garlic Naan। अब Kitchen का बटन दबाएं — order सीधा kitchen की screen पर पहुंच गया, और KOT भी print हो सकता है।",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 700 },
+        { "do": "type", "selector": "#login", "text": "videoresto@nestpos.pk", "delay": 40 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
+        { "do": "click", "selector": "form[action*='login'] button[type=submit]", "after": 1500 },
+        { "do": "goto", "url": "/pos/invoice/create" },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "wait", "ms": 1500 },
+        { "do": "click", "selector": "button[\\@click=\"setOrderType('dine_in')\"]", "after": 1500 },
+        { "do": "click", "selector": "button:has-text('T-3') >> nth=0", "after": 1500 },
+        { "do": "click", "selector": ".prod-card:has-text('Chicken Tikka')", "after": 1000 },
+        { "do": "click", "selector": ".prod-card:has-text('Garlic Naan')", "after": 1500 },
+        { "do": "click", "selector": "button[\\@click=\"sendToKitchen()\"]", "after": 3000 }
+      ]
+    },
+    {
+      "id": "s03_kds_screen",
+      "narration": "अब देखें kitchen की screen — menu से KDS खोलें। नया order सामने है — table का number, items, और वक़्त। बावर्ची को सब कुछ साफ़ नज़र आ रहा है।",
+      "actions": [
+        { "do": "goto", "url": "/pos/restaurant/kds" },
+        { "do": "wait", "ms": 2500 },
+        { "do": "highlight", "selector": "div:has-text('T-3') >> nth=-1", "after": 3000 }
+      ]
+    },
+    {
+      "id": "s04_status_flow",
+      "narration": "khana banna शुरू हुआ तो Start Preparing दबाएं — order का रंग बदल गया, counter को भी पता चल गया के काम जारी है। और जब तैयार हो जाए — Mark Ready। waiter को साफ़ नज़र आता है के कौन सा order उठाना है।",
+      "actions": [
+        { "do": "click", "selector": "button:has-text('Start Preparing') >> nth=0", "after": 3000 },
+        { "do": "wait", "ms": 1500 },
+        { "do": "click", "selector": "button:has-text('Mark Ready') >> nth=0", "after": 3000 },
+        { "do": "wait", "ms": 1500 }
+      ]
+    },
+    {
+      "id": "s05_station_filter",
+      "narration": "बड़े kitchen में stations भी बन सकते हैं — मसलन BBQ counter अलग, बाक़ी khana अलग। ऊपर से station चुनें तो सिर्फ़ उसी station के items नज़र आते हैं — हर बावर्ची का अपना काम, अपनी screen।",
+      "actions": [
+        { "do": "highlight", "selector": "select >> nth=0", "after": 2500 },
+        { "do": "select", "selector": "select >> nth=0", "value": { "label": "BBQ Counter" }, "after": 3000 },
+        { "do": "wait", "ms": 2000 }
+      ]
+    },
+    {
+      "id": "s06_kitchen_login",
+      "narration": "और सुनिए — kitchen staff के लिए अलग login भी बनता है। बावर्ची अपनी ID से login करे तो उसे सिर्फ़ KDS नज़र आता है — ना sale, ना reports, ना settings। हर बंदा अपने काम तक।",
+      "actions": [
+        { "do": "clearCookies" },
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 700 },
+        { "do": "type", "selector": "#login", "text": "videokitchen@nestpos.pk", "delay": 40 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
+        { "do": "click", "selector": "form[action*='login'] button[type=submit]", "after": 2500 },
+        { "do": "wait", "ms": 2500 }
+      ]
+    },
+    {
+      "id": "s07_outro",
+      "card": { "heading": "Shukriya!", "sub": "Tables aur Restaurant Mode ki videos bhi dekhen" },
+      "narration": "तो ये था KDS — order counter से सीधा kitchen, status वापस counter तक। tables और restaurant mode की videos भी ज़रूर देखें। शुक्रिया!",
+      "minMs": 5000
+    }
+  ]
+}

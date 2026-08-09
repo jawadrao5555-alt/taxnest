@@ -1,0 +1,65 @@
+{
+  "slug": "keyboard-shortcuts",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Keyboard Shortcuts — Mouse ke Baghair Tez Kaam",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": { "heading": "Keyboard Shortcuts", "sub": "F1 = poori list · Enter se agla qadam · F5, F10, F11" },
+      "narration": "अस्सलामु अलैकुम! तेज़ cashier की पहचान ये है के उस का हाथ mouse पर कम और keyboard पर ज़्यादा रहता है। नेस्ट पी ओ एस में हर ज़रूरी काम का shortcut मौजूद है। आइए सीखते हैं।",
+      "minMs": 5500
+    },
+    {
+      "id": "s02_help_modal",
+      "narration": "sale screen पर F1 दबाएं या ऊपर सवालिया निशान पर click करें — shortcuts की पूरी list सामने आ जाती है। ये list हमेशा यहीं मिलेगी, याद रखने की फ़िक्र ना करें।",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 700 },
+        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 40 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
+        { "do": "click", "selector": "form[action*='login'] button[type=submit]", "after": 1500 },
+        { "do": "goto", "url": "/pos/invoice/create" },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "wait", "ms": 1500 },
+        { "do": "click", "selector": "button[\\@click=\"showShortcuts = true\"]", "after": 2500 },
+        { "do": "wait", "ms": 2000 }
+      ]
+    },
+    {
+      "id": "s03_read_list",
+      "narration": "चंद अहम shortcuts याद कर लें — F5 से bill hold, F10 से provisional यानी local bills, F11 से नाकाम bills। Alt और B से table board, Alt और R से आख़िरी receipt दोबारा print। और payment के लिए Alt और one यानी CASH — bill एक ही झटके में मुकम्मल।",
+      "actions": [
+        { "do": "wait", "ms": 6000 },
+        { "do": "press", "selector": "body", "key": "Escape", "after": 1500 }
+      ]
+    },
+    {
+      "id": "s04_f10_demo",
+      "narration": "मसलन F10 दबाएं — provisional bills का ख़ाना खुल गया। यहां arrow keys से bill चुनें और Enter से खोलें। Escape से वापस।",
+      "actions": [
+        { "do": "press", "selector": "body", "key": "F10", "after": 2500 },
+        { "do": "wait", "ms": 2000 },
+        { "do": "press", "selector": "body", "key": "Escape", "after": 1500 }
+      ]
+    },
+    {
+      "id": "s05_guided_flow",
+      "narration": "और सब से बड़ी सहूलत — guided flow। search में product का नाम लिखें, Enter दबाएं — item cart में। search ख़ाली हो और cart भरा हो, तो Enter आप को ख़ुद अगले क़दम पर ले जाता है — यानी payment तक पूरा bill सिर्फ़ Enter दबाते दबाते बन जाता है।",
+      "actions": [
+        { "do": "type", "selector": "input[x-ref=searchInput]", "text": "Cheeni", "delay": 90, "after": 1200 },
+        { "do": "press", "selector": "input[x-ref=searchInput]", "key": "Enter", "after": 2000 },
+        { "do": "type", "selector": "input[x-ref=searchInput]", "text": "Doodh", "delay": 90, "after": 1200 },
+        { "do": "press", "selector": "input[x-ref=searchInput]", "key": "Enter", "after": 2000 },
+        { "do": "wait", "ms": 1500 },
+        { "do": "click", "selector": "button.bg-purple-600:has-text('CASH')", "after": 3000 },
+        { "do": "press", "selector": "body", "key": "Escape", "after": 1000 }
+      ]
+    },
+    {
+      "id": "s06_outro",
+      "card": { "heading": "Shukriya!", "sub": "F1 dabayen — list hamesha samne" },
+      "narration": "बस इतना याद रखें — जब भी भूलें, F1 दबाएं, पूरी list सामने। चंद दिन की मश्क़ के बाद आप का हाथ mouse को तरसेगा। शुक्रिया!",
+      "minMs": 5000
+    }
+  ]
+}

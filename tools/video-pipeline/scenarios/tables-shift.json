@@ -1,0 +1,79 @@
+{
+  "slug": "tables-shift",
+  "baseUrl": "https://127.0.0.1:5443",
+  "title": "Tables aur Table Shift — Dine-in ka Intezam",
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "card": { "heading": "Tables aur Table Shift", "sub": "Table board · Occupied timer · Table badalna" },
+      "narration": "अस्सलामु अलैकुम! dine-in restaurant की जान है table का intezam — कौन सा table ख़ाली है, किस पर گا ہَک कब से बैठे हैं, और अगर گا ہَک table बदलना चाहे तो? आज यही सब सीखेंगे।",
+      "minMs": 6000
+    },
+    {
+      "id": "s02_board",
+      "narration": "menu से Tables खोलें — ये है आप का table board। हर table का हाल एक नज़र में — सब्ज़ यानी available, और जिस पर order चल रहा हो वो occupied, वक़्त के साथ। Table Setup से आप tables बना और बदल सकते हैं।",
+      "actions": [
+        { "do": "goto", "url": "/pos/login" },
+        { "do": "wait", "ms": 700 },
+        { "do": "type", "selector": "#login", "text": "videoresto@nestpos.pk", "delay": 40 },
+        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
+        { "do": "click", "selector": "form[action*='login'] button[type=submit]", "after": 1500 },
+        { "do": "goto", "url": "/pos/restaurant/tables" },
+        { "do": "wait", "ms": 2000 },
+        { "do": "highlight", "selector": "a:has-text('T-3') >> nth=0", "after": 2500 }
+      ]
+    },
+    {
+      "id": "s03_start_order",
+      "narration": "table T-3 पर گا ہَک बैठे — board पर T-3 दबाएं, सीधे sale screen खुलती है, table पहले से चुना हुआ। order लगाएं — Beef Pulao और Roghni Naan — और Kitchen को भेज दें।",
+      "actions": [
+        { "do": "click", "selector": "a:has-text('T-3') >> nth=0", "after": 2000 },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "wait", "ms": 1500 },
+        { "do": "click", "selector": ".prod-card:has-text('Beef Pulao')", "after": 1000 },
+        { "do": "click", "selector": ".prod-card:has-text('Roghni Naan')", "after": 1500 },
+        { "do": "click", "selector": "button[\\@click=\"sendToKitchen()\"]", "after": 3000 }
+      ]
+    },
+    {
+      "id": "s04_board_occupied",
+      "narration": "board पर वापस आएं — T-3 अब occupied है, और साथ timer चल रहा है के گا ہَک कितनी देर से बैठे हैं। इसी से आप को service की रफ़्तार का पता चलता रहता है।",
+      "actions": [
+        { "do": "goto", "url": "/pos/restaurant/tables" },
+        { "do": "wait", "ms": 2000 },
+        { "do": "highlight", "selector": "a:has-text('T-3') >> nth=0", "after": 3000 }
+      ]
+    },
+    {
+      "id": "s05_shift",
+      "narration": "अब मशहूर मसला — گا ہَک कहते हैं, भाई AC वाला table दे दो। waiter screen पर occupied table दबाएं, Shift चुनें, और नया table — T-5। बस! order, items, और timer — सब कुछ नए table पर मुंतक़िल। KOT दोबारा print नहीं होता — kitchen अपने काम में लगा रहता है।",
+      "actions": [
+        { "do": "goto", "url": "/pos/waiter" },
+        { "do": "wait", "ms": 2000 },
+        { "do": "click", "selector": "button:has-text('T-3') >> nth=0", "after": 2000 },
+        { "do": "click", "selector": "button:has-text('Shift')", "after": 2000 },
+        { "do": "click", "selector": "button[\\@click=\"doShift(t)\"]:has-text('T-5')", "after": 3000 },
+        { "do": "wait", "ms": 1500 }
+      ]
+    },
+    {
+      "id": "s06_settle",
+      "narration": "khana ख़त्म, bill का वक़्त। board से T-5 खोलें — पूरा order सामने आ जाता है — और CASH दबा दें। table फिर से available, अगले گا ہَک के लिए तैयार।",
+      "actions": [
+        { "do": "goto", "url": "/pos/restaurant/tables" },
+        { "do": "wait", "ms": 1500 },
+        { "do": "click", "selector": "a:has-text('T-5') >> nth=0", "after": 2500 },
+        { "do": "waitFor", "selector": ".prod-card" },
+        { "do": "wait", "ms": 2000 },
+        { "do": "click", "selector": "button.bg-purple-600:has-text('CASH')", "after": 3000 },
+        { "do": "press", "selector": "body", "key": "Escape", "after": 1200 }
+      ]
+    },
+    {
+      "id": "s07_outro",
+      "card": { "heading": "Shukriya!", "sub": "KDS aur Restaurant Mode ki videos bhi dekhen" },
+      "narration": "तो ये था tables का पूरा intezam — board से order, timer से नज़र, और shift से آسانी। KDS और restaurant mode की videos भी देखें। शुक्रिया!",
+      "minMs": 5000
+    }
+  ]
+}

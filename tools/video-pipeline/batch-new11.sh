@@ -7,12 +7,15 @@ export CHROMIUM_BIN=/nix/store/qa9cnw4v5xkxyip6mb9kxqfq1z4x2dx1-chromium-138.0.7
 SLUGS=(
   dashboard-tour
   hold-recall
+  keyboard-shortcuts
+  language-badalna
+  suggestion-box
   reports-tax-guide
+  kds-kitchen
   tables-shift
   recipes-ingredients
   qr-menu
   rider-live-tracking
-  kds-kitchen
 )
 OLD_SLUGS=(
   dashboard-tour

@@ -5,7 +5,10 @@
   "scenes": [
     {
       "id": "s01_intro",
-      "card": { "heading": "Ingredients aur Recipes", "sub": "Saman ka stock · Recipe banayen · Sale par khud minus" },
+      "card": {
+        "heading": "Ingredients aur Recipes",
+        "sub": "Saman ka stock · Recipe banayen · Sale par khud minus"
+      },
       "narration": "अस्सलामु अलैकुम! restaurant में सिर्फ़ khana नहीं बिकता — पीछे chawal, chicken, oil का stock भी ख़र्च होता है। नेस्ट पी ओ एस में recipe बना दें, तो हर sale पर सामान का stock ख़ुद-ब-ख़ुद minus होता है। आइए देखें।",
       "minMs": 6000
     },
@@ -13,58 +16,177 @@
       "id": "s02_ingredients_page",
       "narration": "menu से Ingredients खोलें। यहां kitchen का हर ख़ाम saman दर्ज है — chawal, chicken, oil — हर एक का rate, मौजूदा stock, और kam-se-kam limit। stock limit से नीचे जाए तो card ख़ुद ख़बरदार करता है।",
       "actions": [
-        { "do": "goto", "url": "/pos/login" },
-        { "do": "wait", "ms": 700 },
-        { "do": "type", "selector": "#login", "text": "videoresto@nestpos.pk", "delay": 40 },
-        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
-        { "do": "click", "selector": "form[action*='login'] button[type=submit]", "after": 1500 },
-        { "do": "goto", "url": "/pos/restaurant/ingredients" },
-        { "do": "wait", "ms": 2000 },
-        { "do": "highlight", "selector": "div:has-text('Basmati Chawal') >> nth=-1", "after": 3000 }
+        {
+          "do": "goto",
+          "url": "/pos/login"
+        },
+        {
+          "do": "wait",
+          "ms": 700
+        },
+        {
+          "do": "type",
+          "selector": "#login",
+          "text": "videoresto@nestpos.pk",
+          "delay": 40
+        },
+        {
+          "do": "type",
+          "selector": "#password",
+          "text": "NestPOS@Demo1",
+          "delay": 40
+        },
+        {
+          "do": "click",
+          "selector": "form[action*='login'] button[type=submit]",
+          "after": 1500
+        },
+        {
+          "do": "goto",
+          "url": "/pos/restaurant/ingredients"
+        },
+        {
+          "do": "wait",
+          "ms": 2000
+        },
+        {
+          "do": "highlight",
+          "selector": "div:has-text('Basmati Chawal') >> nth=-1",
+          "after": 3000
+        }
       ]
     },
     {
       "id": "s03_add_ingredient",
       "narration": "नया saman add करना आसान है — Add Ingredient दबाएं। नाम लिखें Tamatar, unit kg, rate नब्बे rupay, stock बीस kg, और limit पांच। save — ho गया दर्ज।",
       "actions": [
-        { "do": "click", "selector": "button:has-text('Add Ingredient') >> nth=0", "after": 1500 },
-        { "do": "type", "selector": "form[action*='ingredients'] input[name='name']", "text": "Tamatar", "delay": 70, "after": 600 },
-        { "do": "select", "selector": "form[action*='ingredients'] select[name='unit']", "value": { "label": "kg" }, "after": 800 },
-        { "do": "type", "selector": "form[action*='ingredients'] input[name='cost_per_unit']", "text": "90", "delay": 70, "after": 600 },
-        { "do": "type", "selector": "form[action*='ingredients'] input[name='current_stock']", "text": "20", "delay": 70, "after": 600 },
-        { "do": "type", "selector": "form[action*='ingredients'] input[name='min_stock_level']", "text": "5", "delay": 70, "after": 800 },
-        { "do": "click", "selector": "form[action*='ingredients'] button[type=submit]", "after": 3000 }
+        {
+          "do": "click",
+          "selector": "button[\\@click=\"showAddModal = true\"]",
+          "after": 1500
+        },
+        {
+          "do": "type",
+          "selector": "div[x-show='showAddModal'] input[name='name']",
+          "text": "Tamatar",
+          "delay": 70,
+          "after": 600
+        },
+        {
+          "do": "select",
+          "selector": "div[x-show='showAddModal'] select[name='unit']",
+          "after": 800,
+          "value": "kg"
+        },
+        {
+          "do": "type",
+          "selector": "div[x-show='showAddModal'] input[name='cost_per_unit']",
+          "text": "90",
+          "delay": 70,
+          "after": 600
+        },
+        {
+          "do": "type",
+          "selector": "div[x-show='showAddModal'] input[name='current_stock']",
+          "text": "20",
+          "delay": 70,
+          "after": 600
+        },
+        {
+          "do": "type",
+          "selector": "div[x-show='showAddModal'] input[name='min_stock_level']",
+          "text": "5",
+          "delay": 70,
+          "after": 800
+        },
+        {
+          "do": "click",
+          "selector": "div[x-show='showAddModal'] button[type=submit]",
+          "after": 3000
+        }
       ]
     },
     {
       "id": "s04_recipes",
       "narration": "अब recipe — menu से Recipes खोलें। Beef Pulao की recipe देखें — एक plate में पाव kilo chawal और पचास gram oil। यही वो हिसाब है जिस से system जानता है के एक plate बिकने पर कितना saman ख़र्च हुआ।",
       "actions": [
-        { "do": "goto", "url": "/pos/restaurant/recipes" },
-        { "do": "wait", "ms": 2000 },
-        { "do": "highlight", "selector": "div:has-text('Beef Pulao') >> nth=-1", "after": 3500 },
-        { "do": "wait", "ms": 1500 }
+        {
+          "do": "goto",
+          "url": "/pos/restaurant/recipes"
+        },
+        {
+          "do": "wait",
+          "ms": 2000
+        },
+        {
+          "do": "highlight",
+          "selector": "h3:has-text('Beef Pulao')",
+          "after": 3500
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        }
       ]
     },
     {
       "id": "s05_sale_deduction",
       "narration": "अब कमाल देखें। sale screen से एक Beef Pulao बेचते हैं — CASH। और अब Ingredients पर वापस — Basmati Chawal का stock ख़ुद पाव kilo kam हो गया! ना कोई register, ना गिनती — system ख़ुद hisaab रखता है।",
       "actions": [
-        { "do": "goto", "url": "/pos/invoice/create" },
-        { "do": "waitFor", "selector": ".prod-card" },
-        { "do": "wait", "ms": 1200 },
-        { "do": "click", "selector": "button[\\@click=\"setOrderType('takeaway')\"]", "after": 1500 },
-        { "do": "click", "selector": ".prod-card:has-text('Beef Pulao')", "after": 1500 },
-        { "do": "click", "selector": "button.bg-purple-600:has-text('CASH')", "after": 3000 },
-        { "do": "press", "selector": "body", "key": "Escape", "after": 1000 },
-        { "do": "goto", "url": "/pos/restaurant/ingredients" },
-        { "do": "wait", "ms": 2000 },
-        { "do": "highlight", "selector": "div:has-text('Basmati Chawal') >> nth=-1", "after": 3500 }
+        {
+          "do": "goto",
+          "url": "/pos/invoice/create"
+        },
+        {
+          "do": "waitFor",
+          "selector": ".prod-card"
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "click",
+          "selector": "button[\\@click=\"setOrderType('takeaway')\"]",
+          "after": 1500
+        },
+        {
+          "do": "click",
+          "selector": ".prod-card:has-text('Beef Pulao')",
+          "after": 1500
+        },
+        {
+          "do": "click",
+          "selector": "button.bg-purple-600:has-text('CASH')",
+          "after": 3000
+        },
+        {
+          "do": "press",
+          "selector": "body",
+          "key": "Escape",
+          "after": 1000
+        },
+        {
+          "do": "goto",
+          "url": "/pos/restaurant/ingredients"
+        },
+        {
+          "do": "wait",
+          "ms": 2000
+        },
+        {
+          "do": "highlight",
+          "selector": "div:has-text('Basmati Chawal') >> nth=-1",
+          "after": 3500
+        }
       ]
     },
     {
       "id": "s06_outro",
-      "card": { "heading": "Shukriya!", "sub": "Recipe banayen — stock ka hisaab system par chhoren" },
+      "card": {
+        "heading": "Shukriya!",
+        "sub": "Recipe banayen — stock ka hisaab system par chhoren"
+      },
       "narration": "तो बस एक बार recipes बना लें — फिर हर plate के साथ saman का hisaab ख़ुद होता रहेगा, और ख़त्म होने से पहले ख़बर भी मिल जाएगी। KDS और tables की videos भी देखें। शुक्रिया!",
       "minMs": 5500
     }

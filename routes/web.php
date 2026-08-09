@@ -820,11 +820,17 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/restaurant/api/customer-lookup', [RestaurantPosController::class, 'customerLookup'])->name('pos.restaurant.customer-lookup');
     Route::post('/restaurant/api/customer-store', [RestaurantPosController::class, 'customerStore'])->name('pos.restaurant.customer-store');
 
-    Route::middleware('restaurant.only')->group(function () {
-    Route::get('/restaurant/pos', [RestaurantPosController::class, 'pos'])->name('pos.restaurant.pos');
+    // 🔧 Hold / Pay-held / Delete-held — accessible from BOTH plain-retail (universal)
+    // and restaurant companies. Previously trapped inside restaurant.only, which
+    // 403'd Hold on retail/general companies even though the universal screen shows
+    // the Hold button and holdOrder() itself enforces the dine-in flow rules for
+    // restaurant companies (defence-in-depth). Same fix pattern as customer-search above.
     Route::post('/restaurant/orders/hold', [RestaurantPosController::class, 'holdOrder'])->name('pos.restaurant.orders.hold');
     Route::post('/restaurant/orders/{id}/pay', [RestaurantPosController::class, 'payOrder'])->name('pos.restaurant.orders.pay');
     Route::post('/restaurant/orders/{id}/delete', [RestaurantPosController::class, 'deleteOrder'])->name('pos.restaurant.orders.delete');
+
+    Route::middleware('restaurant.only')->group(function () {
+    Route::get('/restaurant/pos', [RestaurantPosController::class, 'pos'])->name('pos.restaurant.pos');
     Route::post('/restaurant/orders/{id}/shift-table', [RestaurantPosController::class, 'shiftTable'])->name('pos.restaurant.orders.shift-table');
     Route::get('/restaurant/orders/by-table/{tableId}', [RestaurantPosController::class, 'getOrdersByTable'])->name('pos.restaurant.orders.by-table');
     // Cancelled Orders report (ZFC, 2 Aug 2026) — admin/manager only (in-method gate)

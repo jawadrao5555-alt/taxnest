@@ -5,7 +5,10 @@
   "scenes": [
     {
       "id": "s01_intro",
-      "card": { "heading": "Dashboard ki Sair", "sub": "Aaj ki sale · Opening cash · Profit · Quick actions" },
+      "card": {
+        "heading": "Dashboard ki Sair",
+        "sub": "Aaj ki sale · Opening cash · Profit · Quick actions"
+      },
       "narration": "अस्सलामु अलैकुम! आज हम नेस्ट पी ओ एस का dashboard समझेंगे — यानी वो पहली screen जो login करते ही खुलती है। एक ही नज़र में आप का पूरा karobar सामने होता है।",
       "minMs": 5000
     },
@@ -13,51 +16,112 @@
       "id": "s02_login",
       "narration": "login करते ही dashboard खुलता है। सब से ऊपर आप का नाम और दुकान का नाम, और साथ ही आज की तारीख़। नीचे बड़े बड़े cards में दिन का पूरा ख़ुलासा।",
       "actions": [
-        { "do": "goto", "url": "/pos/login" },
-        { "do": "wait", "ms": 700 },
-        { "do": "type", "selector": "#login", "text": "videodemo@nestpos.pk", "delay": 40 },
-        { "do": "type", "selector": "#password", "text": "NestPOS@Demo1", "delay": 40 },
-        { "do": "click", "selector": "form[action*='login'] button[type=submit]", "after": 2000 },
-        { "do": "goto", "url": "/pos/dashboard" },
-        { "do": "wait", "ms": 2500 }
+        {
+          "do": "goto",
+          "url": "/pos/login"
+        },
+        {
+          "do": "wait",
+          "ms": 700
+        },
+        {
+          "do": "type",
+          "selector": "#login",
+          "text": "videodemo@nestpos.pk",
+          "delay": 40
+        },
+        {
+          "do": "type",
+          "selector": "#password",
+          "text": "NestPOS@Demo1",
+          "delay": 40
+        },
+        {
+          "do": "click",
+          "selector": "form[action*='login'] button[type=submit]",
+          "after": 2000
+        },
+        {
+          "do": "goto",
+          "url": "/pos/dashboard"
+        },
+        {
+          "do": "wait",
+          "ms": 2500
+        }
       ]
     },
     {
       "id": "s03_kpis",
       "narration": "ये देखें — आज की revenue, यानी आज कितनी sale हुई। कितने bill बने, हर bill की average रक़म, और कितने گا ہَک आए। ये सब numbers हर नई sale के साथ ख़ुद update होते रहते हैं — आप को कुछ नहीं करना।",
       "actions": [
-        { "do": "highlight", "selector": "div:has-text(\"Today's Revenue\") >> nth=-1", "after": 3500 },
-        { "do": "wait", "ms": 2000 }
+        {
+          "do": "highlight",
+          "selector": "div:has-text(\"Today's Revenue\") >> nth=-1",
+          "after": 3500
+        },
+        {
+          "do": "wait",
+          "ms": 2000
+        }
       ]
     },
     {
       "id": "s04_opening_cash",
       "narration": "ये है Opening Cash का हिस्सा — subah दुकान खोलते वक़्त गल्ले में जो cash था, वो यहां लिखें। फिर din के आख़िर में day close करते वक़्त hisaab बिल्कुल साफ़ मिलता है — opening cash, plus sale, minus ख़र्चे।",
       "actions": [
-        { "do": "highlight", "selector": "div:has-text('Opening Cash') >> nth=-1", "after": 3500 },
-        { "do": "wait", "ms": 1500 }
+        {
+          "do": "highlight",
+          "selector": "p:has-text('Opening Cash')",
+          "after": 3500
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        }
       ]
     },
     {
       "id": "s05_profit",
       "narration": "और ये सिर्फ़ admin को नज़र आने वाली line है — munafa, यानी profit। अगर आप ने products में purchase price डाल रखी है, तो नेस्ट पी ओ एस ख़ुद बताता है के आज कितना munafa हुआ। cashier को ये कभी नज़र नहीं आता — ये सिर्फ़ मालिक की नज़र के लिए है।",
       "actions": [
-        { "do": "highlight", "selector": "div:has-text('Profit') >> nth=-1", "after": 3500 },
-        { "do": "wait", "ms": 1500 }
+        {
+          "do": "highlight",
+          "selector": "p:has-text('Profit')",
+          "after": 3500
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        }
       ]
     },
     {
       "id": "s06_quick_actions",
       "narration": "नीचे quick actions हैं — नई sale शुरू करनी हो, reports देखनी हों, या products manage करने हों — एक click पर पहुंच जाएं। और ऊपर वाली navigation हर page से मिलती है, तो dashboard पर वापस आना हमेशा आसान है।",
       "actions": [
-        { "do": "scroll", "selector": "text=New Sale", "after": 1500 },
-        { "do": "highlight", "selector": "a:has-text('New Sale') >> nth=0", "after": 3000 },
-        { "do": "wait", "ms": 1500 }
+        {
+          "do": "scroll",
+          "selector": "text=New Sale",
+          "after": 1500
+        },
+        {
+          "do": "highlight",
+          "selector": "a:has-text('New Sale') >> nth=0",
+          "after": 3000
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        }
       ]
     },
     {
       "id": "s07_outro",
-      "card": { "heading": "Shukriya!", "sub": "Day Close aur Reports ki videos bhi dekhen" },
+      "card": {
+        "heading": "Shukriya!",
+        "sub": "Day Close aur Reports ki videos bhi dekhen"
+      },
       "narration": "तो ये था आप का dashboard — पूरा karobar एक screen पर। day close और reports की videos भी ज़रूर देखें ता के hisaab kitab पर पूरी grip आ जाए। शुक्रिया!",
       "minMs": 5000
     }

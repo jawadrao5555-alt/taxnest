@@ -147,7 +147,9 @@ class VideoRestoShopSeeder extends Seeder
             $floorId = DB::table('restaurant_floors')->where('company_id', $companyId)->where('name', 'Main Hall')->value('id');
             foreach (range(1, 8) as $i) {
                 DB::table('restaurant_tables')->updateOrInsert(
-                    ['company_id' => $companyId, 'table_number' => 'T-' . $i],
+                    // Bare number — the app UI prepends "T-" itself (waiter/KDS/universal).
+                    // 'T-'.$i here rendered as "T-T-3" on those screens.
+                    ['company_id' => $companyId, 'table_number' => (string) $i],
                     [
                         'floor_id' => $floorId,
                         'seats' => $i <= 4 ? 4 : ($i <= 6 ? 6 : 8),

@@ -128,6 +128,10 @@ class AdminPaymentProofController extends Controller
             $company->update(['status' => 'approved', 'company_status' => 'active']);
         }
 
+        // Agent commission: a verified proof is the "cleared payment" that
+        // earns the introducing agent their Schedule A cut. Never breaks approval.
+        \App\Services\AgentCommissionService::recordForProof($proof->fresh());
+
         AdminAuditLog::log(auth('admin')->id(), 'Payment proof approved', 'PaymentProof', $proof->id, [
             'company_id' => $proof->company_id,
             'subscription_id' => $subscription->id,

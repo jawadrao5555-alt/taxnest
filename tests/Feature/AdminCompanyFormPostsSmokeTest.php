@@ -72,6 +72,7 @@ class AdminCompanyFormPostsSmokeTest extends TestCase
             $table->string('status')->default('approved');
             $table->string('company_status')->default('active');
             $table->unsignedBigInteger('franchise_id')->nullable();
+            $table->unsignedBigInteger('agent_id')->nullable();
             $table->unsignedBigInteger('requested_plan_id')->nullable();
             $table->decimal('standard_tax_rate', 5, 2)->nullable();
             $table->string('invoice_number_prefix')->nullable();

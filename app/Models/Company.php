@@ -131,6 +131,7 @@ class Company extends Model
         'status',
         'product_type',
         'franchise_id',
+        'agent_id',
         'deleted_reason',
         'force_watermark',
         'fbr_pos_enabled',
@@ -510,6 +511,11 @@ class Company extends Model
     public function franchise()
     {
         return $this->belongsTo(Franchise::class);
+    }
+
+    public function agent()
+    {
+        return $this->belongsTo(Agent::class);
     }
 
     public function usageStats()

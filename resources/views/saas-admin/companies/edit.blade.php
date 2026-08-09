@@ -79,6 +79,17 @@
                         @endforeach
                     </select>
                 </div>
+                @if(!empty($agents) && $agents->count() && (auth('admin')->user()->role ?? null) === 'super_admin')
+                <div>
+                    <label class="text-xs text-gray-400 mb-1 block">Introduced by Agent</label>
+                    <select name="agent_id" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500">
+                        <option value="">None</option>
+                        @foreach($agents as $ag)
+                        <option value="{{ $ag->id }}" {{ old('agent_id', $company->agent_id) == $ag->id ? 'selected' : '' }}>{{ $ag->name }}{{ $ag->territory ? ' — ' . $ag->territory : '' }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                @endif
                 <div>
                     <label class="text-xs text-gray-400 mb-1 block">Standard Tax Rate (%)</label>
                     <input type="number" name="standard_tax_rate" value="{{ old('standard_tax_rate', $company->standard_tax_rate) }}" step="0.01" min="0" max="100" class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 placeholder-gray-600">

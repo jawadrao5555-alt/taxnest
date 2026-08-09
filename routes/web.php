@@ -1083,6 +1083,15 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/subscriptions', [AdminSubscriptionController::class, 'index'])->name('saas.admin.subscriptions');
     Route::post('/subscriptions/assign', [AdminSubscriptionController::class, 'assign'])->name('saas.admin.subscriptions.assign');
 
+    // Agents/Partners program (super-admin only, guarded in controller).
+    Route::get('/agents', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'index'])->name('saas.admin.agents');
+    Route::post('/agents', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'store'])->name('saas.admin.agents.store');
+    Route::get('/agents/{id}', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'show'])->whereNumber('id')->name('saas.admin.agents.show');
+    Route::put('/agents/{id}', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'update'])->name('saas.admin.agents.update');
+    Route::post('/agents/{id}/toggle', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'toggle'])->name('saas.admin.agents.toggle');
+    Route::get('/agents/{id}/export', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'export'])->name('saas.admin.agents.export');
+    Route::post('/agents/{id}/clawback', [\App\Http\Controllers\SaasAdmin\AdminAgentController::class, 'clawback'])->name('saas.admin.agents.clawback');
+
     // Consultant program oversight: consultants, links, commissions, payouts.
     Route::get('/consultants', [\App\Http\Controllers\SaasAdmin\AdminConsultantController::class, 'index'])->name('saas.admin.consultants');
     Route::post('/consultants/{id}/toggle', [\App\Http\Controllers\SaasAdmin\AdminConsultantController::class, 'toggle'])->name('saas.admin.consultants.toggle');

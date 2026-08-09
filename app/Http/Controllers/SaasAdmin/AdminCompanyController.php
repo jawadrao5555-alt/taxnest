@@ -23,7 +23,17 @@ class AdminCompanyController extends Controller
     public function create()
     {
         $franchises = Franchise::where('status', 'active')->get();
-        return view('saas-admin.companies.create', compact('franchises'));
+        $agents = $this->activeAgents();
+        return view('saas-admin.companies.create', compact('franchises', 'agents'));
+    }
+
+    /** Active agents for the "Introduced by Agent" dropdown (super-admin only UI). */
+    private function activeAgents()
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasTable('agents')) {
+            return collect();
+        }
+        return \App\Models\Agent::where('status', 'active')->orderBy('name')->get();
     }
 
     public function store(Request $request)
@@ -44,6 +54,7 @@ class AdminCompanyController extends Controller
             'website' => 'nullable|string|max:255',
             'status' => 'required|in:approved,pending',
             'franchise_id' => 'nullable|exists:franchises,id',
+            'agent_id' => 'nullable|exists:agents,id',
             'admin_email' => 'required|email|unique:users,email',
             'admin_password' => 'required|string|min:6',
             'admin_name' => 'required|string|max:255',
@@ -75,6 +86,15 @@ class AdminCompanyController extends Controller
         if ($request->product_type === 'pos') {
             $companyData['pra_reporting_enabled'] = false;
             $companyData['pra_environment'] = 'sandbox';
+        }
+
+        // Only super admin sees/sets the agent dropdown (Agents section is
+        // super-admin-only); key added conditionally so older schemas without
+        // the column never receive it.
+        if (auth('admin')->user()?->isSuperAdmin()
+            && $request->filled('agent_id')
+            && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'agent_id')) {
+            $companyData['agent_id'] = $request->agent_id;
         }
 
         $company = Company::create($companyData);
@@ -115,7 +135,8 @@ class AdminCompanyController extends Controller
         $company = Company::findOrFail($id);
         $franchises = Franchise::where('status', 'active')->get();
         $companyAdmin = User::where('company_id', $id)->where('role', 'company_admin')->first();
-        return view('saas-admin.companies.edit', compact('company', 'franchises', 'companyAdmin'));
+        $agents = $this->activeAgents();
+        return view('saas-admin.companies.edit', compact('company', 'franchises', 'companyAdmin', 'agents'));
     }
 
     public function update(Request $request, $id)
@@ -135,6 +156,7 @@ class AdminCompanyController extends Controller
             'business_activity' => 'nullable|string|max:255',
             'website' => 'nullable|string|max:255',
             'franchise_id' => 'nullable|exists:franchises,id',
+            'agent_id' => 'nullable|exists:agents,id',
             'standard_tax_rate' => 'nullable|numeric|min:0|max:100',
             'invoice_number_prefix' => 'nullable|string|max:20',
             'fbr_environment' => 'nullable|in:sandbox,production',
@@ -180,6 +202,13 @@ class AdminCompanyController extends Controller
             $fields = array_merge($fields, ['fbr_environment', 'fbr_registration_no', 'fbr_business_name', 'fbr_pos_enabled', 'fbr_pos_environment', 'fbr_pos_id']);
         } else {
             $fields = array_merge($fields, ['pra_environment', 'pra_pos_id']);
+        }
+
+        // Agent link is super-admin-only (the field is hidden from other admins).
+        if (auth('admin')->user()?->isSuperAdmin()
+            && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'agent_id')
+            && $request->has('agent_id')) {
+            $fields[] = 'agent_id';
         }
 
         $company->update($request->only($fields));

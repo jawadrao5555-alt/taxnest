@@ -8,6 +8,11 @@
     $waiterEffStyle = in_array($waiterOwnStyle, array_keys(\App\Models\User::WAITER_STYLES), true)
         ? $waiterOwnStyle
         : (optional(\App\Models\Company::find(app('currentCompanyId')))->pos_dashboard_style ?? 'default');
+    // Fast Food mode (Pizza Master, 10 Aug 2026): speed-first LAYOUT — customer
+    // name, Urgent aur "Mazeed" fold GAYAB; sirf table + items + ek note box +
+    // send. Koi feature DELETE nahi hua — Full/Saaf theme par sab wapis aa
+    // jata hai (per-waiter pick, Theme button).
+    $waiterSimple = ($waiterEffStyle === 'fastfood');
 @endphp
 @if($waiterEffStyle === 'saaf')<link rel="stylesheet" href="{{ asset('css/pos-saaf.css') }}?v=5">@endif
 @php
@@ -301,6 +306,13 @@
                  "Mazeed" fold ke andar — koi feature HATAYA nahi, sirf chhupaya. --}}
             <template x-if="!appendOrderId">
                 <div class="space-y-3">
+                    @if($waiterSimple)
+                    {{-- FAST FOOD MODE: sirf ek note box (kam mirch waghera) — naam,
+                         urgent, mazeed sab chhupa. Order = dine-in + counter default. --}}
+                    <textarea x-model="kitchenNotes" rows="2" placeholder="{{ __('pos.ph_kitchen_note_order') }}"
+                              autocomplete="off" name="waiter_kn_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                              class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm px-3 py-2.5 focus:ring-teal-500 focus:border-teal-500"></textarea>
+                    @else
                     <input type="text" x-model="customerName" placeholder="{{ __('pos.ph_customer_name_optional') }}"
                            autocomplete="off" name="waiter_customer_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                            class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm px-3 py-2.5 focus:ring-teal-500 focus:border-teal-500">
@@ -351,6 +363,7 @@
                             <p x-show="!cashierId" class="mt-1 text-[11px] text-gray-400">{{ __('pos.all_cashiers_will_see') }}</p>
                         </div>
                     </div>
+                    @endif
                 </div>
             </template>
 

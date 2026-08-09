@@ -110,4 +110,22 @@ class PosWaiterStylePrefTest extends TestCase
         $this->expectException(ValidationException::class);
         $this->callSaveStyle('purple');
     }
+
+    /**
+     * Fast Food mode (Pizza Master, 10 Aug 2026): 'fastfood' is a real catalogue
+     * entry — saveStyle must accept it, and it must fit the varchar(10) column.
+     */
+    public function test_fastfood_style_accepted_and_fits_column(): void
+    {
+        $waiter = $this->makeUser('pos_waiter');
+
+        $this->assertArrayHasKey('fastfood', User::WAITER_STYLES);
+        foreach (array_keys(User::WAITER_STYLES) as $key) {
+            $this->assertLessThanOrEqual(10, strlen($key), "style key {$key} overflows users.pos_personal_style varchar(10)");
+        }
+
+        $res = $this->callSaveStyle('fastfood');
+        $this->assertSame(200, $res->getStatusCode());
+        $this->assertSame('fastfood', $waiter->fresh()->pos_personal_style);
+    }
 }

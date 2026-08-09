@@ -3991,6 +3991,7 @@ return [
     'style_saaf_word'        => 'سادہ',
     'style_full_word'        => 'مکمل',
     'style_buttons_word'     => 'بٹن',
+    'style_fastfood_word'    => 'فاسٹ فوڈ (سادہ)',
     'waiter_theme_btn'       => 'تھیم',
     'waiter_theme_pick_title' => 'اپنی تھیم چنیں',
     // Buttons style — waiter home screen (Task #340, Aug 2026)

@@ -3990,6 +3990,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'style_saaf_word'        => 'Saaf',
     'style_full_word'        => 'Full',
     'style_buttons_word'     => 'Buttons',
+    'style_fastfood_word'    => 'Fast Food (Sada)',
     'waiter_theme_btn'       => 'Theme',
     'waiter_theme_pick_title' => 'Apni theme chunein',
     // Buttons style — waiter home screen (Task #340, Aug 2026)

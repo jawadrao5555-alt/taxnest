@@ -18,9 +18,13 @@ class User extends Authenticatable
      * both layout resolvers (pos-app.blade.php + waiter.blade.php).
      */
     public const WAITER_STYLES = [
-        'buttons' => 'pos.style_buttons_word',
-        'saaf'    => 'pos.style_saaf_word',
-        'default' => 'pos.style_full_word',
+        'buttons'  => 'pos.style_buttons_word',
+        'saaf'     => 'pos.style_saaf_word',
+        'default'  => 'pos.style_full_word',
+        // Fast Food mode (Pizza Master, 10 Aug 2026): waiter screen LAYOUT theme —
+        // hides customer name / Urgent / Mazeed fold; sirf table + items + ek note
+        // box + send. Visual skin = default. Fine-dine waiters pick Full/Saaf.
+        'fastfood' => 'pos.style_fastfood_word',
     ];
 
     protected $fillable = [

@@ -67,6 +67,16 @@
 
     <div id="importSection" class="hidden mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-md p-5">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">{{ __('pos.bulk_import_products_excel') }}</h3>
+        @php
+            // Strict plan binding (9 Aug 2026): Excel import/export = Business+.
+            $canExcelPlan = \App\Services\PosFeatureService::planAllows($company, 'excel_enabled');
+        @endphp
+        @if(!$canExcelPlan)
+        <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg px-4 py-3">
+            <p class="text-xs text-amber-800 dark:text-amber-300 mb-2">{{ __('pos.plan_locked_feature') }}</p>
+            <a href="{{ route('pos.billing') }}" class="inline-flex items-center gap-1.5 bg-gradient-to-r from-purple-500 to-purple-700 text-white px-4 py-2 rounded-lg text-xs font-semibold no-underline">{{ __('pos.billing_plan') }}</a>
+        </div>
+        @else
 
         <div class="mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg px-4 py-3">
             <p class="text-xs text-blue-800 dark:text-blue-300"><strong>{{ __('pos.easy_way_label') }}</strong> {{ __('pos.import_easy_way_text') }}</p>
@@ -102,6 +112,7 @@
                 </form>
             </div>
         </div>
+        @endif
     </div>
 
     <div id="addProductForm" class="hidden mb-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-md p-5"

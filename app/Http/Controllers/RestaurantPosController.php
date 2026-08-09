@@ -2214,6 +2214,12 @@ class RestaurantPosController extends Controller
         if ($user && !in_array($user->pos_role, ['pos_admin', 'pos_manager'], true) && $user->role !== 'company_admin') {
             return redirect('/pos/invoice/create');
         }
+        // Strict plan binding (owner, 9 Aug 2026): cancelled-orders & kitchen-waste
+        // report is a Pro plan-card promise — restaurant-module gate (Pro+ or trial).
+        $company = Company::find(app('currentCompanyId'));
+        if (!\App\Services\PosFeatureService::restaurantAllowed($company)) {
+            return redirect()->route('pos.billing')->with('error', __('pos.plan_locked_feature'));
+        }
         return null;
     }
 

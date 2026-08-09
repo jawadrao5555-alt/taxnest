@@ -35,7 +35,7 @@ class PosFeatureService
      * active trial passes (evaluate-before-buying), otherwise the active
      * plan's column decides.
      */
-    public const PLAN_GATES = ['deals_enabled', 'riders_enabled', 'hazri_enabled', 'analytics_enabled', 'reports_enabled', 'rider_tracking_enabled', 'custom_access_enabled', 'qr_menu_enabled', 'offline_enabled'];
+    public const PLAN_GATES = ['deals_enabled', 'riders_enabled', 'hazri_enabled', 'analytics_enabled', 'reports_enabled', 'rider_tracking_enabled', 'custom_access_enabled', 'qr_menu_enabled', 'offline_enabled', 'excel_enabled'];
 
     public const FLAG_META = [
         'kot' => [

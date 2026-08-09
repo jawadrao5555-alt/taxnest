@@ -6326,6 +6326,11 @@ class PosController extends Controller
 
     public function downloadProductTemplate()
     {
+        // Strict plan binding (owner, 9 Aug 2026): Product Excel import/export
+        // is a Business+ plan-card promise — same gate on template/export + import.
+        if ($r = $this->planGate('excel_enabled')) {
+            return $r;
+        }
         $companyId = app('currentCompanyId');
         $existingProducts = PosProduct::where('company_id', $companyId)->orderBy('name')->get();
 
@@ -6410,6 +6415,10 @@ class PosController extends Controller
 
     public function importProducts(Request $request)
     {
+        // Strict plan binding (owner, 9 Aug 2026): Excel import is Business+.
+        if ($r = $this->planGate('excel_enabled')) {
+            return $r;
+        }
         $companyId = app('currentCompanyId');
 
         // Subscription access gate (Task 361 review): this route deliberately has

@@ -1,8 +1,7 @@
-@extends('layouts.pos-app')
-
-@section('title', __('pos.cancelled_orders'))
-
-@section('content')
+{{-- 9 Aug 2026: layouts.pos-app is a SLOT-based component layout — @extends
+     against it 500s with "Undefined variable $slot". This was the only view
+     still using @extends; converted to <x-pos-layout> like every other page. --}}
+<x-pos-layout>
 <div class="max-w-6xl mx-auto px-4 py-6">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div>
@@ -85,4 +84,4 @@
     </div>
     <div class="mt-4">{{ $orders->links() }}</div>
 </div>
-@endsection
+</x-pos-layout>

@@ -59,16 +59,19 @@ $GATES = PosFeatureService::PLAN_GATES;
 $EXPECTED_GATE_ORDER = [
     'deals_enabled', 'riders_enabled', 'hazri_enabled', 'analytics_enabled',
     'reports_enabled', 'rider_tracking_enabled', 'custom_access_enabled',
-    'qr_menu_enabled', 'offline_enabled',
+    'qr_menu_enabled', 'offline_enabled', 'excel_enabled',
 ];
 $MATRIX = [
-    // plan name => [deals, riders, hazri, analytics, reports, rider_tracking, custom_access, qr_menu, offline]
+    // plan name => [deals, riders, hazri, analytics, reports, rider_tracking, custom_access, qr_menu, offline, excel]
     // 9 Aug 2026 (owner): rider LIVE tracking moved back UP — Unlimited ONLY.
-    'Starter'   => [false, false, false, false, true,  false, false, false, false],
-    'Business'  => [true,  false, false, false, true,  false, false, false, true ],
-    'Pro'       => [true,  true,  false, true,  true,  false, false, true,  true ],
-    'Pro Max'   => [true,  true,  true,  true,  true,  false, false, true,  true ],
-    'Unlimited' => [true,  true,  true,  true,  true,  true,  true,  true,  true ],
+    // 9 Aug 2026 strict binding: reports_enabled gates CSV/PDF exports only —
+    // Starter card promises basic report PAGES (ungated) but NOT exports, so
+    // Starter reports=false; excel_enabled (product import/export) = Business+.
+    'Starter'   => [false, false, false, false, false, false, false, false, false, false],
+    'Business'  => [true,  false, false, false, true,  false, false, false, true,  true ],
+    'Pro'       => [true,  true,  false, true,  true,  false, false, true,  true,  true ],
+    'Pro Max'   => [true,  true,  true,  true,  true,  false, false, true,  true,  true ],
+    'Unlimited' => [true,  true,  true,  true,  true,  true,  true,  true,  true,  true ],
 ];
 // Derived-surface expectations per plan:
 $CUSTOM_SET_PLANS = ['Unlimited'];                   // customSet() honored only here

@@ -5512,6 +5512,10 @@ function restaurantPos() {
                 if (e.key === '3' && tlen >= 3) { e.preventDefault(); this.flowTypeIndex = 2; return; }
                 if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); this.confirmGuidedType(); return; }
                 if (e.key === 'Escape') { e.preventDefault(); this.flowStep = 'items'; this.enterSearchMode(); return; }
+                {{-- 10 Aug 2026 (Pizza Master voice note): F2 = "search par le jao" ka
+                     universal matlab hai — overlay khula ho tab bhi. Escape jaisa hi
+                     exit, warna cashier ko F2 "dead" lagta hai. --}}
+                if (e.key === 'F2') { e.preventDefault(); this.flowStep = 'items'; this.enterSearchMode(); return; }
                 if (/^F\d+$/.test(e.key) || ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'e'))) { e.preventDefault(); }
                 return;
             }
@@ -5531,6 +5535,11 @@ function restaurantPos() {
                 if ((e.key === 'ArrowLeft' || e.key === 'ArrowUp') && n)  { e.preventDefault(); this.tablePickerIndex = (this.tablePickerIndex - 1 + n) % n; return; }
                 if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); const t = flat[this.tablePickerIndex]; if (t) this.selectTable(t); return; }
                 if (e.key === 'Escape') { e.preventDefault(); this.showTablePicker = false; return; }
+                {{-- 10 Aug 2026 (Pizza Master voice note): Dine-In tab picker khol deta
+                     hai aur F2 mar jata tha — cashier pehle items dalna chahta hai.
+                     F2 = picker band + seedha search; table baad mein (hold/pay guard
+                     picker dobara khol dega). --}}
+                if (e.key === 'F2') { e.preventDefault(); this.showTablePicker = false; this.enterSearchMode(); return; }
                 if (/^F\d+$/.test(e.key) || ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'e'))) { e.preventDefault(); }
                 return;
             }
@@ -5544,6 +5553,9 @@ function restaurantPos() {
             if (this.tableBoardOpen && !this.boardMenuTable && !this.boardConfirm && !this.boardShift && !this.showPayModal) {
                 if (e.altKey && (e.key === 'b' || e.key === 'B' || e.code === 'KeyB')) { e.preventDefault(); this.tableBoardOpen = false; return; }
                 if (e.key === 'Escape') { e.preventDefault(); this.tableBoardOpen = false; return; }
+                {{-- 10 Aug 2026: F2 board se bhi seedha search par le jaye (Esc + F2
+                     ka shortcut chain torna nahi). --}}
+                if (e.key === 'F2') { e.preventDefault(); this.tableBoardOpen = false; this.enterSearchMode(); return; }
                 if (/^F\d+$/.test(e.key) || ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'e'))) { e.preventDefault(); }
                 return;
             }

@@ -88,6 +88,67 @@
             transform: rotate(180deg);
         }
     </style>
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@@context": "https://schema.org",
+        "@@type": "SoftwareApplication",
+        "@@id": "https://taxnest.com.pk/pos#software",
+        "name": "NestPOS",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "description": "NestPOS is a keyboard-fast, PRA-compliant point-of-sale system for Pakistani retail and restaurant businesses, with automatic fiscal integration and offline billing support.",
+        "offers": { "@@type": "Offer", "price": "0", "priceCurrency": "PKR" },
+        "url": "https://taxnest.com.pk/pos",
+        "publisher": {
+            "@@type": "Organization",
+            "@@id": "https://taxnest.com.pk/#organization",
+            "name": "TaxNest",
+            "url": "https://taxnest.com.pk/"
+        }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+        "@@context": "https://schema.org",
+        "@@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@@type": "Question",
+                "name": "How does the PRA connection actually work?",
+                "acceptedAnswer": {
+                    "@@type": "Answer",
+                    "text": "Two modes. Cloud mode submits bills straight from our servers to PRA. Fiscal-device mode runs a small desktop agent on your counter PC for shops whose PRA registration requires the local fiscal service — the system queues bills and the agent fiscalizes them automatically."
+                }
+            },
+            {
+                "@@type": "Question",
+                "name": "Does NestPOS work for restaurants?",
+                "acceptedAnswer": {
+                    "@@type": "Answer",
+                    "text": "Yes — a full restaurant module: dine-in / takeaway / delivery order types, table management, kitchen order tickets and held orders, all on the same keyboard-fast sale screen."
+                }
+            },
+            {
+                "@@type": "Question",
+                "name": "What if my internet goes down mid-day?",
+                "acceptedAnswer": {
+                    "@@type": "Answer",
+                    "text": "Keep selling. Bills print offline and sync to PRA automatically when the connection returns — no manual re-entry, no lost sales."
+                }
+            },
+            {
+                "@@type": "Question",
+                "name": "What do the NestPOS plans include?",
+                "acceptedAnswer": {
+                    "@@type": "Answer",
+                    "text": "Starter covers your owner account plus 1 team account with up to 500 PRA bills per month. Business adds up to 5 team accounts and 2,000 bills per month. Pro is the complete POS — full restaurant module, delivery riders & khata, public QR menu, analytics, 10 team accounts, 2 branches and 3,000 bills per month. Pro Max adds Staff Hazri (attendance) with 15 team accounts, 3 branches and 5,000 bills per month. Unlimited is fully unrestricted — Rider Live Tracking on a map, unlimited team accounts, unlimited branches, unlimited billing, every feature unlocked, with priority support."
+                }
+            }
+        ]
+    }
+    </script>
 </head>
 <body x-data="{ scrolled: false, mobileMenuOpen: false }" @scroll.window="scrolled = (window.pageYOffset > 20)">
 

@@ -121,6 +121,94 @@
             border-bottom: 1px solid transparent;
         }
     </style>
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@@context": "https://schema.org",
+        "@@graph": [
+            {
+                "@@type": "Organization",
+                "@@id": "https://taxnest.com.pk/#organization",
+                "name": "TaxNest",
+                "url": "https://taxnest.com.pk/",
+                "logo": {
+                    "@@type": "ImageObject",
+                    "url": "https://taxnest.com.pk/images/brand/taxnest-logo.svg"
+                },
+                "description": "Pakistan's FBR and PRA compliant tax, invoicing, and point-of-sale platform for retailers, restaurants, and wholesalers.",
+                "areaServed": "PK",
+                "foundingLocation": { "@@type": "Country", "name": "Pakistan" }
+            },
+            {
+                "@@type": "WebSite",
+                "@@id": "https://taxnest.com.pk/#website",
+                "url": "https://taxnest.com.pk/",
+                "name": "TaxNest",
+                "publisher": { "@@id": "https://taxnest.com.pk/#organization" }
+            },
+            {
+                "@@type": "SoftwareApplication",
+                "@@id": "https://taxnest.com.pk/#software",
+                "name": "TaxNest",
+                "applicationCategory": "BusinessApplication",
+                "operatingSystem": "Web",
+                "description": "Pakistan's FBR and PRA compliant tax, invoicing, and point-of-sale platform for retailers, restaurants, and wholesalers.",
+                "offers": { "@@type": "Offer", "price": "0", "priceCurrency": "PKR" },
+                "url": "https://taxnest.com.pk/",
+                "publisher": { "@@id": "https://taxnest.com.pk/#organization" }
+            }
+        ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+        "@@context": "https://schema.org",
+        "@@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@@type": "Question",
+                "name": "Is there a free trial?",
+                "acceptedAnswer": {
+                    "@@type": "Answer",
+                    "text": "Yes. Every product starts with a 3-day free trial — no credit card required. Register, get approved, and explore the full system before paying."
+                }
+            },
+            {
+                "@@type": "Question",
+                "name": "Are the three products connected to each other?",
+                "acceptedAnswer": {
+                    "@@type": "Answer",
+                    "text": "No — by design. Digital Invoice, NestPOS and FBR POS each have their own login, their own data and their own panel. Nothing leaks between products, which keeps every regulator's records clean."
+                }
+            },
+            {
+                "@@type": "Question",
+                "name": "What happens after I register?",
+                "acceptedAnswer": {
+                    "@@type": "Answer",
+                    "text": "Your company goes to our team for a quick review. While pending you can look around the whole panel; once approved, everything unlocks and your trial begins."
+                }
+            },
+            {
+                "@@type": "Question",
+                "name": "Does the POS keep working if the internet drops?",
+                "acceptedAnswer": {
+                    "@@type": "Answer",
+                    "text": "Yes. Bills keep printing offline and the system submits them to the authority automatically the moment connectivity returns — no manual re-entry."
+                }
+            },
+            {
+                "@@type": "Question",
+                "name": "Can I run branches and multiple staff accounts?",
+                "acceptedAnswer": {
+                    "@@type": "Answer",
+                    "text": "Yes. Plans include multiple users and branches with role-based access — cashiers, managers and admins each see exactly what they should, and every action lands in an immutable audit log."
+                }
+            }
+        ]
+    }
+    </script>
 </head>
 <body x-data="{ scrolled: false, mobileOpen: false }" @scroll.window="scrolled = (window.pageYOffset > 20)">
 

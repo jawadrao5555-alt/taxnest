@@ -166,6 +166,67 @@
             text-align: left;
         }
     </style>
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@@context": "https://schema.org",
+        "@@type": "SoftwareApplication",
+        "@@id": "https://taxnest.com.pk/digital-invoice#software",
+        "name": "TaxNest Digital Invoice",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "description": "FBR-compliant digital invoicing platform for Pakistani businesses — submit, track, and manage sales tax invoices with automated HS code assistance and sandbox testing.",
+        "offers": { "@@type": "Offer", "price": "0", "priceCurrency": "PKR" },
+        "url": "https://taxnest.com.pk/digital-invoice",
+        "publisher": {
+            "@@type": "Organization",
+            "@@id": "https://taxnest.com.pk/#organization",
+            "name": "TaxNest",
+            "url": "https://taxnest.com.pk/"
+        }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+        "@@context": "https://schema.org",
+        "@@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@@type": "Question",
+                "name": "Can I test invoices before sending them to FBR?",
+                "acceptedAnswer": {
+                    "@@type": "Answer",
+                    "text": "Yes. Every invoice is validated against FBR's rules before submission, and a sandbox environment lets you verify the full payload safely before anything touches production."
+                }
+            },
+            {
+                "@@type": "Question",
+                "name": "Which billing cycles are available for Digital Invoice?",
+                "acceptedAnswer": {
+                    "@@type": "Answer",
+                    "text": "Digital Invoice is fully flexible: pay Monthly, Quarterly (1% off), Semi-Annual (3% off) or Annual (6% off). You pick the cycle at checkout — no lock-in beyond the period you choose."
+                }
+            },
+            {
+                "@@type": "Question",
+                "name": "I don't know my HS codes. Does the system help?",
+                "acceptedAnswer": {
+                    "@@type": "Answer",
+                    "text": "Yes. As you type an item, the HS intelligence engine suggests matching codes and checks them against the correct tax schedule — so the right rate is applied before the invoice ever leaves your screen."
+                }
+            },
+            {
+                "@@type": "Question",
+                "name": "What happens if a submission fails?",
+                "acceptedAnswer": {
+                    "@@type": "Answer",
+                    "text": "Nothing is lost. The invoice stays in your panel with the exact FBR response, you fix the flagged field and resubmit. Duplicate protection makes sure a retry never creates a second invoice."
+                }
+            }
+        ]
+    }
+    </script>
 </head>
 <body class="relative min-h-[100dvh] flex flex-col" x-data="{ showLoginModal: {{ isset($showLogin) && $showLogin ? 'true' : 'false' }}, scrolled: false, mobileOpen: false }" @scroll.window="scrolled = (window.pageYOffset > 20)">
 

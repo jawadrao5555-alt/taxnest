@@ -4049,4 +4049,6 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'munafa_cost_note' => 'Lagat ka hisaab: sale ke waqt ka mehfooz khareed rate (average). Purane bills jin par rate mehfooz nahi tha un par mojooda average khareed rate lagta hai; jo products kabhi Stock & Purchase se receive nahi hue un ki lagat maloom nahi hoti.',
     'munafa_returns_note' => 'Wapsi (returns) khud minus ho jati hain.',
     'munafa_loyalty' => 'Points (loyalty) discount',
+    'admin_sound_on_hint' => 'Awaaz ON hai — band karne ke liye click karein',
+    'admin_sound_off_hint' => 'Awaaz OFF hai — on karne ke liye click karein',
 ];

@@ -4049,4 +4049,6 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'munafa_cost_note' => 'Cost basis: the purchase rate saved at sale time (average purchase price). Older bills without a saved rate use the current average purchase rate; products never received via Stock & Purchase show as unknown.',
     'munafa_returns_note' => 'Returns are subtracted automatically.',
     'munafa_loyalty' => 'Loyalty points redeemed',
+    'admin_sound_on_hint' => 'Sound is ON — click to turn it off',
+    'admin_sound_off_hint' => 'Sound is OFF — click to turn it on',
 ];

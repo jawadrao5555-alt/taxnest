@@ -246,7 +246,7 @@
                         var on = soundOn();
                         sideBtn.textContent = on ? '\uD83D\uDD14' : '\uD83D\uDD15';
                         sideBtn.style.color = on ? '#fbbf24' : '#9ca3af';
-                        sideBtn.title = on ? 'Awaaz ON hai — band karne ke liye click karein' : 'Awaaz OFF hai — on karne ke liye click karein';
+                        sideBtn.title = on ? @js(__('pos.admin_sound_on_hint')) : @js(__('pos.admin_sound_off_hint'));
                     }
                     if (sideBtn) {
                         syncSideBtn();

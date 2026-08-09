@@ -293,6 +293,18 @@ class PosController extends Controller
                 // last save from either page wins. Missing/invalid input keeps 80mm default.
                 'receipt_printer_size' => $request->input('rp_printer_size', $company->receipt_printer_size ?? '80mm'),
             ];
+            // Print Position + Left Margin (owner, 10 Aug 2026): same columns the
+            // Kitchen Settings save writes — receipts/proof bill/KOT read them all.
+            // Exposed HERE too so non-restaurant shops (no kitchen page) get margin
+            // control. hasColumn guards: PROD drift convention + minimal test schemas.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_align_center')
+                && $request->filled('rp_align_center')) {
+                $companyUpdates['kot_align_center'] = (bool) ((int) $request->input('rp_align_center'));
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_left_margin_mm')
+                && $request->filled('rp_left_margin_mm')) {
+                $companyUpdates['kot_left_margin_mm'] = max(0, min(30, (int) $request->input('rp_left_margin_mm')));
+            }
             // Order Matching (Aug 2026): same number on receipt + kitchen KOT.
             // off = nothing extra; token = daily token; code = unique ORD short code.
             // hasColumn guard: PROD drift self-heal convention + minimal test schemas.

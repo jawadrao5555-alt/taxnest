@@ -170,6 +170,30 @@
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.paper_size_hint') }}</p>
         </div>
 
+        {{-- Print Position + Left Margin (owner, 10 Aug 2026 — Pizza Master ask):
+             same company columns the Kitchen Settings page writes (kot_align_center /
+             kot_left_margin_mm) — they steer the RECEIPTS (80/58mm), proof bill AND
+             the KOT alike, so shops without the kitchen module get the control too.
+             Last save from either page wins, same convention as paper size. --}}
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-6">
+            <label class="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">📐 {{ __('pos.print_position') }} <span class="text-xs font-normal text-gray-500 dark:text-gray-400">{{ __('pos.applies_both_receipt_types') }}</span></label>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <select name="rp_align_center" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-purple-500 focus:ring-purple-500">
+                        <option value="0" {{ !($company->kot_align_center ?? false) ? 'selected' : '' }}>{{ __('pos.print_pos_left_edge') }}</option>
+                        <option value="1" {{ ($company->kot_align_center ?? false) ? 'selected' : '' }}>{{ __('pos.print_pos_center') }}</option>
+                    </select>
+                    <p class="text-[11px] text-amber-600 dark:text-amber-400 mt-1">{{ __('pos.print_pos_center_warn') }}</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">{{ __('pos.left_margin_mm') }}</label>
+                    <input type="number" name="rp_left_margin_mm" min="0" max="30" step="1" value="{{ (int) ($company->kot_left_margin_mm ?? 0) }}"
+                           class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-purple-500 focus:ring-purple-500">
+                    <p class="text-[11px] text-gray-400 mt-1">{{ __('pos.left_margin_mm_hint') }}</p>
+                </div>
+            </div>
+        </div>
+
         {{-- Order Matching (owner request 06 Aug 2026, customer voice notes): the
              sale receipt and the kitchen KOT carried DIFFERENT numbers (L-107 vs
              ORD-…), so counter staff couldn't pair a ready order with a bill.

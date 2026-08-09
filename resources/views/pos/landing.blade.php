@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#052730">
     <title>NestPOS — Keyboard-Fast POS with PRA Compliance</title>
+    <meta name="description" content="NestPOS is a keyboard-fast PRA-compliant POS system for Pakistani retail and restaurants — offline billing, automatic fiscal sync, and real-time sales reporting.">
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=playfair-display:400,600,700,900|inter:400,500,600,700,800|jetbrains-mono:400,700&display=swap" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])

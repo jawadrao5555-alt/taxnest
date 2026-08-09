@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#052730">
     <title>TaxNest — Tax Compliance Platform for Pakistan</title>
+    <meta name="description" content="TaxNest is Pakistan's all-in-one FBR and PRA compliance platform — digital invoicing, POS billing, and audit-ready reporting for businesses of every size.">
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])

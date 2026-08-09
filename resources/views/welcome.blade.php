@@ -5,7 +5,9 @@
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.6') }}">
 
-        <title>{{ config('app.name', 'Laravel') }}</title>
+        <title>TaxNest — Pakistan FBR &amp; PRA Tax Compliance Platform</title>
+        <meta name="robots" content="noindex">
+        <link rel="canonical" href="https://taxnest.com.pk/">
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">

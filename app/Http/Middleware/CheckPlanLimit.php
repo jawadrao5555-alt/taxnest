@@ -77,7 +77,12 @@ class CheckPlanLimit
         switch ($resource) {
             case 'terminals':
                 if ($plan->max_terminals !== null && (int) $plan->max_terminals >= 0) {
-                    $current = PosTerminal::where('company_id', $companyId)->where('is_active', true)->count();
+                    // FBR POS counters live in fbr_pos_terminals — counting the
+                    // PRA table here would let fbrpos companies add unlimited
+                    // counters (their PosTerminal count is always 0).
+                    $current = ($plan->product_type ?? null) === 'fbrpos'
+                        ? \App\Models\FbrPosTerminal::where('company_id', $companyId)->where('is_active', true)->count()
+                        : PosTerminal::where('company_id', $companyId)->where('is_active', true)->count();
                     if ($current >= (int) $plan->max_terminals) {
                         $exceeded = true;
                         $limitName = "terminals (max: {$plan->max_terminals})";

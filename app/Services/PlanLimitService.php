@@ -293,6 +293,41 @@ class PlanLimitService
         return ['allowed' => true, 'remaining' => $limit - $count];
     }
 
+    /**
+     * FBR POS counter (terminal) quota — active FbrPosTerminal rows vs plan
+     * max_terminals. The plan.limit:terminals route middleware guards CREATE;
+     * this covers the REACTIVATION path (toggle), which would otherwise
+     * bypass the cap via deactivate → create → reactivate.
+     * NULL / negative limit = unlimited (platform convention).
+     */
+    public static function canAddFbrTerminal(int $companyId): array
+    {
+        $company = \App\Models\Company::find($companyId);
+        if ($company && $company->is_internal_account) {
+            return ['allowed' => true, 'internal' => true];
+        }
+
+        $sub = self::getActiveSubscription($companyId);
+        if (!$sub || !$sub->pricingPlan) {
+            return ['allowed' => true];
+        }
+        if ($sub->hasActiveOverride()) {
+            return ['allowed' => true, 'override' => true];
+        }
+
+        $limit = $sub->pricingPlan->max_terminals;
+        if ($limit === null || (int) $limit < 0) {
+            return ['allowed' => true];
+        }
+
+        $count = \App\Models\FbrPosTerminal::where('company_id', $companyId)
+            ->where('is_active', true)->count();
+        if ($count >= (int) $limit) {
+            return ['allowed' => false, 'reason' => "Counter limit reached ({$count}/{$limit}). Please upgrade your package."];
+        }
+        return ['allowed' => true, 'remaining' => (int) $limit - $count];
+    }
+
     public static function canAddBranch(int $companyId): array
     {
         $company = \App\Models\Company::find($companyId);

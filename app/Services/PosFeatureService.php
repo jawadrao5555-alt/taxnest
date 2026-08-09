@@ -35,7 +35,7 @@ class PosFeatureService
      * active trial passes (evaluate-before-buying), otherwise the active
      * plan's column decides.
      */
-    public const PLAN_GATES = ['deals_enabled', 'riders_enabled', 'hazri_enabled', 'analytics_enabled', 'reports_enabled', 'rider_tracking_enabled', 'custom_access_enabled', 'qr_menu_enabled', 'offline_enabled', 'excel_enabled'];
+    public const PLAN_GATES = ['deals_enabled', 'riders_enabled', 'hazri_enabled', 'analytics_enabled', 'reports_enabled', 'rider_tracking_enabled', 'custom_access_enabled', 'qr_menu_enabled', 'offline_enabled', 'excel_enabled', 'khata_enabled', 'loyalty_enabled', 'kot_enabled'];
 
     public const FLAG_META = [
         'kot' => [
@@ -378,20 +378,42 @@ class PosFeatureService
         if ($company->is_internal_account) {
             $allowed = true;
         } else {
-            $sub = \App\Services\PlanLimitService::getActiveSubscription($company->id);
-            if ($sub) {
-                if ($sub->hasActiveOverride()) {
-                    $allowed = true;
-                } elseif ($sub->pricingPlan) {
-                    if (!\Illuminate\Support\Facades\Schema::hasColumn('pricing_plans', $planColumn)) {
-                        $allowed = true; // fail open until migration lands
-                    } elseif (!empty($sub->pricingPlan->{$planColumn})) {
+            try {
+                $sub = \App\Services\PlanLimitService::getActiveSubscription($company->id);
+                if ($sub) {
+                    if ($sub->hasActiveOverride()) {
                         $allowed = true;
+                    } elseif ($sub->pricingPlan) {
+                        if (!\Illuminate\Support\Facades\Schema::hasColumn('pricing_plans', $planColumn)) {
+                            $allowed = true; // fail open until migration lands
+                        } elseif (!empty($sub->pricingPlan->{$planColumn})) {
+                            $allowed = true;
+                        }
+                    }
+                    if (!$allowed && $sub->isTrialActive()) {
+                        $allowed = true; // trial companies evaluate everything
                     }
                 }
-                if (!$allowed && $sub->isTrialActive()) {
-                    $allowed = true; // trial companies evaluate everything
+            } catch (\Illuminate\Database\QueryException $e) {
+                // Fail OPEN only for SCHEMA-LAG faults (missing table/column:
+                // mid-migration PROD window, minimal test schemas) — same
+                // convention as the missing-column branch above. Any other DB
+                // error must propagate, or a real production fault would
+                // silently bypass every PRA + FBR premium gate.
+                $msg = $e->getMessage();
+                $schemaLag = str_contains($msg, 'no such table')
+                    || str_contains($msg, 'no such column')
+                    || str_contains($msg, 'Base table or view not found')
+                    || str_contains($msg, 'Unknown column');
+                if (!$schemaLag) {
+                    throw $e;
                 }
+                \Illuminate\Support\Facades\Log::warning('planAllows fail-open (schema lag)', [
+                    'company_id' => $company->id,
+                    'column' => $planColumn,
+                    'error' => $msg,
+                ]);
+                $allowed = true;
             }
         }
 

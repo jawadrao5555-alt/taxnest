@@ -13,10 +13,18 @@
 
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-5 mb-5">
         <h2 class="font-bold mb-3 text-gray-900 dark:text-white">{{ __('pos.add_new_counter_plus') }}</h2>
-        <form method="POST" action="{{ route('fbrpos.phase2.terminals.store') }}" class="grid sm:grid-cols-3 gap-3">
+        <form method="POST" action="{{ route('fbrpos.phase2.terminals.store') }}" class="grid sm:grid-cols-{{ ($branches ?? collect())->isNotEmpty() ? '4' : '3' }} gap-3">
             @csrf
             <input type="text" name="terminal_name" placeholder="{{ __('pos.ph_eg_counter_1') }}" required class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white">
             <input type="text" name="location" placeholder="{{ __('pos.ph_location_optional') }}" class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white">
+            @if(($branches ?? collect())->isNotEmpty())
+            <select name="branch_id" class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white">
+                <option value="">{{ __('pos.main_branch') }}</option>
+                @foreach($branches as $b)
+                <option value="{{ $b->id }}">{{ $b->name }}</option>
+                @endforeach
+            </select>
+            @endif
             <button class="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-blue-700">{{ __('pos.add_counter') }}</button>
         </form>
     </div>
@@ -25,7 +33,7 @@
         <table class="w-full text-sm table-cards">
             <thead class="bg-gray-50 dark:bg-gray-700 text-left">
                 <tr>
-                    <th class="px-4 py-3">{{ __('pos.th_name') }}</th><th>{{ __('pos.th_code') }}</th><th>{{ __('pos.th_location') }}</th><th>{{ __('pos.th_status') }}</th><th class="text-right pr-4">{{ __('pos.th_actions') }}</th>
+                    <th class="px-4 py-3">{{ __('pos.th_name') }}</th><th>{{ __('pos.th_code') }}</th><th>{{ __('pos.th_location') }}</th>@if(($branches ?? collect())->isNotEmpty())<th>{{ __('pos.branch_word') }}</th>@endif<th>{{ __('pos.th_status') }}</th><th class="text-right pr-4">{{ __('pos.th_actions') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -34,6 +42,9 @@
                     <td class="px-4 py-3 font-semibold dark:text-white">{{ $t->terminal_name }}</td>
                     <td class="dark:text-gray-300"><code>{{ $t->terminal_code }}</code></td>
                     <td class="dark:text-gray-300">{{ $t->location ?? '—' }}</td>
+                    @if(($branches ?? collect())->isNotEmpty())
+                    <td class="dark:text-gray-300">{{ optional($branches->firstWhere('id', $t->branch_id))->name ?? __('pos.main_branch') }}</td>
+                    @endif
                     <td>@if($t->is_active)<span class="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs">{{ __('pos.active_word') }}</span>@else<span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">{{ __('pos.inactive_word') }}</span>@endif</td>
                     <td class="text-right pr-4 py-3">
                         <form method="POST" action="{{ route('fbrpos.phase2.terminals.toggle', $t->id) }}" class="inline">
@@ -47,7 +58,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">{{ __('pos.no_counters_yet') }}</td></tr>
+                <tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">{{ __('pos.no_counters_yet') }}</td></tr>
             @endforelse
             </tbody>
         </table>

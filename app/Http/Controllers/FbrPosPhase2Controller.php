@@ -20,6 +20,8 @@ use Illuminate\Support\Str;
 
 class FbrPosPhase2Controller extends Controller
 {
+    use \App\Http\Controllers\Concerns\FbrPlanGate;
+
     private function user() { return Auth::guard('fbrpos')->user(); }
     private function companyId(): int { return (int) $this->user()->company_id; }
 
@@ -29,7 +31,9 @@ class FbrPosPhase2Controller extends Controller
     {
         $terminals = FbrPosTerminal::where('company_id', $this->companyId())
             ->orderBy('terminal_name')->get();
-        return view('fbr-pos.phase2.terminals', compact('terminals'));
+        $branches = \App\Models\Branch::where('company_id', $this->companyId())
+            ->orderBy('name')->get();
+        return view('fbr-pos.phase2.terminals', compact('terminals', 'branches'));
     }
 
     public function storeTerminal(Request $r)
@@ -37,10 +41,20 @@ class FbrPosPhase2Controller extends Controller
         $r->validate([
             'terminal_name' => 'required|string|max:100',
             'location' => 'nullable|string|max:100',
+            'branch_id' => 'nullable|integer',
         ]);
+        // Branch must belong to THIS company; anything else = main shop (null).
+        $branchId = null;
+        if ($r->filled('branch_id')) {
+            $branchId = (int) $r->branch_id;
+            if (!\App\Models\Branch::where('company_id', $this->companyId())->where('id', $branchId)->exists()) {
+                $branchId = null;
+            }
+        }
         $code = 'FBR-' . strtoupper(Str::random(4)) . '-C' . $this->companyId();
         FbrPosTerminal::create([
             'company_id' => $this->companyId(),
+            'branch_id' => $branchId,
             'terminal_name' => $r->terminal_name,
             'terminal_code' => $code,
             'location' => $r->location,
@@ -52,6 +66,15 @@ class FbrPosPhase2Controller extends Controller
     public function toggleTerminal($id)
     {
         $t = FbrPosTerminal::where('company_id', $this->companyId())->findOrFail($id);
+        // Reactivation re-checks the counter quota — otherwise deactivate →
+        // create → reactivate silently bypasses max_terminals (same pattern
+        // as PRA toggleCashier).
+        if (!$t->is_active) {
+            $check = \App\Services\PlanLimitService::canAddFbrTerminal($this->companyId());
+            if (!($check['allowed'] ?? true)) {
+                return back()->with('error', $check['reason'] ?? __('pos.plan_locked_feature'));
+            }
+        }
         $t->update(['is_active' => !$t->is_active]);
         return back()->with('success', 'Counter ' . ($t->is_active ? 'activated' : 'deactivated'));
     }
@@ -171,6 +194,7 @@ class FbrPosPhase2Controller extends Controller
 
     public function promotions()
     {
+        if ($resp = $this->fbrPlanGate('deals_enabled')) return $resp;
         $promos = FbrPosPromotion::where('company_id', $this->companyId())
             ->orderByDesc('id')->paginate(20);
         return view('fbr-pos.phase2.promotions', compact('promos'));
@@ -178,6 +202,7 @@ class FbrPosPhase2Controller extends Controller
 
     public function storePromotion(Request $r)
     {
+        if ($resp = $this->fbrPlanGate('deals_enabled')) return $resp;
         $r->validate([
             'name' => 'required|string|max:100',
             'code' => 'nullable|string|max:50',
@@ -209,6 +234,7 @@ class FbrPosPhase2Controller extends Controller
 
     public function togglePromotion($id)
     {
+        if ($resp = $this->fbrPlanGate('deals_enabled')) return $resp;
         $p = FbrPosPromotion::where('company_id', $this->companyId())->findOrFail($id);
         $p->update(['is_active' => !$p->is_active]);
         return back()->with('success', 'Promotion ' . ($p->is_active ? 'activated' : 'deactivated'));
@@ -216,12 +242,18 @@ class FbrPosPhase2Controller extends Controller
 
     public function deletePromotion($id)
     {
+        if ($resp = $this->fbrPlanGate('deals_enabled')) return $resp;
         FbrPosPromotion::where('company_id', $this->companyId())->where('id', $id)->delete();
         return back()->with('success', 'Promotion deleted');
     }
 
     public function validatePromo(Request $r)
     {
+        // Operational deals gate (not just the management pages): a plan
+        // without deals_enabled must not be able to APPLY promo codes either.
+        if (!$this->fbrPlanAllows('deals_enabled')) {
+            return response()->json(['ok' => false, 'msg' => __('pos.plan_locked_feature')]);
+        }
         $r->validate(['code' => 'required|string', 'subtotal' => 'required|numeric']);
         $promo = FbrPosPromotion::where('company_id', $this->companyId())
             ->where('code', strtoupper($r->code))->first();
@@ -241,6 +273,7 @@ class FbrPosPhase2Controller extends Controller
 
     public function loyaltySettings(Request $r)
     {
+        if ($resp = $this->fbrPlanGate('loyalty_enabled')) return $resp;
         $settings = FbrPosLoyaltySetting::forCompany($this->companyId());
 
         if ($r->isMethod('post')) {
@@ -264,6 +297,10 @@ class FbrPosPhase2Controller extends Controller
 
     public function customerPoints($phone)
     {
+        // Operational loyalty gate — mirror of validatePromo's deals gate.
+        if (!$this->fbrPlanAllows('loyalty_enabled')) {
+            return response()->json(['ok' => false, 'msg' => __('pos.plan_locked_feature')]);
+        }
         $customer = PosCustomer::where('company_id', $this->companyId())
             ->where('phone', $phone)->first();
         if (!$customer) return response()->json(['ok' => false]);

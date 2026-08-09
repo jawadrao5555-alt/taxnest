@@ -20,6 +20,13 @@ class TutorialVideoOwnerControlsTest extends TestCase
 
     private function makeVideo(array $attrs): TutorialVideo
     {
+        // RefreshDatabase runs the real migrations, and some of them SEED
+        // tutorial_videos rows (e.g. rider-live-tracking, 9 Aug 2026 batch).
+        // Drop any same-slug seed row so the test always exercises a fresh
+        // controls_applied=false row instead of hitting the unique index.
+        if (!empty($attrs['slug'])) {
+            TutorialVideo::where('slug', $attrs['slug'])->delete();
+        }
         return TutorialVideo::create($attrs + [
             'title' => 'Test',
             'video_url' => '/videos/tutorials/x.mp4',

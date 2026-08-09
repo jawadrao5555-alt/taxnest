@@ -4069,4 +4069,18 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'se_whatsapp' => 'WhatsApp par Rabta',
     'se_later' => 'Baad Mein',
     'se_6h_note' => 'Yeh yaad-dahani har 6 ghante baad dobara aayegi jab tak renewal mukammal na ho.',
+
+    // FBR POS team & branches (Aug 2026 feature-infrastructure pass)
+    'member_added' => 'Team member add ho gaya.',
+    'member_updated' => 'Team member update ho gaya.',
+    'branch_word' => 'Branch',
+    'branches_title' => 'Branches',
+    'branches_desc' => 'Apni dukan ki branches manage karein',
+    'add_branch' => 'Branch Add Karein',
+    'ph_branch_name' => 'Misal: Main Branch',
+    'city_word' => 'Sheher',
+    'branch_added' => 'Branch add ho gayi.',
+    'branch_updated' => 'Branch save ho gayi.',
+    'no_branches_yet' => 'Abhi koi branch nahi — poori dukan aik hi branch hai.',
+    'main_branch' => 'Main dukan',
 ];

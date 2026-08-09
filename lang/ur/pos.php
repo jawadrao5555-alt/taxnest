@@ -4069,4 +4069,18 @@ return [
     'se_whatsapp' => 'واٹس ایپ پر رابطہ',
     'se_later' => 'بعد میں',
     'se_6h_note' => 'یہ یاد دہانی ہر چھ گھنٹے بعد دوبارہ آئے گی جب تک تجدید مکمل نہ ہو۔',
+
+    // FBR POS team & branches (Aug 2026 feature-infrastructure pass)
+    'member_added' => 'ٹیم رکن شامل ہو گیا۔',
+    'member_updated' => 'ٹیم رکن کی معلومات محفوظ ہو گئیں۔',
+    'branch_word' => 'برانچ',
+    'branches_title' => 'برانچیں',
+    'branches_desc' => 'اپنی دکان کی برانچیں سنبھالیں',
+    'add_branch' => 'برانچ شامل کریں',
+    'ph_branch_name' => 'مثلاً: مرکزی برانچ',
+    'city_word' => 'شہر',
+    'branch_added' => 'برانچ شامل ہو گئی۔',
+    'branch_updated' => 'برانچ محفوظ ہو گئی۔',
+    'no_branches_yet' => 'ابھی کوئی برانچ نہیں — پوری دکان ایک ہی برانچ ہے۔',
+    'main_branch' => 'مرکزی دکان',
 ];

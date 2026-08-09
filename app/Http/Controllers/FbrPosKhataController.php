@@ -16,6 +16,8 @@ use Illuminate\Support\Facades\DB;
  */
 class FbrPosKhataController extends Controller
 {
+    use \App\Http\Controllers\Concerns\FbrPlanGate;
+
     private function user() { return Auth::guard('fbrpos')->user(); }
     private function companyId(): int { return (int) $this->user()->company_id; }
 
@@ -33,6 +35,7 @@ class FbrPosKhataController extends Controller
 
     public function index(Request $request)
     {
+        if ($resp = $this->fbrPlanGate('khata_enabled')) return $resp;
         $this->assertNotCashier();
         $companyId = $this->companyId();
 
@@ -58,6 +61,7 @@ class FbrPosKhataController extends Controller
 
     public function ledger($customerId)
     {
+        if ($resp = $this->fbrPlanGate('khata_enabled')) return $resp;
         $this->assertNotCashier();
         $companyId = $this->companyId();
         $customer = PosCustomer::where('company_id', $companyId)->findOrFail($customerId);
@@ -91,6 +95,7 @@ class FbrPosKhataController extends Controller
 
     public function wasooli(Request $request)
     {
+        if ($resp = $this->fbrPlanGate('khata_enabled')) return $resp;
         $this->assertNotCashier();
         $request->validate([
             'customer_id' => 'required|integer',

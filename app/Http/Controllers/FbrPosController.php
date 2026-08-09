@@ -18,6 +18,8 @@ use Illuminate\Support\Str;
 
 class FbrPosController extends Controller
 {
+    use \App\Http\Controllers\Concerns\FbrPlanGate;
+
     // 🎯 VALUE MODE — UoM gating: only measure-based UoMs allow value(Rs) → qty derivation
     // Per FBR PRAL spec: weight/volume/length UoMs accept decimal qty; piece-based UoMs do not.
     const VALUE_MODE_UOMS = ['KG', 'GM', 'LTR', 'ML', 'MTR', 'SQM'];
@@ -643,9 +645,16 @@ class FbrPosController extends Controller
             ->where('user_id', Auth::guard('fbrpos')->id())
             ->where('status', 'open')->latest('id')->first();
         $loyaltySettings = \App\Models\FbrPosLoyaltySetting::forCompany($companyId);
+        if (!$this->fbrPlanAllows('loyalty_enabled')) {
+            // Display-only mask (never saved): plan without loyalty must not
+            // offer redemption on the sale screen; store() rejects it too.
+            $loyaltySettings->is_enabled = false;
+        }
         $heldCount = \App\Models\FbrPosHeldSale::where('company_id', $companyId)->count();
-        $activePromos = \App\Models\FbrPosPromotion::where('company_id', $companyId)
-            ->where('is_active', true)->orderByDesc('id')->limit(20)->get();
+        $activePromos = $this->fbrPlanAllows('deals_enabled')
+            ? \App\Models\FbrPosPromotion::where('company_id', $companyId)
+                ->where('is_active', true)->orderByDesc('id')->limit(20)->get()
+            : collect();
 
         // 🌐 Classic create screen RETIRED (Aug 2026, owner order): the universal
         // screen is the ONLY FBR sale screen — fbr_universal_enabled no longer
@@ -986,6 +995,14 @@ class FbrPosController extends Controller
                 // Phase 2: Promotion discount (cart-level, separate from manual discount)
                 $promotionDiscount = 0;
                 $promo = null;
+                // Operational deals gate: a plan without deals_enabled must not
+                // APPLY promotions at billing time (management pages are gated
+                // separately). Explicit reject — never a silent total mismatch.
+                if ($request->promotion_id && !$this->fbrPlanAllows('deals_enabled')) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'promotion_id' => __('pos.plan_locked_feature'),
+                    ]);
+                }
                 if ($request->promotion_id) {
                     $promo = \App\Models\FbrPosPromotion::where('company_id', $companyId)
                         ->where('id', $request->promotion_id)->where('is_active', true)->first();
@@ -1002,6 +1019,14 @@ class FbrPosController extends Controller
                 $loyaltyRedemptionAmount = 0;
                 $loyaltyPointsRedeemed = (int) ($request->loyalty_points_redeemed ?? 0);
                 $loyaltySettings = \App\Models\FbrPosLoyaltySetting::forCompany($companyId);
+                // Operational loyalty gate — redemption changes the payable
+                // total, so reject explicitly when the plan lacks loyalty.
+                $loyaltyPlanOk = $this->fbrPlanAllows('loyalty_enabled');
+                if ($loyaltyPointsRedeemed > 0 && !$loyaltyPlanOk) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'loyalty_points_redeemed' => __('pos.plan_locked_feature'),
+                    ]);
+                }
                 if ($loyaltyPointsRedeemed > 0 && $loyaltySettings->is_enabled && $request->customer_id) {
                     $customer = \App\Models\PosCustomer::where('company_id', $companyId)
                         ->where('id', $request->customer_id)->first();
@@ -1019,9 +1044,11 @@ class FbrPosController extends Controller
                 $totalAmount = round($subtotal - $discountAmount + $totalTax + $fbrServiceCharge - $loyaltyRedemptionAmount, 2);
                 if ($totalAmount < 0) $totalAmount = 0;
 
-                // Loyalty earn (1 point per rs_per_point on net total)
+                // Loyalty earn (1 point per rs_per_point on net total) —
+                // accrual silently skipped when the plan lacks loyalty (earn
+                // never changes the payable total, so no hard reject needed).
                 $loyaltyPointsEarned = 0;
-                if ($loyaltySettings->is_enabled && $request->customer_id && $loyaltySettings->rs_per_point > 0) {
+                if ($loyaltyPlanOk && $loyaltySettings->is_enabled && $request->customer_id && $loyaltySettings->rs_per_point > 0) {
                     $loyaltyPointsEarned = (int) floor($totalAmount / (float) $loyaltySettings->rs_per_point);
                 }
 
@@ -1031,6 +1058,15 @@ class FbrPosController extends Controller
                 if ($request->payment_method === 'credit' && !$request->customer_id) {
                     throw \Illuminate\Validation\ValidationException::withMessages([
                         'customer_id' => 'Udhaar bill ke liye customer chunna zaroori hai.',
+                    ]);
+                }
+                // Plan gate (strict feature binding): khata/udhaar sale needs
+                // a plan with khata_enabled — same source hierarchy as PRA
+                // (internal/override/trial pass via planAllows).
+                if ($request->payment_method === 'credit'
+                    && !$this->fbrPlanAllows('khata_enabled')) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'payment_method' => __('pos.plan_locked_feature'),
                     ]);
                 }
                 // Tenant guard: the chosen customer must belong to THIS company —
@@ -2106,6 +2142,7 @@ class FbrPosController extends Controller
      */
     public function kotTicket(int $id)
     {
+        if ($resp = $this->fbrPlanGate('kot_enabled')) return $resp;
         $companyId = app('currentCompanyId');
         $company   = Company::find($companyId);
         $held      = \App\Models\FbrPosHeldSale::where('company_id', $companyId)->findOrFail($id);
@@ -2132,6 +2169,7 @@ class FbrPosController extends Controller
      */
     public function kotReprint(int $id)
     {
+        if ($resp = $this->fbrPlanGate('kot_enabled')) return $resp;
         $companyId = app('currentCompanyId');
         $company   = Company::find($companyId);
 
@@ -2307,6 +2345,7 @@ class FbrPosController extends Controller
         if (Auth::guard('fbrpos')->user()->role !== 'company_admin') {
             return response()->json(['success' => false, 'message' => __('pos.only_company_admin_toggle_fbr')], 403);
         }
+        if ($resp = $this->fbrPlanGate('kot_enabled')) return $resp;
 
         $companyId = app('currentCompanyId');
         $company   = Company::findOrFail($companyId);
@@ -2560,6 +2599,7 @@ class FbrPosController extends Controller
      */
     public function reportsAnalyticsPdf(Request $request)
     {
+        if ($resp = $this->fbrPlanGate('analytics_enabled')) return $resp;
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
@@ -2571,6 +2611,214 @@ class FbrPosController extends Controller
             compact('company', 'analytics'),
             'FBR-Sales-Analytics-' . $analytics->from . '-to-' . $analytics->to . '.pdf'
         );
+    }
+
+    /**
+     * CSV export of range transactions (FBR mirror of PosController::exportReportCsv).
+     * reports_enabled plan gate; cashiers/viewers are locked to their own sales.
+     * GET /fbr-pos/reports/export-csv?from=&to=&branch_id=
+     */
+    public function exportReportCsv(Request $request)
+    {
+        if ($resp = $this->fbrPlanGate('reports_enabled')) return $resp;
+
+        $companyId = app('currentCompanyId');
+        [$from, $to] = $this->resolveFbrReportRange($request);
+        $user = Auth::guard('fbrpos')->user();
+
+        $q = FbrPosTransaction::where('company_id', $companyId)
+            ->whereBetween('created_at', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
+            ->with('creator:id,name')
+            ->orderBy('created_at');
+        if ($user && in_array($user->pos_role ?? '', ['pos_cashier', 'local_viewer'], true)) {
+            $q->where('created_by', $user->id);
+        }
+        // Branch isolation, resolved SERVER-side: a requested branch must be
+        // accessible to THIS user (admin = all, manager = pivot branches,
+        // cashier = own branch only); with no explicit request the active
+        // branch context applies (legacy NULL rows stay visible, same
+        // convention as BranchContextService::applyToQuery everywhere else).
+        $branchCtx = app(\App\Services\BranchContextService::class);
+        if ($request->filled('branch_id')) {
+            $requestedBranch = (int) $request->branch_id;
+            abort_unless(!$user || $branchCtx->canAccess($requestedBranch), 403, __('pos.access_denied'));
+            $q->where('branch_id', $requestedBranch);
+        } else {
+            $branchCtx->applyToQuery($q);
+        }
+
+        $filename = 'FBR-Sales-' . $from->toDateString() . '-to-' . $to->toDateString() . '.csv';
+        return response()->streamDownload(function () use ($q) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['Date', 'Invoice #', 'FBR Invoice #', 'Customer', 'Payment', 'Subtotal', 'Discount', 'Tax', 'Total', 'FBR Status', 'Staff']);
+            $q->chunk(500, function ($rows) use ($out) {
+                foreach ($rows as $t) {
+                    fputcsv($out, [
+                        $t->created_at->format('Y-m-d H:i'),
+                        $t->invoice_number,
+                        $t->fbr_invoice_number,
+                        $t->customer_name,
+                        $t->payment_method,
+                        $t->subtotal,
+                        $t->discount_amount,
+                        $t->tax_amount,
+                        $t->total_amount,
+                        $t->fbr_status,
+                        $t->creator->name ?? '',
+                    ]);
+                }
+            });
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 👥 TEAM MANAGEMENT — FBR twin of /pos/team (strict feature binding
+    // pass, Aug 2026). Owner/pos_admin only; quota = plan user_limit via
+    // PlanLimitService::canAddPosUser (pos_manager + pos_cashier count).
+    // ═══════════════════════════════════════════════════════════════════
+
+    /** Team management is owner/admin only (managers/cashiers never see it). */
+    private function fbrTeamAdminOnly(): void
+    {
+        $u = Auth::guard('fbrpos')->user();
+        if (!$u || !($u->role === 'company_admin' || ($u->pos_role ?? '') === 'pos_admin')) {
+            abort(403, __('pos.access_denied'));
+        }
+    }
+
+    public function fbrTeam()
+    {
+        $this->fbrTeamAdminOnly();
+        $companyId = app('currentCompanyId');
+
+        $team = \App\Models\User::where('company_id', $companyId)
+            ->whereIn('pos_role', ['pos_admin', 'pos_manager', 'pos_cashier'])
+            ->orderByRaw("CASE WHEN pos_role = 'pos_admin' THEN 0 WHEN pos_role = 'pos_manager' THEN 1 ELSE 2 END")
+            ->orderBy('name')
+            ->get();
+
+        // Owner rule (Jul 2026, same as PRA): admin can VIEW stored team
+        // passwords. Decrypted server-side, team roles only, admin-gated page.
+        $teamPasswords = [];
+        foreach ($team as $member) {
+            if (in_array($member->pos_role, ['pos_cashier', 'pos_manager'], true)
+                && !empty($member->pos_team_password_enc)) {
+                try {
+                    $teamPasswords[$member->id] = \Illuminate\Support\Facades\Crypt::decryptString($member->pos_team_password_enc);
+                } catch (\Throwable $e) {
+                    // APP_KEY rotated / corrupt payload — treat as "not stored".
+                }
+            }
+        }
+
+        $branches = \App\Models\Branch::where('company_id', $companyId)->orderBy('name')->get();
+        $quota = \App\Services\PlanLimitService::canAddPosUser($companyId);
+
+        return view('fbr-pos.team', compact('team', 'teamPasswords', 'branches', 'quota'));
+    }
+
+    public function fbrStoreTeamMember(Request $request)
+    {
+        $this->fbrTeamAdminOnly();
+        $companyId = app('currentCompanyId');
+
+        $request->validate([
+            'name' => 'required|string|max:100',
+            'email' => 'required|email|max:150|unique:users,email',
+            'password' => 'required|string|min:6|max:100',
+            'pos_role' => 'required|in:pos_cashier,pos_manager',
+            'default_branch_id' => 'nullable|integer',
+        ]);
+
+        $check = \App\Services\PlanLimitService::canAddPosUser($companyId);
+        if (!($check['allowed'] ?? true)) {
+            return back()->with('error', $check['reason'] ?? __('pos.plan_locked_feature'));
+        }
+
+        $user = new \App\Models\User();
+        $user->name = $request->name;
+        $user->email = $request->email;
+        $user->password = \Illuminate\Support\Facades\Hash::make($request->password);
+        $user->company_id = $companyId;
+        $user->role = 'employee';
+        $user->pos_role = $request->pos_role;
+        $user->is_active = true;
+        $user->default_branch_id = $this->fbrResolveBranchId($request, $companyId);
+        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_team_password_enc')) {
+            $user->pos_team_password_enc = \Illuminate\Support\Facades\Crypt::encryptString($request->password);
+        }
+        $user->save();
+
+        return back()->with('success', __('pos.member_added'));
+    }
+
+    public function fbrUpdateTeamMember(Request $request, int $id)
+    {
+        $this->fbrTeamAdminOnly();
+        $companyId = app('currentCompanyId');
+
+        // Never lets the admin row be edited through this path.
+        $member = \App\Models\User::where('company_id', $companyId)
+            ->whereIn('pos_role', ['pos_cashier', 'pos_manager'])
+            ->findOrFail($id);
+
+        $request->validate([
+            'name' => 'required|string|max:100',
+            'email' => 'required|email|max:150|unique:users,email,' . $member->id,
+            'password' => 'nullable|string|min:6|max:100',
+            'pos_role' => 'required|in:pos_cashier,pos_manager',
+            'default_branch_id' => 'nullable|integer',
+        ]);
+
+        $member->name = $request->name;
+        $member->email = $request->email;
+        $member->pos_role = $request->pos_role;
+        $member->default_branch_id = $this->fbrResolveBranchId($request, $companyId);
+        if ($request->filled('password')) {
+            $member->password = \Illuminate\Support\Facades\Hash::make($request->password);
+            if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_team_password_enc')) {
+                $member->pos_team_password_enc = \Illuminate\Support\Facades\Crypt::encryptString($request->password);
+            }
+        }
+        $member->save();
+
+        return back()->with('success', __('pos.member_updated'));
+    }
+
+    public function fbrToggleTeamMember(int $id)
+    {
+        $this->fbrTeamAdminOnly();
+        $companyId = app('currentCompanyId');
+
+        $member = \App\Models\User::where('company_id', $companyId)
+            ->whereIn('pos_role', ['pos_cashier', 'pos_manager'])
+            ->findOrFail($id);
+
+        // Reactivation re-checks the quota (deactivate → create → reactivate
+        // must not bypass user_limit — same rule as PRA toggleCashier).
+        if (!$member->is_active) {
+            $check = \App\Services\PlanLimitService::canAddPosUser($companyId);
+            if (!($check['allowed'] ?? true)) {
+                return back()->with('error', $check['reason'] ?? __('pos.plan_locked_feature'));
+            }
+        }
+
+        $member->is_active = !$member->is_active;
+        $member->save();
+
+        return back()->with('success', $member->is_active ? __('pos.activate') : __('pos.deactivate'));
+    }
+
+    /** Company-owned branch id from the request, or null (main shop). */
+    private function fbrResolveBranchId(Request $request, int $companyId): ?int
+    {
+        if (!$request->filled('default_branch_id')) {
+            return null;
+        }
+        $branchId = (int) $request->default_branch_id;
+        return \App\Models\Branch::where('company_id', $companyId)->where('id', $branchId)->exists()
+            ? $branchId : null;
     }
 
     /**
@@ -3587,6 +3835,7 @@ class FbrPosController extends Controller
         // other product actions (null user = direct/CLI test invocation, allowed).
         $u = Auth::guard('fbrpos')->user();
         if ($u && $u->role !== 'company_admin') abort(403, 'Only admin can manage products.');
+        if ($resp = $this->fbrPlanGate('excel_enabled')) return $resp;
 
         $companyId = app('currentCompanyId');
         $existingProducts = Product::where('company_id', $companyId)->orderBy('name')->get();
@@ -3669,6 +3918,7 @@ class FbrPosController extends Controller
     {
         $u = Auth::guard('fbrpos')->user();
         if ($u && $u->role !== 'company_admin') abort(403, 'Only admin can manage products.');
+        if ($resp = $this->fbrPlanGate('excel_enabled')) return $resp;
 
         $companyId = app('currentCompanyId');
 

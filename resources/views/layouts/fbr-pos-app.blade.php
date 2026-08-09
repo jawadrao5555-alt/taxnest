@@ -518,6 +518,16 @@
 
                                 <div class="border-t border-gray-100 dark:border-gray-700 py-1">
                                     <p class="px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ __('pos.settings') }}</p>
+                                    @if (auth('fbrpos')->user()->role === 'company_admin' || (auth('fbrpos')->user()->pos_role ?? '') === 'pos_admin')
+                                    <a href="{{ route('fbrpos.team') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                        {{ __('pos.team_management') }}
+                                    </a>
+                                    <a href="{{ route('fbrpos.branches') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18M3 7v14m18-14v14M6 11h.01M6 15h.01M10 11h.01M10 15h.01M14 11h.01M14 15h.01M18 11h.01M18 15h.01M4 7l8-4 8 4H4z"/></svg>
+                                        {{ __('pos.branches_title') }}
+                                    </a>
+                                    @endif
                                     <a href="{{ route('fbrpos.business-profile') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                                         {{ __('pos.nav_business_profile') }}
@@ -698,6 +708,16 @@
                         <a href="{{ route('fbrpos.munafa') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.munafa') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
                             {{ __('pos.munafa_report') }}
+                        </a>
+                        @endif
+                        @if (auth('fbrpos')->user()->role === 'company_admin' || (auth('fbrpos')->user()->pos_role ?? '') === 'pos_admin')
+                        <a href="{{ route('fbrpos.team') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.team') ? $sidebarActive : $sidebarInactive }}">
+                            <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                            {{ __('pos.team_management') }}
+                        </a>
+                        <a href="{{ route('fbrpos.branches') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.branches') ? $sidebarActive : $sidebarInactive }}">
+                            <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21h18M3 7v14m18-14v14M6 11h.01M6 15h.01M10 11h.01M10 15h.01M14 11h.01M14 15h.01M18 11h.01M18 15h.01M4 7l8-4 8 4H4z"/></svg>
+                            {{ __('pos.branches_title') }}
                         </a>
                         @endif
                     </div>

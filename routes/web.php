@@ -1218,6 +1218,19 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/api/check-pin-session', [FbrPosController::class, 'checkPinSession'])->name('fbrpos.api.check-pin-session');
     Route::get('/billing', [FbrPosController::class, 'billing'])->name('fbrpos.billing');
     Route::get('/reports', [FbrPosController::class, 'reports'])->name('fbrpos.reports');
+    Route::get('/reports/export-csv', [FbrPosController::class, 'exportReportCsv'])->name('fbrpos.reports.export-csv');
+
+    // 👥 Team management (FBR twin of /pos/team) — admin-only in controller.
+    Route::get('/team', [FbrPosController::class, 'fbrTeam'])->name('fbrpos.team');
+    Route::post('/team', [FbrPosController::class, 'fbrStoreTeamMember'])->name('fbrpos.team.store');
+    Route::put('/team/{id}', [FbrPosController::class, 'fbrUpdateTeamMember'])->name('fbrpos.team.update');
+    Route::post('/team/{id}/toggle', [FbrPosController::class, 'fbrToggleTeamMember'])->name('fbrpos.team.toggle');
+
+    // 🏬 Branch management (multi-branch v1) — admin-only in controller.
+    Route::get('/branches', [\App\Http\Controllers\FbrPosBranchController::class, 'index'])->name('fbrpos.branches');
+    Route::post('/branches', [\App\Http\Controllers\FbrPosBranchController::class, 'store'])->name('fbrpos.branches.store');
+    Route::put('/branches/{id}', [\App\Http\Controllers\FbrPosBranchController::class, 'update'])->name('fbrpos.branches.update');
+    Route::post('/branches/{id}/toggle', [\App\Http\Controllers\FbrPosBranchController::class, 'toggle'])->name('fbrpos.branches.toggle');
     Route::get('/tax-reports', [FbrPosController::class, 'taxReports'])->name('fbrpos.tax-reports');
     Route::match(['get', 'post'], '/business-profile', [FbrPosController::class, 'businessProfile'])->name('fbrpos.business-profile');
     Route::match(['get', 'post'], '/my-profile', [FbrPosController::class, 'myProfile'])->name('fbrpos.my-profile');
@@ -1277,7 +1290,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     // -------------------------------------------------------- Phase 2: Mall-Grade Universal Features --------------------------------------------------------
     // Terminals (multi-counter)
     Route::get('/terminals', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'terminals'])->name('fbrpos.phase2.terminals');
-    Route::post('/terminals', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'storeTerminal'])->name('fbrpos.phase2.terminals.store');
+    Route::post('/terminals', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'storeTerminal'])->middleware('plan.limit:terminals')->name('fbrpos.phase2.terminals.store');
     Route::post('/terminals/{id}/toggle', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'toggleTerminal'])->name('fbrpos.phase2.terminals.toggle');
     Route::delete('/terminals/{id}', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'deleteTerminal'])->name('fbrpos.phase2.terminals.delete');
 

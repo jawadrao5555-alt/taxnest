@@ -4069,4 +4069,18 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'se_whatsapp' => 'Contact on WhatsApp',
     'se_later' => 'Later',
     'se_6h_note' => 'This reminder will reappear every 6 hours until the renewal is complete.',
+
+    // FBR POS team & branches (Aug 2026 feature-infrastructure pass)
+    'member_added' => 'Team member added.',
+    'member_updated' => 'Team member updated.',
+    'branch_word' => 'Branch',
+    'branches_title' => 'Branches',
+    'branches_desc' => 'Manage your shop branches',
+    'add_branch' => 'Add Branch',
+    'ph_branch_name' => 'e.g. Main Branch',
+    'city_word' => 'City',
+    'branch_added' => 'Branch added.',
+    'branch_updated' => 'Branch saved.',
+    'no_branches_yet' => 'No branches yet — your whole shop runs as one branch.',
+    'main_branch' => 'Main shop',
 ];

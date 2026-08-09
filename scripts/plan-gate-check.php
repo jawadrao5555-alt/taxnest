@@ -60,18 +60,22 @@ $EXPECTED_GATE_ORDER = [
     'deals_enabled', 'riders_enabled', 'hazri_enabled', 'analytics_enabled',
     'reports_enabled', 'rider_tracking_enabled', 'custom_access_enabled',
     'qr_menu_enabled', 'offline_enabled', 'excel_enabled',
+    'khata_enabled', 'loyalty_enabled', 'kot_enabled',
 ];
 $MATRIX = [
-    // plan name => [deals, riders, hazri, analytics, reports, rider_tracking, custom_access, qr_menu, offline, excel]
+    // plan name => [deals, riders, hazri, analytics, reports, rider_tracking, custom_access, qr_menu, offline, excel, khata, loyalty, kot]
     // 9 Aug 2026 (owner): rider LIVE tracking moved back UP — Unlimited ONLY.
     // 9 Aug 2026 strict binding: reports_enabled gates CSV/PDF exports only —
     // Starter card promises basic report PAGES (ungated) but NOT exports, so
     // Starter reports=false; excel_enabled (product import/export) = Business+.
-    'Starter'   => [false, false, false, false, false, false, false, false, false, false],
-    'Business'  => [true,  false, false, false, true,  false, false, false, true,  true ],
-    'Pro'       => [true,  true,  false, true,  true,  false, false, true,  true,  true ],
-    'Pro Max'   => [true,  true,  true,  true,  true,  false, false, true,  true,  true ],
-    'Unlimited' => [true,  true,  true,  true,  true,  true,  true,  true,  true,  true ],
+    // 10 Aug 2026 FBR infrastructure pass: khata/loyalty/kot columns added
+    // TRUE for every plan of every product (behaviour-preserving — nothing
+    // was gated on them before). The FBR ladder flip comes later.
+    'Starter'   => [false, false, false, false, false, false, false, false, false, false, true, true, true],
+    'Business'  => [true,  false, false, false, true,  false, false, false, true,  true,  true, true, true],
+    'Pro'       => [true,  true,  false, true,  true,  false, false, true,  true,  true,  true, true, true],
+    'Pro Max'   => [true,  true,  true,  true,  true,  false, false, true,  true,  true,  true, true, true],
+    'Unlimited' => [true,  true,  true,  true,  true,  true,  true,  true,  true,  true,  true, true, true],
 ];
 // Derived-surface expectations per plan:
 $CUSTOM_SET_PLANS = ['Unlimited'];                   // customSet() honored only here
@@ -201,6 +205,21 @@ try {
     $c->is_internal_account = true;
     $c->save();
     $assertGates($c->fresh(), $allTrue, 'internal account');
+
+    // ── 7. FBR POS plan rows stay PERMISSIVE until the owner picks the
+    //       FBR ladder (10 Aug 2026 infrastructure pass): the FBR panel is
+    //       now wired to these gates, so a false here would silently lock a
+    //       live feature for paying FBR customers. ──────────────────────
+    $fbrGateCols = ['excel_enabled', 'deals_enabled', 'analytics_enabled', 'offline_enabled',
+                    'reports_enabled', 'khata_enabled', 'loyalty_enabled', 'kot_enabled'];
+    $fbrPlans = DB::table('pricing_plans')->where('product_type', 'fbrpos')->get();
+    check($fbrPlans->count() > 0, 'fbrpos pricing_plans rows exist');
+    foreach ($fbrPlans as $p) {
+        foreach ($fbrGateCols as $col) {
+            check((bool) ($p->{$col} ?? false) === true,
+                "fbrpos plan {$p->name}: {$col} must be TRUE (permissive until the FBR ladder is chosen)");
+        }
+    }
 } catch (\Throwable $e) {
     DB::rollBack();
     fwrite(STDERR, 'ERROR: check crashed: ' . $e->getMessage() . "\n" . $e->getTraceAsString() . "\n");

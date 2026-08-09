@@ -55,7 +55,12 @@
                     <input type="date" name="to" value="{{ $ra->to }}" max="{{ today()->toDateString() }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
                 </div>
                 <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition">{{ __('pos.apply_word') }}</button>
+                @if(\App\Services\PosFeatureService::planAllows($company, 'analytics_enabled'))
                 <a href="{{ route('fbrpos.reports.analytics-pdf', ['from' => $ra->from, 'to' => $ra->to]) }}" class="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition">{{ __('pos.pdf_word') }}</a>
+                @endif
+                @if(\App\Services\PosFeatureService::planAllows($company, 'reports_enabled'))
+                <a href="{{ route('fbrpos.reports.export-csv', ['from' => $ra->from, 'to' => $ra->to]) }}" class="px-4 py-2 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 transition">{{ __('pos.export_csv') }}</a>
+                @endif
             </form>
         </div>
         <div class="flex flex-wrap gap-2 mb-5">

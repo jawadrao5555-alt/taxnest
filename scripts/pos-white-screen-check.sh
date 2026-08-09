@@ -369,7 +369,9 @@ PRA_PAGES=(
 FBR_PAGES=(
   "/fbr-pos/dashboard|fbr-pos/day-close|fbr-pos/create"
   "/fbr-pos/customize|dashboard-style"
-  "/fbr-pos/reports|fbr-pos/reports/analytics-pdf|raDailyTrend"
+  # Aug 2026 strict plan binding: analytics-pdf/export links are plan-gated and
+  # the charts need bills in range — marker = the always-rendered date filter.
+  "/fbr-pos/reports|name=\"from\"|raDailyTrend"
   "/fbr-pos/settings|name=\"fbr_pos_token\"|name=\"fbr_pos_id\""
   "/fbr-pos/create|manualItemNameInput|restaurantPos\("
 )

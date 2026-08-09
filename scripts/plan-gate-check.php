@@ -206,19 +206,81 @@ try {
     $c->save();
     $assertGates($c->fresh(), $allTrue, 'internal account');
 
-    // ── 7. FBR POS plan rows stay PERMISSIVE until the owner picks the
-    //       FBR ladder (10 Aug 2026 infrastructure pass): the FBR panel is
-    //       now wired to these gates, so a false here would silently lock a
-    //       live feature for paying FBR customers. ──────────────────────
-    $fbrGateCols = ['excel_enabled', 'deals_enabled', 'analytics_enabled', 'offline_enabled',
-                    'reports_enabled', 'khata_enabled', 'loyalty_enabled', 'kot_enabled'];
-    $fbrPlans = DB::table('pricing_plans')->where('product_type', 'fbrpos')->get();
-    check($fbrPlans->count() > 0, 'fbrpos pricing_plans rows exist');
-    foreach ($fbrPlans as $p) {
-        foreach ($fbrGateCols as $col) {
-            check((bool) ($p->{$col} ?? false) === true,
-                "fbrpos plan {$p->name}: {$col} must be TRUE (permissive until the FBR ladder is chosen)");
+    // ── 7. FBR POS ladder (owner-approved 9 Aug 2026 — strict binding +
+    //       reprice 999/1999/2999). Rows matched by product_type+name; a
+    //       drift here means the fbrpos_plan_reprice_and_strict_gating
+    //       migration didn't run or someone hand-edited the rows. ────────
+    $fbrGateCols = ['inventory_enabled', 'offline_enabled', 'excel_enabled', 'khata_enabled',
+                    'reports_enabled', 'deals_enabled', 'loyalty_enabled', 'kot_enabled',
+                    'analytics_enabled'];
+    $FBR_MATRIX = [
+        // name => [price, inventory, offline, excel, khata, reports, deals, loyalty, kot, analytics]
+        'Starter'  => [999,  true,  false, false, false, false, false, false, false, false],
+        'Business' => [1999, true,  true,  true,  true,  true,  false, false, false, false],
+        'Pro'      => [2999, true,  true,  true,  true,  true,  true,  true,  true,  true],
+        // Trial gate COLUMNS stay false (PRA convention): active trial unlocks
+        // via isTrialActive; true columns would leak features to EXPIRED trials.
+        'Trial'    => [0,    true,  false, false, false, false, false, false, false, false],
+    ];
+    $fbrPlans = DB::table('pricing_plans')->where('product_type', 'fbrpos')->get()->keyBy('name');
+    foreach ($FBR_MATRIX as $name => $row) {
+        $p = $fbrPlans[$name] ?? null;
+        if (!$p) { bad("fbrpos plan row missing: {$name}"); continue; }
+        $wantPrice = array_shift($row);
+        check((float) $p->price === (float) $wantPrice,
+            "fbrpos {$name}: price must be {$wantPrice}, got {$p->price}");
+        check((float) ($p->price_monthly ?? -1) === (float) $wantPrice,
+            "fbrpos {$name}: price_monthly must be {$wantPrice}, got " . ($p->price_monthly ?? 'NULL'));
+        foreach ($fbrGateCols as $i => $col) {
+            check((bool) ($p->{$col} ?? false) === $row[$i],
+                "fbrpos {$name}: {$col} expected " . var_export($row[$i], true));
         }
+    }
+
+    // Functional spot-checks through planAllows (fbrpos companies): the
+    // cross-cutting rules must behave exactly like PRA — Starter locked out
+    // of premium gates, Business partial, active trial all-open.
+    $mkFbrCompany = function (string $suffix) use ($mkCompany): Company {
+        $c = $mkCompany('FBR ' . $suffix);
+        $c->product_type = 'fbrpos';
+        $c->save();
+        return $c->fresh();
+    };
+    if (isset($fbrPlans['Starter'], $fbrPlans['Business'], $fbrPlans['Trial'])) {
+        $c = $mkFbrCompany('Starter');
+        $mkSub($c, $fbrPlans['Starter']->id);
+        PosFeatureService::flushGateCaches();
+        foreach (['offline_enabled', 'excel_enabled', 'khata_enabled', 'reports_enabled',
+                  'deals_enabled', 'loyalty_enabled', 'kot_enabled', 'analytics_enabled'] as $g) {
+            check(PosFeatureService::planAllows($c, $g) === false, "fbrpos Starter sub: {$g} must be locked");
+        }
+        check(PosFeatureService::planAllows($c, 'inventory_enabled') === true, 'fbrpos Starter sub: inventory_enabled must be open');
+
+        $c = $mkFbrCompany('Business');
+        $mkSub($c, $fbrPlans['Business']->id);
+        PosFeatureService::flushGateCaches();
+        foreach (['offline_enabled', 'excel_enabled', 'khata_enabled', 'reports_enabled'] as $g) {
+            check(PosFeatureService::planAllows($c, $g) === true, "fbrpos Business sub: {$g} must be open");
+        }
+        foreach (['deals_enabled', 'loyalty_enabled', 'kot_enabled', 'analytics_enabled'] as $g) {
+            check(PosFeatureService::planAllows($c, $g) === false, "fbrpos Business sub: {$g} must be locked");
+        }
+
+        $c = $mkFbrCompany('TrialActive');
+        $mkSub($c, $fbrPlans['Trial']->id, ['trial_ends_at' => now()->addDays(3)]);
+        PosFeatureService::flushGateCaches();
+        foreach (['offline_enabled', 'deals_enabled', 'analytics_enabled', 'khata_enabled'] as $g) {
+            check(PosFeatureService::planAllows($c, $g) === true, "fbrpos active trial: {$g} must be open");
+        }
+
+        $c = $mkFbrCompany('TrialExpired');
+        $mkSub($c, $fbrPlans['Trial']->id, ['trial_ends_at' => now()->subDay()]);
+        PosFeatureService::flushGateCaches();
+        foreach (['offline_enabled', 'deals_enabled', 'analytics_enabled', 'khata_enabled'] as $g) {
+            check(PosFeatureService::planAllows($c, $g) === false, "fbrpos expired trial: {$g} must be locked");
+        }
+    } else {
+        bad('fbrpos Starter/Business/Trial rows missing — cannot run functional fbrpos checks');
     }
 } catch (\Throwable $e) {
     DB::rollBack();

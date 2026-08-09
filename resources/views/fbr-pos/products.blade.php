@@ -40,8 +40,11 @@
         @endif
     @endif
 
-    @if(auth('fbrpos')->user() && auth('fbrpos')->user()->role === 'company_admin')
-    {{-- ═══ EXCEL EXPORT / BULK IMPORT (FBR mirror of the PRA POS round-trip) ═══ --}}
+    @if(auth('fbrpos')->user() && auth('fbrpos')->user()->role === 'company_admin'
+        && \App\Services\PosFeatureService::planAllows($company ?? \App\Models\Company::find(app('currentCompanyId')), 'excel_enabled'))
+    {{-- ═══ EXCEL EXPORT / BULK IMPORT (FBR mirror of the PRA POS round-trip) ═══
+         Strict plan binding (Aug 2026): whole section hidden without excel_enabled —
+         the template/import routes are fbrPlanGate('excel_enabled')-blocked too. --}}
     <div x-data="{ open: false }" class="mb-6">
         <button type="button" @click="open = !open"
                 class="inline-flex items-center gap-1.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg text-xs font-semibold shadow-sm hover:shadow transition">

@@ -875,6 +875,8 @@ return [
     'dc_last_inv' => 'آخری انوائس',
     'dc_local' => 'لوکل',
     'dc_net_sales' => 'نیٹ سیلز',
+    'dc_taxable_value' => 'قابلِ ٹیکس مالیت',
+    'dc_exempt_value' => 'ٹیکس سے مستثنیٰ مالیت',
     'dc_not_reported' => 'رپورٹ نہیں ہوا',
     'dc_offline_queue' => 'آف لائن قطار',
     'dc_open_no_table' => '+ :count آرڈر بغیر ٹیبل کے',

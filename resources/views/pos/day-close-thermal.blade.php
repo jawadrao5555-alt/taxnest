@@ -58,6 +58,13 @@
         <tr><td>{{ __('pos.dc_discount') }}</td><td class="r">-{{ number_format($report->total_discount, 2) }}</td></tr>
         @endif
         <tr><td>{{ __('pos.dc_net_sales') }}</td><td class="r">{{ number_format($report->net_sales, 2) }}</td></tr>
+        {{-- PRA segregation (owner 9 Aug 2026): taxable vs exempt split --}}
+        @if(isset($taxSplit))
+        <tr><td>{{ __('pos.dc_taxable_value') }}</td><td class="r">{{ number_format($taxSplit['taxable'], 2) }}</td></tr>
+        @if($taxSplit['exempt'] > 0)
+        <tr><td>{{ __('pos.dc_exempt_value') }}</td><td class="r">{{ number_format($taxSplit['exempt'], 2) }}</td></tr>
+        @endif
+        @endif
         <tr><td>{{ __('pos.dc_sales_tax') }}</td><td class="r">{{ number_format($report->total_tax, 2) }}</td></tr>
         <tr><td class="b lg">{{ __('pos.dc_total_revenue') }}</td><td class="r b lg">{{ number_format($report->total_amount, 2) }}</td></tr>
     </table>

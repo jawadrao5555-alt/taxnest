@@ -70,6 +70,11 @@
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ __('pos.kpi_total_tax') }}</p>
             <p class="text-2xl font-bold text-purple-600 mt-1">PKR {{ number_format($stats->total_tax) }}</p>
+            {{-- PRA segregation (owner 9 Aug 2026): taxable vs exempt values --}}
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.dc_taxable_value') }}: PKR {{ number_format($stats->taxable_value) }}</p>
+            @if($stats->exempt_value > 0)
+            <p class="text-xs text-gray-500 dark:text-gray-400">{{ __('pos.dc_exempt_value') }}: PKR {{ number_format($stats->exempt_value) }}</p>
+            @endif
         </div>
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ __('pos.kpi_net_revenue') }}</p>

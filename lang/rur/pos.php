@@ -875,6 +875,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'dc_last_inv' => 'Akhri Invoice',
     'dc_local' => 'Local',
     'dc_net_sales' => 'Net Sale',
+    'dc_taxable_value' => 'Taxable Value',
+    'dc_exempt_value' => 'Exempt / Non-Taxable Value',
     'dc_not_reported' => 'Report Nahi Hui',
     'dc_offline_queue' => 'Offline Queue',
     'dc_open_no_table' => '+ :count order bina table ke',

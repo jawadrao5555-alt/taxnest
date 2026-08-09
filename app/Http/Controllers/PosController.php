@@ -8221,6 +8221,11 @@ class PosController extends Controller
             'gross_sales' => $transactions->sum('subtotal'),
             'total_discount' => $transactions->sum('discount_amount'),
             'net_sales' => $transactions->sum('subtotal') - $transactions->sum('discount_amount'),
+            // PRA segregation (owner 9 Aug 2026): taxable vs exempt split —
+            // same formula as the tax report (taxable = subtotal − discount −
+            // exempt share; exempt_amount is post-discount, PosTaxMath).
+            'taxable_value' => $transactions->sum(fn ($t) => max(0, (float) $t->subtotal - (float) $t->discount_amount - (float) ($t->exempt_amount ?? 0))),
+            'exempt_value' => $transactions->sum(fn ($t) => (float) ($t->exempt_amount ?? 0)),
             'total_tax' => $transactions->sum('tax_amount'),
             'total_amount' => $transactions->sum('total_amount'),
             'cash_amount' => $payBuckets['cash'],
@@ -9472,9 +9477,13 @@ class PosController extends Controller
             ? $this->buildBiometricRows($companyId, $report->report_date->toDateString())
             : [];
 
+        // PRA segregation (owner 9 Aug 2026) — computed from the historical
+        // transaction set (works for OLD closed days too; no schema change).
+        $taxSplit = $this->dayCloseTaxSplit($transactions);
+
         return $this->renderReportPdf(
             'pos.day-close-pdf',
-            compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri', 'bioPunches'),
+            compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit'),
             "Day-Close-{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf"
         );
     }
@@ -9522,7 +9531,24 @@ class PosController extends Controller
             ? $this->buildBiometricRows($companyId, $report->report_date->toDateString())
             : [];
 
-        return view('pos.day-close-thermal', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri', 'bioPunches'));
+        // PRA segregation (owner 9 Aug 2026) — same historical computation as the PDF.
+        $taxSplit = $this->dayCloseTaxSplit($transactions);
+
+        return view('pos.day-close-thermal', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit'));
+    }
+
+    /**
+     * Taxable vs exempt segregation for day-close surfaces (owner 9 Aug 2026):
+     * taxable = subtotal − discount − exempt share (post-discount, PosTaxMath),
+     * exempt = stored exempt_amount — the SAME formula the tax report uses,
+     * so day-close and tax report never disagree.
+     */
+    private function dayCloseTaxSplit($transactions): array
+    {
+        return [
+            'taxable' => $transactions->sum(fn ($t) => max(0, (float) $t->subtotal - (float) $t->discount_amount - (float) ($t->exempt_amount ?? 0))),
+            'exempt' => $transactions->sum(fn ($t) => (float) ($t->exempt_amount ?? 0)),
+        ];
     }
 
     /**

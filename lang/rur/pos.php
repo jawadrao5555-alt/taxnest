@@ -4051,4 +4051,22 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'munafa_loyalty' => 'Points (loyalty) discount',
     'admin_sound_on_hint' => 'Awaaz ON hai — band karne ke liye click karein',
     'admin_sound_off_hint' => 'Awaaz OFF hai — on karne ke liye click karein',
+
+    // Subscription-expiry warning popup (9 Aug 2026)
+    'se_kind_sub' => 'Subscription',
+    'se_kind_trial' => 'Free Trial',
+    'se_kind_temp' => 'Aarzi Access',
+    'se_title_today' => ':kind AAJ Khatam Ho Rahi Hai!',
+    'se_title_soon' => ':kind Khatam Honay Wali Hai',
+    'se_line_today' => 'Aap ki :kind AAJ (:date) khatam ho rahi hai.',
+    'se_line_1day' => 'Sirf 1 din baqi — aap ki :kind :date ko khatam ho jayegi.',
+    'se_line_days' => ':days din baqi — aap ki :kind :date ko khatam ho jayegi.',
+    'se_consequence' => 'Renewal na hone par nayi bills / invoices banana band ho jayega aur account sirf dekhne ke qabil reh jayega. Barah-e-karam pehle se payment kar ke receipt bhej dein taake kaam na ruke.',
+    'se_tell_admin' => 'Barah-e-karam apne admin / malik ko foran ittila dein taake woh renewal kar sakein.',
+    'se_under_review' => 'Aap ki payment receipt review mein hai — team verify karte hi subscription barha di jayegi.',
+    'se_choose_package' => 'Package chunein aur payment receipt upload karein',
+    'se_sale_annual_note' => '⚡ Abhi sale chal rahi hai — lekin sale sirf annual plan par hai. Quarterly rate full hai.',
+    'se_whatsapp' => 'WhatsApp par Rabta',
+    'se_later' => 'Baad Mein',
+    'se_6h_note' => 'Yeh yaad-dahani har 6 ghante baad dobara aayegi jab tak renewal mukammal na ho.',
 ];

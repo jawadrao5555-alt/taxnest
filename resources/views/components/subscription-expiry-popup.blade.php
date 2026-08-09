@@ -55,11 +55,11 @@
     $seForceOpen = false;
     if ($sePopup) {
         $seKindLabel = match ($sePopup['kind']) {
-            'trial' => 'Free Trial',
-            'override' => 'Temporary Access',
-            default => 'Subscription',
+            'trial' => __('pos.se_kind_trial'),
+            'override' => __('pos.se_kind_temp'),
+            default => __('pos.se_kind_sub'),
         };
-        $seUntilNice = $sePopup['until'] ? \Carbon\Carbon::parse($sePopup['until'])->format('d M Y') : null;
+        $seUntilNice = \Carbon\Carbon::parse($sePopup['until'] ?? now())->format('d M Y');
         $seDays = $sePopup['days_left'];
 
         // Payment account details (same SystemSetting keys as the lock modal)
@@ -71,10 +71,10 @@
             'instructions' => \App\Models\SystemSetting::get('payment_instructions', ''),
         ];
         $seWaNumber = preg_replace('/\D/', '', (string) \App\Models\SystemSetting::get('support_whatsapp_number', ''));
-        $seWaMsg = "Hello, main apni TaxNest subscription RENEW karna chahta hoon.\n"
+        $seWaMsg = "Hello, I want to RENEW my TaxNest subscription.\n"
             . 'Company: ' . ($seCompany->name ?? '') . "\n"
             . 'NTN: ' . ($seCompany->ntn ?? '') . "\n"
-            . 'Payment receipt attach kar raha hoon.';
+            . 'Payment receipt attached.';
         $seWaLink = $seWaNumber ? 'https://wa.me/' . $seWaNumber . '?text=' . urlencode($seWaMsg) : null;
 
         // Renew form: POS cashiers ko sirf warning (payment admin/manager ka kaam) —
@@ -158,9 +158,9 @@
                         <div>
                             <h2 class="text-lg font-bold leading-tight">
                                 @if($seDays <= 0)
-                                    {{ $seKindLabel }} AAJ Khatam Ho Rahi Hai!
+                                    {{ __('pos.se_title_today', ['kind' => $seKindLabel]) }}
                                 @else
-                                    {{ $seKindLabel }} Khatam Honay Wali Hai
+                                    {{ __('pos.se_title_soon', ['kind' => $seKindLabel]) }}
                                 @endif
                             </h2>
                             <p class="text-xs text-white/80 mt-0.5">{{ $seCompany->name ?? '' }}</p>
@@ -176,16 +176,15 @@
                 <div class="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-4">
                     <p class="text-sm font-semibold text-red-700 dark:text-red-300">
                         @if($seDays <= 0)
-                            Aap ki {{ strtolower($seKindLabel) }} <strong>aaj{{ $seUntilNice ? ' (' . $seUntilNice . ')' : '' }}</strong> khatam ho rahi hai.
+                            {{ __('pos.se_line_today', ['kind' => $seKindLabel, 'date' => $seUntilNice]) }}
                         @elseif($seDays == 1)
-                            Sirf <strong>1 din</strong> baqi — {{ $seUntilNice ? $seUntilNice . ' ko' : 'kal' }} khatam ho jayegi.
+                            {{ __('pos.se_line_1day', ['kind' => $seKindLabel, 'date' => $seUntilNice]) }}
                         @else
-                            <strong>{{ $seDays }} din</strong> baqi — {{ $seUntilNice ?? '' }} ko khatam ho jayegi.
+                            {{ __('pos.se_line_days', ['days' => $seDays, 'kind' => $seKindLabel, 'date' => $seUntilNice]) }}
                         @endif
                     </p>
                     <p class="text-xs text-red-600/80 dark:text-red-300/80 mt-1.5">
-                        Renewal na hone par nayi bills / invoices banana band ho jayega aur account view-only ho jayega.
-                        Barah-e-karam pehle se payment kar ke receipt bhej dein taake kaam na ruke.
+                        {{ __('pos.se_consequence') }}
                     </p>
                 </div>
 
@@ -214,12 +213,12 @@
 
                 @if(!$seCanRenew)
                 <div class="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 text-sm text-amber-700 dark:text-amber-300">
-                    Barah-e-karam apne <strong>admin / malik</strong> ko foran ittila dein taake woh renewal kar sakein.
+                    {{ __('pos.se_tell_admin') }}
                 </div>
                 @elseif($sePendingProof)
                 <div class="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4 text-sm text-blue-700 dark:text-blue-300 flex items-start gap-2">
                     <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <span>Aap ki payment receipt <strong>review mein hai</strong> — team verify karte hi subscription barha di jayegi.</span>
+                    <span>{{ __('pos.se_under_review') }}</span>
                 </div>
                 @elseif($seSubmit && count($sePlans))
                 <form method="POST" action="{{ $seSubmit }}" enctype="multipart/form-data"
@@ -240,7 +239,7 @@
                       }"
                       class="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-4 space-y-3">
                     @csrf
-                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Package chunein &amp; payment receipt upload karein</p>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ __('pos.se_choose_package') }}</p>
 
                     <div class="grid grid-cols-1 {{ count($seCycles) > 1 ? 'sm:grid-cols-2' : '' }} gap-2">
                         <select name="pricing_plan_id" x-model="planId" required
@@ -270,7 +269,7 @@
                     </div>
                     <div x-show="saleActive && cycle === 'quarterly'" x-cloak
                          class="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                        ⚡ Abhi sale chal rahi hai — lekin <strong>sale sirf annual plan par</strong> hai. Quarterly rate full hai.
+                        {{ __('pos.se_sale_annual_note') }}
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -305,15 +304,15 @@
                     <a href="{{ $seWaLink }}" target="_blank" rel="noopener"
                        class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#25D366] hover:bg-[#1ebe5b] text-white text-sm font-semibold transition">
                         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.945C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.515 5.26l-.999 3.648 3.973-1.715z"/></svg>
-                        WhatsApp par Rabta
+                        {{ __('pos.se_whatsapp') }}
                     </a>
                     @endif
                     <button type="button" @click="snooze()"
                             class="px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition">
-                        Baad Mein
+                        {{ __('pos.se_later') }}
                     </button>
                 </div>
-                <p class="text-[11px] text-center text-gray-400">Yeh yaad-dahani har 6 ghante baad dobara aayegi jab tak renewal mukammal na ho.</p>
+                <p class="text-[11px] text-center text-gray-400">{{ __('pos.se_6h_note') }}</p>
             </div>
         </div>
     </div>

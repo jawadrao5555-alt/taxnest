@@ -232,18 +232,17 @@
         @php
             $omStyle = $company->order_match_style ?? 'off';
             $omToken = ($omStyle === 'token' && !empty($order->token_no)) ? (int) $order->token_no : null;
-            $omCode = ($omStyle === 'code' && $order->exists && !empty($order->order_number))
-                ? \App\Services\OrderTokenService::shortCode($order->order_number)
-                : null;
         @endphp
         {{-- 10 Aug 2026 (Pizza Master follow-up video): "KOT #1" carries no info on the
              FIRST ticket — print the batch number only from #2 onward, where the kitchen
              genuinely needs it to spot a delta/repeat ticket for the same order. --}}
         @php $kotBatchShown = !empty($kotBatchNo) && (int) $kotBatchNo > 1; @endphp
+        {{-- 10 Aug 2026 (Pizza Master, via owner): CODE style par chhota boxed code
+             "pyara nahi lagta" — poora ORD- number hi wapis (bold, complete). Matching
+             phir bhi chalti hai: receipt ka code = isi number ka aakhri hissa. Sirf
+             TOKEN style ka bada box rehta hai (woh alag number hai — bulane ke liye). --}}
         @if($omToken)
             <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:20px; font-weight:900; color:#000;">{{ __('pos.order_match_token_label') }} {{ $omToken }}</span>@if($kotBatchShown) <span class="text-sm bold">KOT #{{ $kotBatchNo }}</span>@endif</p>
-        @elseif($omCode)
-            <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:18px; font-weight:900; letter-spacing:2px; color:#000;">{{ $omCode }}</span>@if($kotBatchShown) <span class="text-sm bold">KOT #{{ $kotBatchNo }}</span>@endif</p>
         @else
             <p class="text-lg bold mt-1">{{ $order->order_number }}@if($kotBatchShown) <span class="text-sm bold">&mdash; KOT #{{ $kotBatchNo }}</span>@endif</p>
         @endif
@@ -357,14 +356,16 @@
             $kotRows = ($ticketItems ?? $order->items);
             $kotQty  = $kotRows->sum('quantity');
         @endphp
-        {{-- 9 Aug 2026 (E-ICEBLUE video): one line instead of two — paper saving. --}}
-        <p>{{ __('pos.kot_order_by') }} {{ $order->creator->name ?? __('pos.kot_staff') }} &mdash; {{ __('pos.kot_items_count', ['count' => $kotRows->count()]) }}, {{ __('pos.kot_total_qty') }} {{ $kotQty == intval($kotQty) ? intval($kotQty) : number_format($kotQty, 2) }}</p>
+        {{-- 9 Aug 2026 (E-ICEBLUE video): one line instead of two — paper saving.
+             10 Aug follow-up #2: URGENT apni alag line ki bajaye ISI line ke side
+             par chhota sa — ek aur line bachi. --}}
+        <p>{{ __('pos.kot_order_by') }} {{ $order->creator->name ?? __('pos.kot_staff') }} &mdash; {{ __('pos.kot_items_count', ['count' => $kotRows->count()]) }}, {{ __('pos.kot_total_qty') }} {{ $kotQty == intval($kotQty) ? intval($kotQty) : number_format($kotQty, 2) }}@if($order->priority ?? false) <span class="priority-badge">{{ __('pos.kot_rush') }}</span>@endif</p>
     </div>
     @endif
-    {{-- URGENT/RUSH (10 Aug 2026, Pizza Master): owner ki explicit farmaish — top ki
-         bajaye NEECHE footer lines ke paas chhota sa. Deliberately OUTSIDE the
-         kot_show_orderby toggle so hiding the order-by line can never hide URGENT. --}}
-    @if($order->priority ?? false)
+    {{-- URGENT fallback: agar company ne order-by footer line hi band ki hui ho
+         (kot_show_orderby OFF) to URGENT phir bhi chhapna zaroori hai — tab hi
+         apni chhoti line par aata hai. Warna upar wali line ke side par hai. --}}
+    @if(!$kotShowOrderby && ($order->priority ?? false))
     <div class="text-center"><span class="priority-badge">{{ __('pos.kot_rush') }}</span></div>
     @endif
 

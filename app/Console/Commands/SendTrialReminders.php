@@ -90,17 +90,24 @@ class SendTrialReminders extends Command
             }
         }
 
-        // ---- Temporary/grace override ending within 2 days (owner, 1 Aug 2026) ----
+        // ---- Temporary/grace override ending soon (owner, 1 Aug 2026) ----
+        // Default window = 2 days. FBR POS shops on a TEMPORARY grant get a
+        // 7-day early warning (free-access expiry reminder, Aug 2026) so they
+        // can decide on a Business/Pro upgrade in time.
         $ovSubs = Subscription::where('active', true)
             ->whereIn('override_type', ['temporary', 'grace'])
             ->whereNotNull('override_until')
-            ->whereBetween('override_until', [now(), now()->addDays(2)->endOfDay()])
+            ->whereBetween('override_until', [now(), now()->addDays(7)->endOfDay()])
             ->whereHas('company', fn ($q) => $q->where('is_internal_account', false))
             ->with('company')
             ->get();
 
         foreach ($ovSubs as $sub) {
             $company = $sub->company;
+            $window = ($company && $company->product_type === 'fbrpos' && $sub->override_type === 'temporary') ? 7 : 2;
+            if ($sub->override_until->gt(now()->addDays($window)->endOfDay())) {
+                continue;
+            }
             $email = $company ? $this->recipientEmail($company) : null;
             if (!$email) {
                 continue;

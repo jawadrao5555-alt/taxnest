@@ -24,9 +24,13 @@
         try {
             $seCompany = \App\Models\Company::find($seCompanyId);
             if ($seCompany && !$seCompany->is_internal_account && ($seCompany->status ?? null) !== 'pending') {
-                // 1) Temporary/grace admin grant ending within 2 days
+                // 1) Temporary/grace admin grant ending soon. FBR POS shops on a
+                //    TEMPORARY grant get a 7-din early warning (Task: free-access
+                //    expiry reminder, Aug 2026) so woh Business/Pro upgrade ka
+                //    faisla waqt par kar saken; baqi sab 2 din pehle.
                 $seOv = \App\Services\SubscriptionAccessService::overrideReminder($seCompany);
-                if ($seOv && $seOv['days_left'] !== null && (int) $seOv['days_left'] <= 2) {
+                $seOvWindow = ($seCompany->product_type === 'fbrpos' && ($seOv['type'] ?? null) === 'temporary') ? 7 : 2;
+                if ($seOv && $seOv['days_left'] !== null && (int) $seOv['days_left'] <= $seOvWindow) {
                     $sePopup = ['kind' => 'override', 'until' => $seOv['until'], 'days_left' => (int) $seOv['days_left']];
                 }
                 // 2) Paid subscription ending within 2 days

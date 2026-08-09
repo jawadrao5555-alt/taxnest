@@ -271,6 +271,7 @@ class SubscriptionAccessService
             'until' => $until->format('Y-m-d'),
             'days_left' => $daysLeft,
             'invoices_left' => $invoicesLeft,
+            'type' => $subscription->override_type,
         ];
     }
 

@@ -374,6 +374,35 @@ class ExpiryReminderBoundaryTest extends TestCase
         $this->assertSame(0, Notification::where('company_id', $plus3->id)->count());
     }
 
+    public function test_fbrpos_temporary_override_email_fires_at_7_days_not_8(): void
+    {
+        // FBR POS temporary grants warn 7 days ahead (free-access expiry reminder, Aug 2026).
+        $in = $this->company(['product_type' => 'fbrpos', 'email' => 'f7@example.test']);
+        $this->overrideSub($in, now()->addDays(7));
+
+        $out = $this->company(['product_type' => 'fbrpos', 'email' => 'f8@example.test']);
+        $this->overrideSub($out, now()->addDays(8));
+
+        // Non-fbrpos stays at the 2-day window even inside the widened query range.
+        $di = $this->company(['product_type' => 'di', 'email' => 'd7@example.test']);
+        $this->overrideSub($di, now()->addDays(7));
+
+        $this->runCommand();
+
+        $this->assertSame(1, Notification::where('company_id', $in->id)->where('type', 'like', 'override_reminder_%')->count());
+        $this->assertSame(0, Notification::where('company_id', $out->id)->count());
+        $this->assertSame(0, Notification::where('company_id', $di->id)->count());
+    }
+
+    public function test_override_reminder_returns_type(): void
+    {
+        $c = $this->company(['product_type' => 'fbrpos']);
+        $this->overrideSub($c, now()->addDays(5));
+        $r = SubscriptionAccessService::overrideReminder($c);
+        $this->assertNotNull($r);
+        $this->assertSame('temporary', $r['type']);
+    }
+
     public function test_override_email_dedup_per_expiry_date(): void
     {
         $c = $this->company();

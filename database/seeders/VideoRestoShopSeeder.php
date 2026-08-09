@@ -145,6 +145,14 @@ class VideoRestoShopSeeder extends Seeder
                 ['is_active' => true, 'updated_at' => now(), 'created_at' => now()]
             );
             $floorId = DB::table('restaurant_floors')->where('company_id', $companyId)->where('name', 'Main Hall')->value('id');
+            // Legacy cleanup: earlier versions stored 'T-1'..'T-8'; normalize in
+            // place (preserves ids/FKs) so re-running never duplicates tables.
+            foreach (range(1, 8) as $i) {
+                DB::table('restaurant_tables')
+                    ->where('company_id', $companyId)
+                    ->where('table_number', 'T-' . $i)
+                    ->update(['table_number' => (string) $i]);
+            }
             foreach (range(1, 8) as $i) {
                 DB::table('restaurant_tables')->updateOrInsert(
                     // Bare number — the app UI prepends "T-" itself (waiter/KDS/universal).

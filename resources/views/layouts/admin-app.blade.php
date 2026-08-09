@@ -198,6 +198,77 @@
                     var badge = document.getElementById('si-unread-badge');
                     if (!badge) return;
                     var url = @json(route('saas.admin.support-inbox.unread', [], false));
+                    var inboxUrl = @json(route('saas.admin.support-inbox', [], false));
+                    var lastCount = parseInt(badge.textContent, 10) || 0;
+                    var SOUND_KEY = 'si-toast-sound'; // 'on' = chime enabled; muted by default
+
+                    function soundOn() {
+                        try { return localStorage.getItem(SOUND_KEY) === 'on'; } catch (e) { return false; }
+                    }
+                    function setSound(v) {
+                        try { localStorage.setItem(SOUND_KEY, v ? 'on' : 'off'); } catch (e) {}
+                    }
+                    function playChime() {
+                        if (!soundOn()) return;
+                        try {
+                            var Ctx = window.AudioContext || window.webkitAudioContext;
+                            if (!Ctx) return;
+                            var ctx = new Ctx();
+                            var play = function () {
+                                var o = ctx.createOscillator();
+                                var g = ctx.createGain();
+                                o.type = 'sine';
+                                o.frequency.setValueAtTime(880, ctx.currentTime);
+                                o.frequency.setValueAtTime(1174, ctx.currentTime + 0.12);
+                                g.gain.setValueAtTime(0.0001, ctx.currentTime);
+                                g.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + 0.02);
+                                g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.45);
+                                o.connect(g); g.connect(ctx.destination);
+                                o.start(); o.stop(ctx.currentTime + 0.5);
+                                setTimeout(function () { try { ctx.close(); } catch (e) {} }, 700);
+                            };
+                            if (ctx.state === 'suspended') {
+                                ctx.resume().then(play).catch(function () { try { ctx.close(); } catch (e) {} });
+                            } else {
+                                play();
+                            }
+                        } catch (e) {}
+                    }
+
+                    function showToast() {
+                        var old = document.getElementById('si-new-mail-toast');
+                        if (old) old.remove();
+                        var t = document.createElement('div');
+                        t.id = 'si-new-mail-toast';
+                        t.setAttribute('role', 'status');
+                        t.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;align-items:center;gap:10px;background:#111827;color:#f9fafb;border:1px solid #374151;border-radius:10px;padding:12px 14px;box-shadow:0 10px 25px rgba(0,0,0,.35);font-size:13px;max-width:320px;cursor:pointer;opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s;';
+                        t.innerHTML =
+                            '<svg style="width:20px;height:20px;flex:none;color:#f87171" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>' +
+                            '<span style="flex:1;">Nayi support email aayi hai</span>' +
+                            '<button type="button" data-si-sound title="Awaaz on/off" style="flex:none;background:none;border:none;color:#9ca3af;cursor:pointer;font-size:15px;padding:2px;line-height:1;">' + (soundOn() ? '\uD83D\uDD14' : '\uD83D\uDD15') + '</button>' +
+                            '<button type="button" data-si-close aria-label="Band karein" style="flex:none;background:none;border:none;color:#9ca3af;cursor:pointer;font-size:16px;padding:2px;line-height:1;">&times;</button>';
+                        t.addEventListener('click', function (e) {
+                            var btn = e.target.closest ? e.target.closest('button') : null;
+                            if (btn && btn.hasAttribute('data-si-close')) { e.stopPropagation(); t.remove(); return; }
+                            if (btn && btn.hasAttribute('data-si-sound')) {
+                                e.stopPropagation();
+                                var next = !soundOn();
+                                setSound(next);
+                                btn.textContent = next ? '\uD83D\uDD14' : '\uD83D\uDD15';
+                                if (next) playChime();
+                                return;
+                            }
+                            window.location.href = inboxUrl;
+                        });
+                        document.body.appendChild(t);
+                        requestAnimationFrame(function () { t.style.opacity = '1'; t.style.transform = 'translateY(0)'; });
+                        setTimeout(function () {
+                            if (!t.isConnected) return;
+                            t.style.opacity = '0'; t.style.transform = 'translateY(8px)';
+                            setTimeout(function () { t.remove(); }, 300);
+                        }, 8000);
+                    }
+
                     function refresh() {
                         fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
                             .then(function (r) { return r.ok ? r.json() : null; })
@@ -206,6 +277,11 @@
                                 var n = parseInt(d.unread, 10) || 0;
                                 if (n > 0) { badge.textContent = n; badge.style.display = ''; }
                                 else { badge.textContent = ''; badge.style.display = 'none'; }
+                                if (n > lastCount && window.location.pathname.indexOf(inboxUrl) !== 0) {
+                                    showToast();
+                                    playChime();
+                                }
+                                lastCount = n;
                             })
                             .catch(function () {});
                     }

@@ -77,9 +77,12 @@
             . 'Payment receipt attached.';
         $seWaLink = $seWaNumber ? 'https://wa.me/' . $seWaNumber . '?text=' . urlencode($seWaMsg) : null;
 
-        // Renew form: POS cashiers ko sirf warning (payment admin/manager ka kaam) —
-        // baqi sab ko package select + receipt upload (lock modal jaisa hi form).
-        $seCanRenew = $seGuard !== 'pos' || (method_exists($seUser, 'isPosAdmin') && $seUser->isPosAdmin());
+        // Renew form: POS/FBR-POS cashiers ko sirf warning (payment admin/manager ka
+        // kaam) — baqi sab ko package select + receipt upload (lock modal jaisa form).
+        // Code-review fix (9 Aug 2026): fbrpos guard bhi isPosAdmin() gate ke andar —
+        // warna FBR cashier ko bank details + renewal form leak hota.
+        $seCanRenew = !in_array($seGuard, ['pos', 'fbrpos'], true)
+            || (method_exists($seUser, 'isPosAdmin') && $seUser->isPosAdmin());
 
         $seSubmit = null; $sePendingProof = false; $sePlans = []; $seCycles = []; $seSaleActive = false;
         if ($seCanRenew) {

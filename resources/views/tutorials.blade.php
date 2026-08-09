@@ -8,8 +8,10 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>Video Tutorials — NestPOS aur FBR POS | TaxNest</title>
     <meta name="description" content="Chhoti chhoti Urdu videos — account banane se le kar bill, customers, products aur reports tak, NestPOS ka har feature aaram se seekhein.">
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
+    <link rel="preload" as="style" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap">
+    <link rel="stylesheet" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap"></noscript>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
         :root {

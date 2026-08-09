@@ -27,8 +27,10 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>Downloads — TaxNest</title>
     <meta name="description" content="Download the NestPOS Desktop Agent for Windows, the TaxNest POS app for Android, and the TaxNest Rider app — everything you need to run TaxNest on your devices.">
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
+    <link rel="preload" as="style" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap">
+    <link rel="stylesheet" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap"></noscript>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
         :root { --teal-dark:#052730; --teal-main:#0A4D5C; --gold:#E7BF3B; --paper:#FDFBF7; --ink:#1F2937; }

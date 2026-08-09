@@ -164,9 +164,7 @@ Route::get('/digital-invoice', function () {
     return view('di-landing', ['plans' => $plans]);
 })->name('di.landing');
 
-Route::get('/di', function () {
-    return redirect('/digital-invoice');
-});
+Route::redirect('/di', '/digital-invoice', 301);
 
 Route::get('/pos', function () {
     $plans = \App\Models\PricingPlan::where('is_trial', false)->where('product_type', 'pos')->orderBy('price')->get();

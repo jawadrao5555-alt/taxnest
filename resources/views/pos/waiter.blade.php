@@ -993,6 +993,14 @@ function waiterApp() {
 
         async send() {
             if (this.sending || !this.cart.length) return;
+            // Table-required guard (owner, 9 Aug 2026): a dine-in punch without a
+            // table printed a KOT at a live shop. Server enforces the same rule;
+            // this guard just opens the table picker instead of wasting a round-trip.
+            if (!this.appendOrderId && this.orderType === 'dine_in' && !this.selectedTable && {{ ($tablesOn ?? false) ? 'true' : 'false' }}) {
+                this.showToast(@js(__('pos.dine_in_table_required')), 'error');
+                this.openTables();
+                return;
+            }
             this.sending = true;
             const items = this.cart.map(l => ({
                 name: l.name, quantity: l.quantity, unit_price: l.unit_price,

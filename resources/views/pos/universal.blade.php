@@ -7028,6 +7028,14 @@ function restaurantPos() {
                 this.showToast(this.orderType === 'takeaway' ? window.TXT.takeaway_billed_directly : window.TXT.hold_dine_in_only, 'error');
                 return null;
             }
+            // Table-required guard (owner, 9 Aug 2026): dine-in Hold/KOT without a
+            // table must not punch — open the table picker instead. Server enforces
+            // the same invariant (holdOrder 422s when tables feature is ON).
+            if (this.tableBoardEnabled && this.orderType === 'dine_in' && !this.selectedTable) {
+                this.showToast(window.TXT.dine_in_table_required, 'error');
+                this.openTablePicker();
+                return null;
+            }
             // Defence-in-depth: backend hold endpoint validates item_id as required|integer
             // and item_type in product,service. Synthetic manual lines (item_id=null,
             // item_type='manual') would 422. Block the action client-side too so the
@@ -7291,6 +7299,15 @@ function restaurantPos() {
             // which posts directly to pos.invoice.store (universal endpoint).
             // P7: incoming waiter carts ALWAYS bill via the manual path — their
             // restaurant order already exists; the hold endpoint would duplicate it.
+            // Table-required guard (owner, 9 Aug 2026): a Dine-In sale — held OR
+            // paid immediately — must not punch without a table when the company
+            // manages tables. Incoming waiter orders are exempt (order already
+            // exists; legacy tableless ones must stay settleable).
+            if (this.tableBoardEnabled && this.orderType === 'dine_in' && !this.selectedTable && !this.incomingOrderId) {
+                this.showToast(window.TXT.dine_in_table_required, 'error');
+                this.openTablePicker();
+                return;
+            }
             if (!this.isRestaurantMode || this.hasManualItems() || this.hasDealItems() || this.incomingOrderId) {
                 return await this.processPaymentManual(method, provisional);
             }

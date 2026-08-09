@@ -192,6 +192,14 @@ class RestaurantPosController extends Controller
             return response()->json(['success' => false, 'message' => 'Hold / Send to Kitchen is for Dine-In orders only. Takeaway is billed directly; Delivery is final or provisional.'], 422);
         }
 
+        // Table-required invariant (owner voice note, 9 Aug 2026): when the company
+        // manages tables, a Dine-In punch — explicit Hold/KOT *or* the internal
+        // billing pass-through (billing_flow) — must never create an order/KOT
+        // without a table. Waiter punch path has the same guard.
+        if (($flowFeatures->tables ?? false) && $request->input('order_type') === 'dine_in' && !$request->table_id) {
+            return response()->json(['success' => false, 'message' => __('pos.dine_in_table_required')], 422);
+        }
+
         if ($request->table_id) {
             $table = RestaurantTable::where('company_id', $companyId)->where('id', $request->table_id)->first();
             if (!$table) {

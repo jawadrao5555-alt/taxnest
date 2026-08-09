@@ -1776,6 +1776,26 @@ class PosController extends Controller
             }
         }
 
+        // Table-required invariant (owner voice note, 9 Aug 2026): when the company
+        // manages tables (tables feature ON), a Dine-In bill needs its table on THIS
+        // direct path too — manual/deal carts and crafted requests bypass the
+        // restaurant hold flow, and the sale screen always sends table_id for
+        // dine-in. Sits AFTER the quota gate (its 403 contract is locked by tests).
+        // Exemptions (never strand a bill):
+        //   - offline replays (offline_queued_at) — queued before the rule existed,
+        //     losing a rung-up bill is far worse than a missing table;
+        //   - requests without order_type (older clients / non-restaurant screens).
+        if ($request->input('order_type') === 'dine_in' && !$request->filled('table_id') && !$request->filled('offline_queued_at')) {
+            $tableFeatures = PosFeatureService::forCompany($company);
+            if ($tableFeatures->tables ?? false) {
+                $tblMsg = __('pos.dine_in_table_required');
+                if ($request->expectsJson()) {
+                    return response()->json(['success' => false, 'error' => $tblMsg, 'message' => $tblMsg], 422);
+                }
+                return back()->withInput()->with('error', $tblMsg);
+            }
+        }
+
         // Per-cashier toggle (owner rule Jul 2026): the ACTING user's own reporting
         // switch decides this bill's fate — never another cashier's or (once the user
         // has personally toggled) the company-wide flag.

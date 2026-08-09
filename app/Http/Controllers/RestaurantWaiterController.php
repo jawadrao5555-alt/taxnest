@@ -122,7 +122,12 @@ class RestaurantWaiterController extends Controller
         // (+ zero-result word rescue). Missing column reads null → 'prefix' (safe).
         $searchAnyWord = (($company->pos_product_search_mode ?? 'prefix') === 'any_word');
 
-        return view('pos.waiter', compact('company', 'products', 'cashiers', 'cashTaxRate', 'userGridPrefs', 'taxInclusive', 'appVersion', 'searchAnyWord'));
+        // Table-required guard (owner, 9 Aug 2026): the send() client check only
+        // fires when the company really manages tables — otherwise dine-in has no
+        // tables to pick and the punch must stay possible.
+        $tablesOn = (bool) (PosFeatureService::forCompany($company)->tables ?? false);
+
+        return view('pos.waiter', compact('company', 'products', 'cashiers', 'cashTaxRate', 'userGridPrefs', 'taxInclusive', 'appVersion', 'searchAnyWord', 'tablesOn'));
     }
 
     /** Live floors + tables — waiter-scoped twin of the sale screen's table-status API. */
@@ -286,6 +291,16 @@ class RestaurantWaiterController extends Controller
 
         $orderType = $validated['order_type'] ?? 'dine_in';
         $tableId = $orderType === 'dine_in' ? ($validated['table_id'] ?? null) : null;
+
+        // Table-required invariant (owner voice note, 9 Aug 2026): a live shop's
+        // waiter punched a dine-in order WITHOUT selecting a table and the KOT
+        // still printed. When the company actually manages tables (tables feature
+        // ON), a dine-in punch without a table is always a mistake — block it
+        // here (the client-side guard is UX only, never a security boundary).
+        $waiterFeatures = PosFeatureService::forCompany($company);
+        if ($orderType === 'dine_in' && !$tableId && ($waiterFeatures->tables ?? false)) {
+            return response()->json(['success' => false, 'message' => __('pos.dine_in_table_required')], 422);
+        }
 
         return DB::transaction(function () use ($companyId, $validated, $cashier, $orderType, $tableId, $user, $company) {
             if ($tableId) {

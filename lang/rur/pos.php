@@ -1066,6 +1066,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'details_word' => 'Details',
     'digits_4_6_paren' => '(4-6 digits)',
     'dine_in' => 'Dine In',
+    'dine_in_table_required' => 'Pehle table select karein — table ke baghair Dine-In order punch nahi ho sakta.',
     'dine_in_auto_kot_hint' => 'Table select aakhri step hoga: order khud-ba-khud hold ho jaye ga, KOT kitchen jayegi, aur bill Recall mein chala jaye ga — extra Hold/KOT button dabane ki zaroorat nahi',
     'dine_in_auto_kot_title' => 'Dine-in par auto KOT select karen',
     'dine_in_only_paren' => '(Sirf Dine-In)',

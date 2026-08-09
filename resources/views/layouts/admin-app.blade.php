@@ -244,9 +244,9 @@
                         t.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;align-items:center;gap:10px;background:#111827;color:#f9fafb;border:1px solid #374151;border-radius:10px;padding:12px 14px;box-shadow:0 10px 25px rgba(0,0,0,.35);font-size:13px;max-width:320px;cursor:pointer;opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s;';
                         t.innerHTML =
                             '<svg style="width:20px;height:20px;flex:none;color:#f87171" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>' +
-                            '<span style="flex:1;">Nayi support email aayi hai</span>' +
-                            '<button type="button" data-si-sound title="Awaaz on/off" style="flex:none;background:none;border:none;color:#9ca3af;cursor:pointer;font-size:15px;padding:2px;line-height:1;">' + (soundOn() ? '\uD83D\uDD14' : '\uD83D\uDD15') + '</button>' +
-                            '<button type="button" data-si-close aria-label="Band karein" style="flex:none;background:none;border:none;color:#9ca3af;cursor:pointer;font-size:16px;padding:2px;line-height:1;">&times;</button>';
+                            '<span style="flex:1;">New support email received</span>' +
+                            '<button type="button" data-si-sound title="Sound on/off" style="flex:none;background:none;border:none;color:#9ca3af;cursor:pointer;font-size:15px;padding:2px;line-height:1;">' + (soundOn() ? '\uD83D\uDD14' : '\uD83D\uDD15') + '</button>' +
+                            '<button type="button" data-si-close aria-label="Close" style="flex:none;background:none;border:none;color:#9ca3af;cursor:pointer;font-size:16px;padding:2px;line-height:1;">&times;</button>';
                         t.addEventListener('click', function (e) {
                             var btn = e.target.closest ? e.target.closest('button') : null;
                             if (btn && btn.hasAttribute('data-si-close')) { e.stopPropagation(); t.remove(); return; }

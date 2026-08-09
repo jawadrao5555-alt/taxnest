@@ -1183,6 +1183,8 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/agent/download', [\App\Http\Controllers\AgentManagementController::class, 'downloadAgent'])->name('fbrpos.agent.download');
     Route::post('/test-connection', [FbrPosController::class, 'testConnection'])->name('fbrpos.testConnection');
     Route::post('/api/toggle-fbr-reporting', [FbrPosController::class, 'toggleFbrReporting'])->name('fbrpos.api.toggle-fbr-reporting');
+    // OFFLINE-FIRST BOOT (Aug 2026 — PRA port): freshness probe for the SW-cached sale screen.
+    Route::get('/api/boot-check', [FbrPosController::class, 'bootCheck'])->name('fbrpos.api.boot-check');
     Route::post('/api/toggle-universal', [FbrPosController::class, 'toggleUniversal'])->name('fbrpos.api.toggle-universal');
     Route::post('/api/toggle-auto-kot', [FbrPosController::class, 'toggleAutoKot'])->name('fbrpos.api.toggle-auto-kot');
     Route::post('/settings/dashboard-style', [FbrPosController::class, 'updateDashboardStyle'])->name('fbrpos.settings.dashboard-style');

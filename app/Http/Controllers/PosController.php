@@ -1870,7 +1870,9 @@ class PosController extends Controller
         if ($offlineUuidColumnExists) {
             if ($request->filled('offline_queued_at')) {
                 try {
-                    $qa = \Carbon\Carbon::parse($request->input('offline_queued_at'));
+                    // Browser sends UTC ISO ("...Z") — convert to app TZ (Asia/Karachi)
+                    // or the stored created_at lands 5h early → wrong business day.
+                    $qa = \Carbon\Carbon::parse($request->input('offline_queued_at'))->setTimezone(config('app.timezone'));
                     $min = now()->subDays(3);
                     if ($qa->lt($min)) {
                         $qa = $min;

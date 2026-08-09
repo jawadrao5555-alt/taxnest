@@ -679,11 +679,85 @@ class FbrPosController extends Controller
                 : $custBase->orderBy('name')->get(['id', 'name', 'phone', 'khata_balance']);
         }
 
-        return view($viewName, compact(
+        // OFFLINE-FIRST BOOT (Aug 2026 — PRA port): fingerprint baked into the
+        // page so a SW-cached copy of this screen can detect staleness via
+        // /fbr-pos/api/boot-check. offlineAllowed = plan gate for NEW offline
+        // queueing (baked, so it also joins the settings fingerprint).
+        $offlineAllowed = $this->fbrPlanAllows('offline_enabled');
+        $bootFp = $this->fbrBootFingerprint($company, Auth::guard('fbrpos')->user());
+
+        return response(view($viewName, compact(
             'company', 'products', 'fbrReportingEnabled', 'frequentProducts',
             'terminals', 'currentShift', 'loyaltySettings', 'heldCount', 'activePromos',
-            'pendingDayCloses', 'customers', 'customersTruncated'
-        ));
+            'pendingDayCloses', 'customers', 'customersTruncated', 'bootFp', 'offlineAllowed'
+        )))
+        ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        ->header('Pragma', 'no-cache')
+        ->header('Expires', '0');
+    }
+
+    /**
+     * OFFLINE-FIRST SALE SCREEN (Aug 2026 — FBR port of PRA): the service worker
+     * serves /fbr-pos/create cache-first (SALE_CACHE in public/sw.js). This
+     * fingerprint — baked into the rendered page AND served by bootCheck() —
+     * lets a cached copy detect that it is stale (new deploy, catalog change,
+     * settings change, user/company switch) and reload itself once.
+     * NEVER hash raw companies.updated_at (frequent writers → reload loop);
+     * posConfigRev() hashes an explicit whitelist incl. fbr_reporting_enabled.
+     */
+    private function fbrBootFingerprint(Company $company, $user): array
+    {
+        $companyId = $company->id;
+        $agg = function ($query) {
+            $row = $query->selectRaw('COUNT(*) AS cnt, MAX(updated_at) AS mx')->first();
+            return ($row->cnt ?? 0) . ':' . (string) ($row->mx ?? '');
+        };
+        $promoAgg = $agg(\App\Models\FbrPosPromotion::where('company_id', $companyId));
+        $catalogRev = md5(implode('|', [
+            $agg(Product::where('company_id', $companyId)),
+            $promoAgg,
+            $agg(\App\Models\FbrPosTerminal::where('company_id', $companyId)),
+            // Promotions carry date windows — a day change must refresh the
+            // screen, but ONLY for companies that actually have promos (PRA
+            // deals lesson: no needless morning reload churn for the rest).
+            str_starts_with($promoAgg, '0:') ? '' : now()->toDateString(),
+        ]));
+
+        $settingsRev = md5(json_encode([
+            $company->posConfigRev(),
+            optional($user->updated_at)->timestamp,
+            (string) ($user->role ?? ''),
+            $agg(\App\Models\FbrPosLoyaltySetting::where('company_id', $companyId)),
+            // Plan gates baked into the screen — a plan change (upgrade/downgrade)
+            // must refresh the offline-cached copy.
+            (bool) $this->fbrPlanAllows('offline_enabled'),
+            (bool) $this->fbrPlanAllows('deals_enabled'),
+            (bool) $this->fbrPlanAllows('loyalty_enabled'),
+        ]));
+
+        $screenPath = resource_path('views/fbr-pos/universal.blade.php');
+        return [
+            'u' => (int) $user->id,
+            'c' => (int) $companyId,
+            's' => is_file($screenPath) ? (string) @filemtime($screenPath) : '0',
+            'cat' => $catalogRev,
+            'set' => $settingsRev,
+        ];
+    }
+
+    /**
+     * GET /fbr-pos/api/boot-check — tiny freshness probe for the SW-cached sale
+     * screen. Never cached ('/api/' is in the SW skip list; no-store headers).
+     */
+    public function bootCheck()
+    {
+        $user = Auth::guard('fbrpos')->user();
+        $company = Company::find(app('currentCompanyId'));
+        if (!$user || !$company) {
+            return response()->json(['ok' => false], 401);
+        }
+        return response()->json(['ok' => true, 'fp' => $this->fbrBootFingerprint($company, $user)])
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 
     public function store(Request $request)
@@ -739,6 +813,14 @@ class FbrPosController extends Controller
             // receipts. Feeds the Pending Deliveries panel (Task 122).
             'order_type' => 'nullable|string|max:20',
             'delivery_address' => 'nullable|string|max:500',
+            // OFFLINE-FIRST FBR POS (Aug 2026 — PRA port): client idempotency UUID
+            // rides on EVERY attempt; queued-bill replays also carry the ORIGINAL
+            // sale moment + cashier + branch so a next-morning sync books the bill
+            // under the right date/user/branch (server clamps + company-checks).
+            'offline_uuid' => 'nullable|string|max:64',
+            'offline_queued_at' => 'nullable|date',
+            'offline_queued_by' => 'nullable|integer',
+            'offline_branch_id' => 'nullable|integer',
             ]);
         } catch (\Illuminate\Validation\ValidationException $ve) {
             Log::warning('FBR POS Store: validation failed', [
@@ -825,8 +907,56 @@ class FbrPosController extends Controller
             $initialFbrStatus = null;
         }
 
+        // OFFLINE-FIRST FBR POS (Aug 2026 — PRA port): honor the ORIGINAL sale
+        // moment + cashier + branch for offline-queued bills. Only trusted when
+        // the request also carries an offline_uuid (came through the offline
+        // queue). Timestamp clamped to [now-3d, now] — a wrong PC clock or a
+        // stale queue can never back-date beyond the wash window or post-date.
+        // Attribution only sticks when the claimed user/branch belongs to THIS
+        // company (spoof-safe) AND the plan actually includes offline billing —
+        // server-side gate so a hand-crafted POST can't backdate bills on a
+        // package without the offline feature (offline_uuid dedupe itself stays
+        // ungated: it must ALWAYS work to stop lost-response duplicates).
+        $offlineQueuedAt = null;
+        $offlineQueuedBy = null;
+        $offlineBranchId = null;
+        if ($offlineUuidColumnExists && $this->fbrPlanAllows('offline_enabled')) {
+            if ($request->filled('offline_queued_at')) {
+                try {
+                    // Browser sends UTC ISO ("...Z") — convert to app TZ (Asia/Karachi)
+                    // or the stored created_at lands 5h early → wrong business day.
+                    $qa = \Carbon\Carbon::parse($request->input('offline_queued_at'))->setTimezone(config('app.timezone'));
+                    if ($qa->lt(now()->subDays(3))) {
+                        $qa = now()->subDays(3);
+                    }
+                    if ($qa->gt(now())) {
+                        $qa = now();
+                    }
+                    $offlineQueuedAt = $qa;
+                } catch (\Throwable $e) {
+                    $offlineQueuedAt = null;
+                }
+            }
+            if ($request->filled('offline_queued_by')) {
+                $qbId = (int) $request->input('offline_queued_by');
+                if ($qbId > 0 && $qbId !== (int) Auth::guard('fbrpos')->id()) {
+                    $offlineQueuedBy = \App\Models\User::where('id', $qbId)
+                        ->where('company_id', $companyId)
+                        ->value('id');
+                }
+            }
+            if ($request->filled('offline_branch_id')) {
+                $obId = (int) $request->input('offline_branch_id');
+                if ($obId > 0) {
+                    $offlineBranchId = \App\Models\Branch::where('company_id', $companyId)
+                        ->where('id', $obId)
+                        ->value('id');
+                }
+            }
+        }
+
         try {
-            $transaction = DB::transaction(function () use ($request, $companyId, $company, $invoiceMode, $initialFbrStatus, $offlineUuid, $offlineUuidColumnExists) {
+            $transaction = DB::transaction(function () use ($request, $companyId, $company, $invoiceMode, $initialFbrStatus, $offlineUuid, $offlineUuidColumnExists, $offlineQueuedAt, $offlineQueuedBy, $offlineBranchId) {
                 $subtotal = 0;
                 $totalTax = 0;
                 $itemsData = [];
@@ -1143,7 +1273,9 @@ class FbrPosController extends Controller
 
                 $transaction = FbrPosTransaction::create($orderTypeFields + $omFields + $offlineUuidField + [
                     'company_id' => $companyId,
-                    'branch_id' => app()->bound('currentBranchId') ? app('currentBranchId') : null,
+                    // Offline sync: book under the branch the bill was RUNG UP on
+                    // (company-verified above), not whoever's session synced it.
+                    'branch_id' => $offlineBranchId ?? (app()->bound('currentBranchId') ? app('currentBranchId') : null),
                     'terminal_id' => $request->terminal_id,
                     'shift_id' => $shift?->id,
                     'invoice_number' => $invoiceNumber,
@@ -1172,8 +1304,17 @@ class FbrPosController extends Controller
                     'change_due' => $changeDue,
                     'status' => 'completed',
                     'fbr_status' => $initialFbrStatus,
-                    'created_by' => Auth::guard('fbrpos')->id(),
+                    // Offline sync: credit the cashier who RANG UP the bill, not
+                    // whoever's session replayed the queue next morning.
+                    'created_by' => $offlineQueuedBy ?: Auth::guard('fbrpos')->id(),
                 ]);
+
+                // Offline sync: stamp the bill with the ORIGINAL (clamped) sale
+                // moment. created_at is NOT mass-assignable — set + save explicitly.
+                if ($offlineQueuedAt) {
+                    $transaction->created_at = $offlineQueuedAt;
+                    $transaction->save();
+                }
 
                 // Update promotion usage
                 if ($promo && $promotionDiscount > 0) {

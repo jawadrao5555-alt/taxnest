@@ -359,7 +359,7 @@
                                 <video x-ref="promoVideo" class="w-full h-full" controls playsinline preload="none"
                                        poster="{{ asset('images/promo-poster.jpg') }}"
                                        x-show="playing" x-cloak>
-                                    <source src="{{ asset('videos/taxnest-overview.mp4') }}?v=1" type="video/mp4">
+                                    <source src="{{ asset('videos/taxnest-overview.mp4') }}?v=2" type="video/mp4">
                                 </video>
                                 <button x-show="!playing" type="button" aria-label="Play video"
                                         @click="playing = true; $nextTick(() => { $refs.promoVideo.play(); })"

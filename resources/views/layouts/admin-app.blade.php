@@ -192,6 +192,7 @@
                     Support Inbox
                     @php $siUnread = \App\Services\SupportMailService::cachedUnreadCount(); @endphp
                     <span id="si-unread-badge" class="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold" @if($siUnread <= 0) style="display:none" @endif>{{ $siUnread > 0 ? $siUnread : '' }}</span>
+                    <button type="button" id="si-sound-toggle" title="Nayi email ki awaaz on/off" style="flex:none;background:none;border:none;cursor:pointer;font-size:14px;padding:2px;line-height:1;color:#9ca3af;">&#128277;</button>
                 </a>
                 <script>
                 (function () {
@@ -208,8 +209,8 @@
                     function setSound(v) {
                         try { localStorage.setItem(SOUND_KEY, v ? 'on' : 'off'); } catch (e) {}
                     }
-                    function playChime() {
-                        if (!soundOn()) return;
+                    function playChime(force) {
+                        if (!force && !soundOn()) return;
                         try {
                             var Ctx = window.AudioContext || window.webkitAudioContext;
                             if (!Ctx) return;
@@ -235,6 +236,26 @@
                         } catch (e) {}
                     }
 
+                    var sideBtn = document.getElementById('si-sound-toggle');
+                    function syncSideBtn() {
+                        if (!sideBtn) return;
+                        var on = soundOn();
+                        sideBtn.textContent = on ? '\uD83D\uDD14' : '\uD83D\uDD15';
+                        sideBtn.style.color = on ? '#fbbf24' : '#9ca3af';
+                        sideBtn.title = on ? 'Awaaz ON hai — band karne ke liye click karein' : 'Awaaz OFF hai — on karne ke liye click karein';
+                    }
+                    if (sideBtn) {
+                        syncSideBtn();
+                        sideBtn.addEventListener('click', function (e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            var next = !soundOn();
+                            setSound(next);
+                            syncSideBtn();
+                            if (next) playChime(true);
+                        });
+                    }
+
                     function showToast() {
                         var old = document.getElementById('si-new-mail-toast');
                         if (old) old.remove();
@@ -255,7 +276,8 @@
                                 var next = !soundOn();
                                 setSound(next);
                                 btn.textContent = next ? '\uD83D\uDD14' : '\uD83D\uDD15';
-                                if (next) playChime();
+                                syncSideBtn();
+                                if (next) playChime(true);
                                 return;
                             }
                             window.location.href = inboxUrl;

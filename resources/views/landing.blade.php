@@ -349,9 +349,9 @@
                 <div class="fade-in-up" x-data="{ playing: false }">
                     <div class="max-w-3xl mx-auto text-center mb-8">
                         <div class="inline-block px-3 py-1 mb-4 bg-purple-50 border border-purple-100 rounded-full text-xs font-semibold uppercase tracking-widest accent-purple">
-                            60-Second Overview
+                            90-Second Overview
                         </div>
-                        <h4 class="text-2xl sm:text-3xl font-serif text-[#052730]">See NestPOS in action</h4>
+                        <h4 class="text-2xl sm:text-3xl font-serif text-[#052730]">See TaxNest in action &mdash; POS, FBR POS &amp; Digital Invoicing</h4>
                     </div>
                     <div class="max-w-4xl mx-auto">
                         <div class="rounded-xl bg-white p-2 border border-gray-200 shadow-xl">
@@ -359,7 +359,7 @@
                                 <video x-ref="promoVideo" class="w-full h-full" controls playsinline preload="none"
                                        poster="{{ asset('images/promo-poster.jpg') }}"
                                        x-show="playing" x-cloak>
-                                    <source src="{{ asset('videos/nestpos-promo.mp4') }}?v=1" type="video/mp4">
+                                    <source src="{{ asset('videos/taxnest-overview.mp4') }}?v=1" type="video/mp4">
                                 </video>
                                 <button x-show="!playing" type="button" aria-label="Play video"
                                         @click="playing = true; $nextTick(() => { $refs.promoVideo.play(); })"

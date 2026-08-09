@@ -17,7 +17,10 @@
         // Order Matching (Aug 2026): unpin kot — gate on kitchen_printer_enabled so
         // FBR restaurant companies can use the KOT + Order Matching flow.
         // D1 decision: reuse kitchen_printer_enabled (already loaded, no new column).
-        'kot' => (bool)($company->kitchen_printer_enabled ?? false),
+        // Strict plan binding (Aug 2026): AND with the plan's kot_enabled gate —
+        // server-side fbrPlanGate('kot_enabled') blocks the ticket routes too.
+        'kot' => (bool)($company->kitchen_printer_enabled ?? false)
+                 && \App\Services\PosFeatureService::planAllows($company, 'kot_enabled'),
         'kitchen' => false, 'recipes' => false, 'inventory' => false,
         'kitchen_notes' => false,
     ];
@@ -1372,7 +1375,10 @@ window.addEventListener('popstate', function() {
                     <kbd x-show="!submitting" class="block mt-0.5 text-[9px] font-mono text-blue-500/60">{{ __('pos.press_2') }}</kbd>
                 </button>
                 {{-- UDHAAR / KHATA (Aug 2026 — Retail Core): credit sale — needs a saved
-                     customer (server blocks it too). Amount lands in the customer's khata. --}}
+                     customer (server blocks it too). Amount lands in the customer's khata.
+                     Strict plan binding: hidden when the plan lacks khata_enabled
+                     (store() rejects khata payments server-side too). --}}
+                @if(\App\Services\PosFeatureService::planAllows($company, 'khata_enabled'))
                 <button @click="payUdhaar()" :disabled="submitting"
                         :class="[payMethodIndex === 2 ? 'ring-2 ring-amber-500 ring-offset-2 dark:ring-offset-gray-900 scale-[1.02] shadow-sm border-amber-400' : '', !selectedCustomer ? 'opacity-50' : '']"
                         class="col-span-2 py-3 rounded-xl text-center border-2 transition disabled:opacity-50 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 hover:bg-amber-100 hover:border-amber-400">
@@ -1384,6 +1390,7 @@ window.addEventListener('popstate', function() {
                     <span class="block text-[10px] font-semibold mt-0.5" :class="selectedCustomer ? 'text-amber-600/70' : 'text-red-500'"
                           x-text="selectedCustomer ? (selectedCustomer.name + window.TXT.udhaar_on_khata_sfx) : window.TXT.udhaar_pick_customer"></span>
                 </button>
+                @endif
             </div>
             {{-- Cash Received / Wapsi (owner request, Jul 2026): optional input — CASH only.
                  data-cash-input keyboard guard: digits type, Enter pays cash. Under-payment

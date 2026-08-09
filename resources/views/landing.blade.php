@@ -8,6 +8,11 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>TaxNest — Tax Compliance Platform for Pakistan</title>
     <meta name="description" content="TaxNest is Pakistan's all-in-one FBR and PRA compliance platform — digital invoicing, POS billing, and audit-ready reporting for businesses of every size.">
+    @include('partials.meta-og', [
+        'ogTitle'       => 'TaxNest — Tax Compliance Platform for Pakistan',
+        'ogDescription' => 'Pakistan\'s all-in-one FBR and PRA compliance platform. Issue FBR Digital Invoices and PRA-integrated POS receipts — all from one account.',
+        'ogUrl'         => 'https://taxnest.com.pk/',
+    ])
     <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
     <link rel="preload" as="style" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap">
     <link rel="stylesheet" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap" media="print" onload="this.media='all'">

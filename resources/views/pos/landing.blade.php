@@ -8,6 +8,11 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>NestPOS — Keyboard-Fast POS with PRA Compliance</title>
     <meta name="description" content="NestPOS is a keyboard-fast PRA-compliant POS system for Pakistani retail and restaurants — offline billing, automatic fiscal sync, and real-time sales reporting.">
+    @include('partials.meta-og', [
+        'ogTitle'       => 'NestPOS — Keyboard-Fast POS with PRA Compliance',
+        'ogDescription' => 'A lightning-fast point-of-sale system built for Pakistani retailers. PRA-integrated billing, inventory, and daily reports — all in one keyboard-driven screen.',
+        'ogUrl'         => 'https://taxnest.com.pk/pos',
+    ])
     <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
     <link rel="preload" as="style" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700,900|inter:400,500,600,700,800|jetbrains-mono:400,700&display=swap">
     <link rel="stylesheet" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700,900|inter:400,500,600,700,800|jetbrains-mono:400,700&display=swap" media="print" onload="this.media='all'">

@@ -1008,21 +1008,6 @@ class FbrService
             $invoice->save();
         };
 
-        if (empty($payload['items'])) {
-            $clearHashOnFailure();
-            \Log::info("FBR submission skipped: Invoice #{$invoice->id} — all items are tax-exempt. Locking internally.");
-            $invoice->status = 'locked';
-            $invoice->fbr_status = 'exempt_internal';
-            $invoice->fbr_submission_hash = null;
-            $invoice->save();
-            return [
-                'status' => 'success',
-                'message' => 'Invoice locked internally — all items are tax-exempt, not reported to FBR.',
-                'fbr_invoice_number' => null,
-                'exempt_only' => true,
-            ];
-        }
-
         $payloadErrors = ScheduleEngine::validateFbrPayload($payload);
         if (!empty($payloadErrors)) {
             $clearHashOnFailure();

@@ -236,12 +236,16 @@
                 ? \App\Services\OrderTokenService::shortCode($order->order_number)
                 : null;
         @endphp
+        {{-- 10 Aug 2026 (Pizza Master follow-up video): "KOT #1" carries no info on the
+             FIRST ticket — print the batch number only from #2 onward, where the kitchen
+             genuinely needs it to spot a delta/repeat ticket for the same order. --}}
+        @php $kotBatchShown = !empty($kotBatchNo) && (int) $kotBatchNo > 1; @endphp
         @if($omToken)
-            <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:20px; font-weight:900; color:#000;">{{ __('pos.order_match_token_label') }} {{ $omToken }}</span>@if(!empty($kotBatchNo)) <span class="text-sm bold">KOT #{{ $kotBatchNo }}</span>@endif</p>
+            <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:20px; font-weight:900; color:#000;">{{ __('pos.order_match_token_label') }} {{ $omToken }}</span>@if($kotBatchShown) <span class="text-sm bold">KOT #{{ $kotBatchNo }}</span>@endif</p>
         @elseif($omCode)
-            <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:18px; font-weight:900; letter-spacing:2px; color:#000;">{{ $omCode }}</span>@if(!empty($kotBatchNo)) <span class="text-sm bold">KOT #{{ $kotBatchNo }}</span>@endif</p>
+            <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:18px; font-weight:900; letter-spacing:2px; color:#000;">{{ $omCode }}</span>@if($kotBatchShown) <span class="text-sm bold">KOT #{{ $kotBatchNo }}</span>@endif</p>
         @else
-            <p class="text-lg bold mt-1">{{ $order->order_number }}@if(!empty($kotBatchNo)) <span class="text-sm bold">&mdash; KOT #{{ $kotBatchNo }}</span>@endif</p>
+            <p class="text-lg bold mt-1">{{ $order->order_number }}@if($kotBatchShown) <span class="text-sm bold">&mdash; KOT #{{ $kotBatchNo }}</span>@endif</p>
         @endif
     </div>
 

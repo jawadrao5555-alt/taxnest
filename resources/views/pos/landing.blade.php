@@ -4,6 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#052730">
+    <link rel="icon" type="image/svg+xml" href="/images/brand/taxnest-mark.svg">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>NestPOS — Keyboard-Fast POS with PRA Compliance</title>
     <meta name="description" content="NestPOS is a keyboard-fast PRA-compliant POS system for Pakistani retail and restaurants — offline billing, automatic fiscal sync, and real-time sales reporting.">
     <link rel="preconnect" href="https://fonts.bunny.net">

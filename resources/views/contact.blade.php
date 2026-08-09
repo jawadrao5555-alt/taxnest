@@ -12,6 +12,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#052730">
+    <link rel="icon" type="image/svg+xml" href="/images/brand/taxnest-mark.svg">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>Contact &amp; Legal — TaxNest</title>
     <meta name="description" content="Contact TaxNest support and review our Privacy Policy, Terms & Conditions, and the responsibilities of TaxNest versus your company.">
     <link rel="preconnect" href="https://fonts.bunny.net">

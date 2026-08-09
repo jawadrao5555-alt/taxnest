@@ -4,6 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#052730">
+    <link rel="icon" type="image/svg+xml" href="/images/brand/taxnest-mark.svg">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>FBR POS — Bank-Grade Point of Sale by TaxNest</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap" rel="stylesheet">

@@ -3,6 +3,8 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+        <link rel="icon" type="image/svg+xml" href="/images/brand/taxnest-mark.svg">
+        <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="stylesheet" href="{{ asset('css/mobile.css?v=2.6') }}">
 
         <title>TaxNest — Pakistan FBR &amp; PRA Tax Compliance Platform</title>

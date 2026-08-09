@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" type="image/svg+xml" href="/images/brand/taxnest-mark.svg">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>{{ $company->name }} — {{ __('pos.qr_title_suffix') }}</title>
     @vite(['resources/css/app.css'])
     <style>

@@ -4,6 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#FDFBF7">
+    <link rel="icon" type="image/svg+xml" href="/images/brand/taxnest-mark.svg">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>Digital Invoice — FBR Invoicing by TaxNest</title>
     <meta name="description" content="Send FBR-compliant digital invoices in seconds. TaxNest Digital Invoice integrates with PRAL's API for automatic submission, real-time validation, and audit-ready records.">
     

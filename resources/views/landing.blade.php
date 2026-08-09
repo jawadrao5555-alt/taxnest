@@ -4,6 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#052730">
+    <link rel="icon" type="image/svg+xml" href="/images/brand/taxnest-mark.svg">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>TaxNest — Tax Compliance Platform for Pakistan</title>
     <meta name="description" content="TaxNest is Pakistan's all-in-one FBR and PRA compliance platform — digital invoicing, POS billing, and audit-ready reporting for businesses of every size.">
     <link rel="preconnect" href="https://fonts.bunny.net">

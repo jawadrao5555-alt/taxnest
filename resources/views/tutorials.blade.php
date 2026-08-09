@@ -4,6 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#052730">
+    <link rel="icon" type="image/svg+xml" href="/images/brand/taxnest-mark.svg">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>Video Tutorials — NestPOS aur FBR POS | TaxNest</title>
     <meta name="description" content="Chhoti chhoti Urdu videos — account banane se le kar bill, customers, products aur reports tak, NestPOS ka har feature aaram se seekhein.">
     <link rel="preconnect" href="https://fonts.bunny.net">

@@ -521,6 +521,7 @@
         </div>
         <x-pwa-update color="emerald" />
         <x-trial-lock-modal />
+        <x-subscription-expiry-popup />
         <x-whatsapp-support />
         <script src="{{ asset('js/wheel-scroll.js?v=1') }}" defer></script>
     </body>

@@ -1154,6 +1154,7 @@
         @endif
         <x-pwa-update color="purple" />
         <x-trial-lock-modal />
+        <x-subscription-expiry-popup />
         {{-- Madadgar unified support bubble (AI chat + WhatsApp) — replaces the plain WhatsApp bubble on POS (owner, 22 Jul 2026).
              Waiters ko nahi (ZFC, 2 Aug 2026): tablet par bubble search box ke
              upar aata tha — support ka rabta admin/cashier ka kaam hai. --}}

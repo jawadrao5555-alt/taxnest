@@ -83,11 +83,13 @@
         }
         /* Aug 2026 (customer photo): the reversed white-on-black RUSH block printed
            as a faint dotted box on thermal printers — same lesson as station headers:
-           solid black text on white + heavy border prints crisp everywhere. */
+           solid black text on white + heavy border prints crisp everywhere.
+           9 Aug 2026 (E-ICEBLUE video, 500 orders/day): the bordered 3-line block
+           wasted paper — now ONE plain bold line, no border/padding/stroke. */
         .priority-badge {
-            display: inline-block; padding: 4px 12px; border: 3px solid #000;
-            font-weight: 900; font-size: 18px; text-transform: uppercase; letter-spacing: 2px;
-            background: #fff; color: #000; -webkit-text-stroke: 0.6px #000;
+            display: inline-block; font-weight: 900; font-size: 14px;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            background: #fff; color: #000;
         }
         /* ZFC feedback Jul 2026: reversed (white-on-black) blocks print blurry on
            cheap thermal printers — station headers now solid black text on white. */
@@ -217,12 +219,16 @@
             <p class="priority-badge mt-1">{{ __('pos.kot_rush') }}</p>
         @endif
         <p class="text-xl bold mt-1">*** {{ strtoupper($stationLabel ?? __('pos.kot_kitchen')) }} ***</p>
-        <p class="text-lg bold mt-1">{{ $order->order_number }}</p>
         {{-- Order Matching (Aug 2026): same number on KOT + customer receipt so
              counter staff can pair a ready order with the customer's bill.
              'token' = daily token; 'code' = short unique code (last ORD segment).
              Shim (transaction) KOTs skip the code box — their big header is
-             already the bill number, which the receipt carries anyway. --}}
+             already the bill number, which the receipt carries anyway.
+             SINGLE SERIAL (E-ICEBLUE video, 9 Aug 2026): when the token/code box
+             prints, the long ORD- number is the SAME identity (code = its last
+             segment) — printing both read as a confusing "double serial" and
+             wasted a line. Box now REPLACES the ORD- line; KOT # rides the same
+             line instead of its own. --}}
         @php
             $omStyle = $company->order_match_style ?? 'off';
             $omToken = ($omStyle === 'token' && !empty($order->token_no)) ? (int) $order->token_no : null;
@@ -231,14 +237,11 @@
                 : null;
         @endphp
         @if($omToken)
-            <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 14px; font-size:20px; font-weight:900; color:#000;">{{ __('pos.order_match_token_label') }} {{ $omToken }}</span></p>
+            <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:20px; font-weight:900; color:#000;">{{ __('pos.order_match_token_label') }} {{ $omToken }}</span>@if(!empty($kotBatchNo)) <span class="text-sm bold">KOT #{{ $kotBatchNo }}</span>@endif</p>
         @elseif($omCode)
-            <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 14px; font-size:18px; font-weight:900; letter-spacing:2px; color:#000;">{{ $omCode }}</span></p>
-        @endif
-        {{-- Item #6: stable per-print-batch number — delta tickets get their own KOT #
-             so the kitchen can reference "KOT #2 of table 5" (stamped, not counted). --}}
-        @if(!empty($kotBatchNo))
-            <p class="text-sm bold">KOT #{{ $kotBatchNo }}</p>
+            <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:18px; font-weight:900; letter-spacing:2px; color:#000;">{{ $omCode }}</span>@if(!empty($kotBatchNo)) <span class="text-sm bold">KOT #{{ $kotBatchNo }}</span>@endif</p>
+        @else
+            <p class="text-lg bold mt-1">{{ $order->order_number }}@if(!empty($kotBatchNo)) <span class="text-sm bold">&mdash; KOT #{{ $kotBatchNo }}</span>@endif</p>
         @endif
     </div>
 
@@ -350,8 +353,8 @@
             $kotRows = ($ticketItems ?? $order->items);
             $kotQty  = $kotRows->sum('quantity');
         @endphp
-        <p>{{ __('pos.kot_order_by') }} {{ $order->creator->name ?? __('pos.kot_staff') }}</p>
-        <p class="mt-1">{{ __('pos.kot_items_count', ['count' => $kotRows->count()]) }} &mdash; {{ __('pos.kot_total_qty') }} {{ $kotQty == intval($kotQty) ? intval($kotQty) : number_format($kotQty, 2) }}</p>
+        {{-- 9 Aug 2026 (E-ICEBLUE video): one line instead of two — paper saving. --}}
+        <p>{{ __('pos.kot_order_by') }} {{ $order->creator->name ?? __('pos.kot_staff') }} &mdash; {{ __('pos.kot_items_count', ['count' => $kotRows->count()]) }}, {{ __('pos.kot_total_qty') }} {{ $kotQty == intval($kotQty) ? intval($kotQty) : number_format($kotQty, 2) }}</p>
     </div>
     @endif
 

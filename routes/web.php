@@ -902,6 +902,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/waiter/orders', [\App\Http\Controllers\RestaurantWaiterController::class, 'storeOrder'])->name('pos.waiter.orders.store');
     Route::post('/waiter/orders/{id}/items', [\App\Http\Controllers\RestaurantWaiterController::class, 'appendItems'])->name('pos.waiter.orders.append');
     Route::post('/waiter/orders/{id}/shift-table', [\App\Http\Controllers\RestaurantWaiterController::class, 'shiftTable'])->name('pos.waiter.orders.shift-table');
+    // Waiter self-cancel (Task 412): apna un-settled order tablet se cancel.
+    Route::post('/waiter/orders/{id}/cancel', [\App\Http\Controllers\RestaurantWaiterController::class, 'cancelOrder'])->name('pos.waiter.orders.cancel');
     // Cashier side — incoming waiter orders on the sale screen.
     Route::get('/api/incoming-orders', [\App\Http\Controllers\RestaurantWaiterController::class, 'incomingOrders'])->name('pos.api.incoming-orders');
     Route::post('/api/incoming-orders/{id}/complete', [\App\Http\Controllers\RestaurantWaiterController::class, 'completeIncoming'])->name('pos.api.incoming-orders.complete');

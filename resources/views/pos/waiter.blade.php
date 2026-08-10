@@ -483,11 +483,50 @@
                             {{-- Table Shift (owner batch, 26 Jul 2026): sirf dine-in
                                  orders (table wale); khali table par hi jayega. --}}
                             <button x-show="o.table_id" @click="startShift(o)" class="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-teal-300 dark:border-teal-700 text-teal-700 dark:text-teal-300 hover:bg-teal-50 text-xs font-bold transition">⇄ {{ __('pos.change_table') }}</button>
+                            {{-- Waiter self-cancel (Task 412): sirf UN-CLAIMED order
+                                 (assigned_cashier_id null) — cashier ke claim/settle
+                                 ke baad cancel counter se hi hota hai. --}}
+                            <button x-show="!o.assigned_cashier_id" @click="cancelAsk = o" class="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 text-xs font-bold transition">✕ {{ __('pos.cancel') }}</button>
                         </div>
                     </div>
                 </template>
             </div>
         </div>
+    </div>
+
+    {{-- ── Waiter self-cancel confirm (Task 412): KOT-warning wali cashier-modal
+         jaisi tasdeeq — waiter apna un-settled order cancel kare. ───────────── --}}
+    <div x-show="cancelAsk" x-cloak class="fixed inset-0 z-[70] flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/60" @click="if (!cancelBusy) cancelAsk = null"></div>
+        <template x-if="cancelAsk">
+            <div class="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+                <div class="px-5 pt-5 text-center">
+                    <div class="mx-auto w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center mb-2">
+                        <svg class="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.947-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"/></svg>
+                    </div>
+                    <p class="text-base font-black text-gray-900 dark:text-white">{{ __('pos.cancel_order_title') }}</p>
+                    <p class="text-lg font-black text-gray-900 dark:text-white mt-0.5"><span class="font-mono" x-text="cancelAsk.order_number"></span> <span x-show="cancelAsk.table" x-text="'• T-' + cancelAsk.table"></span> <span x-text="'• Rs ' + Math.round(cancelAsk.total_amount).toLocaleString()"></span></p>
+                </div>
+                <div class="px-5 py-3 max-h-40 overflow-y-auto">
+                    <div class="space-y-1">
+                        <template x-for="(it, ix) in cancelAsk.items" :key="'cx' + ix">
+                            <div class="flex items-center justify-between gap-2 text-xs text-gray-700 dark:text-gray-300">
+                                <span class="flex-1" x-text="it.quantity + ' × ' + it.name"></span>
+                                <span class="text-gray-400" x-text="Math.round(it.quantity * it.unit_price).toLocaleString()"></span>
+                            </div>
+                        </template>
+                    </div>
+                    <div x-show="cancelAsk.kot_sent_at" class="mt-3 px-3 py-2 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-300 dark:border-orange-700">
+                        <p class="text-[11px] font-bold text-orange-700 dark:text-orange-300">&#9888;&#65039; {{ __('pos.cancel_kot_warning') }}</p>
+                    </div>
+                    <p x-show="!cancelAsk.kot_sent_at" class="mt-3 text-[11px] text-gray-400 text-center">{{ __('pos.cancel_no_kot_note') }}</p>
+                </div>
+                <div class="p-4 grid grid-cols-1 gap-2">
+                    <button @click="cancelAsk = null" :disabled="cancelBusy" class="w-full py-2.5 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition">{{ __('pos.cancel_keep_order') }}</button>
+                    <button @click="confirmCancel()" :disabled="cancelBusy" class="w-full py-2.5 rounded-xl text-sm font-extrabold text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 transition"><span x-show="!cancelBusy">{{ __('pos.cancel_yes_free') }}</span><span x-show="cancelBusy">…</span></button>
+                </div>
+            </div>
+        </template>
     </div>
 
     {{-- ── Theme picker modal (owner, 8 Aug 2026): waiter apni marzi ki theme
@@ -663,6 +702,8 @@ function waiterApp() {
         shiftPickFor: null,      // Multi-order shift (Task 104): table whose held order is being chosen
         appendPickFor: null,     // Multi-order Add Items (Task 108): table whose held order is being chosen
         shiftBusy: false,
+        cancelAsk: null,        // Task 412: waiter self-cancel confirm modal (order object)
+        cancelBusy: false,
         shiftTablesLoading: false,
         toast: '',
         toastType: 'success',
@@ -904,6 +945,31 @@ function waiterApp() {
             this.showMyOrders = true;
             this.myOrdersLoading = true;
             this.loadMyOrders().finally(() => { this.myOrdersLoading = false; });
+        },
+
+        // Waiter self-cancel (Task 412): apna held, abhi-tak-un-settled order
+        // cancel karo. Server par atomic conditional update hai — cashier settle
+        // kar chuka ho to 409 + friendly message.
+        async confirmCancel() {
+            if (!this.cancelAsk || this.cancelBusy) return;
+            this.cancelBusy = true;
+            try {
+                const res = await fetch('/pos/waiter/orders/' + this.cancelAsk.id + '/cancel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data.success) {
+                    this.showToast(@js(__('pos.order_cancelled_toast')), 'success');
+                } else {
+                    this.showToast(data.message || @js(__('pos.cancel_failed')), 'error');
+                }
+            } catch (e) {
+                this.showToast(@js(__('pos.cancel_failed_conn')), 'error');
+            }
+            this.cancelBusy = false;
+            this.cancelAsk = null;
+            this.loadMyOrders();
         },
 
         startAppend(o) {

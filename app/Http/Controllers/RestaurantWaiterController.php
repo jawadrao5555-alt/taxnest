@@ -489,6 +489,83 @@ class RestaurantWaiterController extends Controller
         return app(RestaurantPosController::class)->shiftTable($request, $id);
     }
 
+    /**
+     * Waiter self-cancel (Task 412, Aug 2026): waiter apna GHALAT punch hua order
+     * cashier ke claim/settle se PEHLE khud cancel kar sake. Soft-cancel semantics
+     * = cashier-side deleteOrder jaisi (status='cancelled', cancelled_at/by) taake
+     * order Cancelled Orders report mein waiter ke naam ke saath aaye.
+     *
+     * Race-safety: single conditional UPDATE (status='held' + created_by=self) —
+     * completeIncoming ka settle-claim bhi status='held' par conditional hai, is
+     * liye cancel vs settle ka sirf EK winner ho sakta hai; settle ho chuka order
+     * yahan 409 deta hai.
+     */
+    public function cancelOrder(Request $request, $id)
+    {
+        $companyId = app('currentCompanyId');
+        $user = auth('pos')->user();
+
+        if (!is_numeric($id) || $id < 1) {
+            return response()->json(['success' => false, 'message' => 'Invalid order ID'], 400);
+        }
+
+        $updates = ['status' => 'cancelled', 'updated_at' => now()];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'cancelled_at')) {
+            $updates['cancelled_at'] = now();
+        }
+        if (\Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'cancelled_by')) {
+            $updates['cancelled_by'] = $user->id;
+        }
+
+        // Atomic single-winner: only the waiter's OWN, still-held, UN-CLAIMED
+        // waiter order flips. assigned_cashier_id NULL = koi cashier ne order
+        // pakra nahi (claimIncoming/storeOrder dono isi column par chalte hain) —
+        // claim ke baad cancel sirf cashier side se hota hai, warna cashier ke
+        // load hue cart ke neeche se order gayab ho sakta tha.
+        $cancelled = RestaurantOrder::where('company_id', $companyId)
+            ->where('id', $id)
+            ->where('source', 'waiter')
+            ->where('status', 'held')
+            ->whereNull('assigned_cashier_id')
+            ->where('created_by', $user->id)
+            ->update($updates);
+
+        if (!$cancelled) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order cancel nahi ho saka — cashier ne order le liya hai (ya settle kar diya). Cancel ab counter se hi ho sakta hai.',
+            ], 409);
+        }
+
+        $order = RestaurantOrder::where('company_id', $companyId)->find($id);
+
+        // Free the table if no other live order still sits on it (deleteOrder / P4 pattern).
+        if ($order && $order->table_id) {
+            $stillActive = RestaurantOrder::where('company_id', $companyId)
+                ->where('table_id', $order->table_id)
+                ->whereIn('status', ['held', 'preparing', 'ready'])
+                ->exists();
+            if (!$stillActive) {
+                RestaurantTable::where('company_id', $companyId)->where('id', $order->table_id)
+                    ->update(['status' => 'available', 'locked_by_user_id' => null, 'locked_at' => null, 'occupied_since' => null]);
+            }
+        }
+
+        try {
+            if ($order && class_exists(\App\Services\AuditLogService::class)) {
+                \App\Services\AuditLogService::log('order_deleted', 'restaurant_order', $order->id, [
+                    'order_number' => $order->order_number,
+                    'total_amount' => $order->total_amount,
+                    'status' => 'held',
+                    'cancelled_from' => 'waiter_tablet',
+                ], null, $companyId, $user->id);
+            }
+        } catch (\Exception $auditEx) {
+        }
+
+        return response()->json(['success' => true, 'message' => 'Order cancelled']);
+    }
+
     /** Cashier side — waiter orders waiting for payment (mine or unassigned; admins see all). */
     public function incomingOrders()
     {
@@ -640,6 +717,8 @@ class RestaurantWaiterController extends Controller
             'subtotal' => (float) $o->subtotal,
             'total_amount' => (float) $o->total_amount,
             'unprinted_count' => $o->items->whereNull('kot_printed_at')->count(),
+            // Waiter self-cancel modal (Task 412): KOT-already-sent warning gate.
+            'kot_sent_at' => $o->kot_sent_at,
             'items' => $o->items->map(fn($i) => [
                 'item_id' => $i->item_id,
                 'item_type' => $i->item_type,

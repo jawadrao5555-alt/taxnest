@@ -51,6 +51,7 @@ class AiInvoiceReaderTest extends TestCase
             $t->string('ntn')->nullable();
             $t->string('address')->nullable();
             $t->string('city')->nullable();
+            $t->string('province')->nullable();
             $t->softDeletes();
             $t->timestamps();
         });
@@ -397,6 +398,42 @@ class AiInvoiceReaderTest extends TestCase
         $this->assertSame('exempt', $item['schedule_type']);
         $this->assertSame(0.0, (float) $item['tax_rate']);
         $this->assertSame(0.0, (float) $item['tax']);
+    }
+
+    // Task 404: plain 'Services' schedule type must survive AI mapping (was
+    // discarded as unrecognized before) and default to the province rate.
+    public function test_map_extraction_honors_services_schedule_from_product(): void
+    {
+        foreach ([['Punjab', 16], ['Sindh', 15]] as [$province, $expectedRate]) {
+            $company = $this->makeCompany('Premium', [], ['province' => $province]);
+
+            DB::table('products')->insert([
+                'company_id' => $company->id,
+                'name' => 'Consultancy Services',
+                'hs_code' => '98159000',
+                'pct_code' => '9815.9000',
+                'uom' => 'Job',
+                'schedule_type' => 'services',
+                'is_active' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $raw = $this->baseExtraction([
+                'items' => [[
+                    'description' => 'Consultancy Services',
+                    'hs_code' => '',
+                    'quantity' => 1, 'uom' => 'Job', 'unit_price' => 10000,
+                    'tax_rate' => null, 'tax_amount' => null, 'confidence' => 'high',
+                ]],
+            ]);
+
+            $mapped = AiInvoiceReaderService::mapExtraction($raw, $company);
+            $item = $mapped['items'][0];
+
+            $this->assertSame('services', $item['schedule_type'], "{$province}: services schedule must be honored");
+            $this->assertSame((float) $expectedRate, (float) $item['tax_rate'], "{$province}: services default rate must follow province");
+        }
     }
 
     public function test_map_extraction_credit_note_maps_reference_and_warns(): void

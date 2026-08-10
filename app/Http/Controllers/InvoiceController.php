@@ -193,7 +193,10 @@ class InvoiceController extends Controller
             }
         }
 
-        return view('invoice.create', compact('branches', 'standardTaxRate', 'nextInvoiceNumber', 'provinces', 'company', 'aiPrefill', 'aiPrefillJson', 'aiParseId'));
+        $servicesTaxRate = ScheduleEngine::servicesRateForProvince($company->province ?? null);
+        $branchServicesRates = $branches->mapWithKeys(fn ($b) => [$b->id => ScheduleEngine::servicesRateForProvince($b->province ?: ($company->province ?? null))]);
+
+        return view('invoice.create', compact('branches', 'standardTaxRate', 'nextInvoiceNumber', 'provinces', 'company', 'aiPrefill', 'aiPrefillJson', 'aiParseId', 'servicesTaxRate', 'branchServicesRates'));
     }
 
     public static function getPakistanProvinces(): array
@@ -232,7 +235,7 @@ class InvoiceController extends Controller
             'items.*.quantity' => 'required|numeric|min:0.01',
             'items.*.price' => 'required|numeric|min:0',
             'items.*.tax' => 'required|numeric|min:0',
-            'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated,fed_services',
+            'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated,fed_services,services',
             'items.*.pct_code' => 'nullable|string|max:50',
             'items.*.tax_rate' => 'nullable|integer|min:0|max:100',
             'items.*.sro_schedule_no' => 'nullable|string|max:100',
@@ -334,7 +337,7 @@ class InvoiceController extends Controller
                     'hs_code' => $item['hs_code'],
                     'schedule_type' => $scheduleType,
                     'pct_code' => $item['pct_code'] ?? ($hsResolved['pct_code'] ?? null),
-                    'tax_rate' => $this->extractTaxRate($item),
+                    'tax_rate' => $this->extractTaxRate($item, $supplierProvince),
                     'sro_schedule_no' => $item['sro_schedule_no'] ?? null,
                     'serial_no' => $item['serial_no'] ?? null,
                     'mrp' => !empty($item['mrp']) ? $item['mrp'] : null,
@@ -476,7 +479,9 @@ class InvoiceController extends Controller
         $company = \App\Models\Company::find($companyId);
         $standardTaxRate = $company ? $company->getStandardTaxRateValue() : 18.0;
         $provinces = self::getPakistanProvinces();
-        return view('invoice.edit', compact('invoice', 'branches', 'standardTaxRate', 'provinces'));
+        $servicesTaxRate = ScheduleEngine::servicesRateForProvince($invoice->supplier_province ?? $company->province ?? null);
+        $branchServicesRates = $branches->mapWithKeys(fn ($b) => [$b->id => ScheduleEngine::servicesRateForProvince($b->province ?: ($company->province ?? null))]);
+        return view('invoice.edit', compact('invoice', 'branches', 'standardTaxRate', 'provinces', 'servicesTaxRate', 'branchServicesRates'));
     }
 
     public function update(Request $request, Invoice $invoice)
@@ -506,7 +511,7 @@ class InvoiceController extends Controller
             'items.*.quantity' => 'required|numeric|min:0.01',
             'items.*.price' => 'required|numeric|min:0',
             'items.*.tax' => 'required|numeric|min:0',
-            'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated,fed_services',
+            'items.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated,fed_services,services',
             'items.*.pct_code' => 'nullable|string|max:50',
             'items.*.tax_rate' => 'nullable|integer|min:0|max:100',
             'items.*.sro_schedule_no' => 'nullable|string|max:100',
@@ -612,7 +617,7 @@ class InvoiceController extends Controller
                     'hs_code' => $item['hs_code'],
                     'schedule_type' => $scheduleType,
                     'pct_code' => $item['pct_code'] ?? ($hsResolved['pct_code'] ?? null),
-                    'tax_rate' => $this->extractTaxRate($item),
+                    'tax_rate' => $this->extractTaxRate($item, $supplierProvince),
                     'sro_schedule_no' => $item['sro_schedule_no'] ?? null,
                     'serial_no' => $item['serial_no'] ?? null,
                     'mrp' => !empty($item['mrp']) ? $item['mrp'] : null,
@@ -2137,7 +2142,7 @@ class InvoiceController extends Controller
         }
     }
 
-    private function extractTaxRate(array $item): float
+    private function extractTaxRate(array $item, ?string $supplierProvince = null): float
     {
         if (isset($item['tax_rate']) && is_numeric($item['tax_rate'])) {
             return floatval($item['tax_rate']);
@@ -2148,7 +2153,7 @@ class InvoiceController extends Controller
                 return round((floatval($item['tax']) / $subtotal) * 100, 2);
             }
         }
-        return ScheduleEngine::getTaxRate($item['schedule_type'] ?? 'standard');
+        return ScheduleEngine::getTaxRate($item['schedule_type'] ?? 'standard', $supplierProvince);
     }
 
     private function submitToFbrSync(Invoice $invoice, ?string $fbrEnvironment = null): array

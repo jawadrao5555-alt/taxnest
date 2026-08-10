@@ -148,7 +148,7 @@ class CsvImportController extends Controller
             'rows.*.quantity' => 'required|numeric|min:0.01',
             'rows.*.price' => 'required|numeric|min:0',
             'rows.*.tax' => 'required|numeric|min:0',
-            'rows.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated',
+            'rows.*.schedule_type' => 'nullable|string|in:standard,reduced,3rd_schedule,exempt,zero_rated,fed_services,services',
             'rows.*.tax_rate' => 'nullable|numeric|min:0|max:100',
         ]);
 
@@ -210,7 +210,7 @@ class CsvImportController extends Controller
                     $saleType = ScheduleEngine::mapSaleType($scheduleType);
                     $taxRate = isset($item['tax_rate']) && is_numeric($item['tax_rate'])
                         ? floatval($item['tax_rate'])
-                        : $this->computeTaxRate($item, $scheduleType);
+                        : $this->computeTaxRate($item, $scheduleType, $company->province ?? null);
 
                     $hsResolved = GlobalHsService::resolveForInvoiceItem(
                         $item['hs_code'], $standardTaxRate, $companyId, $invoice->id
@@ -282,7 +282,7 @@ class CsvImportController extends Controller
         }
     }
 
-    private function computeTaxRate(array $item, string $scheduleType): float
+    private function computeTaxRate(array $item, string $scheduleType, ?string $supplierProvince = null): float
     {
         if (isset($item['tax'], $item['price'], $item['quantity'])) {
             $subtotal = floatval($item['price']) * floatval($item['quantity']);
@@ -290,6 +290,6 @@ class CsvImportController extends Controller
                 return round((floatval($item['tax']) / $subtotal) * 100, 2);
             }
         }
-        return ScheduleEngine::getTaxRate($scheduleType);
+        return ScheduleEngine::getTaxRate($scheduleType, $supplierProvince);
     }
 }

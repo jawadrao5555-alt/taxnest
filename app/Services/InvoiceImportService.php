@@ -82,7 +82,7 @@ class InvoiceImportService
 
     public const VALID_DOC_TYPES = ['Sale Invoice', 'Credit Note', 'Debit Note'];
 
-    public const VALID_SCHEDULE_TYPES = ['standard', 'reduced', '3rd_schedule', 'exempt', 'zero_rated'];
+    public const VALID_SCHEDULE_TYPES = ['standard', 'reduced', '3rd_schedule', 'exempt', 'zero_rated', 'fed_services', 'services'];
 
     /**
      * Template sample rows: uploads that still contain these exact rows skip
@@ -546,7 +546,7 @@ class InvoiceImportService
             if ($tax !== null && $subtotal > 0) {
                 $taxRate = round(($tax / $subtotal) * 100, 2);
             } else {
-                $taxRate = $scheduleType === 'standard' ? $standardTaxRate : ScheduleEngine::getTaxRate($scheduleType);
+                $taxRate = $scheduleType === 'standard' ? $standardTaxRate : ScheduleEngine::getTaxRate($scheduleType, $company->province ?? null);
             }
         }
         $data['tax_rate'] = $this->numberToString($taxRate);
@@ -757,7 +757,7 @@ class InvoiceImportService
                             'hs_code' => $item['hs_code'],
                             'schedule_type' => $scheduleType,
                             'pct_code' => $pctCode,
-                            'tax_rate' => floatval($item['tax_rate'] !== '' ? $item['tax_rate'] : ScheduleEngine::getTaxRate($scheduleType)),
+                            'tax_rate' => floatval($item['tax_rate'] !== '' ? $item['tax_rate'] : ScheduleEngine::getTaxRate($scheduleType, $company->province ?? null)),
                             'sro_schedule_no' => $item['sro_schedule_no'] !== '' ? $item['sro_schedule_no'] : null,
                             'serial_no' => $item['sro_serial_no'] !== '' ? $item['sro_serial_no'] : null,
                             'mrp' => $item['mrp'] !== '' ? floatval($item['mrp']) : null,

@@ -473,6 +473,78 @@ class InvoiceBulkImportTest extends TestCase
     // Draft creation
     // ------------------------------------------------------------------
 
+    // ------------------------------------------------------------------
+    // Task 404: plain 'Services' (SN019) — importer acceptance + province rate
+    // ------------------------------------------------------------------
+
+    public function test_services_row_accepted_and_defaults_to_company_province_rate(): void
+    {
+        // Company province = Punjab (setUp) → services default 16%
+        $rows = $this->parsedRows([$this->row([
+            'hs_code' => '98159000',
+            'description' => 'Consultancy services',
+            'schedule_type' => 'services',
+            'price' => '0', // subtotal 0 → tax_rate falls back to the schedule/province default
+            'tax_rate' => '',
+            'tax' => '0',
+        ])]);
+        $result = $this->service->validateRows($rows, $this->company);
+        $this->assertSame([], $result['rows'][0]['errors']);
+        $this->assertSame('services', $result['rows'][0]['data']['schedule_type']);
+        $this->assertSame('Services', $result['rows'][0]['data']['_sale_type']);
+        $this->assertEquals(16, (float) $result['rows'][0]['data']['tax_rate']);
+    }
+
+    public function test_services_row_defaults_to_sindh_rate_for_sindh_company(): void
+    {
+        $sindhCo = Company::create([
+            'name' => 'Sindh Services Co',
+            'fbr_registration_no' => '7654321',
+            'next_invoice_number' => 1,
+            'province' => 'Sindh',
+            'standard_tax_rate' => 18.0,
+        ]);
+        $rows = $this->parsedRows([$this->row([
+            'hs_code' => '98159000',
+            'description' => 'Consultancy services',
+            'schedule_type' => 'services',
+            'price' => '0', // subtotal 0 → tax_rate falls back to the schedule/province default
+            'tax_rate' => '',
+            'tax' => '0',
+        ])]);
+        $result = $this->service->validateRows($rows, $sindhCo);
+        $this->assertSame('services', $result['rows'][0]['data']['schedule_type']);
+        $this->assertEquals(15, (float) $result['rows'][0]['data']['tax_rate']);
+    }
+
+    public function test_services_row_keeps_explicit_rate(): void
+    {
+        // Punjab company but user explicitly enters 15% — user rate wins.
+        $rows = $this->parsedRows([$this->row([
+            'hs_code' => '98159000',
+            'description' => 'Consultancy services',
+            'schedule_type' => 'services',
+            'tax_rate' => '15',
+            'tax' => '150',
+        ])]);
+        $result = $this->service->validateRows($rows, $this->company);
+        $this->assertEquals(15, (float) $result['rows'][0]['data']['tax_rate']);
+    }
+
+    public function test_fed_services_row_accepted(): void
+    {
+        $rows = $this->parsedRows([$this->row([
+            'hs_code' => '98159000',
+            'description' => 'FED services',
+            'schedule_type' => 'fed_services',
+            'tax_rate' => '16',
+            'tax' => '160',
+        ])]);
+        $result = $this->service->validateRows($rows, $this->company);
+        $this->assertSame('fed_services', $result['rows'][0]['data']['schedule_type']);
+        $this->assertSame('Services (FED in ST Mode)', $result['rows'][0]['data']['_sale_type']);
+    }
+
     public function test_create_drafts_groups_rows_and_persists_resolved_fields(): void
     {
         $result = $this->service->validateRows($this->parsedRows([

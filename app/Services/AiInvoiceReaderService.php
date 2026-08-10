@@ -81,7 +81,7 @@ class AiInvoiceReaderService
     public const QUOTA_TRIAL = 5;
     public const QUOTA_DEFAULT = 25;
 
-    private const SCHEDULE_TYPES = ['standard', 'reduced', '3rd_schedule', 'exempt', 'zero_rated'];
+    private const SCHEDULE_TYPES = ['standard', 'reduced', '3rd_schedule', 'exempt', 'zero_rated', 'fed_services', 'services'];
 
     public static function enabled(): bool
     {
@@ -883,7 +883,7 @@ PROMPT;
                 } elseif ($aiTax !== null && $aiTax > 0 && $qty * $price > 0) {
                     $taxRate = round($aiTax / ($qty * $price) * 100);
                 } else {
-                    $taxRate = $scheduleType === 'standard' ? $standardRate : ScheduleEngine::getTaxRate($scheduleType);
+                    $taxRate = $scheduleType === 'standard' ? $standardRate : ScheduleEngine::getTaxRate($scheduleType, $company->province ?? null);
                 }
             }
             if (in_array($scheduleType, ['exempt', 'zero_rated'], true)) {

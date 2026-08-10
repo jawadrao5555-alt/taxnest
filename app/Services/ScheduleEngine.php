@@ -12,6 +12,9 @@ class ScheduleEngine
         'zero_rated' => ['label' => 'Zero Rated', 'tax_rate' => 0, 'requires_sro' => false, 'requires_serial' => false, 'requires_mrp' => false],
         // FBR only accepts 16% for Services (FED in ST Mode) — scenario SN018 (confirmed Aug 2026: 13% and 19.5% rejected in sandbox).
         'fed_services' => ['label' => 'Services (FED in ST Mode)', 'tax_rate' => 16, 'requires_sro' => false, 'requires_serial' => false, 'requires_mrp' => false],
+        // Plain Services (no FED) — scenario SN019. Rate follows the supplier province's services rate
+        // (see servicesRateForProvince()), so no fixed rate here.
+        'services' => ['label' => 'Services', 'tax_rate' => null, 'requires_sro' => false, 'requires_serial' => false, 'requires_mrp' => false],
     ];
 
     public static array $hsLookupTable = [
@@ -96,8 +99,37 @@ class ScheduleEngine
         }
     }
 
-    public static function getTaxRate(string $scheduleType): float
+    /**
+     * Provincial sales-tax-on-services rates (plain 'Services', FBR scenario SN019).
+     * Single source of truth — UI defaults, controller fallbacks, and importers all resolve through here.
+     * PRA (Punjab) 16%; SRB (Sindh), KPRA (KP), BRA (Balochistan) and ICT 15%. Rate stays user-editable.
+     */
+    public const SERVICES_PROVINCE_RATES = [
+        'Punjab' => 16.0,
+        'Sindh' => 15.0,
+        'Khyber Pakhtunkhwa' => 15.0,
+        'Balochistan' => 15.0,
+        'Islamabad' => 15.0,
+        'Azad Kashmir' => 16.0,
+        'Gilgit-Baltistan' => 16.0,
+    ];
+
+    public static function servicesRateForProvince(?string $province): float
     {
+        $province = trim((string) $province);
+        foreach (self::SERVICES_PROVINCE_RATES as $name => $rate) {
+            if (strcasecmp($name, $province) === 0) {
+                return $rate;
+            }
+        }
+        return 16.0;
+    }
+
+    public static function getTaxRate(string $scheduleType, ?string $province = null): float
+    {
+        if ($scheduleType === 'services') {
+            return self::servicesRateForProvince($province);
+        }
         $config = self::getScheduleConfig($scheduleType);
         return $config['tax_rate'] ?? 18.0;
     }

@@ -49,7 +49,7 @@
                     <h3 class="text-sm font-extrabold text-gray-900 dark:text-white mb-4 uppercase tracking-wider">Branch</h3>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Branch (Optional)</label>
-                        <select name="branch_id" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                        <select name="branch_id" id="branch_id_select" @change="onBranchChange($event.target.value)" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                             <option value="">— Select Branch —</option>
                             @foreach($branches as $branch)
                             <option value="{{ $branch->id }}" {{ old('branch_id', $invoice->branch_id) == $branch->id ? 'selected' : '' }}>
@@ -205,6 +205,7 @@
                                         <option value="exempt">Exempt</option>
                                         <option value="zero_rated">Zero Rated</option>
                                         <option value="fed_services" title="FBR only accepts a 16% tax rate for Services (FED in ST Mode)">Services (FED in ST Mode)</option>
+                                        <option value="services" title="Plain services (no FED) — tax rate follows your province's services rate">Services</option>
                                     </select>
                                 </div>
                                 <div>
@@ -421,8 +422,11 @@
         function invoiceEditForm() {
             const companyStandardRate = {{ $standardTaxRate ?? 18 }};
             const defaultTaxRates = {
-                standard: companyStandardRate, reduced: 10, '3rd_schedule': 17, exempt: 0, zero_rated: 0, fed_services: 16
+                standard: companyStandardRate, reduced: 10, '3rd_schedule': 17, exempt: 0, zero_rated: 0, fed_services: 16, services: {{ $servicesTaxRate ?? 16 }}
             };
+            // Plain Services (SN019): default rate follows the SUPPLIER province — branch province wins over company province.
+            const companyServicesRate = {{ $servicesTaxRate ?? 16 }};
+            const branchServicesRates = {!! json_encode($branchServicesRates ?? []) !!};
 
             const scheduleHints = {
                 standard: 'Standard Rate: No SRO, Serial, or MRP required.',
@@ -432,6 +436,7 @@
                 zero_rated: 'Zero Rated: SRO and Serial are optional.',
                 reduced: 'Reduced Rate: SRO and Serial No required.',
                 fed_services: 'Services (FED in ST Mode): FBR only accepts a 16% tax rate for this sale type (scenario SN018) — other rates are rejected.',
+                services: 'Services: plain services sale type (scenario SN019). Defaulted to your province\'s services rate ({{ $servicesTaxRate ?? 16 }}%) — Punjab 16%, Sindh/KP/Balochistan/Islamabad 15%. Adjust if needed.',
             };
 
             function detectRegType(ntn, cnic) {
@@ -463,13 +468,31 @@
                         return { requires_sro: true, requires_serial: true, requires_mrp: false, optional_sro: false, optional_serial: false, hint: scheduleHints.reduced };
                     case 'fed_services':
                         return { requires_sro: false, requires_serial: false, requires_mrp: false, optional_sro: false, optional_serial: false, hint: scheduleHints.fed_services };
+                    case 'services':
+                        return { requires_sro: false, requires_serial: false, requires_mrp: false, optional_sro: false, optional_serial: false, hint: scheduleHints.services };
                     default:
                         return { requires_sro: false, requires_serial: false, requires_mrp: false, optional_sro: false, optional_serial: false, hint: '' };
                 }
             }
 
             return {
-                init() { window.invoiceFormInstance = this; },
+                init() {
+                    window.invoiceFormInstance = this;
+                    // Pre-selected branch decides the supplier province → services (SN019) default rate.
+                    const branchSel = document.getElementById('branch_id_select');
+                    if (branchSel && branchSel.value) defaultTaxRates.services = branchServicesRates[branchSel.value] ?? companyServicesRate;
+                },
+                // Branch change → supplier province change → services default rate change (SN019).
+                onBranchChange(branchId) {
+                    const rate = branchServicesRates[branchId] ?? companyServicesRate;
+                    defaultTaxRates.services = rate;
+                    this.items.forEach((item, idx) => {
+                        if (item.schedule_type === 'services') {
+                            item.tax_rate = rate;
+                            this.calcTax(idx);
+                        }
+                    });
+                },
                 buyer_name: @js($invoice->buyer_name),
                 buyer_ntn: @js($invoice->buyer_ntn),
                 buyer_cnic: @js($invoice->buyer_cnic ?? ''),
@@ -574,7 +597,7 @@
                     let types = [...new Set(this.items.map(i => i.schedule_type))];
                     if (types.length > 1) {
                         let labels = types.map(t => {
-                            let map = { standard: 'Standard', reduced: 'Reduced', '3rd_schedule': '3rd Schedule', exempt: 'Exempt', zero_rated: 'Zero Rated', fed_services: 'Services (FED in ST Mode)' };
+                            let map = { standard: 'Standard', reduced: 'Reduced', '3rd_schedule': '3rd Schedule', exempt: 'Exempt', zero_rated: 'Zero Rated', fed_services: 'Services (FED in ST Mode)', services: 'Services' };
                             return map[t] || t;
                         });
                         this.scheduleError = 'Warning: Mixed schedule types detected (' + labels.join(', ') + '). All items should use the same schedule type.';

@@ -53,19 +53,12 @@ class CompanySettingsController extends Controller
             return redirect('/dashboard')->with('error', 'Company not found.');
         }
 
-        $sandboxToken = null;
-        $productionToken = null;
-        try {
-            if (!empty($company->fbr_sandbox_token)) {
-                $sandboxToken = Crypt::decryptString($company->fbr_sandbox_token);
-            }
-            if (!empty($company->fbr_production_token)) {
-                $productionToken = Crypt::decryptString($company->fbr_production_token);
-            }
-        } catch (\Exception $e) {
-            $sandboxToken = $company->fbr_sandbox_token ?? null;
-            $productionToken = $company->fbr_production_token ?? null;
-        }
+        // Centralized DI token resolution: decrypts encrypted tokens, passes through
+        // plausible raw tokens, and yields '' for corrupted blobs (never shows a
+        // Crypt blob in the settings form).
+        $fbrService = app(\App\Services\FbrService::class);
+        $sandboxToken = $fbrService->resolveDiToken($company, 'sandbox') ?: null;
+        $productionToken = $fbrService->resolveDiToken($company, 'production') ?: null;
 
         $initData = [
             'environment' => $company->fbr_environment ?? 'sandbox',
@@ -277,22 +270,22 @@ class CompanySettingsController extends Controller
         $company = Company::find(auth()->user()->company_id);
         $environment = $company->fbr_environment ?? 'sandbox';
 
-        $token = null;
-        try {
-            if ($environment === 'production' && $company->fbr_production_token) {
-                $token = Crypt::decryptString($company->fbr_production_token);
-            } elseif ($company->fbr_sandbox_token) {
-                $token = Crypt::decryptString($company->fbr_sandbox_token);
-            }
-        } catch (\Exception $e) {
-            $token = $environment === 'production' ? $company->fbr_production_token : $company->fbr_sandbox_token;
-        }
+        // Centralized DI token resolution (FbrService): handles encrypted tokens,
+        // tolerates plausible RAW tokens, and returns '' for corrupted blobs
+        // (never sends an undecryptable blob as a bearer token).
+        $tokenEnv = ($environment === 'production' && $company->fbr_production_token) ? 'production' : 'sandbox';
+        $token = app(\App\Services\FbrService::class)->resolveDiToken($company, $tokenEnv);
 
         if (empty($token)) {
             $company->update(['fbr_connection_status' => 'red']);
+            $hasStored = $environment === 'production'
+                ? !empty($company->fbr_production_token) || !empty($company->fbr_sandbox_token)
+                : !empty($company->fbr_sandbox_token);
             return response()->json([
                 'status' => 'red',
-                'message' => 'No FBR token configured for ' . $environment . ' environment.',
+                'message' => $hasStored
+                    ? 'Stored FBR token could not be read (corrupted or encrypted with a different key). Please re-save your token.'
+                    : 'No FBR token configured for ' . $environment . ' environment.',
             ]);
         }
 
@@ -368,14 +361,7 @@ class CompanySettingsController extends Controller
 
     private function testToken(Company $company)
     {
-        $token = null;
-        try {
-            if ($company->fbr_sandbox_token) {
-                $token = Crypt::decryptString($company->fbr_sandbox_token);
-            }
-        } catch (\Exception $e) {
-            $token = $company->fbr_sandbox_token;
-        }
+        $token = app(\App\Services\FbrService::class)->resolveDiToken($company, 'sandbox');
 
         $checks = [];
         $checks['token_exists'] = !empty($token);
@@ -460,20 +446,15 @@ class CompanySettingsController extends Controller
 
     private function testDryRun(Company $company)
     {
-        $token = null;
-        try {
-            if ($company->fbr_sandbox_token) {
-                $token = Crypt::decryptString($company->fbr_sandbox_token);
-            }
-        } catch (\Exception $e) {
-            $token = $company->fbr_sandbox_token;
-        }
+        $token = app(\App\Services\FbrService::class)->resolveDiToken($company, 'sandbox');
 
         if (empty($token)) {
             return response()->json([
                 'success' => false,
                 'title' => 'Dry Run Failed',
-                'message' => 'No sandbox token configured. Please set your sandbox token first.',
+                'message' => !empty($company->fbr_sandbox_token)
+                    ? 'Stored sandbox token could not be read (corrupted or encrypted with a different key). Please re-save your token.'
+                    : 'No sandbox token configured. Please set your sandbox token first.',
             ]);
         }
 

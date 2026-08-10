@@ -811,18 +811,52 @@ class FbrService
         return "Unregistered";
     }
 
-    private function getApiToken($company): string
+    /**
+     * Detect a plausible RAW (unencrypted) FBR bearer token stored directly in the DB.
+     * Laravel Crypt payloads are base64 of a JSON envelope and always start with "eyJ"
+     * and run ~200+ chars; real FBR tokens are UUID-like/opaque strings of 30–64 chars.
+     * A raw token must be usable as-is instead of failing decrypt → '' → red status.
+     */
+    private function looksLikeRawFbrToken(string $value): bool
     {
-        $env = $company->fbr_environment ?? 'sandbox';
-        $encryptedToken = '';
-        if ($env === 'production') {
-            $encryptedToken = $company->fbr_production_token ?? '';
-        } else {
-            $encryptedToken = $company->fbr_sandbox_token ?? '';
-        }
+        $value = trim($value);
+        $len = strlen($value);
+        if ($len < 30 || $len > 64) return false;
+        if (str_starts_with($value, 'eyJ')) return false; // Crypt/JWT envelope
+        // Tokens are printable single-line strings (UUIDs, hex, base62-ish)
+        return preg_match('/^[A-Za-z0-9\-_\.]+$/', $value) === 1;
+    }
+
+    /**
+     * Resolve a company's DI bearer token for the given environment.
+     * SINGLE source of truth for DI token handling — used by submission paths
+     * (getApiToken) AND the FBR Settings connection/sandbox test endpoints, so
+     * raw-token tolerance and corrupted-blob rejection behave identically everywhere.
+     *
+     * - Encrypted token → decrypted plaintext.
+     * - Plausible RAW token (30–64 chars, no Crypt envelope) → used as-is (warned).
+     * - Corrupted/undecryptable blob → '' (logged + connection status flipped red).
+     */
+    public function resolveDiToken($company, ?string $env = null): string
+    {
+        $env = $env ?: ($company->fbr_environment ?? 'sandbox');
+        $encryptedToken = $env === 'production'
+            ? ($company->fbr_production_token ?? '')
+            : ($company->fbr_sandbox_token ?? '');
 
         if (empty($encryptedToken)) {
             return '';
+        }
+
+        // RAW (unencrypted) token stored directly in the column — use it as-is.
+        // (e.g. a 36-char UUID pasted/imported without going through Crypt.)
+        if ($this->looksLikeRawFbrToken($encryptedToken)) {
+            \Log::warning("FBR DI token stored UNENCRYPTED — using raw value as bearer token. Re-save via panel to encrypt.", [
+                'company_id' => $company->id ?? null,
+                'env' => $env,
+                'token_length' => strlen(trim($encryptedToken)),
+            ]);
+            return trim($encryptedToken);
         }
 
         try {
@@ -848,6 +882,11 @@ class FbrService
             } catch (\Throwable $te) {}
             return '';
         }
+    }
+
+    private function getApiToken($company): string
+    {
+        return $this->resolveDiToken($company);
     }
 
     private function getPostUrl($company): string
@@ -1767,6 +1806,15 @@ class FbrService
         if (empty($company->fbr_pos_token)) {
             Log::warning("FBR IMS POS: No dedicated POS token configured for company #{$company->id}");
             return '';
+        }
+
+        // RAW (unencrypted) token stored directly in the column — use it as-is.
+        if ($this->looksLikeRawFbrToken($company->fbr_pos_token)) {
+            Log::warning("FBR IMS POS token stored UNENCRYPTED — using raw value as bearer token. Re-save via panel to encrypt.", [
+                'company_id' => $company->id ?? null,
+                'token_length' => strlen(trim($company->fbr_pos_token)),
+            ]);
+            return trim($company->fbr_pos_token);
         }
 
         try {

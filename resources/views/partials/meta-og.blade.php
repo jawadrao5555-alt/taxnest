@@ -16,6 +16,7 @@
 <meta property="og:locale"      content="en_PK">
 {{-- Twitter / X Card --}}
 <meta name="twitter:card"        content="summary_large_image">
+<meta name="twitter:site"        content="@TaxNestPK">
 <meta name="twitter:title"       content="{{ $ogTitle }}">
 <meta name="twitter:description" content="{{ $ogDescription }}">
 <meta name="twitter:image"       content="{{ $ogImage }}">

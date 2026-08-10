@@ -461,6 +461,7 @@
                     <th class="px-4 py-2">{{ __('pos.stock_purch_col_supplier') }}</th>
                     <th class="px-4 py-2">{{ __('pos.stock_purch_items_col') }}</th>
                     <th class="px-4 py-2 text-right">{{ __('pos.stock_purch_col_total') }}</th>
+                    <th class="px-4 py-2 text-right"></th>
                 </tr>
             </thead>
             <tbody>
@@ -483,7 +484,14 @@
                                         class="text-blue-600 dark:text-blue-400 text-xs font-bold hover:underline whitespace-nowrap">{{ __('pos.stock_purch_less') }}</button>
                             </span>
                         </td>
-                        <td data-label="{{ __('pos.stock_purch_col_total') }}" class="px-4 py-2 text-right font-bold text-gray-900 dark:text-white" x-text="'Rs ' + po.total"></td>
+                        <td data-label="{{ __('pos.stock_purch_col_total') }}" class="px-4 py-2 text-right font-bold text-gray-900 dark:text-white"
+                            :class="po.voided ? 'line-through opacity-60' : ''" x-text="'Rs ' + po.total"></td>
+                        <td class="px-4 py-2 text-right whitespace-nowrap">
+                            <span x-show="po.voided" x-cloak
+                                  class="inline-block px-2 py-0.5 rounded text-xs font-bold bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400">{{ __('pos.stock_pur_voided') }}</span>
+                            <button type="button" x-show="po.can_void" @click="voidPurchase(po)"
+                                    class="px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs font-bold hover:bg-red-50 dark:hover:bg-red-900/20">{{ __('pos.stock_pur_void_btn') }}</button>
+                        </td>
                     </tr>
                 </template>
             </tbody>
@@ -541,6 +549,17 @@ function stockPage() {
         purchMoreTpl: {!! $purchMoreTpl !!},
         purchMoreLabel(n) { return this.purchMoreTpl.replace(':n', n); },
         visiblePurchItems(po) { return this.purchExpanded.includes(po.id) ? po.items : po.items.slice(0, 3); },
+        // Void a purchase (Task 419) — confirm, then a plain form POST so the
+        // whole page refreshes from server data (stock list, tiles, history).
+        voidPurchase(po) {
+            if (!confirm(@js(__('pos.stock_pur_void_confirm')).replace(':number', po.po_number))) return;
+            const f = document.createElement('form');
+            f.method = 'POST';
+            f.action = '{{ url('/fbr-pos/stock/purchase') }}/' + po.id + '/void';
+            f.innerHTML = '<input type="hidden" name="_token" value="{{ csrf_token() }}">';
+            document.body.appendChild(f);
+            f.submit();
+        },
         searchPurchases() { this.fetchPurchases(true); },
         loadMorePurchases() { this.fetchPurchases(false); },
         async fetchPurchases(reset) {

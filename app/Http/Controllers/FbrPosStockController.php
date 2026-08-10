@@ -179,6 +179,8 @@ class FbrPosStockController extends Controller
             'date' => ($po->received_date ?? $po->created_at)?->format('d M Y'),
             'supplier' => $po->supplier?->name,
             'total' => number_format((float) $po->total_amount, 2),
+            'voided' => $po->status === PurchaseOrder::STATUS_CANCELLED,
+            'can_void' => $po->status === PurchaseOrder::STATUS_RECEIVED,
             'items' => $po->items->map(fn ($it) => [
                 'name' => $it->product?->name ?? ('#' . $it->product_id),
                 'qty' => $trimQty($it->quantity),
@@ -475,6 +477,94 @@ class FbrPosStockController extends Controller
 
         return redirect()->route('fbrpos.stock')
             ->with('success', "Stock receive ho gaya — {$po->po_number} (Rs " . number_format($po->total_amount, 2) . ")");
+    }
+
+    /**
+     * Void a received purchase (Task 419) — the "galat stock receive" fix.
+     * Admin/manager only (same gate), confirm handled client-side.
+     *
+     * Reverses each line's received stock as a return_out movement and rolls
+     * back the kharid rates via InventoryService::reversePurchase (see its
+     * docblock for the avg-price approach — un-weight the running average,
+     * fall back to the most recent OTHER purchase price when degenerate).
+     * The PO row is kept (status=cancelled) so the audit trail stays intact.
+     */
+    public function voidPurchase($id)
+    {
+        $this->assertNotCashier();
+        $companyId = $this->companyId();
+        $po = PurchaseOrder::where('company_id', $companyId)->with('items')->findOrFail($id);
+
+        if ($po->status === PurchaseOrder::STATUS_CANCELLED) {
+            return redirect()->route('fbrpos.stock')->with('error', __('pos.stock_pur_void_already'));
+        }
+        // Only fully RECEIVED purchases can be voided — this table is shared
+        // with the DI panel's PO workflow, where draft/ordered/partial rows
+        // have NOT put (all) their stock in yet. Reversing those would deduct
+        // stock that was never added.
+        if ($po->status !== PurchaseOrder::STATUS_RECEIVED) {
+            return redirect()->route('fbrpos.stock')->with('error', __('pos.stock_pur_void_not_received'));
+        }
+
+        DB::transaction(function () use ($po, $companyId) {
+            // Row lock + re-check — double-submit must not reverse stock twice.
+            $locked = PurchaseOrder::lockForUpdate()->find($po->id);
+            if (!$locked || $locked->status !== PurchaseOrder::STATUS_RECEIVED) {
+                return;
+            }
+
+            foreach ($po->items as $item) {
+                // Only what was ACTUALLY received ever hit the stock — never
+                // fall back to the ordered quantity.
+                $qty = (float) $item->received_quantity;
+                if ($qty <= 0) {
+                    continue;
+                }
+
+                // Most recent STILL-VALID purchase price — the value the
+                // last/avg kharid rolls back to when this purchase set them.
+                // Movements of previously-voided POs stay in history, so a
+                // PO-referenced movement only qualifies while its PO is still
+                // RECEIVED (never this one, never a cancelled one). NULL =
+                // no valid prior purchase → reversePurchase resets to 0.
+                $fallback = InventoryMovement::where('inventory_movements.company_id', $companyId)
+                    ->where('inventory_movements.product_id', $item->product_id)
+                    ->where('inventory_movements.type', InventoryMovement::TYPE_PURCHASE)
+                    ->where(function ($w) use ($po) {
+                        $w->where(function ($q) use ($po) {
+                            $q->where('reference_type', 'purchase_order')
+                              ->where('reference_id', '!=', $po->id)
+                              ->whereExists(function ($sub) {
+                                  $sub->selectRaw('1')
+                                      ->from('purchase_orders')
+                                      ->whereColumn('purchase_orders.id', 'inventory_movements.reference_id')
+                                      ->where('purchase_orders.status', PurchaseOrder::STATUS_RECEIVED);
+                              });
+                        })
+                        ->orWhere('reference_type', '!=', 'purchase_order')
+                        ->orWhereNull('reference_type');
+                    })
+                    ->orderByDesc('id')
+                    ->value('unit_price');
+
+                InventoryService::reversePurchase(
+                    $companyId,
+                    (int) $item->product_id,
+                    $qty,
+                    (float) $item->unit_price,
+                    null,
+                    ['type' => 'purchase_void', 'id' => $po->id, 'number' => $po->po_number],
+                    'Purchase void — ' . $po->po_number,
+                    $this->user()->id,
+                    $fallback !== null ? (float) $fallback : null
+                );
+            }
+
+            $locked->update(['status' => PurchaseOrder::STATUS_CANCELLED]);
+        });
+
+        return redirect()->route('fbrpos.stock')
+            ->with('success', __('pos.stock_pur_voided_msg', ['number' => $po->po_number]));
     }
 
     /** Inline update of a product's min stock level (alert threshold). */

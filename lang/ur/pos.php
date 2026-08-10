@@ -4202,4 +4202,10 @@ return [
     'stock_sup_deleted' => 'سپلائر حذف ہو گیا: :name',
     'stock_sup_deactivated' => 'سپلائر غیر فعال کر دیا گیا (خریداری کی ہسٹری محفوظ ہے): :name',
     'stock_sup_reactivated' => 'سپلائر دوبارہ فعال ہو گیا: :name',
+    'stock_pur_void_btn' => 'منسوخ کریں',
+    'stock_pur_voided' => 'منسوخ',
+    'stock_pur_void_confirm' => 'خریداری :number منسوخ کریں؟ اس خریداری سے شامل ہوا اسٹاک واپس کٹ جائے گا اور خرید ریٹ پچھلی خریداری پر واپس چلا جائے گا۔ یہ واپس نہیں ہو سکتا۔',
+    'stock_pur_voided_msg' => 'خریداری منسوخ ہو گئی: :number — اسٹاک واپس کٹ گیا۔',
+    'stock_pur_void_already' => 'یہ خریداری پہلے ہی منسوخ ہو چکی ہے۔',
+    'stock_pur_void_not_received' => 'صرف وصول شدہ خریداری منسوخ ہو سکتی ہے۔',
 ];

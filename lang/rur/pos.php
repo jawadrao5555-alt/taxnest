@@ -4202,4 +4202,10 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'stock_sup_deleted' => 'Supplier delete ho gaya: :name',
     'stock_sup_deactivated' => 'Supplier band kar diya gaya (purchase history mehfooz hai): :name',
     'stock_sup_reactivated' => 'Supplier wapis chalu ho gaya: :name',
+    'stock_pur_void_btn' => 'Void',
+    'stock_pur_voided' => 'VOID',
+    'stock_pur_void_confirm' => 'Purchase :number void karein? Is purchase se add hua stock wapis kat jayega aur kharid rate pichli purchase par wapis chala jayega. Yeh wapis nahi ho sakta.',
+    'stock_pur_voided_msg' => 'Purchase void ho gayi: :number — stock wapis kat gaya.',
+    'stock_pur_void_already' => 'Yeh purchase pehle hi void ho chuki hai.',
+    'stock_pur_void_not_received' => 'Sirf receive shuda purchase void ho sakti hai.',
 ];

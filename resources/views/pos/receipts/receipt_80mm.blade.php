@@ -320,8 +320,6 @@
         @if(!empty($company->fbr_registration_no))<p><strong>STRN:</strong> {{ $company->fbr_registration_no }}</p>@endif
     </div>
 
-    <div class="separator"></div>
-
     @php
         // Bill Number Style (07 Aug 2026): when this bill's stream is set to
         // 'token', the frozen daily token (bill_token, allocated at bill birth)
@@ -339,7 +337,23 @@
             }
         } catch (\Throwable $e) { $rcptBillToken = null; }
     @endphp
+
+    {{-- Order-number early lookup: for fiscal top box (code-style restaurant bills).
+         Schema-guarded per PROD drift convention. --}}
+    @php
+        $omRcptFullNum = null;
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'token_no')) {
+                $omEarlyRO = \App\Models\RestaurantOrder::where('company_id', $transaction->company_id)
+                    ->where('pos_transaction_id', $transaction->id)
+                    ->orderByDesc('id')
+                    ->first();
+                if ($omEarlyRO) { $omRcptFullNum = $omEarlyRO->order_number; }
+            }
+        } catch (\Throwable $e) { $omRcptFullNum = null; }
+    @endphp
     @if($rcptTopBadge)
+    <div class="separator"></div>
     <div class="invoice-numbers" style="text-align:center; padding:4px 5px;">
         <strong style="font-size:12px; color:#000;">{{ $rcptTopProvisional ? __('pos.receipt_provisional_bill') : __('pos.receipt_sale_receipt') }}</strong><br>
         @if($rcptBillToken !== null)
@@ -358,6 +372,12 @@
         </div>
         @endif
         <table class="inv-table">
+            @if($omRcptFullNum)
+            <tr>
+                <td class="inv-label">Order #:</td>
+                <td class="inv-value" style="font-weight:900;">{{ $omRcptFullNum }}</td>
+            </tr>
+            @endif
             <tr>
                 <td class="inv-label">{{ __('pos.receipt_pos_invoice') }}:</td>
                 <td class="inv-value">{{ $transaction->invoice_number }}</td>
@@ -417,7 +437,8 @@
     <div style="text-align:center; padding:2px 0 3px;">
         <span style="display:inline-block; border:2px solid #000; padding:2px 14px; font-size:16px; font-weight:900;">{{ __('pos.order_match_token_label') }} {{ $omRcptToken }}</span>
     </div>
-    @elseif($omRcptCode)
+    @elseif($omRcptCode && !$rcptPraFiscal)
+    {{-- Short-code box: only for non-fiscal bills; fiscal bills show the full order number in the top invoice box --}}
     <div style="text-align:center; padding:2px 0 3px;">
         <span style="display:inline-block; border:2px solid #000; padding:2px 14px; font-size:14px; font-weight:900; letter-spacing:2px;">{{ $omRcptCode }}</span>
     </div>
@@ -593,14 +614,7 @@
     <div class="edge-box" style="border: 2px solid #000; text-align: center; font-weight: bold; font-size: 14px; letter-spacing: 1px; padding: 3px 2px; margin: 3px 0; color: #000;">{{ __('pos.rcpt_payment_banner') }} {{ $rcptPayLabel }}</div>
     @endif
 
-    <div class="separator"></div>
-
     @if($transaction->pra_status === 'submitted' && $transaction->pra_invoice_number)
-    <div class="pra-badge">
-        <div class="pra-title">{{ __('pos.receipt_pra_fiscal_invoice') }}</div>
-        <div>POS: {{ $transaction->invoice_number }}</div>
-        <div class="pra-number">PRA: {{ $transaction->pra_invoice_number }}</div>
-    </div>
     @php
         // QR carries the RAW PRA invoice number (PRA Sahulat app format).
         $praQr = $transaction->pra_invoice_number

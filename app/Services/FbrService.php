@@ -292,6 +292,8 @@ class FbrService
      *   SN006 — Goods at Standard Rate (default) / Unregistered (legacy)
      *   SN007 — Exempt Goods
      *   SN008 — 3rd Schedule Goods / Registered
+     *   SN018 — Services (FED in ST Mode)
+     *   SN019 — Services Rendered or Provided
      *   SN026 — Goods at Standard Rate / End Consumer
      *   SN027 — 3rd Schedule Goods / End Consumer
      *   SN028 — Goods at Reduced Rate (8th Schedule)
@@ -325,6 +327,17 @@ class FbrService
         $isExempt = (strpos($saleType, 'exempt') !== false || $scheduleType === 'exempt');
         $isReduced = (strpos($saleType, 'reduced') !== false || $scheduleType === 'reduced' || $scheduleType === '8th_schedule');
         $isSteel = $this->isSteelHsCode($hsCode);
+
+        // Services scenarios (Aug 2026, Al Haq Enterprises onboarding):
+        // SN018 = Services where FED is charged in ST mode; SN019 = plain Services.
+        // Checked BEFORE goods branches — a services sale can never be 3rd-schedule
+        // /steel/goods-standard. Telecommunication services are also FED-in-ST (SN018).
+        $isServices = (strpos($saleType, 'service') !== false || strpos($saleType, 'telecommunication') !== false);
+        if ($isServices) {
+            $isFedInStMode = (strpos($saleType, 'fed in st mode') !== false
+                || strpos($saleType, 'telecommunication') !== false);
+            return $isFedInStMode ? 'SN018' : 'SN019';
+        }
 
         if ($isExempt) {
             return 'SN007';

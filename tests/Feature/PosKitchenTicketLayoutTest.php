@@ -8,25 +8,35 @@ use App\Models\RestaurantOrder;
 use App\Models\RestaurantOrderItem;
 
 /**
- * KOT LAYOUT LOCK — Task 395 (9 Aug 2026, Pizza Master / E-ICEBLUE compaction).
+ * KOT LAYOUT LOCK — Task 395 (9 Aug 2026) + Task 397 reconcile (10 Aug 2026,
+ * Pizza Master follow-up via owner).
  *
  * The compact KOT rendering has real customer history behind every line:
- *   • SINGLE SERIAL: when the token/code box prints, it REPLACES the long
- *     ORD- order-number line (code IS its last segment — printing both read
- *     as a confusing "double serial"); KOT #N rides the SAME line.
- *   • style 'off': the plain ORD- line prints (+ inline "— KOT #N" when set).
+ *   • TOKEN style: the big bordered token box REPLACES the long ORD- line
+ *     (token is the call-out number); KOT # rides the SAME line.
+ *   • CODE style (10 Aug 2026, Pizza Master: "chhota boxed code pyara nahi
+ *     lagta"): the FULL bold ORD- order number prints, NO box. Matching still
+ *     works — the receipt's short code is the number's last segment. The box
+ *     remains for TOKEN style ONLY.
+ *   • KOT # prints only from batch #2 onward (10 Aug 2026: "KOT #1" carries
+ *     no info on the first ticket).
+ *   • style 'off': the plain ORD- line prints (+ inline "— KOT #N" when ≥2).
  *   • Transaction-shim KOTs (order-less delivery bills; $order->exists ===
  *     false, kotBatchNo null): the bill/invoice number line MUST print —
  *     it is the only identity the ticket carries.
- *   • priority=true: URGENT is ONE plain bold line — no bordered block
- *     (the old 3-line reversed block printed as a faint dotted box and
- *     wasted paper).
+ *   • priority=true: URGENT is a small plain bold badge riding INLINE at the
+ *     end of the order-by footer line (10 Aug 2026 photo: top placement
+ *     wasted paper). Standalone line ONLY when kot_show_orderby is OFF.
+ *     Never a bordered/reversed block (prints as a faint dotted box on
+ *     thermal printers).
  *
  * These are RENDERED-VIEW tests: the blade is rendered directly with the
  * exact variable set both controller render sites pass
  * (RestaurantPosController::kitchenTicket / ::renderTransactionKot), so any
- * future template edit that re-introduces a double serial, a bordered URGENT
- * block, or hides the shim's bill number fails here.
+ * future template edit that re-introduces the boxed short code, a bordered
+ * URGENT block, a top-of-ticket URGENT, "KOT #1" on first tickets, or hides
+ * the shim's bill number fails here. The tests moved to the 10 Aug design —
+ * never "fix" a failure here by reverting kitchen-ticket.blade.php.
  *
  * Pattern: APP_ENV=testing + sqlite :memory: (no tables needed — unsaved
  * model shims, exists toggled explicitly, exactly like renderTransactionKot).
@@ -41,11 +51,14 @@ class PosKitchenTicketLayoutTest extends TestCase
 
     // ── Render helpers ───────────────────────────────────────────────────
 
-    private function makeCompany(string $style): Company
+    private function makeCompany(string $style, array $attrs = []): Company
     {
         $company = new Company();
         $company->name = 'KOT Layout Co';
         $company->order_match_style = $style;
+        foreach ($attrs as $k => $v) {
+            $company->{$k} = $v;
+        }
         return $company;
     }
 
@@ -108,7 +121,12 @@ class PosKitchenTicketLayoutTest extends TestCase
         return substr($html, $pos);
     }
 
-    // ── 1. style = 'token' ───────────────────────────────────────────────
+    private function stripCss(string $html): string
+    {
+        return preg_replace('/<style\b[^>]*>.*?<\/style>/s', '', $html) ?? $html;
+    }
+
+    // ── 1. style = 'token' — the ONLY style that boxes ──────────────────
 
     public function test_token_style_prints_token_box_and_drops_ord_line(): void
     {
@@ -138,38 +156,51 @@ class PosKitchenTicketLayoutTest extends TestCase
         $this->assertStringNotContainsString(self::ORDER_NUMBER, $body);
     }
 
-    // ── 2. style = 'code' ────────────────────────────────────────────────
+    // ── 2. style = 'code' — FULL bold ORD number, NO box (10 Aug 2026) ──
 
-    public function test_code_style_prints_short_code_box_and_drops_ord_line(): void
+    public function test_code_style_prints_full_order_number_without_box(): void
     {
         $company = $this->makeCompany('code');
-        $order = $this->makeOrder(); // exists=true → code derives from order_number
+        $order = $this->makeOrder(); // exists=true → DB-backed order
 
         $body = $this->body($this->render($company, $order, 3));
 
-        // Code box = last ORD segment, boxed (border style on the span)
-        $this->assertMatchesRegularExpression(
-            '/<span style="[^"]*border:2px solid #000[^"]*">' . self::SHORT_CODE . '<\/span>/',
-            $body,
-            'short-code box prints'
-        );
-        // The full ORD- number must be gone (code IS its last segment)
-        $this->assertStringNotContainsString(self::ORDER_NUMBER, $body, 'ORD- line replaced by code box');
-        $this->assertStringContainsString('KOT #3', $body, 'KOT # inline when batch set');
+        // The FULL ORD- number prints (bold line) — owner-approved 10 Aug design
+        $this->assertStringContainsString(self::ORDER_NUMBER, $body, 'full ORD- order number prints for code style');
+        // NO bordered box in code mode — the box is TOKEN-only now
+        $this->assertStringNotContainsString('border:2px solid #000; padding:2px 10px', $body, 'no boxed code — box is token-style only');
+        // KOT # rides the same line (batch 3 ≥ 2 → shown)
+        $this->assertStringContainsString(self::ORDER_NUMBER . ' <span class="text-sm bold">&mdash; KOT #3</span>', $body, 'KOT # inline with ORD- line');
     }
 
-    public function test_code_style_with_null_batch_omits_kot_number(): void
+    public function test_code_style_with_null_batch_prints_plain_ord_line(): void
     {
         $company = $this->makeCompany('code');
         $order = $this->makeOrder();
 
         $body = $this->body($this->render($company, $order, null));
 
-        $this->assertStringContainsString(self::SHORT_CODE . '</span>', $body);
+        $this->assertStringContainsString(self::ORDER_NUMBER, $body);
         $this->assertStringNotContainsString('KOT #', $body);
+        $this->assertStringNotContainsString('border:2px solid #000; padding:2px 10px', $body);
     }
 
-    // ── 3. style = 'off' ─────────────────────────────────────────────────
+    // ── 3. KOT # only from batch #2 onward (10 Aug 2026) ────────────────
+
+    public function test_first_batch_never_prints_kot_number(): void
+    {
+        // "KOT #1" carries no info on the FIRST ticket — suppressed for every style.
+        foreach (['token', 'code', 'off'] as $style) {
+            $company = $this->makeCompany($style);
+            $order = $this->makeOrder($style === 'token' ? ['token_no' => 42] : []);
+
+            $body = $this->body($this->render($company, $order, 1));
+
+            $this->assertStringNotContainsString('KOT #', $body, "no KOT #1 on first ticket (style {$style})");
+        }
+    }
+
+    // ── 4. style = 'off' ─────────────────────────────────────────────────
 
     public function test_off_style_prints_ord_line_with_inline_kot_number(): void
     {
@@ -196,13 +227,13 @@ class PosKitchenTicketLayoutTest extends TestCase
         $this->assertStringNotContainsString('KOT #', $body);
     }
 
-    // ── 4. Transaction-shim KOT (order-less bill) ────────────────────────
+    // ── 5. Transaction-shim KOT (order-less bill) ────────────────────────
 
     public function test_transaction_shim_always_prints_bill_number(): void
     {
         // renderTransactionKot: unsaved shim, exists === false, kotBatchNo null.
-        // Even with 'code' style ON, omCode requires $order->exists — the shim
-        // falls through to the plain line, so the BILL number always prints.
+        // Code style now prints the plain number line for shims too — the BILL
+        // number always prints, never a box.
         $company = $this->makeCompany('code');
         $order = $this->makeOrder(['order_number' => 'INV-000123'], exists: false);
 
@@ -224,10 +255,12 @@ class PosKitchenTicketLayoutTest extends TestCase
         $this->assertStringContainsString('INV-000456', $body);
     }
 
-    // ── 5. URGENT = single plain line, no bordered block ─────────────────
+    // ── 6. URGENT — inline on the order-by footer line (10 Aug 2026) ─────
 
-    public function test_priority_renders_single_line_urgent_without_border_block(): void
+    public function test_priority_rides_inline_on_orderby_footer_line(): void
     {
+        // kot_show_orderby defaults ON → URGENT is a small span at the END of
+        // the order-by line, never its own line, never at the top.
         $company = $this->makeCompany('off');
         $order = $this->makeOrder(['priority' => true]);
         $order->priority = true;
@@ -235,8 +268,15 @@ class PosKitchenTicketLayoutTest extends TestCase
         $html = $this->render($company, $order, null);
         $body = $this->body($html);
 
-        // The badge prints as ONE plain <p> line
-        $this->assertStringContainsString('<p class="priority-badge mt-1">' . __('pos.kot_rush') . '</p>', $body, 'URGENT is a single plain line');
+        // Inline: badge span sits on the same <p> as the order-by text
+        $this->assertMatchesRegularExpression(
+            '/<p>[^<]*' . preg_quote(__('pos.kot_order_by'), '/') . '.*<span class="priority-badge">' . preg_quote(__('pos.kot_rush'), '/') . '<\/span><\/p>/s',
+            $body,
+            'URGENT rides inline at the end of the order-by footer line'
+        );
+        // No standalone URGENT line/block anywhere (old top placement dead)
+        $this->assertStringNotContainsString('<p class="priority-badge', $body, 'no standalone URGENT <p> line');
+        $this->assertSame(1, substr_count($this->stripCss($body), 'priority-badge'), 'URGENT prints exactly once');
 
         // The .priority-badge CSS rule must stay border-free and non-reversed
         $this->assertSame(1, preg_match('/\.priority-badge\s*\{([^}]*)\}/s', $html, $m), '.priority-badge rule present');
@@ -246,6 +286,21 @@ class PosKitchenTicketLayoutTest extends TestCase
         $this->assertStringNotContainsString('background: #000', $css, 'no reversed (white-on-black) URGENT block');
     }
 
+    public function test_priority_standalone_line_only_when_orderby_footer_off(): void
+    {
+        // Fallback: company hid the order-by footer line → URGENT must still
+        // print, on its own small centered line.
+        $company = $this->makeCompany('off', ['kot_show_orderby' => false]);
+        $order = $this->makeOrder(['priority' => true]);
+        $order->priority = true;
+
+        $body = $this->body($this->render($company, $order, null));
+
+        $this->assertStringNotContainsString(__('pos.kot_order_by'), $body, 'order-by line hidden');
+        $this->assertStringContainsString('<div class="text-center"><span class="priority-badge">' . __('pos.kot_rush') . '</span></div>', $body, 'standalone URGENT fallback line prints');
+        $this->assertSame(1, substr_count($this->stripCss($body), 'priority-badge'), 'URGENT prints exactly once');
+    }
+
     public function test_no_priority_no_urgent_line(): void
     {
         $company = $this->makeCompany('off');
@@ -253,12 +308,7 @@ class PosKitchenTicketLayoutTest extends TestCase
 
         $body = $this->body($this->render($company, $order, null));
 
-        $this->assertStringNotContainsString('priority-badge mt-1">', $body === '' ? $body : $this->stripCss($body));
+        $this->assertStringNotContainsString('priority-badge', $this->stripCss($body));
         $this->assertStringNotContainsString(__('pos.kot_rush'), $this->stripCss($body));
-    }
-
-    private function stripCss(string $html): string
-    {
-        return preg_replace('/<style\b[^>]*>.*?<\/style>/s', '', $html) ?? $html;
     }
 }

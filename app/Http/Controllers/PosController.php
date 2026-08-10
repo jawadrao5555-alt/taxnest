@@ -861,23 +861,43 @@ class PosController extends Controller
             default => $bizToday,
         };
 
-        // Cost / profit aggregation: JOIN items → products to read cost_price.
-        // unit_price kept from item (snapshot at time of sale).
-        // Profit = (item.subtotal - cost_price * quantity) summed across all completed orders in period.
-        $profitRow = \DB::table('pos_transactions as t')
-            ->join('pos_transaction_items as i', 'i.transaction_id', '=', 't.id')
-            ->leftJoin('pos_products as p', function ($j) {
-                $j->on('p.id', '=', 'i.item_id')->where('i.item_type', '=', 'product');
-            })
-            ->where('t.company_id', $companyId)
-            ->where('t.status', 'completed')
-            ->where('t.business_date', '>=', $periodStart)
-            ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
-            ->where($excludeLocalRaw)
-            ->selectRaw('
-                COALESCE(SUM(i.subtotal), 0) as gross_revenue,
-                COALESCE(SUM(COALESCE(p.cost_price, 0) * i.quantity), 0) as total_cost
-            ')->first();
+        // Cost / profit aggregation — PROFIT-FREEZE (Task 423, Aug 2026):
+        // use the per-line frozen cost_price snapshot from pos_transaction_items
+        // so a purchase-rate edit never retroactively rewrites dashboard profit.
+        // Mirrors the range-analytics freeze and the FBR POS dashboard fix.
+        // Lines without a stored snapshot (NULL/zero) are cost-unknown → excluded
+        // from cost; coverage_pct shows the admin how complete the data is.
+        // hasColumn guard: the column may not yet exist on older PROD schemas.
+        $hasDashFrozenCost = \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'cost_price');
+        if ($hasDashFrozenCost) {
+            $profitRow = \DB::table('pos_transactions as t')
+                ->join('pos_transaction_items as i', 'i.transaction_id', '=', 't.id')
+                ->where('t.company_id', $companyId)
+                ->where('t.status', 'completed')
+                ->where('t.business_date', '>=', $periodStart)
+                ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
+                ->where($excludeLocalRaw)
+                ->selectRaw('
+                    COALESCE(SUM(CASE WHEN COALESCE(i.cost_price,0) > 0 THEN i.subtotal ELSE 0 END), 0) as gross_revenue,
+                    COALESCE(SUM(CASE WHEN COALESCE(i.cost_price,0) > 0 THEN i.cost_price * i.quantity ELSE 0 END), 0) as total_cost
+                ')->first();
+        } else {
+            // Legacy fallback (pre-migration): join live product cost.
+            $profitRow = \DB::table('pos_transactions as t')
+                ->join('pos_transaction_items as i', 'i.transaction_id', '=', 't.id')
+                ->leftJoin('pos_products as p', function ($j) {
+                    $j->on('p.id', '=', 'i.item_id')->where('i.item_type', '=', 'product');
+                })
+                ->where('t.company_id', $companyId)
+                ->where('t.status', 'completed')
+                ->where('t.business_date', '>=', $periodStart)
+                ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
+                ->where($excludeLocalRaw)
+                ->selectRaw('
+                    COALESCE(SUM(i.subtotal), 0) as gross_revenue,
+                    COALESCE(SUM(COALESCE(p.cost_price, 0) * i.quantity), 0) as total_cost
+                ')->first();
+        }
 
         $periodOrders = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
@@ -886,18 +906,27 @@ class PosController extends Controller
             ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue')
             ->first();
 
-        $totalCost     = (float) ($profitRow->total_cost ?? 0);
-        $totalRevenue  = (float) ($periodOrders->revenue ?? 0);
-        $totalProfit   = max(0, $totalRevenue - $totalCost); // floor at 0 for display
-        $marginPct     = $totalRevenue > 0 ? round(($totalRevenue - $totalCost) / $totalRevenue * 100, 1) : 0;
+        // PROFIT-FREEZE alignment: use costed-lines revenue (gross_revenue) as the
+        // denominator for profit/margin — same as range analytics. Counting all-lines
+        // revenue against only costed-lines cost would treat unknown-cost lines as
+        // 100% profit and overstate both profit and margin on post-migration shops
+        // that still have old bills without a snapshot. When the frozen-cost column
+        // is absent (legacy fallback branch), gross_revenue already equals all-lines
+        // revenue so the behaviour is identical to before.
+        $totalCost         = (float) ($profitRow->total_cost ?? 0);
+        $costedRevenue     = (float) ($profitRow->gross_revenue ?? 0); // only lines with a cost snapshot
+        $totalRevenue      = (float) ($periodOrders->revenue ?? 0);    // all-lines (for the orders KPI)
+        $totalProfit       = max(0, $costedRevenue - $totalCost);       // floor at 0 for display
+        $marginPct         = $costedRevenue > 0 ? round(($costedRevenue - $totalCost) / $costedRevenue * 100, 1) : 0;
 
         $profitStats = [
             'period'   => $period,
             'orders'   => (int) ($periodOrders->count ?? 0),
-            'revenue'  => $totalRevenue,
+            'revenue'  => $costedRevenue,  // revenue of costed lines — consistent with cost/profit
             'cost'     => $totalCost,
             'profit'   => $totalProfit,
             'margin'   => $marginPct,
+            'all_revenue' => $totalRevenue, // kept for caller completeness (unused in view today)
         ];
 
         // Top products by quantity sold (period)
@@ -915,28 +944,52 @@ class PosController extends Controller
             ->limit(5)
             ->get();
 
-        // Top products by profit (period) — needs cost_price
-        $topProfit = \DB::table('pos_transactions as t')
-            ->join('pos_transaction_items as i', 'i.transaction_id', '=', 't.id')
-            ->join('pos_products as p', 'p.id', '=', 'i.item_id')
-            ->where('t.company_id', $companyId)
-            ->where('t.status', 'completed')
-            ->where('t.business_date', '>=', $periodStart)
-            ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
-            ->where($excludeLocalRaw)
-            ->where('i.item_type', 'product')
-            ->selectRaw('
-                i.item_id, MAX(i.item_name) as name,
-                SUM(i.subtotal) as revenue,
-                SUM(COALESCE(p.cost_price,0) * i.quantity) as cost,
-                SUM(i.subtotal - COALESCE(p.cost_price,0) * i.quantity) as profit
-            ')
-            ->groupBy('i.item_id')
-            ->orderByDesc('profit')
-            ->limit(5)
-            ->get();
+        // Top products by profit (period) — PROFIT-FREEZE: use frozen item snapshot.
+        if ($hasDashFrozenCost) {
+            $topProfit = \DB::table('pos_transactions as t')
+                ->join('pos_transaction_items as i', 'i.transaction_id', '=', 't.id')
+                ->where('t.company_id', $companyId)
+                ->where('t.status', 'completed')
+                ->where('t.business_date', '>=', $periodStart)
+                ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
+                ->where($excludeLocalRaw)
+                ->where('i.item_type', 'product')
+                ->where('i.cost_price', '>', 0)   // only lines with a frozen snapshot
+                ->selectRaw('
+                    i.item_id, MAX(i.item_name) as name,
+                    SUM(i.subtotal) as revenue,
+                    SUM(i.cost_price * i.quantity) as cost,
+                    SUM(i.subtotal - i.cost_price * i.quantity) as profit
+                ')
+                ->groupBy('i.item_id')
+                ->orderByDesc('profit')
+                ->limit(5)
+                ->get();
+        } else {
+            // Legacy fallback (pre-migration): join live product cost.
+            $topProfit = \DB::table('pos_transactions as t')
+                ->join('pos_transaction_items as i', 'i.transaction_id', '=', 't.id')
+                ->join('pos_products as p', 'p.id', '=', 'i.item_id')
+                ->where('t.company_id', $companyId)
+                ->where('t.status', 'completed')
+                ->where('t.business_date', '>=', $periodStart)
+                ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
+                ->where($excludeLocalRaw)
+                ->where('i.item_type', 'product')
+                ->selectRaw('
+                    i.item_id, MAX(i.item_name) as name,
+                    SUM(i.subtotal) as revenue,
+                    SUM(COALESCE(p.cost_price,0) * i.quantity) as cost,
+                    SUM(i.subtotal - COALESCE(p.cost_price,0) * i.quantity) as profit
+                ')
+                ->groupBy('i.item_id')
+                ->orderByDesc('profit')
+                ->limit(5)
+                ->get();
+        }
 
-        // Low margin alert: products with cost_price > 0 AND (price - cost)/price < 15%
+        // Low margin alert: always reads live product cost (forward-looking config signal,
+        // intentionally NOT frozen — a shopkeeper correcting a rate should see the update here).
         $lowMargin = PosProduct::where('company_id', $companyId)
             ->where('is_active', true)
             ->where('cost_price', '>', 0)
@@ -946,11 +999,29 @@ class PosController extends Controller
             ->limit(5)
             ->get(['id', 'name', 'price', 'cost_price']);
 
-        // Coverage: how many active products have cost_price set (helps user understand accuracy)
-        $costCoverage = [
-            'with_cost' => PosProduct::where('company_id', $companyId)->where('is_active', true)->where('cost_price', '>', 0)->count(),
-            'total'     => PosProduct::where('company_id', $companyId)->where('is_active', true)->count(),
-        ];
+        // Coverage: when using frozen snapshots, show % of sold product lines in the
+        // period that carry a cost snapshot. Pre-migration fallback: active-product count.
+        if ($hasDashFrozenCost) {
+            $covRow = \DB::table('pos_transactions as t')
+                ->join('pos_transaction_items as i', 'i.transaction_id', '=', 't.id')
+                ->where('t.company_id', $companyId)
+                ->where('t.status', 'completed')
+                ->where('t.business_date', '>=', $periodStart)
+                ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
+                ->where($excludeLocalRaw)
+                ->where('i.item_type', 'product')
+                ->selectRaw('COUNT(*) as total, SUM(CASE WHEN COALESCE(i.cost_price,0) > 0 THEN 1 ELSE 0 END) as with_cost')
+                ->first();
+            $costCoverage = [
+                'with_cost' => (int) ($covRow->with_cost ?? 0),
+                'total'     => (int) ($covRow->total ?? 0),
+            ];
+        } else {
+            $costCoverage = [
+                'with_cost' => PosProduct::where('company_id', $companyId)->where('is_active', true)->where('cost_price', '>', 0)->count(),
+                'total'     => PosProduct::where('company_id', $companyId)->where('is_active', true)->count(),
+            ];
+        }
         // ─────────────────────────────────────────────────────────────────────
 
         $recentTransactions = PosTransaction::where('company_id', $companyId)
@@ -2056,6 +2127,18 @@ class PosController extends Controller
                 $transaction->save();
             }
 
+            // PROFIT-FREEZE: snapshot the sale-time cost so profit history stays
+            // correct even when a shopkeeper later edits the purchase rate.
+            // Mirrors the FBR POS freeze (Task 416 / Task 423, owner decision Aug 2026).
+            $hasCostPriceCol = \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'cost_price');
+            $storeCostProductIds = collect($companyItems)->where('type', 'product')->pluck('item_id')->filter()->unique()->values();
+            $storeCostMap = ($hasCostPriceCol && $storeCostProductIds->isNotEmpty())
+                ? \App\Models\PosProduct::where('company_id', $companyId)
+                    ->whereIn('id', $storeCostProductIds)
+                    ->get(['id', 'cost_price'])
+                    ->keyBy('id')
+                : collect();
+
             foreach ($companyItems as $ri) {
                 $itemTaxRate = $ri['isExempt'] ? 0 : $taxRate;
                 $itemDiscountShare = $subtotal > 0 ? round($discountAmount * ($ri['lineTotal'] / $subtotal), 2) : 0;
@@ -2067,6 +2150,12 @@ class PosController extends Controller
                     : round($itemTaxableAmount * $itemTaxRate / 100, 2);
 
                 $thirdSchemaExists = \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'is_third_schedule');
+                // Freeze cost snapshot: only product-type items with a known cost.
+                $frozenCost = null;
+                if ($hasCostPriceCol && $ri['type'] === 'product' && !empty($ri['item_id'])) {
+                    $cp = (float) ($storeCostMap[$ri['item_id']]?->cost_price ?? 0);
+                    $frozenCost = $cp > 0 ? $cp : null;
+                }
                 PosTransactionItem::create(array_merge([
                     'transaction_id' => $transaction->id,
                     'item_type' => $ri['type'],
@@ -2080,7 +2169,8 @@ class PosController extends Controller
                     'is_tax_exempt' => $ri['isExempt'],
                     'tax_rate' => $itemTaxRate,
                     'tax_amount' => $itemTaxAmount,
-                ], $thirdSchemaExists ? ['is_third_schedule' => $ri['isThirdSchedule'] ?? false] : []));
+                ], $thirdSchemaExists ? ['is_third_schedule' => $ri['isThirdSchedule'] ?? false] : [],
+                   $hasCostPriceCol ? ['cost_price' => $frozenCost] : []));
             }
 
             PosPayment::create([
@@ -2395,6 +2485,17 @@ class PosController extends Controller
 
             $transaction->items()->delete();
 
+            // PROFIT-FREEZE on edit: re-snapshot cost at edit time so the frozen
+            // cost stays current if the product rate changed since the original bill.
+            $hasCostPriceColEdit = \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'cost_price');
+            $editCostProductIds = collect($companyItems)->where('type', 'product')->pluck('item_id')->filter()->unique()->values();
+            $editCostMap = ($hasCostPriceColEdit && $editCostProductIds->isNotEmpty())
+                ? \App\Models\PosProduct::where('company_id', $companyId)
+                    ->whereIn('id', $editCostProductIds)
+                    ->get(['id', 'cost_price'])
+                    ->keyBy('id')
+                : collect();
+
             foreach ($companyItems as $ri) {
                 $itemTaxRate = $ri['isExempt'] ? 0 : $taxRate;
                 $itemDiscountShare = $subtotal > 0 ? round($discountAmount * ($ri['lineTotal'] / $subtotal), 2) : 0;
@@ -2404,6 +2505,11 @@ class PosController extends Controller
                     : round($itemTaxableAmount * $itemTaxRate / 100, 2);
 
                 $thirdSchemaExistsEdit = \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'is_third_schedule');
+                $frozenCostEdit = null;
+                if ($hasCostPriceColEdit && $ri['type'] === 'product' && !empty($ri['item_id'])) {
+                    $cpEdit = (float) ($editCostMap[$ri['item_id']]?->cost_price ?? 0);
+                    $frozenCostEdit = $cpEdit > 0 ? $cpEdit : null;
+                }
                 PosTransactionItem::create(array_merge([
                     'transaction_id' => $transaction->id,
                     'item_type' => $ri['type'],
@@ -2417,7 +2523,8 @@ class PosController extends Controller
                     'is_tax_exempt' => $ri['isExempt'],
                     'tax_rate' => $itemTaxRate,
                     'tax_amount' => $itemTaxAmount,
-                ], $thirdSchemaExistsEdit ? ['is_third_schedule' => $ri['isThirdSchedule'] ?? false] : []));
+                ], $thirdSchemaExistsEdit ? ['is_third_schedule' => $ri['isThirdSchedule'] ?? false] : [],
+                   $hasCostPriceColEdit ? ['cost_price' => $frozenCostEdit] : []));
             }
 
             $transaction->payments()->delete();
@@ -8692,22 +8799,47 @@ class PosController extends Controller
             ->get(['id', 'created_at', 'business_date', 'created_by', 'customer_id', 'customer_name', 'customer_phone', 'subtotal', 'total_amount', 'tax_amount', 'discount_amount', 'payment_method']);
 
         $ids = $transactions->pluck('id')->all();
+        // PROFIT-FREEZE (Task 423, owner decision Aug 2026): cost basis = the cost_price
+        // SNAPSHOT frozen on each sold line at sale time — same basis as FBR POS (Task 416).
+        // NEVER the product's current cost: a kharid-rate edit must not retro-rewrite a past
+        // range's profit. Lines without a stored snapshot are cost-unknown and excluded
+        // (coverage_pct shows it). Column may not exist on older PROD schema — hasColumn guard.
+        $hasFrozenCost = \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'cost_price');
+        $itemCols = ['transaction_id', 'item_type', 'item_id', 'item_name', 'quantity', 'subtotal', 'tax_amount', 'item_discount_amount'];
+        if ($hasFrozenCost) {
+            $itemCols[] = 'cost_price';
+        }
         $items = empty($ids) ? collect() : \App\Models\PosTransactionItem::whereIn('transaction_id', $ids)
-            ->get(['transaction_id', 'item_type', 'item_id', 'item_name', 'quantity', 'subtotal', 'tax_amount', 'item_discount_amount']);
+            ->get($itemCols);
 
-        // Category + cost resolution (company-scoped lookup — shared-table trap).
+        // Category resolution: productMap provides the category label.
+        // When hasFrozenCost is TRUE, cost comes from the per-line item snapshot.
+        // When FALSE (pre-migration fallback), cost comes from live pos_products.cost_price
+        // so the profit widget keeps working exactly as before the migration ran on PROD.
         $productIds = $items->where('item_type', 'product')->pluck('item_id')->filter()->unique()->values();
+        $productMapCols = $hasFrozenCost ? ['id', 'category'] : ['id', 'category', 'cost_price'];
         $productMap = $productIds->isEmpty() ? collect() : \App\Models\PosProduct::where('company_id', $companyId)
-            ->whereIn('id', $productIds)->get(['id', 'category', 'cost_price'])->keyBy('id');
+            ->whereIn('id', $productIds)->get($productMapCols)->keyBy('id');
 
-        $items->each(function ($it) use ($productMap, $isAdminView) {
+        $items->each(function ($it) use ($productMap, $isAdminView, $hasFrozenCost) {
             $cost = null;
             if ($it->item_type === 'product') {
                 $p = $productMap[$it->item_id] ?? null;
                 $cat = trim((string) ($p->category ?? ''));
                 $it->resolved_category = $cat !== '' ? $cat : 'Uncategorized';
-                if ($isAdminView && $p && $p->cost_price !== null && (float) $p->cost_price > 0) {
-                    $cost = (float) $p->cost_price * (float) $it->quantity;
+                if ($isAdminView) {
+                    if ($hasFrozenCost) {
+                        // Frozen snapshot: only count lines with a non-zero sale-time capture.
+                        // Old bills (NULL snapshot) are excluded; coverage_pct shows the gap.
+                        if (isset($it->cost_price) && (float) $it->cost_price > 0) {
+                            $cost = (float) $it->cost_price * (float) $it->quantity;
+                        }
+                    } else {
+                        // Pre-migration fallback: live product cost (same behaviour as before Task 423).
+                        if ($p && $p->cost_price !== null && (float) $p->cost_price > 0) {
+                            $cost = (float) $p->cost_price * (float) $it->quantity;
+                        }
+                    }
                 }
             } elseif ($it->item_type === 'service') {
                 $it->resolved_category = 'Services';

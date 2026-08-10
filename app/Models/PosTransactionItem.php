@@ -9,7 +9,7 @@ class PosTransactionItem extends Model
     protected $fillable = [
         'transaction_id', 'item_type', 'item_id', 'item_name',
         'special_notes', 'deal_snapshot',
-        'quantity', 'unit_price', 'subtotal',
+        'quantity', 'unit_price', 'cost_price', 'subtotal',
         'is_tax_exempt', 'is_third_schedule', 'tax_rate', 'tax_amount',
         'item_discount_type', 'item_discount_value', 'item_discount_amount',
     ];
@@ -18,6 +18,7 @@ class PosTransactionItem extends Model
         'deal_snapshot' => 'array',
         'quantity' => 'decimal:3',
         'unit_price' => 'decimal:2',
+        'cost_price' => 'decimal:4',
         'subtotal' => 'decimal:2',
         'is_tax_exempt' => 'boolean',
         'is_third_schedule' => 'boolean',

@@ -8464,8 +8464,9 @@ class PosController extends Controller
      * sitting on them. Restaurant-mode companies only (plan-allowed + toggled on);
      * everyone else gets a zeroed summary so the warning block never renders.
      * Also the authority for the MANUAL day-close hard block (owner rule
-     * 10 Aug 2026): closeDayReport refuses while count > 0. The 6 AM auto
-     * close stays unblocked and stamps open_orders_at_close instead.
+     * 10 Aug 2026): closeDayReport refuses while count > 0. The 6 AM AUTO
+     * close SKIPS the day entirely and logs a warning (skip_alert policy,
+     * owner decision 10 Aug 2026) — it no longer closes past open orders.
      */
     private function openHeldOrdersSummary(int $companyId, ?Company $company): object
     {
@@ -8526,8 +8527,9 @@ class PosController extends Controller
         // no "close anyway" escape hatch. Un-finalized orders can never be
         // finalized after close. Defense in depth: the page hides the close
         // button too, but the endpoint is the authority. The 6 AM AUTO close
-        // (AutoCloseDayPos → performDayClose) is deliberately NOT blocked — it
-        // must never strand a day — and it stamps open_orders_at_close instead.
+        // (AutoCloseDayPos) applies the skip_alert policy (owner 10 Aug 2026):
+        // it SKIPS the day entirely and logs a warning — staff must settle
+        // orders and close manually; the auto-close retries on the next run.
         $openAtClose = $this->openHeldOrdersSummary($companyId, $company);
         if ($openAtClose->count > 0) {
             return back()->with('error', __('pos.dayclose_blocked_open_orders', [
@@ -9591,11 +9593,12 @@ class PosController extends Controller
             }
 
             // Open held orders AT close time (ZFC 3 Aug 2026): stamped on the
-            // report so both close paths surface them — manual close sees the
-            // live warning on the page, the user-less AUTO close leaves this
-            // durable record ("din band hua magar X tables khule the") on the
-            // Z-report view. Informational only — the close never touches or
-            // blocks on held orders. try/catch: reporting must never fail a close.
+            // report so the Z-report view shows a durable record if any orders
+            // were open at the moment performDayClose ran. In normal operation
+            // this will be empty: manual close is hard-blocked while orders are
+            // open (closeDayReport guard), and the 6 AM auto-close now SKIPS
+            // (skip_alert policy, owner 10 Aug 2026). Kept as a defensive
+            // audit trail for edge cases. try/catch: must never fail a close.
             try {
                 $heldAtClose = $this->openHeldOrdersSummary($companyId, Company::find($companyId));
                 if ($heldAtClose->count > 0) {

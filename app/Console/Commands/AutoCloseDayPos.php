@@ -27,7 +27,7 @@ class AutoCloseDayPos extends Command
 
         $companies = Company::where('pos_auto_dayclose_24h', true)
             ->where('product_type', 'pos')
-            ->get(['id']);
+            ->get(['id', 'restaurant_mode']);
 
         if ($companies->isEmpty()) {
             $this->info('No companies with auto day-close enabled.');
@@ -71,6 +71,31 @@ class AutoCloseDayPos extends Command
 
                 if ($dates->isEmpty()) {
                     continue;
+                }
+
+                // POLICY (owner decision 10 Aug 2026): if the company runs the
+                // restaurant module AND there are still open orders (held /
+                // preparing / ready with items), SKIP the auto-close for today
+                // and emit a log warning instead of closing silently past live
+                // orders. A stranded business day is far preferable to closing
+                // while a table is still occupied — staff or the owner must close
+                // manually once the orders are settled. The command runs hourly,
+                // so the day will auto-close on the NEXT run if no orders remain.
+                if ($company->restaurant_mode && \Schema::hasTable('restaurant_orders')) {
+                    $openCount = \App\Models\RestaurantOrder::where('company_id', $company->id)
+                        ->whereIn('status', ['held', 'preparing', 'ready'])
+                        ->whereHas('items')
+                        ->count();
+                    if ($openCount > 0) {
+                        $msg = "Company {$company->id}: auto-close SKIPPED — {$openCount} open order(s) still active. Staff must settle and close manually.";
+                        $this->warn($msg);
+                        Log::warning('pos:auto-dayclose skipped — open orders', [
+                            'company_id' => $company->id,
+                            'open_orders' => $openCount,
+                            'dates_pending' => $dates->values(),
+                        ]);
+                        continue; // skip to next company
+                    }
                 }
 
                 // A system-run close still records a closer — use the company admin.

@@ -149,6 +149,19 @@ Route::get('/', function () {
 
 Route::get('/contact', fn () => view('contact'))->name('contact');
 
+Route::get('/sitemap.xml', function () {
+    $urls = [
+        ['loc' => url('/'),                'priority' => '1.0', 'changefreq' => 'weekly'],
+        ['loc' => url('/pos'),             'priority' => '0.9', 'changefreq' => 'monthly'],
+        ['loc' => url('/digital-invoice'), 'priority' => '0.9', 'changefreq' => 'monthly'],
+        ['loc' => url('/tutorials'),       'priority' => '0.8', 'changefreq' => 'weekly'],
+        ['loc' => url('/download'),        'priority' => '0.7', 'changefreq' => 'monthly'],
+        ['loc' => url('/contact'),         'priority' => '0.6', 'changefreq' => 'yearly'],
+    ];
+    return response()->view('sitemap', compact('urls'))
+        ->header('Content-Type', 'application/xml');
+})->name('sitemap');
+
 // Public downloads hub — /download (singular) on purpose: /downloads/ is a real
 // directory in public/ (APKs, agent zip) and Apache serves existing dirs
 // directly, so that path never reaches Laravel.

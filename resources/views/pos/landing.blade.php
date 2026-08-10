@@ -13,6 +13,7 @@
         'ogDescription' => 'A lightning-fast point-of-sale system built for Pakistani retailers. PRA-integrated billing, inventory, and daily reports — all in one keyboard-driven screen.',
         'ogUrl'         => 'https://taxnest.com.pk/pos',
     ])
+    <link rel="canonical" href="https://taxnest.com.pk/pos">
     <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
     <link rel="preload" as="style" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700,900|inter:400,500,600,700,800|jetbrains-mono:400,700&display=swap">
     <link rel="stylesheet" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700,900|inter:400,500,600,700,800|jetbrains-mono:400,700&display=swap" media="print" onload="this.media='all'">

@@ -1,0 +1,11 @@
+# TaxNest
+
+TaxNest is Pakistan's all-in-one FBR and PRA tax compliance platform — digital invoicing, POS billing, and reporting.
+
+## Key pages
+
+- https://taxnest.com.pk/ — Platform overview
+- https://taxnest.com.pk/digital-invoice — FBR Digital Invoice product
+- https://taxnest.com.pk/pos — NestPOS PRA-compliant POS
+- https://taxnest.com.pk/tutorials — Product video tutorials
+- https://taxnest.com.pk/contact — Contact and legal information

@@ -13,6 +13,7 @@
         'ogDescription' => 'Issue FBR-compliant Digital Invoices in seconds. TaxNest Digital Invoice automates your FBR reporting so you stay compliant without the paperwork.',
         'ogUrl'         => 'https://taxnest.com.pk/digital-invoice',
     ])
+    <link rel="canonical" href="https://taxnest.com.pk/digital-invoice">
     <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
     <link rel="preload" as="style" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap">
     <link rel="stylesheet" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap" media="print" onload="this.media='all'">

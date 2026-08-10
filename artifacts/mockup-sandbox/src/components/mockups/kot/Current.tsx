@@ -81,16 +81,6 @@ export function Current() {
         </tbody>
       </table>
 
-      {/* Kitchen notes */}
-      <Sep thick />
-      <div style={{
-        border: "3px solid #000", padding: "4px 6px", marginTop: 4,
-        fontSize: 14, fontWeight: 900, background: "#fff", color: "#000",
-        textTransform: "uppercase", letterSpacing: 0.5,
-      }}>
-        NOTES Jaldi banana
-      </div>
-
       <Sep thick />
 
       {/* Order-by footer */}

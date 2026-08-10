@@ -150,10 +150,14 @@
 
     {{-- Stock list --}}
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden mb-6">
-        <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+        <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between gap-2 flex-wrap">
             <h3 class="font-bold text-gray-900 dark:text-white">Stock List</h3>
-            <input type="text" x-model="stockFilter" placeholder="Product search..." autocomplete="off" name="stock_list_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
-                   class="border rounded-lg px-3 py-1.5 text-sm w-48 dark:bg-gray-700 dark:text-white dark:border-gray-600">
+            <div class="relative w-full sm:w-64">
+                <input type="text" x-model.debounce.200ms="stockFilter" placeholder="{{ __('pos.stock_list_search_ph') }}" autocomplete="off" name="stock_list_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                       class="border rounded-lg px-3 py-1.5 pr-8 text-sm w-full dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                <button type="button" x-show="stockFilter !== ''" x-cloak @click="stockFilter = ''; $el.previousElementSibling.value = ''"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 font-bold px-1 leading-none" aria-label="Clear">&times;</button>
+            </div>
         </div>
         <div class="max-h-[480px] overflow-y-auto">
             <table class="w-full text-sm table-cards">
@@ -163,12 +167,13 @@
                         <th class="px-4 py-2 text-right">Stock</th>
                         <th class="px-4 py-2 text-right">Min Level</th>
                         <th class="px-4 py-2 text-right">Last Kharid</th>
+                        <th class="px-4 py-2 text-right"></th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach($rows as $r)
                     <tr class="border-t dark:border-gray-700"
-                        x-show="stockFilter === '' || '{{ strtolower(addslashes($r->name . ' ' . ($r->sku ?? ''))) }}'.includes(stockFilter.toLowerCase())">
+                        x-show="stockRowMatch('{{ strtolower(addslashes($r->name . ' ' . ($r->sku ?? '') . ' ' . ($r->barcode ?? ''))) }}')">
                         <td class="px-4 py-2">
                             <span class="font-semibold text-gray-900 dark:text-white">{{ $r->name }}</span>
                             <span class="text-xs text-gray-400 ml-1">{{ $r->sku ? '· ' . $r->sku : '' }}</span>
@@ -183,10 +188,90 @@
                                    class="w-20 border rounded px-2 py-1 text-right text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
                         </td>
                         <td class="px-4 py-2 text-right text-gray-500 dark:text-gray-400">{{ $r->last_purchase_price > 0 ? 'Rs ' . number_format($r->last_purchase_price, 2) : '—' }}</td>
+                        <td class="px-4 py-2 text-right">
+                            <button type="button" @click="openEdit({{ $r->product_id }})"
+                                    class="px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 text-xs font-bold hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                                {{ __('pos.stock_edit_btn') }}
+                            </button>
+                        </td>
                     </tr>
                     @endforeach
+                    <tr x-show="stockNoMatch()" x-cloak>
+                        <td colspan="5" class="px-4 py-8 text-center text-gray-400">{{ __('pos.stock_no_match') }}</td>
+                    </tr>
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    {{-- Stock item quick-edit modal (Task 416). Plain form POST → redirect
+         back with flash, so the row, stat tiles and low-stock alerts all
+         refresh from fresh server data after save. --}}
+    <div x-show="editOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4"
+         @keydown.escape.window="editOpen = false">
+        <div class="absolute inset-0 bg-black/50" @click="editOpen = false"></div>
+        <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <form method="POST" action="{{ route('fbrpos.stock.item') }}" @submit="return confirmEditSubmit()">
+                @csrf
+                <input type="hidden" name="product_id" :value="edit.id">
+                <input type="hidden" name="kharid_rate_orig" :value="edit.kharid_orig">
+                <input type="hidden" name="quantity_orig" :value="edit.qty_orig">
+                <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between gap-2">
+                    <div class="min-w-0">
+                        <h3 class="font-bold text-gray-900 dark:text-white truncate" x-text="edit.name"></h3>
+                        <p class="text-xs text-gray-400" x-text="edit.sku ? 'SKU: ' + edit.sku : ''"></p>
+                    </div>
+                    <button type="button" @click="editOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl leading-none font-bold px-1">&times;</button>
+                </div>
+                <div class="p-5 space-y-4">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">{{ __('pos.stock_edit_sale_price') }}</label>
+                            <input type="number" name="default_price" x-model="edit.price" step="0.01" min="0" required
+                                   autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                                   class="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">{{ __('pos.uom_label') }}</label>
+                            @php
+                                $quickUomList = ['U','PCS','KG','GM','LTR','ML','MTR','SQM','FT','IN','YDS','PKT','DOZ','BOX','CTN','BAG','BTL','TIN','CAN','BUN','ROL','SET'];
+                            @endphp
+                            <select name="uom" x-model="edit.uom"
+                                    class="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                                @foreach($quickUomList as $code)
+                                    <option value="{{ $code }}">{{ $code }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">{{ __('pos.stock_edit_kharid') }}</label>
+                        <input type="number" name="kharid_rate" x-model="edit.kharid" step="0.01" min="0"
+                               autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                               class="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                        <p class="text-xs text-amber-600 dark:text-amber-400 mt-1">{{ __('pos.stock_edit_kharid_note') }}</p>
+                    </div>
+                    <div class="rounded-lg bg-gray-50 dark:bg-gray-700/50 p-3">
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">{{ __('pos.stock_edit_current_qty') }}:
+                            <strong class="text-gray-900 dark:text-white" x-text="edit.qty_orig + ' ' + edit.uom"></strong></p>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">{{ __('pos.stock_edit_correct_qty') }}</label>
+                        <input type="number" name="new_quantity" x-model="edit.qty" step="0.001"
+                               autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                               class="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600 mb-2">
+                        <input type="text" name="qty_reason" maxlength="200" placeholder="{{ __('pos.stock_edit_qty_reason') }}"
+                               autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                               class="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                        <p class="text-xs text-gray-400 mt-1">{{ __('pos.stock_edit_qty_note') }}</p>
+                    </div>
+                    <a :href="'{{ url('/fbr-pos/products') }}/' + edit.id + '/edit'" class="inline-block text-xs text-blue-600 dark:text-blue-400 hover:underline">{{ __('pos.stock_edit_full_link') }} →</a>
+                </div>
+                <div class="px-5 py-4 border-t border-gray-100 dark:border-gray-700 flex gap-2 justify-end">
+                    <button type="button" @click="editOpen = false"
+                            class="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">{{ __('pos.stock_edit_cancel') }}</button>
+                    <button type="submit"
+                            class="px-5 py-2 rounded-lg bg-blue-600 text-white text-sm font-bold hover:bg-blue-700">{{ __('pos.stock_edit_save') }}</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -252,12 +337,25 @@ function stockPage() {
         prodSearch: '',
         prodResults: [],
         purchaseRows: [],
-        // Baked product list for instant client-side search (name/sku/barcode).
+        editOpen: false,
+        edit: { id: 0, name: '', sku: '', uom: 'U', price: '', kharid: '', kharid_orig: '', qty: '', qty_orig: '' },
+        // Baked product list for instant client-side search (name/sku/barcode)
+        // AND the quick-edit modal prefill (price/qty/kharid per row).
         // NOTE: complex expressions inside the json Blade directive break its
         // paren matcher (nested fn arrows) — the compiled view got truncated.
         // So: build the collection in a php block, UTF-8-safe encode + fallback.
         @php
-            $bakedStockProducts = $rows->map(fn ($r) => ['id' => $r->product_id, 'name' => $r->name, 'sku' => $r->sku, 'uom' => $r->uom])->values();
+            $trimQty3 = fn ($v) => rtrim(rtrim(number_format((float) $v, 3, '.', ''), '0'), '.');
+            $bakedStockProducts = $rows->map(fn ($r) => [
+                'id' => $r->product_id,
+                'name' => $r->name,
+                'sku' => $r->sku,
+                'barcode' => $r->barcode,
+                'uom' => $r->uom,
+                'price' => number_format((float) $r->default_price, 2, '.', ''),
+                'qty' => $trimQty3($r->quantity),
+                'kharid' => $r->last_purchase_price > 0 ? number_format((float) $r->last_purchase_price, 2, '.', '') : '',
+            ])->values();
             $bakedStockJson = json_encode($bakedStockProducts, JSON_INVALID_UTF8_SUBSTITUTE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?: '[]';
             $bakedPurchJson = json_encode($recentPurchasesData, JSON_INVALID_UTF8_SUBSTITUTE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?: '[]';
             $purchMoreTpl = json_encode(__('pos.stock_purch_more_n'), JSON_INVALID_UTF8_SUBSTITUTE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?: '"+:n"';
@@ -301,8 +399,39 @@ function stockPage() {
             const q = this.prodSearch.trim().toLowerCase();
             if (q.length < 1) { this.prodResults = []; return; }
             this.prodResults = this.allProducts.filter(p =>
-                (p.name || '').toLowerCase().includes(q) || (p.sku || '').toLowerCase().includes(q)
+                (p.name || '').toLowerCase().includes(q) || (p.sku || '').toLowerCase().includes(q) || (p.barcode || '').toLowerCase().includes(q)
             ).slice(0, 12);
+        },
+        // ── Stock List filter (name / SKU / barcode) ──
+        stockRowMatch(hay) {
+            const q = this.stockFilter.trim().toLowerCase();
+            return q === '' || hay.includes(q);
+        },
+        stockNoMatch() {
+            const q = this.stockFilter.trim().toLowerCase();
+            if (q === '') return false;
+            return !this.allProducts.some(p =>
+                ((p.name || '') + ' ' + (p.sku || '') + ' ' + (p.barcode || '')).toLowerCase().includes(q)
+            );
+        },
+        // ── Quick-edit modal ──
+        openEdit(id) {
+            const p = this.allProducts.find(x => x.id === id);
+            if (!p) return;
+            this.edit = {
+                id: p.id, name: p.name, sku: p.sku || '', uom: p.uom || 'U',
+                price: p.price, kharid: p.kharid, kharid_orig: p.kharid,
+                qty: p.qty, qty_orig: p.qty,
+            };
+            this.editOpen = true;
+        },
+        confirmEditSubmit() {
+            const from = parseFloat(this.edit.qty_orig || '0') || 0;
+            const to = parseFloat(this.edit.qty === '' ? this.edit.qty_orig : this.edit.qty) || 0;
+            if (Math.abs(to - from) > 0.0005) {
+                return confirm(@js(__('pos.stock_edit_qty_confirm')).replace(':from', from).replace(':to', to));
+            }
+            return true;
         },
         pickFirst() { if (this.prodResults.length > 0) this.addRow(this.prodResults[0]); },
         addRow(p) {

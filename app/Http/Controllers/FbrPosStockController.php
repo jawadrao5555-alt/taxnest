@@ -66,7 +66,9 @@ class FbrPosStockController extends Controller
                 'product_id' => $p->id,
                 'name' => $p->name,
                 'sku' => $p->sku,
+                'barcode' => $p->barcode,
                 'uom' => $p->uom ?: 'U',
+                'default_price' => (float) $p->default_price,
                 'quantity' => $s ? (float) $s->quantity : 0.0,
                 'min_stock_level' => $s ? (float) $s->min_stock_level : 0.0,
                 'last_purchase_price' => $s ? (float) $s->last_purchase_price : 0.0,
@@ -308,11 +310,112 @@ class FbrPosStockController extends Controller
     }
 
     /**
+     * Per-row quick edit from the Stock List modal (Task 416):
+     * sale price + unit → shared products table (same fields the full product
+     * form writes — the sale screen's baked catalog refreshes via the boot
+     * fingerprint because products.updated_at moves);
+     * quantity correction → NEVER a raw column overwrite: the delta is booked
+     * through InventoryService as an adjustment_in/out movement (audit trail),
+     * so the row, stat tiles and low-stock alerts all follow;
+     * kharid-rate correction → inventory_stocks purchase-price fields ONLY.
+     *
+     * PROFIT-FREEZE RULE (owner decision): a kharid-rate edit changes the cost
+     * frozen onto FUTURE bills only. It must never touch any sold line's
+     * stored cost_price — past bills' profit stays exactly as reported.
+     *
+     * kharid_rate / new_quantity apply only when they differ from the *_orig
+     * hidden fields (what the modal was opened with) — an untouched field on
+     * re-save never rewrites avg_purchase_price or books a zero adjustment.
+     */
+    public function updateItem(Request $request)
+    {
+        $this->assertNotCashier();
+        $request->validate([
+            'product_id' => 'required|integer',
+            // Same rules the full product-update path applies to these fields.
+            'default_price' => 'required|numeric|min:0',
+            'uom' => 'nullable|string|max:20',
+            'kharid_rate' => 'nullable|numeric|min:0',
+            'kharid_rate_orig' => 'nullable|numeric',
+            'new_quantity' => 'nullable|numeric|min:-9999999|max:9999999',
+            'quantity_orig' => 'nullable|numeric',
+            'qty_reason' => 'nullable|string|max:200',
+        ]);
+
+        $companyId = $this->companyId();
+        $product = Product::where('company_id', $companyId)->findOrFail($request->product_id);
+
+        $changedAny = false;
+
+        // ── Sale price / unit (products table — Eloquent only saves dirty
+        // attributes, so an unchanged form does not touch updated_at / the
+        // sale-screen boot fingerprint).
+        $product->fill([
+            'default_price' => round((float) $request->default_price, 2),
+            'uom' => strtoupper(trim((string) ($request->uom ?: $product->uom ?: 'U'))),
+        ]);
+        if ($product->isDirty()) {
+            $product->save();
+            $changedAny = true;
+        }
+
+        // ── Kharid rate (purchase-price fields only — the cost snapshot at
+        // sale time reads avg first, last as fallback, so both are set).
+        if ($request->filled('kharid_rate')) {
+            $rate = round((float) $request->kharid_rate, 2);
+            $rateOrig = $request->filled('kharid_rate_orig') ? round((float) $request->kharid_rate_orig, 2) : null;
+            if ($rateOrig === null || abs($rate - $rateOrig) > 0.009) {
+                $stock = InventoryStock::firstOrCreate(
+                    ['company_id' => $companyId, 'product_id' => $product->id, 'branch_id' => null],
+                    ['quantity' => 0, 'min_stock_level' => 0, 'avg_purchase_price' => 0, 'last_purchase_price' => 0]
+                );
+                $stock->update(['avg_purchase_price' => $rate, 'last_purchase_price' => $rate]);
+                $changedAny = true;
+            }
+        }
+
+        // ── Quantity correction (adjustment movement, never an overwrite).
+        if ($request->filled('new_quantity')) {
+            $newQty = round((float) $request->new_quantity, 3);
+            $qtyOrig = $request->filled('quantity_orig') ? round((float) $request->quantity_orig, 3) : null;
+            if ($qtyOrig === null || abs($newQty - $qtyOrig) > 0.0005) {
+                $reason = trim((string) ($request->qty_reason ?? ''));
+                $note = 'Stock correction (quick edit)' . ($reason !== '' ? ' — ' . $reason : '');
+                DB::transaction(function () use ($companyId, $product, $newQty, $note, &$changedAny) {
+                    $stock = InventoryStock::lockForUpdate()->firstOrCreate(
+                        ['company_id' => $companyId, 'product_id' => $product->id, 'branch_id' => null],
+                        ['quantity' => 0, 'min_stock_level' => 0, 'avg_purchase_price' => 0, 'last_purchase_price' => 0]
+                    );
+                    $delta = round($newQty - (float) $stock->quantity, 3);
+                    if (abs($delta) < 0.0005) {
+                        return;
+                    }
+                    $ref = ['type' => 'stock_quick_edit', 'id' => $product->id, 'number' => null];
+                    if ($delta > 0) {
+                        InventoryService::addStock($companyId, $product->id, $delta, 0,
+                            InventoryMovement::TYPE_ADJUSTMENT_IN, null, $ref, $note, $this->user()->id);
+                    } else {
+                        InventoryService::deductStock($companyId, $product->id, abs($delta), 0,
+                            InventoryMovement::TYPE_ADJUSTMENT_OUT, null, $ref, $note, $this->user()->id);
+                    }
+                    $changedAny = true;
+                });
+            }
+        }
+
+        return redirect()->route('fbrpos.stock')->with('success', $changedAny
+            ? __('pos.stock_item_updated', ['name' => $product->name])
+            : __('pos.stock_item_no_change', ['name' => $product->name]));
+    }
+
+    /**
      * Munafa (profit) report — Aug 2026.
      * Product-wise: sale value (ex-tax, net of item discounts) minus purchase
-     * cost. Cost basis = cost_price SNAPSHOT stored on each sold line at sale
-     * time; older lines (pre-snapshot) fall back to the CURRENT avg purchase
-     * price; products never purchased show as cost-unknown. Returns subtract.
+     * cost. Cost basis = the cost_price SNAPSHOT frozen on each sold line at
+     * sale time — ONLY (Task 416, owner decision): pre-snapshot lines (no
+     * stored cost) are cost-unknown, EXCLUDED from munafa totals and surfaced
+     * via a "cost record nahi" count, so a later kharid-rate edit can never
+     * retro-change reported profit. Returns subtract.
      */
     public function munafa(Request $request)
     {
@@ -341,13 +444,11 @@ class FbrPosStockController extends Controller
 
         $sign = "CASE WHEN t.transaction_type = 'return' THEN -1 ELSE 1 END";
 
+        // FROZEN COST ONLY (Task 416): no live-rate fallback. A line either
+        // carries its sale-time cost snapshot or it is cost-unknown — its sale
+        // value stays visible but never enters the profit math.
         $rows = DB::table('fbr_pos_transaction_items as i')
             ->join('fbr_pos_transactions as t', 't.id', '=', 'i.transaction_id')
-            ->leftJoin('inventory_stocks as s', function ($j) use ($companyId) {
-                $j->on('s.product_id', '=', 'i.product_id')
-                  ->where('s.company_id', '=', $companyId)
-                  ->whereNull('s.branch_id');
-            })
             ->where('t.company_id', $companyId)
             ->where('t.status', 'completed')
             ->whereBetween('t.created_at', [$fromDt, $toDt])
@@ -357,8 +458,10 @@ class FbrPosStockController extends Controller
                 i.item_name,
                 SUM(({$sign}) * i.quantity) as qty,
                 SUM(({$sign}) * i.subtotal) as sale_value,
-                SUM(({$sign}) * i.quantity * COALESCE(i.cost_price, s.avg_purchase_price, 0)) as cost_value,
-                MAX(CASE WHEN i.cost_price IS NULL AND COALESCE(s.avg_purchase_price, 0) = 0 THEN 1 ELSE 0 END) as cost_unknown
+                SUM(CASE WHEN i.cost_price IS NOT NULL THEN ({$sign}) * i.quantity * i.cost_price ELSE 0 END) as cost_value,
+                SUM(CASE WHEN i.cost_price IS NOT NULL THEN ({$sign}) * i.subtotal ELSE 0 END) as costed_sale_value,
+                SUM(CASE WHEN i.cost_price IS NOT NULL THEN 1 ELSE 0 END) as costed_lines,
+                SUM(CASE WHEN i.cost_price IS NULL THEN 1 ELSE 0 END) as unknown_lines
             ")
             ->orderByDesc('sale_value')
             ->get()
@@ -366,9 +469,14 @@ class FbrPosStockController extends Controller
                 $r->qty = round((float) $r->qty, 3);
                 $r->sale_value = round((float) $r->sale_value, 2);
                 $r->cost_value = round((float) $r->cost_value, 2);
-                $r->cost_unknown = (bool) $r->cost_unknown;
-                $r->profit = round($r->sale_value - $r->cost_value, 2);
-                $r->margin = $r->sale_value > 0 ? round($r->profit / $r->sale_value * 100, 1) : null;
+                $r->costed_sale_value = round((float) $r->costed_sale_value, 2);
+                $r->costed_lines = (int) $r->costed_lines;
+                $r->unknown_lines = (int) $r->unknown_lines;
+                $r->cost_unknown = $r->unknown_lines > 0;
+                // Profit only over the costed portion; fully-unknown rows have none.
+                $r->profit = $r->costed_lines > 0 ? round($r->costed_sale_value - $r->cost_value, 2) : null;
+                $r->margin = ($r->profit !== null && $r->costed_sale_value > 0)
+                    ? round($r->profit / $r->costed_sale_value * 100, 1) : null;
                 return $r;
             })
             ->filter(fn ($r) => abs($r->qty) > 0.0001 || abs($r->sale_value) > 0.009)
@@ -390,22 +498,30 @@ class FbrPosStockController extends Controller
         $loyaltyRedemptions = round((float) ($header->l ?? 0), 2);
 
         $revenue = round($rows->sum('sale_value'), 2);
+        $costedRevenue = round($rows->sum('costed_sale_value'), 2);
         $cost = round($rows->sum('cost_value'), 2);
-        $grossProfit = round($revenue - $cost, 2);
+        // Gross profit over COSTED lines only — cost-unknown sale value is
+        // excluded (never estimated from the current rate).
+        $grossProfit = round($costedRevenue - $cost, 2);
         $netProfit = round($grossProfit - $billDiscounts - $loyaltyRedemptions, 2);
         $unknownCount = $rows->where('cost_unknown', true)->count();
+        $unknownLines = (int) $rows->sum('unknown_lines');
+        $unknownSaleValue = round($revenue - $costedRevenue, 2);
 
         return view('fbr-pos.munafa', [
             'rows' => $rows,
             'from' => $fromDt->toDateString(),
             'to' => $toDt->toDateString(),
             'revenue' => $revenue,
+            'costedRevenue' => $costedRevenue,
             'cost' => $cost,
             'grossProfit' => $grossProfit,
             'billDiscounts' => $billDiscounts,
             'loyaltyRedemptions' => $loyaltyRedemptions,
             'netProfit' => $netProfit,
             'unknownCount' => $unknownCount,
+            'unknownLines' => $unknownLines,
+            'unknownSaleValue' => $unknownSaleValue,
         ]);
     }
 }

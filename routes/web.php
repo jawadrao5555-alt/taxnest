@@ -1349,6 +1349,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/stock/supplier', [\App\Http\Controllers\FbrPosStockController::class, 'storeSupplier'])->name('fbrpos.stock.supplier')->middleware('plan.limit:inventory');
     Route::post('/stock/purchase', [\App\Http\Controllers\FbrPosStockController::class, 'storePurchase'])->name('fbrpos.stock.purchase')->middleware('plan.limit:inventory');
     Route::post('/stock/min-level', [\App\Http\Controllers\FbrPosStockController::class, 'updateMinLevel'])->name('fbrpos.stock.minlevel')->middleware('plan.limit:inventory');
+    Route::post('/stock/item', [\App\Http\Controllers\FbrPosStockController::class, 'updateItem'])->name('fbrpos.stock.item')->middleware('plan.limit:inventory');
     Route::get('/munafa', [\App\Http\Controllers\FbrPosStockController::class, 'munafa'])->name('fbrpos.munafa');
 });
 

@@ -117,7 +117,7 @@
     </table>
 
     @if($analytics->profit !== null && ($analytics->profit->cost > 0 || $analytics->profit->revenue > 0))
-    <div class="section-title">{{ __('pos.ra_profit_estimate', ['pct' => $analytics->profit->coverage_pct]) }}</div>
+    <div class="section-title">{{ __('pos.fbr_ra_profit_estimate', ['pct' => $analytics->profit->coverage_pct]) }}</div>
     <table class="data">
         <thead>
             <tr>

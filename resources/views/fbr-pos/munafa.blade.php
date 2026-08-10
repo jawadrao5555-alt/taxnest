@@ -79,8 +79,8 @@
                     </td>
                     <td class="px-4 py-2.5 text-right text-gray-700 dark:text-gray-300">{{ rtrim(rtrim(number_format($r->qty, 3), '0'), '.') }}</td>
                     <td class="px-4 py-2.5 text-right text-gray-700 dark:text-gray-300">Rs {{ number_format($r->sale_value, 0) }}</td>
-                    <td class="px-4 py-2.5 text-right text-gray-500 dark:text-gray-400">{{ $r->cost_unknown && $r->cost_value == 0 ? '—' : 'Rs ' . number_format($r->cost_value, 0) }}</td>
-                    <td class="px-4 py-2.5 text-right font-bold {{ $r->profit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400' }}">Rs {{ number_format($r->profit, 0) }}</td>
+                    <td class="px-4 py-2.5 text-right text-gray-500 dark:text-gray-400">{{ $r->costed_lines === 0 ? '—' : 'Rs ' . number_format($r->cost_value, 0) }}</td>
+                    <td class="px-4 py-2.5 text-right font-bold {{ $r->profit === null ? 'text-gray-400' : ($r->profit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400') }}">{{ $r->profit === null ? '—' : 'Rs ' . number_format($r->profit, 0) }}</td>
                     <td class="px-4 py-2.5 text-right text-gray-500 dark:text-gray-400">{{ $r->margin !== null ? number_format($r->margin, 1) . '%' : '—' }}</td>
                 </tr>
                 @endforeach
@@ -90,13 +90,18 @@
         @endif
     </div>
 
+    {{-- Coverage note: cost-unknown lines are EXCLUDED from munafa (never
+         estimated from the current rate) — owner must see why coverage is partial. --}}
+    @if($unknownLines > 0)
+    <div class="mt-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+        ⚠️ {{ __('pos.munafa_excluded_note', ['lines' => number_format($unknownLines), 'amount' => number_format($unknownSaleValue, 0)]) }}
+    </div>
+    @endif
+
     {{-- Cost-basis explainer --}}
     <div class="mt-4 text-xs text-gray-400 dark:text-gray-500 space-y-1">
         <p>ℹ️ {{ __('pos.munafa_cost_note') }}</p>
         <p>{{ __('pos.munafa_returns_note') }}</p>
-        @if($unknownCount > 0)
-            <p class="text-amber-500">⚠️ {{ $unknownCount }} × {{ __('pos.munafa_cost_unknown') }}</p>
-        @endif
     </div>
 </div>
 </x-fbr-pos-layout>

@@ -3026,9 +3026,15 @@ class FbrPosController extends Controller
      * Range analytics for the FBR POS Reports page (owner request Jul 2026 —
      * mirror of the PRA version): date-window deep dive — product breakdown
      * (the `products` table has NO category column, so no category layer),
-     * profit (ADMIN-ONLY, products.cost_price based, coverage-aware), previous-
-     * period comparison, daily + hourly chart data, cashier performance, top
-     * customers, payment split, FBR submission health.
+     * profit (ADMIN-ONLY, coverage-aware), previous-period comparison, daily +
+     * hourly chart data, cashier performance, top customers, payment split,
+     * FBR submission health.
+     *
+     * PROFIT-FREEZE (Task 416, owner decision): cost basis = the cost_price
+     * SNAPSHOT frozen on each sold line at sale time — same basis as the
+     * Stock-page Munafa report. NEVER the product's current cost: a kharid-rate
+     * edit must not retro-rewrite a past range's profit. Lines without a
+     * stored snapshot are cost-unknown and excluded (coverage_pct shows it).
      */
     private function buildFbrReportRangeAnalytics(int $companyId, \Carbon\Carbon $from, \Carbon\Carbon $to, $user): object
     {
@@ -3040,20 +3046,13 @@ class FbrPosController extends Controller
 
         $ids = $transactions->pluck('id')->all();
         $items = empty($ids) ? collect() : FbrPosTransactionItem::whereIn('transaction_id', $ids)
-            ->get(['transaction_id', 'product_id', 'item_name', 'quantity', 'subtotal', 'tax_amount', 'item_discount', 'promotion_discount']);
+            ->get(['transaction_id', 'product_id', 'item_name', 'quantity', 'subtotal', 'tax_amount', 'item_discount', 'promotion_discount', 'cost_price']);
 
-        // Cost resolution (company-scoped product lookup).
-        $productIds = $items->pluck('product_id')->filter()->unique()->values();
-        $productMap = $productIds->isEmpty() ? collect() : Product::where('company_id', $companyId)
-            ->whereIn('id', $productIds)->get(['id', 'cost_price'])->keyBy('id');
-
-        $items->each(function ($it) use ($productMap, $isAdminView) {
+        // Cost resolution: per-line frozen snapshot ONLY (no live product cost).
+        $items->each(function ($it) use ($isAdminView) {
             $cost = null;
-            if ($isAdminView && $it->product_id) {
-                $p = $productMap[$it->product_id] ?? null;
-                if ($p && $p->cost_price !== null && (float) $p->cost_price > 0) {
-                    $cost = (float) $p->cost_price * (float) $it->quantity;
-                }
+            if ($isAdminView && $it->cost_price !== null && (float) $it->cost_price > 0) {
+                $cost = (float) $it->cost_price * (float) $it->quantity;
             }
             $it->resolved_cost = $cost;
         });
@@ -3073,8 +3072,8 @@ class FbrPosController extends Controller
             ];
         })->sortByDesc('revenue')->take(25);
 
-        // Profit summary (ADMIN-ONLY): only items whose product has a cost_price
-        // set count toward cost — coverage_pct tells the admin how complete it is.
+        // Profit summary (ADMIN-ONLY): only lines carrying a frozen sale-time
+        // cost snapshot count — coverage_pct tells the admin how complete it is.
         $profit = null;
         if ($isAdminView) {
             $withCost = $items->filter(fn ($it) => $it->resolved_cost !== null);

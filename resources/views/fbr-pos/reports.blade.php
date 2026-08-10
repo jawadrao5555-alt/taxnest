@@ -132,11 +132,11 @@
         @if($ra->profit !== null)
         <div class="p-4 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 mb-5">
             <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
-                <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.profit_estimate') }} <span class="text-xs font-medium text-gray-500">{{ __('pos.profit_estimate_note') }}</span></p>
+                <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.profit_estimate') }} <span class="text-xs font-medium text-gray-500">{{ __('pos.fbr_profit_note_frozen') }}</span></p>
                 <span class="text-xs font-semibold px-2 py-0.5 rounded-full {{ $ra->profit->coverage_pct >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' }}">{{ __('pos.pct_items_covered', ['pct' => $ra->profit->coverage_pct]) }}</span>
             </div>
             @if($ra->profit->cost <= 0 && $ra->profit->revenue <= 0)
-            <p class="text-sm text-gray-500">{{ __('pos.no_cost_price_set_hint') }}</p>
+            <p class="text-sm text-gray-500">{{ __('pos.fbr_no_cost_snapshot_hint') }}</p>
             @else
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>

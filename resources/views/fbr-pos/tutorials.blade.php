@@ -18,7 +18,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             @foreach($group['videos'] as $v)
             <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
-                <video class="w-full bg-black" style="aspect-ratio: 16 / 9;" controls preload="metadata" playsinline src="{{ $v->video_url }}"></video>
+                <video class="w-full bg-black tut-lazy" style="aspect-ratio: 16 / 9;" controls preload="none" playsinline data-src="{{ $v->video_url }}"></video>
                 <div class="p-4">
                     <h3 class="text-sm font-bold text-gray-900 dark:text-white">{{ $v->title }}</h3>
                     @if($v->description)
@@ -37,4 +37,17 @@
         <p class="text-xs text-gray-500 dark:text-gray-400">{{ __('pos.tutorials_more_soon') }} {{ __('pos.tutorials_watch_public') }}</p>
     </div>
 </div>
+<script>
+(function () {
+    var obs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+            if (!e.isIntersecting) return;
+            var v = e.target;
+            if (v.dataset.src) { v.src = v.dataset.src; delete v.dataset.src; }
+            obs.unobserve(v);
+        });
+    }, { rootMargin: '300px' });
+    document.querySelectorAll('video.tut-lazy').forEach(function (v) { obs.observe(v); });
+})();
+</script>
 </x-fbr-pos-layout>

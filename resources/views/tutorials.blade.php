@@ -87,7 +87,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     @foreach($group['videos'] as $v)
                     <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                        <video class="tut-video" controls preload="metadata" playsinline src="{{ $v->video_url }}"></video>
+                        <video class="tut-video tut-lazy" controls preload="none" playsinline data-src="{{ $v->video_url }}"></video>
                         <div class="p-4 sm:p-5">
                             <h4 class="text-base sm:text-lg font-bold text-gray-900" style="font-family: 'Inter', sans-serif;">{{ $v->title }}</h4>
                             @if($v->description)
@@ -117,5 +117,18 @@
     </main>
 
     <x-site-footer />
+<script>
+(function () {
+    var obs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+            if (!e.isIntersecting) return;
+            var v = e.target;
+            if (v.dataset.src) { v.src = v.dataset.src; delete v.dataset.src; }
+            obs.unobserve(v);
+        });
+    }, { rootMargin: '300px' });
+    document.querySelectorAll('video.tut-lazy').forEach(function (v) { obs.observe(v); });
+})();
+</script>
 </body>
 </html>

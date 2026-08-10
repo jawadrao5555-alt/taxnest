@@ -334,6 +334,20 @@ class FbrPosStockPurchasesSearchTest extends TestCase
             $table->decimal('last_purchase_price', 12, 2)->default(0);
             $table->timestamps();
         });
+        // Recent Corrections list (Task 447) queries movements; zero rows is fine.
+        Schema::create('inventory_movements', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->unsignedBigInteger('branch_id')->nullable();
+            $table->unsignedBigInteger('product_id');
+            $table->string('type');
+            $table->decimal('quantity', 12, 4)->default(0);
+            $table->decimal('balance_after', 12, 4)->nullable();
+            $table->string('reference_number')->nullable();
+            $table->text('notes')->nullable();
+            $table->unsignedBigInteger('created_by')->nullable();
+            $table->timestamps();
+        });
         // trial-lock-modal component queries plans; zero rows is fine.
         Schema::create('pricing_plans', function (Blueprint $table) {
             $table->id();

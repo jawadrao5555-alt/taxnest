@@ -389,6 +389,60 @@
         </div>
     </div>
 
+    {{-- Recent Corrections (Task 447) — company-wide adjustment_in/out
+         movements across ALL products, newest first, so the shopkeeper can
+         audit every manual stock change without opening products one by one. --}}
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden mb-6">
+        <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+            <h3 class="font-bold text-gray-900 dark:text-white">{{ __('pos.stock_corr_title') }}</h3>
+            <p class="text-xs text-gray-400 mt-0.5">{{ __('pos.stock_corr_sub') }}</p>
+        </div>
+        <p x-show="corrections.length === 0" x-cloak class="text-sm text-gray-400 text-center py-6 px-4">{{ __('pos.stock_corr_empty') }}</p>
+        <table class="w-full text-sm table-cards" x-show="corrections.length > 0">
+            <thead class="bg-gray-50 dark:bg-gray-700 text-left">
+                <tr>
+                    <th class="px-4 py-2">{{ __('pos.stock_mov_col_date') }}</th>
+                    <th class="px-4 py-2">{{ __('pos.stock_corr_col_product') }}</th>
+                    <th class="px-4 py-2">{{ __('pos.stock_mov_col_type') }}</th>
+                    <th class="px-4 py-2 text-right">{{ __('pos.stock_mov_col_qty') }}</th>
+                    <th class="px-4 py-2 text-right">{{ __('pos.stock_mov_col_balance') }}</th>
+                    <th class="px-4 py-2">{{ __('pos.stock_mov_col_note') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="c in corrections" :key="c.id">
+                    <tr class="border-t dark:border-gray-700 align-top">
+                        <td data-label="{{ __('pos.stock_mov_col_date') }}" class="px-4 py-2 whitespace-nowrap text-gray-700 dark:text-gray-300">
+                            <span x-text="c.date"></span>
+                            <span class="block text-xs text-gray-400" x-text="c.time"></span>
+                        </td>
+                        <td data-label="{{ __('pos.stock_corr_col_product') }}" class="px-4 py-2 font-semibold text-gray-900 dark:text-white" x-text="c.product"></td>
+                        <td data-label="{{ __('pos.stock_mov_col_type') }}" class="px-4 py-2">
+                            <span class="inline-block px-2 py-0.5 rounded text-xs font-bold"
+                                  :class="c.in ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'"
+                                  x-text="movTypeLabel(c.type)"></span>
+                        </td>
+                        <td data-label="{{ __('pos.stock_mov_col_qty') }}" class="px-4 py-2 text-right font-bold whitespace-nowrap"
+                            :class="c.in ? 'text-green-600' : 'text-red-600'"
+                            x-text="(c.in ? '+' : '\u2212') + c.qty"></td>
+                        <td data-label="{{ __('pos.stock_mov_col_balance') }}" class="px-4 py-2 text-right text-gray-700 dark:text-gray-300 whitespace-nowrap" x-text="c.balance !== null ? c.balance : '\u2014'"></td>
+                        <td data-label="{{ __('pos.stock_mov_col_note') }}" class="px-4 py-2 text-gray-600 dark:text-gray-300">
+                            <span x-text="c.notes || ''"></span>
+                            <span class="block text-xs text-gray-400" x-show="c.by" x-text="c.by"></span>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+        <div class="px-4 py-3 border-t border-gray-100 dark:border-gray-700 text-center" x-show="corrHasMore" x-cloak>
+            <button type="button" @click="loadMoreCorrections()" :disabled="corrLoading"
+                    class="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">
+                <span x-show="!corrLoading">{{ __('pos.stock_mov_load_more') }}</span>
+                <span x-show="corrLoading" x-cloak>{{ __('pos.stock_mov_loading') }}</span>
+            </button>
+        </div>
+    </div>
+
     {{-- Recent purchases — Alpine-rendered: server-side search + load-more over the full history --}}
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
         <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex flex-wrap items-center justify-between gap-2">
@@ -472,6 +526,7 @@ function stockPage() {
             ])->values();
             $bakedStockJson = json_encode($bakedStockProducts, JSON_INVALID_UTF8_SUBSTITUTE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?: '[]';
             $bakedPurchJson = json_encode($recentPurchasesData, JSON_INVALID_UTF8_SUBSTITUTE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?: '[]';
+            $bakedCorrJson = json_encode($recentCorrectionsData, JSON_INVALID_UTF8_SUBSTITUTE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?: '[]';
             $purchMoreTpl = json_encode(__('pos.stock_purch_more_n'), JSON_INVALID_UTF8_SUBSTITUTE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?: '"+:n"';
         @endphp
         allProducts: {!! $bakedStockJson !!},
@@ -598,6 +653,29 @@ function stockPage() {
             } catch (e) {
             } finally {
                 if (seq === this.movSeq) this.movLoading = false;
+            }
+        },
+        // ── Recent Corrections: company-wide adjustments, load-more (Task 447) ──
+        corrections: {!! $bakedCorrJson !!},
+        corrHasMore: {{ $correctionsHasMore ? 'true' : 'false' }},
+        corrPage: 1,
+        corrLoading: false,
+        async loadMoreCorrections() {
+            if (this.corrLoading) return;
+            this.corrLoading = true;
+            const page = this.corrPage + 1;
+            try {
+                const res = await fetch(`{{ route('fbrpos.stock.corrections', [], false) }}?page=` + page, {
+                    headers: { 'Accept': 'application/json' },
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                this.corrections = this.corrections.concat(data.corrections);
+                this.corrPage = page;
+                this.corrHasMore = data.has_more;
+            } catch (e) {
+            } finally {
+                this.corrLoading = false;
             }
         },
         pickFirst() { if (this.prodResults.length > 0) this.addRow(this.prodResults[0]); },

@@ -95,8 +95,19 @@ class FbrPosStockController extends Controller
         $purchasesHasMore = $recentPurchases->count() > self::PURCHASES_PER_PAGE;
         $recentPurchases = $recentPurchases->take(self::PURCHASES_PER_PAGE);
 
+        // First page of the company-wide Recent Corrections list (adjustment
+        // movements across all products) — same bake-first-page pattern as
+        // Recent Purchases; older pages come from corrections() below.
+        $recentCorrections = $this->correctionsQuery($companyId)
+            ->limit(self::CORRECTIONS_PER_PAGE + 1)
+            ->get();
+        $correctionsHasMore = $recentCorrections->count() > self::CORRECTIONS_PER_PAGE;
+        $recentCorrections = $recentCorrections->take(self::CORRECTIONS_PER_PAGE);
+
         return view('fbr-pos.stock', [
             'company' => $company,
+            'recentCorrectionsData' => $this->serializeCorrections($recentCorrections),
+            'correctionsHasMore' => $correctionsHasMore,
             'rows' => $rows,
             'lowStock' => $lowStock,
             'negative' => $negative,
@@ -229,6 +240,70 @@ class FbrPosStockController extends Controller
             'has_more' => $hasMore,
             'page' => $page,
         ]);
+    }
+
+    /** Page size for the company-wide Recent Corrections list. */
+    private const CORRECTIONS_PER_PAGE = 15;
+
+    /**
+     * Company-wide recent stock corrections (Task 447) — every manual
+     * adjustment_in / adjustment_out movement across ALL products, newest
+     * first, so the shopkeeper can audit the whole shop in one list instead
+     * of opening the per-product History modal product by product.
+     * Owner/manager only (same gate as the rest of this module).
+     */
+    public function corrections(Request $request)
+    {
+        $this->assertNotCashier();
+        $companyId = $this->companyId();
+
+        $data = $request->validate([
+            'page' => 'nullable|integer|min:1|max:100000',
+        ]);
+        $page = max(1, (int) ($data['page'] ?? 1));
+
+        $rows = $this->correctionsQuery($companyId)
+            ->skip(($page - 1) * self::CORRECTIONS_PER_PAGE)
+            ->take(self::CORRECTIONS_PER_PAGE + 1)
+            ->get();
+
+        $hasMore = $rows->count() > self::CORRECTIONS_PER_PAGE;
+
+        return response()->json([
+            'corrections' => $this->serializeCorrections($rows->take(self::CORRECTIONS_PER_PAGE)),
+            'has_more' => $hasMore,
+            'page' => $page,
+        ]);
+    }
+
+    /** Shared base query for the baked first page and the JSON endpoint. */
+    private function correctionsQuery(int $companyId)
+    {
+        // product + creator eager-loaded — live runs with strict lazy-loading,
+        // every relation the serializer reads must be covered by with().
+        return InventoryMovement::where('company_id', $companyId)
+            ->whereIn('type', [InventoryMovement::TYPE_ADJUSTMENT_IN, InventoryMovement::TYPE_ADJUSTMENT_OUT])
+            ->with('product:id,name', 'creator:id,name')
+            ->orderByDesc('id');
+    }
+
+    /** One shape for the baked first page and the JSON endpoint. */
+    private function serializeCorrections($rows): array
+    {
+        $trimQty = fn ($v) => rtrim(rtrim(number_format((float) $v, 3, '.', ''), '0'), '.');
+
+        return $rows->map(fn ($m) => [
+            'id' => (int) $m->id,
+            'date' => $m->created_at?->format('d M Y') ?? '',
+            'time' => $m->created_at?->format('h:i A') ?? '',
+            'product' => $m->product?->name ?? ('#' . $m->product_id),
+            'type' => (string) $m->type,
+            'in' => $m->isIncoming(),
+            'qty' => $trimQty($m->quantity),
+            'balance' => $m->balance_after !== null ? $trimQty($m->balance_after) : null,
+            'notes' => $m->notes ?: null,
+            'by' => $m->creator?->name,
+        ])->values()->all();
     }
 
     /** Toggle stock tracking for the company (owner/admin action). */

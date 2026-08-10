@@ -3,8 +3,8 @@
     @include('fbr-pos.partials.back-link')
     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Stock &amp; Purchase</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Maal ka hisaab — stock, kam-stock alerts, supplier aur purchase entry</p>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.stock_page_title') }}</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('pos.stock_page_sub') }}</p>
         </div>
         <div class="flex items-center gap-3">
             {{-- Stock tracking toggle --}}
@@ -12,13 +12,13 @@
                 @csrf
                 <input type="hidden" name="enabled" value="{{ $stockEnabled ? 0 : 1 }}">
                 <button type="submit"
-                        onclick="return confirm('{{ $stockEnabled ? 'Stock tracking OFF karein? Sale par stock nahi katega.' : 'Stock tracking ON karein? Har sale par stock khud kam hoga.' }}')"
+                        onclick="return confirm(@js($stockEnabled ? __('pos.stock_toggle_off_confirm') : __('pos.stock_toggle_on_confirm')))"
                         class="flex items-center gap-2 px-4 py-2 rounded-xl border-2 text-sm font-bold transition {{ $stockEnabled ? 'bg-green-50 border-green-400 text-green-700 dark:bg-green-900/20 dark:text-green-400' : 'bg-gray-50 border-gray-300 text-gray-500 dark:bg-gray-800 dark:border-gray-600' }}">
                     <span class="w-2.5 h-2.5 rounded-full {{ $stockEnabled ? 'bg-green-500' : 'bg-gray-400' }}"></span>
-                    Stock Tracking {{ $stockEnabled ? 'ON' : 'OFF' }}
+                    {{ $stockEnabled ? __('pos.stock_tracking_on') : __('pos.stock_tracking_off') }}
                 </button>
             </form>
-            <a href="{{ route('fbrpos.create') }}" class="text-sm text-blue-600 hover:underline">← Sale Screen</a>
+            <a href="{{ route('fbrpos.create') }}" class="text-sm text-blue-600 hover:underline">← {{ __('pos.stock_back_sale_screen') }}</a>
         </div>
     </div>
 
@@ -34,15 +34,15 @@
     {{-- Stat tiles --}}
     <div class="grid grid-cols-3 gap-3 mb-6">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
-            <p class="text-xs font-bold uppercase tracking-wider text-gray-400">Products</p>
+            <p class="text-xs font-bold uppercase tracking-wider text-gray-400">{{ __('pos.stock_tile_products') }}</p>
             <p class="text-2xl font-extrabold text-gray-900 dark:text-white mt-1">{{ $rows->count() }}</p>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 border-l-4 {{ $lowStock->count() > 0 ? 'border-amber-500' : 'border-gray-200 dark:border-gray-700' }}">
-            <p class="text-xs font-bold uppercase tracking-wider text-gray-400">Kam Stock Alert</p>
+            <p class="text-xs font-bold uppercase tracking-wider text-gray-400">{{ __('pos.stock_tile_low') }}</p>
             <p class="text-2xl font-extrabold {{ $lowStock->count() > 0 ? 'text-amber-600' : 'text-gray-900 dark:text-white' }} mt-1">{{ $lowStock->count() }}</p>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 border-l-4 {{ $negative->count() > 0 ? 'border-red-500' : 'border-gray-200 dark:border-gray-700' }}">
-            <p class="text-xs font-bold uppercase tracking-wider text-gray-400">Minus Stock</p>
+            <p class="text-xs font-bold uppercase tracking-wider text-gray-400">{{ __('pos.stock_tile_minus') }}</p>
             <p class="text-2xl font-extrabold {{ $negative->count() > 0 ? 'text-red-600' : 'text-gray-900 dark:text-white' }} mt-1">{{ $negative->count() }}</p>
         </div>
     </div>
@@ -59,7 +59,7 @@
             <span class="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-800 border border-amber-300 dark:border-amber-700 text-sm">
                 <strong class="text-gray-900 dark:text-white">{{ $r->name }}</strong>
                 <span class="text-amber-700 dark:text-amber-400 font-bold ml-1">{{ rtrim(rtrim(number_format($r->quantity, 3), '0'), '.') }} {{ $r->uom }}</span>
-                <span class="text-gray-400 text-xs">(min {{ rtrim(rtrim(number_format($r->min_stock_level, 3), '0'), '.') }})</span>
+                <span class="text-gray-400 text-xs">({{ __('pos.stock_min_prefix') }} {{ rtrim(rtrim(number_format($r->min_stock_level, 3), '0'), '.') }})</span>
             </span>
             @endforeach
         </div>
@@ -69,12 +69,12 @@
     <div class="grid lg:grid-cols-2 gap-6 mb-6">
         {{-- Purchase entry --}}
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-5">
-            <h3 class="font-bold text-gray-900 dark:text-white mb-3">Naya Stock Receive (Purchase)</h3>
+            <h3 class="font-bold text-gray-900 dark:text-white mb-3">{{ __('pos.stock_purchase_heading') }}</h3>
             <form method="POST" action="{{ route('fbrpos.stock.purchase') }}" @submit="return purchaseRows.length > 0">
                 @csrf
-                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Supplier (optional)</label>
+                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">{{ __('pos.stock_supplier_optional_lbl') }}</label>
                 <select name="supplier_id" class="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600 mb-3">
-                    <option value="">— Bina supplier —</option>
+                    <option value="">{{ __('pos.stock_no_supplier_option') }}</option>
                     @foreach($suppliers as $s)
                     @if($s->is_active)
                     <option value="{{ $s->id }}">{{ $s->name }}{{ $s->city ? ' (' . $s->city . ')' : '' }}</option>
@@ -103,14 +103,14 @@
                         <input type="hidden" :name="`items[${i}][product_id]`" :value="row.product_id">
                         <span class="flex-1 text-sm font-semibold text-gray-900 dark:text-white truncate" x-text="row.name"></span>
                         <input type="number" :name="`items[${i}][quantity]`" x-model="row.quantity" step="0.001" min="0.001" required
-                               :placeholder="'Qty (' + row.uom + ')'" class="w-24 border rounded px-2 py-1.5 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                               :placeholder="@js(__('pos.stock_qty_ph')) + ' (' + row.uom + ')'" class="w-24 border rounded px-2 py-1.5 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
                         <input type="number" :name="`items[${i}][unit_price]`" x-model="row.unit_price" step="0.01" min="0" required
-                               placeholder="Kharid Rate" class="w-28 border rounded px-2 py-1.5 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                               placeholder="{{ __('pos.stock_kharid_rate_ph') }}" class="w-28 border rounded px-2 py-1.5 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
                         <button type="button" @click="purchaseRows.splice(i, 1)" class="text-red-500 hover:text-red-700 font-bold px-1">&times;</button>
                     </div>
                 </template>
 
-                <input type="text" name="notes" maxlength="300" placeholder="Note (optional)" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                <input type="text" name="notes" maxlength="300" placeholder="{{ __('pos.stock_note_ph') }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
                        class="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600 mt-2 mb-3">
 
                 <button type="submit" :disabled="purchaseRows.length === 0"
@@ -122,16 +122,16 @@
 
         {{-- Suppliers --}}
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-5">
-            <h3 class="font-bold text-gray-900 dark:text-white mb-3">Suppliers</h3>
+            <h3 class="font-bold text-gray-900 dark:text-white mb-3">{{ __('pos.stock_suppliers_heading') }}</h3>
             <form method="POST" action="{{ route('fbrpos.stock.supplier') }}" class="grid grid-cols-2 gap-2 mb-4">
                 @csrf
-                <input type="text" name="name" required maxlength="150" placeholder="Supplier ka naam *" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                <input type="text" name="name" required maxlength="150" placeholder="{{ __('pos.stock_sup_name_ph') }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
                        class="col-span-2 border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
-                <input type="text" name="phone" maxlength="30" placeholder="Phone" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                <input type="text" name="phone" maxlength="30" placeholder="{{ __('pos.stock_sup_phone_ph') }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
                        class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
-                <input type="text" name="city" maxlength="80" placeholder="Sheher" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                <input type="text" name="city" maxlength="80" placeholder="{{ __('pos.stock_sup_city_ph') }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
                        class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
-                <button type="submit" class="col-span-2 py-2 rounded-lg bg-gray-800 dark:bg-gray-600 text-white text-sm font-bold hover:bg-gray-900">+ Supplier Add</button>
+                <button type="submit" class="col-span-2 py-2 rounded-lg bg-gray-800 dark:bg-gray-600 text-white text-sm font-bold hover:bg-gray-900">{{ __('pos.stock_sup_add_btn') }}</button>
             </form>
             @if($suppliers->isEmpty())
                 <p class="text-sm text-gray-400 text-center py-4">{{ __('pos.stock_no_suppliers') }}</p>
@@ -176,11 +176,11 @@
                     </div>
                     <form method="POST" action="{{ route('fbrpos.stock.supplier.update', $s->id) }}" x-show="editSup" x-cloak class="grid grid-cols-2 gap-2 mt-1">
                         @csrf
-                        <input type="text" name="name" value="{{ $s->name }}" required maxlength="150" placeholder="Supplier ka naam *" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                        <input type="text" name="name" value="{{ $s->name }}" required maxlength="150" placeholder="{{ __('pos.stock_sup_name_ph') }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
                                class="col-span-2 border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
-                        <input type="text" name="phone" value="{{ $s->phone }}" maxlength="30" placeholder="Phone" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                        <input type="text" name="phone" value="{{ $s->phone }}" maxlength="30" placeholder="{{ __('pos.stock_sup_phone_ph') }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
                                class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
-                        <input type="text" name="city" value="{{ $s->city }}" maxlength="80" placeholder="Sheher" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                        <input type="text" name="city" value="{{ $s->city }}" maxlength="80" placeholder="{{ __('pos.stock_sup_city_ph') }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
                                class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
                         <div class="col-span-2 flex gap-2">
                             <button type="submit" class="flex-1 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700">{{ __('pos.stock_sup_save') }}</button>
@@ -197,7 +197,7 @@
     {{-- Stock list --}}
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden mb-6">
         <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between gap-2 flex-wrap">
-            <h3 class="font-bold text-gray-900 dark:text-white">Stock List</h3>
+            <h3 class="font-bold text-gray-900 dark:text-white">{{ __('pos.stock_list_heading') }}</h3>
             <div class="relative w-full sm:w-64">
                 <input type="text" x-model.debounce.200ms="stockFilter" placeholder="{{ __('pos.stock_list_search_ph') }}" autocomplete="off" name="stock_list_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                        class="border rounded-lg px-3 py-1.5 pr-8 text-sm w-full dark:bg-gray-700 dark:text-white dark:border-gray-600">
@@ -209,10 +209,10 @@
             <table class="w-full text-sm table-cards">
                 <thead class="bg-gray-50 dark:bg-gray-700 text-left sticky top-0">
                     <tr>
-                        <th class="px-4 py-2">Product</th>
-                        <th class="px-4 py-2 text-right">Stock</th>
-                        <th class="px-4 py-2 text-right">Min Level</th>
-                        <th class="px-4 py-2 text-right">Last Kharid</th>
+                        <th class="px-4 py-2">{{ __('pos.stock_col_product') }}</th>
+                        <th class="px-4 py-2 text-right">{{ __('pos.stock_col_stock') }}</th>
+                        <th class="px-4 py-2 text-right">{{ __('pos.stock_col_min_level') }}</th>
+                        <th class="px-4 py-2 text-right">{{ __('pos.stock_col_last_kharid') }}</th>
                         <th class="px-4 py-2 text-right"></th>
                     </tr>
                 </thead>
@@ -392,7 +392,7 @@
     {{-- Recent purchases — Alpine-rendered: server-side search + load-more over the full history --}}
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
         <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex flex-wrap items-center justify-between gap-2">
-            <h3 class="font-bold text-gray-900 dark:text-white">Recent Purchases</h3>
+            <h3 class="font-bold text-gray-900 dark:text-white">{{ __('pos.stock_recent_purchases') }}</h3>
             <input type="search" x-model="purchQ" @input.debounce.400ms="searchPurchases()"
                    placeholder="{{ __('pos.stock_purch_search_ph') }}" autocomplete="off" name="purch_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                    class="border rounded-lg px-3 py-1.5 text-sm w-full sm:w-72 dark:bg-gray-700 dark:text-white dark:border-gray-600">
@@ -402,19 +402,19 @@
         <table class="w-full text-sm table-cards" x-show="purchases.length > 0">
             <thead class="bg-gray-50 dark:bg-gray-700 text-left">
                 <tr>
-                    <th class="px-4 py-2">Number</th>
-                    <th class="px-4 py-2">Date</th>
-                    <th class="px-4 py-2">Supplier</th>
+                    <th class="px-4 py-2">{{ __('pos.stock_purch_col_number') }}</th>
+                    <th class="px-4 py-2">{{ __('pos.stock_purch_col_date') }}</th>
+                    <th class="px-4 py-2">{{ __('pos.stock_purch_col_supplier') }}</th>
                     <th class="px-4 py-2">{{ __('pos.stock_purch_items_col') }}</th>
-                    <th class="px-4 py-2 text-right">Total</th>
+                    <th class="px-4 py-2 text-right">{{ __('pos.stock_purch_col_total') }}</th>
                 </tr>
             </thead>
             <tbody>
                 <template x-for="po in purchases" :key="po.id">
                     <tr class="border-t dark:border-gray-700 align-top">
-                        <td data-label="Number" class="px-4 py-2 font-semibold text-gray-900 dark:text-white" x-text="po.po_number"></td>
-                        <td data-label="Date" class="px-4 py-2 text-gray-500" x-text="po.date"></td>
-                        <td data-label="Supplier" class="px-4 py-2 text-gray-500" x-text="po.supplier || '—'"></td>
+                        <td data-label="{{ __('pos.stock_purch_col_number') }}" class="px-4 py-2 font-semibold text-gray-900 dark:text-white" x-text="po.po_number"></td>
+                        <td data-label="{{ __('pos.stock_purch_col_date') }}" class="px-4 py-2 text-gray-500" x-text="po.date"></td>
+                        <td data-label="{{ __('pos.stock_purch_col_supplier') }}" class="px-4 py-2 text-gray-500" x-text="po.supplier || '—'"></td>
                         <td data-label="{{ __('pos.stock_purch_items_col') }}" class="px-4 py-2 text-gray-600 dark:text-gray-300">
                             <span class="inline-flex flex-wrap gap-x-1 gap-y-0.5 justify-end sm:justify-start">
                                 <template x-for="(it, ix) in visiblePurchItems(po)" :key="po.id + '-' + ix">
@@ -429,7 +429,7 @@
                                         class="text-blue-600 dark:text-blue-400 text-xs font-bold hover:underline whitespace-nowrap">{{ __('pos.stock_purch_less') }}</button>
                             </span>
                         </td>
-                        <td data-label="Total" class="px-4 py-2 text-right font-bold text-gray-900 dark:text-white" x-text="'Rs ' + po.total"></td>
+                        <td data-label="{{ __('pos.stock_purch_col_total') }}" class="px-4 py-2 text-right font-bold text-gray-900 dark:text-white" x-text="'Rs ' + po.total"></td>
                     </tr>
                 </template>
             </tbody>

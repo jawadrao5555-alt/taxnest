@@ -235,10 +235,16 @@
                         </td>
                         <td class="px-4 py-2 text-right text-gray-500 dark:text-gray-400">{{ $r->last_purchase_price > 0 ? 'Rs ' . number_format($r->last_purchase_price, 2) : '—' }}</td>
                         <td class="px-4 py-2 text-right">
-                            <button type="button" @click="openEdit({{ $r->product_id }})"
-                                    class="px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 text-xs font-bold hover:bg-blue-50 dark:hover:bg-blue-900/20">
-                                {{ __('pos.stock_edit_btn') }}
-                            </button>
+                            <span class="inline-flex items-center gap-1">
+                                <button type="button" @click="openMov({{ $r->product_id }})"
+                                        class="px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 text-xs font-bold hover:bg-gray-50 dark:hover:bg-gray-700">
+                                    {{ __('pos.stock_mov_btn') }}
+                                </button>
+                                <button type="button" @click="openEdit({{ $r->product_id }})"
+                                        class="px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 text-xs font-bold hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                                    {{ __('pos.stock_edit_btn') }}
+                                </button>
+                            </span>
                         </td>
                     </tr>
                     @endforeach
@@ -318,6 +324,68 @@
                             class="px-5 py-2 rounded-lg bg-blue-600 text-white text-sm font-bold hover:bg-blue-700">{{ __('pos.stock_edit_save') }}</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    {{-- Per-product stock movement history modal (Task 425). Read-only audit
+         trail: purchases, sales, corrections (adjustment in/out) with the
+         reason note, running balance and who did it. --}}
+    <div x-show="movOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4"
+         @keydown.escape.window="movOpen = false">
+        <div class="absolute inset-0 bg-black/50" @click="movOpen = false"></div>
+        <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between gap-2">
+                <div class="min-w-0">
+                    <h3 class="font-bold text-gray-900 dark:text-white truncate">{{ __('pos.stock_mov_title') }} — <span x-text="movName"></span></h3>
+                </div>
+                <button type="button" @click="movOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl leading-none font-bold px-1">&times;</button>
+            </div>
+            <div class="overflow-y-auto flex-1">
+                <p x-show="movLoading && movRows.length === 0" class="text-sm text-gray-400 text-center py-8">{{ __('pos.stock_mov_loading') }}</p>
+                <p x-show="!movLoading && movRows.length === 0" x-cloak class="text-sm text-gray-400 text-center py-8 px-4">{{ __('pos.stock_mov_empty') }}</p>
+                <table class="w-full text-sm" x-show="movRows.length > 0" x-cloak>
+                    <thead class="bg-gray-50 dark:bg-gray-700 text-left sticky top-0">
+                        <tr>
+                            <th class="px-4 py-2">{{ __('pos.stock_mov_col_date') }}</th>
+                            <th class="px-4 py-2">{{ __('pos.stock_mov_col_type') }}</th>
+                            <th class="px-4 py-2 text-right">{{ __('pos.stock_mov_col_qty') }}</th>
+                            <th class="px-4 py-2 text-right">{{ __('pos.stock_mov_col_balance') }}</th>
+                            <th class="px-4 py-2">{{ __('pos.stock_mov_col_note') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="m in movRows" :key="m.id">
+                            <tr class="border-t dark:border-gray-700 align-top">
+                                <td class="px-4 py-2 whitespace-nowrap text-gray-700 dark:text-gray-300">
+                                    <span x-text="m.date"></span>
+                                    <span class="block text-xs text-gray-400" x-text="m.time"></span>
+                                </td>
+                                <td class="px-4 py-2">
+                                    <span class="inline-block px-2 py-0.5 rounded text-xs font-bold"
+                                          :class="m.in ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'"
+                                          x-text="movTypeLabel(m.type)"></span>
+                                    <span class="block text-xs text-gray-400 mt-0.5" x-show="m.ref" x-text="m.ref"></span>
+                                </td>
+                                <td class="px-4 py-2 text-right font-bold whitespace-nowrap"
+                                    :class="m.in ? 'text-green-600' : 'text-red-600'"
+                                    x-text="(m.in ? '+' : '\u2212') + m.qty"></td>
+                                <td class="px-4 py-2 text-right text-gray-700 dark:text-gray-300 whitespace-nowrap" x-text="m.balance !== null ? m.balance : '\u2014'"></td>
+                                <td class="px-4 py-2 text-gray-600 dark:text-gray-300">
+                                    <span x-text="m.notes || ''"></span>
+                                    <span class="block text-xs text-gray-400" x-show="m.by" x-text="m.by"></span>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-4 py-3 border-t border-gray-100 dark:border-gray-700 text-center" x-show="movHasMore" x-cloak>
+                <button type="button" @click="loadMoreMovements()" :disabled="movLoading"
+                        class="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">
+                    <span x-show="!movLoading">{{ __('pos.stock_mov_load_more') }}</span>
+                    <span x-show="movLoading" x-cloak>{{ __('pos.stock_mov_loading') }}</span>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -478,6 +546,59 @@ function stockPage() {
                 return confirm(@js(__('pos.stock_edit_qty_confirm')).replace(':from', from).replace(':to', to));
             }
             return true;
+        },
+        // ── Per-product movement history modal (Task 425) ──
+        movOpen: false,
+        movName: '',
+        movProductId: 0,
+        movRows: [],
+        movHasMore: false,
+        movPage: 1,
+        movLoading: false,
+        movSeq: 0,
+        movTypeLabels: @php echo json_encode([
+            'purchase' => __('pos.stock_mov_type_purchase'),
+            'sale' => __('pos.stock_mov_type_sale'),
+            'adjustment_in' => __('pos.stock_mov_type_adjustment_in'),
+            'adjustment_out' => __('pos.stock_mov_type_adjustment_out'),
+            'return_in' => __('pos.stock_mov_type_return_in'),
+            'return_out' => __('pos.stock_mov_type_return_out'),
+            'transfer_in' => __('pos.stock_mov_type_transfer_in'),
+            'transfer_out' => __('pos.stock_mov_type_transfer_out'),
+            'opening' => __('pos.stock_mov_type_opening'),
+        ], JSON_INVALID_UTF8_SUBSTITUTE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?: '{}'; @endphp,
+        movTypeLabel(t) { return this.movTypeLabels[t] || t; },
+        openMov(id) {
+            const p = this.allProducts.find(x => x.id === id);
+            this.movProductId = id;
+            this.movName = p ? p.name : '';
+            this.movRows = [];
+            this.movHasMore = false;
+            this.movPage = 1;
+            this.movOpen = true;
+            this.fetchMovements(true);
+        },
+        loadMoreMovements() { this.fetchMovements(false); },
+        async fetchMovements(reset) {
+            const seq = ++this.movSeq;
+            this.movLoading = true;
+            const page = reset ? 1 : this.movPage + 1;
+            try {
+                const params = new URLSearchParams({ product_id: this.movProductId, page: page });
+                const res = await fetch(`{{ route('fbrpos.stock.movements', [], false) }}?` + params.toString(), {
+                    headers: { 'Accept': 'application/json' },
+                });
+                if (!res.ok || seq !== this.movSeq) return;
+                const data = await res.json();
+                if (seq !== this.movSeq) return; // stale — another product was opened
+                if (reset) { this.movRows = data.movements; }
+                else { this.movRows = this.movRows.concat(data.movements); }
+                this.movPage = page;
+                this.movHasMore = data.has_more;
+            } catch (e) {
+            } finally {
+                if (seq === this.movSeq) this.movLoading = false;
+            }
         },
         pickFirst() { if (this.prodResults.length > 0) this.addRow(this.prodResults[0]); },
         addRow(p) {

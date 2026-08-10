@@ -175,6 +175,62 @@ class FbrPosStockController extends Controller
         ])->values()->all();
     }
 
+    /** Page size for the per-product movement history modal. */
+    private const MOVEMENTS_PER_PAGE = 20;
+
+    /**
+     * Per-product stock movement history (JSON) — Task 425.
+     * Lets the shopkeeper audit corrections: every inventory_movements row
+     * (purchase received, sold, adjustment in/out, returns, opening) with
+     * date, delta, running balance, the optional reason note and who did it.
+     * Owner/manager only (same gate as the rest of this module).
+     */
+    public function movements(Request $request)
+    {
+        $this->assertNotCashier();
+        $companyId = $this->companyId();
+
+        $data = $request->validate([
+            'product_id' => 'required|integer',
+            'page' => 'nullable|integer|min:1|max:100000',
+        ]);
+        $page = max(1, (int) ($data['page'] ?? 1));
+
+        // Company scope enforced through the product lookup — a foreign
+        // product_id 404s before any movement row is read.
+        $product = Product::where('company_id', $companyId)->findOrFail($data['product_id']);
+
+        $rows = InventoryMovement::where('company_id', $companyId)
+            ->where('product_id', $product->id)
+            ->with('creator:id,name')
+            ->orderByDesc('id')
+            ->skip(($page - 1) * self::MOVEMENTS_PER_PAGE)
+            ->take(self::MOVEMENTS_PER_PAGE + 1)
+            ->get();
+
+        $hasMore = $rows->count() > self::MOVEMENTS_PER_PAGE;
+        $trimQty = fn ($v) => rtrim(rtrim(number_format((float) $v, 3, '.', ''), '0'), '.');
+
+        $movements = $rows->take(self::MOVEMENTS_PER_PAGE)->map(fn ($m) => [
+            'id' => (int) $m->id,
+            'date' => $m->created_at?->format('d M Y') ?? '',
+            'time' => $m->created_at?->format('h:i A') ?? '',
+            'type' => (string) $m->type,
+            'in' => $m->isIncoming(),
+            'qty' => $trimQty($m->quantity),
+            'balance' => $m->balance_after !== null ? $trimQty($m->balance_after) : null,
+            'ref' => $m->reference_number ?: null,
+            'notes' => $m->notes ?: null,
+            'by' => $m->creator?->name,
+        ])->values()->all();
+
+        return response()->json([
+            'movements' => $movements,
+            'has_more' => $hasMore,
+            'page' => $page,
+        ]);
+    }
+
     /** Toggle stock tracking for the company (owner/admin action). */
     public function toggle(Request $request)
     {

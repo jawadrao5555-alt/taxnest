@@ -73,9 +73,13 @@ class PosAuthController extends Controller
         $user = null;
         if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
             $user = User::where('email', $login)->first();
-        } elseif (preg_match('/^\d{10,13}$/', preg_replace('/\D/', '', $login))) {
+        } elseif (preg_match('/^\d{7,13}$/', preg_replace('/\D/', '', $login))) {
+            // 7–8 digits = a real Pakistani NTN (task 433) — company lookup only.
+            // 10–13 digits keep phone-first precedence, then NTN/CNIC fallback.
             $phone = preg_replace('/\D/', '', $login);
-            $user = User::where('phone', $phone)->first();
+            if (strlen($phone) >= 10) {
+                $user = User::where('phone', $phone)->first();
+            }
             if (!$user) {
                 // Frost & Brew (Aug 2026): NTN/CNIC typed WITH dashes must still
                 // match — DB stores plain digits, so compare BOTH the raw input

@@ -470,6 +470,82 @@ class FbrPosStockQuickEditTest extends TestCase
         $this->assertSame(80.0 + (150.0 - 90.0), (float) $res3->viewData('grossProfit'));
     }
 
+    // ── 5b. Munafa banner state: anyCostedLines proxy is line-count not revenue ─
+
+    /**
+     * All lines in the period have NULL cost → anyCostedLines=false → the
+     * first-time "setup" banner is shown (not the partial-exclusion amber box).
+     */
+    public function test_munafa_all_unknown_sets_anyCostedLines_false(): void
+    {
+        $companyId = $this->makeCompany();
+        $user      = $this->makeUser($companyId);
+        $pid       = $this->makeProduct($companyId, 'Namak');
+
+        // Two sales, both with NULL cost (pre-snapshot scenario).
+        $this->makeSale($companyId, [[$pid, 'Namak', 3, 300, null]]);
+        $this->makeSale($companyId, [[$pid, 'Namak', 2, 200, null]]);
+
+        $res = $this->actingAs($user, 'fbrpos')->get('/fbr-pos/munafa')->assertOk();
+
+        $this->assertFalse((bool) $res->viewData('anyCostedLines'),
+            'anyCostedLines must be false when every line has NULL cost');
+        $this->assertSame(2, (int) $res->viewData('unknownLines')); // 2 line-item rows, not qty
+        $this->assertSame(500.0, (float) $res->viewData('revenue'));
+        // Profit totals are all zero — nothing costed.
+        $this->assertSame(0.0, (float) $res->viewData('grossProfit'));
+    }
+
+    /**
+     * Mixed period: some lines costed, some not → anyCostedLines=true → the
+     * partial-exclusion amber box is shown (not the first-time setup banner).
+     */
+    public function test_munafa_mixed_lines_sets_anyCostedLines_true(): void
+    {
+        $companyId = $this->makeCompany();
+        $user      = $this->makeUser($companyId);
+        $pid       = $this->makeProduct($companyId, 'Doodh');
+
+        $this->makeSale($companyId, [[$pid, 'Doodh', 2, 200, 50.0]]); // costed
+        $this->makeSale($companyId, [[$pid, 'Doodh', 1, 100, null]]); // not costed
+
+        $res = $this->actingAs($user, 'fbrpos')->get('/fbr-pos/munafa')->assertOk();
+
+        $this->assertTrue((bool) $res->viewData('anyCostedLines'),
+            'anyCostedLines must be true when at least one line carries a cost snapshot');
+        $this->assertSame(1, (int) $res->viewData('unknownLines'));
+        // Profit = costed line only: 200 − 2×50 = 100.
+        $this->assertSame(100.0, (float) $res->viewData('grossProfit'));
+    }
+
+    /**
+     * Edge case: a costed sale + a matching costed return net costedRevenue to
+     * zero, PLUS an unknown-cost sale.  anyCostedLines must remain true (two
+     * costed lines exist) so the partial-exclusion box is shown — NOT the
+     * all-unknown first-time banner.
+     */
+    public function test_munafa_costed_sale_plus_costed_return_netting_zero_still_shows_partial(): void
+    {
+        $companyId = $this->makeCompany();
+        $user      = $this->makeUser($companyId);
+        $pid       = $this->makeProduct($companyId, 'Ghee');
+
+        // Costed sale: qty 2, subtotal 400, cost 80/u.
+        $this->makeSale($companyId, [[$pid, 'Ghee', 2, 400, 80.0]], 'sale');
+        // Costed return of the same qty/subtotal (netting costedRevenue to 0).
+        $this->makeSale($companyId, [[$pid, 'Ghee', 2, 400, 80.0]], 'return');
+        // Unknown-cost sale on top.
+        $this->makeSale($companyId, [[$pid, 'Ghee', 1, 150, null]], 'sale');
+
+        $res = $this->actingAs($user, 'fbrpos')->get('/fbr-pos/munafa')->assertOk();
+
+        // Two costed lines exist even though costedRevenue nets to 0.
+        $this->assertTrue((bool) $res->viewData('anyCostedLines'),
+            'anyCostedLines must be true even when a costed sale + costed return net to zero revenue');
+        // There IS one unknown line.
+        $this->assertSame(1, (int) $res->viewData('unknownLines'));
+    }
+
     // ── 6. Reports range analytics: per-line snapshot, not product cost ─────
 
     public function test_reports_analytics_profit_uses_line_snapshot_not_product_cost(): void

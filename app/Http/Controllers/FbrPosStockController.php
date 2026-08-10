@@ -621,6 +621,14 @@ class FbrPosStockController extends Controller
         $unknownCount = $rows->where('cost_unknown', true)->count();
         $unknownLines = (int) $rows->sum('unknown_lines');
         $unknownSaleValue = round($revenue - $costedRevenue, 2);
+        // TRUE when at least one sold line in the period carries a frozen cost
+        // snapshot (costed_lines > 0).  Used by the blade to distinguish:
+        //   anyCostedLines = false → "all-unknown" first-time setup banner
+        //   anyCostedLines = true  → "partial exclusion" amber box
+        // Derived from the line count (not signed revenue) so a costed
+        // sale + matching costed return that nets costedRevenue to zero is
+        // still treated as "some lines costed" — the partial box is shown.
+        $anyCostedLines = (int) $rows->sum('costed_lines') > 0;
 
         return view('fbr-pos.munafa', [
             'rows' => $rows,
@@ -636,6 +644,7 @@ class FbrPosStockController extends Controller
             'unknownCount' => $unknownCount,
             'unknownLines' => $unknownLines,
             'unknownSaleValue' => $unknownSaleValue,
+            'anyCostedLines' => $anyCostedLines,
         ]);
     }
 }

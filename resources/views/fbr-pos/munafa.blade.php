@@ -49,6 +49,24 @@
         </div>
     </div>
 
+    {{-- First-time banner: period has sales but ZERO costed lines — the
+         shopkeeper set no kharid rate before billing, so every line is excluded.
+         This is the most common "empty munafa" complaint for new shops. --}}
+    @if($revenue > 0 && !$anyCostedLines)
+    <div class="mb-5 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-xl p-4">
+        <p class="font-bold text-blue-800 dark:text-blue-300 mb-1">{{ __('pos.munafa_setup_head') }}</p>
+        <p class="text-sm text-blue-700 dark:text-blue-400 mb-3">{{ __('pos.munafa_setup_body') }}</p>
+        <ol class="text-sm text-blue-700 dark:text-blue-400 list-decimal list-inside space-y-1 mb-3">
+            <li>{{ __('pos.munafa_setup_step1') }}</li>
+            <li>{{ __('pos.munafa_setup_step2') }}</li>
+            <li>{{ __('pos.munafa_setup_step3') }}</li>
+        </ol>
+        <a href="{{ route('fbrpos.stock') }}" class="inline-flex items-center gap-1 text-sm font-semibold bg-blue-600 text-white rounded-lg px-4 py-2 hover:bg-blue-700">
+            {{ __('pos.munafa_go_stock') }} →
+        </a>
+    </div>
+    @endif
+
     {{-- Product table --}}
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
         @if($rows->isEmpty())
@@ -91,10 +109,19 @@
     </div>
 
     {{-- Coverage note: cost-unknown lines are EXCLUDED from munafa (never
-         estimated from the current rate) — owner must see why coverage is partial. --}}
-    @if($unknownLines > 0)
-    <div class="mt-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
-        ⚠️ {{ __('pos.munafa_excluded_note', ['lines' => number_format($unknownLines), 'amount' => number_format($unknownSaleValue, 0)]) }}
+         estimated from the current rate) — owner must see why coverage is partial.
+         Only shown when SOME (not all) lines are excluded, so it doesn't duplicate
+         the first-time banner above. --}}
+    @if($unknownLines > 0 && $anyCostedLines)
+    <div class="mt-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-4">
+        <p class="font-semibold text-amber-800 dark:text-amber-300 text-sm mb-1">
+            ⚠️ {{ __('pos.munafa_excluded_note', ['lines' => number_format($unknownLines), 'amount' => number_format($unknownSaleValue, 0)]) }}
+        </p>
+        <p class="text-xs text-amber-700 dark:text-amber-400 mb-2">{{ __('pos.munafa_excluded_why') }}</p>
+        <p class="text-xs text-amber-700 dark:text-amber-400">
+            {{ __('pos.munafa_excluded_action') }}
+            <a href="{{ route('fbrpos.stock') }}" class="underline font-semibold">{{ __('pos.munafa_go_stock') }} →</a>
+        </p>
     </div>
     @endif
 

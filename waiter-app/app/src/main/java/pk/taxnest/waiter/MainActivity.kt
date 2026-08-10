@@ -10,6 +10,8 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.os.Message
+import android.view.View
+import android.widget.FrameLayout
 import android.webkit.CookieManager
 import android.webkit.DownloadListener
 import android.webkit.URLUtil
@@ -54,6 +56,12 @@ class MainActivity : Activity() {
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private var lastMainFrameUrl: String = START_URL
 
+    // Fullscreen <video> support (ported from pos-app v1.0.3): tutorial videos
+    // ka fullscreen button WebView mein tab hi chalta hai jab shell
+    // onShowCustomView de. Video ek overlay view ban kar aata hai.
+    private var customVideoView: View? = null
+    private var customViewCallback: WebChromeClient.CustomViewCallback? = null
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -95,6 +103,40 @@ class MainActivity : Activity() {
         }
 
         web.webChromeClient = object : WebChromeClient() {
+            // Fullscreen video (ported from pos-app v1.0.3): bina in overrides
+            // ke video ka fullscreen button dabane par kuch NAHI hota (WebView
+            // default = unsupported). Video view decor par overlay hota hai,
+            // system bars chhup jaati hain; back/exit par sab waisa hi wapas.
+            override fun onShowCustomView(view: View, callback: CustomViewCallback) {
+                if (customVideoView != null) { callback.onCustomViewHidden(); return }
+                customVideoView = view
+                customViewCallback = callback
+                web.visibility = View.GONE
+                (window.decorView as FrameLayout).addView(
+                    view,
+                    FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                )
+                @Suppress("DEPRECATION")
+                window.decorView.systemUiVisibility =
+                    View.SYSTEM_UI_FLAG_FULLSCREEN or
+                    View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            }
+
+            override fun onHideCustomView() {
+                val v = customVideoView ?: return
+                (window.decorView as FrameLayout).removeView(v)
+                customVideoView = null
+                customViewCallback?.onCustomViewHidden()
+                customViewCallback = null
+                web.visibility = View.VISIBLE
+                @Suppress("DEPRECATION")
+                window.decorView.systemUiVisibility = 0
+            }
+
             override fun onShowFileChooser(
                 view: WebView,
                 callback: ValueCallback<Array<Uri>>,
@@ -253,6 +295,12 @@ class MainActivity : Activity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        // Fullscreen video chal rahi ho to back pehle usse band kare —
+        // web history ya app se bahar nahi.
+        if (customVideoView != null) {
+            web.webChromeClient?.onHideCustomView()
+            return
+        }
         if (web.canGoBack()) web.goBack() else moveTaskToBack(true)
     }
 

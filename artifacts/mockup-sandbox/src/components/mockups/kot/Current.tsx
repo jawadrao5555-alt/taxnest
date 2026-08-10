@@ -50,8 +50,6 @@ export function Current() {
         <span>12:20 AM</span>
       </div>
 
-      <Sep thick />
-
       {/* Items table */}
       <table style={{ width: "100%", borderCollapse: "collapse", margin: "2px 0" }}>
         <thead>

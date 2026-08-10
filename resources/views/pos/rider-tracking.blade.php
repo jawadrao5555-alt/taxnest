@@ -43,6 +43,7 @@
         'shopLat' => $shopLat,
         'shopLng' => $shopLng,
         'shopSaveUrl' => route('pos.riders.tracking.shop'),
+        'resolveLinkUrl' => route('pos.riders.tracking.resolve'),
         'i18n' => [
             'shop_label' => __('pos.rt_shop_label'),
             'shop_hint' => __('pos.rt_shop_hint'),
@@ -59,6 +60,7 @@
             'just_now' => __('pos.rt_just_now'),
             'gap_stopped' => __('pos.rt_gap_recording_stopped'),
             'gap_offline' => __('pos.rt_gap_offline_sync'),
+            'pin_dropped' => __('pos.rt_pin_dropped'),
         ],
     ]))" x-init="init()">
 
@@ -148,7 +150,10 @@
                                     x-text="res.display_name"></button>
                         </template>
                         <template x-if="searchDone && !searchResults.length">
-                            <div class="px-3 py-2 text-xs text-gray-400 dark:text-gray-500">{{ __('pos.rt_search_no_results') }}</div>
+                            <div class="px-3 py-2">
+                                <div class="text-xs text-gray-400 dark:text-gray-500">{{ __('pos.rt_search_no_results') }}</div>
+                                <div class="mt-1 text-[11px] text-amber-700 dark:text-amber-300">{{ __('pos.rt_search_drag_hint') }}</div>
+                            </div>
                         </template>
                     </div>
                 </div>
@@ -287,13 +292,55 @@
                 const html = '<div style="font-size:26px; line-height:1; filter: drop-shadow(0 1px 2px rgba(0,0,0,.35));'
                     + (isPending ? ' opacity:.75;' : '') + '">🏪</div>';
                 const icon = L.divIcon({ className: '', html: html, iconSize: [26, 26], iconAnchor: [13, 24] });
+                // Pending pin must be DRAGGABLE (ZFC: "pin ko apni dukan par ghaseet lein").
+                // Leaflet can't toggle draggable after creation reliably — recreate when mode changes.
+                if (this.shopMarker && this.shopMarkerDraggable !== isPending) {
+                    this.shopMarker.remove();
+                    this.shopMarker = null;
+                }
                 if (this.shopMarker) {
                     this.shopMarker.setLatLng([lat, lng]);
                     this.shopMarker.setIcon(icon);
                 } else {
-                    this.shopMarker = L.marker([lat, lng], { icon: icon, zIndexOffset: 500 })
+                    this.shopMarker = L.marker([lat, lng], { icon: icon, zIndexOffset: 500, draggable: isPending })
                         .addTo(this.map).bindPopup('<b>' + this.esc(this.i18n.shop_label) + '</b>');
+                    this.shopMarkerDraggable = isPending;
+                    if (isPending) {
+                        this.shopMarker.on('dragend', () => {
+                            const ll = this.shopMarker.getLatLng();
+                            this.pendingShop = { lat: ll.lat, lng: ll.lng };
+                        });
+                    }
                 }
+            },
+            // Google Maps link / raw "lat, lng" paste → direct pin (no geocoder needed).
+            // Handles: .../@31.52,74.35,17z · ...!3d31.52!4d74.35 · ?q=31.52,74.35 (also %2C) · "31.52, 74.35"
+            parseLatLng(q) {
+                const pats = [
+                    /!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/,
+                    /@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/,
+                    /[?&](?:q|query|ll|destination)=(-?\d{1,2}\.\d+)(?:%2C|,)\s*(-?\d{1,3}\.\d+)/i,
+                    /^\s*(-?\d{1,2}\.\d+)\s*[, ]\s*(-?\d{1,3}\.\d+)\s*$/,
+                ];
+                for (const re of pats) {
+                    const m = q.match(re);
+                    if (!m) continue;
+                    const lat = parseFloat(m[1]), lng = parseFloat(m[2]);
+                    if (isFinite(lat) && isFinite(lng) && this.pkBounds && this.pkBounds.contains([lat, lng])) {
+                        return { lat, lng };
+                    }
+                }
+                return null;
+            },
+            dropPin(lat, lng) {
+                this.searchResults = [];
+                this.searchDone = false;
+                this.userCentered = true;
+                this.settingShop = true;
+                this.pendingShop = { lat, lng };
+                this.renderShopMarker(lat, lng, true);
+                this.map.setView([lat, lng], 17);
+                this.statusLine = this.i18n.pin_dropped;
             },
             toggleSetShop() {
                 if (this.settingShop) { this.cancelSetShop(); return; }
@@ -487,13 +534,80 @@
             searchPlace() {
                 const q = (this.searchQ || '').trim();
                 if (!q || this.searchBusy) return;
+                // Google Maps link / coordinates paste — pin lands directly, no geocoder.
+                const ll = this.parseLatLng(q);
+                if (ll) { this.dropPin(ll.lat, ll.lng); return; }
+                // Redirect-only Google share link (maps.app.goo.gl/…) — no coords
+                // in the URL; server follows the redirects (browser can't, CORS).
+                if (/^https?:\/\/(maps\.app\.goo\.gl|goo\.gl|g\.co|(?:www\.|maps\.)?google\.com(?:\.pk)?)\//i.test(q)) {
+                    this.resolveLink(q);
+                    return;
+                }
                 this.searchBusy = true;
                 this.searchDone = false;
                 const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=pk&accept-language=en&q=' + encodeURIComponent(q);
                 fetch(url, { headers: { 'Accept': 'application/json' } })
                     .then(r => r.ok ? r.json() : [])
                     .then(list => {
-                        this.searchResults = Array.isArray(list) ? list : [];
+                        const results = Array.isArray(list) ? list : [];
+                        if (results.length) {
+                            this.searchResults = results;
+                            this.searchDone = true;
+                            this.searchBusy = false;
+                            return;
+                        }
+                        // Photon fallback (komoot) — better small-business/POI coverage
+                        // than Nominatim for names only listed as OSM POIs.
+                        return this.photonSearch(q);
+                    })
+                    .catch(() => this.photonSearch(q).catch(() => {
+                        this.searchResults = []; this.searchDone = true; this.searchBusy = false;
+                    }));
+            },
+            resolveLink(q) {
+                this.searchBusy = true;
+                this.searchDone = false;
+                fetch(cfg.resolveLinkUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
+                    },
+                    body: JSON.stringify({ url: q }),
+                })
+                    .then(r => r.json().catch(() => null))
+                    .then(j => {
+                        this.searchBusy = false;
+                        if (j && j.ok && isFinite(j.lat) && isFinite(j.lng)) {
+                            this.dropPin(j.lat, j.lng);
+                        } else {
+                            this.searchResults = [];
+                            this.searchDone = true; // shows no-results + drag hint
+                        }
+                    })
+                    .catch(() => { this.searchBusy = false; this.searchResults = []; this.searchDone = true; });
+            },
+            photonSearch(q) {
+                // Pakistan bbox keeps results local (Photon has no countrycodes param).
+                const url = 'https://photon.komoot.io/api/?limit=5&lang=en&bbox=60.4,22.8,77.6,37.5&q=' + encodeURIComponent(q);
+                return fetch(url, { headers: { 'Accept': 'application/json' } })
+                    .then(r => r.ok ? r.json() : null)
+                    .then(j => {
+                        const feats = (j && Array.isArray(j.features)) ? j.features : [];
+                        this.searchResults = feats
+                            .filter(f => f && f.geometry && Array.isArray(f.geometry.coordinates))
+                            .map(f => {
+                                const p = f.properties || {};
+                                const name = [p.name, p.street, p.district, p.city, p.state]
+                                    .filter(Boolean).join(', ');
+                                return {
+                                    display_name: name || (f.geometry.coordinates[1] + ', ' + f.geometry.coordinates[0]),
+                                    lat: f.geometry.coordinates[1],
+                                    lon: f.geometry.coordinates[0],
+                                };
+                            })
+                            .filter(r => this.pkBounds && this.pkBounds.contains([parseFloat(r.lat), parseFloat(r.lon)]));
                         this.searchDone = true;
                         this.searchBusy = false;
                     })
@@ -505,6 +619,14 @@
                 this.searchDone = false;
                 if (!isFinite(lat) || !isFinite(lng)) return;
                 this.userCentered = true; // late ipCenter() must not override a manual search
+                if (this.settingShop) {
+                    // Pin-mode: search result becomes the (draggable) pending pin.
+                    this.pendingShop = { lat, lng };
+                    this.renderShopMarker(lat, lng, true);
+                    this.statusLine = this.i18n.pin_dropped;
+                    this.map.setView([lat, lng], 17);
+                    return;
+                }
                 this.map.setView([lat, lng], 14);
             },
             esc(s) {

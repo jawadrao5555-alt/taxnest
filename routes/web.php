@@ -942,6 +942,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         Route::get('/riders/tracking/trail/{rider}', [\App\Http\Controllers\PosRiderTrackingController::class, 'trail'])->name('pos.riders.tracking.trail');
         // Task #320 (ZFC): dukan ki location pin — map par shop marker + default center
         Route::post('/riders/tracking/shop-location', [\App\Http\Controllers\PosRiderTrackingController::class, 'saveShopLocation'])->name('pos.riders.tracking.shop');
+        // Task #446 (ZFC): Google Maps short-link → lat/lng (server follows redirects)
+        Route::post('/riders/tracking/resolve-link', [\App\Http\Controllers\PosRiderTrackingController::class, 'resolveShopLink'])->name('pos.riders.tracking.resolve');
     });
     // Rider portal — pos_rider role is confined to these routes by PosAuth
     // (exact 'pos/rider' + 'pos/rider/' prefix; /pos/riders stays admin-only).

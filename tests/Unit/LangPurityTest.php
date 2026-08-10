@@ -29,6 +29,8 @@ class LangPurityTest extends TestCase
         // Literal UI/status labels referenced verbatim inside Urdu guidance text
         // (FBR settings field "Token", fail-queue status "Settings Error", "Retry" button):
         'Token','Error','Settings','Retry',
+        // Brand names in the rider-tracking shop-pin search guidance (Aug 2026):
+        'Google','Maps',
         'Direct','Fiscal','Device','Submission','Mode','Hold','Deals','Update','Bill','Bills','Add','Customer','Product','Arrow','keys','More','Large','Order','Developed','Powered','chai','samosa','Preparing','Ready','Cleared','Report','Madadgar','series','Desktop','Agent','Sync','Retry','Edit','Recall','Pay','Delete','Close','Print','Set','default','New','Shortcut','Settings','devices','Printers','Label','free','app','xxxx','pos','products','Needed','Qty',
         'Pro','Max','SSL','zip','Cloud','Code','XXXXXXX','Letter','Registration','Point','Sale','Tax','Rate','Exempt',
     ];

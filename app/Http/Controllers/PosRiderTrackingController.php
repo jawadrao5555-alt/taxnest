@@ -422,6 +422,35 @@ class PosRiderTrackingController extends Controller
     }
 
     /**
+     * POST /pos/riders/tracking/resolve-link — Task #446 (ZFC, Aug 2026):
+     * pasted Google Maps SHORT link (maps.app.goo.gl etc.) → lat/lng.
+     * Browser can't follow those redirects (CORS); server does, with a fixed
+     * Google-host allowlist (see GoogleMapsLinkResolver — SSRF-safe).
+     */
+    public function resolveShopLink(Request $request)
+    {
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        if (!PosFeatureService::planAllows($company, 'riders_enabled')
+            || !PosFeatureService::planAllows($company, 'rider_tracking_enabled')) {
+            return response()->json(['ok' => false, 'error' => 'plan_locked'], 403);
+        }
+
+        $data = $request->validate(['url' => 'required|string|max:600']);
+
+        if (!\App\Services\GoogleMapsLinkResolver::isResolvableUrl($data['url'])) {
+            return response()->json(['ok' => false, 'error' => 'not_a_maps_link'], 422);
+        }
+
+        $ll = \App\Services\GoogleMapsLinkResolver::resolve($data['url']);
+        if (!$ll) {
+            return response()->json(['ok' => false, 'error' => 'not_found'], 404);
+        }
+
+        return response()->json(['ok' => true, 'lat' => $ll['lat'], 'lng' => $ll['lng']]);
+    }
+
+    /**
      * POST /pos/riders/tracking/shop-location — Task #320 (ZFC, Aug 2026):
      * admin map par pin rakh kar dukan ki location save karta hai.
      * PosAdminOnly route group; Pakistan-bounds validation (map PK-locked hai).

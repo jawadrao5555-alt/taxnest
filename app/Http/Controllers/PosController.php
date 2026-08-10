@@ -1497,6 +1497,9 @@ class PosController extends Controller
             // Task 117: offlineAllowed is BAKED into the sale screen — a plan
             // change (upgrade/downgrade) must refresh the offline-cached copy.
             (bool) \App\Services\PosFeatureService::planAllows($company, 'offline_enabled'),
+            // Task 431: the Delivery Board button is BAKED into the sale screen —
+            // a riders plan-gate change must refresh the offline-cached copy.
+            (bool) \App\Services\PosFeatureService::planAllows($company, 'riders_enabled'),
         ]));
 
         $screenPath = resource_path('views/pos/universal.blade.php');

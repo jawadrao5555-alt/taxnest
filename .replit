@@ -72,7 +72,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "env -u DATABASE_URL -u DB_CONNECTION -u PGHOST -u PGPORT -u PGUSER -u PGPASSWORD -u PGDATABASE php artisan serve --host=0.0.0.0 --port=5000"
+args = "env -u DATABASE_URL -u DB_CONNECTION -u PGHOST -u PGPORT -u PGUSER -u PGPASSWORD -u PGDATABASE PHP_CLI_SERVER_WORKERS=8 php artisan serve --host=0.0.0.0 --port=5000"
 waitForPort = 5000
 
 [[workflows.workflow]]

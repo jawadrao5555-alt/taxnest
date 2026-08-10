@@ -2,6 +2,16 @@
 {{-- Deliveries board (Jul 2026) — open to admins, managers AND cashiers
      (the cashier is who receives the rider's cash). Rider CRUD lives on
      /pos/riders (admin-only). --}}
+{{-- Embedded mode (Task 431, 10 Aug 2026): the sale screen opens this board in
+     a modal IFRAME. Frame detection (window.self !== window.top) — not a query
+     param — so tab links / date filter / POST-redirects inside the iframe keep
+     the embedded look with zero param plumbing. Hides the app top-nav and the
+     history-back button (back inside a frame would strand the modal). --}}
+<script>if (window.self !== window.top) { document.documentElement.classList.add('tn-embedded'); }</script>
+<style>
+    .tn-embedded .topnav-bar { display: none !important; }
+    .tn-embedded .tn-embed-hide { display: none !important; }
+</style>
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6"
      x-data="{ settleRider: null, settleTotal: 0, recalcSettle(form) {
          let t = 0;
@@ -15,7 +25,7 @@
                  direct-open fallback = POS dashboard. --}}
             <button type="button"
                     onclick="if (history.length > 1) { history.back(); } else { window.location = '{{ route('pos.dashboard') }}'; }"
-                    class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-semibold hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+                    class="tn-embed-hide inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-semibold hover:bg-gray-200 dark:hover:bg-gray-700 transition"
                     title="{{ __('pos.ti_go_back') }}">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                 {{ __('pos.back_word') }}

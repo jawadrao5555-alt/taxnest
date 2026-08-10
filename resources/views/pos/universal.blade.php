@@ -58,6 +58,17 @@
     // 'local' (offline billing only) or 'pra' (PRA billing only). Drives which
     // sale-screen entry points render; server guards re-enforce everything.
     $uBillScope = $__ppUser?->posBillingScope() ?? 'both';
+    // Delivery Board on the sale screen (Task 431, owner voice note 10 Aug 2026):
+    // shopkeeper request — delivery manager ke liye TEESRI alag ID/window na khole.
+    // Button shows under the SAME verdict as the nav "Deliveries" link (pos-app
+    // layout line ~709): delivery feature ON + riders plan gate + Custom Access
+    // tick ($posNavCan-equivalent, incl. no-delivery-manager fallback inside
+    // posCustomAllows). The board itself opens in a lazy modal IFRAME pointing at
+    // /pos/deliveries — the route's own gates (PosAuth + deliveryGate + stream
+    // scope) re-enforce everything server-side; zero boot cost until opened.
+    $showDeliveriesBoardBtn = !empty($features->delivery)
+        && \App\Services\PosFeatureService::planAllows($company, 'riders_enabled')
+        && (($__ppUser?->posCustomAllows('deliveries')) ?? true);
 @endphp
 @if($__ppShow)
 <div id="tn-silent-prompt" class="fixed bottom-4 left-4 z-40 max-w-sm rounded-xl bg-purple-800 text-white px-4 py-3 shadow-sm">
@@ -472,6 +483,15 @@ window.addEventListener('popstate', function() {
                 <span class="hidden lg:inline">{{ __('pos.pending_deliveries') }}</span>
                 <span class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-amber-600 text-white text-[9px] rounded-full flex items-center justify-center font-bold" x-text="pendingDeliveryBills().length"></span>
             </button>
+
+            {{-- Delivery Board (Task 431): rider assign / delivered / settle in a modal
+                 iframe — delivery manager ko alag ID/window ki zaroorat nahi. --}}
+            @if($showDeliveriesBoardBtn)
+            <button type="button" onclick="tnOpenDeliveryBoard()" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition flex-shrink-0" title="{{ __('pos.deliveries') }}">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+                <span class="hidden lg:inline">{{ __('pos.deliveries') }}</span>
+            </button>
+            @endif
 
             {{-- Failed PRA bills — F11 --}}
             <button @click="openFailedBills()" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 transition flex-shrink-0" title="{{ __('pos.ti_failed_pra_f11') }}">
@@ -1004,6 +1024,14 @@ window.addEventListener('popstate', function() {
             <span class="hidden sm:inline">{{ __('pos.failed_word_html') }}</span>
             <span x-show="failedBills.length > 0" class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-red-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold animate-pulse" x-text="failedBills.length"></span>
         </button>
+
+        {{-- Delivery Board (Task 431) — mobile copy of the nav-strip button --}}
+        @if($showDeliveriesBoardBtn)
+        <button type="button" onclick="tnOpenDeliveryBoard()" class="flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition" title="{{ __('pos.deliveries') }}">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+            <span class="hidden sm:inline">{{ __('pos.deliveries') }}</span>
+        </button>
+        @endif
 
         {{-- ── REPRINT — header shortcut. Alt+R. Today's bills, click = instant print. ── --}}
         {{-- Read-only: cashier + admin both allowed. Teal family (no-blue rule).       --}}
@@ -8773,4 +8801,56 @@ function restaurantPos() {
     };
 }
 </script>
+
+@if($showDeliveriesBoardBtn)
+{{-- ── Delivery Board modal (Task 431, 10 Aug 2026) ─────────────────────────
+     Full /pos/deliveries board in a LAZY iframe overlay — iframe src is set on
+     first open only (zero sale-screen boot cost; pos-boot-splash-perf.md).
+     Vanilla JS + inline styles on purpose: outside the restaurantPos() Alpine
+     state, and no arbitrary Tailwind classes (vite-arbitrary-classes.md).
+     The board page detects window.self !== window.top and hides its own top
+     nav + back button (see pos/deliveries.blade.php) — so tab/filter/POST
+     navigation INSIDE the iframe keeps the embedded look. All gating stays
+     server-side on the route (PosAuth + plan/feature gates + stream scope). --}}
+<div id="tn-delivery-board" style="display:none; position:fixed; inset:0; z-index:95;">
+    <div onclick="tnCloseDeliveryBoard()" style="position:absolute; inset:0; background:rgba(15,23,42,.55); backdrop-filter:blur(4px);"></div>
+    <div style="position:absolute; inset:16px; display:flex; flex-direction:column; background:#f9fafb; border-radius:16px; overflow:hidden; box-shadow:0 24px 64px rgba(0,0,0,.35);" class="dark:bg-gray-900">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 16px; background:#064e3b; color:#fff; flex-shrink:0;">
+            <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+                <svg style="width:18px;height:18px;flex-shrink:0;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+                <span style="font-weight:800; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ __('pos.deliveries') }}</span>
+            </div>
+            <button type="button" onclick="tnCloseDeliveryBoard()" style="display:flex; align-items:center; gap:6px; padding:6px 14px; border-radius:10px; background:rgba(255,255,255,.14); color:#fff; font-weight:800; font-size:12px; border:1px solid rgba(255,255,255,.25); cursor:pointer;">
+                {{ __('pos.close') }}
+                <svg style="width:14px;height:14px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <iframe id="tn-delivery-board-frame" title="{{ __('pos.deliveries') }}" style="flex:1 1 0%; width:100%; border:0; background:#f9fafb;"></iframe>
+    </div>
+</div>
+<script>
+function tnOpenDeliveryBoard() {
+    var wrap = document.getElementById('tn-delivery-board');
+    var frame = document.getElementById('tn-delivery-board-frame');
+    if (!wrap || !frame) return;
+    if (!frame.getAttribute('src')) {
+        frame.setAttribute('src', '{{ route('pos.deliveries', [], false) }}');
+    }
+    wrap.style.display = 'block';
+}
+function tnCloseDeliveryBoard() {
+    var wrap = document.getElementById('tn-delivery-board');
+    if (wrap) wrap.style.display = 'none';
+    // Reload the board next open so rider/status changes are always fresh.
+    var frame = document.getElementById('tn-delivery-board-frame');
+    if (frame) frame.removeAttribute('src');
+}
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+        var wrap = document.getElementById('tn-delivery-board');
+        if (wrap && wrap.style.display !== 'none') { tnCloseDeliveryBoard(); e.stopPropagation(); }
+    }
+}, true);
+</script>
+@endif
 </x-pos-layout>

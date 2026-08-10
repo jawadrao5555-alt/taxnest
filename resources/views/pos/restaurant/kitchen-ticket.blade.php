@@ -15,7 +15,7 @@
         $kotShowOrderby       = (bool) ($company->kot_show_orderby ?? true);
         $kotShowBarcode       = (bool) ($company->kot_show_barcode ?? true);
         $kotShowFooter        = (bool) ($company->kot_show_footer ?? true);
-        $kotShowKitchenNotes  = (bool) ($company->kot_show_kitchen_notes ?? true);
+        $kotShowKitchenNotes  = (bool) ($company->kot_show_kitchen_notes ?? false);
         $kotAlignCenter       = (bool) ($company->kot_align_center ?? false);
         $kotMarginMm          = max(0, min(30, (int) ($company->kot_left_margin_mm ?? 0)));
     @endphp

@@ -209,7 +209,7 @@
                     ['rp_kot_show_orderby',         'pos.show_order_by_item_count',      'pos.show_order_by_item_count_hint',     $company->kot_show_orderby ?? true],
                     ['rp_kot_show_barcode',         'pos.show_barcode',                  'pos.show_barcode_hint',                 $company->kot_show_barcode ?? true],
                     ['rp_kot_show_footer',          'pos.show_business_name_bottom',     'pos.show_business_name_bottom_hint',    $company->kot_show_footer ?? true],
-                    ['rp_kot_show_kitchen_notes',   'pos.show_kitchen_notes_box',        'pos.show_kitchen_notes_box_hint',       $company->kot_show_kitchen_notes ?? true],
+                    ['rp_kot_show_kitchen_notes',   'pos.show_kitchen_notes_box',        'pos.show_kitchen_notes_box_hint',       $company->kot_show_kitchen_notes ?? false],
                 ] as [$fieldName, $labelKey, $hintKey, $checked])
                 <div class="p-5 flex items-center justify-between">
                     <div>

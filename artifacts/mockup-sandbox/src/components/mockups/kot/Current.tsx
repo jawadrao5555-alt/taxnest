@@ -39,20 +39,15 @@ export function Current() {
 
       <Sep thick />
 
-      {/* Date + Time */}
-      <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700 }}>
-        <span>Aug 10, 2026</span>
-        <span>12:20 AM</span>
-      </div>
-
-      {/* Order type + table */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 2 }}>
+      {/* Date + Time + Order type — ek hi line mein */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: 700 }}>
         <span style={{
           display: "inline-block", padding: "1px 6px",
           border: "2px solid #000", fontWeight: 700, fontSize: 12,
           textTransform: "uppercase", letterSpacing: 1,
         }}>TAKE AWAY</span>
-        {/* no table for take away */}
+        <span>Aug 10, 2026</span>
+        <span>12:20 AM</span>
       </div>
 
       <Sep thick />

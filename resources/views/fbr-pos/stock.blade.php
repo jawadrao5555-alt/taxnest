@@ -76,7 +76,9 @@
                 <select name="supplier_id" class="w-full border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600 mb-3">
                     <option value="">— Bina supplier —</option>
                     @foreach($suppliers as $s)
+                    @if($s->is_active)
                     <option value="{{ $s->id }}">{{ $s->name }}{{ $s->city ? ' (' . $s->city . ')' : '' }}</option>
+                    @endif
                     @endforeach
                 </select>
 
@@ -134,13 +136,57 @@
             @if($suppliers->isEmpty())
                 <p class="text-sm text-gray-400 text-center py-4">{{ __('pos.stock_no_suppliers') }}</p>
             @else
-            <div class="max-h-48 overflow-y-auto divide-y dark:divide-gray-700">
+            <div class="max-h-64 overflow-y-auto divide-y dark:divide-gray-700">
                 @foreach($suppliers as $s)
-                <div class="py-2 flex items-center justify-between text-sm">
-                    <div>
-                        <p class="font-semibold text-gray-900 dark:text-white">{{ $s->name }}</p>
-                        <p class="text-xs text-gray-400">{{ $s->phone ?: '' }}{{ $s->city ? ' · ' . $s->city : '' }}</p>
+                <div class="py-2 text-sm" x-data="{ editSup: false }">
+                    <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1" x-show="!editSup">
+                        <div class="min-w-0 {{ $s->is_active ? '' : 'opacity-60' }}">
+                            <p class="font-semibold text-gray-900 dark:text-white truncate">
+                                {{ $s->name }}
+                                @unless($s->is_active)
+                                <span class="ml-1 align-middle text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300">{{ __('pos.stock_sup_inactive') }}</span>
+                                @endunless
+                            </p>
+                            <p class="text-xs text-gray-400">{{ $s->phone ?: '' }}{{ $s->city ? ($s->phone ? ' · ' : '') . $s->city : '' }}</p>
+                        </div>
+                        <div class="flex items-center gap-1 shrink-0">
+                            @if($s->is_active)
+                            <button type="button" @click="editSup = true"
+                                    class="px-2.5 py-1.5 rounded-lg text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700">{{ __('pos.stock_sup_edit') }}</button>
+                            @if($s->purchase_orders_count > 0)
+                            <form method="POST" action="{{ route('fbrpos.stock.supplier.delete', $s->id) }}"
+                                  onsubmit="return confirm(@js(__('pos.stock_sup_deact_confirm')))">
+                                @csrf
+                                <button type="submit" class="px-2.5 py-1.5 rounded-lg text-xs font-bold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-gray-700">{{ __('pos.stock_sup_deactivate') }}</button>
+                            </form>
+                            @else
+                            <form method="POST" action="{{ route('fbrpos.stock.supplier.delete', $s->id) }}"
+                                  onsubmit="return confirm(@js(__('pos.stock_sup_del_confirm')))">
+                                @csrf
+                                <button type="submit" class="px-2.5 py-1.5 rounded-lg text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-700">{{ __('pos.stock_sup_delete') }}</button>
+                            </form>
+                            @endif
+                            @else
+                            <form method="POST" action="{{ route('fbrpos.stock.supplier.reactivate', $s->id) }}">
+                                @csrf
+                                <button type="submit" class="px-2.5 py-1.5 rounded-lg text-xs font-bold text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-gray-700">{{ __('pos.stock_sup_reactivate') }}</button>
+                            </form>
+                            @endif
+                        </div>
                     </div>
+                    <form method="POST" action="{{ route('fbrpos.stock.supplier.update', $s->id) }}" x-show="editSup" x-cloak class="grid grid-cols-2 gap-2 mt-1">
+                        @csrf
+                        <input type="text" name="name" value="{{ $s->name }}" required maxlength="150" placeholder="Supplier ka naam *" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                               class="col-span-2 border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                        <input type="text" name="phone" value="{{ $s->phone }}" maxlength="30" placeholder="Phone" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                               class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                        <input type="text" name="city" value="{{ $s->city }}" maxlength="80" placeholder="Sheher" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                               class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                        <div class="col-span-2 flex gap-2">
+                            <button type="submit" class="flex-1 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700">{{ __('pos.stock_sup_save') }}</button>
+                            <button type="button" @click="editSup = false" class="flex-1 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-xs font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">{{ __('pos.stock_sup_cancel') }}</button>
+                        </div>
+                    </form>
                 </div>
                 @endforeach
             </div>

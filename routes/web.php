@@ -1347,6 +1347,9 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/stock/purchases', [\App\Http\Controllers\FbrPosStockController::class, 'purchases'])->name('fbrpos.stock.purchases');
     Route::post('/stock/toggle', [\App\Http\Controllers\FbrPosStockController::class, 'toggle'])->name('fbrpos.stock.toggle')->middleware('plan.limit:inventory');
     Route::post('/stock/supplier', [\App\Http\Controllers\FbrPosStockController::class, 'storeSupplier'])->name('fbrpos.stock.supplier')->middleware('plan.limit:inventory');
+    Route::post('/stock/supplier/{id}/update', [\App\Http\Controllers\FbrPosStockController::class, 'updateSupplier'])->name('fbrpos.stock.supplier.update')->middleware('plan.limit:inventory');
+    Route::post('/stock/supplier/{id}/delete', [\App\Http\Controllers\FbrPosStockController::class, 'deleteSupplier'])->name('fbrpos.stock.supplier.delete')->middleware('plan.limit:inventory');
+    Route::post('/stock/supplier/{id}/reactivate', [\App\Http\Controllers\FbrPosStockController::class, 'reactivateSupplier'])->name('fbrpos.stock.supplier.reactivate')->middleware('plan.limit:inventory');
     Route::post('/stock/purchase', [\App\Http\Controllers\FbrPosStockController::class, 'storePurchase'])->name('fbrpos.stock.purchase')->middleware('plan.limit:inventory');
     Route::post('/stock/min-level', [\App\Http\Controllers\FbrPosStockController::class, 'updateMinLevel'])->name('fbrpos.stock.minlevel')->middleware('plan.limit:inventory');
     Route::post('/stock/item', [\App\Http\Controllers\FbrPosStockController::class, 'updateItem'])->name('fbrpos.stock.item')->middleware('plan.limit:inventory');

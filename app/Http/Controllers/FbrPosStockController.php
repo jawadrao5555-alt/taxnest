@@ -79,7 +79,8 @@ class FbrPosStockController extends Controller
         $lowStock = $rows->filter(fn ($r) => $r->tracked && $r->min_stock_level > 0 && $r->quantity <= $r->min_stock_level)->values();
         $negative = $rows->filter(fn ($r) => $r->quantity < 0)->values();
 
-        $suppliers = Supplier::forCompany($companyId)->orderBy('name')->get();
+        // withCount decides Delete vs Deactivate per row (history must stay intact).
+        $suppliers = Supplier::forCompany($companyId)->withCount('purchaseOrders')->orderBy('name')->get();
 
         // First page of purchase history (page size + 1 to detect "has more");
         // the blade renders these via Alpine and fetches older/searched pages
@@ -204,6 +205,63 @@ class FbrPosStockController extends Controller
         ]);
 
         return redirect()->route('fbrpos.stock')->with('success', 'Supplier add ho gaya: ' . $request->name);
+    }
+
+    /** Edit a supplier's basic fields (same fields as the add form). */
+    public function updateSupplier(Request $request, $id)
+    {
+        $this->assertNotCashier();
+        $supplier = Supplier::forCompany($this->companyId())->findOrFail($id);
+
+        $request->validate([
+            'name' => 'required|string|max:150',
+            'phone' => 'nullable|string|max:30',
+            'city' => 'nullable|string|max:80',
+        ]);
+
+        $supplier->update([
+            'name' => $request->name,
+            'phone' => $request->phone,
+            'city' => $request->city,
+        ]);
+
+        return redirect()->route('fbrpos.stock')
+            ->with('success', __('pos.stock_sup_updated', ['name' => $supplier->name]));
+    }
+
+    /**
+     * Delete a supplier — hard-delete ONLY when it has no purchase history.
+     * Suppliers table is shared with the DI panel; a supplier referenced by
+     * purchase orders is deactivated instead (hidden from the purchase-entry
+     * dropdown, still shown on old purchase rows, reactivatable).
+     */
+    public function deleteSupplier($id)
+    {
+        $this->assertNotCashier();
+        $supplier = Supplier::forCompany($this->companyId())->findOrFail($id);
+
+        if ($supplier->purchaseOrders()->exists()) {
+            $supplier->update(['is_active' => false]);
+            return redirect()->route('fbrpos.stock')
+                ->with('success', __('pos.stock_sup_deactivated', ['name' => $supplier->name]));
+        }
+
+        $name = $supplier->name;
+        $supplier->delete();
+
+        return redirect()->route('fbrpos.stock')
+            ->with('success', __('pos.stock_sup_deleted', ['name' => $name]));
+    }
+
+    /** Bring a deactivated supplier back into the purchase-entry dropdown. */
+    public function reactivateSupplier($id)
+    {
+        $this->assertNotCashier();
+        $supplier = Supplier::forCompany($this->companyId())->findOrFail($id);
+        $supplier->update(['is_active' => true]);
+
+        return redirect()->route('fbrpos.stock')
+            ->with('success', __('pos.stock_sup_reactivated', ['name' => $supplier->name]));
     }
 
     /**

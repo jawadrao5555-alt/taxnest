@@ -644,7 +644,8 @@ Bills cashier ke paas hi rahenge — ye sirf kitchen display clear karega.',
     'confirm_hide_all_products' => 'Kya waqai SAB products sale screen se hide karne hain? (Search se phir bhi mil jayenge)',
     'confirm_mark_returned' => 'Mark this delivery as RETURNED? The bill stays recorded — it only comes off the rider\'s cash khata.',
     'confirm_new_password' => 'Naya Password Confirm karein',
-    'confirm_open_orders_prefix' => ':count order abhi OPEN hain! Phir bhi din band karna hai?',
+    'dayclose_blocked_open_orders' => 'Din band nahi ho sakta: :count order abhi OPEN hain:tables. Pehle unhein final ya cancel karein — din band hone ke baad final nahi ho sakte.',
+    'dayclose_blocked_hint' => 'Jab tak ye orders final ya cancel nahi hote, din band nahi ho sakta.',
     'confirm_promote_local_bill' => 'Bill :invoice ko PRA par jama karein?
 
 • Ye bill FINAL ho jayega aur naya POS serial number milega

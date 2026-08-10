@@ -545,32 +545,39 @@
             </div>
             @endif
             @if(($openOrders ?? 0) > 0)
-            {{-- ZFC 28 Jul 2026: warn BEFORE closing when held orders / occupied
-                 tables are still open — they dangle into tomorrow otherwise. --}}
-            <div class="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-400 dark:border-amber-700">
+            {{-- Owner rule 10 Aug 2026: open orders HARD-BLOCK day close — no
+                 "close anyway" confirm. Finalize or cancel them first (they can
+                 never be finalized after close). Server enforces this too. --}}
+            <div class="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border-2 border-red-400 dark:border-red-700">
                 <div class="text-sm">
-                    <span class="font-bold text-amber-800 dark:text-amber-300">{{ __('pos.open_orders_warning', ['count' => $openOrders]) }}{{ ($occupiedTables ?? 0) > 0 ? ' — ' . __('pos.n_tables_occupied', ['count' => $occupiedTables]) : '' }}</span>
+                    <span class="font-bold text-red-800 dark:text-red-300">{{ __('pos.open_orders_warning', ['count' => $openOrders]) }}{{ ($occupiedTables ?? 0) > 0 ? ' — ' . __('pos.n_tables_occupied', ['count' => $occupiedTables]) : '' }}</span>
                     @if(!empty($openHeld->tableNumbers ?? ''))
                     {{-- ZFC 3 Aug 2026: WHICH tables and HOW MUCH — 5 tables sat
                          occupied for 2 days because nobody could see the detail. --}}
-                    <p class="text-xs font-semibold text-amber-800 dark:text-amber-300 mt-1">
+                    <p class="text-xs font-semibold text-red-800 dark:text-red-300 mt-1">
                         {{ __('pos.dc_open_tables_list', ['tables' => $openHeld->tableNumbers]) }} — {{ __('pos.dc_open_orders_amount', ['amount' => number_format($openHeld->amount ?? 0)]) }}@if(($openHeld->noTableCount ?? 0) > 0) ({{ __('pos.dc_open_no_table', ['count' => $openHeld->noTableCount]) }})@endif
                     </p>
                     @elseif(($openHeld->amount ?? 0) > 0)
-                    <p class="text-xs font-semibold text-amber-800 dark:text-amber-300 mt-1">{{ __('pos.dc_open_orders_amount', ['amount' => number_format($openHeld->amount)]) }}</p>
+                    <p class="text-xs font-semibold text-red-800 dark:text-red-300 mt-1">{{ __('pos.dc_open_orders_amount', ['amount' => number_format($openHeld->amount)]) }}</p>
                     @endif
-                    <p class="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-                        {{ __('pos.settle_held_before_close') }}
+                    <p class="text-xs font-bold text-red-700 dark:text-red-400 mt-0.5">
+                        {{ __('pos.dayclose_blocked_hint') }}
                         <a href="{{ route('pos.invoice.create') }}" class="underline font-semibold">{{ __('pos.dc_open_table_board') }}</a>
                     </p>
                 </div>
             </div>
-            @endif
-            <button type="submit" onclick="return confirm({{ Js::from((($openOrders ?? 0) > 0 ? __('pos.confirm_open_orders_prefix', ['count' => $openOrders]) . "\n\n" : '') . __('pos.confirm_close_day')) }})"
+            <button type="button" disabled
+                class="px-6 py-2.5 bg-gray-400 dark:bg-gray-600 text-white font-semibold rounded-lg cursor-not-allowed text-sm flex items-center gap-2" title="{{ __('pos.dayclose_blocked_hint') }}">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                {{ __('pos.close_day_generate_z') }}
+            </button>
+            @else
+            <button type="submit" onclick="return confirm({{ Js::from(__('pos.confirm_close_day')) }})"
                 class="px-6 py-2.5 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition text-sm flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                 {{ __('pos.close_day_generate_z') }}
             </button>
+            @endif
         </form>
     </div>
     @endif

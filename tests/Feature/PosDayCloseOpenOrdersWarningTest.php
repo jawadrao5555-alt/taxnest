@@ -22,8 +22,10 @@ use Illuminate\Database\Schema\Blueprint;
  *      distinct table count, total amount and no-table count are reported.
  *   2. Completed/cancelled orders and item-less shells are ignored.
  *   3. Non-restaurant companies get a zeroed summary (warning never renders).
- *   4. The summary is informational — this test suite does NOT assert any
- *      blocking behavior, because there must be none.
+ *   4. Since 10 Aug 2026 (owner rule) the summary also drives the MANUAL
+ *      day-close HARD BLOCK in closeDayReport — the HTTP-level blocking test
+ *      lives in PosDayCloseAutoFinalizeTest. The 6 AM auto close stays
+ *      unblocked (open_orders_at_close stamp instead).
  *
  * Pattern: sqlite :memory: + minimal Schema::create; private method via
  * reflection (same approach as PosDayCloseAutoFinalizeTest).

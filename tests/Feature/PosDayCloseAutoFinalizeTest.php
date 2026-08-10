@@ -847,4 +847,98 @@ class PosDayCloseAutoFinalizeTest extends TestCase
         $this->assertSame(8.0, \App\Models\PosTaxRule::getRateForMethod('qr_payment', $company), 'every digital channel needs its own active rule row (no cross-method fallback)');
         $this->assertSame(8.0, \App\Models\PosTaxRule::getRateForMethod('credit_card', $company));
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // 7. OPEN-ORDERS HARD BLOCK (owner rule 10 Aug 2026) — closeDayReport POST
+    //    must REFUSE while any restaurant order is still open (no "close
+    //    anyway"). The 6 AM auto close (performDayClose) stays unblocked.
+    // ════════════════════════════════════════════════════════════════════════
+
+    private function ensureRestaurantTables(): void
+    {
+        // PosFeatureService caches restaurantAllowed per company id in a STATIC —
+        // reset so earlier suites' verdicts don't leak in.
+        $prop = new \ReflectionProperty(\App\Services\PosFeatureService::class, 'restaurantAllowedCache');
+        $prop->setAccessible(true);
+        $prop->setValue(null, []);
+
+        if (!Schema::hasColumn('companies', 'restaurant_mode')) {
+            Schema::table('companies', function (Blueprint $table) {
+                $table->boolean('restaurant_mode')->default(false);
+            });
+        }
+        if (!Schema::hasTable('restaurant_orders')) {
+            Schema::create('restaurant_orders', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('company_id');
+                $table->unsignedBigInteger('table_id')->nullable();
+                $table->string('status')->default('held');
+                $table->decimal('total_amount', 12, 2)->default(0);
+                $table->timestamps();
+            });
+        }
+        if (!Schema::hasTable('restaurant_order_items')) {
+            Schema::create('restaurant_order_items', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('order_id');
+                $table->string('item_name')->nullable();
+                $table->decimal('quantity', 8, 2)->default(1);
+                $table->decimal('subtotal', 12, 2)->default(0);
+                $table->timestamps();
+            });
+        }
+        if (!Schema::hasTable('restaurant_tables')) {
+            Schema::create('restaurant_tables', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('company_id');
+                $table->string('table_number');
+                $table->timestamps();
+            });
+        }
+        DB::table('restaurant_order_items')->delete();
+        DB::table('restaurant_orders')->delete();
+        DB::table('restaurant_tables')->delete();
+    }
+
+    public function test_manual_close_hard_blocked_while_orders_open_then_succeeds_after_settle(): void
+    {
+        $this->ensureRestaurantTables();
+        // is_internal_account=true → restaurantAllowed short-circuits to yes.
+        $companyId = $this->makeHttpCompany(['restaurant_mode' => true, 'is_internal_account' => true]);
+        $this->makeProvisional($companyId, 'L-0001');
+
+        $tableId = DB::table('restaurant_tables')->insertGetId([
+            'company_id' => $companyId, 'table_number' => '4',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $orderId = DB::table('restaurant_orders')->insertGetId([
+            'company_id' => $companyId, 'table_id' => $tableId, 'status' => 'held',
+            'total_amount' => 1200, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('restaurant_order_items')->insert([
+            'order_id' => $orderId, 'item_name' => 'Pizza', 'quantity' => 1,
+            'subtotal' => 1200, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $user = $this->makePosUser($companyId);
+
+        // 1. Open order → HARD BLOCK: error flash, NO report row created.
+        $response = $this->closeDay($user);
+        $response->assertSessionHas('error');
+        $this->assertStringContainsString(
+            __('pos.dayclose_blocked_open_orders', [
+                'count' => 1,
+                'tables' => ' (' . __('pos.dc_open_tables_list', ['tables' => '4']) . ')',
+            ]),
+            session('error')
+        );
+        $this->assertSame(0, DB::table('pos_day_close_reports')->where('company_id', $companyId)->count(),
+            'blocked close must not create a Z-report');
+
+        // 2. Order settled → close proceeds exactly as before.
+        DB::table('restaurant_orders')->where('id', $orderId)->update(['status' => 'completed']);
+        $response = $this->closeDay($user);
+        $response->assertSessionHas('success');
+        $this->assertSame(1, DB::table('pos_day_close_reports')->where('company_id', $companyId)->count());
+    }
 }

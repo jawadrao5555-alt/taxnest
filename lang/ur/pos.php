@@ -644,7 +644,8 @@ return [
     'confirm_hide_all_products' => 'کیا سیل اسکرین سے تمام پروڈکٹس چھپانی ہیں؟ (یہ سرچ میں پھر بھی نظر آئیں گی)',
     'confirm_mark_returned' => 'کیا اس ڈیلیوری کو RETURNED مارک کرنا ہے؟ بل ریکارڈ میں رہے گا — یہ صرف رائیڈر کے کیش اکاؤنٹ سے نکل جائے گا۔',
     'confirm_new_password' => 'نیا پاس ورڈ کنفرم کریں',
-    'confirm_open_orders_prefix' => ':count آرڈر ابھی OPEN ہیں! پھر بھی دن بند کرنا ہے؟',
+    'dayclose_blocked_open_orders' => 'دن بند نہیں ہو سکتا: :count آرڈر ابھی OPEN ہیں:tables۔ پہلے انہیں فائنل یا کینسل کریں — دن بند ہونے کے بعد فائنل نہیں ہو سکتے۔',
+    'dayclose_blocked_hint' => 'جب تک یہ آرڈر فائنل یا کینسل نہیں ہوتے، دن بند نہیں ہو سکتا۔',
     'confirm_promote_local_bill' => 'بل :invoice کو پی آر اے پر جمع کریں؟
 
 • یہ بل FINAL ہو جائے گا اور نیا POS سیریل نمبر ملے گا

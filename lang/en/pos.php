@@ -644,7 +644,8 @@ Bills stay with the cashier — this only clears the kitchen display.',
     'confirm_hide_all_products' => 'Hide ALL products from the sale screen? (They will still appear in search)',
     'confirm_mark_returned' => 'Mark this delivery as RETURNED? The bill stays recorded — it only comes off the rider\'s cash account.',
     'confirm_new_password' => 'Confirm New Password',
-    'confirm_open_orders_prefix' => ':count order(s) are still OPEN! Close the day anyway?',
+    'dayclose_blocked_open_orders' => 'Day close blocked: :count order(s) are still OPEN:tables. Finalize or cancel them first — they cannot be finalized after close.',
+    'dayclose_blocked_hint' => 'Day close is blocked until these orders are finalized or cancelled.',
     'confirm_promote_local_bill' => 'Submit bill :invoice to PRA?
 
 • This bill will become FINAL and get a new POS serial number

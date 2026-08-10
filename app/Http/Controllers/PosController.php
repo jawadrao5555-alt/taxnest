@@ -8353,14 +8353,19 @@ class PosController extends Controller
      * orders are still un-settled, which table numbers, and how much money is
      * sitting on them. Restaurant-mode companies only (plan-allowed + toggled on);
      * everyone else gets a zeroed summary so the warning block never renders.
-     * Purely informational — day-close is NEVER blocked by open orders.
+     * Also the authority for the MANUAL day-close hard block (owner rule
+     * 10 Aug 2026): closeDayReport refuses while count > 0. The 6 AM auto
+     * close stays unblocked and stamps open_orders_at_close instead.
      */
     private function openHeldOrdersSummary(int $companyId, ?Company $company): object
     {
         $empty = (object) ['count' => 0, 'tables' => 0, 'tableNumbers' => '', 'amount' => 0.0, 'noTableCount' => 0];
+        // Cheap column check FIRST: restaurantAllowed() hits subscriptions —
+        // non-restaurant companies (the vast majority) must short-circuit
+        // before any plan lookup (also keeps minimal-schema tests green).
         $restaurantEnabled = $company
-            && \App\Services\PosFeatureService::restaurantAllowed($company)
-            && (bool) ($company->restaurant_mode ?? false);
+            && (bool) ($company->restaurant_mode ?? false)
+            && \App\Services\PosFeatureService::restaurantAllowed($company);
         if (! $restaurantEnabled || ! \Schema::hasTable('restaurant_orders')) {
             return $empty;
         }
@@ -8405,6 +8410,21 @@ class PosController extends Controller
         $user = \Illuminate\Support\Facades\Auth::guard('pos')->user();
         // Default = the OPEN trading day (business day) — same rule as the page.
         $date = $request->input('date', \App\Services\PosBusinessDay::current($companyId));
+
+        // HARD BLOCK (owner rule 10 Aug 2026): while ANY restaurant order is still
+        // open (held/preparing/ready with items), manual day-close must refuse —
+        // no "close anyway" escape hatch. Un-finalized orders can never be
+        // finalized after close. Defense in depth: the page hides the close
+        // button too, but the endpoint is the authority. The 6 AM AUTO close
+        // (AutoCloseDayPos → performDayClose) is deliberately NOT blocked — it
+        // must never strand a day — and it stamps open_orders_at_close instead.
+        $openAtClose = $this->openHeldOrdersSummary($companyId, $company);
+        if ($openAtClose->count > 0) {
+            return back()->with('error', __('pos.dayclose_blocked_open_orders', [
+                'count' => $openAtClose->count,
+                'tables' => $openAtClose->tableNumbers !== '' ? ' (' . __('pos.dc_open_tables_list', ['tables' => $openAtClose->tableNumbers]) . ')' : '',
+            ]));
+        }
 
         // Local-bill wash at day-close now follows the STANDING company policy set by
         // an admin in Customize POS → Local Billing (save=archive | delete, per bill
@@ -8564,9 +8584,12 @@ class PosController extends Controller
         ];
 
         // Restaurant-only extras: deals performance + order-type split.
+        // Cheap column check FIRST: restaurantAllowed() hits subscriptions —
+        // non-restaurant companies (the vast majority) must short-circuit
+        // before any plan lookup (also keeps minimal-schema tests green).
         $restaurantEnabled = $company
-            && \App\Services\PosFeatureService::restaurantAllowed($company)
-            && (bool) ($company->restaurant_mode ?? false);
+            && (bool) ($company->restaurant_mode ?? false)
+            && \App\Services\PosFeatureService::restaurantAllowed($company);
         $deals = collect();
         $orderTypes = collect();
         if ($restaurantEnabled) {

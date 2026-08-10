@@ -104,7 +104,7 @@
                         <svg class="w-6 h-6 text-[#B8912A]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                     </div>
                     <h3 class="font-serif text-lg text-[#052730] mb-1">TaxNest POS App</h3>
-                    <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Android 7+ · APK{{ $posApkSize ? ' · ' . $posApkSize : '' }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Android 7+ · v1.0.3 · APK{{ $posApkSize ? ' · ' . $posApkSize : '' }}</p>
                     <p class="text-sm text-gray-500 leading-relaxed flex-1">Your complete POS panel on mobile — every team member signs in with their normal login (owner, admin, cashier, waiter, rider) and sees exactly their own screens. Always up to date automatically.</p>
                     <div class="mt-5">
                         <a href="{{ url('downloads/taxnest-pos.apk') }}" class="block text-center bg-[#0A4D5C] hover:bg-[#083D49] text-white text-sm font-semibold px-4 py-3 rounded-lg transition-colors">Download APK</a>

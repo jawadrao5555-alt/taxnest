@@ -1922,8 +1922,11 @@ window.addEventListener('popstate', function() {
                             {{-- Table Shift (owner batch, 26 Jul 2026): har role, sirf
                                  KHALI table par, timer continue, KOT reprint NAHI. --}}
                             <button @click="boardAskShift()" :disabled="boardBusy" class="w-full py-2 rounded-xl text-xs font-bold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 disabled:opacity-40 transition">&#8644; Table Badlein (Shift)</button>
-                            <button x-show="!(boardMenuTable.order && boardMenuTable.order.source === 'waiter')" @click="boardFree()" :disabled="boardBusy" class="w-full py-2 rounded-xl text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-40 transition">{{ __('pos.order_cancel_table_free') }}</button>
-                            <p x-show="boardMenuTable.order && boardMenuTable.order.source === 'waiter'" class="text-[10px] text-purple-500 dark:text-purple-400 text-center">{{ __('pos.waiter_order_cancel_side') }}</p>
+                            {{-- Task #409 (owner, 10 Aug 2026): waiter orders are now cancellable
+                                 HERE too — same warning modal + soft-cancel endpoint as cashier
+                                 orders. The old "cancel from waiter/admin side only" note lied:
+                                 no such cancel existed anywhere. --}}
+                            <button @click="boardFree()" :disabled="boardBusy" class="w-full py-2 rounded-xl text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-40 transition">{{ __('pos.order_cancel_table_free') }}</button>
                         </div>
                     </template>
                     <template x-if="!boardMenuTable.order && boardMenuTable.status === 'reserved'">
@@ -2597,6 +2600,10 @@ window.addEventListener('popstate', function() {
                             <button @click="printIncomingKot(o)" class="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs font-bold transition" title="{{ __('pos.ti_print_full_kot') }}">KOT</button>
                             @endif
                             <button x-show="o.unprinted_count > 0 && o.items.some(i => i.printed)" @click="printIncomingKot(o, true)" class="px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition" title="{{ __('pos.ti_print_only_new') }}">{{ __('pos.added_short') }}</button>
+                            {{-- Task #409 (owner, 10 Aug 2026): waiter ke takeaway/delivery orders
+                                 SIRF yahan dikhte hain — cancel bhi yahin se (soft-cancel →
+                                 Cancelled Orders report, cancelled_by saved). --}}
+                            <button @click="cancelIncoming(o)" class="px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 hover:bg-red-100 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs font-bold transition">{{ __('pos.incoming_cancel_btn') }}</button>
                         </div>
                     </div>
                 </template>
@@ -6363,6 +6370,32 @@ function restaurantPos() {
                 this.showToast(window.TXT.could_not_load_order_conn, 'error');
             } finally { this._claimBusy = false; }
         },
+        // Task #409 (owner, 10 Aug 2026): cancel a waiter order straight from the
+        // ghanti (incoming) panel — the ONLY surface where waiter takeaway/delivery
+        // orders live. Soft-cancel (deleteOrder) → Cancelled Orders report with
+        // cancelled_by; table (if any) freed server-side.
+        async cancelIncoming(o) {
+            if (this._claimBusy || !o) return;
+            if (!confirm(window.TXT.cancel_incoming_q + (o.order_number || '#' + o.id) + (o.waiter ? ' (' + o.waiter + ')' : '') + '?')) return;
+            this._claimBusy = true;
+            try {
+                const res = await fetch('/pos/restaurant/orders/' + o.id + '/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                });
+                const data = res.ok ? await res.json().catch(() => null) : null;
+                if (data && data.success) {
+                    this.incomingOrders = this.incomingOrders.filter(x => x.id !== o.id);
+                    this.heldOrders = this.heldOrders.filter(x => x.id !== o.id);
+                    this.showToast(window.TXT.order_cancelled_toast, 'success');
+                    if (this.tableBoardEnabled) this.loadTableStatus();
+                } else {
+                    this.showToast((data && data.message) || window.TXT.cancel_failed, 'error');
+                }
+            } catch (e) {
+                this.showToast(window.TXT.cancel_failed_conn, 'error');
+            } finally { this._claimBusy = false; }
+        },
         // Fire-and-forget: backend only flips status='reserved' → available, so this
         // is harmless after payment (already freed) or on occupied tables (held-order
         // lifecycle owns those).
@@ -6452,7 +6485,9 @@ function restaurantPos() {
             if (!t) return '';
             if (t.order) {
                 const bits = [];
-                if (this.boardIsWaiter(t)) bits.push('Waiter order');
+                // Task #409: show WHO punched it — waiter ka naam bhi (sirf "Waiter
+                // order" likhna owner ko na-kaafi laga).
+                if (this.boardIsWaiter(t)) bits.push('Waiter' + (t.order.staff_name ? ': ' + String(t.order.staff_name).split(' ')[0] : ' order'));
                 else if (t.order.staff_name) bits.push(String(t.order.staff_name).split(' ')[0]);
                 if (t.order.order_number) bits.push('#' + t.order.order_number);
                 const el = this.boardTileTime(t);
@@ -6653,14 +6688,12 @@ function restaurantPos() {
         heldMenuPay()    { const o = this.heldMenu; this.heldMenu = null; if (o) this.payHeldOrder(o.id); },
         heldMenuResend() { const o = this.heldMenu; this.heldMenu = null; if (o) this.resendKitchen(o); },
         heldMenuDelete() { const o = this.heldMenu; this.heldMenu = null; if (o) this.deleteHeldOrder(o.id); },
-        // Free table: reserved-only → release; cashier order → confirm + cancel
-        // (same endpoint as Held-modal delete). Waiter orders never reach here
-        // (button hidden) — cancel belongs to the waiter/admin side.
+        // Free table: reserved-only → release; any open order (cashier OR waiter,
+        // Task #409) → confirm + soft-cancel via the same deleteOrder endpoint.
         async boardFree() {
             const t = this.boardMenuTable;
             if (!t || this.boardBusy) return;
             if (t.order) {
-                if (t.order.source === 'waiter') return;
                 // ZFC (2 Aug 2026): bare confirm() ki jagah warning modal — items
                 // ki list + "KOT kitchen ja chuki hai" ka alert, taake bana hua
                 // khana anjane mein cancel na ho.
@@ -6698,6 +6731,9 @@ function restaurantPos() {
                 const data = res.ok ? await res.json().catch(() => null) : null;
                 if (data && data.success) {
                     this.heldOrders = this.heldOrders.filter(o => o.id !== ask.order.id);
+                    // Waiter order cancelled from the board → drop it from the ghanti
+                    // (incoming) list too, warna badge stale reh jata (Task #409).
+                    this.incomingOrders = this.incomingOrders.filter(o => o.id !== ask.order.id);
                     this.showToast(window.TXT.order_cancel_t_prefix + t.table_number + window.TXT.table_freed_suffix, 'success');
                 } else {
                     this.showToast((data && data.message) || window.TXT.cancel_failed, 'error');

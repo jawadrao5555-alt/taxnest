@@ -204,6 +204,7 @@
                                         <option value="3rd_schedule">3rd Schedule</option>
                                         <option value="exempt">Exempt</option>
                                         <option value="zero_rated">Zero Rated</option>
+                                        <option value="fed_services" title="FBR only accepts a 16% tax rate for Services (FED in ST Mode)">Services (FED in ST Mode)</option>
                                     </select>
                                 </div>
                                 <div>
@@ -420,7 +421,7 @@
         function invoiceEditForm() {
             const companyStandardRate = {{ $standardTaxRate ?? 18 }};
             const defaultTaxRates = {
-                standard: companyStandardRate, reduced: 10, '3rd_schedule': 17, exempt: 0, zero_rated: 0
+                standard: companyStandardRate, reduced: 10, '3rd_schedule': 17, exempt: 0, zero_rated: 0, fed_services: 16
             };
 
             const scheduleHints = {
@@ -430,6 +431,7 @@
                 exempt: 'Exempt: SRO Schedule No required (Serial No not needed).',
                 zero_rated: 'Zero Rated: SRO and Serial are optional.',
                 reduced: 'Reduced Rate: SRO and Serial No required.',
+                fed_services: 'Services (FED in ST Mode): FBR only accepts a 16% tax rate for this sale type (scenario SN018) — other rates are rejected.',
             };
 
             function detectRegType(ntn, cnic) {
@@ -459,6 +461,8 @@
                         return { requires_sro: false, requires_serial: false, requires_mrp: false, optional_sro: true, optional_serial: true, hint: scheduleHints.zero_rated };
                     case 'reduced':
                         return { requires_sro: true, requires_serial: true, requires_mrp: false, optional_sro: false, optional_serial: false, hint: scheduleHints.reduced };
+                    case 'fed_services':
+                        return { requires_sro: false, requires_serial: false, requires_mrp: false, optional_sro: false, optional_serial: false, hint: scheduleHints.fed_services };
                     default:
                         return { requires_sro: false, requires_serial: false, requires_mrp: false, optional_sro: false, optional_serial: false, hint: '' };
                 }
@@ -570,7 +574,7 @@
                     let types = [...new Set(this.items.map(i => i.schedule_type))];
                     if (types.length > 1) {
                         let labels = types.map(t => {
-                            let map = { standard: 'Standard', reduced: 'Reduced', '3rd_schedule': '3rd Schedule', exempt: 'Exempt', zero_rated: 'Zero Rated' };
+                            let map = { standard: 'Standard', reduced: 'Reduced', '3rd_schedule': '3rd Schedule', exempt: 'Exempt', zero_rated: 'Zero Rated', fed_services: 'Services (FED in ST Mode)' };
                             return map[t] || t;
                         });
                         this.scheduleError = 'Warning: Mixed schedule types detected (' + labels.join(', ') + '). All items should use the same schedule type.';

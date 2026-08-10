@@ -10,6 +10,8 @@ class ScheduleEngine
         '3rd_schedule' => ['label' => '3rd Schedule', 'tax_rate' => 17, 'requires_sro' => false, 'requires_serial' => false, 'requires_mrp' => true],
         'exempt' => ['label' => 'Exempt', 'tax_rate' => 0, 'requires_sro' => true, 'requires_serial' => false, 'requires_mrp' => false],
         'zero_rated' => ['label' => 'Zero Rated', 'tax_rate' => 0, 'requires_sro' => false, 'requires_serial' => false, 'requires_mrp' => false],
+        // FBR only accepts 16% for Services (FED in ST Mode) — scenario SN018 (confirmed Aug 2026: 13% and 19.5% rejected in sandbox).
+        'fed_services' => ['label' => 'Services (FED in ST Mode)', 'tax_rate' => 16, 'requires_sro' => false, 'requires_serial' => false, 'requires_mrp' => false],
     ];
 
     public static array $hsLookupTable = [
@@ -146,6 +148,10 @@ class ScheduleEngine
                 $errors[] = "Item #" . ($index + 1) . ": Zero Rated items must have 0% tax rate";
             }
 
+            if ($scheduleType === 'fed_services' && $taxRate !== null && abs($taxRate - 16) > 0.001) {
+                $errors[] = "Item #" . ($index + 1) . ": Services (FED in ST Mode) must use a 16% tax rate — FBR rejects any other rate for this sale type.";
+            }
+
             $rules = self::resolveValidationRules($scheduleType, $taxRate, $standardTaxRate);
             $config = self::getScheduleConfig($scheduleType);
             $itemNum = $index + 1;
@@ -251,6 +257,13 @@ class ScheduleEngine
             $saleType = $item['saleType'] ?? '';
             if (str_contains($saleType, 'Exempt') && isset($item['salesTaxApplicable']) && $item['salesTaxApplicable'] != 0) {
                 $errors[] = "Item #{$num}: Exempt items must have zero salesTaxApplicable";
+            }
+            // FBR only accepts a 16% rate for Services (FED in ST Mode) — SN018.
+            if (stripos($saleType, 'Services (FED in ST Mode)') !== false) {
+                $rateNum = floatval(str_replace('%', '', (string) ($item['rate'] ?? '')));
+                if (abs($rateNum - 16) > 0.001) {
+                    $errors[] = "Item #{$num}: Services (FED in ST Mode) must use a 16% tax rate — FBR rejects any other rate for this sale type.";
+                }
             }
         }
 

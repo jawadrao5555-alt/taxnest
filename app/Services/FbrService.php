@@ -486,6 +486,13 @@ class FbrService
             }
 
             $saleType = strtolower($item['saleType'] ?? '');
+
+            // FBR only accepts a 16% rate for Services (FED in ST Mode) — scenario SN018
+            // (confirmed Aug 2026: 13% and 19.5% both rejected in sandbox).
+            if (strpos($saleType, 'services (fed in st mode)') !== false && is_numeric($rate) && abs(floatval($rate) - 16) > 0.001) {
+                $errors[] = ['code' => 'SN018', 'message' => "Item #{$sn}: Services (FED in ST Mode) must use a 16% tax rate — FBR rejects any other rate for this sale type."];
+            }
+
             if (strpos($saleType, '3rd schedule') !== false) {
                 $retailPrice = floatval($item['fixedNotifiedValueOrRetailPrice'] ?? 0);
                 if ($retailPrice <= 0) {

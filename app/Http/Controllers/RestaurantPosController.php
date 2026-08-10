@@ -1520,7 +1520,7 @@ class RestaurantPosController extends Controller
         }
         // KOT Print Style (customer feedback 27 Jul 2026): paper-saving toggles +
         // print position. hasColumn guards = prod self-heal parity.
-        foreach (['kot_compact', 'kot_show_customer', 'kot_show_orderby', 'kot_show_barcode', 'kot_show_footer', 'kot_align_center'] as $kotFlag) {
+        foreach (['kot_compact', 'kot_show_customer', 'kot_show_orderby', 'kot_show_barcode', 'kot_show_footer', 'kot_show_kitchen_notes', 'kot_align_center'] as $kotFlag) {
             if (\Illuminate\Support\Facades\Schema::hasColumn('companies', $kotFlag)) {
                 $updates[$kotFlag] = (bool) $request->input($kotFlag);
             }

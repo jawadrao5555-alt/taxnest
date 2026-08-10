@@ -194,6 +194,38 @@
             </div>
         </div>
 
+        {{-- KOT Print Style (Aug 2026): same toggles as Kitchen Settings — exposed
+             here too so shops without the kitchen module can control their KOT layout.
+             Uses rp_kot_* prefix; PosController saves them to the same company columns. --}}
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md">
+            <div class="p-5 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-sm font-bold text-gray-900 dark:text-white">🎫 {{ __('pos.kot_print_style') }}</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.kot_print_style_hint') }}</p>
+            </div>
+            <div class="divide-y divide-gray-200 dark:divide-gray-700">
+                @foreach([
+                    ['rp_kot_compact',             'pos.compact_kot',                  'pos.compact_kot_hint',                  $company->kot_compact ?? false],
+                    ['rp_kot_show_customer',        'pos.show_customer_name',            'pos.show_customer_name_hint',           $company->kot_show_customer ?? true],
+                    ['rp_kot_show_orderby',         'pos.show_order_by_item_count',      'pos.show_order_by_item_count_hint',     $company->kot_show_orderby ?? true],
+                    ['rp_kot_show_barcode',         'pos.show_barcode',                  'pos.show_barcode_hint',                 $company->kot_show_barcode ?? true],
+                    ['rp_kot_show_footer',          'pos.show_business_name_bottom',     'pos.show_business_name_bottom_hint',    $company->kot_show_footer ?? true],
+                    ['rp_kot_show_kitchen_notes',   'pos.show_kitchen_notes_box',        'pos.show_kitchen_notes_box_hint',       $company->kot_show_kitchen_notes ?? true],
+                ] as [$fieldName, $labelKey, $hintKey, $checked])
+                <div class="p-5 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __($labelKey) }}</h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __($hintKey) }}</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="hidden" name="{{ $fieldName }}" value="0">
+                        <input type="checkbox" name="{{ $fieldName }}" value="1" {{ $checked ? 'checked' : '' }} class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-purple-600"></div>
+                    </label>
+                </div>
+                @endforeach
+            </div>
+        </div>
+
         {{-- Order Matching (owner request 06 Aug 2026, customer voice notes): the
              sale receipt and the kitchen KOT carried DIFFERENT numbers (L-107 vs
              ORD-…), so counter staff couldn't pair a ready order with a bill.

@@ -10,13 +10,14 @@
         // paper-saving toggles + print position, read from the COMPANY row so
         // BOTH render paths (kitchen-ticket route + Agent print-job content)
         // honor them. Null-coalesced defaults = prod schema-drift safe.
-        $kotCompact      = (bool) ($company->kot_compact ?? false);
-        $kotShowCustomer = (bool) ($company->kot_show_customer ?? true);
-        $kotShowOrderby  = (bool) ($company->kot_show_orderby ?? true);
-        $kotShowBarcode  = (bool) ($company->kot_show_barcode ?? true);
-        $kotShowFooter   = (bool) ($company->kot_show_footer ?? true);
-        $kotAlignCenter  = (bool) ($company->kot_align_center ?? false);
-        $kotMarginMm     = max(0, min(30, (int) ($company->kot_left_margin_mm ?? 0)));
+        $kotCompact           = (bool) ($company->kot_compact ?? false);
+        $kotShowCustomer      = (bool) ($company->kot_show_customer ?? true);
+        $kotShowOrderby       = (bool) ($company->kot_show_orderby ?? true);
+        $kotShowBarcode       = (bool) ($company->kot_show_barcode ?? true);
+        $kotShowFooter        = (bool) ($company->kot_show_footer ?? true);
+        $kotShowKitchenNotes  = (bool) ($company->kot_show_kitchen_notes ?? true);
+        $kotAlignCenter       = (bool) ($company->kot_align_center ?? false);
+        $kotMarginMm          = max(0, min(30, (int) ($company->kot_left_margin_mm ?? 0)));
     @endphp
     <style>
         @page { size: 80mm auto; margin: 0; }
@@ -250,16 +251,13 @@
 
     <div class="separator"></div>
 
+    {{-- 10 Aug 2026 (owner): order-type badge + date + time on ONE line — saves a
+         full printed line. Table number stays beside the badge when present. --}}
     <div class="flex">
-        <span class="bold">{{ $order->created_at->format('M d, Y') }}</span>
-        <span class="bold">{{ $order->created_at->format('h:i A') }}</span>
-    </div>
-
-    <div class="flex mt-1">
-        <span class="order-type-badge">{{ \Illuminate\Support\Facades\Lang::has('pos.ot_' . $order->order_type) ? __('pos.ot_' . $order->order_type) : strtoupper(str_replace('_', ' ', $order->order_type)) }}</span>
-        @if($order->table)
-            <span class="bold text-lg">T-{{ $order->table->table_number }}</span>
-        @endif
+        <span>
+            <span class="order-type-badge">{{ \Illuminate\Support\Facades\Lang::has('pos.ot_' . $order->order_type) ? __('pos.ot_' . $order->order_type) : strtoupper(str_replace('_', ' ', $order->order_type)) }}</span>@if($order->table) <span class="bold text-lg">T-{{ $order->table->table_number }}</span>@endif
+        </span>
+        <span class="bold">{{ $order->created_at->format('M d') }} {{ $order->created_at->format('h:i A') }}</span>
     </div>
 
     @if($kotShowCustomer && $order->customer_name)
@@ -267,8 +265,6 @@
         <span class="bold text-sm">{{ __('pos.receipt_customer') }}: {{ $order->customer_name }}</span>
     </div>
     @endif
-
-    <div class="separator"></div>
 
     {{-- Jul 28 2026 (ZFC feedback via owner): "ADDED ITEMS" / "UPDATED ORDER"
          banners REMOVED entirely — an updated order's ticket prints only the
@@ -321,7 +317,7 @@
         </div>
     @endforeach
 
-    @if($order->kitchen_notes)
+    @if($kotShowKitchenNotes && $order->kitchen_notes)
     <div class="separator"></div>
     {{-- Aug 2026 (restaurant feedback): multi-item notes come as separate lines from
          the textarea — print each on its OWN line, numbered, so the kitchen can match

@@ -3153,6 +3153,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'show_business_name' => 'Business Name dikhayen',
     'show_business_name_bottom' => 'Business Name neeche dikhayen',
     'show_business_name_bottom_hint' => 'Ticket ke end par apna business name print karein',
+    'show_kitchen_notes_box' => 'Order-Level Notes Box dikhayein',
+    'show_kitchen_notes_box_hint' => 'Ticket par bordered kitchen notes box print karein — band karein agar item-level notes kaafi hain',
     'show_cashier' => 'Cashier dikhayen',
     'show_cashier_details' => 'Cashier details dikhayen',
     'show_customer_name' => 'Customer Name dikhayen',

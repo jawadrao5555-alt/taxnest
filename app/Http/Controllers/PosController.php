@@ -305,6 +305,15 @@ class PosController extends Controller
                 && $request->filled('rp_left_margin_mm')) {
                 $companyUpdates['kot_left_margin_mm'] = max(0, min(30, (int) $request->input('rp_left_margin_mm')));
             }
+            // KOT Print Style toggles (Aug 2026): also saveable from receipt-settings
+            // so shops without the kitchen module can still control their KOT layout.
+            // Uses rp_kot_* prefix + hidden=0/checkbox=1 pattern (same as kitchen-settings).
+            foreach (['kot_compact', 'kot_show_customer', 'kot_show_orderby', 'kot_show_barcode', 'kot_show_footer', 'kot_show_kitchen_notes'] as $kotFlag) {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('companies', $kotFlag)
+                    && $request->has('rp_' . $kotFlag)) {
+                    $companyUpdates[$kotFlag] = (bool) $request->input('rp_' . $kotFlag);
+                }
+            }
             // Order Matching (Aug 2026): same number on receipt + kitchen KOT.
             // off = nothing extra; token = daily token; code = unique ORD short code.
             // hasColumn guard: PROD drift self-heal convention + minimal test schemas.

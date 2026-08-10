@@ -3153,6 +3153,8 @@ return [
     'show_business_name' => 'کاروبار کا نام دکھائیں',
     'show_business_name_bottom' => 'کاروبار کا نام نیچے دکھائیں',
     'show_business_name_bottom_hint' => 'رسید کے آخر میں اپنے کاروبار کا نام پرنٹ کریں',
+    'show_kitchen_notes_box' => 'آرڈر نوٹس باکس دکھائیں',
+    'show_kitchen_notes_box_hint' => 'ٹکٹ پر کچن نوٹس باکس پرنٹ کریں — بند کریں اگر آئٹم نوٹس کافی ہوں',
     'show_cashier' => 'کیشیئر دکھائیں',
     'show_cashier_details' => 'کیشیئر کی تفصیلات دکھائیں',
     'show_customer_name' => 'کسٹمر کا نام دکھائیں',

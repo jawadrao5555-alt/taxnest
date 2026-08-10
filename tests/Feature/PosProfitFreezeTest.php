@@ -110,6 +110,29 @@ class PosProfitFreezeTest extends TestCase
         $this->assertEquals(50, $ra->profit->coverage_pct); // 1 of 2 product lines
     }
 
+    /** Pre-migration bills (all-NULL snapshots): coverage drops to 0%, no fake profit. */
+    public function test_coverage_pct_is_zero_when_all_snapshots_null(): void
+    {
+        $tx = $this->makeTransaction();
+        foreach ([['Old A', 100], ['Old B', 80]] as [$name, $price]) {
+            PosTransactionItem::create([
+                'transaction_id' => $tx, 'item_type' => 'product',
+                'item_id' => $this->makeProduct(cost: 45.00)->id,
+                'item_name' => $name, 'quantity' => 1, 'unit_price' => $price,
+                'subtotal' => $price, 'cost_price' => null, 'is_tax_exempt' => false,
+                'tax_rate' => 0, 'tax_amount' => 0,
+            ]);
+        }
+
+        $ra = $this->runRangeAnalytics();
+
+        $this->assertNotNull($ra->profit);
+        $this->assertEquals(0, $ra->profit->coverage_pct, 'Pre-migration bills (NULL snapshots) must show 0% coverage');
+        $this->assertEquals(0.0, $ra->profit->revenue, 'No costed revenue when no line has a snapshot');
+        $this->assertEquals(0.0, $ra->profit->cost);
+        $this->assertEquals(0.0, $ra->profit->profit, 'Must not invent profit from live product cost');
+    }
+
     /** Pre-migration fallback: when cost_price column is absent, reads live product cost. */
     public function test_range_analytics_falls_back_to_live_cost_when_column_absent(): void
     {

@@ -693,6 +693,86 @@ class PosMonthlyBillQuotaPathsTest extends TestCase
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    // PATH 2b — Task 407: prepaid delivery (qr_payment) on payOrder
+    //
+    // The Delivery Prepaid toggle (Task 287) overrides the payment method to
+    // 'qr_payment' on EVERY submit path. payOrder's validation only allowed
+    // cash/card/online/split → live shop ZFC Pizza Point (10 Aug 2026) got a
+    // 422 on every Cash/Card/PAY/Provisional press for prepaid delivery bills.
+    // payOrder must mirror storeInvoice's accepted set + alias normalization.
+    // ════════════════════════════════════════════════════════════════════════
+
+    public function test_pay_order_accepts_qr_payment_prepaid_delivery(): void
+    {
+        $companyId = $this->makeRestaurantCompany();
+        $orderId = $this->makeOrder($companyId, ['order_type' => 'delivery']);
+
+        $response = $this->actingAs($this->makeUser($companyId), 'pos')
+            ->postJson("/pos/restaurant/orders/{$orderId}/pay", ['payment_method' => 'qr_payment']);
+
+        $response->assertStatus(200)->assertJson(['success' => true]);
+
+        $order = DB::table('restaurant_orders')->where('id', $orderId)->first();
+        $this->assertSame('completed', $order->status);
+        $this->assertSame('qr_payment', $order->payment_method, 'prepaid bill must stay qr_payment — never cash (rider khata rule)');
+
+        $tx = DB::table('pos_transactions')->where('id', $order->pos_transaction_id)->first();
+        $this->assertSame('qr_payment', $tx->payment_method);
+        $this->assertNull($tx->cash_received, 'non-cash bill must not record cash_received');
+    }
+
+    public function test_pay_order_accepts_qr_payment_provisional_delivery(): void
+    {
+        // Provisional + prepaid — the exact combination that also errored live.
+        $companyId = $this->makeRestaurantCompany();
+        $orderId = $this->makeOrder($companyId, ['order_type' => 'delivery']);
+
+        $response = $this->actingAs($this->makeUser($companyId), 'pos')
+            ->postJson("/pos/restaurant/orders/{$orderId}/pay", [
+                'payment_method' => 'qr_payment',
+                'save_as_provisional' => 1,
+            ]);
+
+        $response->assertStatus(200)->assertJson(['success' => true]);
+
+        $order = DB::table('restaurant_orders')->where('id', $orderId)->first();
+        $tx = DB::table('pos_transactions')->where('id', $order->pos_transaction_id)->first();
+        $this->assertSame('qr_payment', $tx->payment_method);
+        $this->assertSame('local', $tx->invoice_mode);
+        $this->assertSame('local', $tx->pra_status);
+    }
+
+    public function test_pay_order_normalizes_card_alias_to_debit_card(): void
+    {
+        // Parity with storeInvoice: 'card' (front-end alias) must be stored as
+        // 'debit_card' so tax rules, PRA PaymentMode, and cash/card aggregations
+        // all see the canonical bucket.
+        $companyId = $this->makeRestaurantCompany();
+        $orderId = $this->makeOrder($companyId, ['order_type' => 'delivery']);
+
+        $response = $this->actingAs($this->makeUser($companyId), 'pos')
+            ->postJson("/pos/restaurant/orders/{$orderId}/pay", ['payment_method' => 'card']);
+
+        $response->assertStatus(200)->assertJson(['success' => true]);
+
+        $order = DB::table('restaurant_orders')->where('id', $orderId)->first();
+        $tx = DB::table('pos_transactions')->where('id', $order->pos_transaction_id)->first();
+        $this->assertSame('debit_card', $tx->payment_method);
+    }
+
+    public function test_pay_order_rejects_unknown_payment_method(): void
+    {
+        $companyId = $this->makeRestaurantCompany();
+        $orderId = $this->makeOrder($companyId, ['order_type' => 'delivery']);
+
+        $response = $this->actingAs($this->makeUser($companyId), 'pos')
+            ->postJson("/pos/restaurant/orders/{$orderId}/pay", ['payment_method' => 'bitcoin']);
+
+        $response->assertStatus(422);
+        $this->assertSame('pending', DB::table('restaurant_orders')->where('id', $orderId)->value('status'));
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     // PATH 3 — PosController::retryPra (provisional promote / plain retry)
     // ════════════════════════════════════════════════════════════════════════
 

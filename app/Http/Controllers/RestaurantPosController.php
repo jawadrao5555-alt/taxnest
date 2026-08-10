@@ -726,7 +726,13 @@ class RestaurantPosController extends Controller
 
         try {
             $request->validate([
-                'payment_method' => 'nullable|string|in:cash,card,online,split',
+                // Task 407: MUST mirror PosController::storeInvoice's accepted set.
+                // The Delivery Prepaid toggle (Task 287) overrides the method to
+                // 'qr_payment' on EVERY submit path — rejecting it here 422'd every
+                // Cash/Card/PAY/Provisional press on prepaid delivery bills at a
+                // live shop (ZFC Pizza Point, 10 Aug 2026). Legacy 'online'/'split'
+                // kept for old tabs still open on the previous build.
+                'payment_method' => 'nullable|string|in:cash,card,debit_card,credit_card,qr_payment,online,split',
             ]);
         } catch (\Illuminate\Validation\ValidationException $ve) {
             Log::warning('[PAY] Validation failed', ['errors' => $ve->errors(), 'input' => $request->all()]);
@@ -771,6 +777,12 @@ class RestaurantPosController extends Controller
         }
 
         $paymentMethod = $request->input('payment_method', 'cash');
+        // Normalize aliases → canonical stored buckets (mirrors storeInvoice):
+        // 'card'/'online' front-end aliases become 'debit_card' so PosTaxRule,
+        // PRA PaymentMode mapping, and cash/card aggregations all see one bucket.
+        if (in_array($paymentMethod, ['card', 'online', 'split'], true)) {
+            $paymentMethod = 'debit_card';
+        }
         $taxRate = PosTaxRule::getRateForMethod($paymentMethod, $company);
 
         $subtotal = $order->items->sum('subtotal');

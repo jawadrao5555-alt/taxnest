@@ -166,6 +166,31 @@ Route::get('/sitemap.xml', function () {
 // directory in public/ (APKs, agent zip) and Apache serves existing dirs
 // directly, so that path never reaches Laravel.
 Route::get('/download', fn () => view('downloads'))->name('downloads.page');
+
+// In-app update check for the Android shells (Task #443) — public, stateless
+// JSON. Each app calls this on launch with its own key and compares the
+// returned `latest` against its installed versionName; empty latest = no
+// update prompt (owner hasn't released / flipped the version yet).
+Route::get('/api/app-version', function () {
+    $map = [
+        'pos'    => ['setting' => 'pos_app_latest_version',    'apk' => 'downloads/taxnest-pos.apk'],
+        'fbrpos' => ['setting' => 'fbrpos_app_latest_version', 'apk' => 'downloads/taxnest-fbr-pos.apk'],
+        'waiter' => ['setting' => 'waiter_app_latest_version', 'apk' => 'downloads/taxnest-waiter.apk'],
+        'rider'  => ['setting' => 'rider_app_latest_version',  'apk' => 'downloads/taxnest-rider.apk'],
+        'di'     => ['setting' => 'di_app_latest_version',     'apk' => 'downloads/taxnest-di.apk'],
+    ];
+    $app = (string) request()->query('app', '');
+    if (!isset($map[$app])) {
+        return response()->json(['ok' => false, 'error' => 'unknown app'], 404);
+    }
+    $latest = trim((string) \App\Models\SystemSetting::get($map[$app]['setting'], ''));
+    return response()->json([
+        'ok'     => true,
+        'app'    => $app,
+        'latest' => $latest,
+        'apk_url'=> url($map[$app]['apk']),
+    ]);
+})->name('api.app-version');
 Route::get('/download/agent', [\App\Http\Controllers\AgentManagementController::class, 'downloadAgent'])->name('public.agent.download');
 
 // Urdu tutorial video library (owner request, 2 Aug 2026) — public page,

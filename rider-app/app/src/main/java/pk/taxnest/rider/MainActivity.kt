@@ -110,7 +110,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<Button>(R.id.updateBtn).setOnClickListener {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ApiClient.DOWNLOAD_PAGE)))
+            // Task 443: Play-Store-jaisa update — APK khud download ho kar
+            // Android ka install prompt khulta hai (browser round-trip khatam).
+            UpdateCheck.startDownload(this, ApiClient.DOWNLOAD_PAGE)
         }
 
         // v1.4.0: background delivery check — notification even when the app

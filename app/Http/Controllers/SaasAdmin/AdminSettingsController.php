@@ -28,6 +28,9 @@ class AdminSettingsController extends Controller
         'payment_instructions',
         'pos_app_latest_version',
         'di_app_latest_version',
+        'fbrpos_app_latest_version',
+        'waiter_app_latest_version',
+        'rider_app_latest_version',
         'ai_reader_model',
         'ai_reader_model_strong',
     ];
@@ -77,6 +80,12 @@ class AdminSettingsController extends Controller
             // their version is lower. Also gates the downloads-page DI card and
             // in-panel nudge — leave empty until owner has phone-tested the APK.
             'di_app_latest_version'  => ['nullable', 'string', 'max:20', 'regex:/^\d+(\.\d+)*$/'],
+            // Latest released FBR POS / Waiter / Rider APK versions (Task #443).
+            // Feed the /api/app-version in-app update check: apps on an older
+            // versionName show the "Update" dialog. Empty = check disabled.
+            'fbrpos_app_latest_version' => ['nullable', 'string', 'max:20', 'regex:/^\d+(\.\d+)*$/'],
+            'waiter_app_latest_version' => ['nullable', 'string', 'max:20', 'regex:/^\d+(\.\d+)*$/'],
+            'rider_app_latest_version'  => ['nullable', 'string', 'max:20', 'regex:/^\d+(\.\d+)*$/'],
             // AI Reader (invoice photo/PDF OCR) model overrides. Empty primary
             // model = built-in default; empty strong model = auto-retry
             // escalation disabled. Model ids only (letters/digits . _ -).

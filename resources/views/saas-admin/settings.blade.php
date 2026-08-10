@@ -40,6 +40,30 @@
                 <p class="text-[11px] text-gray-500 mt-1">Set this to the versionName of the newest released DI APK (TaxNest DI). Also controls the downloads-page DI card and in-panel download nudge — <strong class="text-amber-400">leave empty until you have phone-tested the APK</strong>; setting it makes the card and nudge go live automatically. Digits and dots only (e.g. 1.0.0).</p>
                 @error('di_app_latest_version') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
             </div>
+            <div class="mt-4">
+                <label class="block text-xs font-medium text-gray-400 mb-1">Latest FBR POS Android App Version</label>
+                <input type="text" name="fbrpos_app_latest_version" value="{{ old('fbrpos_app_latest_version', $settings['fbrpos_app_latest_version']) }}"
+                       placeholder="e.g. 1.0.2"
+                       class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
+                <p class="text-[11px] text-gray-500 mt-1">versionName of the newest released FBR POS APK. Apps with in-app update support (v1.0.2+) show an "Update" dialog when their version is lower. Leave empty to disable. Digits and dots only.</p>
+                @error('fbrpos_app_latest_version') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
+            </div>
+            <div class="mt-4">
+                <label class="block text-xs font-medium text-gray-400 mb-1">Latest Waiter Android App Version</label>
+                <input type="text" name="waiter_app_latest_version" value="{{ old('waiter_app_latest_version', $settings['waiter_app_latest_version']) }}"
+                       placeholder="e.g. 1.0.2"
+                       class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
+                <p class="text-[11px] text-gray-500 mt-1">versionName of the newest released Waiter APK. Same in-app update rule as above. Leave empty to disable.</p>
+                @error('waiter_app_latest_version') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
+            </div>
+            <div class="mt-4">
+                <label class="block text-xs font-medium text-gray-400 mb-1">Latest Rider Android App Version</label>
+                <input type="text" name="rider_app_latest_version" value="{{ old('rider_app_latest_version', $settings['rider_app_latest_version']) }}"
+                       placeholder="e.g. 1.4.1"
+                       class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
+                <p class="text-[11px] text-gray-500 mt-1">versionName of the newest released Rider APK. Same in-app update rule as above. Leave empty to disable.</p>
+                @error('rider_app_latest_version') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
+            </div>
         </div>
 
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">

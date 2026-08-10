@@ -230,6 +230,9 @@ class MainActivity : Activity() {
         } else {
             web.loadUrl(START_URL)
         }
+
+        // Play-Store-jaisa update check (Task 443) — fail-silent, once per launch.
+        UpdateCheck.run(this)
     }
 
     /** true = handled externally (or blocked); false = let the WebView load it. */

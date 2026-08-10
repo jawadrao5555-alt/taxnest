@@ -39,9 +39,9 @@ class PosRiderTrackingController extends Controller
     private const GAP_THRESHOLD_MINUTES = 5; // default gap detection threshold
     private const OFFLINE_HEURISTIC_MINUTES = 5; // created_at - recorded_at delta for offline tag
 
-    // Bump on each Android release; APK hosted on OUR server (never a GitHub
+    // APK hosted on OUR server (never a GitHub
     // release — desktop agents auto-update from this repo's releases/latest).
-    private const APP_LATEST_VERSION = '1.4.0';
+    // Latest version lives in the rider_app_latest_version SystemSetting (Task 443).
     private const APP_DOWNLOAD_URL = 'https://taxnest.com.pk/downloads/taxnest-rider.apk';
 
     // ─── Shared gates ───────────────────────────────────────────────────────
@@ -366,9 +366,13 @@ class PosRiderTrackingController extends Controller
     /** GET /api/rider-app/v1/version — app self-update check (public). */
     public function appVersion()
     {
+        // Task #443: version comes ONLY from the admin-editable SystemSetting
+        // (same release gate as the shell apps' /api/app-version). Empty =
+        // update check disabled — no hardcoded fallback, otherwise old riders
+        // would see an update prompt while the owner is still phone-testing.
         return response()->json([
             'ok' => true,
-            'latest' => self::APP_LATEST_VERSION,
+            'latest' => trim((string) \App\Models\SystemSetting::get('rider_app_latest_version', '')),
             'url' => self::APP_DOWNLOAD_URL,
         ]);
     }

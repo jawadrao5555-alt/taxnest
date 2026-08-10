@@ -250,6 +250,7 @@ return [
     'auth_ph_business_name_fbr' => 'مثلاً ABC ٹریڈنگ',
     'auth_ph_business_name_pra' => 'مثلاً ABC اسٹور',
     'auth_ph_credential' => 'اپنا کریڈینشل درج کریں',
+    'auth_username_ambiguous' => 'یہ یوزر نیم ایک سے زیادہ اکاؤنٹس سے ملتا ہے — براہ کرم اپنا مکمل ای میل لکھ کر لاگ ان کریں۔',
     'auth_ph_full_name' => 'پورا نام',
     'auth_ph_min8' => 'کم از کم 8 حروف',
     'auth_ph_ntn_optional' => 'اختیاری — PRA انٹیگریشن کے لیے بعد میں شامل کریں',

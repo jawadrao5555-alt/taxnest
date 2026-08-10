@@ -78,7 +78,18 @@ class FbrPosAuthController extends Controller
                 }
             }
         } else {
-            $user = User::where('username', $login)->first();
+            // Username login (owner report 10 Aug 2026): username column first,
+            // then email local-part fallback ("cashier1" → cashier1@gmail.com),
+            // scoped to FBR-POS-panel companies. Ambiguity = clear error, never
+            // a guess into the wrong account.
+            $resolved = \App\Services\LoginIdentifierResolver::resolveUsername($login, ['fbrpos']);
+            if ($resolved['ambiguous']) {
+                RateLimiter::hit($throttleKey);
+                return back()->withErrors([
+                    'login' => __('pos.auth_username_ambiguous'),
+                ])->withInput($request->only('login'));
+            }
+            $user = $resolved['user'];
         }
 
         if ($user && Hash::check($password, $user->password)) {

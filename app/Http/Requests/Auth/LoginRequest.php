@@ -52,7 +52,15 @@ class LoginRequest extends FormRequest
         }
 
         // ═══ STEP 2 — Resolve identifier → User (DI only) ═══
-        $user = $this->resolveUserByIdentifier($login);
+        $resolution = $this->resolveUserByIdentifier($login);
+        if ($resolution['ambiguous']) {
+            // Two DI accounts share this email local-part — never guess.
+            RateLimiter::hit($this->throttleKey());
+            throw ValidationException::withMessages([
+                'login' => __('pos.auth_username_ambiguous'),
+            ]);
+        }
+        $user = $resolution['user'];
 
         if ($user) {
             $company = $user->company_id ? Company::find($user->company_id) : null;
@@ -79,8 +87,10 @@ class LoginRequest extends FormRequest
     /**
      * Resolve a login identifier (email / phone / username / CNIC / NTN / FBR reg)
      * into a User. Does NOT verify password — that's done by Auth::attempt afterwards.
+     *
+     * @return array{user: ?User, ambiguous: bool}
      */
-    private function resolveUserByIdentifier(string $login): ?User
+    private function resolveUserByIdentifier(string $login): array
     {
         $normalizedPhone = preg_replace('/[^0-9]/', '', $login);
         $user = null;
@@ -97,7 +107,11 @@ class LoginRequest extends FormRequest
         }
 
         if (!$user) {
-            $user = User::where('username', $login)->first();
+            // Panel-scoped exact-username match: an out-of-panel username
+            // (e.g. a POS cashier named "ali") must not block a DI account
+            // whose email is ali@… — out-of-scope matches fall through to
+            // the NTN/CNIC step and then the scoped local-part fallback.
+            $user = \App\Services\LoginIdentifierResolver::resolveUsernameColumn($login, ['di', null]);
         }
 
         if (!$user) {
@@ -120,7 +134,15 @@ class LoginRequest extends FormRequest
             }
         }
 
-        return $user;
+        if (!$user) {
+            // Email local-part fallback, LAST so NTN/CNIC/FBR-reg keep their
+            // existing precedence (owner report 10 Aug 2026): "cashier1" must
+            // find cashier1@gmail.com when no users.username matches. DI scope
+            // = product_type 'di' or company-less accounts (null).
+            return \App\Services\LoginIdentifierResolver::resolveEmailLocalPart($login, ['di', null]);
+        }
+
+        return ['user' => $user, 'ambiguous' => false];
     }
 
     public function ensureIsNotRateLimited(): void

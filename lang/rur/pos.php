@@ -250,6 +250,7 @@ return [
     'auth_ph_business_name_fbr' => 'misal: ABC Trading',
     'auth_ph_business_name_pra' => 'misal: ABC Store',
     'auth_ph_credential' => 'Apna login likhein',
+    'auth_username_ambiguous' => 'Yeh username aik se zyada accounts se milta hai — apna poora email likh kar login karein.',
     'auth_ph_full_name' => 'Poora naam',
     'auth_ph_min8' => 'Kam az kam 8 characters',
     'auth_ph_ntn_optional' => 'Zaroori nahi — PRA integration ke liye baad mein add kar sakte hain',

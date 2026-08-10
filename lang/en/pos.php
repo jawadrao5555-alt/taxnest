@@ -250,6 +250,7 @@ return [
     'auth_ph_business_name_fbr' => 'e.g. ABC Trading',
     'auth_ph_business_name_pra' => 'e.g. ABC Store',
     'auth_ph_credential' => 'Enter your credential',
+    'auth_username_ambiguous' => 'This username matches more than one account — please log in with your full email address.',
     'auth_ph_full_name' => 'Full name',
     'auth_ph_min8' => 'Min 8 characters',
     'auth_ph_ntn_optional' => 'Optional — add later for PRA integration',

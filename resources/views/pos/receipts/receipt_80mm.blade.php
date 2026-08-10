@@ -338,12 +338,15 @@
         } catch (\Throwable $e) { $rcptBillToken = null; }
     @endphp
 
-    {{-- Order-number early lookup: for fiscal top box (code-style restaurant bills).
+    {{-- Order-number early lookup: for fiscal top box (code-style restaurant bills
+         ONLY — style 'off'/'token' and retail bills must never print it).
          Schema-guarded per PROD drift convention. --}}
     @php
         $omRcptFullNum = null;
         try {
-            if (\Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'token_no')) {
+            if (($company->order_match_style ?? 'off') === 'code'
+                && ($transaction->order_type ?? null)
+                && \Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'token_no')) {
                 $omEarlyRO = \App\Models\RestaurantOrder::where('company_id', $transaction->company_id)
                     ->where('pos_transaction_id', $transaction->id)
                     ->orderByDesc('id')

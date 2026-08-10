@@ -4032,6 +4032,13 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'stock_receive_btn' => 'Receive Stock',
     'stock_no_suppliers' => 'No suppliers yet',
     'stock_no_purchases' => 'No purchase entries yet',
+    'stock_purch_items_col' => 'What was purchased',
+    'stock_purch_search_ph' => 'Search: purchase #, supplier or product...',
+    'stock_purch_no_results' => 'No purchase matched this search',
+    'stock_purch_more_n' => '+:n more',
+    'stock_purch_less' => 'show less',
+    'stock_purch_load_more' => 'Load older purchases',
+    'stock_purch_loading' => 'Loading...',
 
     // Munafa (profit) report (Aug 2026)
     'munafa_report' => 'Profit Report',

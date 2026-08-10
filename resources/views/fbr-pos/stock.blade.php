@@ -190,31 +190,58 @@
         </div>
     </div>
 
-    {{-- Recent purchases --}}
+    {{-- Recent purchases — Alpine-rendered: server-side search + load-more over the full history --}}
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
-        <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+        <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex flex-wrap items-center justify-between gap-2">
             <h3 class="font-bold text-gray-900 dark:text-white">Recent Purchases</h3>
+            <input type="search" x-model="purchQ" @input.debounce.400ms="searchPurchases()"
+                   placeholder="{{ __('pos.stock_purch_search_ph') }}" autocomplete="off" name="purch_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                   class="border rounded-lg px-3 py-1.5 text-sm w-full sm:w-72 dark:bg-gray-700 dark:text-white dark:border-gray-600">
         </div>
-        @if($recentPurchases->isEmpty())
-            <p class="text-sm text-gray-400 text-center py-6">{{ __('pos.stock_no_purchases') }}</p>
-        @else
-        <table class="w-full text-sm table-cards">
+        <p x-show="purchases.length === 0 && purchQ.trim() === ''" x-cloak class="text-sm text-gray-400 text-center py-6">{{ __('pos.stock_no_purchases') }}</p>
+        <p x-show="purchases.length === 0 && purchQ.trim() !== ''" x-cloak class="text-sm text-gray-400 text-center py-6">{{ __('pos.stock_purch_no_results') }}</p>
+        <table class="w-full text-sm table-cards" x-show="purchases.length > 0">
             <thead class="bg-gray-50 dark:bg-gray-700 text-left">
-                <tr><th class="px-4 py-2">Number</th><th class="px-4 py-2">Date</th><th class="px-4 py-2">Supplier</th><th class="px-4 py-2 text-right">Items</th><th class="px-4 py-2 text-right">Total</th></tr>
+                <tr>
+                    <th class="px-4 py-2">Number</th>
+                    <th class="px-4 py-2">Date</th>
+                    <th class="px-4 py-2">Supplier</th>
+                    <th class="px-4 py-2">{{ __('pos.stock_purch_items_col') }}</th>
+                    <th class="px-4 py-2 text-right">Total</th>
+                </tr>
             </thead>
             <tbody>
-                @foreach($recentPurchases as $po)
-                <tr class="border-t dark:border-gray-700">
-                    <td class="px-4 py-2 font-semibold text-gray-900 dark:text-white">{{ $po->po_number }}</td>
-                    <td class="px-4 py-2 text-gray-500">{{ $po->received_date?->format('d M Y') ?? $po->created_at->format('d M Y') }}</td>
-                    <td class="px-4 py-2 text-gray-500">{{ $po->supplier?->name ?? '—' }}</td>
-                    <td class="px-4 py-2 text-right text-gray-500">{{ $po->items->count() }}</td>
-                    <td class="px-4 py-2 text-right font-bold text-gray-900 dark:text-white">Rs {{ number_format($po->total_amount, 2) }}</td>
-                </tr>
-                @endforeach
+                <template x-for="po in purchases" :key="po.id">
+                    <tr class="border-t dark:border-gray-700 align-top">
+                        <td data-label="Number" class="px-4 py-2 font-semibold text-gray-900 dark:text-white" x-text="po.po_number"></td>
+                        <td data-label="Date" class="px-4 py-2 text-gray-500" x-text="po.date"></td>
+                        <td data-label="Supplier" class="px-4 py-2 text-gray-500" x-text="po.supplier || '—'"></td>
+                        <td data-label="{{ __('pos.stock_purch_items_col') }}" class="px-4 py-2 text-gray-600 dark:text-gray-300">
+                            <span class="inline-flex flex-wrap gap-x-1 gap-y-0.5 justify-end sm:justify-start">
+                                <template x-for="(it, ix) in visiblePurchItems(po)" :key="po.id + '-' + ix">
+                                    <span class="whitespace-nowrap"><span x-text="it.name"></span><span class="text-gray-400 font-semibold" x-text="'\u00d7' + it.qty"></span><span x-show="ix < visiblePurchItems(po).length - 1">,</span></span>
+                                </template>
+                                <button type="button" x-show="po.items.length > 3 && !purchExpanded.includes(po.id)"
+                                        @click="purchExpanded.push(po.id)"
+                                        class="text-blue-600 dark:text-blue-400 text-xs font-bold hover:underline whitespace-nowrap"
+                                        x-text="purchMoreLabel(po.items.length - 3)"></button>
+                                <button type="button" x-show="po.items.length > 3 && purchExpanded.includes(po.id)"
+                                        @click="purchExpanded = purchExpanded.filter(id => id !== po.id)"
+                                        class="text-blue-600 dark:text-blue-400 text-xs font-bold hover:underline whitespace-nowrap">{{ __('pos.stock_purch_less') }}</button>
+                            </span>
+                        </td>
+                        <td data-label="Total" class="px-4 py-2 text-right font-bold text-gray-900 dark:text-white" x-text="'Rs ' + po.total"></td>
+                    </tr>
+                </template>
             </tbody>
         </table>
-        @endif
+        <div class="px-4 py-3 border-t border-gray-100 dark:border-gray-700 text-center" x-show="purchHasMore" x-cloak>
+            <button type="button" @click="loadMorePurchases()" :disabled="purchLoading"
+                    class="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">
+                <span x-show="!purchLoading">{{ __('pos.stock_purch_load_more') }}</span>
+                <span x-show="purchLoading" x-cloak>{{ __('pos.stock_purch_loading') }}</span>
+            </button>
+        </div>
     </div>
 </div>
 
@@ -232,8 +259,44 @@ function stockPage() {
         @php
             $bakedStockProducts = $rows->map(fn ($r) => ['id' => $r->product_id, 'name' => $r->name, 'sku' => $r->sku, 'uom' => $r->uom])->values();
             $bakedStockJson = json_encode($bakedStockProducts, JSON_INVALID_UTF8_SUBSTITUTE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?: '[]';
+            $bakedPurchJson = json_encode($recentPurchasesData, JSON_INVALID_UTF8_SUBSTITUTE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?: '[]';
+            $purchMoreTpl = json_encode(__('pos.stock_purch_more_n'), JSON_INVALID_UTF8_SUBSTITUTE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?: '"+:n"';
         @endphp
         allProducts: {!! $bakedStockJson !!},
+        // ── Recent Purchases: server-side search + load-more ──
+        purchases: {!! $bakedPurchJson !!},
+        purchHasMore: {{ $purchasesHasMore ? 'true' : 'false' }},
+        purchQ: '',
+        purchPage: 1,
+        purchLoading: false,
+        purchSeq: 0,
+        purchExpanded: [],
+        purchMoreTpl: {!! $purchMoreTpl !!},
+        purchMoreLabel(n) { return this.purchMoreTpl.replace(':n', n); },
+        visiblePurchItems(po) { return this.purchExpanded.includes(po.id) ? po.items : po.items.slice(0, 3); },
+        searchPurchases() { this.fetchPurchases(true); },
+        loadMorePurchases() { this.fetchPurchases(false); },
+        async fetchPurchases(reset) {
+            const seq = ++this.purchSeq;
+            this.purchLoading = true;
+            const page = reset ? 1 : this.purchPage + 1;
+            try {
+                const params = new URLSearchParams({ q: this.purchQ.trim(), page: page });
+                const res = await fetch(`{{ route('fbrpos.stock.purchases', [], false) }}?` + params.toString(), {
+                    headers: { 'Accept': 'application/json' },
+                });
+                if (!res.ok || seq !== this.purchSeq) return;
+                const data = await res.json();
+                if (seq !== this.purchSeq) return; // stale response — a newer search superseded it
+                if (reset) { this.purchases = data.purchases; this.purchExpanded = []; }
+                else { this.purchases = this.purchases.concat(data.purchases); }
+                this.purchPage = page;
+                this.purchHasMore = data.has_more;
+            } catch (e) {
+            } finally {
+                if (seq === this.purchSeq) this.purchLoading = false;
+            }
+        },
         searchProducts() {
             const q = this.prodSearch.trim().toLowerCase();
             if (q.length < 1) { this.prodResults = []; return; }

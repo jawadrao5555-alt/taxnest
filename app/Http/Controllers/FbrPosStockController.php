@@ -79,11 +79,18 @@ class FbrPosStockController extends Controller
 
         $suppliers = Supplier::forCompany($companyId)->orderBy('name')->get();
 
+        // First page of purchase history (page size + 1 to detect "has more");
+        // the blade renders these via Alpine and fetches older/searched pages
+        // from purchases() below. items.product eager-loaded — live runs with
+        // strict lazy-loading, every relation the serializer reads must be
+        // covered by with().
         $recentPurchases = PurchaseOrder::where('company_id', $companyId)
-            ->with('supplier:id,name', 'items')
+            ->with('supplier:id,name', 'items.product:id,name')
             ->orderByDesc('id')
-            ->limit(15)
+            ->limit(self::PURCHASES_PER_PAGE + 1)
             ->get();
+        $purchasesHasMore = $recentPurchases->count() > self::PURCHASES_PER_PAGE;
+        $recentPurchases = $recentPurchases->take(self::PURCHASES_PER_PAGE);
 
         return view('fbr-pos.stock', [
             'company' => $company,
@@ -91,9 +98,78 @@ class FbrPosStockController extends Controller
             'lowStock' => $lowStock,
             'negative' => $negative,
             'suppliers' => $suppliers,
-            'recentPurchases' => $recentPurchases,
+            'recentPurchasesData' => $this->serializePurchases($recentPurchases),
+            'purchasesHasMore' => $purchasesHasMore,
             'stockEnabled' => (bool) $company->inventory_enabled,
         ]);
+    }
+
+    /** Page size for the Recent Purchases list (initial render + search/load-more). */
+    private const PURCHASES_PER_PAGE = 15;
+
+    /**
+     * Search + paginate the company's full purchase history (JSON).
+     * Matches purchase number, supplier name, or product name — server-side,
+     * so the page never bakes thousands of rows.
+     */
+    public function purchases(Request $request)
+    {
+        $this->assertNotCashier();
+        $companyId = $this->companyId();
+
+        $data = $request->validate([
+            'q' => 'nullable|string|max:100',
+            'page' => 'nullable|integer|min:1|max:100000',
+        ]);
+        $q = trim((string) ($data['q'] ?? ''));
+        $page = max(1, (int) ($data['page'] ?? 1));
+
+        $query = PurchaseOrder::where('company_id', $companyId)
+            ->with('supplier:id,name', 'items.product:id,name');
+
+        if ($q !== '') {
+            $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $q) . '%';
+            $query->where(function ($w) use ($like) {
+                $w->where('po_number', 'like', $like)
+                  ->orWhereHas('supplier', fn ($s) => $s->where('name', 'like', $like))
+                  ->orWhereHas('items.product', fn ($p) => $p->where('name', 'like', $like));
+            });
+        }
+
+        $rows = $query->orderByDesc('id')
+            ->skip(($page - 1) * self::PURCHASES_PER_PAGE)
+            ->take(self::PURCHASES_PER_PAGE + 1)
+            ->get();
+
+        $hasMore = $rows->count() > self::PURCHASES_PER_PAGE;
+
+        return response()->json([
+            'purchases' => $this->serializePurchases($rows->take(self::PURCHASES_PER_PAGE)),
+            'has_more' => $hasMore,
+            'page' => $page,
+        ]);
+    }
+
+    /**
+     * One shape for both the baked first page and the JSON endpoint, so the
+     * blade has a single Alpine rendering path. Numbers pre-formatted here;
+     * ids cast to int (live PDO returns string ints).
+     */
+    private function serializePurchases($purchases): array
+    {
+        $trimQty = fn ($v) => rtrim(rtrim(number_format((float) $v, 3, '.', ''), '0'), '.');
+
+        return $purchases->map(fn ($po) => [
+            'id' => (int) $po->id,
+            'po_number' => (string) $po->po_number,
+            'date' => ($po->received_date ?? $po->created_at)?->format('d M Y'),
+            'supplier' => $po->supplier?->name,
+            'total' => number_format((float) $po->total_amount, 2),
+            'items' => $po->items->map(fn ($it) => [
+                'name' => $it->product?->name ?? ('#' . $it->product_id),
+                'qty' => $trimQty($it->quantity),
+            ])->values()->all(),
+        ])->values()->all();
     }
 
     /** Toggle stock tracking for the company (owner/admin action). */

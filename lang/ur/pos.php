@@ -4033,6 +4033,13 @@ return [
     'stock_receive_btn' => 'اسٹاک وصول کریں',
     'stock_no_suppliers' => 'ابھی کوئی سپلائر نہیں',
     'stock_no_purchases' => 'ابھی کوئی پرچیز انٹری نہیں',
+    'stock_purch_items_col' => 'کیا خریدا',
+    'stock_purch_search_ph' => 'تلاش کریں: پرچیز نمبر، سپلائر یا پروڈکٹ...',
+    'stock_purch_no_results' => 'اس تلاش پر کوئی پرچیز نہیں ملی',
+    'stock_purch_more_n' => '+:n مزید',
+    'stock_purch_less' => 'کم دکھائیں',
+    'stock_purch_load_more' => 'پرانی پرچیزیں دکھائیں',
+    'stock_purch_loading' => 'لوڈ ہو رہا ہے...',
     // Munafa (profit) report (Aug 2026)
     'munafa_report' => 'منافع رپورٹ',
     'munafa_sub' => 'ہر پروڈکٹ کا منافع — فروخت میں سے خرید لاگت نکال کر',

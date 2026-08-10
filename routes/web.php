@@ -1344,6 +1344,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
 
     // Stock / Purchase / Suppliers (Aug 2026 — Retail Core)
     Route::get('/stock', [\App\Http\Controllers\FbrPosStockController::class, 'index'])->name('fbrpos.stock');
+    Route::get('/stock/purchases', [\App\Http\Controllers\FbrPosStockController::class, 'purchases'])->name('fbrpos.stock.purchases');
     Route::post('/stock/toggle', [\App\Http\Controllers\FbrPosStockController::class, 'toggle'])->name('fbrpos.stock.toggle')->middleware('plan.limit:inventory');
     Route::post('/stock/supplier', [\App\Http\Controllers\FbrPosStockController::class, 'storeSupplier'])->name('fbrpos.stock.supplier')->middleware('plan.limit:inventory');
     Route::post('/stock/purchase', [\App\Http\Controllers\FbrPosStockController::class, 'storePurchase'])->name('fbrpos.stock.purchase')->middleware('plan.limit:inventory');

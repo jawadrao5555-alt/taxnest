@@ -4032,6 +4032,13 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'stock_receive_btn' => 'Stock Receive Karein',
     'stock_no_suppliers' => 'Abhi koi supplier nahi',
     'stock_no_purchases' => 'Abhi koi purchase entry nahi',
+    'stock_purch_items_col' => 'Kya kharida',
+    'stock_purch_search_ph' => 'Search: purchase #, supplier ya product...',
+    'stock_purch_no_results' => 'Is search par koi purchase nahi mili',
+    'stock_purch_more_n' => '+:n aur',
+    'stock_purch_less' => 'kam dikhayen',
+    'stock_purch_load_more' => 'Purani purchases dikhayen',
+    'stock_purch_loading' => 'Load ho raha hai...',
 
     // Munafa (profit) report (Aug 2026)
     'munafa_report' => 'Munafa Report',

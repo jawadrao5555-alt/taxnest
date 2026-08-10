@@ -48,6 +48,12 @@
     $taxRate = 0;
     $taxRules = collect();
     $customers = $customers ?? collect();
+    // Delivery Board button (Aug 2026): separate from $features->delivery (pinned false for
+    // restaurant-markup gate) — use PosFeatureService directly so delivery shops get the board
+    // without unpinning the restaurant delivery markup which must stay off for FBR.
+    $_fbrAllFeatures = \App\Services\PosFeatureService::forCompany($company);
+    $showDeliveriesBoardBtn = !empty($_fbrAllFeatures->delivery)
+        && \App\Services\PosFeatureService::planAllows($company, 'riders_enabled');
 @endphp
 <style>
 *, *::before, *::after { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
@@ -290,6 +296,14 @@ window.addEventListener('popstate', function() {
                 <span class="hidden lg:inline">{{ __('pos.pending_deliveries') }}</span>
                 <span class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-amber-600 text-white text-[9px] rounded-full flex items-center justify-center font-bold" x-text="pendingDeliveryBills().length"></span>
             </button>
+
+            {{-- Delivery Board (Aug 2026) — lazy iframe modal; only shown when delivery feature + riders plan gate are both ON. --}}
+            @if($showDeliveriesBoardBtn)
+            <button type="button" onclick="tnOpenDeliveryBoard()" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-emerald-600/85 hover:bg-emerald-600 ring-1 ring-emerald-300/40 transition flex-shrink-0" title="{{ __('pos.deliveries') }}">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+                <span class="hidden lg:inline">{{ __('pos.deliveries') }}</span>
+            </button>
+            @endif
 
             {{-- Failed FBR bills — F11 (page modal: Retry / Edit / Delete inline) --}}
             <button @click="openFailedBills()" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-red-600/85 hover:bg-red-600 ring-1 ring-red-300/40 transition flex-shrink-0" title="{{ __('pos.ti_failed_fbr_f11') }}">
@@ -799,6 +813,14 @@ window.addEventListener('popstate', function() {
             <span class="hidden sm:inline">{{ __('pos.pending_deliveries') }}</span>
             <span class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-amber-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="pendingDeliveryBills().length"></span>
         </button>
+
+        {{-- Delivery Board — mobile button (Aug 2026) --}}
+        @if($showDeliveriesBoardBtn)
+        <button type="button" onclick="tnOpenDeliveryBoard()" class="flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition" title="{{ __('pos.deliveries') }}">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+            <span class="hidden sm:inline">{{ __('pos.deliveries') }}</span>
+        </button>
+        @endif
 
         {{-- ── FAILED BILLS — header shortcut. F11. Red theme = needs attention. ── --}}
         {{-- Click → modal with Retry / Edit / Delete actions inline. --}}
@@ -6330,4 +6352,54 @@ function restaurantPos() {
     };
 }
 </script>
+
+@if($showDeliveriesBoardBtn)
+{{-- ── Delivery Board modal (Aug 2026) ─────────────────────────────────────────
+     Full /fbr-pos/deliveries board in a LAZY iframe overlay — iframe src is set
+     on first open only (zero sale-screen boot cost; pos-boot-splash-perf.md).
+     Vanilla JS + inline styles — outside Alpine state, no arbitrary Tailwind
+     classes (vite-arbitrary-classes.md). Board page detects window.self !==
+     window.top and hides its own nav + back button. All gating stays server-side
+     on the route (fbrpos.auth + deliveryGate + plan gate). --}}
+<div id="tn-delivery-board" style="display:none; position:fixed; inset:0; z-index:95;">
+    <div onclick="tnCloseDeliveryBoard()" style="position:absolute; inset:0; background:rgba(15,23,42,.55); backdrop-filter:blur(4px);"></div>
+    <div style="position:absolute; inset:16px; display:flex; flex-direction:column; background:#f9fafb; border-radius:16px; overflow:hidden; box-shadow:0 24px 64px rgba(0,0,0,.35);" class="dark:bg-gray-900">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 16px; background:#065f46; color:#fff; flex-shrink:0;">
+            <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+                <svg style="width:18px;height:18px;flex-shrink:0;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+                <span style="font-weight:800; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ __('pos.deliveries') }}</span>
+            </div>
+            <button type="button" onclick="tnCloseDeliveryBoard()" style="display:flex; align-items:center; gap:6px; padding:6px 14px; border-radius:10px; background:rgba(255,255,255,.14); color:#fff; font-weight:800; font-size:12px; border:1px solid rgba(255,255,255,.25); cursor:pointer;">
+                {{ __('pos.close') }}
+                <svg style="width:14px;height:14px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <iframe id="tn-delivery-board-frame" title="{{ __('pos.deliveries') }}" style="flex:1 1 0%; width:100%; border:0; background:#f9fafb;"></iframe>
+    </div>
+</div>
+<script>
+function tnOpenDeliveryBoard() {
+    var wrap = document.getElementById('tn-delivery-board');
+    var frame = document.getElementById('tn-delivery-board-frame');
+    if (!wrap || !frame) return;
+    if (!frame.getAttribute('src')) {
+        frame.setAttribute('src', '{{ route('fbrpos.deliveries', [], false) }}');
+    }
+    wrap.style.display = 'block';
+}
+function tnCloseDeliveryBoard() {
+    var wrap = document.getElementById('tn-delivery-board');
+    if (wrap) wrap.style.display = 'none';
+    // Reload board on next open so rider/status changes are always fresh.
+    var frame = document.getElementById('tn-delivery-board-frame');
+    if (frame) frame.removeAttribute('src');
+}
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+        var wrap = document.getElementById('tn-delivery-board');
+        if (wrap && wrap.style.display !== 'none') { tnCloseDeliveryBoard(); e.stopPropagation(); }
+    }
+}, true);
+</script>
+@endif
 </x-fbr-pos-layout>

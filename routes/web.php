@@ -1380,6 +1380,20 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/stock/min-level', [\App\Http\Controllers\FbrPosStockController::class, 'updateMinLevel'])->name('fbrpos.stock.minlevel')->middleware('plan.limit:inventory');
     Route::post('/stock/item', [\App\Http\Controllers\FbrPosStockController::class, 'updateItem'])->name('fbrpos.stock.item')->middleware('plan.limit:inventory');
     Route::get('/munafa', [\App\Http\Controllers\FbrPosStockController::class, 'munafa'])->name('fbrpos.munafa');
+
+    // 🚚 Delivery Riders (Aug 2026 — FBR port of PRA PosRiderController)
+    // Board + mutations: admin + cashier. Rider CRUD: admin-only (checked in controller).
+    Route::get('/deliveries', [\App\Http\Controllers\FbrPosRiderController::class, 'deliveries'])->name('fbrpos.deliveries');
+    Route::post('/deliveries/{id}/assign', [\App\Http\Controllers\FbrPosRiderController::class, 'assign'])->name('fbrpos.deliveries.assign');
+    Route::post('/deliveries/{id}/status', [\App\Http\Controllers\FbrPosRiderController::class, 'updateStatus'])->name('fbrpos.deliveries.status');
+    Route::post('/deliveries/{id}/mark-prepaid', [\App\Http\Controllers\FbrPosRiderController::class, 'markPrepaid'])->name('fbrpos.deliveries.mark-prepaid');
+    Route::post('/deliveries/{id}/unmark-prepaid', [\App\Http\Controllers\FbrPosRiderController::class, 'unmarkPrepaid'])->name('fbrpos.deliveries.unmark-prepaid');
+    Route::post('/deliveries/rider/{riderId}/bulk-status', [\App\Http\Controllers\FbrPosRiderController::class, 'bulkStatus'])->name('fbrpos.deliveries.bulk');
+    Route::post('/riders/{id}/settle', [\App\Http\Controllers\FbrPosRiderController::class, 'settle'])->name('fbrpos.riders.settle');
+    Route::get('/riders', [\App\Http\Controllers\FbrPosRiderController::class, 'index'])->name('fbrpos.riders');
+    Route::post('/riders', [\App\Http\Controllers\FbrPosRiderController::class, 'store'])->name('fbrpos.riders.store');
+    Route::put('/riders/{id}', [\App\Http\Controllers\FbrPosRiderController::class, 'update'])->name('fbrpos.riders.update');
+    Route::post('/riders/{id}/login', [\App\Http\Controllers\FbrPosRiderController::class, 'saveLogin'])->name('fbrpos.riders.login');
 });
 
 Route::get('/setup-migrate-xK9mP2', function () {

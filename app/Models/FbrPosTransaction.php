@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\PosRider;
 
 class FbrPosTransaction extends Model
 {
@@ -31,6 +32,10 @@ class FbrPosTransaction extends Model
         // apiRetryFailed auto-sync calls) on failure. Reset to 0 on explicit manual retry
         // or successful submission. Scheduler skips bills at >= MAX_AUTO_RETRY (5).
         'fbr_auto_retry_count',
+        // Rider / delivery lifecycle (Aug 2026) — mirrors PRA pos_transactions rider columns.
+        'rider_id', 'delivery_status', 'rider_assigned_at', 'delivered_at',
+        'rider_settlement_id', 'rider_settled_at',
+        'prepaid_converted_at', 'prepaid_converted_by',
     ];
 
     protected $casts = [
@@ -68,5 +73,11 @@ class FbrPosTransaction extends Model
     public function fbrLogs()
     {
         return $this->hasMany(FbrPosLog::class, 'transaction_id');
+    }
+
+    /** Assigned rider (shared pos_riders table, company-scoped). */
+    public function rider()
+    {
+        return $this->belongsTo(PosRider::class, 'rider_id');
     }
 }

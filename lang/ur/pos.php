@@ -2769,6 +2769,7 @@ return [
     'receipt_popup_autoclose' => 'رسید پاپ اپ آٹو کلوز',
     'receipt_popup_autoclose_sub' => 'بل بننے کے اتنے سیکنڈ بعد رسید پاپ اپ خود بند ہو جائے گا — جب کیشیئر اس کے ساتھ کچھ کرتا ہے تو ٹائمر رک جاتا ہے۔ "کبھی نہیں" = پاپ اپ کھلا رہے گا (پرانا طریقہ)۔',
     'receipt_pos_invoice' => 'POS انوائس #',
+    'receipt_local_invoice' => 'لوکل انوائس #',
     'receipt_pra_fiscal' => 'PRA فسکل #',
     'receipt_pra_fiscal_invoice' => 'PRA فسکل انوائس',
     'receipt_pra_fiscal_short' => 'PRA فسکل',

@@ -330,10 +330,10 @@
         // Stream mirrors applyReportFilters: local = L-series OR reporting-OFF
         // final (NULL pra_status + no fiscal number).
         $rcptBillToken = null;
+        $rcptIsLocalStream = ($transaction->invoice_mode ?? null) === 'local'
+            || (($transaction->pra_status ?? null) === null && ($transaction->pra_invoice_number ?? null) === null);
         try {
             if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'bill_token') && $transaction->bill_token) {
-                $rcptIsLocalStream = $transaction->invoice_mode === 'local'
-                    || ($transaction->pra_status === null && $transaction->pra_invoice_number === null);
                 $rcptNumStyle = $rcptIsLocalStream ? ($company->local_number_style ?? 'serial') : ($company->pra_number_style ?? 'serial');
                 if ($rcptNumStyle === 'token') { $rcptBillToken = (int) $transaction->bill_token; }
             }
@@ -383,14 +383,24 @@
                 <td class="inv-value" style="font-weight:900;">{{ $omRcptFullNum }}</td>
             </tr>
             @endif
-            <tr>
-                <td class="inv-label">{{ __('pos.receipt_pos_invoice') }}:</td>
-                <td class="inv-value">{{ $transaction->invoice_number }}</td>
-            </tr>
+            {{-- Single number row (10 Aug 2026, owner feedback): PRA Fiscal # when
+                 reported; Local Invoice # (own serial) for local-stream bills;
+                 POS serial fallback for PRA-stream bills still awaiting fiscal
+                 number — no bill ever prints number-less. --}}
             @if($transaction->pra_invoice_number)
             <tr>
                 <td class="inv-label">{{ __('pos.receipt_pra_fiscal') }}:</td>
                 <td class="inv-value">{{ $transaction->pra_invoice_number }}</td>
+            </tr>
+            @elseif($rcptIsLocalStream)
+            <tr>
+                <td class="inv-label">{{ __('pos.receipt_local_invoice') }}:</td>
+                <td class="inv-value">{{ $transaction->invoice_number }}</td>
+            </tr>
+            @else
+            <tr>
+                <td class="inv-label">{{ __('pos.receipt_pos_invoice') }}:</td>
+                <td class="inv-value">{{ $transaction->invoice_number }}</td>
             </tr>
             @endif
         </table>

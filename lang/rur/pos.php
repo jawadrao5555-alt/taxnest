@@ -2769,6 +2769,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'receipt_popup_autoclose' => 'Receipt popup khud-ba-khud band ho jaye',
     'receipt_popup_autoclose_sub' => 'Bill ke baad receipt popup itne second mein khud band ho jaye — cashier ke haath lagane par timer ruk jata hai. "Kabhi nahi" = popup khula rahe (purana tareeqa).',
     'receipt_pos_invoice' => 'POS Invoice #',
+    'receipt_local_invoice' => 'Local Invoice #',
     'receipt_pra_fiscal' => 'PRA Fiscal #',
     'receipt_pra_fiscal_invoice' => 'PRA FISCAL INVOICE',
     'receipt_pra_fiscal_short' => 'PRA FISCAL',

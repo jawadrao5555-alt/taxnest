@@ -112,6 +112,78 @@ class FbrPosDashboardUnclosedDaysWarningTest extends TestCase
         $response->assertDontSee(trans_choice('pos.dash_unclosed_days_title', 1, ['count' => 1]));
     }
 
+    /**
+     * Pre-cutoff grace (Task 489): at 01:00 a shop trading past midnight is
+     * still inside YESTERDAY's business day (default cutoff 06:00), so an
+     * unclosed yesterday must NOT be flagged as stranded.
+     */
+    public function test_yesterday_not_flagged_before_cutoff(): void
+    {
+        Carbon::setTestNow(now()->setTime(1, 0));
+        \App\Services\PosBusinessDay::forgetCutoff($this->company->id);
+        $this->strandPriorDay(); // bill yesterday 14:00, never closed
+
+        $response = $this->actingAs($this->posAdmin, 'fbrpos')->get('/fbr-pos/dashboard');
+        $response->assertOk();
+        $response->assertViewHas('unclosedPriorDays', fn ($days) => $days->isEmpty());
+        $response->assertDontSee(trans_choice('pos.dash_unclosed_days_title', 1, ['count' => 1]));
+    }
+
+    /** Grace covers ONLY yesterday: a genuinely older stranded day still warns at 01:00. */
+    public function test_older_stranded_day_still_flagged_before_cutoff(): void
+    {
+        Carbon::setTestNow(now()->setTime(1, 0));
+        \App\Services\PosBusinessDay::forgetCutoff($this->company->id);
+        $old = now()->subDays(2)->setTime(14, 0);
+        DB::table('fbr_pos_transactions')->insert([
+            'company_id' => $this->company->id,
+            'invoice_number' => 'FPOS-STR-OLD',
+            'transaction_type' => 'sale',
+            'status' => 'completed',
+            'invoice_mode' => 'fbr',
+            'fbr_status' => null,
+            'subtotal' => 100,
+            'total_amount' => 100,
+            'payment_method' => 'cash',
+            'created_at' => $old,
+            'updated_at' => $old,
+        ]);
+        $this->strandPriorDay(); // yesterday: covered by grace
+
+        $response = $this->actingAs($this->posAdmin, 'fbrpos')->get('/fbr-pos/dashboard');
+        $response->assertOk();
+        $response->assertViewHas('unclosedPriorDays', function ($days) use ($old) {
+            return $days->count() === 1 && $days->first() === $old->toDateString();
+        });
+        $response->assertSee(trans_choice('pos.dash_unclosed_days_title', 1, ['count' => 1]));
+    }
+
+    /** From the cutoff on (06:00), an unclosed yesterday is flagged as usual. */
+    public function test_yesterday_flagged_at_cutoff(): void
+    {
+        Carbon::setTestNow(now()->setTime(6, 0));
+        \App\Services\PosBusinessDay::forgetCutoff($this->company->id);
+        $day = $this->strandPriorDay();
+
+        $response = $this->actingAs($this->posAdmin, 'fbrpos')->get('/fbr-pos/dashboard');
+        $response->assertOk();
+        $response->assertViewHas('unclosedPriorDays', function ($days) use ($day) {
+            return $days->count() === 1 && $days->first() === $day;
+        });
+    }
+
+    /** Grace also applies on the day-close page's detailed banner. */
+    public function test_day_close_page_respects_grace_before_cutoff(): void
+    {
+        Carbon::setTestNow(now()->setTime(1, 0));
+        \App\Services\PosBusinessDay::forgetCutoff($this->company->id);
+        $this->strandPriorDay();
+
+        $response = $this->actingAs($this->posAdmin, 'fbrpos')->get('/fbr-pos/day-close');
+        $response->assertOk();
+        $response->assertViewHas('unclosedPriorDays', fn ($days) => $days->isEmpty());
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Fixtures
     // ─────────────────────────────────────────────────────────────────────────

@@ -3512,9 +3512,21 @@ class FbrPosController extends Controller
      * so days key on DATE(created_at); "prior" = created_at < startOfToday
      * (timezone-safe range, same convention as getPendingDayCloses).
      * Returns an ascending collection of Y-m-d strings (max 30 days back).
+     *
+     * Pre-cutoff grace (Task 489 — mirrors the PRA PosBusinessDay rule): a
+     * shop still trading at 1 AM has NOT abandoned yesterday — before the
+     * company's day-close cutoff (default 06:00) yesterday is its still-open
+     * trading day, so it is never flagged as stranded. From the cutoff on,
+     * an unclosed yesterday is flagged as usual. Genuinely older days are
+     * always flagged.
      */
     private function unclosedPriorBusinessDays(int $companyId, ?string $excludeDate = null)
     {
+        $nowLocal = now()->setTimezone(config('app.timezone'));
+        $graceDate = null;
+        if ($nowLocal->format('H:i') < \App\Services\PosBusinessDay::cutoffFor($companyId)) {
+            $graceDate = $nowLocal->copy()->subDay()->toDateString();
+        }
         $priorDates = FbrPosTransaction::where('company_id', $companyId)
             ->where('created_at', '<', now()->startOfDay())
             ->selectRaw('DATE(created_at) as d')
@@ -3534,7 +3546,7 @@ class FbrPosController extends Controller
             ->map(fn ($d) => \Carbon\Carbon::parse($d)->toDateString());
 
         return $priorDates
-            ->reject(fn ($d) => $closedDates->contains($d) || $d === $excludeDate)
+            ->reject(fn ($d) => $closedDates->contains($d) || $d === $excludeDate || $d === $graceDate)
             ->sort()
             ->values();
     }

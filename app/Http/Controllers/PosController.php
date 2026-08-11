@@ -2169,6 +2169,26 @@ class PosController extends Controller
             // both the fresh-create and the resumed-draft finalize paths.
             if ($offlineQueuedAt) {
                 $transaction->created_at = $offlineQueuedAt;
+                // The creating hook already stamped business_date, but it stamped
+                // from "now" (the SYNC moment) — re-stamp from the original
+                // sale moment so an offline 1 AM bill lands in the right
+                // trading day.
+                try {
+                    if (\Schema::hasColumn('pos_transactions', 'business_date')) {
+                        $stampDay = \App\Services\PosBusinessDay::forMoment((int) $companyId, $offlineQueuedAt);
+                        // A closed day never reopens (its Z-report is final):
+                        // if the original trading day was already day-closed,
+                        // book the late replay into the CURRENT open day.
+                        $alreadyClosed = \App\Models\PosDayCloseReport::where('company_id', $companyId)
+                            ->where('report_date', $stampDay)
+                            ->exists();
+                        $transaction->business_date = $alreadyClosed
+                            ? \App\Services\PosBusinessDay::current((int) $companyId)
+                            : $stampDay;
+                    }
+                } catch (\Throwable $e) {
+                    // Never block a sync over the stamp — backfill repairs it.
+                }
                 $transaction->save();
             }
 

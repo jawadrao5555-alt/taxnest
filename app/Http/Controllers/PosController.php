@@ -8455,7 +8455,37 @@ class PosController extends Controller
         $openOrders = $openHeld->count;
         $occupiedTables = $openHeld->tables;
 
-        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld'));
+        // Stranded-day banner (Task 455): if the 6 AM auto-close was skipped
+        // (open orders) or auto-close is off and nobody closed manually, prior
+        // business days sit open with no visible trace. Surface every un-closed
+        // prior trading day so staff close it BEFORE more bills pile onto today.
+        // Same detection as pos:auto-dayclose: keyed by business_date, archived
+        // rows included, closed = a PosDayCloseReport row exists for that date.
+        $unclosedPriorDays = collect();
+        $bizToday = \App\Services\PosBusinessDay::current($companyId);
+        $hasBizDate = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'business_date');
+        $priorDates = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->when($hasBizDate,
+                fn ($q) => $q->where('business_date', '<', $bizToday)->selectRaw('business_date as d'),
+                fn ($q) => $q->whereDate('created_at', '<', $bizToday)->selectRaw('DATE(created_at) as d'))
+            ->groupBy('d')
+            ->orderByDesc('d')
+            ->limit(30)
+            ->pluck('d')
+            ->map(fn ($d) => (string) $d);
+        if ($priorDates->isNotEmpty()) {
+            $closedDates = PosDayCloseReport::where('company_id', $companyId)
+                ->whereIn('report_date', $priorDates)
+                ->pluck('report_date')
+                ->map(fn ($d) => \Carbon\Carbon::parse($d)->toDateString());
+            $unclosedPriorDays = $priorDates
+                ->reject(fn ($d) => $closedDates->contains($d) || $d === $date)
+                ->sort()
+                ->values();
+        }
+
+        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays'));
     }
 
     /**

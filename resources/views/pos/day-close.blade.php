@@ -13,6 +13,32 @@
         </form>
     </div>
 
+    {{-- Stranded-day banner (Task 455): prior business day(s) never closed —
+         auto-close skipped (open orders) or nobody closed manually. Surface
+         them loudly before more bills pile onto today. --}}
+    @if(($unclosedPriorDays ?? collect())->isNotEmpty())
+    <div class="mb-6 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-800">
+        <div class="flex items-start gap-3">
+            <div class="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="font-bold text-red-800 dark:text-red-300">{{ __('pos.dc_prior_open_title') }}</p>
+                <p class="text-sm text-red-700 dark:text-red-400 mt-0.5">{{ __('pos.dc_prior_open_msg') }}</p>
+                <div class="flex flex-wrap gap-2 mt-3">
+                    @foreach($unclosedPriorDays as $openDay)
+                    <a href="{{ route('pos.day-close', ['date' => $openDay]) }}"
+                       class="inline-flex items-center gap-2 px-3 py-1.5 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        {{ __('pos.dc_close_this_day', ['date' => \Carbon\Carbon::parse($openDay)->format('d M Y')]) }}
+                    </a>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
     @if($existingReport)
     <div class="mb-6 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">

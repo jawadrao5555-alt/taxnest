@@ -86,6 +86,15 @@ class PosPendingBillsTileTest extends TestCase
             $table->timestamps();
         });
 
+        // Task 479: dashboard() now runs stranded-day detection against
+        // fbr_day_close_reports — the table must exist for the FBR tests.
+        Schema::create('fbr_day_close_reports', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->date('report_date');
+            $table->timestamps();
+        });
+
         Schema::create('pos_transactions', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('company_id');

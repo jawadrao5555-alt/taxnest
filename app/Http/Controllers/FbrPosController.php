@@ -261,6 +261,14 @@ class FbrPosController extends Controller
         $user = Auth::guard('fbrpos')->user();
         $isAdmin = in_array($user->pos_role ?? $user->role ?? '', ['pos_admin', 'pos_manager', 'company_admin']);
 
+        // Stranded-day warning (Task 479 — FBR mirror of PRA Task 466): prior
+        // days with bills but no day-close report. Compact echo on the
+        // dashboard — everyone lands here. dayCloseAllowed decides whether the
+        // link is actionable (cashiers without day-close rights get info-only
+        // text, not a dead-end link).
+        $unclosedPriorDays = $this->unclosedPriorBusinessDays($companyId);
+        $canDayClose = \App\Services\PosAccessService::dayCloseAllowed($user, $company);
+
         $allowedStyles = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify'];
         $dashboardStyle = in_array($company->pos_dashboard_style, $allowedStyles) ? $company->pos_dashboard_style : 'default';
 
@@ -275,7 +283,8 @@ class FbrPosController extends Controller
         return view('fbr-pos.dashboard', compact(
             'company', 'todayStats', 'monthStats',
             'fbrSubmitted', 'fbrPending', 'recentTransactions', 'fbrReportingStatus',
-            'dashboardStyle', 'notifications', 'pendingProvisional', 'isAdmin'
+            'dashboardStyle', 'notifications', 'pendingProvisional', 'isAdmin',
+            'unclosedPriorDays', 'canDayClose'
         ));
     }
 
@@ -3414,6 +3423,14 @@ class FbrPosController extends Controller
 
     public function dayCloseReport(Request $request)
     {
+        // Owner rule (5 Aug 2026, mirrored from PRA): Day Close is admin/manager
+        // work by DEFAULT. A cashier reaches it only when the company switch or
+        // a Team Custom Access tick re-opens it — dayCloseAllowed = single
+        // verdict shared with the nav and dashboard links.
+        $dayCloseUser = Auth::guard('fbrpos')->user();
+        if ($dayCloseUser && !\App\Services\PosAccessService::dayCloseAllowed($dayCloseUser)) {
+            return redirect()->route('fbrpos.dashboard')->with('error', __('pos.custom_access_denied'));
+        }
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $date = $request->get('date', today()->format('Y-m-d'));
@@ -3480,7 +3497,46 @@ class FbrPosController extends Controller
                 ->count();
         }
 
-        return view('fbr-pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'analytics', 'pendingAutoFinal'));
+        // Stranded-day banner (Task 479 — FBR mirror of PRA Task 455): prior
+        // days never closed, EXCLUDING the day currently being viewed (no
+        // self-referential "close this day" nag on its own page).
+        $unclosedPriorDays = $this->unclosedPriorBusinessDays($companyId, $date);
+
+        return view('fbr-pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'analytics', 'pendingAutoFinal', 'unclosedPriorDays'));
+    }
+
+    /**
+     * Stranded-day detection (Task 479 — FBR mirror of PosController::
+     * unclosedPriorBusinessDays): prior days that have bills but NO
+     * FbrDayCloseReport row. FbrPosTransaction has no business_date column,
+     * so days key on DATE(created_at); "prior" = created_at < startOfToday
+     * (timezone-safe range, same convention as getPendingDayCloses).
+     * Returns an ascending collection of Y-m-d strings (max 30 days back).
+     */
+    private function unclosedPriorBusinessDays(int $companyId, ?string $excludeDate = null)
+    {
+        $priorDates = FbrPosTransaction::where('company_id', $companyId)
+            ->where('created_at', '<', now()->startOfDay())
+            ->selectRaw('DATE(created_at) as d')
+            ->groupBy('d')
+            ->orderByDesc('d')
+            ->limit(30)
+            ->pluck('d')
+            ->map(fn ($d) => (string) $d);
+        if ($priorDates->isEmpty()) {
+            return collect();
+        }
+        // No whereIn on report_date: the column may hold datetimes (driver-
+        // dependent), so filter after normalizing — same convention as
+        // getPendingDayCloses.
+        $closedDates = FbrDayCloseReport::where('company_id', $companyId)
+            ->pluck('report_date')
+            ->map(fn ($d) => \Carbon\Carbon::parse($d)->toDateString());
+
+        return $priorDates
+            ->reject(fn ($d) => $closedDates->contains($d) || $d === $excludeDate)
+            ->sort()
+            ->values();
     }
 
     /**
@@ -3588,6 +3644,12 @@ class FbrPosController extends Controller
 
     public function closeDayReport(Request $request)
     {
+        // Owner rule (5 Aug 2026, mirrored from PRA): cashier day-close only
+        // via company switch / Custom Access tick.
+        $dayCloseUser = Auth::guard('fbrpos')->user();
+        if ($dayCloseUser && !\App\Services\PosAccessService::dayCloseAllowed($dayCloseUser)) {
+            return redirect()->route('fbrpos.dashboard')->with('error', __('pos.custom_access_denied'));
+        }
         $companyId = app('currentCompanyId');
         $user = Auth::guard('fbrpos')->user();
         $date = $request->input('date', today()->format('Y-m-d'));

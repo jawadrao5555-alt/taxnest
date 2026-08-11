@@ -3,6 +3,31 @@
     <x-pwa-banner color="blue" appName="Nest FBR Pos" />
     <x-pwa-push scope="fbrpos" />
 
+    {{-- ━━━ Stranded-day warning (Task 479 — FBR mirror of PRA Task 466): prior
+         day(s) never closed. Compact echo of the day-close page's detailed
+         banner — links there when the user may close days; info-only otherwise. ━━━ --}}
+    @if(($unclosedPriorDays ?? collect())->isNotEmpty())
+    <div class="mb-4 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-800 flex items-center gap-3">
+        <div class="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center flex-shrink-0">
+            <svg class="w-4 h-4 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        </div>
+        <p class="flex-1 min-w-0 text-sm text-red-800 dark:text-red-300">
+            <span class="font-bold">{{ trans_choice('pos.dash_unclosed_days_title', $unclosedPriorDays->count(), ['count' => $unclosedPriorDays->count()]) }}</span>
+            <span class="text-red-700 dark:text-red-400">&middot; {{ $unclosedPriorDays->map(fn ($d) => \Carbon\Carbon::parse($d)->format('d M'))->implode(', ') }}</span>
+            @unless($canDayClose ?? false)
+            <span class="block text-xs text-red-600 dark:text-red-400 mt-0.5">{{ __('pos.dash_unclosed_days_info_only') }}</span>
+            @endunless
+        </p>
+        @if($canDayClose ?? false)
+        <a href="{{ route('fbrpos.day-close', ['date' => $unclosedPriorDays->first()]) }}"
+           class="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition">
+            {{ __('pos.dash_unclosed_days_action') }}
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        </a>
+        @endif
+    </div>
+    @endif
+
     {{-- ━━━ In-app notifications (mark-read dismissal, 30-day window — mirrors DI dashboard) ━━━ --}}
     @if(isset($notifications) && $notifications->count() > 0)
     <div class="mb-4 space-y-2">

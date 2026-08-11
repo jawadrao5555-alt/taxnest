@@ -49,7 +49,7 @@
     <div class="flex items-center gap-3 px-4 py-2.5 bg-emerald-50 dark:bg-emerald-900/30 border-b border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-sm">
         <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         <span class="flex-1 font-medium">{{ $payNotif->title }} <span class="hidden sm:inline font-normal opacity-80">{{ $payNotif->message }}</span></span>
-        <button @click="dismiss()" class="flex-shrink-0 p-1 rounded hover:bg-emerald-100 dark:hover:bg-emerald-800/50" aria-label="Dismiss">
+        <button @click="dismiss()" class="flex-shrink-0 p-1 rounded hover:bg-emerald-100 dark:hover:bg-emerald-800/50" aria-label="{{ __('pos.dismiss') }}">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
     </div>
@@ -57,7 +57,7 @@
     <div class="flex items-center gap-3 px-4 py-2.5 bg-red-50 dark:bg-red-900/30 border-b border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 text-sm">
         <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         <span class="flex-1 font-medium">{{ $payNotif->message }}</span>
-        <button @click="dismiss()" class="flex-shrink-0 p-1 rounded hover:bg-red-100 dark:hover:bg-red-800/50" aria-label="Dismiss">
+        <button @click="dismiss()" class="flex-shrink-0 p-1 rounded hover:bg-red-100 dark:hover:bg-red-800/50" aria-label="{{ __('pos.dismiss') }}">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
     </div>

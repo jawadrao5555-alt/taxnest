@@ -70,6 +70,10 @@ class CheckPlanLimit
         $exceeded = false;
         $limitName = '';
         $customReason = null;
+        // Localized per-resource fallback (task 498): pos.tl_reason_{key}_cap
+        // with :max substituted — English $limitName kept only as last resort.
+        $limitKey = null;
+        $limitMax = null;
 
         // Limit convention (matches PlanLimitService + the admin plan builder,
         // which validates min:-1): NULL or any negative value = UNLIMITED.
@@ -87,6 +91,8 @@ class CheckPlanLimit
                     if ($current >= (int) $plan->max_terminals) {
                         $exceeded = true;
                         $limitName = "terminals (max: {$plan->max_terminals})";
+                        $limitKey = 'terminals';
+                        $limitMax = (int) $plan->max_terminals;
                     }
                 }
                 break;
@@ -96,6 +102,8 @@ class CheckPlanLimit
                     if ($current >= (int) $plan->max_users) {
                         $exceeded = true;
                         $limitName = "users (max: {$plan->max_users})";
+                        $limitKey = 'users';
+                        $limitMax = (int) $plan->max_users;
                     }
                 }
                 break;
@@ -105,6 +113,8 @@ class CheckPlanLimit
                     if ($current >= (int) $plan->max_products) {
                         $exceeded = true;
                         $limitName = "products (max: {$plan->max_products})";
+                        $limitKey = 'products';
+                        $limitMax = (int) $plan->max_products;
                     }
                 }
                 break;
@@ -116,6 +126,8 @@ class CheckPlanLimit
                     if ($current >= (int) $plan->max_products) {
                         $exceeded = true;
                         $limitName = "products (max: {$plan->max_products})";
+                        $limitKey = 'products';
+                        $limitMax = (int) $plan->max_products;
                     }
                 }
                 break;
@@ -132,6 +144,7 @@ class CheckPlanLimit
                 if (!$plan->inventory_enabled && !$plan->is_trial) {
                     $exceeded = true;
                     $limitName = 'inventory (not included in your plan)';
+                    $limitKey = 'inventory';
                 }
                 break;
             case 'invoices':
@@ -168,9 +181,13 @@ class CheckPlanLimit
         }
 
         if ($exceeded) {
-            $msg = $customReason
-                ? SubscriptionAccessService::localizedLockReason($customReason)
-                : "Plan limit exceeded for {$limitName}. Please upgrade your subscription.";
+            if ($customReason) {
+                $msg = SubscriptionAccessService::localizedLockReason($customReason);
+            } elseif ($limitKey) {
+                $msg = __("pos.tl_reason_{$limitKey}_cap", ['max' => $limitMax]);
+            } else {
+                $msg = "Plan limit exceeded for {$limitName}. Please upgrade your subscription.";
+            }
             if ($request->expectsJson()) {
                 return response()->json(['error' => $msg, 'message' => $msg], 403);
             }

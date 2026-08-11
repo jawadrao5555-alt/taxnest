@@ -261,7 +261,7 @@ class FbrPosPlanGatingTest extends TestCase
         $this->subscribe($c1, ['inventory_enabled' => false]);
         $response = $this->runMiddleware($c1, 'inventory');
         $this->assertSame(403, $response->getStatusCode());
-        $this->assertStringContainsString('inventory', $response->getData(true)['error'] ?? '');
+        $this->assertStringContainsStringIgnoringCase('inventory', $response->getData(true)['error'] ?? '');
 
         // Paid plan WITH inventory (Pro) → allowed.
         $c2 = $this->makeCompany();

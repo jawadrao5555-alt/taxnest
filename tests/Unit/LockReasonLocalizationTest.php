@@ -65,6 +65,29 @@ class LockReasonLocalizationTest extends TestCase
         }
     }
 
+    public function test_per_resource_plan_cap_messages_are_localized(): void
+    {
+        // CheckPlanLimit middleware fallback keys (task 498 — products/counters/team caps)
+        $keys = ['tl_reason_products_cap', 'tl_reason_users_cap', 'tl_reason_terminals_cap', 'tl_reason_inventory_cap'];
+        foreach (['en', 'rur', 'ur'] as $locale) {
+            app()->setLocale($locale);
+            foreach ($keys as $key) {
+                $val = __('pos.' . $key, ['max' => 500]);
+                $this->assertNotSame('pos.' . $key, $val, "[$locale] missing $key");
+                if ($key !== 'tl_reason_inventory_cap') {
+                    $this->assertStringContainsString('500', $val, "[$locale] :max not substituted in $key");
+                }
+                $this->assertStringNotContainsString(':max', $val);
+                if ($locale !== 'en') {
+                    $this->assertNotSame(__('pos.' . $key, ['max' => 500], 'en'), $val, "[$locale] $key still English");
+                }
+                if ($locale === 'ur') {
+                    $this->assertMatchesRegularExpression('/[\x{0600}-\x{06FF}]/u', $val, "[ur] $key not Urdu script");
+                }
+            }
+        }
+    }
+
     public function test_renewal_form_billing_cycle_labels_are_localized(): void
     {
         $keys = ['cycle_monthly', 'cycle_quarterly', 'cycle_semi_annual', 'cycle_annual'];

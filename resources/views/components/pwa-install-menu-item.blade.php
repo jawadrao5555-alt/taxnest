@@ -9,7 +9,7 @@ Safe to include MULTIPLE times per page (unique ids per include).
 Requires <x-pwa-init /> once on the page (all three product layouts already have it).
 Usage: <x-pwa-install-menu-item color="purple" app-name="Nest POS" item-class="menu-link flex items-center gap-2.5 px-4 py-2 ..." />
 --}}
-@props(['color' => 'emerald', 'label' => 'Install App', 'appName' => 'TaxNest', 'itemClass' => 'flex items-center gap-2 px-4 py-2 text-sm text-gray-700'])
+@props(['color' => 'emerald', 'label' => null, 'appName' => 'TaxNest', 'itemClass' => 'flex items-center gap-2 px-4 py-2 text-sm text-gray-700'])
 @php
     $palette = [
         'emerald' => '#059669',
@@ -22,7 +22,7 @@ Usage: <x-pwa-install-menu-item color="purple" app-name="Nest POS" item-class="m
 @endphp
 <a href="#" id="{{ $uid }}" class="{{ $itemClass }}">
     <svg class="w-4 h-4 opacity-70 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 4v12m0 0l-4-4m4 4l4-4m-9 8h10"/></svg>
-    <span data-role="label">{{ $label }}</span>
+    <span data-role="label">{{ $label ?? __('pos.pwa_mi_label') }}</span>
     <span data-role="check" style="display:none; margin-left:auto; color:currentColor; font-weight:700; font-size:10px;">&#10003;</span>
 </a>
 
@@ -33,40 +33,40 @@ Usage: <x-pwa-install-menu-item color="purple" app-name="Nest POS" item-class="m
             <div style="width:60px; height:60px; margin:0 auto 12px; border-radius:14px; background:{{ $accent }}; display:flex; align-items:center; justify-content:center;">
                 <svg width="30" height="30" fill="none" stroke="white" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4m-9 8h10"/></svg>
             </div>
-            <h3 style="font-size:17px; font-weight:800; color:#111827; margin:0;">Install {{ $appName }}</h3>
-            <p style="font-size:12.5px; color:#6b7280; margin:5px 0 0;">Get the full app experience &mdash; opens like a real app, no browser bar.</p>
+            <h3 style="font-size:17px; font-weight:800; color:#111827; margin:0;">{{ __('pos.pwa_install_title', ['app' => $appName]) }}</h3>
+            <p style="font-size:12.5px; color:#6b7280; margin:5px 0 0;">{!! __('pos.pwa_install_sub') !!}</p>
         </div>
 
         <div data-sec="ios" style="display:none;">
             <ol style="font-size:13.5px; color:#374151; padding:0; list-style:none; margin:0;">
-                <li style="display:flex; gap:11px; margin-bottom:12px; align-items:flex-start;"><span style="flex-shrink:0; width:26px; height:26px; border-radius:50%; background:{{ $accent }}; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">1</span><span>Tap the <strong>Share</strong> button at the bottom of Safari.</span></li>
-                <li style="display:flex; gap:11px; margin-bottom:12px; align-items:flex-start;"><span style="flex-shrink:0; width:26px; height:26px; border-radius:50%; background:{{ $accent }}; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">2</span><span>Scroll down and tap <strong>Add to Home Screen</strong>.</span></li>
-                <li style="display:flex; gap:11px; align-items:flex-start;"><span style="flex-shrink:0; width:26px; height:26px; border-radius:50%; background:{{ $accent }}; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">3</span><span>Tap <strong>Add</strong> in the top-right corner.</span></li>
+                <li style="display:flex; gap:11px; margin-bottom:12px; align-items:flex-start;"><span style="flex-shrink:0; width:26px; height:26px; border-radius:50%; background:{{ $accent }}; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">1</span><span>{!! __('pos.pwa_ios_step_share') !!}</span></li>
+                <li style="display:flex; gap:11px; margin-bottom:12px; align-items:flex-start;"><span style="flex-shrink:0; width:26px; height:26px; border-radius:50%; background:{{ $accent }}; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">2</span><span>{!! __('pos.pwa_ios_step_add_home') !!}</span></li>
+                <li style="display:flex; gap:11px; align-items:flex-start;"><span style="flex-shrink:0; width:26px; height:26px; border-radius:50%; background:{{ $accent }}; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">3</span><span>{!! __('pos.pwa_ios_step_add') !!}</span></li>
             </ol>
         </div>
 
         <div data-sec="ios-other" style="display:none;">
-            <p style="font-size:13.5px; color:#374151; margin:0;">On iPhone/iPad, apps can only be installed from <strong>Safari</strong>. Open this page in Safari, tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>.</p>
+            <p style="font-size:13.5px; color:#374151; margin:0;">{!! __('pos.pwa_ios_other_note') !!}</p>
         </div>
 
         <div data-sec="android" style="display:none;">
             <ol style="font-size:13.5px; color:#374151; padding:0; list-style:none; margin:0;">
-                <li style="display:flex; gap:11px; margin-bottom:12px; align-items:flex-start;"><span style="flex-shrink:0; width:26px; height:26px; border-radius:50%; background:{{ $accent }}; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">1</span><span>Tap the <strong>&#8942;</strong> menu in the top-right of Chrome.</span></li>
-                <li style="display:flex; gap:11px; margin-bottom:12px; align-items:flex-start;"><span style="flex-shrink:0; width:26px; height:26px; border-radius:50%; background:{{ $accent }}; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">2</span><span>Tap <strong>Install app</strong> (or <strong>Add to Home screen</strong>).</span></li>
-                <li style="display:flex; gap:11px; align-items:flex-start;"><span style="flex-shrink:0; width:26px; height:26px; border-radius:50%; background:{{ $accent }}; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">3</span><span>Confirm with <strong>Install</strong>.</span></li>
+                <li style="display:flex; gap:11px; margin-bottom:12px; align-items:flex-start;"><span style="flex-shrink:0; width:26px; height:26px; border-radius:50%; background:{{ $accent }}; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">1</span><span>{!! __('pos.pwa_android_step_menu') !!}</span></li>
+                <li style="display:flex; gap:11px; margin-bottom:12px; align-items:flex-start;"><span style="flex-shrink:0; width:26px; height:26px; border-radius:50%; background:{{ $accent }}; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">2</span><span>{!! __('pos.pwa_android_step_install') !!}</span></li>
+                <li style="display:flex; gap:11px; align-items:flex-start;"><span style="flex-shrink:0; width:26px; height:26px; border-radius:50%; background:{{ $accent }}; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">3</span><span>{!! __('pos.pwa_android_step_confirm') !!}</span></li>
             </ol>
         </div>
 
         <div data-sec="desktop" style="display:none;">
             <ol style="font-size:13.5px; color:#374151; padding:0; list-style:none; margin:0;">
-                <li style="display:flex; gap:11px; margin-bottom:12px; align-items:flex-start;"><span style="flex-shrink:0; width:26px; height:26px; border-radius:50%; background:{{ $accent }}; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">1</span><span>Look for the <strong>install icon</strong> at the right end of the address bar (a screen with a down arrow).</span></li>
-                <li style="display:flex; gap:11px; margin-bottom:12px; align-items:flex-start;"><span style="flex-shrink:0; width:26px; height:26px; border-radius:50%; background:{{ $accent }}; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">2</span><span>Or open the browser <strong>&#8942;</strong> menu and choose <strong>Install {{ $appName }}&hellip;</strong> / <strong>Apps &rarr; Install</strong>.</span></li>
-                <li style="display:flex; gap:11px; align-items:flex-start;"><span style="flex-shrink:0; width:26px; height:26px; border-radius:50%; background:{{ $accent }}; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">3</span><span>Confirm with <strong>Install</strong> &mdash; the app opens in its own window.</span></li>
+                <li style="display:flex; gap:11px; margin-bottom:12px; align-items:flex-start;"><span style="flex-shrink:0; width:26px; height:26px; border-radius:50%; background:{{ $accent }}; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">1</span><span>{!! __('pos.pwa_desktop_step_icon') !!}</span></li>
+                <li style="display:flex; gap:11px; margin-bottom:12px; align-items:flex-start;"><span style="flex-shrink:0; width:26px; height:26px; border-radius:50%; background:{{ $accent }}; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">2</span><span>{!! __('pos.pwa_desktop_step_menu', ['app' => e($appName)]) !!}</span></li>
+                <li style="display:flex; gap:11px; align-items:flex-start;"><span style="flex-shrink:0; width:26px; height:26px; border-radius:50%; background:{{ $accent }}; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;">3</span><span>{!! __('pos.pwa_desktop_step_confirm') !!}</span></li>
             </ol>
-            <p style="font-size:11.5px; color:#9ca3af; margin:12px 0 0;">Works in Chrome and Edge. Firefox/Safari on desktop don't support app installs.</p>
+            <p style="font-size:11.5px; color:#9ca3af; margin:12px 0 0;">{!! __('pos.pwa_desktop_note') !!}</p>
         </div>
 
-        <button type="button" data-role="close" style="margin-top:18px; width:100%; padding:10px; border-radius:10px; border:none; background:#f3f4f6; color:#6b7280; font-size:13px; font-weight:600; cursor:pointer;">Close</button>
+        <button type="button" data-role="close" style="margin-top:18px; width:100%; padding:10px; border-radius:10px; border:none; background:#f3f4f6; color:#6b7280; font-size:13px; font-weight:600; cursor:pointer;">{{ __('pos.pwa_close_btn') }}</button>
     </div>
 </div>
 
@@ -83,7 +83,7 @@ Usage: <x-pwa-install-menu-item color="purple" app-name="Nest POS" item-class="m
     const labelEl = btn.querySelector('[data-role="label"]');
     const checkEl = btn.querySelector('[data-role="check"]');
     function markInstalled(){
-        if (labelEl) labelEl.textContent = 'App Installed';
+        if (labelEl) labelEl.textContent = @json(__('pos.pwa_mi_installed'));
         if (checkEl) checkEl.style.display = 'inline';
         btn.setAttribute('data-installed', '1');
     }

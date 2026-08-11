@@ -21,10 +21,10 @@
         @click="{{ $canSwitch ? 'open = !open' : '' }}"
         @if(!$canSwitch) disabled @endif
         class="flex items-center gap-2 px-3 py-1.5 rounded-lg border {{ $c['border'] }} {{ $c['bg'] }} {{ $c['text'] }} text-xs font-bold hover:shadow-sm transition {{ $canSwitch ? 'cursor-pointer' : 'cursor-default opacity-90' }}"
-        title="{{ $canSwitch ? 'Switch branch' : 'You are locked to this branch' }}">
+        title="{{ $canSwitch ? __('pos.branch_switch_tooltip') : __('pos.branch_locked_tooltip') }}">
         <span class="w-2 h-2 rounded-full {{ $c['dot'] }} animate-pulse"></span>
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-        <span class="hidden sm:inline truncate max-w-[120px]">{{ $current->name ?? 'Select Branch' }}</span>
+        <span class="hidden sm:inline truncate max-w-[120px]">{{ $current->name ?? __('pos.branch_select') }}</span>
         @if($canSwitch)
             <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
         @endif
@@ -39,7 +39,7 @@
         x-cloak
         class="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
         <div class="px-4 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-            <p class="text-[10px] uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">Switch Branch</p>
+            <p class="text-[10px] uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400">{{ __('pos.branch_switch_heading') }}</p>
         </div>
         <div class="max-h-72 overflow-y-auto">
             @foreach($branches as $b)
@@ -52,7 +52,7 @@
                             <div class="text-sm font-bold text-gray-900 dark:text-white truncate">
                                 {{ $b->name }}
                                 @if($b->is_head_office)
-                                    <span class="ml-1 text-[9px] px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800 font-bold uppercase">HQ</span>
+                                    <span class="ml-1 text-[9px] px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800 font-bold uppercase">{{ __('pos.branch_hq_badge') }}</span>
                                 @endif
                             </div>
                             <div class="text-[11px] text-gray-500 truncate">{{ $b->city ?: $b->address ?: '—' }}</div>
@@ -66,7 +66,7 @@
         </div>
         @if($svc->isOwner())
             <a href="/branches" class="block px-4 py-2 text-center text-xs font-bold {{ $c['text'] }} bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 hover:{{ $c['bg'] }}">
-                + Manage Branches
+                {{ __('pos.branch_manage_link') }}
             </a>
         @endif
     </div>

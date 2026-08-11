@@ -26,23 +26,23 @@ Usage: <x-pwa-banner color="emerald" appName="Tax DI" />
 
             <div style="flex:1; min-width:0; color:#fff;">
                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                    <h4 style="margin:0; font-size:14.5px; font-weight:800; letter-spacing:0.1px;">Install {{ $appName }} as Desktop App</h4>
+                    <h4 style="margin:0; font-size:14.5px; font-weight:800; letter-spacing:0.1px;">{{ __('pos.pwa_banner_title', ['app' => $appName]) }}</h4>
                     <span style="display:inline-flex; align-items:center; gap:3px; padding:2px 7px; border-radius:6px; background:rgba(255,255,255,0.22); font-size:9px; font-weight:800; letter-spacing:0.6px;">
                         <span style="width:5px; height:5px; border-radius:50%; background:#22c55e; box-shadow:0 0 6px #22c55e;"></span>
-                        EXE LOOK
+                        {{ __('pos.pwa_banner_exe_look') }}
                     </span>
                 </div>
                 <p style="margin:3px 0 0; font-size:11.5px; opacity:0.94; line-height:1.45; font-weight:500;">
-                    No browser bars &middot; Works offline &middot; Opens from Start Menu &middot; Real native feel
+                    {!! __('pos.pwa_banner_perks') !!}
                 </p>
             </div>
 
             <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
                 <button id="tnPwaBannerInstall" style="padding:9px 18px; border-radius:11px; background:#fff; color:{{ $c['btn'] }}; border:none; font-size:12px; font-weight:800; letter-spacing:0.2px; cursor:pointer; box-shadow: 0 6px 16px rgba(0,0,0,0.22); transition: all .15s ease; display:inline-flex; align-items:center; gap:6px;">
                     <svg style="width:13px; height:13px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4m-9 8h10"/></svg>
-                    Install Now
+                    {{ __('pos.pwa_banner_install_now') }}
                 </button>
-                <button id="tnPwaBannerDismiss" style="padding:8px; border-radius:9px; background:rgba(255,255,255,0.12); color:#fff; border:none; cursor:pointer; line-height:0; transition: background .15s ease;" title="Dismiss">
+                <button id="tnPwaBannerDismiss" style="padding:8px; border-radius:9px; background:rgba(255,255,255,0.12); color:#fff; border:none; cursor:pointer; line-height:0; transition: background .15s ease;" title="{{ __('pos.pwa_banner_dismiss') }}">
                     <svg style="width:16px; height:16px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>

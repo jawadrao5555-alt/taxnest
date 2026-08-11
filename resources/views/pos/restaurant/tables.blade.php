@@ -33,7 +33,10 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             @php $tvHeldIdx = 0; @endphp
             @foreach($tvOpenOrders as $oo)
-            <a href="{{ route('pos.invoice.create', $oo->table_id ? ['table_id' => $oo->table_id] : []) }}"
+            {{-- Task 502 (11 Aug 2026): card click par WOHI order sale screen mein
+                 recall ho — ?recall_order= sale screen boot par isi order ko cart
+                 mein load karta hai (table_id sirf fallback context ke liye). --}}
+            <a href="{{ route('pos.invoice.create', array_merge(['recall_order' => $oo->id], $oo->table_id ? ['table_id' => $oo->table_id] : [])) }}"
                class="block bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-700 p-3 hover:shadow-lg transition">
                 <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center gap-2 min-w-0">

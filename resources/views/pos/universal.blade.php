@@ -3757,6 +3757,8 @@ function restaurantPos() {
         kitchenNotes: '',
         selectedTable: {!! $jsEnc($selectedTableJson, 'null') !!},
         heldOrders: {!! $jsEnc($heldOrders) !!},
+        // Task 502: Tables page open-order card → boot par isi order ka direct recall.
+        bootRecallOrderId: {!! $jsEnc($recallOrderIdForJs ?? null, 'null') !!},
         showTablePicker: false,
         tablePickerIndex: 0,
         // ZFC (Aug 2026): unsent-cart switch prompt — { kind:'table', table } |
@@ -4281,7 +4283,10 @@ function restaurantPos() {
             // KHALI cart milta tha — lagta tha purana order GHAYAB ho gaya (asal
             // mein woh held-order mein mehfooz tha). ?table_id= boot par us table
             // ka chalta order khud cart mein load ho (waiter order = atomic claim).
-            setTimeout(() => this.autoOpenPreselectedTable(), 600);
+            // Task 502 (11 Aug 2026): Tables page open-order card ?recall_order= ke
+            // saath aata hai — boot par WOHI order recall ho (table_id fallback se
+            // pehle), warna purana table_id-based auto-open chale.
+            setTimeout(() => this.autoRecallFromUrl(), 600);
             try {
                 const up = new URLSearchParams(window.location.search).get('updated');
                 if (up) {
@@ -6620,6 +6625,26 @@ function restaurantPos() {
                 ord.table = ord.table || { id: t.id, table_number: t.table_number, occupied_since: null };
                 this.recallOrder(ord);
             } catch (e) { /* silent — board/Recall raste bahar-haal khule hain */ }
+        },
+        // Task 502 (11 Aug 2026): ?recall_order= boot handler — Tables page ke
+        // open-order card ka WOHI order seedha cart mein aaye. Server ne id ko
+        // pehle hi company + status (held/preparing/ready) par validate kiya hai;
+        // yahan baked heldOrders (items+table samet) se uthate hain. Waiter-source
+        // orders hamesha atomic claim se (single-winner invariant). Order na mile
+        // (kisi aur ne abhi-abhi final/delete kar diya) to purana table_id-based
+        // auto-open fallback chalta hai.
+        async autoRecallFromUrl() {
+            const rid = this.bootRecallOrderId;
+            if (!rid) return this.autoOpenPreselectedTable();
+            // Kisi aur boot-flow ne cart le liya (edit-bill / restore / claim)? Haath na lagao.
+            if (this.cart.length || this.editingBillId || this.recalledOrderId || this.incomingOrderId) return;
+            const ord = this.heldOrders.find(o => Number(o.id) === Number(rid));
+            if (!ord) return this.autoOpenPreselectedTable();
+            if (ord.source === 'waiter') {
+                try { await this.claimAndLoadIncoming({ id: ord.id }); } catch (e) { /* silent */ }
+                return;
+            }
+            this.recallOrder(ord);
         },
         // FINAL — step 1: close menu, open the explicit confirm (anti "anjaane
         // mein final"). Both modals are z-50; they never overlap.

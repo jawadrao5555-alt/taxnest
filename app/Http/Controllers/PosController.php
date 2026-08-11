@@ -1501,6 +1501,22 @@ class PosController extends Controller
             }
         }
 
+        // Task 502 (11 Aug 2026): Tables page ke open-order cards ?recall_order={id}
+        // bhejte hain — sale screen boot par WOHI order cart mein recall ho.
+        // Sirf company-scoped + khula (held/preparing/ready) order pass hota hai;
+        // warna param chup-chaap ignore (normal boot). SW-safe: query-string wali
+        // navigations network-only hain (SALE_CACHE sirf bina-query URL cache
+        // karta hai), is liye fingerprint/cache path par koi asar nahi.
+        $recallOrderIdForJs = null;
+        if ($request->filled('recall_order') && $features->kot && class_exists(RestaurantOrder::class)) {
+            $recallCandidate = RestaurantOrder::where('company_id', $companyId)
+                ->whereIn('status', ['held', 'preparing', 'ready'])
+                ->find((int) $request->input('recall_order'));
+            if ($recallCandidate) {
+                $recallOrderIdForJs = (int) $recallCandidate->id;
+            }
+        }
+
         // Per-USER grid visibility overrides (owner, 25 Jul 2026): map of
         // "type:id" => 0/1. Empty array until the table exists (prod drift safe
         // — mapForUser is hasTable + try/catch guarded internally).
@@ -1516,7 +1532,8 @@ class PosController extends Controller
             'customers', 'taxRate', 'taxRules', 'stockStatus', 'blockOutOfStock',
             'posRole', 'discountLimit', 'hasManagerPin', 'ingredientCosts',
             'lowStockAlerts', 'inventoryEnabled', 'dealsForJs',
-            'editBillForJs', 'userGridPrefs', 'bootFp', 'customersTruncated'
+            'editBillForJs', 'userGridPrefs', 'bootFp', 'customersTruncated',
+            'recallOrderIdForJs'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         ->header('Pragma', 'no-cache')

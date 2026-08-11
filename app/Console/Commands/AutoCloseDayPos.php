@@ -27,7 +27,7 @@ class AutoCloseDayPos extends Command
 
         $companies = Company::where('pos_auto_dayclose_24h', true)
             ->where('product_type', 'pos')
-            ->get(['id', 'restaurant_mode']);
+            ->get(['id', 'name', 'restaurant_mode']);
 
         if ($companies->isEmpty()) {
             $this->info('No companies with auto day-close enabled.');
@@ -94,6 +94,11 @@ class AutoCloseDayPos extends Command
                             'open_orders' => $openCount,
                             'dates_pending' => $dates->values(),
                         ]);
+                        // Task 454: alert the owner by email — the log line alone
+                        // reaches nobody. Throttled to ONE email per company per
+                        // calendar day (the command runs hourly); if the day is
+                        // still stranded tomorrow, tomorrow's run alerts again.
+                        $this->sendSkipAlert($company, $openCount, $dates);
                         continue; // skip to next company
                     }
                 }
@@ -145,5 +150,94 @@ class AutoCloseDayPos extends Command
 
         $this->info("Auto day-close complete — {$closedTotal} day(s) closed.");
         return self::SUCCESS;
+    }
+
+    /**
+     * Task 454: email the company admin/owner when the auto day-close is
+     * skipped because restaurant orders are still open. Throttled via cache to
+     * one email per company per calendar day (command runs hourly), so a day
+     * still stranded on the NEXT morning's run triggers a fresh alert. Mail
+     * failure never breaks the close loop — the log warning already exists.
+     */
+    private function sendSkipAlert(Company $company, int $openCount, $pendingDates): void
+    {
+        $cacheKey = 'pos_autoclose_skip_alert:' . $company->id . ':' . today()->toDateString();
+        try {
+            // Reserve the daily slot atomically (guards concurrent runs), but
+            // RELEASE it on any failure below — only a successfully sent email
+            // may consume the quota, otherwise a transient SMTP hiccup would
+            // silence every retry for the rest of the day.
+            if (! \Illuminate\Support\Facades\Cache::add($cacheKey, 1, now()->endOfDay())) {
+                return;
+            }
+
+            // Owner = users.role 'company_admin' (pos_role is often NULL on
+            // owner rows); fall back to a POS admin account if no owner email.
+            $email = User::where('company_id', $company->id)
+                ->where(function ($q) {
+                    $q->where('role', 'company_admin')
+                        ->orWhereIn('pos_role', ['pos_admin', 'company_admin']);
+                })
+                ->whereNotNull('email')
+                ->orderByRaw("CASE WHEN role = 'company_admin' THEN 0 ELSE 1 END")
+                ->value('email');
+            if (! $email) {
+                Log::warning('pos:auto-dayclose skip alert — no admin email', ['company_id' => $company->id]);
+                \Illuminate\Support\Facades\Cache::forget($cacheKey); // retry next hour — an admin may be added
+                return;
+            }
+
+            // Which tables are still occupied (dine-in orders with a table).
+            $tables = \App\Models\RestaurantOrder::where('company_id', $company->id)
+                ->whereIn('status', ['held', 'preparing', 'ready'])
+                ->whereHas('items')
+                ->with('table:id,table_number')
+                ->get(['id', 'table_id'])
+                ->pluck('table.table_number')
+                ->filter()
+                ->unique()
+                ->values();
+
+            $pendingList = collect($pendingDates)->implode(', ');
+
+            $paragraphs = [
+                "Aaj ka auto day-close skip ho gaya kyunke {$openCount} order(s) abhi bhi open hain"
+                    . ($tables->isNotEmpty() ? ' (tables: ' . $tables->implode(', ') . ')' : '') . '.',
+                "Pending day(s): {$pendingList}.",
+                'Kya karna hai: pehle sab open orders settle karein (payment le kar band karein), phir POS ke Day Close page se din khud close karein.',
+                'Agar orders settle ho jayen to agla auto-close run (har ghantay) din khud band kar dega — lekin intezaar na karein, manually close karna behtar hai.',
+            ];
+
+            \Illuminate\Support\Facades\Mail::to($email)->send(new \App\Mail\TrialReminderMail(
+                subjectLine: 'Day Close skip ho gaya — orders abhi open hain',
+                companyName: $company->name ?? 'your company',
+                headline: 'Auto Day-Close skip ho gaya',
+                paragraphs: $paragraphs,
+                ctaUrl: url('/pos/day-close'),
+                ctaLabel: 'Day Close Page Kholen',
+                panelName: 'PRA POS',
+            ));
+
+            if (class_exists(\App\Services\MailHealth::class)) {
+                \App\Services\MailHealth::recordSuccess();
+            }
+            Log::info('pos:auto-dayclose skip alert emailed', [
+                'company_id' => $company->id,
+                'open_orders' => $openCount,
+            ]);
+        } catch (\Throwable $e) {
+            // Free the daily slot so the next hourly run retries the alert.
+            try {
+                \Illuminate\Support\Facades\Cache::forget($cacheKey);
+            } catch (\Throwable $ignored) {
+            }
+            Log::warning('pos:auto-dayclose skip alert email failed', [
+                'company_id' => $company->id,
+                'error' => $e->getMessage(),
+            ]);
+            if (class_exists(\App\Services\MailHealth::class)) {
+                \App\Services\MailHealth::recordFailure('Auto day-close skip alert', $e);
+            }
+        }
     }
 }

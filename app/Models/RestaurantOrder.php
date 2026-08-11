@@ -16,6 +16,7 @@ class RestaurantOrder extends Model
         'kitchen_status', 'kitchen_started_at', 'kitchen_ready_at', 'kitchen_cleared_at',
         'assigned_cashier_id', 'source',
         'token_no',
+        'superseded_at',
     ];
 
     protected $casts = [
@@ -32,6 +33,7 @@ class RestaurantOrder extends Model
         'kot_sent_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'cancelled_by' => 'integer',
+        'superseded_at' => 'datetime',
         'kot_print_count' => 'integer',
         'kitchen_started_at' => 'datetime',
         'kitchen_ready_at' => 'datetime',
@@ -67,6 +69,33 @@ class RestaurantOrder extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    // Task 506: jis user ne order cancel kiya (deleteOrder / waiter cancelOrder).
+    public function canceller()
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
+    }
+
+    /**
+     * Task 506: sirf ASLI (human) cancels — recall+re-hold ke system-supersede
+     * ghosts ko chhupao. Shared predicate: report page/CSV/PDF/summary aur
+     * dashboard "cancelled today" tile sab isi se guzarte hain.
+     * - superseded_at marker (naya supersede write + backfill)
+     * - legacy-ghost signature fallback (NULL stamps + zero items) — auto-deploy
+     *   code ko migrate se pehle bhi utar sakta hai, is liye dono guards.
+     */
+    public function scopeGenuineCancelled($query)
+    {
+        $query->where('status', 'cancelled');
+        if (\Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'superseded_at')) {
+            $query->whereNull('superseded_at');
+        }
+        return $query->where(function ($q) {
+            $q->whereNotNull('cancelled_at')
+                ->orWhereNotNull('cancelled_by')
+                ->orWhereHas('items');
+        });
     }
 
     public function posTransaction()

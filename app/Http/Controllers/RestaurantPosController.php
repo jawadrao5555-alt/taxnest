@@ -394,7 +394,15 @@ class RestaurantPosController extends Controller
                         ];
                     }
                     $oldOrder->items()->delete();
-                    $oldOrder->update(['status' => 'cancelled']);
+                    // Task 506: yeh SYSTEM supersede hai (recall + re-hold), human
+                    // cancel nahi — superseded_at stamp karo taake Cancelled Orders
+                    // report / dashboard tile mein ghost row na bane. Status
+                    // 'cancelled' hi rehta hai (blacklist queries leak-safe).
+                    $supersede = ['status' => 'cancelled'];
+                    if (Schema::hasColumn('restaurant_orders', 'superseded_at')) {
+                        $supersede['superseded_at'] = now();
+                    }
+                    $oldOrder->update($supersede);
                     if ($oldOrder->table_id) {
                         $activeOnTable = RestaurantOrder::where('table_id', $oldOrder->table_id)
                             ->where('company_id', $companyId)
@@ -1911,8 +1919,10 @@ class RestaurantPosController extends Controller
         // day's cancelled count, same cutoff window the dashboard's "today"
         // metrics use ($today = bizDate + cutoff). cancelled_at NULL fallback
         // (column nayi hai) → updated_at, matching the report's query.
+        // Task 506: genuineCancelled scope — recall-supersede ghosts excluded,
+        // same predicate as the Cancelled Orders report.
         $cancelledTodayCount = RestaurantOrder::where('company_id', $companyId)
-            ->where('status', 'cancelled')
+            ->genuineCancelled()
             ->whereRaw('COALESCE(cancelled_at, updated_at) >= ?', [$today])
             ->count();
 
@@ -2221,10 +2231,12 @@ class RestaurantPosController extends Controller
         if ($from > $to) { [$from, $to] = [$to, $from]; }
 
         return RestaurantOrder::where('company_id', $companyId)
-            ->where('status', 'cancelled')
+            // Task 506: sirf asli (human) cancels — recall+re-hold ke
+            // system-supersede ghosts is shared scope se bahar rehte hain.
+            ->genuineCancelled()
             // cancelled_at NULL fallback (column abhi nayi hai) → updated_at
             ->whereRaw('DATE(COALESCE(cancelled_at, updated_at)) BETWEEN ? AND ?', [$from, $to])
-            ->with(['items', 'table', 'creator'])
+            ->with(['items', 'table', 'creator', 'canceller'])
             ->orderByDesc(DB::raw('COALESCE(cancelled_at, updated_at)'));
     }
 
@@ -2269,7 +2281,7 @@ class RestaurantPosController extends Controller
         return response()->streamDownload(function () use ($orders) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM (Excel)
-            fputcsv($out, ['Order #', 'Date/Time Cancelled', 'Table', 'Order Type', 'Items', 'Made Items', 'Amount (Rs)', 'KOT Sent', 'Punched By']);
+            fputcsv($out, ['Order #', 'Date/Time Cancelled', 'Table', 'Order Type', 'Items', 'Made Items', 'Amount (Rs)', 'KOT Sent', 'Punched By', 'Cancelled By']);
             foreach ($orders as $o) {
                 $items = $o->items->map(fn ($i) => $i->quantity . 'x ' . $i->item_name)->implode('; ');
                 $made = $o->items->where('was_made', true)->map(fn ($i) => $i->quantity . 'x ' . $i->item_name)->implode('; ');
@@ -2283,6 +2295,7 @@ class RestaurantPosController extends Controller
                     (int) round($o->total_amount),
                     $o->kot_sent_at ? 'YES' : 'no',
                     $o->creator?->name ?? '-',
+                    $o->canceller?->name ?? 'System',
                 ]);
             }
             fclose($out);

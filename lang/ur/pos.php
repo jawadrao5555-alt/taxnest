@@ -3316,6 +3316,7 @@ return [
     'sync_queue' => 'سنک قطار',
     'sync_to_pra_now' => 'ابھی PRA سے سنک کریں',
     'syncing_word' => 'سنک ہو رہا ہے',
+    'system_word' => 'سسٹم',
     'table_board' => 'ٹیبل بورڈ',
     'table_cancel_confirm_sfx' => ' آرڈر کینسل ہو جائے گا اور ٹیبل خالی ہو جائے گی۔
 یقین ہے؟',

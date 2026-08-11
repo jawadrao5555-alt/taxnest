@@ -133,6 +133,7 @@ class FbrPosStockController extends Controller
 
         $data = $request->validate([
             'q' => 'nullable|string|max:100',
+            'date' => 'nullable|date_format:Y-m-d',
             'page' => 'nullable|integer|min:1|max:100000',
         ]);
         $q = trim((string) ($data['q'] ?? ''));
@@ -140,6 +141,18 @@ class FbrPosStockController extends Controller
 
         $query = PurchaseOrder::where('company_id', $companyId)
             ->with('supplier:id,name', 'items.product:id,name');
+
+        // Optional single-day filter (Task 469) — same range predicate (not
+        // whereDate) as movements()/correctionsQuery() so a created_at index
+        // stays usable. Matches received_date too (the date the list shows)
+        // in case an old row's received day differs from its entry day.
+        if (!empty($data['date'])) {
+            $day = \Illuminate\Support\Carbon::parse($data['date'], config('app.timezone'));
+            $query->where(function ($w) use ($day, $data) {
+                $w->whereBetween('created_at', [$day->copy()->startOfDay(), $day->copy()->endOfDay()])
+                  ->orWhere('received_date', $data['date']);
+            });
+        }
 
         if ($q !== '') {
             $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $q) . '%';

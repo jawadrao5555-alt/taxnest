@@ -470,12 +470,20 @@
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
         <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex flex-wrap items-center justify-between gap-2">
             <h3 class="font-bold text-gray-900 dark:text-white">{{ __('pos.stock_recent_purchases') }}</h3>
-            <input type="search" x-model="purchQ" @input.debounce.400ms="searchPurchases()"
-                   placeholder="{{ __('pos.stock_purch_search_ph') }}" autocomplete="off" name="purch_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
-                   class="border rounded-lg px-3 py-1.5 text-sm w-full sm:w-72 dark:bg-gray-700 dark:text-white dark:border-gray-600">
+            <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <input type="search" x-model="purchQ" @input.debounce.400ms="searchPurchases()"
+                       placeholder="{{ __('pos.stock_purch_search_ph') }}" autocomplete="off" name="purch_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                       class="border rounded-lg px-3 py-1.5 text-sm w-full sm:w-72 dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                {{-- Single-day filter (Task 469) — server-side, page 1 reload on change --}}
+                <input type="date" x-model="purchDate" @change="searchPurchases()"
+                       class="border rounded-lg px-3 py-1.5 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                <button type="button" x-show="purchDate !== ''" x-cloak
+                        @click="purchDate = ''; searchPurchases()"
+                        class="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-xs font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">{{ __('pos.stock_corr_clear_filters') }}</button>
+            </div>
         </div>
-        <p x-show="purchases.length === 0 && purchQ.trim() === ''" x-cloak class="text-sm text-gray-400 text-center py-6">{{ __('pos.stock_no_purchases') }}</p>
-        <p x-show="purchases.length === 0 && purchQ.trim() !== ''" x-cloak class="text-sm text-gray-400 text-center py-6">{{ __('pos.stock_purch_no_results') }}</p>
+        <p x-show="purchases.length === 0 && purchQ.trim() === '' && purchDate === ''" x-cloak class="text-sm text-gray-400 text-center py-6">{{ __('pos.stock_no_purchases') }}</p>
+        <p x-show="purchases.length === 0 && (purchQ.trim() !== '' || purchDate !== '')" x-cloak class="text-sm text-gray-400 text-center py-6">{{ __('pos.stock_purch_no_results') }}</p>
         <table class="w-full text-sm table-cards" x-show="purchases.length > 0">
             <thead class="bg-gray-50 dark:bg-gray-700 text-left">
                 <tr>
@@ -565,6 +573,7 @@ function stockPage() {
         purchases: {!! $bakedPurchJson !!},
         purchHasMore: {{ $purchasesHasMore ? 'true' : 'false' }},
         purchQ: '',
+        purchDate: '',
         purchPage: 1,
         purchLoading: false,
         purchSeq: 0,
@@ -591,6 +600,7 @@ function stockPage() {
             const page = reset ? 1 : this.purchPage + 1;
             try {
                 const params = new URLSearchParams({ q: this.purchQ.trim(), page: page });
+                if (this.purchDate) params.set('date', this.purchDate);
                 const res = await fetch(`{{ route('fbrpos.stock.purchases', [], false) }}?` + params.toString(), {
                     headers: { 'Accept': 'application/json' },
                 });

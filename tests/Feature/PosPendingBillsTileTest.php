@@ -79,6 +79,11 @@ class PosPendingBillsTileTest extends TestCase
             $table->string('invoice_mode')->nullable();
             $table->string('fbr_status')->nullable();
             $table->string('fbr_invoice_number')->nullable();
+            // Task 503: the real schema has business_date (trading-day bucket,
+            // set by the model's creating hook). Without it, whereBizDate()
+            // falls back to whereDate(created_at), which diverges from the
+            // trading day during the 00:00–cutoff PKT window → midnight flake.
+            $table->string('business_date')->nullable();
             $table->decimal('subtotal', 12, 2)->default(0);
             $table->decimal('tax_amount', 12, 2)->default(0);
             $table->decimal('total_amount', 12, 2)->default(0);
@@ -177,6 +182,7 @@ class PosPendingBillsTileTest extends TestCase
 
     protected function tearDown(): void
     {
+        \Carbon\Carbon::setTestNow();
         Auth::guard('fbrpos')->logout();
         Auth::guard('pos')->logout();
         parent::tearDown();
@@ -201,12 +207,15 @@ class PosPendingBillsTileTest extends TestCase
 
     protected function fbrBill(array $attrs = []): int
     {
+        // DB::table bypasses the FbrPosTransaction creating hook, so set
+        // business_date explicitly the same way the hook does (Task 503).
         return DB::table('fbr_pos_transactions')->insertGetId(array_merge([
             'company_id' => $this->companyId,
             'invoice_number' => 'F-' . uniqid(),
             'status' => 'completed',
             'invoice_mode' => 'local',
             'fbr_status' => 'local',
+            'business_date' => \App\Services\PosBusinessDay::currentFbr($this->companyId),
             'total_amount' => 100,
             'created_at' => now(), 'updated_at' => now(),
         ], $attrs));
@@ -256,10 +265,10 @@ class PosPendingBillsTileTest extends TestCase
         $this->fbrBill(['invoice_mode' => 'fbr', 'fbr_status' => 'pending']);
         // NEVER counted: non-completed local bill.
         $this->fbrBill(['status' => 'draft']);
-        // NEVER counted: yesterday's provisional.
-        $yid = $this->fbrBill();
-        DB::table('fbr_pos_transactions')->where('id', $yid)
-            ->update(['created_at' => now()->subDay()]);
+        // NEVER counted: previous trading day's provisional.
+        $prevBiz = \Carbon\Carbon::parse(\App\Services\PosBusinessDay::currentFbr($this->companyId))
+            ->subDay()->toDateString();
+        $this->fbrBill(['business_date' => $prevBiz, 'created_at' => now()->subDay()]);
 
         $data = (new FbrPosController())->dashboard()->getData();
 
@@ -287,6 +296,28 @@ class PosPendingBillsTileTest extends TestCase
         // Even with a non-zero confidential count, the tile output is empty.
         $this->assertSame(1, $data['pendingProvisional']);
         $this->assertSame('', trim($this->renderFbrTile($data)));
+    }
+
+    public function test_fbr_pending_count_correct_just_after_midnight(): void
+    {
+        // Task 503 regression: 00:30 PKT is pre-cutoff, so the open trading
+        // day is YESTERDAY. Bills created "now" must still be counted as
+        // today's pending provisionals (business_date bucket, not calendar
+        // DATE(created_at)).
+        \Carbon\Carbon::setTestNow(
+            \Carbon\Carbon::today(config('app.timezone'))->addMinutes(30)
+        );
+
+        $this->actAs('fbrpos', 'pos_admin');
+        $this->fbrBill();
+        $this->fbrBill();
+        // Previous trading day's provisional — never counted.
+        $prevBiz = \Carbon\Carbon::parse(\App\Services\PosBusinessDay::currentFbr($this->companyId))
+            ->subDay()->toDateString();
+        $this->fbrBill(['business_date' => $prevBiz, 'created_at' => now()->subDay()]);
+
+        $data = (new FbrPosController())->dashboard()->getData();
+        $this->assertSame(2, $data['pendingProvisional']);
     }
 
     public function test_fbr_dashboard_blade_passes_local_tab_url_and_non_restaurant(): void

@@ -37,13 +37,16 @@
     </style>
 
     <div class="px-3 sm:px-4 py-3" x-data="riderTracking(@js([
-        'dataUrl' => route('pos.riders.tracking.data'),
-        'trailUrlBase' => url('/pos/riders/tracking/trail'),
+        {{-- Relative URLs (route(..., false)) — absolute route() URLs drop the
+             :5000 port behind the dev proxy → cross-origin fetch = CORS death.
+             Relative = same-origin everywhere (dev + live). --}}
+        'dataUrl' => route('pos.riders.tracking.data', [], false),
+        'trailUrlBase' => '/pos/riders/tracking/trail',
         'companyCity' => $companyCity ?? '',
         'shopLat' => $shopLat,
         'shopLng' => $shopLng,
-        'shopSaveUrl' => route('pos.riders.tracking.shop'),
-        'resolveLinkUrl' => route('pos.riders.tracking.resolve'),
+        'shopSaveUrl' => route('pos.riders.tracking.shop', [], false),
+        'resolveLinkUrl' => route('pos.riders.tracking.resolve', [], false),
         'i18n' => [
             'shop_label' => __('pos.rt_shop_label'),
             'shop_hint' => __('pos.rt_shop_hint'),
@@ -201,6 +204,11 @@
                 // minZoom 5 = itna zoom-out hi ho sake ke Pakistan poora dikhe.
                 const pkBounds = L.latLngBounds([22.8, 60.4], [37.5, 77.6]);
                 this.pkBounds = pkBounds;
+                // Defensive: if a stray double Alpine boot already bound Leaflet to
+                // this container, reclaim it — otherwise L.map throws
+                // "Map container is already initialized" and the map dies.
+                const mapEl = document.getElementById('rt-map');
+                if (mapEl && mapEl._leaflet_id) { mapEl._leaflet_id = null; mapEl.innerHTML = ''; }
                 this.map = L.map('rt-map', {
                     zoomControl: true,
                     maxBounds: pkBounds,

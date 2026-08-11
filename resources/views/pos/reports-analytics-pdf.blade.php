@@ -119,6 +119,22 @@
     </table>
     @endif
 
+    @if($analytics->profit !== null && $analytics->profit->revenue <= 0 && ($analytics->profit->product_revenue ?? 0) > 0)
+    {{-- First-time setup: sales exist but no line has a saved purchase cost --}}
+    <div style="border: 1.5px solid #1d4ed8; background-color: #eff6ff; padding: 8px 12px; margin: 0 0 12px;">
+        <p style="font-size: 10px; font-weight: bold; color: #1e40af; margin-bottom: 3px;">{{ __('pos.munafa_setup_head') }}</p>
+        <p style="font-size: 9px; color: #1e3a8a; margin-bottom: 3px;">{{ __('pos.munafa_setup_body') }}</p>
+        <p style="font-size: 9px; color: #1e3a8a;">1. {{ __('pos.pra_munafa_setup_step1') }} &nbsp;2. {{ __('pos.pra_munafa_setup_step2') }} &nbsp;3. {{ __('pos.munafa_setup_step3') }}</p>
+    </div>
+    @elseif($analytics->profit !== null && ($analytics->profit->unknown_lines ?? 0) > 0)
+    {{-- Partial exclusion: some old lines have no cost snapshot --}}
+    <div style="border: 1.5px solid #b45309; background-color: #fffbeb; padding: 8px 12px; margin: 0 0 12px;">
+        <p style="font-size: 10px; font-weight: bold; color: #92400e; margin-bottom: 3px;">{{ __('pos.munafa_excluded_note', ['lines' => number_format($analytics->profit->unknown_lines), 'amount' => number_format($analytics->profit->unknown_sale_value ?? 0, 0)]) }}</p>
+        <p style="font-size: 9px; color: #92400e; margin-bottom: 3px;">{{ __('pos.munafa_excluded_why') }}</p>
+        <p style="font-size: 9px; color: #92400e;">{{ __('pos.pra_munafa_excluded_action') }}</p>
+    </div>
+    @endif
+
     @if($analytics->categories->isNotEmpty())
     <div class="section-title">{{ __('pos.ra_category_breakdown') }}</div>
     <table class="data">

@@ -3316,6 +3316,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'sync_queue' => 'Sync queue',
     'sync_to_pra_now' => 'Abhi PRA se sync karein',
     'syncing_word' => 'Sync ho raha hai',
+    'system_word' => 'System',
     'table_board' => 'Table board',
     'table_cancel_confirm_sfx' => ' ka order CANCEL hoga aur table khali ho jayega.\\nPakka?',
     'table_freed_suffix' => ' khali',

@@ -17,6 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Cloudflare in front of the origin: restore the real visitor IP from
+        // CF-Connecting-IP (only when the peer is a genuine CF edge — spoof-safe).
+        // Must run BEFORE TrustProxies / everything else.
+        $middleware->prepend(\App\Http\Middleware\TrustCloudflare::class);
         $middleware->trustProxies(at: '*');
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
         // Slow-request telemetry: near-zero overhead on fast requests; logs

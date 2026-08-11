@@ -21,6 +21,28 @@ use Carbon\Carbon;
  */
 class SubscriptionAccessService
 {
+    /**
+     * Map the English denial reasons produced by hasAccess() to the viewer's
+     * locale (pos.tl_reason_* keys). The service keeps returning English
+     * (admin panels / logs rely on it); customer-facing surfaces call this.
+     * Unknown strings fall through untranslated rather than breaking.
+     */
+    public static function localizedLockReason(string $reason): string
+    {
+        $m = [];
+        return match (true) {
+            str_starts_with($reason, 'No active subscription') => __('pos.tl_reason_no_sub'),
+            str_starts_with($reason, 'Your subscription is inactive') => __('pos.tl_reason_inactive'),
+            str_starts_with($reason, 'Your plan has expired') => __('pos.tl_reason_expired'),
+            str_starts_with($reason, 'Your free trial has expired') => __('pos.tl_reason_trial_expired'),
+            str_starts_with($reason, 'Free invoice limit not configured') => __('pos.tl_reason_limit_missing'),
+            preg_match('/^Free trial invoice limit reached \((\d+)\/(\d+)\)/', $reason, $m) === 1 => __('pos.tl_reason_trial_limit', ['used' => $m[1], 'limit' => $m[2]]),
+            preg_match('/^Free invoice limit reached \((\d+)\/(\d+)\)/', $reason, $m) === 1 => __('pos.tl_reason_free_limit', ['used' => $m[1], 'limit' => $m[2]]),
+            preg_match('/^Temporary invoice allowance reached \((\d+)\/(\d+)\)/', $reason, $m) === 1 => __('pos.tl_reason_temp_limit', ['used' => $m[1], 'limit' => $m[2]]),
+            default => $reason,
+        };
+    }
+
     public static function hasAccess(Company $company): array
     {
         $subscription = Subscription::where('company_id', $company->id)

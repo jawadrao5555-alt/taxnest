@@ -101,10 +101,10 @@
                 $seProductType = 'di';
             }
             $seCycles = $seProductType === 'di'
-                ? [['key' => 'monthly', 'label' => 'Monthly'], ['key' => 'quarterly', 'label' => 'Quarterly'], ['key' => 'semi_annual', 'label' => 'Semi-Annual'], ['key' => 'annual', 'label' => 'Annual']]
+                ? [['key' => 'monthly', 'label' => __('pos.cycle_monthly')], ['key' => 'quarterly', 'label' => __('pos.cycle_quarterly')], ['key' => 'semi_annual', 'label' => __('pos.cycle_semi_annual')], ['key' => 'annual', 'label' => __('pos.cycle_annual')]]
                 : ($seProductType === 'pos'
-                    ? [['key' => 'annual', 'label' => 'Annual'], ['key' => 'quarterly', 'label' => 'Quarterly']]
-                    : [['key' => 'annual', 'label' => 'Annual']]);
+                    ? [['key' => 'annual', 'label' => __('pos.cycle_annual')], ['key' => 'quarterly', 'label' => __('pos.cycle_quarterly')]]
+                    : [['key' => 'annual', 'label' => __('pos.cycle_annual')]]);
             try {
                 foreach (\App\Models\PricingPlan::where('is_trial', false)->where('product_type', $seProductType)->orderBy('price')->get() as $seLp) {
                     $sePrices = [];
@@ -151,7 +151,9 @@
     <div x-show="open" class="fixed inset-0 z-[70] flex items-center justify-center p-4" style="display:none;">
         <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="snooze()"></div>
 
-        <div class="relative w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden max-h-[90vh] overflow-y-auto"
+        {{-- dir=rtl in Urdu-script locale: without it, mixed Urdu+date lines ("12 Aug 2026") get bidi-scrambled --}}
+        <div @if(app()->getLocale() === 'ur') dir="rtl" @endif
+             class="relative w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden max-h-[90vh] overflow-y-auto"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="opacity-0 scale-95"
              x-transition:enter-end="opacity-100 scale-100">

@@ -20,19 +20,21 @@
             if ($ov) {
                 $parts = [];
                 $parts[] = $ov['days_left'] <= 0
-                    ? 'ends today'
-                    : ('ends ' . $ov['until'] . ' — ' . $ov['days_left'] . ' day' . ($ov['days_left'] == 1 ? '' : 's') . ' left');
+                    ? __('pos.trb_ends_today')
+                    : ($ov['days_left'] == 1
+                        ? __('pos.trb_ends_1day', ['date' => $ov['until']])
+                        : __('pos.trb_ends_days', ['date' => $ov['until'], 'days' => $ov['days_left']]));
                 if ($ov['invoices_left'] !== null) {
-                    $parts[] = $ov['invoices_left'] <= 0 ? 'no invoices left' : ($ov['invoices_left'] . ' invoice' . ($ov['invoices_left'] == 1 ? '' : 's') . ' left');
+                    $parts[] = $ov['invoices_left'] <= 0
+                        ? __('pos.trb_no_invoices')
+                        : ($ov['invoices_left'] == 1 ? __('pos.trb_inv_1') : __('pos.trb_inv_n', ['count' => $ov['invoices_left']]));
                 }
                 // Auto-granted bridge access (payment proof upload) reads differently
                 // from a manual admin grant — the customer is waiting on verification.
                 $ovSub = \App\Models\Subscription::where('company_id', $rCompany->id)->where('active', true)->orderByDesc('id')->first();
                 $isAutoGrant = $ovSub && $ovSub->override_by === null && str_contains((string) $ovSub->override_reason, 'payment proof #');
                 $reminder = [
-                    'text' => ($isAutoGrant
-                        ? 'Temporary access while we verify your payment — '
-                        : 'Free access granted by admin — ') . implode(' · ', $parts) . '.',
+                    'text' => __($isAutoGrant ? 'pos.trb_grant_auto' : 'pos.trb_grant_admin', ['parts' => implode(' · ', $parts)]),
                     'key' => 'override_reminder_' . now()->toDateString() . '_' . $ov['days_left'] . '_' . ($ov['invoices_left'] ?? 'x'),
                 ];
             }
@@ -42,7 +44,11 @@
                 $pe = \App\Services\SubscriptionAccessService::paidEndingReminder($rCompany);
                 if ($pe) {
                     $reminder = [
-                        'text' => 'Your subscription ' . ($pe['days_left'] <= 0 ? 'ends today' : ('ends ' . $pe['until'] . ' — ' . $pe['days_left'] . ' day' . ($pe['days_left'] == 1 ? '' : 's') . ' left')) . '. Renew now to avoid interruption.',
+                        'text' => $pe['days_left'] <= 0
+                            ? __('pos.trb_sub_today')
+                            : ($pe['days_left'] == 1
+                                ? __('pos.trb_sub_1day', ['date' => $pe['until']])
+                                : __('pos.trb_sub_days', ['date' => $pe['until'], 'days' => $pe['days_left']])),
                         'key' => 'sub_ending_reminder_' . now()->toDateString() . '_' . $pe['days_left'],
                     ];
                 }
@@ -58,13 +64,17 @@
                 if ($dayUrgent || $invUrgent) {
                     $parts = [];
                     if ($dayUrgent) {
-                        $parts[] = $daysLeft <= 0 ? 'expires today' : ($daysLeft . ' day' . ($daysLeft == 1 ? '' : 's') . ' left');
+                        $parts[] = $daysLeft <= 0
+                            ? __('pos.trb_expires_today')
+                            : ($daysLeft == 1 ? __('pos.trb_days_1') : __('pos.trb_days_n', ['days' => $daysLeft]));
                     }
                     if ($invUrgent) {
-                        $parts[] = $invLeft <= 0 ? 'no free invoices left' : ($invLeft . ' invoice' . ($invLeft == 1 ? '' : 's') . ' left');
+                        $parts[] = $invLeft <= 0
+                            ? __('pos.trb_no_free_inv')
+                            : ($invLeft == 1 ? __('pos.trb_inv_1') : __('pos.trb_inv_n', ['count' => $invLeft]));
                     }
                     $reminder = [
-                        'text' => 'Your free trial is ending — ' . implode(' · ', $parts) . '.',
+                        'text' => __('pos.trb_trial_ending', ['parts' => implode(' · ', $parts)]),
                         'key' => 'trial_reminder_' . now()->toDateString() . '_' . ($daysLeft ?? 'x') . '_' . ($invLeft ?? 'x'),
                     ];
                 }
@@ -88,7 +98,7 @@
      x-show="show" x-cloak class="relative z-40">
     <div class="flex items-center gap-3 px-4 py-2.5 bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-sm">
         <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z"/></svg>
-        <span class="flex-1 font-medium">{{ $reminder['text'] }} <span class="hidden sm:inline font-normal opacity-80">{{ __('pos.trb_subscribe_now') }}</span></span>
+        <span class="flex-1 font-medium" @if(app()->getLocale() === 'ur') dir="rtl" @endif>{{ $reminder['text'] }} <span class="hidden sm:inline font-normal opacity-80">{{ __('pos.trb_subscribe_now') }}</span></span>
         <button @click="dismiss()" class="flex-shrink-0 p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-800/50" aria-label="{{ __('pos.dismiss') }}">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>

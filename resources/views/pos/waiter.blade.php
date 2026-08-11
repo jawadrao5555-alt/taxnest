@@ -53,11 +53,17 @@
                 // waiters can tell if their installed app is outdated. Same key
                 // /api/app-version?app=waiter serves; empty = show nothing.
                 $waiterApkVersion = trim((string) \App\Models\SystemSetting::get('waiter_app_latest_version', ''));
+                // Task #470: mirror the /download page gating — hide the button
+                // entirely when the APK file isn't uploaded yet, so waiters never
+                // hit a 404 from a dead link.
+                $waiterApkExists = is_file(public_path('downloads/taxnest-waiter.apk'));
             @endphp
+            @if($waiterApkExists)
             <a href="{{ url('/downloads/taxnest-waiter.apk') }}"
                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200">
                 ⬇ {{ __('pos.waiter_app_download') }}@if($waiterApkVersion !== '') <span class="font-normal text-gray-500 dark:text-gray-400">v{{ $waiterApkVersion }}</span>@endif
             </a>
+            @endif
             {{-- ZFC (29 Jul 2026): manual refresh — waiter phones keep this tab
                  open for days; this pulls the LATEST code with a cache-buster. --}}
             <button @click="hardRefresh()" title="{{ __('pos.ti_refresh_app') }}" class="px-3 py-2 rounded-xl text-sm font-bold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-teal-500 transition">

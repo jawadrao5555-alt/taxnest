@@ -205,6 +205,7 @@ class FbrPosStockController extends Controller
 
         $data = $request->validate([
             'product_id' => 'required|integer',
+            'date' => 'nullable|date_format:Y-m-d',
             'page' => 'nullable|integer|min:1|max:100000',
         ]);
         $page = max(1, (int) ($data['page'] ?? 1));
@@ -213,10 +214,19 @@ class FbrPosStockController extends Controller
         // product_id 404s before any movement row is read.
         $product = Product::where('company_id', $companyId)->findOrFail($data['product_id']);
 
-        $rows = InventoryMovement::where('company_id', $companyId)
+        $query = InventoryMovement::where('company_id', $companyId)
             ->where('product_id', $product->id)
             ->with('creator:id,name')
-            ->orderByDesc('id')
+            ->orderByDesc('id');
+
+        // Optional single-day filter (Task 465) — same range predicate (not
+        // whereDate) as correctionsQuery() so an index on created_at stays usable.
+        if (!empty($data['date'])) {
+            $day = \Illuminate\Support\Carbon::parse($data['date'], config('app.timezone'));
+            $query->whereBetween('created_at', [$day->copy()->startOfDay(), $day->copy()->endOfDay()]);
+        }
+
+        $rows = $query
             ->skip(($page - 1) * self::MOVEMENTS_PER_PAGE)
             ->take(self::MOVEMENTS_PER_PAGE + 1)
             ->get();

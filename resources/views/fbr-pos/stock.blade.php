@@ -340,9 +340,18 @@
                 </div>
                 <button type="button" @click="movOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl leading-none font-bold px-1">&times;</button>
             </div>
+            {{-- Single-day filter (Task 465) — server-side, page 1 reload on change --}}
+            <div class="px-5 py-2.5 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2">
+                <input type="date" x-model="movDate" @change="searchMovements()"
+                       class="border rounded-lg px-3 py-1.5 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                <button type="button" x-show="movDate !== ''" x-cloak
+                        @click="movDate = ''; searchMovements()"
+                        class="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-xs font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">{{ __('pos.stock_corr_clear_filters') }}</button>
+            </div>
             <div class="overflow-y-auto flex-1">
                 <p x-show="movLoading && movRows.length === 0" class="text-sm text-gray-400 text-center py-8">{{ __('pos.stock_mov_loading') }}</p>
-                <p x-show="!movLoading && movRows.length === 0" x-cloak class="text-sm text-gray-400 text-center py-8 px-4">{{ __('pos.stock_mov_empty') }}</p>
+                <p x-show="!movLoading && movRows.length === 0 && movDate === ''" x-cloak class="text-sm text-gray-400 text-center py-8 px-4">{{ __('pos.stock_mov_empty') }}</p>
+                <p x-show="!movLoading && movRows.length === 0 && movDate !== ''" x-cloak class="text-sm text-gray-400 text-center py-8 px-4">{{ __('pos.stock_corr_no_results') }}</p>
                 <table class="w-full text-sm" x-show="movRows.length > 0" x-cloak>
                     <thead class="bg-gray-50 dark:bg-gray-700 text-left sticky top-0">
                         <tr>
@@ -644,6 +653,7 @@ function stockPage() {
         movPage: 1,
         movLoading: false,
         movSeq: 0,
+        movDate: '',
         movTypeLabels: @php echo json_encode([
             'purchase' => __('pos.stock_mov_type_purchase'),
             'sale' => __('pos.stock_mov_type_sale'),
@@ -663,9 +673,11 @@ function stockPage() {
             this.movRows = [];
             this.movHasMore = false;
             this.movPage = 1;
+            this.movDate = '';
             this.movOpen = true;
             this.fetchMovements(true);
         },
+        searchMovements() { this.fetchMovements(true); },
         loadMoreMovements() { this.fetchMovements(false); },
         async fetchMovements(reset) {
             const seq = ++this.movSeq;
@@ -673,6 +685,7 @@ function stockPage() {
             const page = reset ? 1 : this.movPage + 1;
             try {
                 const params = new URLSearchParams({ product_id: this.movProductId, page: page });
+                if (this.movDate) params.set('date', this.movDate);
                 const res = await fetch(`{{ route('fbrpos.stock.movements', [], false) }}?` + params.toString(), {
                     headers: { 'Accept': 'application/json' },
                 });

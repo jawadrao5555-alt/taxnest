@@ -4120,6 +4120,7 @@ return [
     'stock_purch_items_col' => 'کیا خریدا',
     'stock_purch_search_ph' => 'تلاش کریں: پرچیز نمبر، سپلائر یا پروڈکٹ...',
     'stock_purch_no_results' => 'اس تلاش پر کوئی پرچیز نہیں ملی',
+    'stock_purch_all_suppliers' => 'تمام سپلائرز',
     'stock_purch_more_n' => '+:n مزید',
     'stock_purch_less' => 'کم دکھائیں',
     'stock_purch_load_more' => 'پرانی پرچیزیں دکھائیں',

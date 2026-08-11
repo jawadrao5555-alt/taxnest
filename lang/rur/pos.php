@@ -4119,6 +4119,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'stock_purch_items_col' => 'Kya kharida',
     'stock_purch_search_ph' => 'Search: purchase #, supplier ya product...',
     'stock_purch_no_results' => 'Is search par koi purchase nahi mili',
+    'stock_purch_all_suppliers' => 'Tamam suppliers',
     'stock_purch_more_n' => '+:n aur',
     'stock_purch_less' => 'kam dikhayen',
     'stock_purch_load_more' => 'Purani purchases dikhayen',

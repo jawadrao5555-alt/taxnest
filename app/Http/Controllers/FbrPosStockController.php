@@ -134,6 +134,7 @@ class FbrPosStockController extends Controller
         $data = $request->validate([
             'q' => 'nullable|string|max:100',
             'date' => 'nullable|date_format:Y-m-d',
+            'supplier_id' => 'nullable|integer|min:1',
             'page' => 'nullable|integer|min:1|max:100000',
         ]);
         $q = trim((string) ($data['q'] ?? ''));
@@ -141,6 +142,13 @@ class FbrPosStockController extends Controller
 
         $query = PurchaseOrder::where('company_id', $companyId)
             ->with('supplier:id,name', 'items.product:id,name');
+
+        // Optional exact supplier filter (Task 488) — company-scoped lookup so
+        // a foreign supplier_id 404s instead of silently matching nothing.
+        if (!empty($data['supplier_id'])) {
+            $supplier = Supplier::forCompany($companyId)->findOrFail($data['supplier_id']);
+            $query->where('supplier_id', $supplier->id);
+        }
 
         // Optional single-day filter (Task 469) — same range predicate (not
         // whereDate) as movements()/correctionsQuery() so a created_at index

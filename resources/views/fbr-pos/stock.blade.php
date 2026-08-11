@@ -474,16 +474,25 @@
                 <input type="search" x-model="purchQ" @input.debounce.400ms="searchPurchases()"
                        placeholder="{{ __('pos.stock_purch_search_ph') }}" autocomplete="off" name="purch_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                        class="border rounded-lg px-3 py-1.5 text-sm w-full sm:w-72 dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                {{-- Supplier filter (Task 488) — server-side exact match, page 1 reload on change.
+                     Inactive suppliers included on purpose: old purchases keep their supplier. --}}
+                <select x-model="purchSupplier" @change="searchPurchases()"
+                        class="border rounded-lg px-3 py-1.5 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                    <option value="">{{ __('pos.stock_purch_all_suppliers') }}</option>
+                    @foreach($suppliers as $s)
+                    <option value="{{ $s->id }}">{{ $s->name }}{{ $s->is_active ? '' : ' (' . __('pos.stock_sup_inactive') . ')' }}</option>
+                    @endforeach
+                </select>
                 {{-- Single-day filter (Task 469) — server-side, page 1 reload on change --}}
                 <input type="date" x-model="purchDate" @change="searchPurchases()"
                        class="border rounded-lg px-3 py-1.5 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
-                <button type="button" x-show="purchDate !== ''" x-cloak
-                        @click="purchDate = ''; searchPurchases()"
+                <button type="button" x-show="purchDate !== '' || purchSupplier !== ''" x-cloak
+                        @click="purchDate = ''; purchSupplier = ''; searchPurchases()"
                         class="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-xs font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">{{ __('pos.stock_corr_clear_filters') }}</button>
             </div>
         </div>
-        <p x-show="purchases.length === 0 && purchQ.trim() === '' && purchDate === ''" x-cloak class="text-sm text-gray-400 text-center py-6">{{ __('pos.stock_no_purchases') }}</p>
-        <p x-show="purchases.length === 0 && (purchQ.trim() !== '' || purchDate !== '')" x-cloak class="text-sm text-gray-400 text-center py-6">{{ __('pos.stock_purch_no_results') }}</p>
+        <p x-show="purchases.length === 0 && purchQ.trim() === '' && purchDate === '' && purchSupplier === ''" x-cloak class="text-sm text-gray-400 text-center py-6">{{ __('pos.stock_no_purchases') }}</p>
+        <p x-show="purchases.length === 0 && (purchQ.trim() !== '' || purchDate !== '' || purchSupplier !== '')" x-cloak class="text-sm text-gray-400 text-center py-6">{{ __('pos.stock_purch_no_results') }}</p>
         <table class="w-full text-sm table-cards" x-show="purchases.length > 0">
             <thead class="bg-gray-50 dark:bg-gray-700 text-left">
                 <tr>
@@ -574,6 +583,7 @@ function stockPage() {
         purchHasMore: {{ $purchasesHasMore ? 'true' : 'false' }},
         purchQ: '',
         purchDate: '',
+        purchSupplier: '',
         purchPage: 1,
         purchLoading: false,
         purchSeq: 0,
@@ -601,6 +611,7 @@ function stockPage() {
             try {
                 const params = new URLSearchParams({ q: this.purchQ.trim(), page: page });
                 if (this.purchDate) params.set('date', this.purchDate);
+                if (this.purchSupplier) params.set('supplier_id', this.purchSupplier);
                 const res = await fetch(`{{ route('fbrpos.stock.purchases', [], false) }}?` + params.toString(), {
                     headers: { 'Accept': 'application/json' },
                 });

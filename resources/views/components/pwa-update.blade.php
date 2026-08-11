@@ -26,13 +26,13 @@ Usage: <x-pwa-update color="emerald" />
                 </svg>
             </div>
             <div style="display:flex; flex-direction:column; gap:1px; line-height:1.25; color:#fff;">
-                <div style="font-size:13px; font-weight:800; letter-spacing:0.2px;">New update available</div>
+                <div style="font-size:13px; font-weight:800; letter-spacing:0.2px;">{{ __('pos.pwa_update_available') }}</div>
                 <div style="font-size:11px; opacity:0.92; font-weight:500;">{{ __('pos.pwa_apply_hint') }}</div>
             </div>
             <button id="tnPwaUpdateBtn" style="flex-shrink:0; margin-left:6px; padding:7px 14px; border-radius:10px; background:#fff; color:{{ $c['to'] }}; border:none; font-size:12px; font-weight:800; cursor:pointer; transition: all .15s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.18);">
-                Refresh
+                {{ __('pos.pwa_refresh_btn') }}
             </button>
-            <button id="tnPwaUpdateDismiss" style="flex-shrink:0; padding:6px; border-radius:8px; background:rgba(255,255,255,0.12); color:#fff; border:none; cursor:pointer; line-height:0; transition: background .15s ease;" title="Postpone">
+            <button id="tnPwaUpdateDismiss" style="flex-shrink:0; padding:6px; border-radius:8px; background:rgba(255,255,255,0.12); color:#fff; border:none; cursor:pointer; line-height:0; transition: background .15s ease;" title="{{ __('pos.pwa_postpone') }}">
                 <svg style="width:14px; height:14px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>

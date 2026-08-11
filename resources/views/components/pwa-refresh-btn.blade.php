@@ -27,7 +27,7 @@ Variants: dark (white-on-dark, default) | light (slate-on-light, for white heade
     }
 @endphp
 <button id="tnPwaRefreshBtn" type="button"
-    title="Check for updates"
+    title="{{ __('pos.pwa_check_updates') }}"
     style="position:relative; display:none; align-items:center; justify-content:center; width:34px; height:34px; border-radius:10px; background:{{ $idleBg }}; border:1px solid {{ $idleBorder }}; color:{{ $idleColor }}; cursor:pointer; transition: all .15s ease; backdrop-filter: blur(8px);">
     <svg id="tnPwaRefreshSvg" style="width:16px; height:16px; transition: transform .4s ease;" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
@@ -53,20 +53,23 @@ Variants: dark (white-on-dark, default) | light (slate-on-light, for white heade
     let updateAvailable = false;
     let busy = false;
 
+    const TITLE_APPLY = @json(__('pos.pwa_apply_now'));
+    const TITLE_CHECK = @json(__('pos.pwa_check_updates'));
+
     btn.style.display = 'inline-flex';
 
     const markUpdate = () => {
         updateAvailable = true;
         if (badge) badge.style.display = 'inline-block';
         btn.classList.add('tn-has-update');
-        btn.title = 'Update available — Click to apply now';
+        btn.title = TITLE_APPLY;
     };
 
     const clearUpdate = () => {
         updateAvailable = false;
         if (badge) badge.style.display = 'none';
         btn.classList.remove('tn-has-update');
-        btn.title = 'Check for updates';
+        btn.title = TITLE_CHECK;
     };
 
     document.addEventListener('tn-pwa-update-available', markUpdate);

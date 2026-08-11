@@ -18,8 +18,8 @@ const offlineSnapshot = require('./src/offline-snapshot');
 const { printHtml: printHtmlSilent } = require('./src/printer');
 const { openPosWindow, getPosWindowRef, isPosWindowOpen, applyKiosk, openFbrPosWindow } = require('./src/pos-window');
 
-const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/taxnest/releases/latest';
-const BUILD_TIMESTAMP = '20260729-1';
+const DOWNLOAD_URL = 'https://github.com/jawadrao5555-alt/nestpos-releases/releases/latest';
+const BUILD_TIMESTAMP = '20260811-1';
 let updateInfo = { available: false, currentBuild: BUILD_TIMESTAMP };
 
 // ─── Zip-based SELF-UPDATE ──────────────────────────────────────────────────
@@ -56,7 +56,14 @@ async function handleAgentUpdate(info) {
     // Host pin: only ever download update zips from our own GitHub releases.
     // (No code-signing available, so a compromised/misconfigured server must
     // not be able to point agents at an arbitrary zip.)
-    if (!String(info.zip_url).startsWith('https://github.com/jawadrao5555-alt/taxnest/releases/download/')) {
+    // Aug 2026: updates are moving to the public releases-only repo
+    // (nestpos-releases) so the main source repo can go private. Accept BOTH
+    // hosts during the transition — old agents pin only the taxnest host.
+    const TRUSTED_UPDATE_HOSTS = [
+      'https://github.com/jawadrao5555-alt/taxnest/releases/download/',
+      'https://github.com/jawadrao5555-alt/nestpos-releases/releases/download/',
+    ];
+    if (!TRUSTED_UPDATE_HOSTS.some((h) => String(info.zip_url).startsWith(h))) {
       console.log(`[self-update] REJECTED zip_url outside trusted release host: ${info.zip_url}`);
       return;
     }

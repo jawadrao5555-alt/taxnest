@@ -204,13 +204,33 @@ class AgentManagementController extends Controller
      * Shared by the download redirect, the /pos/agent page AND the agent
      * heartbeat's self-update advertisement (AgentController).
      */
+    /**
+     * GitHub repo (owner/name) that hosts agent release assets.
+     * Aug 2026: moving to a public releases-only repo (nestpos-releases) so
+     * the main source repo can go private. Overridable via SystemSetting
+     * 'agent_release_repo' without a deploy.
+     */
+    public static function releaseRepo(): string
+    {
+        try {
+            $repo = trim((string) \App\Models\SystemSetting::get('agent_release_repo', ''));
+        } catch (\Throwable $e) {
+            $repo = '';
+        }
+        // Basic owner/name sanity guard — anything else falls back to default.
+        if (!preg_match('#^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$#', $repo)) {
+            return 'jawadrao5555-alt/nestpos-releases';
+        }
+        return $repo;
+    }
+
     public static function latestReleaseInfo(): array
     {
         return \Illuminate\Support\Facades\Cache::remember('taxnest_agent_latest_release', 600, function () {
             try {
                 $resp = \Illuminate\Support\Facades\Http::timeout(6)
                     ->withHeaders(['Accept' => 'application/vnd.github+json', 'User-Agent' => 'TaxNest'])
-                    ->get('https://api.github.com/repos/jawadrao5555-alt/taxnest/releases/latest');
+                    ->get('https://api.github.com/repos/' . self::releaseRepo() . '/releases/latest');
                 if ($resp->successful()) {
                     return [
                         'tag' => $resp->json('tag_name'),
@@ -270,7 +290,7 @@ class AgentManagementController extends Controller
             return response()->download($localPath, 'TaxNest-PRA-Agent-Windows.zip');
         }
 
-        return redirect()->away('https://github.com/jawadrao5555-alt/taxnest/releases/latest');
+        return redirect()->away('https://github.com/' . self::releaseRepo() . '/releases/latest');
     }
 
     public function latestVersionInfo()

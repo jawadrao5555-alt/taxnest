@@ -4215,7 +4215,7 @@ class FbrPosController extends Controller
             if ($accessCompany) {
                 $access = \App\Services\SubscriptionAccessService::hasAccess($accessCompany);
                 if (!$access['allowed']) {
-                    return back()->with('error', $access['reason']);
+                    return back()->with('error', \App\Services\SubscriptionAccessService::localizedLockReason($access['reason']));
                 }
             }
         }
@@ -5042,7 +5042,7 @@ class FbrPosController extends Controller
             if ($accessCompany) {
                 $access = \App\Services\SubscriptionAccessService::hasAccess($accessCompany);
                 if (!$access['allowed']) {
-                    return response()->json(['ok' => false, 'error' => $access['reason']], 403);
+                    return response()->json(['ok' => false, 'error' => \App\Services\SubscriptionAccessService::localizedLockReason($access['reason'])], 403);
                 }
             }
         }

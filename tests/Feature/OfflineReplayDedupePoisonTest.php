@@ -376,7 +376,9 @@ class OfflineReplayDedupePoisonTest extends TestCase
         $fresh = $this->actingAs($user, 'pos')
             ->postJson('/pos/invoice/store', $this->queuedBillPayload('replay-quota-0002'));
         $fresh->assertStatus(403)->assertJson(['success' => false]);
-        $this->assertStringContainsString('Monthly bill limit reached (1/1', (string) $fresh->json('error'));
+        // Quota error is now localized to the shop's language (task 496) —
+        // assert on the counts, which survive translation.
+        $this->assertStringContainsString('(1/1', (string) $fresh->json('error'));
 
         $this->assertSame(1, DB::table('pos_transactions')->where('company_id', $company->id)->count());
     }

@@ -769,7 +769,7 @@ class RestaurantPosController extends Controller
                 $provisionalAllowed = !$restaurantish || $order->order_type === 'delivery';
                 return response()->json([
                     'success' => false,
-                    'message' => $quota['reason'],
+                    'message' => \App\Services\SubscriptionAccessService::localizedLockReason($quota['reason']),
                     'quota_full' => true,
                     'provisional_allowed' => $provisionalAllowed,
                 ], 403);

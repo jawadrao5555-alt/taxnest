@@ -42,10 +42,11 @@ class CheckPlanLimit
         if ($company) {
             $access = SubscriptionAccessService::hasAccess($company);
             if (!$access['allowed']) {
+                $reason = SubscriptionAccessService::localizedLockReason($access['reason']);
                 if ($request->expectsJson()) {
-                    return response()->json(['error' => $access['reason']], 403);
+                    return response()->json(['error' => $reason], 403);
                 }
-                return back()->with('error', $access['reason']);
+                return back()->with('error', $reason);
             }
 
             // Lifetime + active temporary/grace bypass per-resource limits entirely.
@@ -167,7 +168,9 @@ class CheckPlanLimit
         }
 
         if ($exceeded) {
-            $msg = $customReason ?: "Plan limit exceeded for {$limitName}. Please upgrade your subscription.";
+            $msg = $customReason
+                ? SubscriptionAccessService::localizedLockReason($customReason)
+                : "Plan limit exceeded for {$limitName}. Please upgrade your subscription.";
             if ($request->expectsJson()) {
                 return response()->json(['error' => $msg, 'message' => $msg], 403);
             }

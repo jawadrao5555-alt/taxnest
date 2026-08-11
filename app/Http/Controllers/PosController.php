@@ -1903,13 +1903,13 @@ class PosController extends Controller
                     $provisionalAllowed = !$restaurantish || !$request->filled('order_type') || $request->input('order_type') === 'delivery';
                     return response()->json([
                         'success' => false,
-                        'error' => $quota['reason'],
-                        'message' => $quota['reason'],
+                        'error' => \App\Services\SubscriptionAccessService::localizedLockReason($quota['reason']),
+                        'message' => \App\Services\SubscriptionAccessService::localizedLockReason($quota['reason']),
                         'quota_full' => true,
                         'provisional_allowed' => $provisionalAllowed,
                     ], 403);
                 }
-                return back()->withInput()->with('error', $quota['reason']);
+                return back()->withInput()->with('error', \App\Services\SubscriptionAccessService::localizedLockReason($quota['reason']));
             }
         }
 
@@ -2877,7 +2877,7 @@ class PosController extends Controller
         if ($transaction->pra_status === 'local') {
             $quota = \App\Services\PlanLimitService::canCreatePosBill($companyId);
             if (!($quota['allowed'] ?? true)) {
-                return back()->with('error', $quota['reason']);
+                return back()->with('error', \App\Services\SubscriptionAccessService::localizedLockReason($quota['reason']));
             }
             // MONTH GATE (owner rule Jul 2026): only CURRENT-MONTH local bills may be
             // promoted to PRA — previous months are closed (report/view only).
@@ -3560,7 +3560,7 @@ class PosController extends Controller
         // gate as storeInvoice finals (paid-plan package limits, Jul 2026).
         $quota = \App\Services\PlanLimitService::canCreatePosBill($companyId);
         if (!($quota['allowed'] ?? true)) {
-            return response()->json(['success' => false, 'message' => $quota['reason']], 403);
+            return response()->json(['success' => false, 'message' => \App\Services\SubscriptionAccessService::localizedLockReason($quota['reason'])], 403);
         }
 
         // Per-cashier toggle (owner rule Jul 2026): the promoting user's own switch decides.
@@ -5728,7 +5728,7 @@ class PosController extends Controller
         if (!in_array($newRole, ['pos_kitchen', 'pos_waiter', 'pos_delivery'], true)) {
             $quota = \App\Services\PlanLimitService::canAddPosUser($companyId);
             if (!($quota['allowed'] ?? true)) {
-                return back()->with('error', $quota['reason']);
+                return back()->with('error', \App\Services\SubscriptionAccessService::localizedLockReason($quota['reason']));
             }
         }
 
@@ -6132,7 +6132,7 @@ class PosController extends Controller
         if (!$cashier->is_active && !in_array($cashier->pos_role, ['pos_kitchen', 'pos_waiter', 'pos_delivery'], true)) {
             $quota = \App\Services\PlanLimitService::canAddPosUser($companyId);
             if (!($quota['allowed'] ?? true)) {
-                return back()->with('error', $quota['reason']);
+                return back()->with('error', \App\Services\SubscriptionAccessService::localizedLockReason($quota['reason']));
             }
         }
 
@@ -6230,7 +6230,7 @@ class PosController extends Controller
         if (\Illuminate\Support\Facades\Schema::hasTable('subscriptions')) {
             $access = \App\Services\SubscriptionAccessService::hasAccess($company);
             if (!$access['allowed']) {
-                return response()->json(['ok' => false, 'error' => $access['reason']], 403);
+                return response()->json(['ok' => false, 'error' => \App\Services\SubscriptionAccessService::localizedLockReason($access['reason'])], 403);
             }
         }
         // Plan product cap (Task 362): this route has NO plan.limit middleware —
@@ -6629,7 +6629,7 @@ class PosController extends Controller
             if ($accessCompany) {
                 $access = \App\Services\SubscriptionAccessService::hasAccess($accessCompany);
                 if (!$access['allowed']) {
-                    return back()->with('error', $access['reason']);
+                    return back()->with('error', \App\Services\SubscriptionAccessService::localizedLockReason($access['reason']));
                 }
             }
         }

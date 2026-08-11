@@ -217,7 +217,8 @@ class ProductController extends Controller
             if ($accessCompany) {
                 $access = \App\Services\SubscriptionAccessService::hasAccess($accessCompany);
                 if (!$access['allowed']) {
-                    return response()->json(['error' => $access['reason'], 'message' => $access['reason']], 403);
+                    $reason = \App\Services\SubscriptionAccessService::localizedLockReason($access['reason']);
+                    return response()->json(['error' => $reason, 'message' => $reason], 403);
                 }
             }
         }

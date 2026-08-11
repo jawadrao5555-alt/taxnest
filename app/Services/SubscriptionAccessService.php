@@ -39,6 +39,11 @@ class SubscriptionAccessService
             preg_match('/^Free trial invoice limit reached \((\d+)\/(\d+)\)/', $reason, $m) === 1 => __('pos.tl_reason_trial_limit', ['used' => $m[1], 'limit' => $m[2]]),
             preg_match('/^Free invoice limit reached \((\d+)\/(\d+)\)/', $reason, $m) === 1 => __('pos.tl_reason_free_limit', ['used' => $m[1], 'limit' => $m[2]]),
             preg_match('/^Temporary invoice allowance reached \((\d+)\/(\d+)\)/', $reason, $m) === 1 => __('pos.tl_reason_temp_limit', ['used' => $m[1], 'limit' => $m[2]]),
+            // PlanLimitService quota reasons (monthly bill + team-account caps)
+            preg_match('/^Monthly bill limit reached \((\d+)\/(\d+) bills this month on the (.+) plan\)/', $reason, $m) === 1 => __('pos.tl_reason_monthly_plan', ['used' => $m[1], 'limit' => $m[2], 'plan' => $m[3]]),
+            preg_match('/^Monthly bill limit reached \((\d+)\/(\d+) this month\)/', $reason, $m) === 1 => __('pos.tl_reason_monthly_admin', ['used' => $m[1], 'limit' => $m[2]]),
+            preg_match('/^Team account limit reached \((\d+)\/(\d+) on the (.+) plan\)/', $reason, $m) === 1 => __('pos.tl_reason_team_plan', ['used' => $m[1], 'limit' => $m[2], 'plan' => $m[3]]),
+            preg_match('/^Team account limit reached \((\d+)\/(\d+)\)/', $reason, $m) === 1 => __('pos.tl_reason_team_admin', ['used' => $m[1], 'limit' => $m[2]]),
             default => $reason,
         };
     }

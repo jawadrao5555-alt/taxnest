@@ -21,6 +21,11 @@ class LockReasonLocalizationTest extends TestCase
         'Free trial invoice limit reached (25/25). Please subscribe to a plan.',
         'Free invoice limit reached (10/10). Please upgrade your plan.',
         'Temporary invoice allowance reached (5/5). Please subscribe to a plan.',
+        // PlanLimitService quota reasons (task 496 — quota errors on billing paths)
+        'Monthly bill limit reached (500/500 this month). Please contact admin.',
+        'Monthly bill limit reached (500/500 bills this month on the Basic plan). Please upgrade your plan to keep billing.',
+        'Team account limit reached (3/3). Please contact admin.',
+        'Team account limit reached (3/3 on the Basic plan). Please upgrade your plan to add more accounts.',
     ];
 
     public function test_every_denied_reason_is_translated_in_rur_and_ur(): void
@@ -46,9 +51,13 @@ class LockReasonLocalizationTest extends TestCase
                 'Free trial invoice limit reached (25/30). Please subscribe to a plan.',
                 'Free invoice limit reached (10/12). Please upgrade your plan.',
                 'Temporary invoice allowance reached (5/7). Please subscribe to a plan.',
+                'Monthly bill limit reached (450/500 this month). Please contact admin.',
+                'Monthly bill limit reached (450/500 bills this month on the Basic plan). Please upgrade your plan to keep billing.',
+                'Team account limit reached (2/3). Please contact admin.',
+                'Team account limit reached (2/3 on the Basic plan). Please upgrade your plan to add more accounts.',
             ] as $raw) {
                 $out = SubscriptionAccessService::localizedLockReason($raw);
-                preg_match('/\((\d+)\/(\d+)\)/', $raw, $m);
+                preg_match('/\((\d+)\/(\d+)[ )]/', $raw, $m);
                 $this->assertStringContainsString($m[1] . '/' . $m[2], $out, "[$locale] counts lost in: $out");
                 $this->assertStringNotContainsString(':used', $out);
                 $this->assertStringNotContainsString(':limit', $out);

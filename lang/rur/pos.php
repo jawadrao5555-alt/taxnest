@@ -2242,6 +2242,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'pending_deliveries_title' => 'Pending deliveries',
     'pending_open_tables' => 'Khule orders',
     'pending_open_tables_sub' => 'Abhi settle nahi hue',
+    'open_since_date' => ':date se khula',
+    'local_archived_explain' => 'Day-close par mehfooz ho chuka — koi action zaroori nahi',
     'pending_provisional_bills' => 'Provisional bills',
     'pending_provisional_sub' => 'Abhi final nahi hue',
     'pending_word' => 'Pending',

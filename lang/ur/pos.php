@@ -2242,6 +2242,8 @@ return [
     'pending_deliveries_title' => 'پینڈنگ ڈیلیوریز',
     'pending_open_tables' => 'اوپن آرڈرز',
     'pending_open_tables_sub' => 'ابھی سیٹل نہیں ہوئے',
+    'open_since_date' => ':date سے کھلا',
+    'local_archived_explain' => 'ڈے کلوز پر محفوظ ہو چکا — کوئی کارروائی درکار نہیں',
     'pending_provisional_bills' => 'عارضی بل',
     'pending_provisional_sub' => 'ابھی تک فائنل نہیں کیے گئے',
     'pending_word' => 'پینڈنگ',

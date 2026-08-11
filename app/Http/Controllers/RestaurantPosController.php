@@ -1911,6 +1911,12 @@ class RestaurantPosController extends Controller
             ->count();
         // (b) Open dine-in/held orders: still un-settled regardless of when they
         //     were opened — a table left open from before the cutoff is still pending.
+        //     Task 507 diagnosis (11 Aug 2026, ZFC Pizza Point "ghost 1"): a lone
+        //     count here with zero provisionals = a genuinely ABANDONED held order
+        //     (no paid txn attached), NOT a pay-path bug. It's actionable: the
+        //     Tables page lists every open order (even table-less / deleted-table)
+        //     and day-close hard-blocks while any remain — so the count always
+        //     leads somewhere staff can settle or cancel.
         $openOrdersCount = RestaurantOrder::where('company_id', $companyId)
             ->whereIn('status', ['held', 'preparing', 'ready'])
             ->count();

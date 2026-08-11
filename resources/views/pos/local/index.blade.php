@@ -64,7 +64,9 @@
                         <td class="px-4 py-3 text-center"><span class="text-[10px] uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300">{{ $b->payment_method }}</span></td>
                         <td class="px-4 py-3 text-center">
                             @if($b->is_archived)
-                                <span class="text-[10px] uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-400">Archived</span>
+                                {{-- Task 507 (11 Aug 2026): "Archived" ka matlab wazeh —
+                                     day-close par mehfooz bill hai, koi pending action nahi. --}}
+                                <span class="text-[10px] uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-400 cursor-help" title="{{ __('pos.local_archived_explain') }}">Archived ✓</span>
                             @else
                                 <span class="text-[10px] uppercase px-2 py-0.5 rounded bg-violet-900/40 text-violet-300">Live</span>
                             @endif
@@ -81,6 +83,12 @@
         </div>
         @if($bills->hasPages())
         <div class="px-4 py-3 border-t border-slate-800">{{ $bills->links() }}</div>
+        @endif
+        @if($bills->contains(fn ($b) => $b->is_archived))
+        {{-- Task 507: archived-state legend — owner ne archived bill ko pending samjha tha. --}}
+        <div class="px-4 py-2.5 border-t border-slate-800 text-[11px] text-slate-500">
+            ℹ <span class="uppercase text-slate-400">Archived</span> = {{ __('pos.local_archived_explain') }}
+        </div>
         @endif
     </div>
 </x-dynamic-component>

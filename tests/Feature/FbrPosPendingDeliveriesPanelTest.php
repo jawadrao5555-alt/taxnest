@@ -82,8 +82,9 @@ class FbrPosPendingDeliveriesPanelTest extends TestCase
             $table->timestamps();
         });
 
-        // PosBusinessDay::forMoment consults PRA day-close reports pre-cutoff.
-        Schema::create('pos_day_close_reports', function (Blueprint $table) {
+        // Task 492: PosBusinessDay::forMomentFbr consults FBR day-close
+        // reports pre-cutoff (fbr_day_close_reports, NOT pos_day_close_reports).
+        Schema::create('fbr_day_close_reports', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('company_id');
             $table->date('report_date');
@@ -150,7 +151,7 @@ class FbrPosPendingDeliveriesPanelTest extends TestCase
         $bill = $this->makeProvisional();
         DB::table('fbr_pos_transactions')->where('id', $bill->id)->update(['created_at' => $at]);
 
-        $expected = \App\Services\PosBusinessDay::forMoment($this->companyId, $at);
+        $expected = \App\Services\PosBusinessDay::forMomentFbr($this->companyId, $at);
         $data = (new FbrPosController())->apiProvisionalBills(new Request())->getData(true);
 
         $this->assertSame($expected, $data['bills'][0]['business_date']);

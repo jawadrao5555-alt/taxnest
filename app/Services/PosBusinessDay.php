@@ -65,15 +65,35 @@ class PosBusinessDay
     }
 
     /**
-     * Trading day for a company at a given moment (app tz = Asia/Karachi).
+     * Trading day for a PRA POS company at a given moment (app tz =
+     * Asia/Karachi). "Already closed" check reads pos_day_close_reports.
      */
     public static function forMoment(int $companyId, CarbonInterface $at): string
+    {
+        return self::resolve($companyId, $at, PosDayCloseReport::class);
+    }
+
+    /**
+     * Trading day for an FBR POS company at a given moment (Task 492 — FBR
+     * mirror). Same per-company cutoff rule, but the "already closed" check
+     * reads fbr_day_close_reports (the two products close independently).
+     */
+    public static function forMomentFbr(int $companyId, CarbonInterface $at): string
+    {
+        return self::resolve($companyId, $at, \App\Models\FbrDayCloseReport::class);
+    }
+
+    /**
+     * Shared cutoff rule: before the cutoff, yesterday stays the open trading
+     * day as long as it has not been day-closed in $reportModel's table.
+     */
+    protected static function resolve(int $companyId, CarbonInterface $at, string $reportModel): string
     {
         try {
             $local = $at->copy()->setTimezone(config('app.timezone'));
             if ($local->format('H:i') < self::cutoffFor($companyId)) {
                 $yesterday = $local->copy()->subDay()->toDateString();
-                $closed = PosDayCloseReport::where('company_id', $companyId)
+                $closed = $reportModel::where('company_id', $companyId)
                     ->where('report_date', $yesterday)
                     ->exists();
                 if (!$closed) {
@@ -89,10 +109,18 @@ class PosBusinessDay
     }
 
     /**
-     * The company's CURRENT open trading day.
+     * The company's CURRENT open trading day (PRA POS).
      */
     public static function current(int $companyId): string
     {
         return self::forMoment($companyId, now());
+    }
+
+    /**
+     * The company's CURRENT open trading day (FBR POS).
+     */
+    public static function currentFbr(int $companyId): string
+    {
+        return self::forMomentFbr($companyId, now());
     }
 }

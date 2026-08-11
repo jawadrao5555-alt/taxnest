@@ -75,7 +75,7 @@ class FbrPosController extends Controller
                     // TODAY (never floods with old confidential provisionals).
                     'business_date' => ($hasBizDate && $b->business_date)
                         ? (string) $b->business_date
-                        : ($b->created_at ? \App\Services\PosBusinessDay::forMoment((int) $companyId, $b->created_at) : null),
+                        : ($b->created_at ? \App\Services\PosBusinessDay::forMomentFbr((int) $companyId, $b->created_at) : null),
                     'order_type' => $hasOrderType ? $b->order_type : null,
                     'delivery_address' => $hasAddress ? $b->delivery_address : null,
                     // FBR POS has no delivery riders — mirror fields stay empty
@@ -94,8 +94,9 @@ class FbrPosController extends Controller
             'count' => $bills->count(),
             // Current business day for the badge's client-side date filter.
             // PosBusinessDay is company-cutoff based (00:00–05:59 counts in
-            // yesterday) and applies to FBR shops the same way.
-            'business_today' => \App\Services\PosBusinessDay::current($companyId),
+            // yesterday); the Fbr variant reads fbr_day_close_reports for the
+            // "already closed" check (Task 492).
+            'business_today' => \App\Services\PosBusinessDay::currentFbr($companyId),
         ]);
     }
 
@@ -206,9 +207,13 @@ class FbrPosController extends Controller
         $branchSvc = app(\App\Services\BranchContextService::class);
         $branchScope = fn ($q) => $branchSvc->applyToQuery($q);
 
+        // Task 492: dashboard "today" = current TRADING day (business_date via
+        // the PosBusinessDay cutoff rule), so a 1 AM sale of a late-night shop
+        // stays in yesterday's figures until that day is closed.
+        $bizToday = $this->fbrBizToday($companyId);
         $todayStats = FbrPosTransaction::where('company_id', $companyId)
             ->tap($branchScope)
-            ->whereDate('created_at', today())
+            ->tap(fn ($q) => $this->whereBizDate($q, $bizToday))
             ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue, COALESCE(SUM(tax_amount), 0) as tax')
             ->first();
 
@@ -246,15 +251,13 @@ class FbrPosController extends Controller
         // Task 112: Pending Bills tile (mirrors PRA dashboard, Task 109) —
         // provisional bills of the current day that are still not FINAL.
         // Triple-filter per pos-provisional rules: completed + invoice_mode='local'
-        // + fbr_status='local'. FbrPosTransaction has no business_date/archive
-        // columns, so "current day" = whereDate(created_at) like the rest of
-        // this dashboard.
+        // + fbr_status='local'. "Current day" = current trading day (Task 492).
         $pendingProvisional = FbrPosTransaction::where('company_id', $companyId)
             ->tap($branchScope)
             ->where('status', 'completed')
             ->where('invoice_mode', 'local')
             ->where('fbr_status', 'local')
-            ->whereDate('created_at', today())
+            ->tap(fn ($q) => $this->whereBizDate($q, $bizToday))
             ->count();
 
         // Same admin/manager rule as PRA dashboard tile (admin-only surface).
@@ -326,21 +329,27 @@ class FbrPosController extends Controller
      */
     private function getPendingDayCloses(int $companyId, int $limit = 10): array
     {
-        $startOfToday = now()->startOfDay();
         $closedDates = FbrDayCloseReport::where('company_id', $companyId)
             ->pluck('report_date')
             ->map(fn($d) => $d instanceof \Carbon\Carbon ? $d->format('Y-m-d') : (string) $d)
             ->all();
 
+        // Task 492: days key on business_date (trading day), "prior" = before
+        // the current OPEN trading day — a late-night shop's 1 AM bills belong
+        // to the still-open yesterday and are never offered for auto-close.
+        $bizToday = $this->fbrBizToday($companyId);
+        $expr = $this->hasBizDate() ? 'business_date' : 'DATE(created_at)';
         $rows = \DB::table('fbr_pos_transactions')
             ->select(
-                \DB::raw('DATE(created_at) as d'),
+                \DB::raw($expr . ' as d'),
                 \DB::raw('COUNT(*) as cnt'),
                 \DB::raw('SUM(total_amount) as total')
             )
             ->where('company_id', $companyId)
-            ->where('created_at', '<', $startOfToday)  // Timezone-safe + index-friendly
-            ->when(!empty($closedDates), fn($q) => $q->whereNotIn(\DB::raw('DATE(created_at)'), $closedDates))
+            ->when($this->hasBizDate(),
+                fn ($q) => $q->where('business_date', '<', $bizToday),
+                fn ($q) => $q->where('created_at', '<', now()->startOfDay()))
+            ->when(!empty($closedDates), fn($q) => $q->whereNotIn(\DB::raw($expr), $closedDates))
             ->groupBy('d')
             ->orderBy('d', 'desc')
             ->limit($limit)
@@ -389,8 +398,11 @@ class FbrPosController extends Controller
         $agentMode = $company->agentServesFbr() && $company->agent_enabled;
         $fbrService = null;
 
+        // Task 492: sweep keys on business_date so an after-midnight provisional
+        // (created 00:30, business_date = the close date) is finalized with its
+        // trading day. The MONTH GATE below stays on real created_at (FBR truth).
         $rows = FbrPosTransaction::where('company_id', $companyId)
-            ->whereDate('created_at', '<=', $date)
+            ->tap(fn ($q) => $this->whereBizDate($q, $date, '<='))
             ->where('invoice_mode', 'local')
             ->where('fbr_status', 'local')
             ->orderBy('id')
@@ -484,8 +496,11 @@ class FbrPosController extends Controller
             $this->lastFinalizeSweep = $this->finalizeFbrProvisionalsAtDayClose($companyId, $company, $date);
         }
 
+        // Task 492: the persisted Z-report keys on business_date — same bucket
+        // as the preview/PDF/thermal paths, so a 1 AM sale closes with its
+        // trading day, never the next calendar day.
         $transactions = FbrPosTransaction::where('company_id', $companyId)
-            ->whereDate('created_at', $date)
+            ->tap(fn ($q) => $this->whereBizDate($q, $date))
             ->with('creator')->orderBy('created_at')->get();
         if ($transactions->isEmpty()) {
             return null;
@@ -1322,6 +1337,17 @@ class FbrPosController extends Controller
                 // moment. created_at is NOT mass-assignable — set + save explicitly.
                 if ($offlineQueuedAt) {
                     $transaction->created_at = $offlineQueuedAt;
+                    // Task 492: the creating hook already stamped business_date
+                    // from "now" (the SYNC moment) — re-stamp from the original
+                    // sale moment so an offline 1 AM bill lands in the right
+                    // trading day.
+                    try {
+                        if (\Schema::hasColumn('fbr_pos_transactions', 'business_date')) {
+                            $transaction->business_date = \App\Services\PosBusinessDay::forMomentFbr((int) $companyId, $offlineQueuedAt);
+                        }
+                    } catch (\Throwable $e) {
+                        // Never block a sync over the stamp — backfill repairs it.
+                    }
                     $transaction->save();
                 }
 
@@ -2712,28 +2738,35 @@ class FbrPosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
+        // Task 492: shop-facing sales reports group by TRADING day
+        // (business_date) — a 1 AM sale shows in yesterday's figures. FBR /
+        // tax reporting surfaces keep real created_at.
+        $bizToday = $this->fbrBizToday($companyId);
+        $monthStart = now()->startOfMonth()->toDateString();
+        $monthEnd = now()->endOfMonth()->toDateString();
+        $monthScope = fn ($q) => $this->hasBizDate()
+            ? $q->whereBetween('business_date', [$monthStart, $monthEnd])
+            : $q->whereYear('created_at', now()->year)->whereMonth('created_at', now()->month);
+
         $todayStats = FbrPosTransaction::where('company_id', $companyId)
-            ->whereDate('created_at', today())
+            ->tap(fn ($q) => $this->whereBizDate($q, $bizToday))
             ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue, COALESCE(SUM(tax_amount), 0) as tax, COALESCE(SUM(discount_amount), 0) as discount')
             ->first();
 
         $monthStats = FbrPosTransaction::where('company_id', $companyId)
-            ->whereYear('created_at', now()->year)
-            ->whereMonth('created_at', now()->month)
+            ->tap($monthScope)
             ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue, COALESCE(SUM(tax_amount), 0) as tax, COALESCE(SUM(discount_amount), 0) as discount')
             ->first();
 
         $dailySales = FbrPosTransaction::where('company_id', $companyId)
-            ->whereYear('created_at', now()->year)
-            ->whereMonth('created_at', now()->month)
-            ->selectRaw('DATE(created_at) as date, COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue')
-            ->groupByRaw('DATE(created_at)')
+            ->tap($monthScope)
+            ->selectRaw($this->bizDateExpr() . ' as date, COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue')
+            ->groupByRaw($this->bizDateExpr())
             ->orderBy('date')
             ->get();
 
         $paymentBreakdown = FbrPosTransaction::where('company_id', $companyId)
-            ->whereYear('created_at', now()->year)
-            ->whereMonth('created_at', now()->month)
+            ->tap($monthScope)
             ->selectRaw('payment_method, COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue')
             ->groupBy('payment_method')
             ->get();
@@ -3439,8 +3472,10 @@ class FbrPosController extends Controller
             ->where('report_date', $date)
             ->first();
 
+        // Task 492: a trading day = its business_date bucket, so a 1 AM sale
+        // closes with yesterday's day, not today's.
         $transactions = FbrPosTransaction::where('company_id', $companyId)
-            ->whereDate('created_at', $date)
+            ->tap(fn ($q) => $this->whereBizDate($q, $date))
             ->with('creator')
             ->orderBy('created_at')
             ->get();
@@ -3490,7 +3525,7 @@ class FbrPosController extends Controller
         $pendingAutoFinal = 0;
         if (!$existingReport && ($company->pos_dayclose_provisional_action ?? null) === 'finalize') {
             $pendingAutoFinal = FbrPosTransaction::where('company_id', $companyId)
-                ->whereDate('created_at', '<=', $date)
+                ->tap(fn ($q) => $this->whereBizDate($q, $date, '<='))
                 ->where('created_at', '>=', now()->startOfMonth())
                 ->where('invoice_mode', 'local')
                 ->where('fbr_status', 'local')
@@ -3506,30 +3541,61 @@ class FbrPosController extends Controller
     }
 
     /**
+     * Does fbr_pos_transactions have the business_date column yet? Guarded so
+     * a tar-deploy window before `migrate --force` falls back to created_at
+     * dates instead of 500ing (same convention as the PRA side).
+     */
+    private function hasBizDate(): bool
+    {
+        // No static cache: it would leak across the sqlite test suites (each
+        // rebuilds a different schema in-process). hasColumn is cheap.
+        try {
+            return \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'business_date');
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /** Current open TRADING day for an FBR company (PosBusinessDay cutoff rule). */
+    private function fbrBizToday(int $companyId): string
+    {
+        return \App\Services\PosBusinessDay::currentFbr($companyId);
+    }
+
+    /**
+     * Scope a query to one/ranged business date(s) — business_date when the
+     * column exists, DATE(created_at) fallback pre-migration. Shop-facing
+     * grouping ONLY: FBR / tax reporting must keep filtering on created_at.
+     */
+    private function whereBizDate($q, string $date, string $op = '=')
+    {
+        return $this->hasBizDate()
+            ? $q->where('business_date', $op, $date)
+            : $q->whereDate('created_at', $op, $date);
+    }
+
+    /** SQL expression for the business-date bucket (grouping / select). */
+    private function bizDateExpr(): string
+    {
+        return $this->hasBizDate() ? 'business_date' : 'DATE(created_at)';
+    }
+
+    /**
      * Stranded-day detection (Task 479 — FBR mirror of PosController::
-     * unclosedPriorBusinessDays): prior days that have bills but NO
-     * FbrDayCloseReport row. FbrPosTransaction has no business_date column,
-     * so days key on DATE(created_at); "prior" = created_at < startOfToday
-     * (timezone-safe range, same convention as getPendingDayCloses).
+     * unclosedPriorBusinessDays): prior TRADING days that have bills but NO
+     * FbrDayCloseReport row. Task 492: keyed on real business_date (created_at
+     * date on pre-migration schemas), with "prior" = before the current open
+     * trading day — this replaces the Task 489 calendar-day + pre-cutoff grace
+     * heuristic: a 1 AM bill now CARRIES yesterday's business_date, so an
+     * open late-night yesterday is simply "today" and never flagged.
      * Returns an ascending collection of Y-m-d strings (max 30 days back).
-     *
-     * Pre-cutoff grace (Task 489 — mirrors the PRA PosBusinessDay rule): a
-     * shop still trading at 1 AM has NOT abandoned yesterday — before the
-     * company's day-close cutoff (default 06:00) yesterday is its still-open
-     * trading day, so it is never flagged as stranded. From the cutoff on,
-     * an unclosed yesterday is flagged as usual. Genuinely older days are
-     * always flagged.
      */
     private function unclosedPriorBusinessDays(int $companyId, ?string $excludeDate = null)
     {
-        $nowLocal = now()->setTimezone(config('app.timezone'));
-        $graceDate = null;
-        if ($nowLocal->format('H:i') < \App\Services\PosBusinessDay::cutoffFor($companyId)) {
-            $graceDate = $nowLocal->copy()->subDay()->toDateString();
-        }
+        $bizToday = $this->fbrBizToday($companyId);
         $priorDates = FbrPosTransaction::where('company_id', $companyId)
-            ->where('created_at', '<', now()->startOfDay())
-            ->selectRaw('DATE(created_at) as d')
+            ->tap(fn ($q) => $this->whereBizDate($q, $bizToday, '<'))
+            ->selectRaw($this->bizDateExpr() . ' as d')
             ->groupBy('d')
             ->orderByDesc('d')
             ->limit(30)
@@ -3546,7 +3612,7 @@ class FbrPosController extends Controller
             ->map(fn ($d) => \Carbon\Carbon::parse($d)->toDateString());
 
         return $priorDates
-            ->reject(fn ($d) => $closedDates->contains($d) || $d === $excludeDate || $d === $graceDate)
+            ->reject(fn ($d) => $closedDates->contains($d) || $d === $excludeDate)
             ->sort()
             ->values();
     }
@@ -3618,7 +3684,7 @@ class FbrPosController extends Controller
         // Yesterday + same-day-last-week comparison.
         $compareFor = function (string $cmpDate) use ($companyId) {
             $row = FbrPosTransaction::where('company_id', $companyId)
-                ->whereDate('created_at', $cmpDate)
+                ->tap(fn ($q) => $this->whereBizDate($q, $cmpDate))
                 ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as revenue, COALESCE(SUM(tax_amount),0) as tax')
                 ->first();
             return (object) [
@@ -3721,7 +3787,7 @@ class FbrPosController extends Controller
         $report = FbrDayCloseReport::where('company_id', $companyId)->findOrFail($id);
 
         $transactions = FbrPosTransaction::where('company_id', $companyId)
-            ->whereDate('created_at', $report->report_date)
+            ->tap(fn ($q) => $this->whereBizDate($q, $report->report_date->toDateString()))
             ->with('creator')
             ->orderBy('created_at')
             ->get();
@@ -3770,7 +3836,7 @@ class FbrPosController extends Controller
         $report = FbrDayCloseReport::where('company_id', $companyId)->findOrFail($id);
 
         $transactions = FbrPosTransaction::where('company_id', $companyId)
-            ->whereDate('created_at', $report->report_date)
+            ->tap(fn ($q) => $this->whereBizDate($q, $report->report_date->toDateString()))
             ->with('creator')
             ->orderBy('created_at')
             ->get();

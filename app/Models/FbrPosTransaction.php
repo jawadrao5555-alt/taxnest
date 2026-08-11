@@ -36,7 +36,34 @@ class FbrPosTransaction extends Model
         'rider_id', 'delivery_status', 'rider_assigned_at', 'delivered_at',
         'rider_settlement_id', 'rider_settled_at',
         'prepaid_converted_at', 'prepaid_converted_by',
+        // Task 492: trading-day bucket (PosBusinessDay cutoff rule, FBR mirror).
+        // Shop-facing grouping only — FBR/tax reporting keeps real created_at.
+        'business_date',
     ];
+
+    protected static function booted()
+    {
+        // Business-day stamp (Task 492 — FBR mirror of the PRA rule): set ONCE
+        // at creation on EVERY create path (sale, provisional, offline sync).
+        // 00:00–05:59 bills belong to the previous day's business while that
+        // day is still un-closed per fbr_day_close_reports. Synced rows with an
+        // explicit created_at are bucketed by that timestamp, not by "now".
+        static::creating(function (self $t) {
+            try {
+                if ($t->business_date === null
+                    && $t->company_id
+                    && \Schema::hasColumn('fbr_pos_transactions', 'business_date')) {
+                    $at = $t->created_at
+                        ? \Illuminate\Support\Carbon::parse($t->created_at)
+                        : now();
+                    $t->business_date = \App\Services\PosBusinessDay::forMomentFbr((int) $t->company_id, $at);
+                }
+            } catch (\Throwable $e) {
+                // Stamping must never block a sale — the migration backfill
+                // repairs any missing stamps.
+            }
+        });
+    }
 
     protected $casts = [
         'subtotal' => 'decimal:2',

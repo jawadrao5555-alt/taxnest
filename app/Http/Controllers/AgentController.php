@@ -38,7 +38,7 @@ class AgentController extends Controller
      * date-style tags like v2026.2.0 are ignored so a mis-tagged release can
      * never trigger a downgrade/update loop.
      */
-    private function agentUpdateInfo(): ?array
+    private function agentUpdateInfo(?string $agentVersion = null): ?array
     {
         try {
             $info = AgentManagementController::latestReleaseInfo();
@@ -53,10 +53,28 @@ class AgentController extends Controller
             if (!$zip) {
                 return null;
             }
+            $zipUrl = $zip['url'];
+
+            // Transition shim (Aug 2026, remove once the fleet is >= 1.7.0):
+            // releases moved to the public releases-only repo (nestpos-releases)
+            // so the main source repo can go private. Agents < 1.7.0 host-pin
+            // ONLY the old taxnest repo and silently reject any other zip_url,
+            // so for them we rewrite the download URL back to the OLD repo,
+            // where every transition release is published with identical assets.
+            $legacy = true;
+            if ($agentVersion && preg_match('/^v?(\d+)\.(\d+)\.(\d+)/', trim($agentVersion), $av)) {
+                $legacy = version_compare("{$av[1]}.{$av[2]}.{$av[3]}", '1.7.0', '<');
+            }
+            $newPrefix = 'https://github.com/jawadrao5555-alt/nestpos-releases/releases/download/';
+            $oldPrefix = 'https://github.com/jawadrao5555-alt/taxnest/releases/download/';
+            if ($legacy && str_starts_with($zipUrl, $newPrefix)) {
+                $zipUrl = $oldPrefix . substr($zipUrl, strlen($newPrefix));
+            }
+
             return [
                 'version' => $m[1] . '.' . $m[2] . '.' . $m[3],
                 'tag' => $tag,
-                'zip_url' => $zip['url'],
+                'zip_url' => $zipUrl,
                 'zip_size' => $zip['size'] ?? 0,
             ];
         } catch (\Throwable $e) {
@@ -102,7 +120,7 @@ class AgentController extends Controller
 
         // ===== FBR POS Fiscal Device company =====
         if ($company->agentServesFbr()) {
-            return $this->fbrHeartbeat($company);
+            return $this->fbrHeartbeat($company, $request->input('version'));
         }
 
         // ===== PRA POS company (default) =====
@@ -157,12 +175,12 @@ class AgentController extends Controller
             'repromoted' => $repromoted,
             'stuck_transaction_ids' => $stuckIds,
             'server_time' => now()->toIso8601String(),
-            'agent_update' => $this->agentUpdateInfo(),
+            'agent_update' => $this->agentUpdateInfo($request->input('version')),
         ]);
     }
 
     /** FBR POS equivalent of the PRA self-heal sweep, operating on fbr_pos_transactions. */
-    private function fbrHeartbeat(Company $company)
+    private function fbrHeartbeat(Company $company, ?string $agentVersion = null)
     {
         // Self-heal: rows with a fiscal invoice # but a stale status.
         $healed = DB::table('fbr_pos_transactions')
@@ -217,7 +235,7 @@ class AgentController extends Controller
             'repromoted' => $repromoted,
             'stuck_transaction_ids' => $stuckIds,
             'server_time' => now()->toIso8601String(),
-            'agent_update' => $this->agentUpdateInfo(),
+            'agent_update' => $this->agentUpdateInfo($agentVersion),
         ]);
     }
 

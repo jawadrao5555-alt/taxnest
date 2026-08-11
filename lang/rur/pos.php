@@ -1867,6 +1867,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'nav_setup' => 'Setup',
     'nav_shifts_cash_drawer' => 'Shifts aur Cash Drawer',
     'nav_stock_levels' => 'Stock Levels',
+    'nav_stock_purchase' => 'Stock & Purchase',
     'nav_stock_overview' => 'Stock Overview',
     'nav_tables' => 'Tables',
     'nav_tax_reports' => 'Tax Reports',

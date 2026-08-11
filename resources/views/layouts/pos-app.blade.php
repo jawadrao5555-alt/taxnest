@@ -913,7 +913,7 @@
                 </div>
                 <button type="button"
                         @click="show = false; sessionStorage.setItem('tnApkBannerV', '{{ $apkLatestVer }}')"
-                        class="flex-shrink-0 p-1 rounded hover:bg-white/20 transition" aria-label="Dismiss">
+                        class="flex-shrink-0 p-1 rounded hover:bg-white/20 transition" aria-label="{{ __('pos.dismiss') }}">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
@@ -933,7 +933,7 @@
                 </div>
                 <button type="button"
                         @click="show = false; localStorage.setItem('tnApkNudgeDismissed', '1')"
-                        class="flex-shrink-0 p-1 rounded hover:bg-white/20 transition" aria-label="Dismiss">
+                        class="flex-shrink-0 p-1 rounded hover:bg-white/20 transition" aria-label="{{ __('pos.dismiss') }}">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>

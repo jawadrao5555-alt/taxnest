@@ -1867,6 +1867,7 @@ return [
     'nav_setup' => 'سیٹ اپ',
     'nav_shifts_cash_drawer' => 'شفٹس اور کیش ڈراور',
     'nav_stock_levels' => 'اسٹاک لیولز',
+    'nav_stock_purchase' => 'اسٹاک اور خریداری',
     'nav_stock_overview' => 'اسٹاک کا جائزہ',
     'nav_tables' => 'ٹیبلز',
     'nav_tax_reports' => 'ٹیکس رپورٹس',

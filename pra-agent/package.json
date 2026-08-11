@@ -5,8 +5,76 @@
   "main": "main.js",
   "author": "TaxNest (Pvt) Ltd",
   "license": "Proprietary",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "node scripts/ensure-deps.js && npx --yes electron-builder@26.15.3 --win --x64 --publish never && node scripts/verify-asar.js",
+    "publish:win": "electron-builder --win --x64 --publish always"
+  },
   "dependencies": {
     "axios": "^1.7.7",
     "electron-store": "^8.2.0"
+  },
+  "devDependencies": {
+    "electron": "^41.7.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.taxnest.pra-agent",
+    "productName": "TaxNest PRA Agent",
+    "copyright": "Copyright (c) 2026 TaxNest",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "offline.html",
+      "src/**/*",
+      "assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "assets/nestpos.ico",
+        "to": "nestpos.ico"
+      },
+      {
+        "from": "assets/nestpos-256.png",
+        "to": "nestpos.png"
+      }
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "jawadrao5555-alt",
+        "repo": "nestpos-releases",
+        "releaseType": "release"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "TaxNest-Agent-Setup-${version}.${ext}",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "TaxNest PRA Agent",
+      "uninstallDisplayName": "TaxNest PRA Agent",
+      "deleteAppDataOnUninstall": false
+    },
+    "electronVersion": "41.7.1"
   }
 }

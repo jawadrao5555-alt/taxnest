@@ -497,12 +497,12 @@
                                     @if (!in_array(auth('fbrpos')->user()->pos_role ?? '', ['pos_cashier', 'local_viewer'], true))
                                     <a href="{{ route('fbrpos.stock') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
-                                        Stock &amp; Purchase
+                                        {{ __('pos.nav_stock_purchase') }}
                                     </a>
                                     @if($fbrPlanKhata)
                                     <a href="{{ route('fbrpos.khata') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
                                         <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-                                        Udhaar / Khata
+                                        {{ __('pos.dc_udhaar') }}
                                     </a>
                                     @endif
                                     <a href="{{ route('fbrpos.munafa') }}" class="menu-link flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
@@ -707,12 +707,12 @@
                         @if (!in_array(auth('fbrpos')->user()->pos_role ?? '', ['pos_cashier', 'local_viewer'], true))
                         <a href="{{ route('fbrpos.stock') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.stock') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
-                            Stock &amp; Purchase
+                            {{ __('pos.nav_stock_purchase') }}
                         </a>
                         @if($fbrPlanKhata)
                         <a href="{{ route('fbrpos.khata') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.khata') ? $sidebarActive : $sidebarInactive }}">
                             <svg class="w-4 h-4 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-                            Udhaar / Khata
+                            {{ __('pos.dc_udhaar') }}
                         </a>
                         @endif
                         <a href="{{ route('fbrpos.munafa') }}" class="{{ $sidebarBase }} {{ request()->routeIs('fbrpos.munafa') ? $sidebarActive : $sidebarInactive }}">

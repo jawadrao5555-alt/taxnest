@@ -16,7 +16,7 @@ Colors: emerald | purple | blue
 <button id="tnPwaInstallBtn"
     type="button"
     style="display:none; align-items:center; gap:7px; padding:7px 13px; border-radius:10px; background:linear-gradient(135deg, {{ $c['from'] }}, {{ $c['to'] }}); color:#fff; border:none; font-size:11.5px; font-weight:800; letter-spacing:0.2px; cursor:pointer; box-shadow: 0 4px 14px {{ $c['glow'] }}, inset 0 0 0 1px rgba(255,255,255,0.15); transition: all .15s ease;"
-    title="Install this app to your device for an exe-like experience">
+    title="{{ __('pos.pwa_pill_title') }}">
     <span style="display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:6px; background:rgba(255,255,255,0.22); flex-shrink:0;">
         <svg style="width:11px; height:11px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4m-9 8h10"/>
@@ -39,27 +39,27 @@ Colors: emerald | purple | blue
             <div style="width:68px; height:68px; margin:0 auto 14px; border-radius:16px; background:linear-gradient(135deg, {{ $c['from'] }}, {{ $c['to'] }}); display:flex; align-items:center; justify-content:center; box-shadow:0 12px 28px {{ $c['glow'] }};">
                 <svg width="34" height="34" fill="none" stroke="white" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4m-9 8h10"/></svg>
             </div>
-            <h3 style="font-size:18px; font-weight:800; color:#111827; margin:0;">Install on your iPhone/iPad</h3>
-            <p style="font-size:13px; color:#6b7280; margin:6px 0 0;">Get the full app experience &mdash; works offline, no browser bar.</p>
+            <h3 style="font-size:18px; font-weight:800; color:#111827; margin:0;">{{ __('pos.pwa_ios_modal_title') }}</h3>
+            <p style="font-size:13px; color:#6b7280; margin:6px 0 0;">{!! __('pos.pwa_ios_modal_sub') !!}</p>
         </div>
         <ol style="font-size:14px; color:#374151; padding-left:0; list-style:none; margin:0;">
             <li style="display:flex; gap:12px; margin-bottom:14px; align-items:flex-start;">
                 <span style="flex-shrink:0; width:28px; height:28px; border-radius:50%; background:{{ $c['accent'] }}; color:white; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700;">1</span>
-                <span>Tap the <strong>Share</strong> button
+                <span>{!! __('pos.pwa_ios_share_prefix') !!}
                     <svg style="display:inline-block; vertical-align:-3px; margin:0 2px;" width="16" height="16" fill="none" stroke="{{ $c['accent'] }}" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M16 6l-4-4m0 0L8 6m4-4v14"/></svg>
-                    at the bottom of Safari.
+                    {!! __('pos.pwa_ios_share_suffix') !!}
                 </span>
             </li>
             <li style="display:flex; gap:12px; margin-bottom:14px; align-items:flex-start;">
                 <span style="flex-shrink:0; width:28px; height:28px; border-radius:50%; background:{{ $c['accent'] }}; color:white; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700;">2</span>
-                <span>Scroll down and tap <strong>Add to Home Screen</strong>.</span>
+                <span>{!! __('pos.pwa_ios_step_add_home') !!}</span>
             </li>
             <li style="display:flex; gap:12px; align-items:flex-start;">
                 <span style="flex-shrink:0; width:28px; height:28px; border-radius:50%; background:{{ $c['accent'] }}; color:white; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700;">3</span>
-                <span>Tap <strong>Add</strong> in the top-right corner.</span>
+                <span>{!! __('pos.pwa_ios_step_add') !!}</span>
             </li>
         </ol>
-        <button onclick="try{localStorage.setItem('tnIosInstallDismissed','1')}catch(e){}; document.getElementById('tnIosInstallModal').style.display='none'" style="margin-top:20px; width:100%; padding:11px; border-radius:11px; border:none; background:#f3f4f6; color:#6b7280; font-size:13px; font-weight:600; cursor:pointer;">Don't show again</button>
+        <button onclick="try{localStorage.setItem('tnIosInstallDismissed','1')}catch(e){}; document.getElementById('tnIosInstallModal').style.display='none'" style="margin-top:20px; width:100%; padding:11px; border-radius:11px; border:none; background:#f3f4f6; color:#6b7280; font-size:13px; font-weight:600; cursor:pointer;">{{ __('pos.pwa_dont_show_again') }}</button>
     </div>
 </div>
 <style>@keyframes tnIosFadeIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}</style>

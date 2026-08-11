@@ -4151,6 +4151,9 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'stock_corr_sub' => 'Sab products ki manual stock corrections — nayi sab se pehle.',
     'stock_corr_empty' => 'Abhi koi stock correction nahi — manual quantity change yahan dikhegi.',
     'stock_corr_col_product' => 'Product',
+    'stock_corr_search_ph' => 'Product ka naam search karein...',
+    'stock_corr_no_results' => 'Is filter par koi correction nahi mili',
+    'stock_corr_clear_filters' => 'Clear',
     // FBR Reports profit — frozen sale-time cost basis (Task 416)
     'fbr_profit_note_frozen' => '(sirf admin — sale ke waqt mehfooz khareed rate par)',
     'fbr_no_cost_snapshot_hint' => 'Kisi biki hui line par khareed rate mehfooz nahi — Stock & Purchase par khareed entry karein; us ke baad ke bills ka munafa yahan nazar aayega.',

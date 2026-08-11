@@ -260,11 +260,13 @@ class FbrPosStockController extends Controller
         $companyId = $this->companyId();
 
         $data = $request->validate([
+            'q' => 'nullable|string|max:100',
+            'date' => 'nullable|date_format:Y-m-d',
             'page' => 'nullable|integer|min:1|max:100000',
         ]);
         $page = max(1, (int) ($data['page'] ?? 1));
 
-        $rows = $this->correctionsQuery($companyId)
+        $rows = $this->correctionsQuery($companyId, trim((string) ($data['q'] ?? '')), $data['date'] ?? null)
             ->skip(($page - 1) * self::CORRECTIONS_PER_PAGE)
             ->take(self::CORRECTIONS_PER_PAGE + 1)
             ->get();
@@ -278,15 +280,33 @@ class FbrPosStockController extends Controller
         ]);
     }
 
-    /** Shared base query for the baked first page and the JSON endpoint. */
-    private function correctionsQuery(int $companyId)
+    /**
+     * Shared base query for the baked first page and the JSON endpoint.
+     * Optional server-side filters (Task 459): product-name search + a single
+     * calendar day — so "what happened to Sugar last Tuesday" is one query,
+     * not a page-through of the whole history.
+     */
+    private function correctionsQuery(int $companyId, string $q = '', ?string $date = null)
     {
         // product + creator eager-loaded — live runs with strict lazy-loading,
         // every relation the serializer reads must be covered by with().
-        return InventoryMovement::where('company_id', $companyId)
+        $query = InventoryMovement::where('company_id', $companyId)
             ->whereIn('type', [InventoryMovement::TYPE_ADJUSTMENT_IN, InventoryMovement::TYPE_ADJUSTMENT_OUT])
             ->with('product:id,name', 'creator:id,name')
             ->orderByDesc('id');
+
+        if ($q !== '') {
+            $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $q) . '%';
+            $query->whereHas('product', fn ($p) => $p->where('name', 'like', $like));
+        }
+
+        if ($date) {
+            // Range predicate (not whereDate) so an index on created_at stays usable.
+            $day = \Illuminate\Support\Carbon::parse($date, config('app.timezone'));
+            $query->whereBetween('created_at', [$day->copy()->startOfDay(), $day->copy()->endOfDay()]);
+        }
+
+        return $query;
     }
 
     /** One shape for the baked first page and the JSON endpoint. */

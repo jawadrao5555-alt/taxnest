@@ -4151,6 +4151,9 @@ return [
     'stock_corr_sub' => 'تمام مصنوعات کی دستی اسٹاک درستگیاں — نئی سب سے پہلے۔',
     'stock_corr_empty' => 'ابھی کوئی اسٹاک درستگی نہیں — دستی مقدار کی تبدیلی یہاں نظر آئے گی۔',
     'stock_corr_col_product' => 'مصنوعہ',
+    'stock_corr_search_ph' => 'مصنوعہ کا نام تلاش کریں...',
+    'stock_corr_no_results' => 'اس فلٹر پر کوئی درستگی نہیں ملی',
+    'stock_corr_clear_filters' => 'صاف کریں',
     // FBR Reports profit — frozen sale-time cost basis (Task 416)
     'fbr_profit_note_frozen' => '(صرف ایڈمن — فروخت کے وقت محفوظ خرید ریٹ پر)',
     'fbr_no_cost_snapshot_hint' => 'کسی فروخت شدہ لائن پر خرید ریٹ محفوظ نہیں — "Stock & Purchase" پر خرید انٹری کریں؛ اس کے بعد کے بلوں کا منافع یہاں نظر آئے گا۔',

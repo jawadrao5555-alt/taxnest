@@ -393,11 +393,25 @@
          movements across ALL products, newest first, so the shopkeeper can
          audit every manual stock change without opening products one by one. --}}
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden mb-6">
-        <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-            <h3 class="font-bold text-gray-900 dark:text-white">{{ __('pos.stock_corr_title') }}</h3>
-            <p class="text-xs text-gray-400 mt-0.5">{{ __('pos.stock_corr_sub') }}</p>
+        <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex flex-wrap items-center justify-between gap-2">
+            <div class="min-w-0">
+                <h3 class="font-bold text-gray-900 dark:text-white">{{ __('pos.stock_corr_title') }}</h3>
+                <p class="text-xs text-gray-400 mt-0.5">{{ __('pos.stock_corr_sub') }}</p>
+            </div>
+            {{-- Server-side filters (Task 459): product-name search + one calendar day --}}
+            <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <input type="search" x-model="corrQ" @input.debounce.400ms="searchCorrections()"
+                       placeholder="{{ __('pos.stock_corr_search_ph') }}" autocomplete="off" name="corr_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                       class="border rounded-lg px-3 py-1.5 text-sm w-full sm:w-56 dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                <input type="date" x-model="corrDate" @change="searchCorrections()"
+                       class="border rounded-lg px-3 py-1.5 text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                <button type="button" x-show="corrQ.trim() !== '' || corrDate !== ''" x-cloak
+                        @click="corrQ = ''; corrDate = ''; searchCorrections()"
+                        class="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-xs font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">{{ __('pos.stock_corr_clear_filters') }}</button>
+            </div>
         </div>
-        <p x-show="corrections.length === 0" x-cloak class="text-sm text-gray-400 text-center py-6 px-4">{{ __('pos.stock_corr_empty') }}</p>
+        <p x-show="corrections.length === 0 && !corrFiltering()" x-cloak class="text-sm text-gray-400 text-center py-6 px-4">{{ __('pos.stock_corr_empty') }}</p>
+        <p x-show="corrections.length === 0 && corrFiltering()" x-cloak class="text-sm text-gray-400 text-center py-6 px-4">{{ __('pos.stock_corr_no_results') }}</p>
         <table class="w-full text-sm table-cards" x-show="corrections.length > 0">
             <thead class="bg-gray-50 dark:bg-gray-700 text-left">
                 <tr>
@@ -679,22 +693,32 @@ function stockPage() {
         corrHasMore: {{ $correctionsHasMore ? 'true' : 'false' }},
         corrPage: 1,
         corrLoading: false,
-        async loadMoreCorrections() {
-            if (this.corrLoading) return;
+        corrQ: '',
+        corrDate: '',
+        corrSeq: 0,
+        corrFiltering() { return this.corrQ.trim() !== '' || this.corrDate !== ''; },
+        searchCorrections() { this.fetchCorrections(true); },
+        loadMoreCorrections() { this.fetchCorrections(false); },
+        async fetchCorrections(reset) {
+            const seq = ++this.corrSeq;
             this.corrLoading = true;
-            const page = this.corrPage + 1;
+            const page = reset ? 1 : this.corrPage + 1;
             try {
-                const res = await fetch(`{{ route('fbrpos.stock.corrections', [], false) }}?page=` + page, {
+                const params = new URLSearchParams({ q: this.corrQ.trim(), page: page });
+                if (this.corrDate) params.set('date', this.corrDate);
+                const res = await fetch(`{{ route('fbrpos.stock.corrections', [], false) }}?` + params.toString(), {
                     headers: { 'Accept': 'application/json' },
                 });
-                if (!res.ok) return;
+                if (!res.ok || seq !== this.corrSeq) return;
                 const data = await res.json();
-                this.corrections = this.corrections.concat(data.corrections);
+                if (seq !== this.corrSeq) return; // stale response — a newer filter superseded it
+                if (reset) { this.corrections = data.corrections; }
+                else { this.corrections = this.corrections.concat(data.corrections); }
                 this.corrPage = page;
                 this.corrHasMore = data.has_more;
             } catch (e) {
             } finally {
-                this.corrLoading = false;
+                if (seq === this.corrSeq) this.corrLoading = false;
             }
         },
         pickFirst() { if (this.prodResults.length > 0) this.addRow(this.prodResults[0]); },

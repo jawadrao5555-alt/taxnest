@@ -4118,6 +4118,10 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'munafa_setup_step1' => 'Neeche button se Stock & Purchase mein jayen.',
     'munafa_setup_step2' => 'Har product ke saamne ✏️ edit icon dabayen aur Khareed Rate dalein.',
     'munafa_setup_step3' => 'Agle bill se us product ka munafa yahan khud nazar aane lagega.',
+    'pra_munafa_setup_step1' => 'Products page par jayen (neeche button hai).',
+    'pra_munafa_setup_step2' => 'Har product ko edit karein aur us ka Cost Price (khareed rate) daalein.',
+    'pra_munafa_excluded_action' => 'Aage ki sales par munafa dekhne ke liye: Products page kholein, har product edit karein aur us ka khareed rate daalein. Us ke baad ke har bill ka munafa yahan khud aata rahega.',
+    'pra_munafa_go_products' => 'Products',
     // Stock List quick edit + search (Task 416)
     'stock_list_search_ph' => 'Talash: naam, SKU ya barcode...',
     'stock_no_match' => 'Koi product nahi mila',

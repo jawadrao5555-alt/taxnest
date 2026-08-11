@@ -8914,12 +8914,19 @@ class PosController extends Controller
             $costedRevenue = (float) $withCost->sum('subtotal');
             $productQty = (float) $items->where('item_type', 'product')->sum('quantity');
             $costedQty = (float) $withCost->sum('quantity');
+            // Task 448 (mirrors FBR munafa Task 426): surface WHY lines are missing
+            // from profit — product lines without a frozen cost snapshot are excluded,
+            // never estimated. unknown_* feed the setup/partial-exclusion banners.
+            $unknownItems = $items->filter(fn ($it) => $it->item_type === 'product' && $it->resolved_cost === null);
             $profit = (object) [
                 'cost' => $cost,
                 'revenue' => $costedRevenue,
                 'profit' => round($costedRevenue - $cost, 2),
                 'margin_pct' => $costedRevenue > 0 ? round(($costedRevenue - $cost) / $costedRevenue * 100, 1) : null,
                 'coverage_pct' => $productQty > 0 ? (int) round($costedQty / $productQty * 100) : 0,
+                'unknown_lines' => $unknownItems->count(),
+                'unknown_sale_value' => (float) $unknownItems->sum('subtotal'),
+                'product_revenue' => (float) $items->where('item_type', 'product')->sum('subtotal'),
             ];
         }
 

@@ -153,7 +153,23 @@
                 <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.profit_estimate') }} <span class="text-xs font-medium text-gray-500">{{ __('pos.profit_estimate_note') }}</span></p>
                 <span class="text-xs font-semibold px-2 py-0.5 rounded-full {{ $ra->profit->coverage_pct >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' }}">{{ __('pos.pct_items_covered', ['pct' => $ra->profit->coverage_pct]) }}</span>
             </div>
-            @if($ra->profit->cost <= 0 && $ra->profit->revenue <= 0)
+            @if($ra->profit->revenue <= 0 && ($ra->profit->product_revenue ?? 0) > 0)
+            {{-- First-time setup banner (Task 448, mirrors FBR munafa Task 426):
+                 the period HAS sales, but ZERO lines carry a cost snapshot — the
+                 shop billed before entering kharid rates, so profit is blank. --}}
+            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-xl p-4">
+                <p class="font-bold text-blue-800 dark:text-blue-300 mb-1">{{ __('pos.munafa_setup_head') }}</p>
+                <p class="text-sm text-blue-700 dark:text-blue-400 mb-3">{{ __('pos.munafa_setup_body') }}</p>
+                <ol class="text-sm text-blue-700 dark:text-blue-400 list-decimal list-inside space-y-1 mb-3">
+                    <li>{{ __('pos.pra_munafa_setup_step1') }}</li>
+                    <li>{{ __('pos.pra_munafa_setup_step2') }}</li>
+                    <li>{{ __('pos.munafa_setup_step3') }}</li>
+                </ol>
+                <a href="{{ route('pos.products') }}" class="inline-flex items-center gap-1 text-sm font-semibold bg-blue-600 text-white rounded-lg px-4 py-2 hover:bg-blue-700">
+                    {{ __('pos.pra_munafa_go_products') }} →
+                </a>
+            </div>
+            @elseif($ra->profit->cost <= 0 && $ra->profit->revenue <= 0)
             <p class="text-sm text-gray-500">{{ __('pos.no_cost_price_hint') }}</p>
             @else
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -174,6 +190,20 @@
                     <p class="text-lg font-bold text-gray-900 dark:text-white">{{ $ra->profit->margin_pct !== null ? $ra->profit->margin_pct . '%' : '—' }}</p>
                 </div>
             </div>
+            @if(($ra->profit->unknown_lines ?? 0) > 0)
+            {{-- Partial exclusion (Task 448, mirrors FBR munafa Task 426): SOME
+                 lines have no cost snapshot and are excluded — never estimated. --}}
+            <div class="mt-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-4">
+                <p class="font-semibold text-amber-800 dark:text-amber-300 text-sm mb-1">
+                    ⚠️ {{ __('pos.munafa_excluded_note', ['lines' => number_format($ra->profit->unknown_lines), 'amount' => number_format($ra->profit->unknown_sale_value, 0)]) }}
+                </p>
+                <p class="text-xs text-amber-700 dark:text-amber-400 mb-2">{{ __('pos.munafa_excluded_why') }}</p>
+                <p class="text-xs text-amber-700 dark:text-amber-400">
+                    {{ __('pos.pra_munafa_excluded_action') }}
+                    <a href="{{ route('pos.products') }}" class="underline font-semibold">{{ __('pos.pra_munafa_go_products') }} →</a>
+                </p>
+            </div>
+            @endif
             @endif
         </div>
         @endif

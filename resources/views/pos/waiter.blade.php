@@ -48,9 +48,15 @@
             @endif
             {{-- Waiter APK download (Aug 2026) — cookie-less public static file,
                  same pattern as Rider APK on rider-tracking page. --}}
+            @php
+                // Task #463: show latest APK version next to the download button so
+                // waiters can tell if their installed app is outdated. Same key
+                // /api/app-version?app=waiter serves; empty = show nothing.
+                $waiterApkVersion = trim((string) \App\Models\SystemSetting::get('waiter_app_latest_version', ''));
+            @endphp
             <a href="{{ url('/downloads/taxnest-waiter.apk') }}"
                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200">
-                ⬇ {{ __('pos.waiter_app_download') }}
+                ⬇ {{ __('pos.waiter_app_download') }}@if($waiterApkVersion !== '') <span class="font-normal text-gray-500 dark:text-gray-400">v{{ $waiterApkVersion }}</span>@endif
             </a>
             {{-- ZFC (29 Jul 2026): manual refresh — waiter phones keep this tab
                  open for days; this pulls the LATEST code with a cache-buster. --}}

@@ -18,6 +18,12 @@
     $diApkVersion = trim((string) \App\Models\SystemSetting::get('di_app_latest_version', ''));
     $diApkSize = ($diApkVersion !== '' && is_file($diApkPath)) ? $fmtMb(filesize($diApkPath)) : null;
     $diApkVisible = $diApkVersion !== '' && is_file($diApkPath);
+    // Waiter card (Task #463): same gating pattern as DI — only visible when both
+    // the APK file exists AND waiter_app_latest_version is set in admin settings.
+    $waiterApkPath = public_path('downloads/taxnest-waiter.apk');
+    $waiterApkVersion = trim((string) \App\Models\SystemSetting::get('waiter_app_latest_version', ''));
+    $waiterApkSize = ($waiterApkVersion !== '' && is_file($waiterApkPath)) ? $fmtMb(filesize($waiterApkPath)) : null;
+    $waiterApkVisible = $waiterApkVersion !== '' && is_file($waiterApkPath);
 @endphp
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
@@ -124,6 +130,21 @@
                     <p class="text-sm text-gray-500 leading-relaxed flex-1">Your complete Digital Invoicing panel on mobile — create FBR invoices, track compliance, manage customers and download PDFs, all from your phone. Always up to date automatically.</p>
                     <div class="mt-5">
                         <a href="{{ url('downloads/taxnest-di.apk') }}" class="block text-center bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-3 rounded-lg transition-colors">Download APK</a>
+                    </div>
+                </div>
+                @endif
+
+                <!-- Waiter App (Android) — only shown when waiter_app_latest_version is set + APK exists (Task #463) -->
+                @if($waiterApkVisible)
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 flex flex-col">
+                    <div class="w-11 h-11 rounded-lg bg-amber-50 flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                    </div>
+                    <h3 class="font-serif text-lg text-[#052730] mb-1">TaxNest Waiter App</h3>
+                    <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Android 7+ · APK{{ $waiterApkSize ? ' · ' . $waiterApkSize : '' }}{{ $waiterApkVersion ? ' · v' . $waiterApkVersion : '' }}</p>
+                    <p class="text-sm text-gray-500 leading-relaxed flex-1">For restaurant waiters — take table orders on the phone, send them straight to the kitchen and keep an eye on order status without leaving the floor.</p>
+                    <div class="mt-5">
+                        <a href="{{ url('downloads/taxnest-waiter.apk') }}" class="block text-center bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold px-4 py-3 rounded-lg transition-colors">Download APK</a>
                     </div>
                 </div>
                 @endif

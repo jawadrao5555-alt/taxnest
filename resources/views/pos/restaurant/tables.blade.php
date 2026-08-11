@@ -17,6 +17,47 @@
         </div>
     </div>
 
+    {{-- ZFC (11 Aug 2026): dashboard ka "Open orders" tile is page par lata hai,
+         lekin bina-table held orders (misal: held delivery) yahan dikhte hi nahi
+         the — "1 pending" click kiya to kuch nahi mila. Yeh section HAR khula
+         (held/preparing/ready) order dikhata hai: table wale table number ke
+         saath, bina-table wale H1/H2 chip ke saath (sale screen jaisi zubaan). --}}
+    @php $tvOpenOrders = $openOrders ?? collect(); @endphp
+    @if($tvOpenOrders->isNotEmpty())
+    <div class="mb-8 rounded-xl border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 p-4">
+        <h2 class="text-sm font-bold text-amber-900 dark:text-amber-200">
+            {{ __('pos.pending_open_tables') }}
+            <span class="ml-1 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-amber-500 text-white text-[11px] font-extrabold">{{ $tvOpenOrders->count() }}</span>
+        </h2>
+        <p class="text-[11px] mt-0.5 mb-3 text-amber-700 dark:text-amber-300">{{ __('pos.pending_open_tables_sub') }}</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            @php $tvHeldIdx = 0; @endphp
+            @foreach($tvOpenOrders as $oo)
+            <a href="{{ route('pos.invoice.create', $oo->table_id ? ['table_id' => $oo->table_id] : []) }}"
+               class="block bg-white dark:bg-gray-800 rounded-lg border border-amber-200 dark:border-amber-700 p-3 hover:shadow-lg transition">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                        @if($oo->table)
+                            <span class="px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-[10px] font-black whitespace-nowrap">{{ $oo->table->table_number }}</span>
+                        @else
+                            @php $tvHeldIdx++; @endphp
+                            <span class="px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-[10px] font-black whitespace-nowrap" title="{{ __('pos.held_orders_no_table') }}">H{{ $tvHeldIdx }}</span>
+                        @endif
+                        <span class="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-[10px] font-bold whitespace-nowrap">{{ Lang::has('pos.ot_' . $oo->order_type) ? __('pos.ot_' . $oo->order_type) : strtoupper(str_replace('_', ' ', $oo->order_type)) }}</span>
+                        <span class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ $oo->customer_name ?: __('pos.other_word') }}</span>
+                    </div>
+                    <span class="text-sm font-extrabold text-gray-900 dark:text-white whitespace-nowrap">Rs {{ number_format((float) $oo->total_amount) }}</span>
+                </div>
+                <div class="mt-1 flex items-center justify-between text-[10px] text-gray-400">
+                    <span class="font-mono">{{ $oo->order_number }}</span>
+                    <span data-since="{{ $oo->created_at->toIso8601String() }}">{{ $oo->created_at->diffForHumans(null, true) }}</span>
+                </div>
+            </a>
+            @endforeach
+        </div>
+    </div>
+    @endif
+
     @forelse($floors as $floor)
     <div class="mb-8">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">{{ $floor->name }}</h2>

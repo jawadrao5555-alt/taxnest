@@ -2235,7 +2235,7 @@ return [
     'pending_deliveries' => 'ڈیلیوریز',
     'pending_deliveries_hint' => 'آج کے ڈیلیوری کچے بل — پیمنٹ آتے ہی ایک کلک میں فائنل',
     'pending_deliveries_title' => 'پینڈنگ ڈیلیوریز',
-    'pending_open_tables' => 'اوپن ڈائن-ان آرڈرز',
+    'pending_open_tables' => 'اوپن آرڈرز',
     'pending_open_tables_sub' => 'ابھی سیٹل نہیں ہوئے',
     'pending_provisional_bills' => 'عارضی بل',
     'pending_provisional_sub' => 'ابھی تک فائنل نہیں کیے گئے',

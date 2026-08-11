@@ -2235,7 +2235,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'pending_deliveries' => 'Pending deliveries',
     'pending_deliveries_hint' => 'Aaj ke delivery kachay bill — payment aate hi ek click mein final',
     'pending_deliveries_title' => 'Pending deliveries',
-    'pending_open_tables' => 'Khule dine-in orders',
+    'pending_open_tables' => 'Khule orders',
     'pending_open_tables_sub' => 'Abhi settle nahi hue',
     'pending_provisional_bills' => 'Provisional bills',
     'pending_provisional_sub' => 'Abhi final nahi hue',

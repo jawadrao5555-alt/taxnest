@@ -38,12 +38,14 @@
     </div>
     @endif
 
-    {{-- Rider App download card (v1.2.0, Aug 2026) --}}
+    {{-- Rider App download card — version label reads from the same SystemSetting
+         key used by /api/app-version, so future APK rollouts need no Blade edit. --}}
+    @php $riderCardVer = trim((string) \App\Models\SystemSetting::get('rider_app_latest_version', '')); @endphp
     <div class="bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-200 dark:border-indigo-700 shadow-sm p-4 mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
         <div class="flex-1">
             <div class="flex items-center gap-2 mb-0.5">
                 <span class="text-lg">📱</span>
-                <span class="font-bold text-indigo-800 dark:text-indigo-200 text-sm">TaxNest Rider App v1.2.0</span>
+                <span class="font-bold text-indigo-800 dark:text-indigo-200 text-sm">TaxNest Rider App{{ $riderCardVer !== '' ? ' v' . $riderCardVer : '' }}</span>
                 <span class="px-1.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-semibold">NEW</span>
             </div>
             <p class="text-xs text-indigo-700 dark:text-indigo-300">{{ __('pos.rider_app_card_desc') }}</p>

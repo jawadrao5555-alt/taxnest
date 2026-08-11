@@ -12,6 +12,7 @@
     $posApkSize = is_file($posApkPath) ? $fmtMb(filesize($posApkPath)) : null;
     $posApkVersion = trim((string) \App\Models\SystemSetting::get('pos_app_latest_version', ''));
     $riderApkSize = is_file($riderApkPath) ? $fmtMb(filesize($riderApkPath)) : null;
+    $riderApkVersion = trim((string) \App\Models\SystemSetting::get('rider_app_latest_version', ''));
     // DI card: only show when both the APK file exists AND di_app_latest_version is set.
     // This lets us scp the file and owner-test before anything is customer-visible.
     $diApkVersion = trim((string) \App\Models\SystemSetting::get('di_app_latest_version', ''));
@@ -133,7 +134,7 @@
                         <svg class="w-6 h-6 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                     </div>
                     <h3 class="font-serif text-lg text-[#052730] mb-1">TaxNest Rider App</h3>
-                    <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Android 8+ · APK{{ $riderApkSize ? ' · ' . $riderApkSize : '' }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Android 8+{{ $riderApkVersion ? ' · v' . $riderApkVersion : '' }} · APK{{ $riderApkSize ? ' · ' . $riderApkSize : '' }}</p>
                     <p class="text-sm text-gray-500 leading-relaxed flex-1">For delivery riders — duty on/off, assigned orders and live location sharing while on duty, so the shop can track deliveries on the map in real time.</p>
                     <div class="mt-5">
                         <a href="{{ url('downloads/taxnest-rider.apk') }}" class="block text-center bg-[#0A4D5C] hover:bg-[#083D49] text-white text-sm font-semibold px-4 py-3 rounded-lg transition-colors">Download APK</a>

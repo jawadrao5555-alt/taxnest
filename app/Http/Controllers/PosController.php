@@ -293,17 +293,43 @@ class PosController extends Controller
                 // last save from either page wins. Missing/invalid input keeps 80mm default.
                 'receipt_printer_size' => $request->input('rp_printer_size', $company->receipt_printer_size ?? '80mm'),
             ];
-            // Print Position + Left Margin (owner, 10 Aug 2026): same columns the
-            // Kitchen Settings save writes — receipts/proof bill/KOT read them all.
-            // Exposed HERE too so non-restaurant shops (no kitchen page) get margin
-            // control. hasColumn guards: PROD drift convention + minimal test schemas.
+            // Print Position + Left Margin (Pizza Master, 11 Aug 2026): receipts now
+            // have their OWN columns (receipt_align_center / receipt_left_margin_mm),
+            // separate from the KOT's kot_* pair — fixing one printer no longer
+            // shifts the other. Legacy fallback: if the new columns are missing
+            // (PROD drift), keep writing the old shared kot_* pair like before.
+            if ($request->filled('rp_align_center')) {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'receipt_align_center')) {
+                    $companyUpdates['receipt_align_center'] = (bool) ((int) $request->input('rp_align_center'));
+                } elseif (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_align_center')) {
+                    $companyUpdates['kot_align_center'] = (bool) ((int) $request->input('rp_align_center'));
+                }
+            }
+            if ($request->filled('rp_left_margin_mm')) {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'receipt_left_margin_mm')) {
+                    $companyUpdates['receipt_left_margin_mm'] = max(0, min(30, (int) $request->input('rp_left_margin_mm')));
+                } elseif (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_left_margin_mm')) {
+                    $companyUpdates['kot_left_margin_mm'] = max(0, min(30, (int) $request->input('rp_left_margin_mm')));
+                }
+            }
+            // KOT ka apna alag margin (Pizza Master, 11 Aug 2026): receipt-settings se
+            // bhi KOT position set ho sakti hai — kitchen-settings wale hi kot_* columns
+            // (us page ki save bhi inhi par likhti hai; aakhri save jeet-ti hai).
             if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_align_center')
-                && $request->filled('rp_align_center')) {
-                $companyUpdates['kot_align_center'] = (bool) ((int) $request->input('rp_align_center'));
+                && $request->filled('rp_kot_align_center')) {
+                $companyUpdates['kot_align_center'] = (bool) ((int) $request->input('rp_kot_align_center'));
             }
             if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_left_margin_mm')
-                && $request->filled('rp_left_margin_mm')) {
-                $companyUpdates['kot_left_margin_mm'] = max(0, min(30, (int) $request->input('rp_left_margin_mm')));
+                && $request->filled('rp_kot_left_margin_mm')) {
+                $companyUpdates['kot_left_margin_mm'] = max(0, min(30, (int) $request->input('rp_kot_left_margin_mm')));
+            }
+            // Dine-in FINAL auto-print (Pizza Master, 11 Aug 2026): OFF = payment par
+            // dine-in ka final receipt KHUD print nahi hota (proof bill pehle diya ja
+            // chuka hota hai). hidden=0/checkbox=1 pattern → has() check. Sale screen
+            // yeh flag bake karti hai — column fingerprint list mein shamil hai.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'print_on_pay_dinein')
+                && $request->has('rp_dinein_autoprint')) {
+                $companyUpdates['print_on_pay_dinein'] = (bool) $request->input('rp_dinein_autoprint');
             }
             // KOT Print Style toggles (Aug 2026): also saveable from receipt-settings
             // so shops without the kitchen module can still control their KOT layout.

@@ -93,6 +93,9 @@ class Company extends Model
         'kot_show_footer',
         'kot_align_center',
         'kot_left_margin_mm',
+        'receipt_align_center',
+        'receipt_left_margin_mm',
+        'print_on_pay_dinein',
         'auto_print_kot',
         'pos_kds_auto_print',
         'kot_reprint_enabled',
@@ -186,6 +189,7 @@ class Company extends Model
         'kot_show_barcode' => 'boolean',
         'kot_show_footer' => 'boolean',
         'kot_align_center' => 'boolean',
+        'print_on_pay_dinein' => 'boolean',
         'pos_kds_auto_print' => 'boolean',
         'kot_reprint_enabled' => 'boolean',
         'pos_receipt_show_tax' => 'boolean',
@@ -394,6 +398,9 @@ class Company extends Model
             'inventory_enabled', 'pos_restock_on_void', 'restaurant_mode',
             'pos_use_legacy_restaurant', 'kds_enabled', 'pos_kds_auto_print',
             'kitchen_printer_enabled', 'print_on_hold', 'print_on_pay',
+            // Dine-in final auto-print flag is BAKED into the sale screen JS —
+            // a toggle must refresh cached sale screens (Pizza Master, 11 Aug 2026).
+            'print_on_pay_dinein',
             'auto_print_kot', 'kot_reprint_enabled', 'dine_in_auto_kot',
             'pos_kot_full_mode', 'kot_compact', 'kot_show_customer',
             'kot_show_orderby', 'kot_show_barcode', 'kot_show_footer',

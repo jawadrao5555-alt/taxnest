@@ -3945,6 +3945,10 @@ function restaurantPos() {
         manualItemSubmitting: false,
         // Phase 4 — Auto-Print receipt on successful sale (mirrors companies.print_on_pay)
         autoPrintEnabled: {{ ($company->print_on_pay ?? true) ? 'true' : 'false' }},
+        // Pizza Master (11 Aug 2026): dine-in FINAL receipt auto-print company toggle —
+        // OFF = payment par dine-in ka final bill khud print NAHI hota (proof bill
+        // pehle diya ja chuka hota hai). KOT logic + manual print untouched.
+        dineinAutoPrint: {{ ($company->print_on_pay_dinein ?? true) ? 'true' : 'false' }},
         // Phase 5+ — Auto-print kitchen ticket on successful sale (mirrors companies.auto_print_kot)
         autoKotEnabled: {{ ($company->auto_print_kot ?? false) ? 'true' : 'false' }},
         // Silent printer routing via Desktop Sync Agent (companies.pos_printer_settings).
@@ -4476,7 +4480,7 @@ function restaurantPos() {
             this.showReceipt = true;
             this.scheduleReceiptAutoClose();
             this.showToast(window.TXT.offline_bill_saved_will_sync, 'success');
-            if (this.autoPrintEnabled) {
+            if (this.autoPrintEnabled && !(this.orderType === 'dine_in' && !this.dineinAutoPrint)) {
                 setTimeout(() => this.printOfflineReceipt(), 400);
             }
             this.clearCart();
@@ -8063,6 +8067,10 @@ function restaurantPos() {
                 return;
             }
             const hasReceipt = !!this.lastTransactionId;
+            // Pizza Master (11 Aug 2026): dine-in FINAL receipt auto-print is company-
+            // optional — proof bill table par pehle diya ja chuka hota hai, final ka
+            // auto-print kaghaz zaya karta tha. Receipt popup / manual print bahaal.
+            const dineinSkipReceipt = (orderType === 'dine_in') && !this.dineinAutoPrint;
             // KDS Auto-Print owns ticket printing → cashier auto-KOT suppressed
             // (owner, Jul 2026). Manual Resend / receipt-popup KOT button stay.
             // DINE-IN finals NEVER auto-KOT (owner, Jul 2026): the kitchen got its
@@ -8072,7 +8080,7 @@ function restaurantPos() {
             // txnKotId (ZFC 28 Jul 2026): order-less delivery bills (provisional
             // rider khata / manual-cart finals) KOT from the TRANSACTION instead.
             const wantsKot = !!this.autoKotEnabled && (!!orderId || !!txnKotId) && orderType !== 'dine_in' && !this.kdsHandlesKot();
-            const wantsReceipt = hasReceipt;
+            const wantsReceipt = hasReceipt && !dineinSkipReceipt;
             // KOT delta = ALWAYS in the auto chain (owner, Jul 2026): the kitchen
             // already has every line that printed at hold / waiter-send / recall —
             // auto-KOT at pay must fire ONLY still-unprinted rows (fresh takeaway
@@ -8436,7 +8444,7 @@ function restaurantPos() {
                     // cashier ticked the box — delivery customer isn't present, paper saved.
                     // KOT release above is NEVER skipped (kitchen must still cook).
                     const skipReceiptPrint = (noPrintOverride === null) ? this.promoteNoPrint : noPrintOverride;
-                    if (!skipReceiptPrint) this.runAutoPrintChain(null);
+                    if (!skipReceiptPrint) this.runAutoPrintChain(null, bill.order_type || null);
                 } else {
                     // Failed — refresh list so cashier sees current state.
                     this.showToast((data && data.message) || window.TXT.submit_failed, 'error');

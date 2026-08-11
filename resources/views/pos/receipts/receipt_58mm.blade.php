@@ -105,8 +105,10 @@
              options apply to ALL slips now (see receipt_80mm). Opt-in; default OFF
              keeps v5 left-align untouched. --}}
         @php
-            $pmAlign = (bool) ($company->kot_align_center ?? false);
-            $pmMm    = max(0, min(30, (int) ($company->kot_left_margin_mm ?? 0)));
+            // Pizza Master (11 Aug 2026): receipts read their OWN margin columns;
+            // NULL = fall back to legacy shared kot_* (old shops unchanged).
+            $pmAlign = (bool) ($company->receipt_align_center ?? $company->kot_align_center ?? false);
+            $pmMm    = max(0, min(30, (int) ($company->receipt_left_margin_mm ?? $company->kot_left_margin_mm ?? 0)));
         @endphp
         @if($pmAlign)
         @media print { html body { margin-left: auto; margin-right: auto; } }

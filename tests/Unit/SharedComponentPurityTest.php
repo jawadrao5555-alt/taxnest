@@ -34,6 +34,14 @@ class SharedComponentPurityTest extends TestCase
         $base = __DIR__ . '/../../resources/views';
         $files = glob($base . '/components/pwa-*.blade.php') ?: [];
         $files[] = $base . '/components/branch-switcher.blade.php';
+        $files[] = $base . '/components/subscription-expiry-popup.blade.php';
+        $files[] = $base . '/components/trial-lock-modal.blade.php';
+        $files[] = $base . '/components/trial-reminder-banner.blade.php';
+        $files[] = $base . '/components/trial-restaurant-notice.blade.php';
+        $files[] = $base . '/components/payment-status-banner.blade.php';
+        $files[] = $base . '/components/bio-unmapped-pin-banner.blade.php';
+        $files[] = $base . '/components/madadgar-support.blade.php';
+        $files[] = $base . '/components/whatsapp-support.blade.php';
         $files[] = $base . '/layouts/pos-app.blade.php';
         $files[] = $base . '/layouts/fbr-pos-app.blade.php';
 
@@ -48,6 +56,7 @@ class SharedComponentPurityTest extends TestCase
         // Regulator / tech acronyms & on-screen badges
         'PRO', 'PREMIUM', 'KDS', 'KOT', 'PDF', 'CSV', 'NTN', 'CNIC', 'PIN', 'SMS',
         'API', 'URL', 'PKR', 'GST', 'HQ', 'exe', 'app', 'App',
+        'IBAN', 'JazzCash', 'EasyPaisa', 'Madadgar',
         // Keyboard keys / shortcuts shown verbatim
         'Enter', 'Esc', 'Del', 'Alt', 'Ctrl', 'Tab', 'Shift', 'Space',
     ];
@@ -320,6 +329,10 @@ class SharedComponentPurityTest extends TestCase
         foreach ([
             'pwa-banner.blade.php', 'pwa-install.blade.php', 'pwa-install-menu-item.blade.php',
             'pwa-push.blade.php', 'branch-switcher.blade.php',
+            'subscription-expiry-popup.blade.php', 'trial-lock-modal.blade.php',
+            'trial-reminder-banner.blade.php', 'trial-restaurant-notice.blade.php',
+            'payment-status-banner.blade.php', 'bio-unmapped-pin-banner.blade.php',
+            'madadgar-support.blade.php', 'whatsapp-support.blade.php',
             'pos-app.blade.php', 'fbr-pos-app.blade.php',
         ] as $must) {
             $this->assertContains($must, $names, "{$must} dropped out of the purity scan set");

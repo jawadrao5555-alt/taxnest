@@ -88,8 +88,8 @@
      x-show="show" x-cloak class="relative z-40">
     <div class="flex items-center gap-3 px-4 py-2.5 bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-sm">
         <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z"/></svg>
-        <span class="flex-1 font-medium">{{ $reminder['text'] }} <span class="hidden sm:inline font-normal opacity-80">Subscribe now to avoid interruption.</span></span>
-        <button @click="dismiss()" class="flex-shrink-0 p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-800/50" aria-label="Dismiss">
+        <span class="flex-1 font-medium">{{ $reminder['text'] }} <span class="hidden sm:inline font-normal opacity-80">{{ __('pos.trb_subscribe_now') }}</span></span>
+        <button @click="dismiss()" class="flex-shrink-0 p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-800/50" aria-label="{{ __('pos.dismiss') }}">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
     </div>

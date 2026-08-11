@@ -173,7 +173,7 @@
                             <p class="text-xs text-white/80 mt-0.5">{{ $seCompany->name ?? '' }}</p>
                         </div>
                     </div>
-                    <button type="button" @click="snooze()" class="text-white/80 hover:text-white" aria-label="Close">
+                    <button type="button" @click="snooze()" class="text-white/80 hover:text-white" aria-label="{{ __('pos.close') }}">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -197,16 +197,16 @@
 
                 @if($seBank['bank_name'] || $seBank['account_number'] || $seBank['iban'])
                 <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-4">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">Payment Account Details</p>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">{{ __('pos.pp_account_details') }}</p>
                     <dl class="space-y-2 text-sm">
                         @if($seBank['bank_name'])
-                        <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Bank</dt><dd class="font-medium text-gray-800 dark:text-gray-100 text-right">{{ $seBank['bank_name'] }}</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">{{ __('pos.pp_bank') }}</dt><dd class="font-medium text-gray-800 dark:text-gray-100 text-right">{{ $seBank['bank_name'] }}</dd></div>
                         @endif
                         @if($seBank['account_title'])
-                        <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Title</dt><dd class="font-medium text-gray-800 dark:text-gray-100 text-right">{{ $seBank['account_title'] }}</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">{{ __('pos.pp_account_title') }}</dt><dd class="font-medium text-gray-800 dark:text-gray-100 text-right">{{ $seBank['account_title'] }}</dd></div>
                         @endif
                         @if($seBank['account_number'])
-                        <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Account #</dt><dd class="font-medium text-gray-800 dark:text-gray-100 text-right select-all">{{ $seBank['account_number'] }}</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">{{ __('pos.pp_account_no') }}</dt><dd class="font-medium text-gray-800 dark:text-gray-100 text-right select-all">{{ $seBank['account_number'] }}</dd></div>
                         @endif
                         @if($seBank['iban'])
                         <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">IBAN</dt><dd class="font-medium text-gray-800 dark:text-gray-100 text-right select-all">{{ $seBank['iban'] }}</dd></div>
@@ -251,7 +251,7 @@
                     <div class="grid grid-cols-1 {{ count($seCycles) > 1 ? 'sm:grid-cols-2' : '' }} gap-2">
                         <select name="pricing_plan_id" x-model="planId" required
                                 class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-100">
-                            <option value="">Select your package</option>
+                            <option value="">{{ __('pos.pp_select_package') }}</option>
                             <template x-for="p in plans" :key="p.id">
                                 <option :value="p.id" x-text="p.name"></option>
                             </template>
@@ -271,7 +271,7 @@
                     @error('billing_cycle')<p class="text-xs text-red-500">{{ $message }}</p>@enderror
 
                     <div x-show="price !== null" x-cloak class="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300">
-                        <span x-text="cycleLabel"></span> package total:
+                        <span x-text="cycleLabel"></span> {{ __('pos.pp_package_total') }}
                         <span class="font-bold">PKR <span x-text="price !== null ? Number(price).toLocaleString() : ''"></span></span>
                     </div>
                     <div x-show="saleActive && cycle === 'quarterly'" x-cloak
@@ -280,28 +280,28 @@
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <input type="number" step="0.01" min="0" name="amount" value="{{ old('amount') }}" placeholder="Amount paid (PKR)"
+                        <input type="number" step="0.01" min="0" name="amount" value="{{ old('amount') }}" placeholder="{{ __('pos.pp_amount_paid') }}"
                                class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-100">
                         <select name="payment_method"
                                 class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-100">
-                            <option value="">Payment method</option>
-                            <option value="bank" @selected(old('payment_method') === 'bank')>Bank Transfer</option>
+                            <option value="">{{ __('pos.pp_payment_method') }}</option>
+                            <option value="bank" @selected(old('payment_method') === 'bank')>{{ __('pos.pp_method_bank') }}</option>
                             <option value="jazzcash" @selected(old('payment_method') === 'jazzcash')>JazzCash</option>
                             <option value="easypaisa" @selected(old('payment_method') === 'easypaisa')>EasyPaisa</option>
-                            <option value="other" @selected(old('payment_method') === 'other')>Other</option>
+                            <option value="other" @selected(old('payment_method') === 'other')>{{ __('pos.pp_method_other') }}</option>
                         </select>
                     </div>
-                    <input type="text" name="reference" value="{{ old('reference') }}" maxlength="120" placeholder="Transaction ID / bank reference (optional)"
+                    <input type="text" name="reference" value="{{ old('reference') }}" maxlength="120" placeholder="{{ __('pos.pp_reference') }}"
                            class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-100">
                     <input type="file" name="proof" accept=".jpg,.jpeg,.png,.pdf" required
                            class="w-full text-sm text-gray-600 dark:text-gray-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-amber-500 file:text-white hover:file:bg-amber-400">
                     @error('proof')<p class="text-xs text-red-500">{{ $message }}</p>@enderror
                     @error('amount')<p class="text-xs text-red-500">{{ $message }}</p>@enderror
-                    <p class="text-[11px] text-gray-400">Accepted: JPG, PNG, PDF — max 5 MB.</p>
+                    <p class="text-[11px] text-gray-400">{{ __('pos.pp_accepted_formats') }}</p>
                     <button type="submit"
                             class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-white text-sm font-semibold transition">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-                        Upload Payment Proof
+                        {{ __('pos.pp_upload_proof') }}
                     </button>
                 </form>
                 @endif

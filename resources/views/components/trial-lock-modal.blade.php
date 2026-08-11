@@ -116,7 +116,7 @@
             class="fixed z-[55] bottom-5 right-5 flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg bg-amber-500 hover:bg-amber-400 text-white text-sm font-semibold transition"
             style="padding-bottom: calc(0.625rem + env(safe-area-inset-bottom, 0px));">
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-        Subscription Locked
+        {{ __('pos.tl_locked_pill') }}
     </button>
 
     {{-- Modal --}}
@@ -135,7 +135,7 @@
                             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
                         </div>
                         <div>
-                            <h2 class="text-lg font-bold leading-tight">Free Trial Ended</h2>
+                            <h2 class="text-lg font-bold leading-tight">{{ __('pos.tl_trial_ended') }}</h2>
                             <p class="text-xs text-white/80 mt-0.5">{{ $lockInfo['company'] }}</p>
                         </div>
                     </div>
@@ -147,21 +147,21 @@
 
             <div class="px-6 py-5 space-y-4">
                 <p class="text-sm text-gray-600 dark:text-gray-300">
-                    {{ $lockInfo['reason'] }} Your account is now <strong>view-only</strong> — you can still browse your data, but creating new invoices / bills is disabled until you subscribe.
+                    {{ $lockInfo['reason'] }} {{ __('pos.tl_view_only') }}
                 </p>
 
                 @if($lockInfo['bank_name'] || $lockInfo['account_number'] || $lockInfo['iban'])
                 <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-4">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">Payment Account Details</p>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">{{ __('pos.pp_account_details') }}</p>
                     <dl class="space-y-2 text-sm">
                         @if($lockInfo['bank_name'])
-                        <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Bank</dt><dd class="font-medium text-gray-800 dark:text-gray-100 text-right">{{ $lockInfo['bank_name'] }}</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">{{ __('pos.pp_bank') }}</dt><dd class="font-medium text-gray-800 dark:text-gray-100 text-right">{{ $lockInfo['bank_name'] }}</dd></div>
                         @endif
                         @if($lockInfo['account_title'])
-                        <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Title</dt><dd class="font-medium text-gray-800 dark:text-gray-100 text-right">{{ $lockInfo['account_title'] }}</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">{{ __('pos.pp_account_title') }}</dt><dd class="font-medium text-gray-800 dark:text-gray-100 text-right">{{ $lockInfo['account_title'] }}</dd></div>
                         @endif
                         @if($lockInfo['account_number'])
-                        <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Account #</dt><dd class="font-medium text-gray-800 dark:text-gray-100 text-right select-all">{{ $lockInfo['account_number'] }}</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">{{ __('pos.pp_account_no') }}</dt><dd class="font-medium text-gray-800 dark:text-gray-100 text-right select-all">{{ $lockInfo['account_number'] }}</dd></div>
                         @endif
                         @if($lockInfo['iban'])
                         <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">IBAN</dt><dd class="font-medium text-gray-800 dark:text-gray-100 text-right select-all">{{ $lockInfo['iban'] }}</dd></div>
@@ -173,7 +173,7 @@
                 </div>
                 @else
                 <div class="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 text-sm text-amber-700 dark:text-amber-300">
-                    Please contact support to get the payment account details and subscribe.
+                    {{ __('pos.tl_contact_support') }}
                 </div>
                 @endif
 
@@ -181,17 +181,17 @@
                 @if($pendingProof)
                 <div class="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4 text-sm text-blue-700 dark:text-blue-300 flex items-start gap-2">
                     <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <span>Your payment proof is <strong>under review</strong>. We'll unlock your account as soon as our team verifies it.</span>
+                    <span>{{ __('pos.tl_under_review') }}</span>
                 </div>
                 @elseif($submitAction && !empty($rejectedProof))
                 <div class="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-4 text-sm text-red-700 dark:text-red-300 flex items-start gap-2">
                     <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <span>Your last payment proof was <strong>rejected</strong>{{ trim((string) $rejectedProof->reject_reason) !== '' ? ' — ' . $rejectedProof->reject_reason : '' }}. Please submit a new payment proof below.</span>
+                    <span>{{ __('pos.tl_rejected', ['reason' => trim((string) $rejectedProof->reject_reason) !== '' ? ' — ' . $rejectedProof->reject_reason : '']) }}</span>
                 </div>
                 @endif
                 @if(!$pendingProof && $submitAction && empty($lockPlans))
                 <div class="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 text-sm text-amber-700 dark:text-amber-300">
-                    No subscription packages are available for your account yet. Please contact support to subscribe.
+                    {{ __('pos.tl_no_packages') }}
                 </div>
                 @elseif(!$pendingProof && $submitAction)
                 <form method="POST" action="{{ $submitAction }}" enctype="multipart/form-data"
@@ -212,12 +212,12 @@
                       }"
                       class="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-4 space-y-3">
                     @csrf
-                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Choose your package &amp; submit your receipt</p>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ __('pos.se_choose_package') }}</p>
 
                     <div class="grid grid-cols-1 {{ count($lockCycles) > 1 ? 'sm:grid-cols-2' : '' }} gap-2">
                         <select name="pricing_plan_id" x-model="planId" required
                                 class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-100">
-                            <option value="">Select your package</option>
+                            <option value="">{{ __('pos.pp_select_package') }}</option>
                             <template x-for="p in plans" :key="p.id">
                                 <option :value="p.id" x-text="p.name"></option>
                             </template>
@@ -237,44 +237,44 @@
                     @error('billing_cycle')<p class="text-xs text-red-500">{{ $message }}</p>@enderror
 
                     <div x-show="price !== null" x-cloak class="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300">
-                        <span x-text="cycleLabel"></span> package total:
+                        <span x-text="cycleLabel"></span> {{ __('pos.pp_package_total') }}
                         <span class="font-bold">PKR <span x-text="price !== null ? Number(price).toLocaleString() : ''"></span></span>
                     </div>
                     <div x-show="saleActive && cycle === 'quarterly'" x-cloak
                          class="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                        ⚡ Abhi sale chal rahi hai — lekin <strong>sale sirf annual plan par</strong> hai. Quarterly rate full hai.
+                        {{ __('pos.se_sale_annual_note') }}
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <input type="number" step="0.01" min="0" name="amount" value="{{ old('amount') }}" placeholder="Amount paid (PKR)"
+                        <input type="number" step="0.01" min="0" name="amount" value="{{ old('amount') }}" placeholder="{{ __('pos.pp_amount_paid') }}"
                                class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-100">
                         <select name="payment_method"
                                 class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-100">
-                            <option value="">Payment method</option>
-                            <option value="bank" @selected(old('payment_method') === 'bank')>Bank Transfer</option>
+                            <option value="">{{ __('pos.pp_payment_method') }}</option>
+                            <option value="bank" @selected(old('payment_method') === 'bank')>{{ __('pos.pp_method_bank') }}</option>
                             <option value="jazzcash" @selected(old('payment_method') === 'jazzcash')>JazzCash</option>
                             <option value="easypaisa" @selected(old('payment_method') === 'easypaisa')>EasyPaisa</option>
-                            <option value="other" @selected(old('payment_method') === 'other')>Other</option>
+                            <option value="other" @selected(old('payment_method') === 'other')>{{ __('pos.pp_method_other') }}</option>
                         </select>
                     </div>
-                    <input type="text" name="reference" value="{{ old('reference') }}" maxlength="120" placeholder="Transaction ID / bank reference (optional)"
+                    <input type="text" name="reference" value="{{ old('reference') }}" maxlength="120" placeholder="{{ __('pos.pp_reference') }}"
                            class="w-full text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-100">
                     <input type="file" name="proof" accept=".jpg,.jpeg,.png,.pdf" required
                            class="w-full text-sm text-gray-600 dark:text-gray-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-amber-500 file:text-white hover:file:bg-amber-400">
                     @error('proof')<p class="text-xs text-red-500">{{ $message }}</p>@enderror
                     @error('amount')<p class="text-xs text-red-500">{{ $message }}</p>@enderror
-                    <p class="text-[11px] text-gray-400">Accepted: JPG, PNG, PDF — max 5 MB.</p>
+                    <p class="text-[11px] text-gray-400">{{ __('pos.pp_accepted_formats') }}</p>
                     @if($everRejected)
-                    <p class="text-[11px] text-amber-600 dark:text-amber-400">Your new proof will be activated after our team verifies it.</p>
+                    <p class="text-[11px] text-amber-600 dark:text-amber-400">{{ __('pos.tl_new_proof_note') }}</p>
                     @else
                     <div class="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
-                        Upload your proof and get <strong>instant access for 10 days</strong> while our team verifies your payment.
+                        {{ __('pos.tl_instant_access') }}
                     </div>
                     @endif
                     <button type="submit"
                             class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-white text-sm font-semibold transition">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-                        Upload Payment Proof
+                        {{ __('pos.pp_upload_proof') }}
                     </button>
                 </form>
                 @endif
@@ -284,14 +284,14 @@
                     <a href="{{ $lockInfo['wa_link'] }}" target="_blank" rel="noopener"
                        class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#25D366] hover:bg-[#1ebe5b] text-white text-sm font-semibold transition">
                         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.945C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.515 5.26l-.999 3.648 3.973-1.715z"/></svg>
-                        Send Payment Proof on WhatsApp
+                        {{ __('pos.tl_whatsapp_send') }}
                     </a>
                     @else
-                    <span class="flex-1 text-center text-xs text-gray-400 px-4 py-3">Support WhatsApp number not configured yet.</span>
+                    <span class="flex-1 text-center text-xs text-gray-400 px-4 py-3">{{ __('pos.tl_wa_not_configured') }}</span>
                     @endif
                     <button type="button" @click="close()"
                             class="px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition">
-                        Continue (view only)
+                        {{ __('pos.tl_continue_view_only') }}
                     </button>
                 </div>
             </div>

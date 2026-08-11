@@ -115,7 +115,7 @@
     </div>
 
     {{-- Floating button --}}
-    <button @click="toggle()" aria-label="Madadgar Support"
+    <button @click="toggle()" aria-label="{{ __('pos.madadgar_support_label') }}"
             class="flex items-center justify-center w-14 h-14 rounded-full shadow-lg bg-purple-600 hover:bg-purple-700 transition-transform hover:scale-105 active:scale-95 cursor-pointer">
         <svg x-show="!open" class="w-7 h-7 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
         <svg x-show="open" x-cloak class="w-7 h-7 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>

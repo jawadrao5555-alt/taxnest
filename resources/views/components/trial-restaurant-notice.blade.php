@@ -34,11 +34,11 @@
     <div class="flex items-center gap-3 px-4 py-2.5 bg-orange-50 dark:bg-orange-900/30 border-b border-orange-200 dark:border-orange-800 text-orange-800 dark:text-orange-200 text-sm">
         <span class="text-base leading-none flex-shrink-0">🍽️</span>
         <span class="flex-1 font-medium">
-            Restaurant &amp; Kitchen features (Kitchen Display, Tables, KOT) are part of your free trial.
-            <span class="hidden sm:inline font-normal opacity-80">They switch off when the trial ends — upgrade to the Pro or Unlimited plan to keep them.</span>
+            {{ __('pos.trn_line1') }}
+            <span class="hidden sm:inline font-normal opacity-80">{{ __('pos.trn_line2') }}</span>
         </span>
-        <a href="{{ route('pos.billing') }}" class="flex-shrink-0 px-3 py-1 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold shadow-sm">View Plans</a>
-        <button @click="dismiss()" class="flex-shrink-0 p-1 rounded hover:bg-orange-100 dark:hover:bg-orange-800/50" aria-label="Dismiss">
+        <a href="{{ route('pos.billing') }}" class="flex-shrink-0 px-3 py-1 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold shadow-sm">{{ __('pos.trn_view_plans') }}</a>
+        <button @click="dismiss()" class="flex-shrink-0 p-1 rounded hover:bg-orange-100 dark:hover:bg-orange-800/50" aria-label="{{ __('pos.dismiss') }}">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
     </div>

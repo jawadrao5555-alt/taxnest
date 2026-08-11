@@ -7,7 +7,7 @@
 @if($waNumber)
     <a href="https://wa.me/{{ $waNumber }}?text={{ urlencode($message) }}"
        target="_blank" rel="noopener"
-       aria-label="WhatsApp Support"
+       aria-label="{{ __('pos.wa_support_label') }}"
        class="fixed z-[60] bottom-5 left-5 flex items-center justify-center w-14 h-14 rounded-full shadow-lg shadow-green-900/40 bg-[#25D366] hover:bg-[#1ebe5b] transition-transform hover:scale-105 active:scale-95"
        style="padding-bottom: env(safe-area-inset-bottom, 0px);">
         <svg class="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">

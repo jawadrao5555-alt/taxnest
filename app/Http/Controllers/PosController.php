@@ -1097,13 +1097,55 @@ class PosController extends Controller
             ->where('report_date', $todayDate)
             ->exists();
 
+        // Stranded-day warning (Task 466): the day-close page already shows a
+        // detailed red banner (Task 455), but staff only see it if they open
+        // that page. Compact echo on the dashboard — everyone lands here.
+        // dayCloseAllowed decides whether the link is actionable (cashiers
+        // without day-close rights get info-only text, not a dead-end link).
+        $unclosedPriorDays = $this->unclosedPriorBusinessDays($companyId);
+        $canDayClose = \App\Services\PosAccessService::dayCloseAllowed(auth('pos')->user(), $company);
+
         return view('pos.dashboard', compact(
             'company', 'todayStats', 'monthStats', 'recentTransactions', 'paymentBreakdown', 'praStatus', 'drafts', 'isCashier',
             'dashboardStyle', 'isRestaurant', 'isAdmin', 'notifications',
             'profitStats', 'topSold', 'topProfit', 'lowMargin', 'costCoverage',
             'dayOpening', 'todayClosed', 'yesterdayRevenue', 'praSyncedToday',
-            'pendingProvisional'
+            'pendingProvisional', 'unclosedPriorDays', 'canDayClose'
         ));
+    }
+
+    /**
+     * Stranded-day detection (Task 455, shared for Task 466): prior business
+     * days that have bills (archived rows included) but NO PosDayCloseReport
+     * row. Keyed by business_date (created_at date on pre-migration schemas).
+     * Returns an ascending collection of Y-m-d strings (max 30 days back).
+     */
+    private function unclosedPriorBusinessDays(int $companyId, ?string $excludeDate = null)
+    {
+        $bizToday = \App\Services\PosBusinessDay::current($companyId);
+        $hasBizDate = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'business_date');
+        $priorDates = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->when($hasBizDate,
+                fn ($q) => $q->where('business_date', '<', $bizToday)->selectRaw('business_date as d'),
+                fn ($q) => $q->whereDate('created_at', '<', $bizToday)->selectRaw('DATE(created_at) as d'))
+            ->groupBy('d')
+            ->orderByDesc('d')
+            ->limit(30)
+            ->pluck('d')
+            ->map(fn ($d) => (string) $d);
+        if ($priorDates->isEmpty()) {
+            return collect();
+        }
+        $closedDates = PosDayCloseReport::where('company_id', $companyId)
+            ->whereIn('report_date', $priorDates)
+            ->pluck('report_date')
+            ->map(fn ($d) => \Carbon\Carbon::parse($d)->toDateString());
+
+        return $priorDates
+            ->reject(fn ($d) => $closedDates->contains($d) || $d === $excludeDate)
+            ->sort()
+            ->values();
     }
 
     /**
@@ -8461,29 +8503,7 @@ class PosController extends Controller
         // prior trading day so staff close it BEFORE more bills pile onto today.
         // Same detection as pos:auto-dayclose: keyed by business_date, archived
         // rows included, closed = a PosDayCloseReport row exists for that date.
-        $unclosedPriorDays = collect();
-        $bizToday = \App\Services\PosBusinessDay::current($companyId);
-        $hasBizDate = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'business_date');
-        $priorDates = PosTransaction::withoutGlobalScope('hide_archived')
-            ->where('company_id', $companyId)
-            ->when($hasBizDate,
-                fn ($q) => $q->where('business_date', '<', $bizToday)->selectRaw('business_date as d'),
-                fn ($q) => $q->whereDate('created_at', '<', $bizToday)->selectRaw('DATE(created_at) as d'))
-            ->groupBy('d')
-            ->orderByDesc('d')
-            ->limit(30)
-            ->pluck('d')
-            ->map(fn ($d) => (string) $d);
-        if ($priorDates->isNotEmpty()) {
-            $closedDates = PosDayCloseReport::where('company_id', $companyId)
-                ->whereIn('report_date', $priorDates)
-                ->pluck('report_date')
-                ->map(fn ($d) => \Carbon\Carbon::parse($d)->toDateString());
-            $unclosedPriorDays = $priorDates
-                ->reject(fn ($d) => $closedDates->contains($d) || $d === $date)
-                ->sort()
-                ->values();
-        }
+        $unclosedPriorDays = $this->unclosedPriorBusinessDays($companyId, $date);
 
         return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays'));
     }

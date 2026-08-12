@@ -151,3 +151,7 @@ Schedule::command('import-batches:prune')->dailyAt('04:45');
 // (6 AM next-morning rule, owner 23 Jul 2026 — a day closes at 6:00 AM the next
 // morning if nobody closed it manually; before 6 AM yesterday stays open).
 Schedule::command('pos:auto-dayclose')->hourly()->withoutOverlapping();
+// Cloudflare guard: Rocket Loader rewrites inline scripts and kills the POS
+// sale screen's Alpine boot. Nightly curl of the live homepage; if the
+// rocket-loader injection marker is found, every admin is emailed at once.
+Schedule::command('cloudflare:check-rocket-loader')->dailyAt('05:15');

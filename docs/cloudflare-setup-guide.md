@@ -29,6 +29,7 @@ SSL/TLS tab:
 
 Speed tab — **YEH BOHOT ZAROORI HAI**:
 - **Rocket Loader: OFF rakhen** (POS sale screen ke scripts kharab kar dega)
+  - Automated guard: nightly `cloudflare:check-rocket-loader` command (05:15) live homepage check karta hai — agar Rocket Loader ka script mila to sab admins ko urgent email jati hai.
 - **Auto Minify: sab OFF rakhen** (HTML/CSS/JS teeno)
 
 Caching tab:

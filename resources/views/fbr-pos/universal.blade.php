@@ -1886,6 +1886,8 @@ window.addEventListener('popstate', function() {
             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.cash_received_now') }}</label>
             <input type="number" id="rider-settle-amount" x-model="riderSettleAmount" min="1" step="0.01" inputmode="decimal"
                    @keydown.enter.prevent="submitRiderSettle()"
+                   {{-- Task 545: global keydown handler ignores keys from form fields, so Escape must be handled on the input itself --}}
+                   @keydown.escape.prevent.stop="riderSettleBill = null"
                    class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm font-bold focus:ring-teal-500 focus:border-teal-500">
             <p class="text-[11px] text-gray-400 mt-1">{{ __('pos.settle_partial_hint') }}</p>
             <p class="text-[11px] font-semibold text-red-600 dark:text-red-400 mt-1" x-show="parseFloat(riderSettleAmount || 0) > riderSettleOutstanding + 0.009" x-cloak>{{ __('pos.settle_amount_over_live') }}</p>

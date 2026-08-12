@@ -17,7 +17,9 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 KEY="/home/runner/workspace/.local/ssh/cpanel_deploy_key"
-HOST="taxnestc@taxnest.com.pk"
+# Cloudflare (Aug 2026): taxnest.com.pk A record is proxied — SSH must go to
+# the origin cPanel box directly. cpanel.taxnest.com.pk is DNS-only (grey cloud).
+HOST="taxnestc@cpanel.taxnest.com.pk"
 PORT=22
 LIVE_DIR="/home/taxnestc/public_html"
 LIVE_URL="https://taxnest.com.pk"   # NOT taxnest.pk (different server, 403)

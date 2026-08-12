@@ -3073,6 +3073,11 @@ class FbrPosController extends Controller
             'password' => 'required|string|min:6|max:100',
             'pos_role' => 'required|in:pos_cashier,pos_manager',
             'default_branch_id' => 'nullable|integer',
+            // Task 529 (twin of PRA storeCashier): optional short login name —
+            // globally unique, no spaces/@ (must never look like an email).
+            'username' => \App\Services\LoginIdentifierResolver::usernameRules(),
+        ], [
+            ...\App\Services\LoginIdentifierResolver::usernameMessages(),
         ]);
 
         $check = \App\Services\PlanLimitService::canAddPosUser($companyId);
@@ -3083,6 +3088,11 @@ class FbrPosController extends Controller
         $user = new \App\Models\User();
         $user->name = $request->name;
         $user->email = $request->email;
+        // Blank → NULL (unique index must keep allowing username-less accounts).
+        // hasColumn = schema-drift guard (same pattern as pos_team_password_enc).
+        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'username')) {
+            $user->username = $request->input('username') ?: null;
+        }
         $user->password = \Illuminate\Support\Facades\Hash::make($request->password);
         $user->company_id = $companyId;
         $user->role = 'employee';
@@ -3113,10 +3123,19 @@ class FbrPosController extends Controller
             'password' => 'nullable|string|min:6|max:100',
             'pos_role' => 'required|in:pos_cashier,pos_manager',
             'default_branch_id' => 'nullable|integer',
+            // Task 529: set/change username from the edit row (own row exempt).
+            'username' => \App\Services\LoginIdentifierResolver::usernameRules($member->id),
+        ], [
+            ...\App\Services\LoginIdentifierResolver::usernameMessages(),
         ]);
 
         $member->name = $request->name;
         $member->email = $request->email;
+        // Blank clears the username (back to email-only login) — NULL, never ''.
+        // hasColumn = schema-drift guard (same pattern as pos_team_password_enc).
+        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'username')) {
+            $member->username = $request->input('username') ?: null;
+        }
         $member->pos_role = $request->pos_role;
         $member->default_branch_id = $this->fbrResolveBranchId($request, $companyId);
         if ($request->filled('password')) {
@@ -3529,10 +3548,12 @@ class FbrPosController extends Controller
                 'name' => 'required|string|max:255',
                 'email' => 'required|email|max:255|unique:users,email,' . $user->id,
                 'phone' => 'nullable|string|max:20',
-                'username' => 'nullable|string|max:100|unique:users,username,' . $user->id,
+                // Task 529: shared rules — no spaces/@, no identifier-shaped
+                // digits (login routers would divert those to phone/NTN/CNIC).
+                'username' => \App\Services\LoginIdentifierResolver::usernameRules($user->id),
                 'current_password' => 'nullable|required_with:new_password',
                 'new_password' => 'nullable|min:8|confirmed',
-            ]);
+            ], \App\Services\LoginIdentifierResolver::usernameMessages());
 
             $user->name = $validated['name'];
             $user->email = $validated['email'];

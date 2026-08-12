@@ -34,6 +34,48 @@ class LoginIdentifierResolver
      *                                   company-less / null-product accounts (DI)
      * @return array{user: ?User, ambiguous: bool}
      */
+    /**
+     * Shared validation rules for every users.username WRITE path (Task 529:
+     * POS/FBR Team store+update, POS/FBR self-profile). Single source of
+     * truth so the Team pages can never save a username the login routers
+     * would refuse to resolve.
+     *
+     * Digit-shape guard: BOTH login controllers divert any input whose
+     * digit-stripped form is 7–13 digits into phone/NTN/CNIC resolution
+     * BEFORE the username resolver runs — such a "username" could be saved
+     * but would never log in. Numeric-only values of any length are also
+     * reserved (they read as identifiers, not names).
+     *
+     * @param  int|null $exceptUserId own row to exempt from the unique check
+     */
+    public static function usernameRules(?int $exceptUserId = null): array
+    {
+        return [
+            'nullable',
+            'string',
+            'max:100',
+            // No spaces, no @ (email-looking values must stay emails).
+            'regex:/^[A-Za-z0-9._-]+$/',
+            function ($attribute, $value, $fail) {
+                $digits = preg_replace('/\D/', '', (string) $value);
+                $len = strlen($digits);
+                if (ctype_digit((string) $value) || ($len >= 7 && $len <= 13)) {
+                    $fail(__('pos.username_digits_reserved'));
+                }
+            },
+            'unique:users,username' . ($exceptUserId ? ',' . $exceptUserId : ''),
+        ];
+    }
+
+    /** Companion error messages for usernameRules(). */
+    public static function usernameMessages(string $field = 'username'): array
+    {
+        return [
+            $field . '.regex' => __('pos.username_format_invalid'),
+            $field . '.unique' => __('pos.username_taken'),
+        ];
+    }
+
     public static function resolveUsername(string $login, array $productTypes): array
     {
         // Exact username match is honoured ONLY when the account belongs to

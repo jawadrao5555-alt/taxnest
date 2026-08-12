@@ -5884,6 +5884,13 @@ class PosController extends Controller
             'phone' => 'nullable|string|max:20',
             'password' => 'required|string|min:6',
             'pos_role' => 'nullable|in:pos_cashier,pos_manager,pos_kitchen,pos_waiter,pos_delivery',
+            // Task 529: optional short login name — staff can log in with it
+            // instead of the full email (LoginIdentifierResolver already
+            // resolves users.username). Globally unique (column has a global
+            // unique index); no spaces/@ so it can never look like an email.
+            'username' => \App\Services\LoginIdentifierResolver::usernameRules(),
+        ], [
+            ...\App\Services\LoginIdentifierResolver::usernameMessages(),
         ]);
 
         $newRole = $request->input('pos_role') ?: 'pos_cashier';
@@ -5917,6 +5924,12 @@ class PosController extends Controller
         // PROD schema-drift guard: skip if the migration hasn't landed yet.
         if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_team_password_enc')) {
             $newUserData['pos_team_password_enc'] = \Illuminate\Support\Facades\Crypt::encryptString($request->password);
+        }
+        // Task 529: optional login username. Blank → NULL (never empty string —
+        // the global unique index must keep allowing many username-less
+        // accounts). hasColumn = schema-drift guard, same as the enc copy.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'username')) {
+            $newUserData['username'] = $request->input('username') ?: null;
         }
         // Billing Scope (07 Aug 2026): cashier/manager accounts can be locked to
         // one stream at creation. NULL/both = no lock (default, legacy behaviour).
@@ -6113,13 +6126,24 @@ class PosController extends Controller
             // row — stored hashes are irreversible, so "view password" is impossible;
             // the admin sets a NEW one instead. Blank = keep the current password.
             'password' => 'nullable|string|min:6|max:100',
+            // Task 529: admin can set/change the member's login username from
+            // the edit row (own row exempt from the unique check).
+            'username' => \App\Services\LoginIdentifierResolver::usernameRules($cashier->id),
+        ], [
+            ...\App\Services\LoginIdentifierResolver::usernameMessages(),
         ]);
 
-        $cashier->update([
+        $cashierData = [
             'name' => $request->name,
             'email' => $request->email,
             'phone' => $request->phone,
-        ]);
+        ];
+        // Task 529: blank clears the username (back to email-only login) —
+        // NULL, never ''. hasColumn = schema-drift guard.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'username')) {
+            $cashierData['username'] = $request->input('username') ?: null;
+        }
+        $cashier->update($cashierData);
 
         // Billing Scope (07 Aug 2026): stream lock is editable from the team edit
         // row — cashier + manager only. Direct assignment (pos_custom_access
@@ -8495,7 +8519,11 @@ class PosController extends Controller
                     'name' => 'required|string|max:255',
                     'email' => 'required|email|max:255|unique:users,email,' . $user->id,
                     'phone' => 'nullable|string|max:30',
-                    'username' => 'nullable|string|max:100|unique:users,username,' . $user->id,
+                    // Task 529: same format rule as the Team page (no spaces/@ —
+                    // an email-looking username could never resolve at login).
+                    'username' => \App\Services\LoginIdentifierResolver::usernameRules($user->id),
+                ], [
+                    ...\App\Services\LoginIdentifierResolver::usernameMessages(),
                 ]);
 
                 $user->update($request->only(['name', 'email', 'phone', 'username']));

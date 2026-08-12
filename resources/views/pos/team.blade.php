@@ -134,32 +134,32 @@
                 <tbody>
                     @forelse($team as $member)
                     <tr class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50" x-data="{ editing: false, showPw: false, accessOpen: false }">
-                        <td class="px-4 py-3">
+                        <td class="px-4 py-3" data-label="{{ __('pos.name_label') }}">
                             <span x-show="!editing" class="font-medium text-gray-900 dark:text-white">{{ $member->name }}</span>
                             <template x-if="editing">
                                 <input form="edit-{{ $member->id }}" type="text" name="name" value="{{ $member->name }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
                             </template>
                         </td>
-                        <td class="px-4 py-3">
+                        <td class="px-4 py-3" data-label="{{ __('pos.email_label') }}">
                             <span x-show="!editing" class="text-gray-600 dark:text-gray-400">{{ $member->email }}</span>
                             <template x-if="editing">
                                 <input form="edit-{{ $member->id }}" type="email" name="email" value="{{ $member->email }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
                             </template>
                         </td>
-                        <td class="px-4 py-3">
+                        <td class="px-4 py-3" data-label="{{ __('pos.username_label') }}">
                             {{-- Task 529: login username — admin sets/changes it from the edit row --}}
                             <span x-show="!editing" class="text-gray-600 dark:text-gray-400 font-mono text-xs">{{ $member->username ?: '—' }}</span>
                             <template x-if="editing">
                                 <input form="edit-{{ $member->id }}" type="text" name="username" value="{{ $member->username }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore placeholder="{{ __('pos.ph_eg_username') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
                             </template>
                         </td>
-                        <td class="px-4 py-3 hidden sm:table-cell">
+                        <td class="px-4 py-3 hidden sm:table-cell" data-label="{{ __('pos.phone_label') }}">
                             <span x-show="!editing" class="text-gray-600 dark:text-gray-400">{{ $member->phone ?? '—' }}</span>
                             <template x-if="editing">
                                 <input form="edit-{{ $member->id }}" type="text" name="phone" value="{{ $member->phone }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
                             </template>
                         </td>
-                        <td class="px-4 py-3">
+                        <td class="px-4 py-3" data-label="{{ __('pos.password_label') }}">
                             {{-- Owner request (Jul 2026): admin can VIEW team passwords.
                                  Decrypted server-side (admin-gated page); hidden behind an
                                  eye toggle. Old accounts have no stored copy until the
@@ -178,7 +178,7 @@
                             <span class="text-xs text-gray-400">—</span>
                             @endif
                         </td>
-                        <td class="px-4 py-3">
+                        <td class="px-4 py-3" data-label="{{ __('pos.role_label') }}">
                             @if($member->pos_role === 'pos_admin' || $member->role === 'company_admin')
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">{{ __('pos.role_admin') }}</span>
                             @elseif($member->pos_role === 'pos_manager')
@@ -199,14 +199,14 @@
                             </span>
                             @endif
                         </td>
-                        <td class="px-4 py-3">
+                        <td class="px-4 py-3" data-label="{{ __('pos.status_label') }}">
                             @if($member->is_active)
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">{{ __('pos.active_word') }}</span>
                             @else
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">{{ __('pos.inactive_word') }}</span>
                             @endif
                         </td>
-                        <td class="px-4 py-3">
+                        <td class="px-4 py-3" data-label="{{ __('pos.pra_reporting') }}">
                             {{-- Owner rule (20 Jul 2026): admin ASSIGNS each cashier Online (PRA
                                  reporting) / Offline here — the sale-screen toggle is read-only
                                  for cashiers. Admin/Manager keep their own sale-screen toggle. --}}
@@ -236,7 +236,7 @@
                             <span class="text-xs text-gray-400">—</span>
                             @endif
                         </td>
-                        <td class="px-4 py-3">
+                        <td class="px-4 py-3" data-label="{{ __('pos.actions_label') }}">
                             @if(in_array($member->pos_role, ['pos_cashier', 'pos_manager', 'pos_kitchen', 'pos_waiter', 'pos_delivery'], true))
                             <div class="flex items-center gap-2">
                                 <button x-show="!editing" @click="editing = true" class="text-amber-600 hover:text-amber-700 text-xs font-medium" title="{{ __('pos.edit') }}">

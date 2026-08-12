@@ -3200,7 +3200,7 @@ class PosController extends Controller
                     ->where(function ($q) {
                         $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
                     })
-                    ->selectRaw('rider_id, COUNT(*) as c, COALESCE(SUM(total_amount),0) as amt')
+                    ->selectRaw('rider_id, COUNT(*) as c, COALESCE(SUM(' . \App\Models\PosRider::remainingExpr('pos_transactions') . '),0) as amt')
                     ->groupBy('rider_id')
                     ->get()
                     ->mapWithKeys(fn ($r) => [$r->rider_id => ['count' => (int) $r->c, 'amount' => (float) $r->amt]])
@@ -9312,7 +9312,14 @@ class PosController extends Controller
             // rider_settled_at stays on the REAL calendar date (settlement
             // timestamps carry no business date) — known v1 limitation: a 1 AM
             // settlement counts toward the calendar day, not the open trading day.
-            $cashIn = (float) PosTransaction::withoutGlobalScope('hide_archived')
+            // Partial settlements (Task 525): new settlement rows carry an
+            // 'allocation' breakdown — for those, cash-in comes from the
+            // allocation entries (exact rupees received today against older
+            // bills, partial or full). The legacy bill-based query stays for
+            // pre-feature settlements (no allocation) so the transition day
+            // never double-counts.
+            $hasAllocation = \Schema::hasColumn('pos_rider_settlements', 'allocation');
+            $legacyCashInQ = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->whereNotNull('rider_id')
                 ->where('payment_method', PosPaymentBuckets::CASH)
@@ -9321,8 +9328,31 @@ class PosController extends Controller
                 ->where('business_date', '<', $date)
                 ->where(function ($q) {
                     $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
-                })
-                ->sum('total_amount');
+                });
+            if ($hasAllocation) {
+                $legacyCashInQ->whereNotIn('rider_settlement_id', function ($q) use ($companyId) {
+                    $q->select('id')->from('pos_rider_settlements')
+                        ->where('company_id', $companyId)
+                        ->whereNotNull('allocation');
+                });
+            }
+            $cashIn = (float) $legacyCashInQ->sum('total_amount');
+            if ($hasAllocation) {
+                $allocCashIn = 0.0;
+                \App\Models\PosRiderSettlement::where('company_id', $companyId)
+                    ->where('panel', 'pra')
+                    ->whereNotNull('allocation')
+                    ->whereDate('created_at', $date)
+                    ->get()
+                    ->each(function ($s) use (&$allocCashIn, $date) {
+                        foreach ((array) $s->allocation as $entry) {
+                            if (!empty($entry['business_date']) && $entry['business_date'] < $date) {
+                                $allocCashIn += (float) ($entry['amount'] ?? 0);
+                            }
+                        }
+                    });
+                $cashIn += $allocCashIn;
+            }
 
             if ($dayBills->isEmpty() && $cashIn == 0.0) {
                 return $empty;
@@ -9332,9 +9362,14 @@ class PosController extends Controller
                 && !$t->rider_settlement_id
                 && $t->delivery_status !== 'returned';
 
+            // Khata remaining per bill — partial cash already received today is
+            // IN the drawer, only the unpaid remainder is out with the rider.
+            $hasPartialCol = \Schema::hasColumn('pos_transactions', 'rider_partial_paid');
+            $remainingOf = fn ($t) => (float) $t->total_amount - ($hasPartialCol ? (float) ($t->rider_partial_paid ?? 0) : 0);
+
             $cashOut = (float) $dayBills
                 ->filter(fn ($t) => ($t->invoice_mode === 'pra' || $t->invoice_mode === null) && $isOpenCash($t))
-                ->sum('total_amount');
+                ->sum($remainingOf);
 
             $riderNames = \App\Models\PosRider::where('company_id', $companyId)
                 ->whereIn('id', $dayBills->pluck('rider_id')->unique())
@@ -9347,7 +9382,7 @@ class PosController extends Controller
                     'delivered' => $rows->where('delivery_status', 'delivered')->count(),
                     'returned' => $rows->where('delivery_status', 'returned')->count(),
                     'cash_total' => round((float) $rows->filter(fn ($t) => $t->payment_method === PosPaymentBuckets::CASH && $t->delivery_status !== 'returned')->sum('total_amount'), 2),
-                    'cash_pending' => round((float) $rows->filter($isOpenCash)->sum('total_amount'), 2),
+                    'cash_pending' => round((float) $rows->filter($isOpenCash)->sum($remainingOf), 2),
                 ];
             }
 

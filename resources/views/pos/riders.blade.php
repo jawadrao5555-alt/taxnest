@@ -180,8 +180,12 @@
                     <tr>
                         <td class="px-4 py-2.5 text-gray-600 dark:text-gray-300">{{ $s->created_at->format('d/m/Y h:i A') }}</td>
                         <td class="px-4 py-2.5 font-medium text-gray-900 dark:text-white">{{ $s->rider->name ?? '—' }}</td>
-                        <td class="px-4 py-2.5 text-gray-600 dark:text-gray-300">{{ $s->bill_count }}</td>
-                        <td class="px-4 py-2.5 font-semibold text-gray-900 dark:text-white">Rs. {{ number_format((float) $s->total_amount) }}</td>
+                        <td class="px-4 py-2.5 text-gray-600 dark:text-gray-300">{{ $s->bill_count }}@if($s->isPartial())<span class="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 align-middle">{{ __('pos.partial_badge') }}</span>@endif</td>
+                        <td class="px-4 py-2.5 font-semibold text-gray-900 dark:text-white">Rs. {{ number_format((float) $s->total_amount) }}
+                            @if($s->outstanding_after !== null && (float) $s->outstanding_after > 0)
+                            <span class="block text-[11px] font-semibold text-amber-600 dark:text-amber-400">{{ __('pos.baqaya_colon') }} Rs. {{ number_format((float) $s->outstanding_after) }}</span>
+                            @endif
+                        </td>
                         <td class="px-4 py-2.5 text-gray-600 dark:text-gray-300">{{ $s->settledBy->name ?? '—' }}</td>
                         <td class="px-4 py-2.5 text-gray-500 dark:text-gray-400 text-xs">{{ $s->notes ?: '—' }}</td>
                     </tr>

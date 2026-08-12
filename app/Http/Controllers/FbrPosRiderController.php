@@ -82,7 +82,7 @@ class FbrPosRiderController extends Controller
             ->where(function ($q) {
                 $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
             })
-            ->select('rider_id', DB::raw('COUNT(*) as bills'), DB::raw('COALESCE(SUM(total_amount),0) as owed'))
+            ->select('rider_id', DB::raw('COUNT(*) as bills'), DB::raw('COALESCE(SUM(' . PosRider::remainingExpr('fbr_pos_transactions') . '),0) as owed'))
             ->groupBy('rider_id')
             ->get()
             ->keyBy('rider_id');
@@ -468,7 +468,11 @@ class FbrPosRiderController extends Controller
         return back()->with('success', $count . ' ' . ($count === 1 ? 'delivery' : 'deliveries') . ' marked ' . $newStatus . ' for ' . $rider->name . '.');
     }
 
-    /** Settle selected open CASH bills for one rider. */
+    /** Settle selected open CASH bills for one rider.
+     *  received_amount (Task 525, "aadha cash abhi, baqi baad"): optional — the
+     *  cash actually handed over. Applies oldest-first: fully covered bills
+     *  settle, the remainder lands on the next bill's rider_partial_paid and the
+     *  rest of the khata stays outstanding. Omitted = full settle (unchanged). */
     public function settle(Request $request, $riderId)
     {
         $companyId = app('currentCompanyId');
@@ -476,12 +480,14 @@ class FbrPosRiderController extends Controller
 
         $settleAll = $request->boolean('settle_all');
         $request->validate([
-            'bill_ids'   => ($settleAll ? 'nullable' : 'required') . '|array|min:1',
-            'bill_ids.*' => 'integer',
-            'notes'      => 'nullable|string|max:500',
+            'bill_ids'        => ($settleAll ? 'nullable' : 'required') . '|array|min:1',
+            'bill_ids.*'      => 'integer',
+            'received_amount' => 'nullable|numeric',
+            'notes'           => 'nullable|string|max:500',
         ]);
 
         return DB::transaction(function () use ($request, $rider, $companyId, $settleAll) {
+            // Oldest first — partial receipts must clear the oldest khata first.
             $query = FbrPosTransaction::where('company_id', $companyId)
                 ->where('rider_id', $rider->id)
                 ->where('payment_method', 'cash')
@@ -492,7 +498,7 @@ class FbrPosRiderController extends Controller
             if (!$settleAll) {
                 $query->whereIn('id', array_map('intval', $request->input('bill_ids')));
             }
-            $bills = $query->lockForUpdate()->get();
+            $bills = $query->orderBy('created_at')->orderBy('id')->lockForUpdate()->get();
 
             if ($bills->isEmpty()) {
                 $msg = $settleAll ? 'No open cash bills on this rider\'s khata.' : 'No open cash bills matched the selection.';
@@ -502,24 +508,113 @@ class FbrPosRiderController extends Controller
                 return back()->with('error', $msg);
             }
 
-            $settlement = PosRiderSettlement::create([
+            $hasPartialCol = Schema::hasColumn('fbr_pos_transactions', 'rider_partial_paid');
+            $remainingOf = fn ($b) => round((float) $b->total_amount - ($hasPartialCol ? (float) ($b->rider_partial_paid ?? 0) : 0), 2);
+            $outstanding = round((float) $bills->sum($remainingOf), 2);
+
+            $receivedRaw = $request->input('received_amount');
+            $received = $receivedRaw === null || $receivedRaw === '' ? $outstanding : round((float) $receivedRaw, 2);
+            if ($received <= 0) {
+                $msg = __('pos.settle_amount_min_err');
+                if ($request->wantsJson()) {
+                    return response()->json(['success' => false, 'message' => $msg], 422);
+                }
+                return back()->with('error', $msg);
+            }
+            if ($received > $outstanding + 0.009) {
+                $msg = __('pos.settle_amount_over_err', ['max' => number_format($outstanding)]);
+                if ($request->wantsJson()) {
+                    return response()->json(['success' => false, 'message' => $msg], 422);
+                }
+                return back()->with('error', $msg);
+            }
+            if (!$hasPartialCol && $received < $outstanding) {
+                $msg = 'Partial settlement is not available yet (database update pending).';
+                if ($request->wantsJson()) {
+                    return response()->json(['success' => false, 'message' => $msg], 422);
+                }
+                return back()->with('error', $msg);
+            }
+
+            // Allocate oldest-first: settle every fully covered bill, drop the
+            // remainder on the next bill's rider_partial_paid.
+            $left = $received;
+            $settledIds = [];
+            $allocation = [];
+            $partialBill = null;   // [$id, $newPartialPaid]
+            foreach ($bills as $b) {
+                if ($left <= 0.009) {
+                    break;
+                }
+                $rem = $remainingOf($b);
+                if ($rem <= 0.009) {
+                    $settledIds[] = $b->id;
+                    continue;
+                }
+                $applied = min($left, $rem);
+                $allocation[] = [
+                    'bill_id'       => (int) $b->id,
+                    'amount'        => round($applied, 2),
+                    'business_date' => (string) ($b->business_date ?: $b->created_at?->toDateString()),
+                ];
+                if ($applied >= $rem - 0.009) {
+                    $settledIds[] = $b->id;
+                } else {
+                    $partialBill = [$b->id, round((float) ($b->rider_partial_paid ?? 0) + $applied, 2)];
+                }
+                $left = round($left - $applied, 2);
+            }
+
+            $settlementData = [
                 'company_id'   => $companyId,
                 'rider_id'     => $rider->id,
                 'settled_by'   => auth('fbrpos')->id(),
-                'total_amount' => $bills->sum('total_amount'),
-                'bill_count'   => $bills->count(),
+                // Cash actually received NOW (earlier partials sit on their own rows).
+                'total_amount' => $received,
+                'bill_count'   => count($settledIds),
                 'notes'        => $request->input('notes'),
-            ]);
+            ];
+            if (Schema::hasColumn('pos_rider_settlements', 'allocation')) {
+                $settlementData['allocation'] = $allocation;
+                $settlementData['panel'] = 'fbr';
+            }
+            $settlement = PosRiderSettlement::create($settlementData);
 
-            FbrPosTransaction::whereIn('id', $bills->pluck('id'))
-                ->update([
-                    'rider_settlement_id' => $settlement->id,
-                    'rider_settled_at'    => now(),
-                ]);
+            if ($settledIds) {
+                FbrPosTransaction::whereIn('id', $settledIds)
+                    ->update([
+                        'rider_settlement_id' => $settlement->id,
+                        'rider_settled_at'    => now(),
+                    ]);
+            }
+            if ($partialBill) {
+                FbrPosTransaction::where('id', $partialBill[0])
+                    ->update(['rider_partial_paid' => $partialBill[1]]);
+            }
 
-            $msg = 'Settled Rs. ' . number_format((float) $settlement->total_amount) . ' (' . $settlement->bill_count . ' bills) from ' . $rider->name . '.';
+            // Whole-khata remaining AFTER this receipt (FBR bills only).
+            $khataLeft = (float) FbrPosTransaction::where('company_id', $companyId)
+                ->where('rider_id', $rider->id)
+                ->where('payment_method', 'cash')
+                ->whereNull('rider_settlement_id')
+                ->where(function ($q) {
+                    $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
+                })
+                ->selectRaw('COALESCE(SUM(' . PosRider::remainingExpr('fbr_pos_transactions') . '), 0) as rem')
+                ->value('rem');
+            if (Schema::hasColumn('pos_rider_settlements', 'outstanding_after')) {
+                $settlement->forceFill(['outstanding_after' => $khataLeft])->save();
+            }
+
+            $msg = $khataLeft > 0.009
+                ? __('pos.partial_settled_msg', [
+                    'amount' => number_format($received),
+                    'name'   => $rider->name,
+                    'left'   => number_format($khataLeft),
+                ])
+                : 'Settled Rs. ' . number_format($received) . ' (' . count($settledIds) . ' bills) from ' . $rider->name . '.';
             if ($request->wantsJson()) {
-                return response()->json(['success' => true, 'message' => $msg, 'total_amount' => (float) $settlement->total_amount, 'bill_count' => (int) $settlement->bill_count]);
+                return response()->json(['success' => true, 'message' => $msg, 'total_amount' => (float) $received, 'bill_count' => count($settledIds), 'outstanding_after' => (float) $khataLeft]);
             }
             return back()->with('success', $msg);
         });

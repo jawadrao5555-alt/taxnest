@@ -34,7 +34,7 @@ class FbrPosTransaction extends Model
         'fbr_auto_retry_count',
         // Rider / delivery lifecycle (Aug 2026) — mirrors PRA pos_transactions rider columns.
         'rider_id', 'delivery_status', 'rider_assigned_at', 'delivered_at',
-        'rider_settlement_id', 'rider_settled_at',
+        'rider_settlement_id', 'rider_settled_at', 'rider_partial_paid',
         'prepaid_converted_at', 'prepaid_converted_by',
         // Task 492: trading-day bucket (PosBusinessDay cutoff rule, FBR mirror).
         // Shop-facing grouping only — FBR/tax reporting keeps real created_at.

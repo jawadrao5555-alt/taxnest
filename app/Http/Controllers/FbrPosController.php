@@ -171,7 +171,7 @@ class FbrPosController extends Controller
                     ->where(function ($q) {
                         $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
                     })
-                    ->selectRaw('rider_id, COUNT(*) as c, COALESCE(SUM(total_amount),0) as amt')
+                    ->selectRaw('rider_id, COUNT(*) as c, COALESCE(SUM(' . \App\Models\PosRider::remainingExpr('fbr_pos_transactions') . '),0) as amt')
                     ->groupBy('rider_id')
                     ->get()
                     ->mapWithKeys(fn ($r) => [$r->rider_id => ['count' => (int) $r->c, 'amount' => (float) $r->amt]])

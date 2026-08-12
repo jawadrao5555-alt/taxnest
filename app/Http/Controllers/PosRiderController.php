@@ -123,7 +123,7 @@ class PosRiderController extends Controller
             ->where(function ($q) {
                 $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
             })
-            ->select('rider_id', DB::raw('COUNT(*) as bills'), DB::raw('COALESCE(SUM(total_amount),0) as owed'))
+            ->select('rider_id', DB::raw('COUNT(*) as bills'), DB::raw('COALESCE(SUM(' . PosRider::remainingExpr('pos_transactions') . '),0) as owed'))
             ->groupBy('rider_id')
             ->get()
             ->keyBy('rider_id');
@@ -330,15 +330,56 @@ class PosRiderController extends Controller
                 $q->where('order_type', 'delivery')->orWhereNotNull('rider_id');
             })
             ->whereIn('status', ['completed'])
-            ->whereIn('delivery_status', ['assigned', 'dispatched'])
+            // Task 512 (Zahid Irfan, 12 Aug 2026): UNASSIGNED delivery bills
+            // (rider_id NULL, delivery_status NULL) were invisible on every tab —
+            // the assign dropdown existed but no bill ever reached it, so shops
+            // needed the confined delivery-manager login just to assign. Pending
+            // now also shows fresh unassigned delivery bills so the rider can be
+            // chosen right here (same pos.deliveries.assign backend, no new path).
+            // 7-din window on unassigned only: purane pre-feature delivery bills
+            // (kabhi rider use hi nahi hua) pending tab ko flood na karein.
+            ->where(function ($q) {
+                $q->whereIn('delivery_status', ['assigned', 'dispatched'])
+                    ->orWhere(function ($q2) {
+                        $q2->whereNull('delivery_status')
+                            ->whereNull('rider_id')
+                            ->whereNull('rider_settlement_id')
+                            ->where('order_type', 'delivery')
+                            ->where('created_at', '>=', now()->subDays(7));
+                    });
+            })
             ->with('rider')
             ->orderBy(DB::raw($assignedTsExpr));
         $this->applyStreamScope($openBillsAll);
         $openBillsAll = $openBillsAll->get();
 
+        // Task 524 (customer voice note, 12 Aug 2026): purane (pichhle business
+        // days ke) UNASSIGNED delivery bills pending list mein "Rider Not
+        // Assigned" demand ki tarah na khalein — woh ek alag collapsed "Purani
+        // deliveries" section mein dikhte hain aur pending tab count mein NAHI
+        // ginte (owner Option C: chhupao nahi, alag karo). Assigned/dispatched
+        // bills har tareekh ke FRESH hi rehte hain (asal pending — unka behavior
+        // bilkul unchanged). Fresh unassigned = business_date (fallback
+        // created_at date) == current business day; 7-din window upar wali
+        // query mein pehle se lagi hai (us se purane aate hi nahi).
+        $bizToday = \App\Services\PosBusinessDay::current($companyId);
+        [$openBillsFresh, $oldUnassigned] = $openBillsAll->partition(function ($b) use ($hasBizDate, $bizToday) {
+            if ($b->rider_id || $b->delivery_status) {
+                return true; // assigned/dispatched — always in the main list
+            }
+            $billDay = ($hasBizDate && $b->business_date)
+                ? (string) $b->business_date
+                : $b->created_at?->format('Y-m-d');
+            return !$billDay || $billDay >= $bizToday;
+        });
+        $openBillsFresh = $openBillsFresh->values();
+        $oldUnassigned  = $oldUnassigned->values();
+
         // Tab counts (computed on the collections — single DB round-trip each).
+        // Pending = fresh unassigned + assigned/dispatched; purani unassigned
+        // ki ginti section ke apne label par hai, tab badge par NAHI (Task 524).
         $tabCounts = [
-            'pending'   => $openBillsAll->count(),
+            'pending'   => $openBillsFresh->count(),
             'delivered' => $allBills->where('delivery_status', 'delivered')->count(),
             'returned'  => $allBills->where('delivery_status', 'returned')->count(),
         ];
@@ -350,7 +391,7 @@ class PosRiderController extends Controller
             $activeTab = 'pending';
         }
         if ($activeTab === 'pending') {
-            $bills = $openBillsAll->values();
+            $bills = $openBillsFresh;
         } elseif ($activeTab === 'delivered') {
             $bills = $allBills->where('delivery_status', 'delivered')->values();
         } else {
@@ -441,7 +482,7 @@ class PosRiderController extends Controller
         $currentRole = auth('pos')->user()->pos_role ?? null;
         $isAdminOrManager = in_array($currentRole, ['pos_admin', 'pos_manager'], true);
 
-        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'openDeliveryOldest', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager'));
+        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'openDeliveryOldest', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager', 'oldUnassigned'));
     }
 
     /** Assign / reassign / unassign a rider on a delivery bill. */
@@ -457,7 +498,7 @@ class PosRiderController extends Controller
         }
 
         if ($txn->rider_settlement_id) {
-            return back()->with('error', 'This bill is already settled — rider cannot be changed.');
+            return $this->statusError($request, 'This bill is already settled — rider cannot be changed.');
         }
         // Rider is LOCKED once the delivery reached a terminal state (owner,
         // Jul 2026): delivered/returned bills keep the rider who actually ran
@@ -465,11 +506,11 @@ class PosRiderController extends Controller
         // never carried the order. Reassign stays open while assigned/dispatched
         // (rider suddenly unavailable → pick another; khata follows rider_id).
         if (in_array($txn->delivery_status, ['delivered', 'returned'], true)) {
-            return back()->with('error', 'This delivery is already ' . $txn->delivery_status . ' — rider can no longer be changed.');
+            return $this->statusError($request, 'This delivery is already ' . $txn->delivery_status . ' — rider can no longer be changed.');
         }
         // Only delivery-shaped bills can carry a rider.
         if ($txn->order_type !== 'delivery' && !$txn->rider_id && !$txn->delivery_address) {
-            return back()->with('error', 'Only delivery bills can be assigned to a rider.');
+            return $this->statusError($request, 'Only delivery bills can be assigned to a rider.');
         }
 
         $riderId = null;
@@ -479,7 +520,7 @@ class PosRiderController extends Controller
                 ->where('is_active', true)
                 ->value('id');
             if (!$riderId) {
-                return back()->with('error', 'Invalid rider.');
+                return $this->statusError($request, 'Invalid rider.');
             }
         }
 
@@ -498,6 +539,16 @@ class PosRiderController extends Controller
             }
         }
         $txn->update($upd);
+
+        // Sale-screen Pending Deliveries popup (Task 513) assigns via fetch —
+        // JSON clients get JSON; the Deliveries board form keeps back().
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success'         => true,
+                'rider_id'        => $riderId,
+                'delivery_status' => $upd['delivery_status'],
+            ]);
+        }
 
         return back()->with('success', $riderId ? 'Rider assigned.' : 'Rider removed.');
     }
@@ -595,7 +646,11 @@ class PosRiderController extends Controller
     /** Settle selected open CASH bills for one rider (partial = per-bill selection).
      *  settle_all=1 (Pending Deliveries panel, Task 123): settle EVERY open cash
      *  bill on the rider's khata in one click — no bill_ids needed. JSON clients
-     *  (the sale-screen panel) get JSON back instead of a redirect. */
+     *  (the sale-screen panel) get JSON back instead of a redirect.
+     *  received_amount (Task 525, "aadha cash abhi, baqi baad"): optional — the
+     *  cash actually handed over. Applies oldest-first: fully covered bills
+     *  settle, the remainder lands on the next bill's rider_partial_paid and the
+     *  rest of the khata stays outstanding. Omitted = full settle (unchanged). */
     public function settle(Request $request, $riderId)
     {
         $companyId = app('currentCompanyId');
@@ -605,6 +660,7 @@ class PosRiderController extends Controller
         $request->validate([
             'bill_ids' => ($settleAll ? 'nullable' : 'required') . '|array|min:1',
             'bill_ids.*' => 'integer',
+            'received_amount' => 'nullable|numeric',
             'notes' => 'nullable|string|max:500',
         ]);
 
@@ -613,6 +669,7 @@ class PosRiderController extends Controller
             // Task 353: stream-scoped — a stream-locked manager can settle only
             // his own stream's cash (cross-stream bill_ids silently drop out and
             // the empty-set guard below rejects the request).
+            // Oldest first — partial receipts must clear the oldest khata first.
             $query = $this->applyStreamScope(PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->where('rider_id', $rider->id)
@@ -624,7 +681,7 @@ class PosRiderController extends Controller
             if (!$settleAll) {
                 $query->whereIn('id', array_map('intval', $request->input('bill_ids')));
             }
-            $bills = $query->lockForUpdate()->get();
+            $bills = $query->orderBy('created_at')->orderBy('id')->lockForUpdate()->get();
 
             if ($bills->isEmpty()) {
                 $msg = $settleAll ? 'No open cash bills on this rider\'s khata.' : 'No open cash bills matched the selection.';
@@ -634,29 +691,116 @@ class PosRiderController extends Controller
                 return back()->with('error', $msg);
             }
 
-            $settlement = PosRiderSettlement::create([
+            $hasPartialCol = Schema::hasColumn('pos_transactions', 'rider_partial_paid');
+            $remainingOf = fn ($b) => round((float) $b->total_amount - ($hasPartialCol ? (float) ($b->rider_partial_paid ?? 0) : 0), 2);
+            $outstanding = round((float) $bills->sum($remainingOf), 2);
+
+            // Received amount: default = full outstanding of the selection.
+            $receivedRaw = $request->input('received_amount');
+            $received = $receivedRaw === null || $receivedRaw === '' ? $outstanding : round((float) $receivedRaw, 2);
+            if ($received <= 0) {
+                $msg = __('pos.settle_amount_min_err');
+                if ($request->wantsJson()) {
+                    return response()->json(['success' => false, 'message' => $msg], 422);
+                }
+                return back()->with('error', $msg);
+            }
+            if ($received > $outstanding + 0.009) {
+                $msg = __('pos.settle_amount_over_err', ['max' => number_format($outstanding)]);
+                if ($request->wantsJson()) {
+                    return response()->json(['success' => false, 'message' => $msg], 422);
+                }
+                return back()->with('error', $msg);
+            }
+            // Pre-migration schema can't hold a partial remainder — full only.
+            if (!$hasPartialCol && $received < $outstanding) {
+                $msg = 'Partial settlement is not available yet (database update pending).';
+                if ($request->wantsJson()) {
+                    return response()->json(['success' => false, 'message' => $msg], 422);
+                }
+                return back()->with('error', $msg);
+            }
+
+            // Allocate oldest-first: settle every fully covered bill, drop the
+            // remainder on the next bill's rider_partial_paid.
+            $left = $received;
+            $settledIds = [];
+            $allocation = [];
+            $partialBill = null;   // [$id, $newPartialPaid]
+            foreach ($bills as $b) {
+                if ($left <= 0.009) {
+                    break;
+                }
+                $rem = $remainingOf($b);
+                if ($rem <= 0.009) {
+                    // Degenerate zero-remaining bill — mark settled, nothing owed.
+                    $settledIds[] = $b->id;
+                    continue;
+                }
+                $applied = min($left, $rem);
+                $allocation[] = [
+                    'bill_id' => (int) $b->id,
+                    'amount' => round($applied, 2),
+                    'business_date' => (string) ($b->business_date ?: $b->created_at?->toDateString()),
+                ];
+                if ($applied >= $rem - 0.009) {
+                    $settledIds[] = $b->id;
+                } else {
+                    $partialBill = [$b->id, round((float) ($b->rider_partial_paid ?? 0) + $applied, 2)];
+                }
+                $left = round($left - $applied, 2);
+            }
+
+            $settlementData = [
                 'company_id' => $companyId,
                 'rider_id' => $rider->id,
                 'settled_by' => auth('pos')->id(),
-                'total_amount' => $bills->sum('total_amount'),
-                'bill_count' => $bills->count(),
+                // Cash actually received NOW (partials already received earlier
+                // are on their own settlement rows — never double-counted).
+                'total_amount' => $received,
+                'bill_count' => count($settledIds),
                 'notes' => $request->input('notes'),
-            ]);
+            ];
+            if (Schema::hasColumn('pos_rider_settlements', 'allocation')) {
+                $settlementData['allocation'] = $allocation;
+                $settlementData['panel'] = 'pra';
+            }
+            $settlement = PosRiderSettlement::create($settlementData);
 
-            PosTransaction::withoutGlobalScope('hide_archived')
-                ->whereIn('id', $bills->pluck('id'))
-                ->update([
-                    'rider_settlement_id' => $settlement->id,
-                    'rider_settled_at' => now(),
-                ]);
+            if ($settledIds) {
+                PosTransaction::withoutGlobalScope('hide_archived')
+                    ->whereIn('id', $settledIds)
+                    ->update([
+                        'rider_settlement_id' => $settlement->id,
+                        'rider_settled_at' => now(),
+                    ]);
+            }
+            if ($partialBill) {
+                PosTransaction::withoutGlobalScope('hide_archived')
+                    ->where('id', $partialBill[0])
+                    ->update(['rider_partial_paid' => $partialBill[1]]);
+            }
 
-            $msg = 'Settled Rs. ' . number_format((float) $settlement->total_amount) . ' (' . $settlement->bill_count . ' bills) from ' . $rider->name . '.';
+            // Whole-khata remaining AFTER this receipt (audit: kitna reh gaya).
+            $khataLeft = $rider->openCashRemaining();
+            if (Schema::hasColumn('pos_rider_settlements', 'outstanding_after')) {
+                $settlement->forceFill(['outstanding_after' => $khataLeft])->save();
+            }
+
+            $msg = $khataLeft > 0.009
+                ? __('pos.partial_settled_msg', [
+                    'amount' => number_format($received),
+                    'name' => $rider->name,
+                    'left' => number_format($khataLeft),
+                ])
+                : 'Settled Rs. ' . number_format($received) . ' (' . count($settledIds) . ' bills) from ' . $rider->name . '.';
             if ($request->wantsJson()) {
                 return response()->json([
                     'success' => true,
                     'message' => $msg,
-                    'total_amount' => (float) $settlement->total_amount,
-                    'bill_count' => (int) $settlement->bill_count,
+                    'total_amount' => (float) $received,
+                    'bill_count' => count($settledIds),
+                    'outstanding_after' => (float) $khataLeft,
                 ]);
             }
             return back()->with('success', $msg);
@@ -878,7 +1022,7 @@ class PosRiderController extends Controller
             ->orderByDesc('id')
             ->get();
 
-        $owed = (float) $rider->openCashBills()->sum('total_amount');
+        $owed = $rider->openCashRemaining();
 
         return view('pos.rider-portal', compact('rider', 'bills', 'owed'));
     }

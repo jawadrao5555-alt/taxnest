@@ -56,4 +56,24 @@ class PosRider extends Model
                 $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
             });
     }
+
+    /**
+     * SQL expression for a bill's khata remaining — partial receipts
+     * (rider_partial_paid, Task 525) already handed over are deducted.
+     * Schema-guarded for prod drift (column may not exist yet).
+     */
+    public static function remainingExpr(string $table = 'pos_transactions'): string
+    {
+        return \Illuminate\Support\Facades\Schema::hasColumn($table, 'rider_partial_paid')
+            ? '(total_amount - COALESCE(rider_partial_paid, 0))'
+            : 'total_amount';
+    }
+
+    /** Rider's khata remaining (open cash bills minus partial receipts). */
+    public function openCashRemaining(): float
+    {
+        return (float) $this->openCashBills()
+            ->selectRaw('COALESCE(SUM(' . self::remainingExpr('pos_transactions') . '), 0) as rem')
+            ->value('rem');
+    }
 }

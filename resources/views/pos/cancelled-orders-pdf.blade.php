@@ -26,7 +26,7 @@
     <table>
         <thead>
             <tr>
-                <th>Order #</th><th>Cancelled At</th><th>Table</th><th>Type</th><th>Items</th><th>Rs</th><th>KOT</th><th>By</th>
+                <th>Order #</th><th>Cancelled At</th><th>Table</th><th>Type</th><th>Items</th><th>Rs</th><th>KOT</th><th>Punched By</th><th>Cancelled By</th>
             </tr>
         </thead>
         <tbody>
@@ -40,9 +40,10 @@
                 <td class="num">{{ number_format($o->total_amount) }}</td>
                 <td>@if ($o->kot_sent_at)<span class="kot">YES</span>@else - @endif</td>
                 <td>{{ $o->creator?->name ?? '-' }}</td>
+                <td>{{ $o->canceller?->name ?? 'System' }}</td>
             </tr>
             @empty
-            <tr><td colspan="8">No cancelled orders in this period.</td></tr>
+            <tr><td colspan="9">No cancelled orders in this period.</td></tr>
             @endforelse
         </tbody>
     </table>

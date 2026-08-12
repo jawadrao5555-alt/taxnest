@@ -6,6 +6,8 @@
     <string name="email">Email</string>
     <string name="password">Password</string>
     <string name="login_btn">Log in</string>
+    <string name="show_password">Show password</string>
+    <string name="hide_password">Hide password</string>
     <string name="login_failed">Login failed — check email or password</string>
     <string name="network_error">Network problem — try again</string>
     <string name="duty_on">Start duty</string>

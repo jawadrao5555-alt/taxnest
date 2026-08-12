@@ -55,6 +55,13 @@
                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.phone_optional') }}</label>
                 <input type="text" name="phone" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500" placeholder="03001234567">
             </div>
+            {{-- Task 529: optional login username — staff logs in with it instead
+                 of the full email (username login already works backend-side). --}}
+            <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.username_label') }} ({{ __('pos.optional_lc') }})</label>
+                <input type="text" name="username" value="{{ old('username') }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500" placeholder="{{ __('pos.ph_eg_username') }}">
+                <p class="text-[10px] text-gray-400 dark:text-gray-500 mt-1">{{ __('pos.username_login_hint') }}</p>
+            </div>
             <div>
                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.password_label') }}</label>
                 <input type="password" name="password" required minlength="6" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500" placeholder="{{ __('pos.ph_min_6_chars') }}">
@@ -115,6 +122,7 @@
                     <tr class="bg-gray-50 dark:bg-gray-800 text-left text-xs text-gray-500 dark:text-gray-400 uppercase">
                         <th class="px-4 py-3">{{ __('pos.name_label') }}</th>
                         <th class="px-4 py-3">{{ __('pos.email_label') }}</th>
+                        <th class="px-4 py-3">{{ __('pos.username_label') }}</th>
                         <th class="px-4 py-3 hidden sm:table-cell">{{ __('pos.phone_label') }}</th>
                         <th class="px-4 py-3">{{ __('pos.password_label') }}</th>
                         <th class="px-4 py-3">{{ __('pos.role_label') }}</th>
@@ -136,6 +144,13 @@
                             <span x-show="!editing" class="text-gray-600 dark:text-gray-400">{{ $member->email }}</span>
                             <template x-if="editing">
                                 <input form="edit-{{ $member->id }}" type="email" name="email" value="{{ $member->email }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                            </template>
+                        </td>
+                        <td class="px-4 py-3">
+                            {{-- Task 529: login username — admin sets/changes it from the edit row --}}
+                            <span x-show="!editing" class="text-gray-600 dark:text-gray-400 font-mono text-xs">{{ $member->username ?: '—' }}</span>
+                            <template x-if="editing">
+                                <input form="edit-{{ $member->id }}" type="text" name="username" value="{{ $member->username }}" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore placeholder="{{ __('pos.ph_eg_username') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
                             </template>
                         </td>
                         <td class="px-4 py-3 hidden sm:table-cell">

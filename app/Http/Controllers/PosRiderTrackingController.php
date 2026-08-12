@@ -358,7 +358,7 @@ class PosRiderTrackingController extends Controller
             'duty_started_at' => optional($rider->duty_started_at)->toIso8601String(),
             'open_deliveries' => $openBills->count(),
             'deliveries' => $deliveries,
-            'khata_owed' => (float) $rider->openCashBills()->sum('total_amount'),
+            'khata_owed' => $rider->openCashRemaining(),
             'last_located_at' => optional($rider->last_located_at)->toIso8601String(),
         ]);
     }

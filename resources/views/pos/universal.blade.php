@@ -478,10 +478,12 @@ window.addEventListener('popstate', function() {
 
             {{-- Pending Deliveries (Task 114) — today's delivery provisionals, one-click final.
                  Button only appears when there IS something pending (light footprint). --}}
-            <button x-show="pendingDeliveryBills().length > 0" x-cloak @click="openPendingDeliveries()" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition flex-shrink-0" title="{{ __('pos.pending_deliveries_hint') }}">
+            {{-- Task 524: button purani unassigned par bhi khulta hai (reachability),
+                 magar numeric badge sirf FRESH ginti dikhata hai. --}}
+            <button x-show="pendingDeliveryBills().length > 0 || staleDeliveryBills().length > 0" x-cloak @click="openPendingDeliveries()" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition flex-shrink-0" title="{{ __('pos.pending_deliveries_hint') }}">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
                 <span class="hidden lg:inline">{{ __('pos.pending_deliveries') }}</span>
-                <span class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-amber-600 text-white text-[9px] rounded-full flex items-center justify-center font-bold" x-text="pendingDeliveryBills().length"></span>
+                <span x-show="pendingDeliveryBills().length > 0" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-amber-600 text-white text-[9px] rounded-full flex items-center justify-center font-bold" x-text="pendingDeliveryBills().length"></span>
             </button>
 
             {{-- Delivery Board (Task 431): rider assign / delivered / settle in a modal
@@ -1006,10 +1008,10 @@ window.addEventListener('popstate', function() {
         @endif
 
         {{-- Pending Deliveries (Task 114) — mobile copy of the nav badge --}}
-        <button x-show="pendingDeliveryBills().length > 0" x-cloak @click="openPendingDeliveries()" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition" title="{{ __('pos.pending_deliveries_hint') }}">
+        <button x-show="pendingDeliveryBills().length > 0 || staleDeliveryBills().length > 0" x-cloak @click="openPendingDeliveries()" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition" title="{{ __('pos.pending_deliveries_hint') }}">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
             <span class="hidden sm:inline">{{ __('pos.pending_deliveries') }}</span>
-            <span class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-amber-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="pendingDeliveryBills().length"></span>
+            <span x-show="pendingDeliveryBills().length > 0" class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-amber-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="pendingDeliveryBills().length"></span>
         </button>
 
         {{-- Waiter box RETIRED (Table-se-Bill, Jul 2026): waiter orders now live inside
@@ -1581,11 +1583,11 @@ window.addEventListener('popstate', function() {
                          The PAY (F8) button below keeps the Pay modal (method choice + note).
                          Failures surface via showToast (modal-independent). --}}
                     <div class="grid grid-cols-2 gap-2">
-                        <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 0; processPayment('cash')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
+                        <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 0; payPrintReceipt = billPrintDefault(orderType); processPayment('cash')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
                             <span class="flex items-center gap-1.5 text-xs font-extrabold leading-none"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>CASH</span>
                             <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(cartTotalForMethod('cash')).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+1</kbd></span>
                         </button>
-                        <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 1; processPayment('card')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-gray-700 hover:bg-gray-800 dark:bg-gray-600 dark:hover:bg-gray-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
+                        <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 1; payPrintReceipt = billPrintDefault(orderType); processPayment('card')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-gray-700 hover:bg-gray-800 dark:bg-gray-600 dark:hover:bg-gray-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
                             <span class="flex items-center gap-1.5 text-xs font-extrabold leading-none"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>CARD</span>
                             <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(cartTotalForMethod('card')).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+2</kbd></span>
                         </button>
@@ -1743,7 +1745,7 @@ window.addEventListener('popstate', function() {
          (ESC / click-away / Cancel). Without this a cancelled held-order payment left the
          stale id behind and the NEXT normal cart sale silently routed to payHeldOrderDirect
          for that old held order (processPayment checks payingHeldOrderId first). --}}
-    <div x-show="showPayModal" x-cloak x-transition.opacity x-effect="if (showPayModal) { submitting = false; saveAsProvisional = false; payMethodIndex = (payPreselect === 1 ? 1 : 0); payPreselect = null; cashReceived = ''; } else if (!submitting) { payingHeldOrderId = null; }" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false">
+    <div x-show="showPayModal" x-cloak x-transition.opacity x-effect="if (showPayModal) { submitting = false; saveAsProvisional = false; payMethodIndex = (payPreselect === 1 ? 1 : 0); payPreselect = null; cashReceived = ''; payPrintReceipt = billPrintDefault(payModalOrderType()); } else if (!submitting) { payingHeldOrderId = null; payPrintReceipt = billPrintDefault(orderType); }" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
             <div class="p-5 text-center border-b border-gray-100 dark:border-gray-800">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ __('pos.payment') }}</h3>
@@ -1815,6 +1817,14 @@ window.addEventListener('popstate', function() {
                     autocomplete="off" name="pos_bill_note_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                     placeholder="{{ __('pos.ph_bill_note_multi') }}"
                     class="w-full text-xs bg-amber-50/60 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-lg px-2.5 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-amber-400 placeholder-gray-400 resize-y"></textarea>
+            </div>
+            {{-- Task 514: per-bill receipt auto-print choice (default = company setting;
+                 unticked = SIRF is bill ki receipt auto-print skip — KOT/PRA/popup untouched). --}}
+            <div class="px-4 pb-1" @click.stop>
+                <label class="flex items-center gap-2 text-[11px] text-gray-600 dark:text-gray-300 cursor-pointer select-none">
+                    <input type="checkbox" x-model="payPrintReceipt" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                    <span>{{ __('pos.final_print_receipt') }}</span>
+                </label>
             </div>
             <div class="px-4 pb-0.5">
                 <p class="text-center text-[10px] text-gray-400 dark:text-gray-500 font-medium">{{ __('pos.use_word') }} <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&larr;</kbd> <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&rarr;</kbd> to choose &middot; <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">Enter</kbd> to confirm</p>
@@ -1984,6 +1994,16 @@ window.addEventListener('popstate', function() {
                     <button @click="boardFinalPay('card')" :disabled="boardBusy" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 hover:border-blue-400">
                         <p class="text-sm font-black text-blue-700 dark:text-blue-300">CARD</p>
                     </button>
+                </div>
+                {{-- Task 514 (Zahid Irfan, 12 Aug 2026): PER-BILL receipt print choice —
+                     default company setting se aata hai (dine-in → print_on_pay_dinein),
+                     cashier is EK bill ke liye override kar sakta hai. Sirf receipt
+                     AUTO-print skip hoti hai; KOT/PRA/popup/manual print untouched. --}}
+                <div class="px-4 pb-2">
+                    <label class="flex items-center gap-2 text-[11px] text-gray-600 dark:text-gray-300 cursor-pointer select-none">
+                        <input type="checkbox" x-model="boardPrintReceipt" class="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500">
+                        <span>{{ __('pos.final_print_receipt') }}</span>
+                    </label>
                 </div>
                 <div class="px-4 pb-4">
                     <button @click="boardConfirm = null" :disabled="boardBusy" class="w-full py-2 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition" x-text="boardBusy ? window.TXT.bill_creating : window.TXT.cancel_go_back"></button>
@@ -2326,7 +2346,7 @@ window.addEventListener('popstate', function() {
                         <p class="text-sm">{{ __('pos.loading_provisional_bills') }}</p>
                     </div>
                 </template>
-                <template x-if="!localBillsLoading && pendingDeliveryBills().length === 0">
+                <template x-if="!localBillsLoading && pendingDeliveryBills().length === 0 && staleDeliveryBills().length === 0">
                     <div class="p-12 text-center text-gray-400">
                         <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         <p class="text-sm font-medium">{{ __('pos.no_pending_deliveries') }}</p>
@@ -2345,6 +2365,10 @@ window.addEventListener('popstate', function() {
                                 </template>
                                 <template x-if="bill.is_final">
                                     <span class="text-[9px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">{{ __('pos.final_word') }}</span>
+                                </template>
+                                {{-- Task 513: unassigned final delivery bill — rider abhi tak nahi laga --}}
+                                <template x-if="bill.is_final && !bill.rider_id">
+                                    <span class="text-[9px] bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 px-2 py-0.5 rounded-full font-bold">{{ __('pos.del_status_unassigned') }}</span>
                                 </template>
                             </div>
                             <span class="text-sm font-bold text-amber-700 dark:text-amber-400" x-text="'Rs. ' + Number(bill.total_amount).toLocaleString()"></span>
@@ -2385,6 +2409,26 @@ window.addEventListener('popstate', function() {
                                 </button>
                             </div>
                         </template>
+                        {{-- Task 513: UNASSIGNED final delivery bill — rider dropdown yahin se
+                             (POST pos.deliveries.assign, same backend as the Deliveries board).
+                             Renders only when the user's deliveries access allows assign
+                             (can_assign_rider from the API mirrors PosAccessService verdict). --}}
+                        <template x-if="bill.is_final && !bill.rider_id && canAssignRider && deliveryRiders.length > 0">
+                            <div class="mb-2 flex items-center gap-2">
+                                <svg class="w-4 h-4 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 11-4 0m10 0a2 2 0 104 0"/></svg>
+                                <select @change="assignRider(bill, $event.target.value); $event.target.value = ''"
+                                        :disabled="riderAssignBusyId"
+                                        class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1.5 focus:ring-purple-500 focus:border-purple-500 disabled:opacity-50">
+                                    <option value="">{{ __('pos.no_rider_opt') }}</option>
+                                    <template x-for="r in deliveryRiders" :key="r.id">
+                                        <option :value="r.id" x-text="r.name"></option>
+                                    </template>
+                                </select>
+                                <template x-if="riderAssignBusyId === bill.id">
+                                    <svg class="w-4 h-4 animate-spin text-purple-500 shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                </template>
+                            </div>
+                        </template>
                         {{-- PROVISIONAL bill: Final Cash/Card (promote path). FINAL bills
                              par yeh buttons render hi nahi hote — promote unpar kabhi nahi. --}}
                         <template x-if="!bill.is_final">
@@ -2402,7 +2446,10 @@ window.addEventListener('popstate', function() {
                         </template>
                         {{-- FINAL bill (3 Aug 2026): status chip + Delivered mark. Cash
                              khata settle upar wale orange rider block se hota hai. --}}
-                        <template x-if="bill.is_final">
+                        {{-- Task 513: rider_id guard — UNASSIGNED bill par status chip /
+                             Delivered button nahi (updateStatus rider-less bill 404 karta);
+                             pehle upar wale dropdown se rider lage. --}}
+                        <template x-if="bill.is_final && bill.rider_id">
                         <div class="flex gap-2 items-stretch">
                             <span class="flex items-center px-2.5 rounded-xl text-[10px] font-bold"
                                   :class="bill.delivery_status === 'delivered' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300'"
@@ -2415,6 +2462,61 @@ window.addEventListener('popstate', function() {
                                 </button>
                             </template>
                         </div>
+                        </template>
+                    </div>
+                </template>
+                {{-- Task 524: purane (pichhle business days ke) UNASSIGNED delivery
+                     bills — alag collapsed "Purani deliveries" group, badge/ginti
+                     mein shamil NAHIN. Assign dropdown wahi maujooda assignRider
+                     (POST pos.deliveries.assign) chalata hai. --}}
+                <template x-if="staleDeliveryBills().length > 0">
+                    <div class="border-t-4 border-gray-100 dark:border-gray-800">
+                        <button type="button" @click="showOldDeliveries = !showOldDeliveries"
+                                class="w-full flex items-center justify-between px-4 py-3 text-left bg-gray-50 dark:bg-gray-800/40 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                            <span class="flex items-center gap-2 text-xs font-bold text-gray-600 dark:text-gray-300">
+                                <svg class="w-3.5 h-3.5 text-gray-400 transition-transform" :class="showOldDeliveries ? 'rotate-90' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                {{ __('pos.old_del_section') }}
+                                <span class="px-1.5 py-0.5 rounded-full text-[10px] font-extrabold bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300" x-text="staleDeliveryBills().length"></span>
+                            </span>
+                        </button>
+                        <template x-if="showOldDeliveries">
+                            <div>
+                                <p class="px-4 pt-2 text-[10px] text-gray-400">{{ __('pos.old_del_hint') }}</p>
+                                <template x-for="bill in staleDeliveryBills().slice(0, 50)" :key="'old-' + bill.id">
+                                    <div class="p-4 border-b border-gray-100 dark:border-gray-800">
+                                        <div class="flex items-center justify-between mb-1.5">
+                                            <div class="flex items-center gap-2 flex-wrap">
+                                                <span class="text-sm font-bold text-gray-700 dark:text-gray-300" x-text="bill.invoice_number"></span>
+                                                {{-- Halka (gray) chip — purana bill koi RED demand nahi (Task 524) --}}
+                                                <span class="text-[9px] bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 px-2 py-0.5 rounded-full font-bold">{{ __('pos.del_status_unassigned') }}</span>
+                                            </div>
+                                            <span class="text-sm font-bold text-gray-700 dark:text-gray-300" x-text="'Rs. ' + Number(bill.total_amount).toLocaleString()"></span>
+                                        </div>
+                                        <template x-if="bill.customer_name || bill.customer_phone">
+                                            <p class="text-[11px] font-semibold text-gray-600 dark:text-gray-400" x-text="(bill.customer_name || window.TXT.customer_word) + (bill.customer_phone ? ' · ' + bill.customer_phone : '')"></p>
+                                        </template>
+                                        <template x-if="bill.delivery_address">
+                                            <p class="text-[11px] text-gray-500" x-text="bill.delivery_address"></p>
+                                        </template>
+                                        <p class="text-[11px] text-gray-400 mb-2" x-text="(bill.business_date ? bill.business_date + ' · ' : '') + (bill.created_time || '') + (bill.created_human ? ' (' + bill.created_human + ')' : '')"></p>
+                                        <template x-if="canAssignRider && deliveryRiders.length > 0">
+                                            <div class="flex items-center gap-2">
+                                                <select @change="assignRider(bill, $event.target.value); $event.target.value = ''"
+                                                        :disabled="riderAssignBusyId"
+                                                        class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1.5 focus:ring-purple-500 focus:border-purple-500 disabled:opacity-50">
+                                                    <option value="">{{ __('pos.no_rider_opt') }}</option>
+                                                    <template x-for="r in deliveryRiders" :key="'oldr-' + r.id">
+                                                        <option :value="r.id" x-text="r.name"></option>
+                                                    </template>
+                                                </select>
+                                                <template x-if="riderAssignBusyId === bill.id">
+                                                    <svg class="w-4 h-4 animate-spin text-purple-500 shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
                         </template>
                     </div>
                 </template>
@@ -3757,6 +3859,8 @@ function restaurantPos() {
         kitchenNotes: '',
         selectedTable: {!! $jsEnc($selectedTableJson, 'null') !!},
         heldOrders: {!! $jsEnc($heldOrders) !!},
+        // Task 502: Tables page open-order card → boot par isi order ka direct recall.
+        bootRecallOrderId: {!! $jsEnc($recallOrderIdForJs ?? null, 'null') !!},
         showTablePicker: false,
         tablePickerIndex: 0,
         // ZFC (Aug 2026): unsent-cart switch prompt — { kind:'table', table } |
@@ -3849,6 +3953,13 @@ function restaurantPos() {
         // ginti ab rider app / khata se milti hai. F10 Local Bills modal inhe
         // KABHI nahi dikhata (woh sirf localBills parhta hai).
         finalDeliveryBills: [],
+        showOldDeliveries: false, // Task 524: collapsed "Purani deliveries" group
+        // Task 513: active riders + assign permission for the Pending Deliveries
+        // popup's rider dropdown on UNASSIGNED bills (same pos.deliveries.assign
+        // backend as the board — no new path).
+        deliveryRiders: [],
+        canAssignRider: false,
+        riderAssignBusyId: null,
         showLocalBills: false,
         activeLocalIndex: 0,
         localBillsLoading: false,
@@ -3945,6 +4056,17 @@ function restaurantPos() {
         manualItemSubmitting: false,
         // Phase 4 — Auto-Print receipt on successful sale (mirrors companies.print_on_pay)
         autoPrintEnabled: {{ ($company->print_on_pay ?? true) ? 'true' : 'false' }},
+        // Pizza Master (11 Aug 2026): dine-in FINAL receipt auto-print company toggle —
+        // OFF = payment par dine-in ka final bill khud print NAHI hota (proof bill
+        // pehle diya ja chuka hota hai). KOT logic + manual print untouched.
+        dineinAutoPrint: {{ ($company->print_on_pay_dinein ?? true) ? 'true' : 'false' }},
+        // Task 514 (Zahid Irfan, 12 Aug 2026): PER-BILL receipt auto-print choice.
+        // Checkbox default = company setting (dine-in → print_on_pay_dinein, warna
+        // print_on_pay); cashier ek EK bill ke liye override karta hai. Sirf receipt
+        // AUTO-print skip hoti hai — KOT, PRA submission, receipt popup, manual print
+        // sab untouched (skipReceipt runAutoPrintChain + offline path dono se guzarta hai).
+        boardPrintReceipt: true,   // Table Board FINAL confirm modal ka checkbox
+        payPrintReceipt: true,     // Pay modal + one-tap CASH/CARD ka checkbox
         // Phase 5+ — Auto-print kitchen ticket on successful sale (mirrors companies.auto_print_kot)
         autoKotEnabled: {{ ($company->auto_print_kot ?? false) ? 'true' : 'false' }},
         // Silent printer routing via Desktop Sync Agent (companies.pos_printer_settings).
@@ -4277,7 +4399,10 @@ function restaurantPos() {
             // KHALI cart milta tha — lagta tha purana order GHAYAB ho gaya (asal
             // mein woh held-order mein mehfooz tha). ?table_id= boot par us table
             // ka chalta order khud cart mein load ho (waiter order = atomic claim).
-            setTimeout(() => this.autoOpenPreselectedTable(), 600);
+            // Task 502 (11 Aug 2026): Tables page open-order card ?recall_order= ke
+            // saath aata hai — boot par WOHI order recall ho (table_id fallback se
+            // pehle), warna purana table_id-based auto-open chale.
+            setTimeout(() => this.autoRecallFromUrl(), 600);
             try {
                 const up = new URLSearchParams(window.location.search).get('updated');
                 if (up) {
@@ -4425,7 +4550,7 @@ function restaurantPos() {
         // Queue a bill that could NOT reach the server (no internet). Mirrors the
         // success UX: receipt popup (offline variant) + optional auto-print of a
         // client-rendered interim receipt, cart cleared so billing continues.
-        async queueOfflineBill(payload, method, savedTotal) {
+        async queueOfflineBill(payload, method, savedTotal, skipReceipt = false) {
             // REUSE the uuid already attached by processPaymentManual (it rode on
             // the failed online attempt too) — minting a fresh one here would
             // reopen the lost-response duplicate window. Fallback only if absent.
@@ -4476,7 +4601,9 @@ function restaurantPos() {
             this.showReceipt = true;
             this.scheduleReceiptAutoClose();
             this.showToast(window.TXT.offline_bill_saved_will_sync, 'success');
-            if (this.autoPrintEnabled) {
+            // Task 514: per-bill checkbox offline path par bhi lago — unticked =
+            // is bill ki offline receipt bhi auto-print nahi hoti.
+            if (!skipReceipt && this.autoPrintEnabled && !(this.orderType === 'dine_in' && !this.dineinAutoPrint)) {
                 setTimeout(() => this.printOfflineReceipt(), 400);
             }
             this.clearCart();
@@ -5709,6 +5836,9 @@ function restaurantPos() {
                 this.payingHeldOrderId = null;
                 this.saveAsProvisional = false;
                 this.payMethodIndex = oneTapCard ? 1 : 0;
+                // Task 514: one-tap = no checkbox choice — company default, kabhi
+                // pichhle (cancel kiye) Pay modal ka stale untick inherit na ho.
+                this.payPrintReceipt = this.billPrintDefault(this.orderType);
                 this.processPayment(oneTapCard ? 'card' : 'cash');
                 return;
             }
@@ -6617,12 +6747,35 @@ function restaurantPos() {
                 this.recallOrder(ord);
             } catch (e) { /* silent — board/Recall raste bahar-haal khule hain */ }
         },
+        // Task 502 (11 Aug 2026): ?recall_order= boot handler — Tables page ke
+        // open-order card ka WOHI order seedha cart mein aaye. Server ne id ko
+        // pehle hi company + status (held/preparing/ready) par validate kiya hai;
+        // yahan baked heldOrders (items+table samet) se uthate hain. Waiter-source
+        // orders hamesha atomic claim se (single-winner invariant). Order na mile
+        // (kisi aur ne abhi-abhi final/delete kar diya) to purana table_id-based
+        // auto-open fallback chalta hai.
+        async autoRecallFromUrl() {
+            const rid = this.bootRecallOrderId;
+            if (!rid) return this.autoOpenPreselectedTable();
+            // Kisi aur boot-flow ne cart le liya (edit-bill / restore / claim)? Haath na lagao.
+            if (this.cart.length || this.editingBillId || this.recalledOrderId || this.incomingOrderId) return;
+            const ord = this.heldOrders.find(o => Number(o.id) === Number(rid));
+            if (!ord) return this.autoOpenPreselectedTable();
+            if (ord.source === 'waiter') {
+                try { await this.claimAndLoadIncoming({ id: ord.id }); } catch (e) { /* silent */ }
+                return;
+            }
+            this.recallOrder(ord);
+        },
         // FINAL — step 1: close menu, open the explicit confirm (anti "anjaane
         // mein final"). Both modals are z-50; they never overlap.
         boardAskFinal() {
             const t = this.boardMenuTable;
             if (!t || !t.order) return;
             this.boardMenuTable = null;
+            // Task 514: per-bill print checkbox ka default company setting se
+            // (tile ki apni order_type ke hisaab se) — har bill par fresh reset.
+            this.boardPrintReceipt = this.billPrintDefault(t.order.order_type || 'dine_in');
             this.boardConfirm = { table: t };
         },
         // FINAL — step 2 (CASH/CARD chosen): waiter orders claim FIRST, then the
@@ -6648,7 +6801,7 @@ function restaurantPos() {
                     }
                     orderId = (data.order && data.order.id) || orderId;
                 }
-                await this.payHeldOrderDirect(orderId, method, null, false, t.order.order_type || 'dine_in');
+                await this.payHeldOrderDirect(orderId, method, null, false, t.order.order_type || 'dine_in', !this.boardPrintReceipt);
                 this.boardConfirm = null;
                 this.loadTableStatus();
                 if (this.isRestaurantMode) this.loadIncoming();
@@ -7316,6 +7469,9 @@ function restaurantPos() {
             }
             this.saveAsProvisional = true;
             this.showPayModal = false;
+            // Task 514: direct provisional save = no checkbox surface — company
+            // default use karo, stale per-bill untick inherit na ho.
+            this.payPrintReceipt = this.billPrintDefault(this.orderType);
             await this.processPayment('cash');
         },
 
@@ -7334,6 +7490,9 @@ function restaurantPos() {
             // Capture provisional flag once at submission start so a stray
             // re-render/checkbox toggle mid-flight cannot flip the path.
             const provisional = !!this.saveAsProvisional;
+            // Task 514: per-bill receipt print choice snapshot (checkbox unticked =
+            // skip SIRF is bill ki receipt auto-print; KOT/PRA/popup untouched).
+            const skipReceipt = !this.payPrintReceipt;
 
             // Task 287 — Delivery Prepaid: override the method to qr_payment on ALL
             // paths (held-order pay, manual/direct, restaurant hold→pay, offline queue)
@@ -7346,7 +7505,7 @@ function restaurantPos() {
 
             if (this.payingHeldOrderId) {
                 this.submitting = true; this.stockError = '';
-                const paidHeld = await this.payHeldOrderDirect(this.payingHeldOrderId, method, null, provisional);
+                const paidHeld = await this.payHeldOrderDirect(this.payingHeldOrderId, method, null, provisional, null, skipReceipt);
                 this.submitting = false;
                 if (!paidHeld) {
                     // Pay failed (stock / already paid / quota) — the order is still
@@ -7385,7 +7544,7 @@ function restaurantPos() {
                 return;
             }
             if (!this.isRestaurantMode || this.hasManualItems() || this.hasDealItems() || this.incomingOrderId) {
-                return await this.processPaymentManual(method, provisional);
+                return await this.processPaymentManual(method, provisional, skipReceipt);
             }
 
             const now = Date.now();
@@ -7417,7 +7576,7 @@ function restaurantPos() {
                 const holdData = await holdRes.json();
                 if (!holdData.success) { this.showToast(holdData.message || window.TXT.failed_word, 'error'); this.submitting = false; return; }
                 const savedTotal = this.totalAmount;
-                const paid = await this.payHeldOrderDirect(holdData.order.id, method, savedTotal, provisional);
+                const paid = await this.payHeldOrderDirect(holdData.order.id, method, savedTotal, provisional, null, skipReceipt);
                 if (!paid) {
                     // Pay failed — KEEP the cart for instant retry and remember the
                     // freshly-created held order so the next Pay REUSES it via
@@ -7445,7 +7604,7 @@ function restaurantPos() {
         // master-product in resolveItemExemptions). Returns JSON when
         // wantsJson() — same shape used by payHeldOrderDirect for receipt
         // modal rendering.
-        async processPaymentManual(method, provisional = false) {
+        async processPaymentManual(method, provisional = false, skipReceipt = false) {
             const now = Date.now();
             // Same debounce toast as processPayment — one-tap must never look dead.
             if (now - this.lastPayTime < 3000) { this.showToast(window.TXT.wait_prev_bill_saved, 'error'); return; }
@@ -7506,7 +7665,7 @@ function restaurantPos() {
                     return;
                 }
                 if (!navigator.onLine) {
-                    await this.queueOfflineBill(payload, method, savedTotal);
+                    await this.queueOfflineBill(payload, method, savedTotal, skipReceipt);
                     this.showPayModal = false;
                     this.submitting = false;
                     this.saveAsProvisional = false;
@@ -7534,7 +7693,7 @@ function restaurantPos() {
                         this.submitting = false;
                         return;
                     }
-                    await this.queueOfflineBill(payload, method, savedTotal);
+                    await this.queueOfflineBill(payload, method, savedTotal, skipReceipt);
                     this.showPayModal = false;
                     this.submitting = false;
                     this.saveAsProvisional = false;
@@ -7553,7 +7712,7 @@ function restaurantPos() {
                         this.submitting = false;
                         if (confirm(window.TXT.quota_provisional_prompt || msg)) {
                             this.lastPayTime = 0; // bypass the 3s double-tap debounce for this deliberate retry
-                            return await this.processPaymentManual(method, true);
+                            return await this.processPaymentManual(method, true, skipReceipt);
                         }
                     }
                     this.showToast(msg, 'error');
@@ -7591,7 +7750,7 @@ function restaurantPos() {
                 const txnKotId = (this.isRestaurantMode && this.orderType === 'delivery' && !this.incomingOrderId && !kotHeldForPayment)
                     ? (data.transaction_id || null) : null;
                 if (kotHeldForPayment) this.showToast(window.TXT.kot_held_until_payment, 'info');
-                this.runAutoPrintChain(null, this.orderType, txnKotId);
+                this.runAutoPrintChain(null, this.orderType, txnKotId, skipReceipt);
                 // P7: settle the linked waiter order (atomic server-side claim) —
                 // frees the table and clears it from every cashier's Incoming list.
                 // FINAL bills only: a provisional is editable/deletable, so it must
@@ -8052,7 +8211,21 @@ function restaurantPos() {
         //
         // ✅ FIX (May-07): Tightened gap between receipt-finish → KOT-start (300ms → 80ms)
         // and initial chain start (400ms → 150ms) to feel snappier on thermal printers.
-        runAutoPrintChain(orderId, orderType = null, txnKotId = null) {
+        // Task 514: per-bill checkbox ka default — company setting ka mirror
+        // (dine-in par print_on_pay_dinein, warna print_on_pay).
+        billPrintDefault(orderType = null) {
+            return !!this.autoPrintEnabled && !((orderType === 'dine_in') && !this.dineinAutoPrint);
+        },
+        // Pay modal ke checkbox ka default order-type: held-order pay par us order
+        // ki apni type (widget se nahi), warna current order-type widget.
+        payModalOrderType() {
+            const held = this.payingHeldOrderId ? this.heldOrders.find(o => o.id === this.payingHeldOrderId) : null;
+            return (held && held.order_type) || this.orderType || null;
+        },
+        // skipReceiptOverride (Task 514): cashier ne per-bill "Receipt print karein"
+        // checkbox UNTICK kiya — SIRF is bill ki receipt auto-print skip; KOT gate
+        // (wantsKot) aur baaki chain waise hi chalti hai.
+        runAutoPrintChain(orderId, orderType = null, txnKotId = null, skipReceiptOverride = false) {
             // MASTER GATE — auto-print OFF means NOTHING fires automatically.
             // Telemetry (Task #63): silent-print shops expect paper on every sale —
             // record WHY the chain did nothing so a "bill never printed" report is
@@ -8063,6 +8236,10 @@ function restaurantPos() {
                 return;
             }
             const hasReceipt = !!this.lastTransactionId;
+            // Pizza Master (11 Aug 2026): dine-in FINAL receipt auto-print is company-
+            // optional — proof bill table par pehle diya ja chuka hota hai, final ka
+            // auto-print kaghaz zaya karta tha. Receipt popup / manual print bahaal.
+            const dineinSkipReceipt = (orderType === 'dine_in') && !this.dineinAutoPrint;
             // KDS Auto-Print owns ticket printing → cashier auto-KOT suppressed
             // (owner, Jul 2026). Manual Resend / receipt-popup KOT button stay.
             // DINE-IN finals NEVER auto-KOT (owner, Jul 2026): the kitchen got its
@@ -8072,7 +8249,7 @@ function restaurantPos() {
             // txnKotId (ZFC 28 Jul 2026): order-less delivery bills (provisional
             // rider khata / manual-cart finals) KOT from the TRANSACTION instead.
             const wantsKot = !!this.autoKotEnabled && (!!orderId || !!txnKotId) && orderType !== 'dine_in' && !this.kdsHandlesKot();
-            const wantsReceipt = hasReceipt;
+            const wantsReceipt = hasReceipt && !dineinSkipReceipt && !skipReceiptOverride;
             // KOT delta = ALWAYS in the auto chain (owner, Jul 2026): the kitchen
             // already has every line that printed at hold / waiter-send / recall —
             // auto-KOT at pay must fire ONLY still-unprinted rows (fresh takeaway
@@ -8133,6 +8310,8 @@ function restaurantPos() {
                 if (data && data.success) {
                     this.localBills = data.bills || [];
                     this.finalDeliveryBills = data.final_deliveries || [];
+                    this.deliveryRiders = data.riders || [];
+                    this.canAssignRider = !!data.can_assign_rider;
                     if (data.business_today) this.bizToday = data.business_today;
                     if (this.activeLocalIndex >= this.filteredLocalBills().length) {
                         this.activeLocalIndex = Math.max(0, this.filteredLocalBills().length - 1);
@@ -8180,8 +8359,21 @@ function restaurantPos() {
             const prov = this.localBills.filter(b => b.order_type === 'delivery' && isToday(b));
             // FINAL delivery bills bhi (3 Aug 2026): jo abhi deliver nahi hue ya
             // cash rider ke khaate par hai — popup ki ginti ab rider app se milti hai.
-            const finals = (this.finalDeliveryBills || []).filter(isToday);
+            // Task 513: UNASSIGNED bills (rider NULL + status NULL) ride the 7-din
+            // server window like the Deliveries board — today-filter unpar nahi lagta,
+            // warna kal ka bina-rider bill popup se ghayab ho jata.
+            // Task 524: purani (pichhle business days ki) unassigned bills MAIN
+            // list/badge se bahar — woh neeche staleDeliveryBills() ke collapsed
+            // group mein hain. Flag SERVER par banta hai (business_date < aaj ka
+            // business day); yahan sirf parha jata hai.
+            const finals = (this.finalDeliveryBills || []).filter(b => !b.is_stale_unassigned && (isToday(b) || (!b.rider_id && !b.delivery_status)));
             return [...prov, ...finals];
+        },
+        // Task 524: purane (day-close ho chuke dinon ke) UNASSIGNED delivery
+        // bills — popup mein alag collapsed "Purani deliveries" group, badge ki
+        // ginti mein KABHI shamil nahi.
+        staleDeliveryBills() {
+            return (this.finalDeliveryBills || []).filter(b => b.is_stale_unassigned);
         },
         openPendingDeliveries() {
             this.showPendingDeliveries = true;
@@ -8199,7 +8391,7 @@ function restaurantPos() {
             } finally {
                 this.deliveryFinalBusyId = null;
             }
-            if (this.pendingDeliveryBills().length === 0) this.showPendingDeliveries = false;
+            if (this.pendingDeliveryBills().length === 0 && this.staleDeliveryBills().length === 0) this.showPendingDeliveries = false;
         },
         // FINAL delivery bill ko panel se Delivered mark karna (3 Aug 2026) —
         // reuses POST /pos/deliveries/{id}/status (JSON). Promote yahan kabhi
@@ -8226,6 +8418,32 @@ function restaurantPos() {
                 this.showToast(window.TXT.network_error, 'error');
             }
             this.deliveryFinalBusyId = null;
+        },
+        // ─── Rider assign from the panel (Task 513) ─────────────────────────
+        // UNASSIGNED delivery bill par dropdown se rider chuno — reuses POST
+        // /pos/deliveries/{id}/assign (same backend as the Deliveries board;
+        // koi naya path nahi). Success = list refresh (bill assigned-section
+        // mein chala jata hai, khata rider_id follow karta hai).
+        async assignRider(bill, riderId) {
+            if (!bill || !riderId || this.riderAssignBusyId) return;
+            this.riderAssignBusyId = bill.id;
+            try {
+                const res = await fetch('{{ url('/pos/deliveries') }}/' + bill.id + '/assign', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ rider_id: riderId }),
+                });
+                const data = await res.json().catch(() => null);
+                if (res.ok && data && data.success) {
+                    this.showToast(@json(__('pos.rider_assign_ok')), 'success');
+                    this.loadLocalBills();
+                } else {
+                    this.showToast((data && data.message) || @json(__('pos.rider_assign_failed')), 'error');
+                }
+            } catch (e) {
+                this.showToast(window.TXT.network_error, 'error');
+            }
+            this.riderAssignBusyId = null;
         },
         // ─── Rider WHOLE-khata settle from the panel (Task 123) ─────────────
         // Reuses POST /pos/riders/{id}/settle with settle_all — settles EVERY
@@ -8436,7 +8654,7 @@ function restaurantPos() {
                     // cashier ticked the box — delivery customer isn't present, paper saved.
                     // KOT release above is NEVER skipped (kitchen must still cook).
                     const skipReceiptPrint = (noPrintOverride === null) ? this.promoteNoPrint : noPrintOverride;
-                    if (!skipReceiptPrint) this.runAutoPrintChain(null);
+                    if (!skipReceiptPrint) this.runAutoPrintChain(null, bill.order_type || null);
                 } else {
                     // Failed — refresh list so cashier sees current state.
                     this.showToast((data && data.message) || window.TXT.submit_failed, 'error');
@@ -8554,7 +8772,7 @@ function restaurantPos() {
             } catch (e) { console.error('Delete held order error:', e); this.showToast(window.TXT.error_deleting_order, 'error'); }
         },
 
-        async payHeldOrderDirect(orderId, method, savedTotal, provisional = false, orderTypeOverride = null) {
+        async payHeldOrderDirect(orderId, method, savedTotal, provisional = false, orderTypeOverride = null, skipReceipt = false) {
             // Order type captured NOW (owner, Jul 2026): held-modal pays read it from
             // the heldOrders entry (removed from the list on success below); billing
             // pass-through orders are never in heldOrders → falls back to the current
@@ -8586,7 +8804,7 @@ function restaurantPos() {
                     // offer a one-click provisional settle instead of a dead-end error.
                     if (res.status === 403 && errData && errData.quota_full && errData.provisional_allowed && !provisional) {
                         if (confirm(window.TXT.quota_provisional_prompt || errData.message)) {
-                            return await this.payHeldOrderDirect(orderId, method, savedTotal, true, orderTypeOverride);
+                            return await this.payHeldOrderDirect(orderId, method, savedTotal, true, orderTypeOverride, skipReceipt);
                         }
                     }
                     this.showToast((errData && errData.message) || ('Payment failed (HTTP ' + res.status + ') — F12 console'), 'error');
@@ -8608,7 +8826,7 @@ function restaurantPos() {
                     // Uses postMessage-chained engine — KOT never fires before the receipt
                     // print dialog is dismissed (was a race in the old setTimeout(200/1800) impl
                     // on slow networks where KOT iframe loaded before receipt iframe).
-                    this.runAutoPrintChain(orderId, payOrderType);
+                    this.runAutoPrintChain(orderId, payOrderType, null, skipReceipt);
                     // Refresh provisional badge count when this save was provisional.
                     if (provisional) { this.loadLocalBills(); }
                     // Refresh failed badge so cashier sees pending/failed state in real time.

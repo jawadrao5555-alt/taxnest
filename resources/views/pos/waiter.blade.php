@@ -84,7 +84,7 @@
 
     {{-- ── Append-mode banner ─────────────────────────────────────────────── --}}
     <div x-show="appendOrderId" x-cloak class="mb-3 rounded-xl bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 px-4 py-2.5 flex items-center justify-between gap-2 flex-wrap">
-        <span class="text-sm font-bold text-amber-800 dark:text-amber-300">{{ __('pos.adding_items_to') }} <span class="font-mono" x-text="appendOrderNumber"></span> {{ __('pos.only_new_items_print') }}</span>
+        <span class="text-sm font-bold text-amber-800 dark:text-amber-300">{{ __('pos.adding_items_to') }} <span class="font-mono" x-text="appendOrderNumber"></span> <span x-show="appendTableLabel" x-cloak class="inline-block align-middle text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 dark:bg-amber-800/60 dark:text-amber-200" x-text="'T-' + appendTableLabel"></span> {{ __('pos.only_new_items_print') }}</span>
         <button @click="cancelAppend()" class="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-800 text-xs font-bold text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600">{{ __('pos.cancel') }}</button>
     </div>
 
@@ -142,7 +142,10 @@
                 {{-- Parcel button — amber, badge = my open takeaway/delivery orders.
                      Task #342 (Aug 2026): tap = inline sub-list of open parcel orders
                      (tap to append, tables jaisa flow) + "+ Naya Parcel Order". --}}
+                {{-- Task 527: takeaway band ho to Parcel button sirf tab dikhe jab
+                     PEHLE se khule parcel orders hon (append allowed, naya nahi). --}}
                 <button @click="selectButtonParcel()"
+                        x-show="canTakeaway || parcelOrders().length > 0"
                         class="w-full flex items-center justify-between rounded-2xl bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-400 dark:border-amber-600 px-5 py-4 transition active:scale-[.98]">
                     <span class="text-lg font-black text-amber-700 dark:text-amber-300">
                         📦 {{ __('pos.waiter_buttons_parcel') }}
@@ -171,10 +174,12 @@
                                   x-text="'Rs ' + Math.round(o.total_amount).toLocaleString()"></span>
                         </button>
                     </template>
+                    @if($waiterCanTakeaway ?? true)
                     <button @click="startNewParcel()"
                             class="w-full rounded-2xl bg-amber-500 hover:bg-amber-600 text-white px-4 py-3 text-sm font-black transition active:scale-[.98]">
                         {{ __('pos.waiter_buttons_new_parcel') }}
                     </button>
+                    @endif
                 </div>
             </div>
 
@@ -350,10 +355,15 @@
                     </button>
 
                     <div x-show="moreOpen" x-cloak class="space-y-3">
+                        {{-- Task 527: takeaway punch admin-controlled (default ON).
+                             Band ho to type-picker hi nahi — waiter dine-in par
+                             locked rehta hai (server order_type=takeaway 403 karta hai). --}}
+                        @if($waiterCanTakeaway ?? true)
                         <div class="grid grid-cols-2 gap-2">
                             <button @click="orderType = 'dine_in'" :class="orderType === 'dine_in' ? 'bg-teal-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'" class="py-2.5 rounded-xl text-xs font-bold transition">{{ __('pos.dine_in') }}</button>
                             <button @click="orderType = 'takeaway'; selectedTable = null" :class="orderType === 'takeaway' ? 'bg-teal-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'" class="py-2.5 rounded-xl text-xs font-bold transition">{{ __('pos.take_away') }}</button>
                         </div>
+                        @endif
                         <input type="text" x-model="customerPhone" placeholder="{{ __('pos.ph_customer_phone_optional') }}" inputmode="tel"
                                autocomplete="off" name="waiter_phone_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                                class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm px-3 py-2.5 focus:ring-teal-500 focus:border-teal-500">
@@ -497,8 +507,12 @@
                             <button x-show="o.table_id" @click="startShift(o)" class="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-teal-300 dark:border-teal-700 text-teal-700 dark:text-teal-300 hover:bg-teal-50 text-xs font-bold transition">⇄ {{ __('pos.change_table') }}</button>
                             {{-- Waiter self-cancel (Task 412): sirf UN-CLAIMED order
                                  (assigned_cashier_id null) — cashier ke claim/settle
-                                 ke baad cancel counter se hi hota hai. --}}
+                                 ke baad cancel counter se hi hota hai.
+                                 Task 527: admin-controlled permission (default OFF) —
+                                 band ho to button hi nahi (server bhi 403 deta hai). --}}
+                            @if($waiterCanCancel ?? false)
                             <button x-show="!o.assigned_cashier_id" @click="cancelAsk = o" class="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 text-xs font-bold transition">✕ {{ __('pos.cancel') }}</button>
+                            @endif
                         </div>
                     </div>
                 </template>
@@ -679,6 +693,9 @@ function waiterApp() {
         },
         cart: [],
         orderType: 'dine_in',
+        // Task 527: takeaway punch admin-controlled — false = parcel/takeaway
+        // flows locked (buttons style Parcel gating + startNewParcel guard).
+        canTakeaway: {{ ($waiterCanTakeaway ?? true) ? 'true' : 'false' }},
         // SADA MODE (owner, 4 Aug 2026): Takeaway/phone/note/cashier "Mazeed"
         // fold ke andar — default band, order bhejne par wapas band.
         moreOpen: false,
@@ -708,6 +725,7 @@ function waiterApp() {
         myOrdersLoading: false,
         appendOrderId: null,
         appendOrderNumber: '',
+        appendTableLabel: '',    // Task 526: append banner mein table number dikhao (parcel = khali)
         parcelListOpen: false,   // Task #342: inline parcel sub-list on buttons home
         tableActionFor: null,    // occupied-tile chooser (Add Items / Shift)
         shiftFor: null,          // Table Shift (26 Jul 2026): order being shifted
@@ -989,11 +1007,15 @@ function waiterApp() {
             this.cart = [];
             this.appendOrderId = o.id;
             this.appendOrderNumber = o.order_number;
+            // Task 526: My Orders API pehle hi order ka table bhejti hai (orderJson
+            // 'table' = table_number); parcel/takeaway par null → badge chhupa rehta hai.
+            this.appendTableLabel = o.table ? String(o.table) : '';
             this.showMyOrders = false;
         },
         cancelAppend() {
             this.appendOrderId = null;
             this.appendOrderNumber = '';
+            this.appendTableLabel = '';
             this.cart = [];
         },
 
@@ -1011,6 +1033,8 @@ function waiterApp() {
             }
             this.appendOrderId = t.order_id;
             this.appendOrderNumber = t.order_number || ('T-' + t.table_number);
+            // Task 526: order_number na ho to banner khud hi T-x dikhata hai — badge skip.
+            this.appendTableLabel = (t.order_number && t.table_number) ? String(t.table_number) : '';
             this.tableActionFor = null;
             this.showTables = false;
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1035,6 +1059,7 @@ function waiterApp() {
             if (!t || !o) return;
             this.appendOrderId = o.id;
             this.appendOrderNumber = o.order_number || ('T-' + t.table_number);
+            this.appendTableLabel = (o.order_number && t.table_number) ? String(t.table_number) : '';
             this.showTables = false;
             window.scrollTo({ top: 0, behavior: 'smooth' });
         },
@@ -1129,7 +1154,7 @@ function waiterApp() {
                     // khud "naya order" halat par wapas (cashier ka intikhab
                     // din bhar qaim rehta hai, jaan boojh kar reset NahiN).
                     this.orderType = 'dine_in'; this.moreOpen = false;
-                    this.appendOrderId = null; this.appendOrderNumber = '';
+                    this.appendOrderId = null; this.appendOrderNumber = ''; this.appendTableLabel = '';
                     this.loadMyOrders();
                     // Buttons style (Task #340, Aug 2026): after send, return to the
                     // home button list and silently refresh table counts/timers.
@@ -1192,6 +1217,7 @@ function waiterApp() {
 
         // "+ Naya Parcel Order" → set takeaway order type and reveal the product grid.
         startNewParcel() {
+            if (!this.canTakeaway) return; // Task 527: admin ne takeaway band rakha hai
             this.parcelListOpen = false;
             this.orderType = 'takeaway';
             this.selectedTable = null;

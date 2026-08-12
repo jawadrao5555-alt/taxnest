@@ -170,29 +170,51 @@
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.paper_size_hint') }}</p>
         </div>
 
-        {{-- Print Position + Left Margin (owner, 10 Aug 2026 — Pizza Master ask):
-             same company columns the Kitchen Settings page writes (kot_align_center /
-             kot_left_margin_mm) — they steer the RECEIPTS (80/58mm), proof bill AND
-             the KOT alike, so shops without the kitchen module get the control too.
-             Last save from either page wins, same convention as paper size. --}}
+        {{-- Print Position + Left Margin (Pizza Master, 11 Aug 2026): ab receipts ke
+             APNE columns hain (receipt_align_center / receipt_left_margin_mm) — KOT
+             se alag, taake ek printer theek karne par doosre ki parchi na kat jaye.
+             NULL = purane shared kot_* par fallback (purani shops jaisi thi waisi).
+             KOT ki apni position neeche "KOT Print Style" card mein hai. --}}
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-6">
-            <label class="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">📐 {{ __('pos.print_position') }} <span class="text-xs font-normal text-gray-500 dark:text-gray-400">{{ __('pos.applies_both_receipt_types') }}</span></label>
+            @php
+                $rpAlignVal = (bool) ($company->receipt_align_center ?? $company->kot_align_center ?? false);
+                $rpMarginVal = (int) ($company->receipt_left_margin_mm ?? $company->kot_left_margin_mm ?? 0);
+            @endphp
+            <label class="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">📐 {{ __('pos.print_position') }} <span class="text-xs font-normal text-gray-500 dark:text-gray-400">{{ __('pos.applies_receipts_only') }}</span></label>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <select name="rp_align_center" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-purple-500 focus:ring-purple-500">
-                        <option value="0" {{ !($company->kot_align_center ?? false) ? 'selected' : '' }}>{{ __('pos.print_pos_left_edge') }}</option>
-                        <option value="1" {{ ($company->kot_align_center ?? false) ? 'selected' : '' }}>{{ __('pos.print_pos_center') }}</option>
+                        <option value="0" {{ !$rpAlignVal ? 'selected' : '' }}>{{ __('pos.print_pos_left_edge') }}</option>
+                        <option value="1" {{ $rpAlignVal ? 'selected' : '' }}>{{ __('pos.print_pos_center') }}</option>
                     </select>
                     <p class="text-[11px] text-amber-600 dark:text-amber-400 mt-1">{{ __('pos.print_pos_center_warn') }}</p>
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">{{ __('pos.left_margin_mm') }}</label>
-                    <input type="number" name="rp_left_margin_mm" min="0" max="30" step="1" value="{{ (int) ($company->kot_left_margin_mm ?? 0) }}"
+                    <input type="number" name="rp_left_margin_mm" min="0" max="30" step="1" value="{{ $rpMarginVal }}"
                            class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-purple-500 focus:ring-purple-500">
                     <p class="text-[11px] text-gray-400 mt-1">{{ __('pos.left_margin_mm_hint') }}</p>
                 </div>
             </div>
         </div>
+
+        {{-- Dine-in FINAL bill auto-print (Pizza Master, 11 Aug 2026 — owner-approved
+             for ALL PRA POS): proof bill table par pehle diya ja chuka hota hai,
+             final ka auto-print kaghaz zaya karta tha. Sirf restaurant-mode shops
+             ko dikhta hai (retail par dine-in hota hi nahi). --}}
+        @if($company->restaurant_mode ?? false)
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 flex items-center justify-between">
+            <div>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">🍽️ {{ __('pos.dinein_autoprint_label') }}</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.dinein_autoprint_hint') }}</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="hidden" name="rp_dinein_autoprint" value="0">
+                <input type="checkbox" name="rp_dinein_autoprint" value="1" {{ ($company->print_on_pay_dinein ?? true) ? 'checked' : '' }} class="sr-only peer">
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-purple-600"></div>
+            </label>
+        </div>
+        @endif
 
         {{-- KOT Print Style (Aug 2026): same toggles as Kitchen Settings — exposed
              here too so shops without the kitchen module can control their KOT layout.
@@ -223,6 +245,26 @@
                     </label>
                 </div>
                 @endforeach
+                {{-- KOT ki APNI print position (Pizza Master, 11 Aug 2026): receipts
+                     wale margin se bilkul alag — kitchen-settings wale hi kot_*
+                     columns likhta hai (aakhri save jeet-ti hai). --}}
+                <div class="p-5">
+                    <label class="block text-sm font-semibold text-gray-900 dark:text-white mb-0.5">📐 {{ __('pos.kot_print_position') }}</label>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ __('pos.kot_print_position_hint') }}</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <select name="rp_kot_align_center" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-purple-500 focus:ring-purple-500">
+                                <option value="0" {{ !($company->kot_align_center ?? false) ? 'selected' : '' }}>{{ __('pos.print_pos_left_edge') }}</option>
+                                <option value="1" {{ ($company->kot_align_center ?? false) ? 'selected' : '' }}>{{ __('pos.print_pos_center') }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">{{ __('pos.left_margin_mm') }}</label>
+                            <input type="number" name="rp_kot_left_margin_mm" min="0" max="30" step="1" value="{{ (int) ($company->kot_left_margin_mm ?? 0) }}"
+                                   class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-purple-500 focus:ring-purple-500">
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 

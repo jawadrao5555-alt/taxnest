@@ -666,6 +666,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/settings/cashier-dayclose-toggle', [PosController::class, 'toggleCashierDayclose'])->name('pos.settings.cashier-dayclose-toggle');
     Route::post('/settings/dayclose-cutoff', [PosController::class, 'updateDaycloseCutoff'])->name('pos.settings.dayclose-cutoff');
     Route::post('/settings/kds-auto-print', [PosController::class, 'toggleKdsAutoPrint'])->name('pos.settings.kds-auto-print');
+    // Task 527: admin-controlled waiter permissions (cancel default OFF, takeaway default ON).
+    Route::post('/settings/waiter-permission', [PosController::class, 'toggleWaiterPermission'])->name('pos.settings.waiter-permission');
     Route::get('/invoice/create', [PosController::class, 'createInvoice'])->name('pos.invoice.create');
     Route::get('/v2/invoice/create', [PosController::class, 'universalCreateInvoice'])->name('pos.v2.invoice.create');
     Route::get('/features', [PosController::class, 'featureSettings'])->name('pos.features');
@@ -717,6 +719,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/reports/analytics-pdf', [PosController::class, 'reportsAnalyticsPdf'])->name('pos.reports.analytics-pdf');
     Route::get('/day-close', [PosController::class, 'dayCloseReport'])->name('pos.day-close');
     Route::post('/day-close', [PosController::class, 'closeDayReport'])->name('pos.close-day');
+    // Task 516: bulk-close every stranded prior business day in one click.
+    Route::post('/day-close/close-all-prior', [PosController::class, 'closeAllPriorDays'])->name('pos.close-all-days');
     Route::post('/day-opening', [PosController::class, 'saveDayOpening'])->name('pos.day-opening.save');
     Route::get('/day-close/{id}/pdf', [PosController::class, 'dayCloseReportPdf'])->name('pos.day-close-pdf');
     Route::get('/day-close/{id}/thermal', [PosController::class, 'dayCloseThermal'])->name('pos.day-close-thermal');
@@ -1286,6 +1290,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/transaction/{id}/pdf-preview', [FbrPosController::class, 'previewPdf'])->name('fbrpos.pdf.preview');
     Route::get('/day-close', [FbrPosController::class, 'dayCloseReport'])->name('fbrpos.day-close');
     Route::post('/day-close', [FbrPosController::class, 'closeDayReport'])->name('fbrpos.close-day');
+    Route::post('/day-close/close-all-prior', [FbrPosController::class, 'closeAllPriorDays'])->name('fbrpos.close-all-days');
     Route::get('/day-close/{id}/pdf', [FbrPosController::class, 'dayCloseReportPdf'])->name('fbrpos.day-close-pdf');
     Route::get('/day-close/{id}/thermal', [FbrPosController::class, 'dayCloseThermal'])->name('fbrpos.day-close-thermal');
     Route::get('/reports/analytics-pdf', [FbrPosController::class, 'reportsAnalyticsPdf'])->name('fbrpos.reports.analytics-pdf');

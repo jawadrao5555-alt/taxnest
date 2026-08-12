@@ -57,6 +57,7 @@
                     <th class="px-4 py-3 text-right">Rs</th>
                     <th class="px-4 py-3 hidden sm:table-cell">KOT</th>
                     <th class="px-4 py-3 hidden md:table-cell">{{ __('pos.punched_by') }}</th>
+                    <th class="px-4 py-3">{{ __('pos.cancelled_by_word') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -75,9 +76,10 @@
                         @endif
                     </td>
                     <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ $o->creator?->name ?? '—' }}</td>
+                    <td class="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">{{ $o->canceller?->name ?? __('pos.system_word') }}</td>
                 </tr>
                 @empty
-                <tr><td colspan="7" class="px-4 py-10 text-center text-sm text-gray-400">{{ __('pos.no_cancelled_orders') }}</td></tr>
+                <tr><td colspan="8" class="px-4 py-10 text-center text-sm text-gray-400">{{ __('pos.no_cancelled_orders') }}</td></tr>
                 @endforelse
             </tbody>
         </table>

@@ -14,10 +14,12 @@
 
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-5 mb-5">
         <h2 class="font-bold mb-3 text-gray-900 dark:text-white">{{ __('pos.add_team_member') }}</h2>
-        <form method="POST" action="{{ route('fbrpos.team.store') }}" class="grid sm:grid-cols-2 lg:grid-cols-{{ $branches->isNotEmpty() ? '6' : '5' }} gap-3">
+        <form method="POST" action="{{ route('fbrpos.team.store') }}" class="grid sm:grid-cols-2 lg:grid-cols-{{ $branches->isNotEmpty() ? '7' : '6' }} gap-3">
             @csrf
             <input type="text" name="name" value="{{ old('name') }}" placeholder="{{ __('pos.ph_cashier_name') }}" required autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white">
             <input type="email" name="email" value="{{ old('email') }}" placeholder="{{ __('pos.email_label') }}" required autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white">
+            {{-- Task 529 (PRA twin): optional login username --}}
+            <input type="text" name="username" value="{{ old('username') }}" placeholder="{{ __('pos.username_label') }} ({{ __('pos.optional_lc') }})" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white">
             <input type="text" name="password" placeholder="{{ __('pos.password_label') }}" required autocomplete="new-password" data-lpignore="true" data-form-type="other" data-1p-ignore class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white">
             <select name="pos_role" class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white">
                 <option value="pos_cashier">{{ __('pos.role_cashier') }}</option>
@@ -42,7 +44,7 @@
         <table class="w-full text-sm table-cards">
             <thead class="bg-gray-50 dark:bg-gray-700 text-left">
                 <tr>
-                    <th class="px-4 py-3">{{ __('pos.full_name') }}</th><th>{{ __('pos.email_label') }}</th><th>{{ __('pos.role_label') }}</th>@if($branches->isNotEmpty())<th>{{ __('pos.branch_word') }}</th>@endif<th>{{ __('pos.password_label') }}</th><th>{{ __('pos.status_word') }}</th><th class="text-right pr-4">{{ __('pos.actions_label') }}</th>
+                    <th class="px-4 py-3">{{ __('pos.full_name') }}</th><th>{{ __('pos.email_label') }}</th><th>{{ __('pos.username_label') }}</th><th>{{ __('pos.role_label') }}</th>@if($branches->isNotEmpty())<th>{{ __('pos.branch_word') }}</th>@endif<th>{{ __('pos.password_label') }}</th><th>{{ __('pos.status_word') }}</th><th class="text-right pr-4">{{ __('pos.actions_label') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -51,6 +53,7 @@
                 <tr class="border-t dark:border-gray-700">
                     <td class="px-4 py-3 font-semibold dark:text-white">{{ $member->name }}</td>
                     <td class="dark:text-gray-300">{{ $member->email }}</td>
+                    <td class="dark:text-gray-300 font-mono text-xs">{{ $member->username ?: '—' }}</td>
                     <td class="dark:text-gray-300">
                         @if($isAdminRow)<span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">{{ __('pos.owner_word') }}</span>
                         @elseif($member->pos_role === 'pos_manager'){{ __('pos.role_manager') }}
@@ -82,11 +85,13 @@
                 </tr>
                 @unless($isAdminRow)
                 <tr x-show="editId === {{ $member->id }}" x-cloak class="border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
-                    <td colspan="{{ $branches->isNotEmpty() ? 7 : 6 }}" class="px-4 py-4">
-                        <form method="POST" action="{{ route('fbrpos.team.update', $member->id) }}" class="grid sm:grid-cols-2 lg:grid-cols-{{ $branches->isNotEmpty() ? '6' : '5' }} gap-3">
+                    <td colspan="{{ $branches->isNotEmpty() ? 8 : 7 }}" class="px-4 py-4">
+                        <form method="POST" action="{{ route('fbrpos.team.update', $member->id) }}" class="grid sm:grid-cols-2 lg:grid-cols-{{ $branches->isNotEmpty() ? '7' : '6' }} gap-3">
                             @csrf @method('PUT')
                             <input type="text" name="name" value="{{ $member->name }}" required autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white">
                             <input type="email" name="email" value="{{ $member->email }}" required autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white">
+                            {{-- Task 529: set/change login username (blank = clear) --}}
+                            <input type="text" name="username" value="{{ $member->username }}" placeholder="{{ __('pos.username_label') }} ({{ __('pos.optional_lc') }})" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white">
                             <input type="text" name="password" placeholder="{{ __('pos.ph_new_password_optional') }}" autocomplete="new-password" data-lpignore="true" data-form-type="other" data-1p-ignore class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white">
                             <select name="pos_role" class="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white">
                                 <option value="pos_cashier" @selected($member->pos_role === 'pos_cashier')>{{ __('pos.role_cashier') }}</option>
@@ -109,7 +114,7 @@
                 </tr>
                 @endunless
             @empty
-                <tr><td colspan="{{ $branches->isNotEmpty() ? 7 : 6 }}" class="px-4 py-8 text-center text-gray-500">{{ __('pos.no_team_members') }}</td></tr>
+                <tr><td colspan="{{ $branches->isNotEmpty() ? 8 : 7 }}" class="px-4 py-8 text-center text-gray-500">{{ __('pos.no_team_members') }}</td></tr>
             @endforelse
             </tbody>
         </table>

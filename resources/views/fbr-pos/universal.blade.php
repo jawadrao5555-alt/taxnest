@@ -291,10 +291,12 @@ window.addEventListener('popstate', function() {
             </button>
 
             {{-- Pending Deliveries (Task 122) — appears only when something IS pending --}}
-            <button x-show="pendingDeliveryBills().length > 0" x-cloak @click="openPendingDeliveries()" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-amber-500/85 hover:bg-amber-500 ring-1 ring-amber-300/40 transition flex-shrink-0" title="{{ __('pos.pending_deliveries_hint') }}">
+            {{-- Task 524: button purani unassigned par bhi khulta hai (reachability),
+                 magar numeric badge sirf FRESH ginti dikhata hai. --}}
+            <button x-show="pendingDeliveryBills().length > 0 || staleDeliveryBills().length > 0" x-cloak @click="openPendingDeliveries()" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-amber-500/85 hover:bg-amber-500 ring-1 ring-amber-300/40 transition flex-shrink-0" title="{{ __('pos.pending_deliveries_hint') }}">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
                 <span class="hidden lg:inline">{{ __('pos.pending_deliveries') }}</span>
-                <span class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-amber-600 text-white text-[9px] rounded-full flex items-center justify-center font-bold" x-text="pendingDeliveryBills().length"></span>
+                <span x-show="pendingDeliveryBills().length > 0" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-amber-600 text-white text-[9px] rounded-full flex items-center justify-center font-bold" x-text="pendingDeliveryBills().length"></span>
             </button>
 
             {{-- Delivery Board (Aug 2026) — lazy iframe modal; only shown when delivery feature + riders plan gate are both ON. --}}
@@ -808,10 +810,10 @@ window.addEventListener('popstate', function() {
 
         {{-- Pending Deliveries (Task 122, FBR port of PRA Task 114) — today's delivery
              provisionals, one-click Final (Cash/Card). Badge auto-hides when empty. --}}
-        <button x-show="pendingDeliveryBills().length > 0" x-cloak @click="openPendingDeliveries()" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition" title="{{ __('pos.pending_deliveries_hint') }}">
+        <button x-show="pendingDeliveryBills().length > 0 || staleDeliveryBills().length > 0" x-cloak @click="openPendingDeliveries()" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition" title="{{ __('pos.pending_deliveries_hint') }}">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
             <span class="hidden sm:inline">{{ __('pos.pending_deliveries') }}</span>
-            <span class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-amber-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="pendingDeliveryBills().length"></span>
+            <span x-show="pendingDeliveryBills().length > 0" class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-amber-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="pendingDeliveryBills().length"></span>
         </button>
 
         {{-- Delivery Board — mobile button (Aug 2026) --}}
@@ -974,9 +976,9 @@ window.addEventListener('popstate', function() {
 
             <div class="md:hidden flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
                 {{-- Pending Deliveries badge — mobile (Task 122) --}}
-                <button x-show="pendingDeliveryBills().length > 0" x-cloak @click="openPendingDeliveries()" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition" title="{{ __('pos.pending_deliveries_hint') }}">
+                <button x-show="pendingDeliveryBills().length > 0 || staleDeliveryBills().length > 0" x-cloak @click="openPendingDeliveries()" class="relative flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition" title="{{ __('pos.pending_deliveries_hint') }}">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
-                    <span class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-amber-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="pendingDeliveryBills().length"></span>
+                    <span x-show="pendingDeliveryBills().length > 0" class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-amber-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="pendingDeliveryBills().length"></span>
                 </button>
                 <button @click="mobileView = 'cart'" class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold shadow-sm">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
@@ -1315,11 +1317,11 @@ window.addEventListener('popstate', function() {
                          charge equals the band total for either method. PAY (F8) keeps the
                          modal (method choice + buyer NTN etc.). --}}
                     <div class="grid grid-cols-2 gap-2">
-                        <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 0; processPayment('cash')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
+                        <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 0; payPrintReceipt = billPrintDefault(); processPayment('cash')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
                             <span class="flex items-center gap-1.5 text-xs font-extrabold leading-none"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>CASH</span>
                             <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(roundedTotal).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+1</kbd></span>
                         </button>
-                        <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 1; processPayment('card')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-gray-700 hover:bg-gray-800 dark:bg-gray-600 dark:hover:bg-gray-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
+                        <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 1; payPrintReceipt = billPrintDefault(); processPayment('card')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-gray-700 hover:bg-gray-800 dark:bg-gray-600 dark:hover:bg-gray-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
                             <span class="flex items-center gap-1.5 text-xs font-extrabold leading-none"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>CARD</span>
                             <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(roundedTotal).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+2</kbd></span>
                         </button>
@@ -1363,7 +1365,7 @@ window.addEventListener('popstate', function() {
          Provisional save is now a SEPARATE button + F9 shortcut
          in the right sidebar (no modal, no checkbox, no key conflict).
          ═══════════════════════════════════════════════════════════════ -->
-    <div x-show="showPayModal" x-cloak x-transition.opacity x-effect="if (showPayModal) { submitting = false; saveAsProvisional = false; payMethodIndex = 0; cashReceived = ''; }" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false">
+    <div x-show="showPayModal" x-cloak x-transition.opacity x-effect="if (showPayModal) { submitting = false; saveAsProvisional = false; payMethodIndex = 0; cashReceived = ''; payPrintReceipt = billPrintDefault(); } else if (!submitting) { payPrintReceipt = billPrintDefault(); }" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
             <div class="p-5 text-center border-b border-gray-100 dark:border-gray-800">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ __('pos.payment') }}</h3>
@@ -1437,6 +1439,15 @@ window.addEventListener('popstate', function() {
                 <p x-show="cashReceived !== '' && parseFloat(cashReceived) > 0 && roundedTotal - parseFloat(cashReceived) > 0.001" x-cloak class="mt-1.5 text-center text-[11px] font-bold text-amber-600 dark:text-amber-400" x-text="window.TXT.short_by_rs + Math.round(roundedTotal - parseFloat(cashReceived)).toLocaleString() + window.TXT.more_needed_sfx"></p>
             </div>
             @endif
+            {{-- Task 520 (port of Task 514): per-bill receipt auto-print choice (default =
+                 company auto-print setting; unticked = SIRF is bill ki receipt auto-print
+                 skip — KOT/FBR submission/receipt popup untouched). --}}
+            <div class="px-4 pb-1" @click.stop>
+                <label class="flex items-center gap-2 text-[11px] text-gray-600 dark:text-gray-300 cursor-pointer select-none">
+                    <input type="checkbox" x-model="payPrintReceipt" class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                    <span>{{ __('pos.final_print_receipt') }}</span>
+                </label>
+            </div>
             <div class="px-4 pb-0.5">
                 <p class="text-center text-[10px] text-gray-400 dark:text-gray-500 font-medium">{{ __('pos.use_word') }} <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&larr;</kbd> <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&rarr;</kbd> to choose &middot; <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">Enter</kbd> to confirm</p>
             </div>
@@ -1859,9 +1870,11 @@ window.addEventListener('popstate', function() {
     {{-- PENDING DELIVERIES panel (Task 122 — FBR port of PRA Task 114).        --}}
     {{-- TODAY's (business day) delivery provisionals — payment aate hi ek      --}}
     {{-- click Final (Cash/Card) via the SAME promote path as F10 Make Final.  --}}
-    {{-- Receipt print = opt-in checkbox (default NO). FBR POS has no riders   --}}
-    {{-- — rider-khata warning/settle from the PRA panel is intentionally      --}}
-    {{-- absent here (API mirrors the fields as null/false).                   --}}
+    {{-- Receipt print = opt-in checkbox (default NO). Task 517: UNASSIGNED    --}}
+    {{-- final delivery bills bhi listed with an inline rider dropdown (POST   --}}
+    {{-- fbrpos.deliveries.assign). Task 521 (PRA parity): assigned/dispatched --}}
+    {{-- + delivered-cash-unsettled finals bhi — Delivered mark (POST          --}}
+    {{-- fbrpos.deliveries.status) + whole-khata Settle (fbrpos.riders.settle).--}}
     {{-- ─────────────────────────────────────────────────────────────────────── --}}
     <div x-show="showPendingDeliveries" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPendingDeliveries = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden" x-transition.scale.90>
@@ -1887,7 +1900,7 @@ window.addEventListener('popstate', function() {
                         <p class="text-sm">{{ __('pos.loading_provisional_bills') }}</p>
                     </div>
                 </template>
-                <template x-if="!localBillsLoading && pendingDeliveryBills().length === 0">
+                <template x-if="!localBillsLoading && pendingDeliveryBills().length === 0 && staleDeliveryBills().length === 0">
                     <div class="p-12 text-center text-gray-400">
                         <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         <p class="text-sm font-medium">{{ __('pos.no_pending_deliveries') }}</p>
@@ -1902,6 +1915,16 @@ window.addEventListener('popstate', function() {
                                 <span class="text-sm font-bold text-gray-900 dark:text-white" x-text="bill.invoice_number"></span>
                                 <template x-if="bill.order_type === 'delivery'">
                                     <span class="text-[9px] bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide" x-text="window.TXT.delivery"></span>
+                                </template>
+                                <template x-if="bill.rider_name">
+                                    <span class="text-[9px] bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300 px-2 py-0.5 rounded-full font-bold" x-text="'{{ __('pos.rider_word') }}: ' + bill.rider_name"></span>
+                                </template>
+                                <template x-if="bill.is_final">
+                                    <span class="text-[9px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">{{ __('pos.final_word') }}</span>
+                                </template>
+                                {{-- Task 517: unassigned final delivery bill — rider abhi tak nahi laga --}}
+                                <template x-if="bill.is_final && !bill.rider_id">
+                                    <span class="text-[9px] bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 px-2 py-0.5 rounded-full font-bold">{{ __('pos.del_status_unassigned') }}</span>
                                 </template>
                             </div>
                             <span class="text-sm font-bold text-amber-700 dark:text-amber-400" x-text="'Rs. ' + Number(bill.total_amount).toLocaleString()"></span>
@@ -1922,6 +1945,48 @@ window.addEventListener('popstate', function() {
                             </p>
                         </template>
                         <p class="text-[11px] text-gray-500 mb-2" x-text="bill.items_count + window.TXT.sfx_item_s_dot + (bill.created_time || bill.created_human)"></p>
+                        {{-- Task 521: rider-khata warning — bill is still on the rider's
+                             unsettled khata (cash rider ke paas). Settle button covers the
+                             rider's WHOLE khata (FbrPosRiderController::settle settle_all). --}}
+                        <template x-if="bill.rider_unsettled">
+                            <div class="mb-2 px-3 py-2 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 text-[11px] font-semibold text-orange-700 dark:text-orange-300 flex items-start gap-1.5">
+                                <svg class="w-3.5 h-3.5 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                <div class="flex-1 min-w-0">
+                                    <span><span x-text="bill.rider_name || '{{ __('pos.rider_word') }}'"></span> {{ __('pos.rider_unsettled_warn') }}</span>
+                                    {{-- Scope line: settle covers the rider's WHOLE khata, not just this bill --}}
+                                    <p class="mt-1 font-normal text-orange-600 dark:text-orange-400" x-text="txtRiderSettleScope(bill)"></p>
+                                </div>
+                                {{-- One-click WHOLE-khata settle (reuses POST /fbr-pos/riders/{id}/settle) --}}
+                                <button @click="settleRider(bill)" :disabled="riderSettleBusyId || deliveryFinalBusyId"
+                                        class="shrink-0 self-center px-3 py-1.5 text-[11px] font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition shadow-sm flex items-center gap-1 disabled:opacity-50">
+                                    <template x-if="riderSettleBusyId === bill.rider_id"><svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg></template>
+                                    {{ __('pos.rider_settle_btn') }}
+                                </button>
+                            </div>
+                        </template>
+                        {{-- Task 517: UNASSIGNED final delivery bill — rider dropdown yahin se
+                             (POST fbrpos.deliveries.assign, same backend as the Deliveries board).
+                             Renders only when the API's can_assign_rider allows (plan gate +
+                             Delivery feature + custom-access verdict, mirrored server-side). --}}
+                        <template x-if="bill.is_final && !bill.rider_id && canAssignRider && deliveryRiders.length > 0">
+                            <div class="mb-2 flex items-center gap-2">
+                                <svg class="w-4 h-4 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 11-4 0m10 0a2 2 0 104 0"/></svg>
+                                <select @change="assignRider(bill, $event.target.value); $event.target.value = ''"
+                                        :disabled="riderAssignBusyId"
+                                        class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1.5 focus:ring-teal-500 focus:border-teal-500 disabled:opacity-50">
+                                    <option value="">{{ __('pos.no_rider_opt') }}</option>
+                                    <template x-for="r in deliveryRiders" :key="r.id">
+                                        <option :value="r.id" x-text="r.name"></option>
+                                    </template>
+                                </select>
+                                <template x-if="riderAssignBusyId === bill.id">
+                                    <svg class="w-4 h-4 animate-spin text-teal-500 shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                </template>
+                            </div>
+                        </template>
+                        {{-- PROVISIONAL bill: Final Cash/Card (promote path). FINAL bills
+                             par yeh buttons render hi nahi hote — promote unpar kabhi nahi. --}}
+                        <template x-if="!bill.is_final">
                         <div class="flex gap-2">
                             <button @click="finalizeDelivery(bill, 'cash')" :disabled="deliveryFinalBusyId" class="flex-1 py-2.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50">
                                 <template x-if="deliveryFinalBusyId === bill.id"><svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg></template>
@@ -1933,6 +1998,80 @@ window.addEventListener('popstate', function() {
                                 {{ __('pos.final_card') }}
                             </button>
                         </div>
+                        </template>
+                        {{-- Task 521: FINAL bill — status chip + Delivered mark (PRA parity).
+                             Cash khata settle upar wale orange rider block se hota hai.
+                             rider_id guard: UNASSIGNED bill par chip/button nahi
+                             (updateStatus rider-less bill 404 karta); pehle rider lage. --}}
+                        <template x-if="bill.is_final && bill.rider_id">
+                        <div class="flex gap-2 items-stretch">
+                            <span class="flex items-center px-2.5 rounded-xl text-[10px] font-bold"
+                                  :class="bill.delivery_status === 'delivered' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-300'"
+                                  x-text="bill.delivery_status === 'delivered' ? @json(__('pos.delivery_status_delivered')) : (bill.delivery_status === 'dispatched' ? @json(__('pos.delivery_status_dispatched')) : @json(__('pos.delivery_status_assigned')))"></span>
+                            <template x-if="bill.delivery_status !== 'delivered'">
+                                <button @click="markFinalDelivered(bill)" :disabled="deliveryFinalBusyId" class="flex-1 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50">
+                                    <template x-if="deliveryFinalBusyId === bill.id"><svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg></template>
+                                    <template x-if="deliveryFinalBusyId !== bill.id"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg></template>
+                                    {{ __('pos.delivered_word') }}
+                                </button>
+                            </template>
+                        </div>
+                        </template>
+                    </div>
+                </template>
+                {{-- Task 524: purane (pichhle business days ke) UNASSIGNED delivery
+                     bills — alag collapsed "Purani deliveries" group, badge/ginti
+                     mein shamil NAHIN. Assign dropdown wahi maujooda assignRider
+                     (POST fbr-pos/deliveries assign) chalata hai. --}}
+                <template x-if="staleDeliveryBills().length > 0">
+                    <div class="border-t-4 border-gray-100 dark:border-gray-800">
+                        <button type="button" @click="showOldDeliveries = !showOldDeliveries"
+                                class="w-full flex items-center justify-between px-4 py-3 text-left bg-gray-50 dark:bg-gray-800/40 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                            <span class="flex items-center gap-2 text-xs font-bold text-gray-600 dark:text-gray-300">
+                                <svg class="w-3.5 h-3.5 text-gray-400 transition-transform" :class="showOldDeliveries ? 'rotate-90' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                {{ __('pos.old_del_section') }}
+                                <span class="px-1.5 py-0.5 rounded-full text-[10px] font-extrabold bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300" x-text="staleDeliveryBills().length"></span>
+                            </span>
+                        </button>
+                        <template x-if="showOldDeliveries">
+                            <div>
+                                <p class="px-4 pt-2 text-[10px] text-gray-400">{{ __('pos.old_del_hint') }}</p>
+                                <template x-for="bill in staleDeliveryBills().slice(0, 50)" :key="'old-' + bill.id">
+                                    <div class="p-4 border-b border-gray-100 dark:border-gray-800">
+                                        <div class="flex items-center justify-between mb-1.5">
+                                            <div class="flex items-center gap-2 flex-wrap">
+                                                <span class="text-sm font-bold text-gray-700 dark:text-gray-300" x-text="bill.invoice_number"></span>
+                                                {{-- Halka (gray) chip — purana bill koi RED demand nahi (Task 524) --}}
+                                                <span class="text-[9px] bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 px-2 py-0.5 rounded-full font-bold">{{ __('pos.del_status_unassigned') }}</span>
+                                            </div>
+                                            <span class="text-sm font-bold text-gray-700 dark:text-gray-300" x-text="'Rs. ' + Number(bill.total_amount).toLocaleString()"></span>
+                                        </div>
+                                        <template x-if="bill.customer_name || bill.customer_phone">
+                                            <p class="text-[11px] font-semibold text-gray-600 dark:text-gray-400" x-text="(bill.customer_name || window.TXT.customer_word) + (bill.customer_phone ? ' · ' + bill.customer_phone : '')"></p>
+                                        </template>
+                                        <template x-if="bill.delivery_address">
+                                            <p class="text-[11px] text-gray-500" x-text="bill.delivery_address"></p>
+                                        </template>
+                                        <p class="text-[11px] text-gray-400 mb-2" x-text="(bill.business_date ? bill.business_date + ' · ' : '') + (bill.created_time || '') + (bill.created_human ? ' (' + bill.created_human + ')' : '')"></p>
+                                        <template x-if="canAssignRider && deliveryRiders.length > 0">
+                                            <div class="flex items-center gap-2">
+                                                <select @change="assignRider(bill, $event.target.value); $event.target.value = ''"
+                                                        :disabled="riderAssignBusyId"
+                                                        class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1.5 focus:ring-teal-500 focus:border-teal-500 disabled:opacity-50">
+                                                    <option value="">{{ __('pos.no_rider_opt') }}</option>
+                                                    <template x-for="r in deliveryRiders" :key="'oldr-' + r.id">
+                                                        <option :value="r.id" x-text="r.name"></option>
+                                                    </template>
+                                                </select>
+                                                <template x-if="riderAssignBusyId === bill.id">
+                                                    <svg class="w-4 h-4 animate-spin text-teal-500 shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
                     </div>
                 </template>
             </div>
@@ -2819,6 +2958,14 @@ function restaurantPos() {
         showPendingDeliveries: false,
         bizToday: '',
         deliveryFinalBusyId: null,
+        // Task 517 (FBR port of PRA Task 513): UNASSIGNED final delivery bills
+        // + rider dropdown right in the popup (POST fbrpos.deliveries.assign).
+        finalDeliveryBills: [],
+        showOldDeliveries: false, // Task 524: collapsed "Purani deliveries" group
+        deliveryRiders: [],
+        canAssignRider: false,
+        riderAssignBusyId: null,
+        riderSettleBusyId: null,
         // Receipt print default = NO (delivery customer isn't at the counter).
         // Opt-in checkbox persisted per device.
         deliveryPrintReceipt: (function(){ try { return localStorage.getItem('fbrpos_delivery_final_print') === '1'; } catch(e) { return false; } })(),
@@ -2887,6 +3034,9 @@ function restaurantPos() {
         // Auto-Print receipt on successful sale — FBR POS persists this per-browser
         // (localStorage 'fbrpos_auto_print'), NOT via a server column. Default ON.
         autoPrintEnabled: (function(){ try { return localStorage.getItem('fbrpos_auto_print') !== '0'; } catch(e) { return true; } })(),
+        // Task 520 (port of Task 514): Pay modal ka per-bill "Receipt print karein"
+        // checkbox — default = billPrintDefault() (auto-print master ka mirror).
+        payPrintReceipt: true,
         // Kitchen ticket auto-print — persisted server-side in companies.auto_print_kot.
         // Gated on kitchen_printer_enabled; read at page boot so the toggle survives
         // a refresh. hasColumn guard keeps the site alive if migration has not run yet.
@@ -3233,7 +3383,7 @@ function restaurantPos() {
         // Queue a bill that could NOT reach the server (no internet). Mirrors the
         // success UX: receipt popup (offline variant) + optional auto-print of a
         // client-rendered interim receipt, cart cleared so billing continues.
-        async queueOfflineBill(payload, method, savedTotal) {
+        async queueOfflineBill(payload, method, savedTotal, skipReceipt = false) {
             // REUSE the uuid already attached by processPaymentManual (it rode on
             // the failed online attempt too) — minting a fresh one here would
             // reopen the lost-response duplicate window. Fallback only if absent.
@@ -3283,7 +3433,9 @@ function restaurantPos() {
             this.showReceipt = true;
             this.scheduleReceiptAutoClose();
             this.showToast(window.TXT.offline_bill_saved_will_sync, 'success');
-            if (this.autoPrintEnabled) {
+            // Task 520: per-bill untick = interim offline receipt bhi auto-print skip
+            // (popup + queue + sync untouched).
+            if (!skipReceipt && this.autoPrintEnabled) {
                 setTimeout(() => this.printOfflineReceipt(), 400);
             }
             this.clearCart();
@@ -4593,10 +4745,10 @@ function restaurantPos() {
             // ── RETAIL FAST BILLING shortcuts (Aug 2026) ──────────────────────────
             // Alt+1 / Alt+2 — one-tap CASH / CARD: skip modal entirely when cart has items.
             // Mirrors the mock-up (PRA-aligned): no confirmation step for simple retail sales.
-            if (e.altKey && e.key === '1') { e.preventDefault(); if (this.cart.length > 0 && !this.submitting && !this.showPayModal) { this.submitting = false; this.saveAsProvisional = false; this.processPayment('cash'); } return; }
-            if (e.altKey && e.key === '2') { e.preventDefault(); if (this.cart.length > 0 && !this.submitting && !this.showPayModal) { this.submitting = false; this.saveAsProvisional = false; this.processPayment('card'); } return; }
+            if (e.altKey && e.key === '1') { e.preventDefault(); if (this.cart.length > 0 && !this.submitting && !this.showPayModal) { this.submitting = false; this.saveAsProvisional = false; this.payPrintReceipt = this.billPrintDefault(); this.processPayment('cash'); } return; }
+            if (e.altKey && e.key === '2') { e.preventDefault(); if (this.cart.length > 0 && !this.submitting && !this.showPayModal) { this.submitting = false; this.saveAsProvisional = false; this.payPrintReceipt = this.billPrintDefault(); this.processPayment('card'); } return; }
             // Alt+3 — instant UDHAAR (khata) sale; needs a selected customer (payUdhaar guards).
-            if (e.altKey && e.key === '3') { e.preventDefault(); if (this.cart.length > 0 && !this.submitting && !this.showPayModal) { this.submitting = false; this.saveAsProvisional = false; this.payUdhaar(); } return; }
+            if (e.altKey && e.key === '3') { e.preventDefault(); if (this.cart.length > 0 && !this.submitting && !this.showPayModal) { this.submitting = false; this.saveAsProvisional = false; this.payPrintReceipt = this.billPrintDefault(); this.payUdhaar(); } return; }
             // Alt+R — Reprint last bill (Akhri Bills top entry).
             if (e.altKey && (e.key === 'r' || e.key === 'R')) { e.preventDefault(); const last = this.recentBills[0]; if (last) { this._printViaIframe('print-receipt-frame', '/fbr-pos/transaction/' + last.id + '/receipt?auto_print=1', 'width=400,height=700'); this.showToast('Reprinting #' + last.invoice_number, 'info'); } else if (this.lastTransactionId) { this.printReceipt(); this.showToast('Reprinting last bill...', 'info'); } else { this.showToast(window.TXT.no_bill_reprint, 'warning'); } return; }
             if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
@@ -5488,6 +5640,9 @@ function restaurantPos() {
             if (this.cart.length === 0) { this.showToast(window.TXT.cart_is_empty, 'error'); return; }
             this.saveAsProvisional = true;
             this.showPayModal = false;
+            // Task 520: direct provisional save = no checkbox surface — company
+            // default use karo, stale per-bill untick inherit na ho.
+            this.payPrintReceipt = this.billPrintDefault();
             await this.processPayment('cash');
         },
 
@@ -5513,10 +5668,14 @@ function restaurantPos() {
             // Capture provisional flag once at submission start so a stray
             // re-render/checkbox toggle mid-flight cannot flip the path.
             const provisional = !!this.saveAsProvisional;
+            // Task 520 (port of Task 514): per-bill receipt print choice snapshot
+            // (checkbox unticked = skip SIRF is bill ki receipt auto-print;
+            // KOT/FBR submission/receipt popup untouched).
+            const skipReceipt = !this.payPrintReceipt;
 
             if (this.payingHeldOrderId) {
                 this.submitting = true; this.stockError = '';
-                await this.payHeldOrderDirect(this.payingHeldOrderId, method, null, provisional);
+                await this.payHeldOrderDirect(this.payingHeldOrderId, method, null, provisional, skipReceipt);
                 this.payingHeldOrderId = null;
                 this.showPayModal = false; this.submitting = false; this.saveAsProvisional = false;
                 return;
@@ -5536,7 +5695,7 @@ function restaurantPos() {
             // returns 403. Route ALL payments through processPaymentManual
             // which posts directly to pos.invoice.store (universal endpoint).
             if (!this.isRestaurantMode || this.hasManualItems()) {
-                return await this.processPaymentManual(method, provisional);
+                return await this.processPaymentManual(method, provisional, skipReceipt);
             }
 
             const now = Date.now();
@@ -5556,7 +5715,7 @@ function restaurantPos() {
                 const holdData = await holdRes.json();
                 if (!holdData.success) { this.showToast(holdData.message || window.TXT.failed_word, 'error'); this.submitting = false; return; }
                 const savedTotal = this.totalAmount;
-                await this.payHeldOrderDirect(holdData.order.id, method, savedTotal, provisional);
+                await this.payHeldOrderDirect(holdData.order.id, method, savedTotal, provisional, skipReceipt);
                 this.clearCart();
                 // Auto-focus phone input → ready for next sale, NO dead focus.
                 this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
@@ -5574,7 +5733,7 @@ function restaurantPos() {
         // master-product in resolveItemExemptions). Returns JSON when
         // wantsJson() — same shape used by payHeldOrderDirect for receipt
         // modal rendering.
-        async processPaymentManual(method, provisional = false) {
+        async processPaymentManual(method, provisional = false, skipReceipt = false) {
             const now = Date.now();
             if (now - this.lastPayTime < 3000) return;
             this.lastPayTime = now;
@@ -5641,7 +5800,7 @@ function restaurantPos() {
                         this.showPayModal = false; this.submitting = false;
                         return;
                     }
-                    await this.queueOfflineBill(payload, method, savedTotal);
+                    await this.queueOfflineBill(payload, method, savedTotal, skipReceipt);
                     this.showPayModal = false; this.submitting = false; this.saveAsProvisional = false;
                     return;
                 }
@@ -5664,7 +5823,7 @@ function restaurantPos() {
                         this.showPayModal = false; this.submitting = false;
                         return;
                     }
-                    await this.queueOfflineBill(payload, method, savedTotal);
+                    await this.queueOfflineBill(payload, method, savedTotal, skipReceipt);
                     this.showPayModal = false; this.submitting = false; this.saveAsProvisional = false;
                     return;
                 }
@@ -5711,7 +5870,7 @@ function restaurantPos() {
                 // Held row is deleted on recall, so post-pay KOT uses the TRANSACTION
                 // reprint endpoint (isFbrHeld=false). Passing the transaction_id (not null)
                 // lets autoKotEnabled=true fire when kitchen_printer is on.
-                this.runAutoPrintChain(data.transaction_id || null, /* isFbrHeld= */ false);
+                this.runAutoPrintChain(data.transaction_id || null, /* isFbrHeld= */ false, skipReceipt);
                 this.clearCart();
                 this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
                 // Refresh provisional badge count if this save was provisional.
@@ -5873,12 +6032,20 @@ function restaurantPos() {
         //
         // ✅ FIX (May-07): Tightened gap between receipt-finish → KOT-start (300ms → 80ms)
         // and initial chain start (400ms → 150ms) to feel snappier on thermal printers.
-        runAutoPrintChain(orderId, isFbrHeld) {
+        // Task 520 (port of Task 514): per-bill checkbox ka default — FBR POS par
+        // auto-print master switch ka mirror (koi dine-in variant nahi).
+        billPrintDefault() {
+            return !!this.autoPrintEnabled;
+        },
+        // skipReceiptOverride (Task 520, port of Task 514): cashier ne per-bill
+        // "Receipt print karein" checkbox UNTICK kiya — SIRF is bill ki receipt
+        // auto-print skip; KOT gate / FBR submission / receipt popup sab untouched.
+        runAutoPrintChain(orderId, isFbrHeld, skipReceiptOverride = false) {
             // MASTER GATE — auto-print OFF means NOTHING fires automatically.
             if (!this.autoPrintEnabled) return;
             const hasReceipt = !!this.lastTransactionId;
             const wantsKot = !!this.autoKotEnabled && !!orderId;
-            const wantsReceipt = hasReceipt;
+            const wantsReceipt = hasReceipt && !skipReceiptOverride;
             if (!wantsReceipt && !wantsKot) return;
             // isFbrHeld distinguishes held-sale KOT (uses /fbr-pos/held/{id}/kitchen-ticket)
             // from completed-transaction reprint (uses /fbr-pos/transaction/{id}/kot-reprint).
@@ -5925,6 +6092,10 @@ function restaurantPos() {
                 if (data && data.success) {
                     this.localPinRequired = false;
                     this.localBills = data.bills || [];
+                    // Task 517: unassigned final deliveries + riders for the popup dropdown.
+                    this.finalDeliveryBills = data.final_deliveries || [];
+                    this.deliveryRiders = data.riders || [];
+                    this.canAssignRider = !!data.can_assign_rider;
                     if (data.business_today) this.bizToday = data.business_today;
                     if (this.activeLocalIndex >= this.filteredLocalBills().length) {
                         this.activeLocalIndex = Math.max(0, this.filteredLocalBills().length - 1);
@@ -5970,12 +6141,120 @@ function restaurantPos() {
         // created_at's date when business_date is missing, so old confidential
         // provisionals never flood the badge.
         pendingDeliveryBills() {
-            return this.localBills.filter(b => (b.order_type == null || b.order_type === 'delivery')
-                && (!this.bizToday || !b.business_date || b.business_date === this.bizToday));
+            const isToday = b => (!this.bizToday || !b.business_date || b.business_date === this.bizToday);
+            const prov = this.localBills.filter(b => (b.order_type == null || b.order_type === 'delivery') && isToday(b));
+            // Task 521 (PRA parity): assigned/dispatched + delivered-cash-unsettled
+            // finals show for TODAY; UNASSIGNED bills (rider NULL + status NULL)
+            // ride the 7-din server window like the Deliveries board — today-filter
+            // unpar nahi lagta, warna kal ka bina-rider bill popup se ghayab ho jata.
+            // Task 524: purani (pichhle business days ki) unassigned bills MAIN
+            // list/badge se bahar — woh neeche staleDeliveryBills() ke collapsed
+            // group mein hain. Flag SERVER par banta hai (business_date < aaj ka
+            // business day); yahan sirf parha jata hai.
+            const finals = (this.finalDeliveryBills || []).filter(b => !b.is_stale_unassigned && (isToday(b) || (!b.rider_id && !b.delivery_status)));
+            return [...prov, ...finals];
+        },
+        // Task 524: purane (day-close ho chuke dinon ke) UNASSIGNED delivery
+        // bills — popup mein alag collapsed "Purani deliveries" group, badge ki
+        // ginti mein KABHI shamil nahi.
+        staleDeliveryBills() {
+            return (this.finalDeliveryBills || []).filter(b => b.is_stale_unassigned);
         },
         openPendingDeliveries() {
             this.showPendingDeliveries = true;
             this.loadLocalBills();
+        },
+        // ─── Rider assign from the panel (Task 517 — FBR port of PRA Task 513) ─
+        // UNASSIGNED final delivery bill par dropdown se rider chuno — reuses
+        // POST /fbr-pos/deliveries/{id}/assign (same backend as the Deliveries
+        // board; koi naya path nahi). Success = list refresh.
+        async assignRider(bill, riderId) {
+            if (!bill || !riderId || this.riderAssignBusyId) return;
+            this.riderAssignBusyId = bill.id;
+            try {
+                const res = await fetch('{{ url('/fbr-pos/deliveries') }}/' + bill.id + '/assign', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ rider_id: riderId }),
+                });
+                const data = await res.json().catch(() => null);
+                if (res.ok && data && data.success) {
+                    this.showToast(@json(__('pos.rider_assign_ok')), 'success');
+                    this.loadLocalBills();
+                } else {
+                    this.showToast((data && data.message) || @json(__('pos.rider_assign_failed')), 'error');
+                }
+            } catch (e) {
+                this.showToast(window.TXT.network_error, 'error');
+            }
+            this.riderAssignBusyId = null;
+        },
+        // ─── Delivered mark from the panel (Task 521 — PRA parity) ──────────
+        // FINAL delivery bill ko panel se Delivered mark karna — reuses POST
+        // /fbr-pos/deliveries/{id}/status (JSON). Promote yahan kabhi nahi
+        // chalta: bill pehle se final hai, sirf delivery status badalta hai.
+        async markFinalDelivered(bill) {
+            if (!bill || !bill.is_final || this.deliveryFinalBusyId) return;
+            this.deliveryFinalBusyId = bill.id;
+            try {
+                const res = await fetch('{{ url('/fbr-pos/deliveries') }}/' + bill.id + '/status', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ delivery_status: 'delivered' }),
+                });
+                const data = await res.json().catch(() => null);
+                if (res.ok && data && data.success) {
+                    bill.delivery_status = 'delivered';
+                    this.showToast(@json(__('pos.marked_delivered_ok')), 'success');
+                    // Card bill delivered = khata par nahi → refresh par list se nikal jata hai.
+                    this.loadLocalBills();
+                } else {
+                    this.showToast((data && data.message) || @json(__('pos.status_update_failed')), 'error');
+                }
+            } catch (e) {
+                this.showToast(window.TXT.network_error, 'error');
+            }
+            this.deliveryFinalBusyId = null;
+        },
+        // ─── Rider WHOLE-khata settle from the panel (Task 521 — PRA parity) ─
+        // Reuses POST /fbr-pos/riders/{id}/settle with settle_all — settles EVERY
+        // unsettled cash bill on the rider's khata (all dates), not just this
+        // bill. Riders never touch invoice_mode/serials.
+        txtRiderSettleScope(bill) {
+            if (!bill || !bill.rider_open_count) return '';
+            return @json(__('pos.rider_settle_scope'))
+                .replace(':count', bill.rider_open_count)
+                .replace(':amount', Number(bill.rider_open_amount || 0).toLocaleString());
+        },
+        async settleRider(bill) {
+            if (!bill || !bill.rider_id || this.riderSettleBusyId) return;
+            const confirmMsg = @json(__('pos.rider_settle_confirm'))
+                .replace(':name', bill.rider_name || @json(__('pos.rider_word')))
+                .replace(':count', bill.rider_open_count || '?')
+                .replace(':amount', Number(bill.rider_open_amount || 0).toLocaleString());
+            if (!window.confirm(confirmMsg)) return;
+            this.riderSettleBusyId = bill.rider_id;
+            try {
+                const res = await fetch('{{ url('/fbr-pos/riders') }}/' + bill.rider_id + '/settle', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    },
+                    body: JSON.stringify({ settle_all: 1 }),
+                });
+                const data = await res.json().catch(() => null);
+                if (res.ok && data && data.success) {
+                    this.showToast(data.message || @json(__('pos.rider_settled_ok')), 'success');
+                    this.loadLocalBills(); // warning disappears on refresh
+                } else {
+                    this.showToast((data && data.message) || @json(__('pos.rider_settle_failed')), 'error');
+                }
+            } catch (e) {
+                this.showToast(@json(__('pos.rider_settle_failed')), 'error');
+            }
+            this.riderSettleBusyId = null;
         },
         // One-click final — reuses the EXACT promote path (race-safe claim,
         // reporting-OFF invariant, PIN gate). Receipt print follows the panel's
@@ -5988,7 +6267,7 @@ function restaurantPos() {
             } finally {
                 this.deliveryFinalBusyId = null;
             }
-            if (this.pendingDeliveryBills().length === 0) this.showPendingDeliveries = false;
+            if (this.pendingDeliveryBills().length === 0 && this.staleDeliveryBills().length === 0) this.showPendingDeliveries = false;
         },
         // Filtered view of localBills — matches invoice number, customer name,
         // phone, or delivery address. ALL list rendering + keyboard nav MUST go
@@ -6155,7 +6434,7 @@ function restaurantPos() {
             } catch (e) { console.error('Delete held order error:', e); this.showToast(window.TXT.error_deleting_order, 'error'); }
         },
 
-        async payHeldOrderDirect(orderId, method, savedTotal, provisional = false) {
+        async payHeldOrderDirect(orderId, method, savedTotal, provisional = false, skipReceipt = false) {
             try {
                 // PROVISIONAL BILL FLOW — when true, RestaurantPosController::payOrder
                 // forces fbr_status='local' and skips FBR submission. Bill remains
@@ -6186,7 +6465,7 @@ function restaurantPos() {
                     // Uses postMessage-chained engine — KOT never fires before the receipt
                     // print dialog is dismissed (was a race in the old setTimeout(200/1800) impl
                     // on slow networks where KOT iframe loaded before receipt iframe).
-                    this.runAutoPrintChain(orderId, /* isFbrHeld= */ false); // PRA restaurant order ID
+                    this.runAutoPrintChain(orderId, /* isFbrHeld= */ false, skipReceipt); // PRA restaurant order ID
                     // Refresh provisional badge count when this save was provisional.
                     if (provisional) { this.loadLocalBills(); }
                     // Refresh failed badge so cashier sees pending/failed state in real time.

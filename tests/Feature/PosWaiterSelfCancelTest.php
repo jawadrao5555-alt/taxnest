@@ -37,6 +37,8 @@ class PosWaiterSelfCancelTest extends TestCase
         Schema::create('companies', function (Blueprint $table) {
             $table->id();
             $table->string('name')->nullable();
+            // Task 527: waiter self-cancel is admin-gated (default OFF).
+            $table->boolean('pos_waiter_cancel_enabled')->default(false);
             $table->timestamps();
             $table->softDeletes();
         });
@@ -105,8 +107,11 @@ class PosWaiterSelfCancelTest extends TestCase
 
     private function seedData(): array
     {
+        // Task 527: the cancel permission is DEFAULT OFF — these locks test
+        // the underlying cancel mechanics, so the seed company enables it.
         $companyId = DB::table('companies')->insertGetId([
-            'name' => 'Cancel Test Co', 'created_at' => now(), 'updated_at' => now(),
+            'name' => 'Cancel Test Co', 'pos_waiter_cancel_enabled' => true,
+            'created_at' => now(), 'updated_at' => now(),
         ]);
         $floorId = DB::table('restaurant_floors')->insertGetId([
             'company_id' => $companyId, 'name' => 'Main', 'created_at' => now(), 'updated_at' => now(),

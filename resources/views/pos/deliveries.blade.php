@@ -13,10 +13,11 @@
     .tn-embedded .tn-embed-hide { display: none !important; }
 </style>
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6"
-     x-data="{ settleRider: null, settleTotal: 0, recalcSettle(form) {
+     x-data="{ settleRider: null, settleTotal: 0, settleAmount: '', recalcSettle(form) {
          let t = 0;
          form.querySelectorAll('input[name=\'bill_ids[]\']:checked').forEach(cb => t += parseFloat(cb.dataset.amount || 0));
          this.settleTotal = t;
+         this.settleAmount = t > 0 ? t : '';
      } }">
 
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
@@ -60,7 +61,8 @@
         @foreach($riders as $rider)
         @php
             $open = $khataBills[$rider->id] ?? collect();
-            $owed = (float) $open->sum('total_amount');
+            // Khata remaining — partial receipts (Task 525) already handed over are deducted.
+            $owed = (float) $open->sum(fn ($b) => (float) $b->total_amount - (float) ($b->rider_partial_paid ?? 0));
         @endphp
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-4">
             @php $openDel = (int) ($openDeliveryCounts[$rider->id] ?? 0); @endphp
@@ -85,7 +87,7 @@
                 <div class="text-lg font-bold text-amber-600 dark:text-amber-400">Rs. {{ number_format($owed) }}</div>
                 <div class="text-[11px] text-gray-400 mb-3">{{ __('pos.unsettled_cash_bills', ['count' => $open->count()]) }}</div>
                 <button type="button" class="w-full px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-semibold shadow-sm hover:bg-purple-700 transition"
-                        @click="settleRider = {{ $rider->id }}; settleTotal = {{ $owed }}">{{ __('pos.settle_cash') }}</button>
+                        @click="settleRider = {{ $rider->id }}; settleTotal = {{ $owed }}; settleAmount = {{ $owed }}">{{ __('pos.settle_cash') }}</button>
             @else
                 <div class="text-lg font-bold text-emerald-600 dark:text-emerald-400">{{ __('pos.clear') }}</div>
                 <div class="text-[11px] text-gray-400">{{ __('pos.no_cash_pending') }}</div>
@@ -122,32 +124,49 @@
                 <div class="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-lg p-5 max-h-[85vh] overflow-y-auto">
                     <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.settle_cash') }} — {{ $rider->name }}</h3>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">{{ __('pos.settle_cash_hint') }}</p>
-                    <form method="POST" action="{{ route('pos.riders.settle', $rider->id) }}" x-init="recalcSettle($el)" @change="recalcSettle($event.target.closest('form'))">
+                    <form method="POST" action="{{ route('pos.riders.settle', $rider->id) }}" x-init="recalcSettle($el)" @change="if ($event.target.name === 'bill_ids[]') recalcSettle($event.target.closest('form'))">
                         @csrf
                         <div class="space-y-1.5 mb-4">
                             @foreach($open as $b)
+                            @php $rem = (float) $b->total_amount - (float) ($b->rider_partial_paid ?? 0); @endphp
                             <label class="flex items-center gap-3 p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/60 cursor-pointer">
-                                <input type="checkbox" name="bill_ids[]" value="{{ $b->id }}" data-amount="{{ (float) $b->total_amount }}" checked class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                                <input type="checkbox" name="bill_ids[]" value="{{ $b->id }}" data-amount="{{ $rem }}" checked class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
                                 <span class="flex-1 min-w-0">
                                     <span class="flex items-center gap-1.5 min-w-0">
                                         <span class="block text-xs font-semibold text-gray-900 dark:text-white truncate">{{ $b->invoice_number ?: ('#' . $b->id) }}</span>
                                         <span class="inline-flex flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold {{ $b->isLocalBill() ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' }}">{{ $b->isLocalBill() ? __('pos.local_word') : __('pos.pra_word') }}</span>
                                     </span>
                                     <span class="block text-[11px] text-gray-400">{{ $b->created_at->format('d/m h:i A') }}@if($b->customer_name) · {{ $b->customer_name }}@endif</span>
+                                    @if((float) ($b->rider_partial_paid ?? 0) > 0)
+                                    <span class="block text-[11px] font-semibold text-amber-600 dark:text-amber-400">{{ __('pos.partial_paid_note', ['paid' => number_format((float) $b->rider_partial_paid)]) }}</span>
+                                    @endif
                                 </span>
-                                <span class="text-xs font-bold text-gray-900 dark:text-white">Rs. {{ number_format((float) $b->total_amount) }}</span>
+                                <span class="text-xs font-bold text-gray-900 dark:text-white">Rs. {{ number_format($rem) }}</span>
                             </label>
                             @endforeach
+                        </div>
+                        {{-- Partial receive (Task 525): "aadha cash abhi, baqi baad" — cashier
+                             enters what actually came; the rest stays on the rider's khata. --}}
+                        <div class="mb-3">
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.cash_received_now') }}</label>
+                            <input type="number" name="received_amount" x-model="settleAmount" min="1" step="0.01" inputmode="decimal"
+                                   class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm font-bold focus:ring-purple-500 focus:border-purple-500">
+                            <p class="text-[11px] text-gray-400 mt-1">{{ __('pos.settle_partial_hint') }}</p>
+                            <p class="text-[11px] font-semibold text-red-600 dark:text-red-400 mt-1" x-show="parseFloat(settleAmount || 0) > settleTotal + 0.009" x-cloak>{{ __('pos.settle_amount_over_live') }}</p>
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.notes_optional') }}</label>
                             <input type="text" name="notes" maxlength="500" placeholder="{{ __('pos.ph_eg_evening_handover') }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
                         </div>
                         <div class="flex items-center justify-between mt-5">
-                            <div class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.receiving_colon') }} Rs. <span x-text="settleTotal.toLocaleString()"></span></div>
+                            <div class="text-xs text-gray-600 dark:text-gray-300">
+                                <div>{{ __('pos.selected_total_colon') }} <b class="text-gray-900 dark:text-white">Rs. <span x-text="settleTotal.toLocaleString()"></span></b></div>
+                                <div class="font-bold" :class="(settleTotal - (parseFloat(settleAmount) || 0)) > 0.009 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'">{{ __('pos.baqaya_colon') }} Rs. <span x-text="Math.max(0, settleTotal - (parseFloat(settleAmount) || 0)).toLocaleString()"></span></div>
+                            </div>
                             <div class="flex gap-2">
                                 <button type="button" class="px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition" @click="settleRider = null">{{ __('pos.cancel') }}</button>
-                                <button type="submit" class="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold shadow-sm hover:bg-purple-700 transition">{{ __('pos.confirm_settlement') }}</button>
+                                <button type="submit" class="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold shadow-sm hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                        :disabled="!(parseFloat(settleAmount) > 0) || parseFloat(settleAmount) > settleTotal + 0.009">{{ __('pos.confirm_settlement') }}</button>
                             </div>
                         </div>
                     </form>
@@ -348,7 +367,14 @@
                                     'returned' => 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400',
                                 ][$st] ?? 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400';
                             @endphp
-                            <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold {{ $stClass }}">{{ $st ? (Lang::has('pos.delivery_status_' . $st) ? __('pos.delivery_status_' . $st) : ucfirst($st)) : '—' }}</span>
+                            @if(!$st && $activeTab === 'pending')
+                                {{-- Task 512: unassigned delivery bill now surfaces on Pending —
+                                     amber chip nudges the admin/manager to pick a rider in the
+                                     dropdown on this same row (no delivery-manager login needed). --}}
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">{{ __('pos.del_status_unassigned') }}</span>
+                            @else
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold {{ $stClass }}">{{ $st ? (Lang::has('pos.delivery_status_' . $st) ? __('pos.delivery_status_' . $st) : ucfirst($st)) : '—' }}</span>
+                            @endif
                             {{-- Delivery duration (owner, 3 Aug 2026): rider assign se
                                  delivered tak kitne minute lage. --}}
                             @if($st === 'delivered' && $b->delivered_at && $b->rider_assigned_at)
@@ -417,6 +443,87 @@
             </table>
         </div>
     </div>
+
+    {{-- Task 524 (customer voice note, 12 Aug 2026): purane (pichhle business
+         days ke) UNASSIGNED delivery bills — collapsed section, pending tab ke
+         badge/count mein shamil NAHIN. Assign yahin se ho sakta hai (same
+         pos.deliveries.assign form as the main table; koi naya path nahi). --}}
+    @if($activeTab === 'pending' && ($oldUnassigned ?? collect())->count())
+    {{-- Task 536: search se auto-expand — script neeche CustomEvent bhejta hai. --}}
+    <div class="mt-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden" x-data="{ showOldDel: false }" @tn-open-olddel.window="showOldDel = true">
+        <button type="button" @click="showOldDel = !showOldDel"
+                class="w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition">
+            <span class="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0" :class="showOldDel ? 'rotate-90' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                {{ __('pos.old_del_section') }}
+                <span class="px-1.5 py-0.5 rounded-full text-[11px] font-extrabold bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">{{ $oldUnassigned->count() }}</span>
+                {{-- Task 536: search hone par yahan match ginti dikhti hai (main #del-count
+                     ko inflate kiye baghair). --}}
+                <span id="del-old-hits" style="display:none" class="px-1.5 py-0.5 rounded-full text-[11px] font-extrabold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300"></span>
+            </span>
+            <span class="hidden sm:inline text-[11px] text-gray-400 truncate">{{ __('pos.old_del_hint') }}</span>
+        </button>
+        <div x-show="showOldDel" x-cloak class="border-t border-gray-100 dark:border-gray-800 overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 dark:bg-gray-800/60">
+                    <tr class="text-left text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        <th class="px-4 py-3">{{ __('pos.bill_label') }}</th>
+                        <th class="px-4 py-3">{{ __('pos.customer_word') }}</th>
+                        <th class="px-4 py-3">{{ __('pos.amount_label') }}</th>
+                        <th class="px-4 py-3">{{ __('pos.payment_label') }}</th>
+                        <th class="px-4 py-3">{{ __('pos.rider_label') }}</th>
+                        <th class="px-4 py-3">{{ __('pos.status_label') }}</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    @foreach($oldUnassigned as $b)
+                    {{-- Task 536: data-oldrow (data-delrow NAHIN — main count alag rahe) + same
+                         data-search recipe as the main table so the one search box filters both. --}}
+                    <tr data-oldrow data-search="{{ Str::lower(($b->invoice_number ?: ('#' . $b->id)) . ' ' . ($b->customer_name ?? '') . ' ' . ($b->customer_phone ?? '') . ' ' . ($b->delivery_address ?? '') . ' ' . ($b->isLocalBill() ? 'local' : 'pra')) }}">
+                        <td class="px-4 py-3">
+                            <div class="font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5 flex-wrap">
+                                <span>{{ $b->invoice_number ?: ('#' . $b->id) }}</span>
+                                <span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold {{ $b->isLocalBill() ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' }}">{{ $b->isLocalBill() ? __('pos.local_word') : __('pos.pra_word') }}</span>
+                            </div>
+                            <div class="text-[11px] text-gray-400">{{ $b->created_at->format('d M · h:i A') }}</div>
+                        </td>
+                        <td class="px-4 py-3">
+                            <div class="text-gray-700 dark:text-gray-300">{{ $b->customer_name ?: __('pos.walk_in') }}</div>
+                            @if($b->delivery_address)<div class="text-[11px] text-gray-400 max-w-[200px] truncate">{{ $b->delivery_address }}</div>@endif
+                        </td>
+                        <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">Rs. {{ number_format((float) $b->total_amount) }}</td>
+                        <td class="px-4 py-3">
+                            @if($b->payment_method === 'cash')
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">{{ __('pos.cash_word') }}</span>
+                            @else
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">{{ ucwords(str_replace('_',' ', $b->payment_method)) }}</span>
+                            @endif
+                        </td>
+                        <td class="px-4 py-3">
+                            <form method="POST" action="{{ route('pos.deliveries.assign', $b->id) }}">
+                                @csrf
+                                <select name="rider_id" onchange="this.form.submit()" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1 focus:ring-purple-500 focus:border-purple-500">
+                                    <option value="">{{ __('pos.no_rider_opt') }}</option>
+                                    @foreach($riders as $r)
+                                    @if($r->is_active)
+                                    <option value="{{ $r->id }}">{{ $r->name }}{{ ($openDeliveryCounts[$r->id] ?? 0) > 0 ? ' — ' . __('pos.rider_out_pill', ['count' => $openDeliveryCounts[$r->id]]) : '' }}</option>
+                                    @endif
+                                    @endforeach
+                                </select>
+                            </form>
+                        </td>
+                        <td class="px-4 py-3">
+                            {{-- Halka (gray) chip — purana bill koi demand nahi kar raha (Task 524). --}}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">{{ __('pos.del_status_unassigned') }}</span>
+                        </td>
+                    </tr>
+                    @endforeach
+                    <tr id="del-old-search-empty" style="display:none"><td colspan="6" class="px-4 py-6 text-center text-sm text-gray-400">{{ __('pos.del_no_match') }}</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    @endif
 </div>
 <script>
 (function () {
@@ -424,6 +531,8 @@
     if (!inp) return;
     var emptyRow = document.getElementById('del-search-empty');
     var cnt = document.getElementById('del-count');
+    var oldHits = document.getElementById('del-old-hits');
+    var oldEmpty = document.getElementById('del-old-search-empty');
     inp.addEventListener('input', function () {
         var q = inp.value.trim().toLowerCase(), shown = 0;
         document.querySelectorAll('tr[data-delrow]').forEach(function (tr) {
@@ -433,6 +542,23 @@
         });
         if (emptyRow) emptyRow.style.display = shown === 0 ? '' : 'none';
         if (cnt) cnt.textContent = shown;
+        // Task 536: purani-deliveries section ke rows bhi filter hon. Alag counter —
+        // main #del-count purane matches se inflate NAHIN hota. Match milne par
+        // section Alpine event se auto-khul jata hai aur header par match-ginti chip.
+        var oldRows = document.querySelectorAll('tr[data-oldrow]'), oldShown = 0;
+        oldRows.forEach(function (tr) {
+            var hit = !q || (tr.getAttribute('data-search') || '').indexOf(q) !== -1;
+            tr.style.display = hit ? '' : 'none';
+            if (hit) oldShown++;
+        });
+        if (oldRows.length) {
+            if (oldHits) {
+                oldHits.style.display = q ? '' : 'none';
+                oldHits.textContent = q ? ('\u2192 ' + oldShown) : '';
+            }
+            if (oldEmpty) oldEmpty.style.display = (q && oldShown === 0) ? '' : 'none';
+            if (q && oldShown > 0) window.dispatchEvent(new CustomEvent('tn-open-olddel'));
+        }
     });
 })();
 </script>

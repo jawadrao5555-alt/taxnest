@@ -293,17 +293,43 @@ class PosController extends Controller
                 // last save from either page wins. Missing/invalid input keeps 80mm default.
                 'receipt_printer_size' => $request->input('rp_printer_size', $company->receipt_printer_size ?? '80mm'),
             ];
-            // Print Position + Left Margin (owner, 10 Aug 2026): same columns the
-            // Kitchen Settings save writes — receipts/proof bill/KOT read them all.
-            // Exposed HERE too so non-restaurant shops (no kitchen page) get margin
-            // control. hasColumn guards: PROD drift convention + minimal test schemas.
+            // Print Position + Left Margin (Pizza Master, 11 Aug 2026): receipts now
+            // have their OWN columns (receipt_align_center / receipt_left_margin_mm),
+            // separate from the KOT's kot_* pair — fixing one printer no longer
+            // shifts the other. Legacy fallback: if the new columns are missing
+            // (PROD drift), keep writing the old shared kot_* pair like before.
+            if ($request->filled('rp_align_center')) {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'receipt_align_center')) {
+                    $companyUpdates['receipt_align_center'] = (bool) ((int) $request->input('rp_align_center'));
+                } elseif (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_align_center')) {
+                    $companyUpdates['kot_align_center'] = (bool) ((int) $request->input('rp_align_center'));
+                }
+            }
+            if ($request->filled('rp_left_margin_mm')) {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'receipt_left_margin_mm')) {
+                    $companyUpdates['receipt_left_margin_mm'] = max(0, min(30, (int) $request->input('rp_left_margin_mm')));
+                } elseif (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_left_margin_mm')) {
+                    $companyUpdates['kot_left_margin_mm'] = max(0, min(30, (int) $request->input('rp_left_margin_mm')));
+                }
+            }
+            // KOT ka apna alag margin (Pizza Master, 11 Aug 2026): receipt-settings se
+            // bhi KOT position set ho sakti hai — kitchen-settings wale hi kot_* columns
+            // (us page ki save bhi inhi par likhti hai; aakhri save jeet-ti hai).
             if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_align_center')
-                && $request->filled('rp_align_center')) {
-                $companyUpdates['kot_align_center'] = (bool) ((int) $request->input('rp_align_center'));
+                && $request->filled('rp_kot_align_center')) {
+                $companyUpdates['kot_align_center'] = (bool) ((int) $request->input('rp_kot_align_center'));
             }
             if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_left_margin_mm')
-                && $request->filled('rp_left_margin_mm')) {
-                $companyUpdates['kot_left_margin_mm'] = max(0, min(30, (int) $request->input('rp_left_margin_mm')));
+                && $request->filled('rp_kot_left_margin_mm')) {
+                $companyUpdates['kot_left_margin_mm'] = max(0, min(30, (int) $request->input('rp_kot_left_margin_mm')));
+            }
+            // Dine-in FINAL auto-print (Pizza Master, 11 Aug 2026): OFF = payment par
+            // dine-in ka final receipt KHUD print nahi hota (proof bill pehle diya ja
+            // chuka hota hai). hidden=0/checkbox=1 pattern → has() check. Sale screen
+            // yeh flag bake karti hai — column fingerprint list mein shamil hai.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'print_on_pay_dinein')
+                && $request->has('rp_dinein_autoprint')) {
+                $companyUpdates['print_on_pay_dinein'] = (bool) $request->input('rp_dinein_autoprint');
             }
             // KOT Print Style toggles (Aug 2026): also saveable from receipt-settings
             // so shops without the kitchen module can still control their KOT layout.
@@ -1120,27 +1146,38 @@ class PosController extends Controller
      * row. Keyed by business_date (created_at date on pre-migration schemas).
      * Returns an ascending collection of Y-m-d strings (max 30 days back).
      */
-    private function unclosedPriorBusinessDays(int $companyId, ?string $excludeDate = null)
+    private function unclosedPriorBusinessDays(int $companyId, ?string $excludeDate = null, bool $oldestFirst = false)
     {
         $bizToday = \App\Services\PosBusinessDay::current($companyId);
         $hasBizDate = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'business_date');
+        // Closed dates FIRST, excluded inside the query (Task 516): the old
+        // shape limited to the newest 30 dates BEFORE dropping closed ones, so
+        // once the newest 30 were all closed, older still-open days became
+        // invisible — the bulk close could never finish a 31+ day backlog.
+        // Normalized in PHP (no whereIn on report_date — drivers that store
+        // DATE with a time part, e.g. sqlite tests, would miss every match
+        // and resurrect closed days); a company has few report rows.
+        $closedDates = PosDayCloseReport::where('company_id', $companyId)
+            ->pluck('report_date')
+            ->map(fn ($d) => \Carbon\Carbon::parse($d)->toDateString());
         $priorDates = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->when($hasBizDate,
                 fn ($q) => $q->where('business_date', '<', $bizToday)->selectRaw('business_date as d'),
                 fn ($q) => $q->whereDate('created_at', '<', $bizToday)->selectRaw('DATE(created_at) as d'))
+            ->when($closedDates->isNotEmpty(), fn ($q) => $q->when($hasBizDate,
+                fn ($qq) => $qq->whereNotIn('business_date', $closedDates->all()),
+                fn ($qq) => $qq->whereNotIn(\DB::raw('DATE(created_at)'), $closedDates->all())))
             ->groupBy('d')
-            ->orderByDesc('d')
+            // Banner shows the newest 30; the BULK close pages OLDEST-first
+            // (Task 516): performDayClose's backlog wash sweeps local bills
+            // with business_date <= close date, so closing a newer day before
+            // discovering an older one would steal the older day's bills into
+            // the wrong report and leave it an artificial zero-report.
+            ->orderBy('d', $oldestFirst ? 'asc' : 'desc')
             ->limit(30)
             ->pluck('d')
             ->map(fn ($d) => (string) $d);
-        if ($priorDates->isEmpty()) {
-            return collect();
-        }
-        $closedDates = PosDayCloseReport::where('company_id', $companyId)
-            ->whereIn('report_date', $priorDates)
-            ->pluck('report_date')
-            ->map(fn ($d) => \Carbon\Carbon::parse($d)->toDateString());
 
         return $priorDates
             ->reject(fn ($d) => $closedDates->contains($d) || $d === $excludeDate)
@@ -1475,6 +1512,22 @@ class PosController extends Controller
             }
         }
 
+        // Task 502 (11 Aug 2026): Tables page ke open-order cards ?recall_order={id}
+        // bhejte hain — sale screen boot par WOHI order cart mein recall ho.
+        // Sirf company-scoped + khula (held/preparing/ready) order pass hota hai;
+        // warna param chup-chaap ignore (normal boot). SW-safe: query-string wali
+        // navigations network-only hain (SALE_CACHE sirf bina-query URL cache
+        // karta hai), is liye fingerprint/cache path par koi asar nahi.
+        $recallOrderIdForJs = null;
+        if ($request->filled('recall_order') && $features->kot && class_exists(RestaurantOrder::class)) {
+            $recallCandidate = RestaurantOrder::where('company_id', $companyId)
+                ->whereIn('status', ['held', 'preparing', 'ready'])
+                ->find((int) $request->input('recall_order'));
+            if ($recallCandidate) {
+                $recallOrderIdForJs = (int) $recallCandidate->id;
+            }
+        }
+
         // Per-USER grid visibility overrides (owner, 25 Jul 2026): map of
         // "type:id" => 0/1. Empty array until the table exists (prod drift safe
         // — mapForUser is hasTable + try/catch guarded internally).
@@ -1490,7 +1543,8 @@ class PosController extends Controller
             'customers', 'taxRate', 'taxRules', 'stockStatus', 'blockOutOfStock',
             'posRole', 'discountLimit', 'hasManagerPin', 'ingredientCosts',
             'lowStockAlerts', 'inventoryEnabled', 'dealsForJs',
-            'editBillForJs', 'userGridPrefs', 'bootFp', 'customersTruncated'
+            'editBillForJs', 'userGridPrefs', 'bootFp', 'customersTruncated',
+            'recallOrderIdForJs'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         ->header('Pragma', 'no-cache')
@@ -3047,6 +3101,10 @@ class PosController extends Controller
         $hasRiderCols = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id')
             && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_settlement_id');
         $hasBizDate = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'business_date');
+        // Current business day (00:00–05:59 counts in yesterday) — the Pending
+        // Deliveries badge filters bills to THIS date client-side, and Task 524
+        // stamps purani unassigned bills server-side against the same date.
+        $bizToday = $hasBizDate ? \App\Services\PosBusinessDay::current($companyId) : null;
         // Billing Scope (07 Aug 2026): pra-scoped staff never see local/provisional
         // bills — the provisional half of this list is emptied for them. The FINAL
         // delivery-bill half below stays (delivery tracking is stream-agnostic).
@@ -3075,20 +3133,41 @@ class PosController extends Controller
             $finalBills = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->where('status', 'completed')
-                ->whereNotNull('rider_id')
                 // NOT a provisional (local+local triple = provisional definition).
                 ->whereNot(function ($q) {
                     $q->where('invoice_mode', 'local')->where('pra_status', 'local');
                 })
                 ->where(function ($q) {
-                    // Abhi raste mein…
-                    $q->whereIn('delivery_status', ['assigned', 'dispatched'])
-                        // …ya deliver ho gaya par cash abhi rider ke paas.
-                        ->orWhere(function ($q2) {
-                            $q2->where('delivery_status', 'delivered')
-                               ->where('payment_method', 'cash')
-                               ->whereNull('rider_settlement_id');
-                        });
+                    $q->where(function ($qa) {
+                        $qa->whereNotNull('rider_id')
+                            ->where(function ($qb) {
+                                // Abhi raste mein… (Task 523: settle_all in
+                                // statuses ko bhi settle kar deta hai —
+                                // settled bill popup se ghayab, FBR fix mirror)
+                                $qb->where(function ($q1) {
+                                        $q1->whereIn('delivery_status', ['assigned', 'dispatched'])
+                                           ->whereNull('rider_settlement_id');
+                                    })
+                                    // …ya deliver ho gaya par cash abhi rider ke paas.
+                                    ->orWhere(function ($q2) {
+                                        $q2->where('delivery_status', 'delivered')
+                                           ->where('payment_method', 'cash')
+                                           ->whereNull('rider_settlement_id');
+                                    });
+                            });
+                    })
+                    // Task 513: UNASSIGNED delivery bills (rider NULL, status NULL,
+                    // unsettled) bhi popup mein — cashier rider yahin se assign kare,
+                    // Deliveries board kholne ki zaroorat na rahe. Same 7-din window
+                    // as the Deliveries board pending tab (Task 512): purane
+                    // pre-feature delivery bills popup ko flood na karein.
+                    ->orWhere(function ($qu) {
+                        $qu->whereNull('rider_id')
+                            ->whereNull('delivery_status')
+                            ->whereNull('rider_settlement_id')
+                            ->where('order_type', 'delivery')
+                            ->where('created_at', '>=', now()->subDays(7));
+                    });
                 })
                 ->orderBy('id', 'desc')
                 ->limit(50)
@@ -3121,7 +3200,7 @@ class PosController extends Controller
                     ->where(function ($q) {
                         $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
                     })
-                    ->selectRaw('rider_id, COUNT(*) as c, COALESCE(SUM(total_amount),0) as amt')
+                    ->selectRaw('rider_id, COUNT(*) as c, COALESCE(SUM(' . \App\Models\PosRider::remainingExpr('pos_transactions') . '),0) as amt')
                     ->groupBy('rider_id')
                     ->get()
                     ->mapWithKeys(fn ($r) => [$r->rider_id => ['count' => (int) $r->c, 'amount' => (float) $r->amt]])
@@ -3166,7 +3245,14 @@ class PosController extends Controller
         // Open FINAL delivery bills — same shape as provisionals + is_final flag
         // + delivery_status (panel inhe alag actions deta hai: Delivered mark /
         // khata settle; Final Cash/Card buttons in par render hi nahi hote).
-        $finalData = $finalBills->map(function ($b) use ($hasBizDate, $riderNames, $riderOpen) {
+        $finalData = $finalBills->map(function ($b) use ($hasBizDate, $bizToday, $riderNames, $riderOpen) {
+            // Task 524: purana (pichhle business day ka) UNASSIGNED bill — popup
+            // ise alag collapsed "Purani deliveries" group mein dikhata hai aur
+            // badge ki ginti se bahar rakhta hai. Flag SERVER par banta hai
+            // (authoritative business day), client sirf parhta hai.
+            $billDay = ($hasBizDate && $b->business_date)
+                ? (string) $b->business_date
+                : $b->created_at?->format('Y-m-d');
             return [
                 'id'               => $b->id,
                 'is_final'         => true,
@@ -3188,17 +3274,44 @@ class PosController extends Controller
                 'rider_unsettled'  => (bool) ($b->rider_id && empty($b->rider_settlement_id) && $b->payment_method === 'cash' && $b->delivery_status !== 'returned'),
                 'rider_open_count' => $b->rider_id ? ($riderOpen[$b->rider_id]['count'] ?? 0) : 0,
                 'rider_open_amount'=> $b->rider_id ? ($riderOpen[$b->rider_id]['amount'] ?? 0) : 0,
+                // Task 524: purani unassigned = collapsed group + badge se bahar.
+                'is_stale_unassigned' => (bool) ($bizToday && $billDay && !$b->rider_id
+                    && !$b->delivery_status && $billDay < $bizToday),
             ];
         });
+
+        // Task 513: active riders list + assign permission — the popup renders a
+        // rider dropdown on UNASSIGNED bills (POST pos.deliveries.assign, same
+        // backend as the board). UI-gating mirrors the route gate: custom-access
+        // 'deliveries' verdict (deliveriesFallbackOpen included via customAllows).
+        // Plan gate (riders = Pro+) + Delivery feature toggle mirror the board's
+        // deliveryGate(); custom-access verdict mirrors PosAuth's route gate.
+        $assignCompany = Company::find($companyId);
+        $canAssignRider = \App\Services\PosFeatureService::planAllows($assignCompany, 'riders_enabled')
+            && !empty(\App\Services\PosFeatureService::forCompany($assignCompany)->delivery)
+            && \App\Services\PosAccessService::customAllows(auth('pos')->user(), 'deliveries') !== false;
+        $assignRiders = [];
+        if ($canAssignRider && $hasRiderCols && \Illuminate\Support\Facades\Schema::hasTable('pos_riders')) {
+            $assignRiders = \DB::table('pos_riders')
+                ->where('company_id', $companyId)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn ($r) => ['id' => (int) $r->id, 'name' => $r->name])
+                ->values()
+                ->all();
+        }
 
         return response()->json([
             'success' => true,
             'count'   => $data->count(),
             'bills'   => $data,
             'final_deliveries' => $finalData,
+            'riders'  => $assignRiders,
+            'can_assign_rider' => $canAssignRider,
             // Current business day (00:00–05:59 counts in yesterday) — the
             // Pending Deliveries badge filters bills to THIS date client-side.
-            'business_today' => $hasBizDate ? \App\Services\PosBusinessDay::current($companyId) : null,
+            'business_today' => $bizToday,
         ]);
     }
 
@@ -5316,6 +5429,42 @@ class PosController extends Controller
         ]);
     }
 
+    /**
+     * Task 527 (owner voice notes, 12 Aug 2026): admin-controlled waiter
+     * permissions — company-level toggles (waiters are excluded from the
+     * per-user Custom Access system):
+     *   'cancel'   → pos_waiter_cancel_enabled   (default OFF)
+     *   'takeaway' → pos_waiter_takeaway_enabled (default ON)
+     */
+    public function toggleWaiterPermission(Request $request)
+    {
+        // Waiter PERMISSION toggles are strictly admin/manager territory —
+        // stricter than posCashierBlocked(): a Custom-Access-granted cashier
+        // may reach other settings, but must never grant waiters abilities.
+        // (PosAuth already confines waiters to pos/waiter* paths; this is the
+        // in-controller defense-in-depth so the gate never depends on
+        // middleware ordering.)
+        $user = auth('pos')->user();
+        if (!$user || !$user->isPosAdmin()) {
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
+        }
+
+        $validated = $request->validate([
+            'permission' => 'required|in:cancel,takeaway',
+            'enabled' => 'required|boolean',
+        ]);
+
+        $column = $validated['permission'] === 'cancel'
+            ? 'pos_waiter_cancel_enabled'
+            : 'pos_waiter_takeaway_enabled';
+
+        $company = Company::find(app('currentCompanyId'));
+        $company->{$column} = (bool) $validated['enabled'];
+        $company->save();
+
+        return response()->json(['success' => true, 'enabled' => (bool) $company->{$column}]);
+    }
+
     public function updateLocalBillingSettings(Request $request)
     {
         $user = auth('pos')->user();
@@ -5735,6 +5884,13 @@ class PosController extends Controller
             'phone' => 'nullable|string|max:20',
             'password' => 'required|string|min:6',
             'pos_role' => 'nullable|in:pos_cashier,pos_manager,pos_kitchen,pos_waiter,pos_delivery',
+            // Task 529: optional short login name — staff can log in with it
+            // instead of the full email (LoginIdentifierResolver already
+            // resolves users.username). Globally unique (column has a global
+            // unique index); no spaces/@ so it can never look like an email.
+            'username' => \App\Services\LoginIdentifierResolver::usernameRules(),
+        ], [
+            ...\App\Services\LoginIdentifierResolver::usernameMessages(),
         ]);
 
         $newRole = $request->input('pos_role') ?: 'pos_cashier';
@@ -5768,6 +5924,12 @@ class PosController extends Controller
         // PROD schema-drift guard: skip if the migration hasn't landed yet.
         if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_team_password_enc')) {
             $newUserData['pos_team_password_enc'] = \Illuminate\Support\Facades\Crypt::encryptString($request->password);
+        }
+        // Task 529: optional login username. Blank → NULL (never empty string —
+        // the global unique index must keep allowing many username-less
+        // accounts). hasColumn = schema-drift guard, same as the enc copy.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'username')) {
+            $newUserData['username'] = $request->input('username') ?: null;
         }
         // Billing Scope (07 Aug 2026): cashier/manager accounts can be locked to
         // one stream at creation. NULL/both = no lock (default, legacy behaviour).
@@ -5964,13 +6126,24 @@ class PosController extends Controller
             // row — stored hashes are irreversible, so "view password" is impossible;
             // the admin sets a NEW one instead. Blank = keep the current password.
             'password' => 'nullable|string|min:6|max:100',
+            // Task 529: admin can set/change the member's login username from
+            // the edit row (own row exempt from the unique check).
+            'username' => \App\Services\LoginIdentifierResolver::usernameRules($cashier->id),
+        ], [
+            ...\App\Services\LoginIdentifierResolver::usernameMessages(),
         ]);
 
-        $cashier->update([
+        $cashierData = [
             'name' => $request->name,
             'email' => $request->email,
             'phone' => $request->phone,
-        ]);
+        ];
+        // Task 529: blank clears the username (back to email-only login) —
+        // NULL, never ''. hasColumn = schema-drift guard.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'username')) {
+            $cashierData['username'] = $request->input('username') ?: null;
+        }
+        $cashier->update($cashierData);
 
         // Billing Scope (07 Aug 2026): stream lock is editable from the team edit
         // row — cashier + manager only. Direct assignment (pos_custom_access
@@ -8346,7 +8519,11 @@ class PosController extends Controller
                     'name' => 'required|string|max:255',
                     'email' => 'required|email|max:255|unique:users,email,' . $user->id,
                     'phone' => 'nullable|string|max:30',
-                    'username' => 'nullable|string|max:100|unique:users,username,' . $user->id,
+                    // Task 529: same format rule as the Team page (no spaces/@ —
+                    // an email-looking username could never resolve at login).
+                    'username' => \App\Services\LoginIdentifierResolver::usernameRules($user->id),
+                ], [
+                    ...\App\Services\LoginIdentifierResolver::usernameMessages(),
                 ]);
 
                 $user->update($request->only(['name', 'email', 'phone', 'username']));
@@ -8635,7 +8812,16 @@ class PosController extends Controller
                 $cashRecon['counted_cash'] = $cashRecon['counted_cash'] ?? null;
             }
         }
-        $result = $this->performDayClose($companyId, $date, $user?->id, $request->input('notes'), $cashRecon);
+        // Task 516: a stranded PRIOR day may be legitimately empty (its local
+        // bills were archived by a newer day's backlog wash) — allow a
+        // zero-figure close so it leaves the stranded banner instead of
+        // erroring "no transactions" forever. STRICTLY limited to dates the
+        // stranded-day detector returns (i.e. days that actually have bills,
+        // archived included) — an arbitrary never-traded past date must NOT
+        // mint a fabricated zero Z-report. Today's close stays strict too.
+        $allowEmpty = $date < \App\Services\PosBusinessDay::current($companyId)
+            && $this->unclosedPriorBusinessDays($companyId)->contains($date);
+        $result = $this->performDayClose($companyId, $date, $user?->id, $request->input('notes'), $cashRecon, $allowEmpty);
 
         if ($result['status'] === 'exists') {
             return back()->with('error', __('pos.dayclose_report_exists'));
@@ -9190,7 +9376,14 @@ class PosController extends Controller
             // rider_settled_at stays on the REAL calendar date (settlement
             // timestamps carry no business date) — known v1 limitation: a 1 AM
             // settlement counts toward the calendar day, not the open trading day.
-            $cashIn = (float) PosTransaction::withoutGlobalScope('hide_archived')
+            // Partial settlements (Task 525): new settlement rows carry an
+            // 'allocation' breakdown — for those, cash-in comes from the
+            // allocation entries (exact rupees received today against older
+            // bills, partial or full). The legacy bill-based query stays for
+            // pre-feature settlements (no allocation) so the transition day
+            // never double-counts.
+            $hasAllocation = \Schema::hasColumn('pos_rider_settlements', 'allocation');
+            $legacyCashInQ = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->whereNotNull('rider_id')
                 ->where('payment_method', PosPaymentBuckets::CASH)
@@ -9199,8 +9392,31 @@ class PosController extends Controller
                 ->where('business_date', '<', $date)
                 ->where(function ($q) {
                     $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
-                })
-                ->sum('total_amount');
+                });
+            if ($hasAllocation) {
+                $legacyCashInQ->whereNotIn('rider_settlement_id', function ($q) use ($companyId) {
+                    $q->select('id')->from('pos_rider_settlements')
+                        ->where('company_id', $companyId)
+                        ->whereNotNull('allocation');
+                });
+            }
+            $cashIn = (float) $legacyCashInQ->sum('total_amount');
+            if ($hasAllocation) {
+                $allocCashIn = 0.0;
+                \App\Models\PosRiderSettlement::where('company_id', $companyId)
+                    ->where('panel', 'pra')
+                    ->whereNotNull('allocation')
+                    ->whereDate('created_at', $date)
+                    ->get()
+                    ->each(function ($s) use (&$allocCashIn, $date) {
+                        foreach ((array) $s->allocation as $entry) {
+                            if (!empty($entry['business_date']) && $entry['business_date'] < $date) {
+                                $allocCashIn += (float) ($entry['amount'] ?? 0);
+                            }
+                        }
+                    });
+                $cashIn += $allocCashIn;
+            }
 
             if ($dayBills->isEmpty() && $cashIn == 0.0) {
                 return $empty;
@@ -9210,9 +9426,14 @@ class PosController extends Controller
                 && !$t->rider_settlement_id
                 && $t->delivery_status !== 'returned';
 
+            // Khata remaining per bill — partial cash already received today is
+            // IN the drawer, only the unpaid remainder is out with the rider.
+            $hasPartialCol = \Schema::hasColumn('pos_transactions', 'rider_partial_paid');
+            $remainingOf = fn ($t) => (float) $t->total_amount - ($hasPartialCol ? (float) ($t->rider_partial_paid ?? 0) : 0);
+
             $cashOut = (float) $dayBills
                 ->filter(fn ($t) => ($t->invoice_mode === 'pra' || $t->invoice_mode === null) && $isOpenCash($t))
-                ->sum('total_amount');
+                ->sum($remainingOf);
 
             $riderNames = \App\Models\PosRider::where('company_id', $companyId)
                 ->whereIn('id', $dayBills->pluck('rider_id')->unique())
@@ -9225,7 +9446,7 @@ class PosController extends Controller
                     'delivered' => $rows->where('delivery_status', 'delivered')->count(),
                     'returned' => $rows->where('delivery_status', 'returned')->count(),
                     'cash_total' => round((float) $rows->filter(fn ($t) => $t->payment_method === PosPaymentBuckets::CASH && $t->delivery_status !== 'returned')->sum('total_amount'), 2),
-                    'cash_pending' => round((float) $rows->filter($isOpenCash)->sum('total_amount'), 2),
+                    'cash_pending' => round((float) $rows->filter($isOpenCash)->sum($remainingOf), 2),
                 ];
             }
 
@@ -9330,10 +9551,99 @@ class PosController extends Controller
         return $sweep;
     }
 
-    public function performDayClose(int $companyId, string $date, ?int $closedBy, ?string $notes = null, ?array $cashRecon = null): array
+    /**
+     * Task 516: bulk-close ALL stranded prior business days in one click.
+     * Ends the "close one, another appears" whack-a-mole: shops that don't
+     * close daily pile up 20+ open days and had to close each one by one.
+     * Iterates chronologically and calls the SAME performDayClose routine per
+     * day (opening-float self-heal, local-bill wash policy, archive semantics
+     * all identical to a single close) — no parallel close path.
+     */
+    public function closeAllPriorDays(Request $request)
+    {
+        // Same authority gate as the single close (owner rule 5 Aug 2026).
+        $user = \Illuminate\Support\Facades\Auth::guard('pos')->user();
+        if ($user && !\App\Services\PosAccessService::dayCloseAllowed($user)) {
+            return redirect()->route('pos.dashboard')->with('error', __('pos.custom_access_denied'));
+        }
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        // Same hard block as the single close: open restaurant orders freeze
+        // ALL manual closes (un-finalized orders can never be finalized after
+        // a close whose backlog wash may sweep their day).
+        $openAtClose = $this->openHeldOrdersSummary($companyId, $company);
+        if ($openAtClose->count > 0) {
+            return back()->with('error', __('pos.dayclose_blocked_open_orders', [
+                'count' => $openAtClose->count,
+                'tables' => $openAtClose->tableNumbers !== '' ? ' (' . __('pos.dc_open_tables_list', ['tables' => $openAtClose->tableNumbers]) . ')' : '',
+            ]));
+        }
+
+        if ($this->unclosedPriorBusinessDays($companyId)->isEmpty()) {
+            return back()->with('success', __('pos.dc_bulk_none_pending'));
+        }
+
+        $closed = 0;
+        $zeroDays = 0;
+        $archived = 0;
+        $deleted = 0;
+        // The detector returns at most 30 dates per query — RE-QUERY until the
+        // backlog is exhausted so 31+ open days still finish in ONE click
+        // ("all" must mean all). oldestFirst: pages must come CHRONOLOGICALLY
+        // (oldest day first) so each day's backlog wash only ever sweeps its
+        // own bills — a newer close would steal older days' local bills.
+        // Guard caps the loop; each pass must make progress or we bail.
+        for ($pass = 0; $pass < 30; $pass++) {
+            $pending = $this->unclosedPriorBusinessDays($companyId, null, true); // oldest 30, ascending
+            if ($pending->isEmpty()) {
+                break;
+            }
+            $closedThisPass = 0;
+            foreach ($pending as $day) {
+                // allowEmpty: stranded days with only already-archived bills get
+                // a zero-figure Z-report so they finally leave the banner. Safe:
+                // every $day comes from the detector (has real bills).
+                $result = $this->performDayClose($companyId, $day, $user?->id, null, null, true);
+                if ($result['status'] === 'created') {
+                    $closed++;
+                    $closedThisPass++;
+                    $archived += $result['archived'];
+                    $deleted += $result['deleted'] ?? 0;
+                    if ((int) ($result['report']->total_invoices ?? 0) === 0) {
+                        $zeroDays++;
+                    }
+                }
+                // 'exists' = already closed (race with another cashier) — skip silently.
+            }
+            if ($closedThisPass === 0) {
+                break; // no progress — never spin
+            }
+        }
+
+        $msg = __('pos.dc_bulk_done', ['closed' => $closed, 'zero' => $zeroDays]);
+        if ($archived > 0) {
+            $msg .= __('pos.dayclose_bills_archived', ['count' => $archived]);
+        }
+        if ($deleted > 0) {
+            $msg .= __('pos.dayclose_bills_deleted', ['count' => $deleted]);
+        }
+
+        // Honest "all": if anything is somehow still pending after the capped
+        // passes (900 days) or a stalled pass, say so instead of implying done.
+        $remaining = $this->unclosedPriorBusinessDays($companyId, null, true)->count();
+        if ($remaining > 0) {
+            return redirect()->route('pos.day-close')
+                ->with('error', $msg . ' ' . __('pos.dc_bulk_partial', ['remaining' => $remaining]));
+        }
+
+        return redirect()->route('pos.day-close')->with('success', $msg);
+    }
+
+    public function performDayClose(int $companyId, string $date, ?int $closedBy, ?string $notes = null, ?array $cashRecon = null, bool $allowEmpty = false): array
     {
         $existing = PosDayCloseReport::where('company_id', $companyId)
-            ->where('report_date', $date)
+            ->whereDate('report_date', $date)
             ->first();
 
         if ($existing) {
@@ -9402,7 +9712,14 @@ class PosController extends Controller
             })
             ->exists();
 
-        if ($transactions->isEmpty() && !$hasLocalBills) {
+        // Empty-day guard: TODAY's close with zero bills stays refused. But a
+        // STRANDED prior day can legitimately be empty — e.g. its local bills
+        // were already archived by a NEWER day's backlog wash (they still make
+        // the day show as "open" in the stranded banner, which counts archived
+        // rows, yet nothing is left to wash). Task 516: $allowEmpty lets those
+        // days get a zero-figure Z-report so they finally leave the banner —
+        // the "close one, another appears" whack-a-mole ender.
+        if ($transactions->isEmpty() && !$hasLocalBills && !$allowEmpty) {
             return ['status' => 'empty', 'report' => null, 'archived' => 0, 'deleted' => 0, 'report_number' => null];
         }
 

@@ -37,7 +37,17 @@ class RestaurantTableController extends Controller
             ->orderBy('sort_order')
             ->get();
 
-        return view('pos.restaurant.tables', compact('floors'));
+        // ZFC (11 Aug 2026): dashboard "Open orders" tile links HERE, but a held
+        // order WITHOUT a table (e.g. a held delivery) was invisible on this page
+        // — shop clicked the "1 pending" tile and found nothing. Same statuses as
+        // the dashboard counter so the numbers always reconcile.
+        $openOrders = RestaurantOrder::where('company_id', $companyId)
+            ->whereIn('status', ['held', 'preparing', 'ready'])
+            ->with('table')
+            ->orderBy('created_at')
+            ->get();
+
+        return view('pos.restaurant.tables', compact('floors', 'openOrders'));
     }
 
     public function manage()

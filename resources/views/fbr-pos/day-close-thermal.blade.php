@@ -68,6 +68,9 @@
     <div class="sec">{{ __('pos.dc_sales_summary') }}</div>
     <table>
         <tr><td>{{ __('pos.dc_total_invoices') }}</td><td class="r b">{{ $report->total_invoices }}</td></tr>
+        {{-- FBR vs Local split (Task 518, same values day-close-pdf shows) --}}
+        <tr><td>&nbsp;&nbsp;{{ __('pos.dcp_fbr_submitted_invoices') }}</td><td class="r">{{ $report->fbr_invoices }}</td></tr>
+        <tr><td>&nbsp;&nbsp;{{ __('pos.dcp_local_invoices') }}</td><td class="r">{{ $report->local_invoices }}</td></tr>
         <tr><td>{{ __('pos.dc_gross_sales') }}</td><td class="r">{{ number_format($report->gross_sales, 2) }}</td></tr>
         @if($report->total_discount > 0)
         <tr><td>{{ __('pos.dc_discount') }}</td><td class="r">-{{ number_format($report->total_discount, 2) }}</td></tr>

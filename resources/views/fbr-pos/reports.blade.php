@@ -6,6 +6,13 @@
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.sales_reports') }}</h1>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.month_overview', ['month' => now()->format('F Y')]) }}</p>
         </div>
+        @if(auth('fbrpos')->user()?->isPosAdmin() && \App\Services\PosFeatureService::planAllows($company, 'hazri_enabled'))
+        {{-- Staff Hazri — FBR mirror (Task #560) — ADMIN/MANAGER-ONLY --}}
+        <a href="{{ route('fbrpos.reports.hazri') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-semibold rounded-lg hover:bg-teal-700 transition">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            {{ __('pos.staff_hazri') }}
+        </a>
+        @endif
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

@@ -1267,6 +1267,8 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/api/check-pin-session', [FbrPosController::class, 'checkPinSession'])->name('fbrpos.api.check-pin-session');
     Route::get('/billing', [FbrPosController::class, 'billing'])->name('fbrpos.billing');
     Route::get('/reports', [FbrPosController::class, 'reports'])->name('fbrpos.reports');
+    // Staff Hazri — FBR mirror (Task #560) — ADMIN/MANAGER-ONLY (403 in controller).
+    Route::get('/reports/hazri', [FbrPosController::class, 'hazriReport'])->name('fbrpos.reports.hazri');
     Route::get('/reports/export-csv', [FbrPosController::class, 'exportReportCsv'])->name('fbrpos.reports.export-csv');
 
     // 👥 Team management (FBR twin of /pos/team) — admin-only in controller.

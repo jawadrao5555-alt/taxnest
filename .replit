@@ -142,7 +142,3 @@ build = ["bash", "-c", "echo 'holding page: no build needed'"]
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 180000
-
-[[ports]]
-localPort = 8080
-externalPort = 8080

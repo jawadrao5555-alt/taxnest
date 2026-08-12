@@ -697,14 +697,21 @@ class FbrPosController extends Controller
             'notes' => $notes,
         ];
 
-        // Cash reconciliation (Z-report): expected = opening float + cash sales;
-        // variance = counted − expected. Columns nullable + schema-guarded (prod
-        // drift self-heal) — auto-close paths pass no $cashRecon. Merged BEFORE
-        // the hash so the recon figures are integrity-protected too.
+        // Delivery Riders (Task 541 — FBR mirror of the PRA Jul 2026 figures):
+        // computed BEFORE the recon so expected cash reflects rider khata.
+        $riderFigures = $this->buildFbrRiderDayFigures($companyId, $date);
+
+        // Cash reconciliation (Z-report): expected = opening float + cash sales
+        // − rider cash still out with riders + rider cash received today for
+        // earlier days' bills; variance = counted − expected. Columns nullable +
+        // schema-guarded (prod drift self-heal) — auto-close paths pass no
+        // $cashRecon. Merged BEFORE the hash so the recon figures are
+        // integrity-protected too.
         if ($cashRecon !== null && \Schema::hasColumn('fbr_day_close_reports', 'opening_float')) {
             $openingFloat = $cashRecon['opening_float'] ?? null;
             $countedCash = $cashRecon['counted_cash'] ?? null;
-            $expectedCash = round((float) ($openingFloat ?? 0) + (float) $baseData['cash_amount'], 2);
+            $expectedCash = round((float) ($openingFloat ?? 0) + (float) $baseData['cash_amount']
+                - (float) $riderFigures['cash_out'] + (float) $riderFigures['cash_in'], 2);
             $baseData['opening_float'] = $openingFloat;
             $baseData['counted_cash'] = $countedCash;
             $baseData['expected_cash'] = $expectedCash;
@@ -714,7 +721,7 @@ class FbrPosController extends Controller
         // Retry loop — max 3 attempts to handle rare concurrent report_number collisions
         for ($attempt = 1; $attempt <= 3; $attempt++) {
             try {
-                return \DB::transaction(function () use ($companyId, $date, $baseData) {
+                return \DB::transaction(function () use ($companyId, $date, $baseData, $riderFigures) {
                     // Race-safe re-check inside transaction
                     $locked = FbrDayCloseReport::where('company_id', $companyId)
                         ->where('report_date', $date)->lockForUpdate()->first();
@@ -728,7 +735,19 @@ class FbrPosController extends Controller
 
                     $data = array_merge($baseData, ['report_number' => $reportNumber]);
                     $data['hash'] = hash('sha256', json_encode($data));
-                    return FbrDayCloseReport::create($data);
+                    $report = FbrDayCloseReport::create($data);
+
+                    // Delivery Riders (Task 541): rider day detail on the
+                    // Z-report. Same schema-drift try/catch pattern as PRA —
+                    // never fail the close over reporting.
+                    if (!empty($riderFigures['active'])) {
+                        try {
+                            $report->forceFill(['rider_summary' => $riderFigures])->save();
+                        } catch (\Throwable $e) {
+                            // rider_summary column missing pre-migration — skip detail
+                        }
+                    }
+                    return $report;
                 });
             } catch (\Illuminate\Database\QueryException $e) {
                 // 23000 = Integrity constraint (unique violation)
@@ -3719,7 +3738,12 @@ class FbrPosController extends Controller
         // self-referential "close this day" nag on its own page).
         $unclosedPriorDays = $this->unclosedPriorBusinessDays($companyId, $date);
 
-        return view('fbr-pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'analytics', 'pendingAutoFinal', 'unclosedPriorDays'));
+        // Delivery Riders (Task 541 — FBR mirror of the PRA Jul 2026 section):
+        // live rider cash figures for the recon preview (unsettled rider cash
+        // is OUT of the drawer; earlier-day settlements are IN).
+        $riderFigures = $this->buildFbrRiderDayFigures($companyId, $date);
+
+        return view('fbr-pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'analytics', 'pendingAutoFinal', 'unclosedPriorDays', 'riderFigures'));
     }
 
     /**
@@ -3905,6 +3929,116 @@ class FbrPosController extends Controller
             'unique_customers' => $uniqueCustomers,
             'comparison' => $comparison,
         ];
+    }
+
+    /**
+     * Delivery Riders (Task 541 — FBR mirror of PosController::
+     * buildRiderDayFigures): per-day rider figures for the Z-report.
+     *
+     * cash_out = TODAY's FBR-set cash delivery bills' REMAINING (total −
+     *            rider_partial_paid) still unsettled at close — that cash sits
+     *            with the rider, NOT in the drawer.
+     * cash_in  = settlements received TODAY for EARLIER days' FBR-set cash
+     *            bills — HYBRID: allocation entries (panel='fbr', exact rupees)
+     *            for Task-525 rows, legacy bill totals for pre-feature
+     *            settlements (allocation NULL), never double-counting.
+     * Both stay FBR-set (invoice_mode 'fbr'/NULL) for consistency with the
+     * stored cash_amount; local provisionals are excluded from both sides.
+     * Per-rider rows cover ALL rider bills of the day (operational truth).
+     * Schema-guarded — returns inactive on prod mid-deploy.
+     */
+    private function buildFbrRiderDayFigures(int $companyId, string $date): array
+    {
+        $empty = ['active' => false, 'riders' => [], 'cash_out' => 0.0, 'cash_in' => 0.0];
+        try {
+            if (!\Schema::hasTable('pos_riders') || !\Schema::hasColumn('fbr_pos_transactions', 'rider_id')) {
+                return $empty;
+            }
+
+            $dayBills = FbrPosTransaction::where('company_id', $companyId)
+                ->tap(fn ($q) => $this->whereBizDate($q, $date))
+                ->whereNotNull('rider_id')
+                ->get();
+
+            // rider_settled_at stays on the REAL calendar date (settlement
+            // timestamps carry no business date) — same v1 limitation as PRA.
+            // Partial settlements (Task 525): allocation-carrying settlement
+            // rows contribute cash-in from their entries (exact rupees received
+            // today against older bills); the legacy bill-based query stays for
+            // pre-feature settlements (no allocation) so the transition day
+            // never double-counts.
+            $hasAllocation = \Schema::hasColumn('pos_rider_settlements', 'allocation');
+            $legacyCashInQ = FbrPosTransaction::where('company_id', $companyId)
+                ->whereNotNull('rider_id')
+                ->where('payment_method', 'cash')
+                ->whereNotNull('rider_settlement_id')
+                ->whereDate('rider_settled_at', $date)
+                ->tap(fn ($q) => $this->whereBizDate($q, $date, '<'))
+                ->where(function ($q) {
+                    $q->where('invoice_mode', 'fbr')->orWhereNull('invoice_mode');
+                });
+            if ($hasAllocation) {
+                $legacyCashInQ->whereNotIn('rider_settlement_id', function ($q) use ($companyId) {
+                    $q->select('id')->from('pos_rider_settlements')
+                        ->where('company_id', $companyId)
+                        ->whereNotNull('allocation');
+                });
+            }
+            $cashIn = (float) $legacyCashInQ->sum('total_amount');
+            if ($hasAllocation) {
+                $allocCashIn = 0.0;
+                \App\Models\PosRiderSettlement::where('company_id', $companyId)
+                    ->where('panel', 'fbr')
+                    ->whereNotNull('allocation')
+                    ->whereDate('created_at', $date)
+                    ->get()
+                    ->each(function ($s) use (&$allocCashIn, $date) {
+                        foreach ((array) $s->allocation as $entry) {
+                            if (!empty($entry['business_date']) && $entry['business_date'] < $date) {
+                                $allocCashIn += (float) ($entry['amount'] ?? 0);
+                            }
+                        }
+                    });
+                $cashIn += $allocCashIn;
+            }
+
+            if ($dayBills->isEmpty() && $cashIn == 0.0) {
+                return $empty;
+            }
+
+            $isOpenCash = fn ($t) => $t->payment_method === 'cash'
+                && !$t->rider_settlement_id
+                && $t->delivery_status !== 'returned';
+
+            // Khata remaining per bill — partial cash already received today is
+            // IN the drawer, only the unpaid remainder is out with the rider.
+            $hasPartialCol = \Schema::hasColumn('fbr_pos_transactions', 'rider_partial_paid');
+            $remainingOf = fn ($t) => (float) $t->total_amount - ($hasPartialCol ? (float) ($t->rider_partial_paid ?? 0) : 0);
+
+            $cashOut = (float) $dayBills
+                ->filter(fn ($t) => ($t->invoice_mode === 'fbr' || $t->invoice_mode === null) && $isOpenCash($t))
+                ->sum($remainingOf);
+
+            $riderNames = \App\Models\PosRider::where('company_id', $companyId)
+                ->whereIn('id', $dayBills->pluck('rider_id')->unique())
+                ->pluck('name', 'id');
+            $riders = [];
+            foreach ($dayBills->groupBy('rider_id') as $rid => $rows) {
+                $riders[] = [
+                    'name' => $riderNames[$rid] ?? ('Rider #' . $rid),
+                    'deliveries' => $rows->count(),
+                    'delivered' => $rows->where('delivery_status', 'delivered')->count(),
+                    'returned' => $rows->where('delivery_status', 'returned')->count(),
+                    'cash_total' => round((float) $rows->filter(fn ($t) => $t->payment_method === 'cash' && $t->delivery_status !== 'returned')->sum('total_amount'), 2),
+                    'cash_pending' => round((float) $rows->filter($isOpenCash)->sum($remainingOf), 2),
+                ];
+            }
+
+            return ['active' => true, 'riders' => $riders, 'cash_out' => round($cashOut, 2), 'cash_in' => round($cashIn, 2)];
+        } catch (\Throwable $e) {
+            // Rider figures are reporting sugar — never let them break day-close.
+            return $empty;
+        }
     }
 
     /**

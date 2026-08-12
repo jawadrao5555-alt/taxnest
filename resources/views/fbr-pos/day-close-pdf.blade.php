@@ -227,6 +227,57 @@
     </table>
     @endif
 
+    {{-- Task 541: rider khata cash movements — rendered INDEPENDENT of the
+         optional cash reconciliation so a cash-in-only day still shows the
+         money that entered/left the drawer via riders. --}}
+    @if(is_array($report->rider_summary) && (($report->rider_summary['cash_out'] ?? 0) > 0 || ($report->rider_summary['cash_in'] ?? 0) > 0))
+    <table class="data">
+        <tbody>
+            @if(($report->rider_summary['cash_out'] ?? 0) > 0)
+            <tr>
+                <td>{{ __('pos.dcp_cash_with_riders') }}</td>
+                <td class="r" style="color:#dc2626;">-{{ number_format($report->rider_summary['cash_out'], 2) }}</td>
+            </tr>
+            @endif
+            @if(($report->rider_summary['cash_in'] ?? 0) > 0)
+            <tr>
+                <td>{{ __('pos.dcp_rider_settlements_received') }}</td>
+                <td class="r">+{{ number_format($report->rider_summary['cash_in'], 2) }}</td>
+            </tr>
+            @endif
+        </tbody>
+    </table>
+    @endif
+
+    {{-- Delivery Riders (Task 541): rider day detail stored on the report --}}
+    @if(is_array($report->rider_summary) && !empty($report->rider_summary['riders']))
+    <div class="section-title">{{ __('pos.dc_delivery_riders') }}</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>{{ __('pos.dcp_rider') }}</th>
+                <th class="c">{{ __('pos.dcp_deliveries') }}</th>
+                <th class="c">{{ __('pos.dcp_delivered') }}</th>
+                <th class="c">{{ __('pos.dcp_returned') }}</th>
+                <th class="r">{{ __('pos.dcp_cash_bills_pkr') }}</th>
+                <th class="r">{{ __('pos.dcp_unsettled_at_close_pkr') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($report->rider_summary['riders'] as $rr)
+            <tr>
+                <td>{{ $rr['name'] ?? '-' }}</td>
+                <td class="c">{{ $rr['deliveries'] ?? 0 }}</td>
+                <td class="c">{{ $rr['delivered'] ?? 0 }}</td>
+                <td class="c">{{ $rr['returned'] ?? 0 }}</td>
+                <td class="r">{{ number_format($rr['cash_total'] ?? 0, 2) }}</td>
+                <td class="r" style="{{ ($rr['cash_pending'] ?? 0) > 0 ? 'color:#dc2626; font-weight:bold;' : '' }}">{{ ($rr['cash_pending'] ?? 0) > 0 ? number_format($rr['cash_pending'], 2) : __('pos.dcp_clear') }}</td>
+            </tr>
+            @endforeach
+        </tbody>
+    </table>
+    @endif
+
     @if($cashierBreakdown->isNotEmpty())
     <div class="section-title">{{ __('pos.dcp_cashier_performance') }}</div>
     <table class="data">

@@ -103,12 +103,42 @@
     <table>
         <tr><td>{{ __('pos.dc_opening_float') }}</td><td class="r">{{ number_format($report->opening_float ?? 0, 2) }}</td></tr>
         <tr><td>{{ __('pos.dc_cash_sales') }}</td><td class="r">{{ number_format($report->cash_amount, 2) }}</td></tr>
+        @if(is_array($report->rider_summary) && ($report->rider_summary['cash_out'] ?? 0) > 0)
+        <tr><td>{{ __('pos.dc_rider_cash') }}</td><td class="r">-{{ number_format($report->rider_summary['cash_out'], 2) }}</td></tr>
+        @endif
+        @if(is_array($report->rider_summary) && ($report->rider_summary['cash_in'] ?? 0) > 0)
+        <tr><td>{{ __('pos.dc_rider_settlements_old') }}</td><td class="r">+{{ number_format($report->rider_summary['cash_in'], 2) }}</td></tr>
+        @endif
         <tr><td>{{ __('pos.dc_expected_drawer') }}</td><td class="r">{{ number_format($report->expected_cash ?? 0, 2) }}</td></tr>
         <tr><td>{{ __('pos.dc_counted_cash') }}</td><td class="r">{{ number_format($report->counted_cash, 2) }}</td></tr>
         <tr>
             <td class="b">{{ __('pos.dc_variance') }} {{ abs((float) $report->cash_variance) < 0.01 ? __('pos.dc_balanced') : ((float) $report->cash_variance < 0 ? __('pos.dc_short') : __('pos.dc_over')) }}</td>
             <td class="r b">{{ (float) $report->cash_variance > 0 ? '+' : '' }}{{ number_format($report->cash_variance, 2) }}</td>
         </tr>
+    </table>
+    <div class="hr"></div>
+    @endif
+
+    {{-- Task 541: rider section prints whenever there are rider rows OR a
+         nonzero cash figure — cash movements repeat here so they show even
+         when the optional cash reconciliation was skipped. --}}
+    @if(is_array($report->rider_summary) && (!empty($report->rider_summary['riders']) || ($report->rider_summary['cash_out'] ?? 0) > 0 || ($report->rider_summary['cash_in'] ?? 0) > 0))
+    <div class="sec">{{ __('pos.dc_delivery_riders') }}</div>
+    <table>
+        @foreach(($report->rider_summary['riders'] ?? []) as $rr)
+        <tr>
+            <td>{{ $rr['name'] ?? '-' }} ({{ $rr['deliveries'] ?? 0 }} {{ __('pos.dcp_del_word') }})</td>
+            <td class="r">{{ ($rr['cash_pending'] ?? 0) > 0 ? __('pos.dcp_owes') . ' ' . number_format($rr['cash_pending'], 2) : __('pos.dcp_clear') }}</td>
+        </tr>
+        @endforeach
+        @if($report->counted_cash === null)
+        @if(($report->rider_summary['cash_out'] ?? 0) > 0)
+        <tr><td>{{ __('pos.dc_rider_cash') }}</td><td class="r">-{{ number_format($report->rider_summary['cash_out'], 2) }}</td></tr>
+        @endif
+        @if(($report->rider_summary['cash_in'] ?? 0) > 0)
+        <tr><td>{{ __('pos.dc_rider_settlements_old') }}</td><td class="r">+{{ number_format($report->rider_summary['cash_in'], 2) }}</td></tr>
+        @endif
+        @endif
     </table>
     <div class="hr"></div>
     @endif

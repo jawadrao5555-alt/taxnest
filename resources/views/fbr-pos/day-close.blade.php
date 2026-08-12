@@ -410,6 +410,56 @@
         @endif
     </div>
 
+    {{-- Delivery Riders (Task 541 — FBR mirror of the PRA Jul 2026 card):
+         rider day detail stored on the closed report. --}}
+    {{-- Shown whenever the stored summary carries rider rows OR a nonzero
+         cash figure — a cash-in-only day (old bills settled today, no new
+         rider bills) must still surface the money movement. --}}
+    @if($existingReport && is_array($existingReport->rider_summary) && (!empty($existingReport->rider_summary['riders']) || ($existingReport->rider_summary['cash_out'] ?? 0) > 0 || ($existingReport->rider_summary['cash_in'] ?? 0) > 0))
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
+        <h3 class="font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.delivery_riders_day_summary') }}</h3>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">
+            {{ __('pos.rider_cash_summary_hint') }}
+        </p>
+        @if(!empty($existingReport->rider_summary['riders']))
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead>
+                    <tr class="text-left text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        <th class="px-3 py-2">{{ __('pos.role_rider') }}</th>
+                        <th class="px-3 py-2 text-center">{{ __('pos.th_deliveries') }}</th>
+                        <th class="px-3 py-2 text-center">{{ __('pos.th_delivered') }}</th>
+                        <th class="px-3 py-2 text-center">{{ __('pos.th_returned') }}</th>
+                        <th class="px-3 py-2 text-right">{{ __('pos.th_cash_bills') }}</th>
+                        <th class="px-3 py-2 text-right">{{ __('pos.th_unsettled_at_close') }}</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    @foreach($existingReport->rider_summary['riders'] as $rr)
+                    <tr>
+                        <td class="px-3 py-2 font-medium text-gray-900 dark:text-white">{{ $rr['name'] ?? '—' }}</td>
+                        <td class="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{{ $rr['deliveries'] ?? 0 }}</td>
+                        <td class="px-3 py-2 text-center text-emerald-600 dark:text-emerald-400">{{ $rr['delivered'] ?? 0 }}</td>
+                        <td class="px-3 py-2 text-center {{ ($rr['returned'] ?? 0) > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-400' }}">{{ $rr['returned'] ?? 0 }}</td>
+                        <td class="px-3 py-2 text-right text-gray-700 dark:text-gray-300">PKR {{ number_format($rr['cash_total'] ?? 0) }}</td>
+                        <td class="px-3 py-2 text-right font-semibold {{ ($rr['cash_pending'] ?? 0) > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400' }}">{{ ($rr['cash_pending'] ?? 0) > 0 ? 'PKR ' . number_format($rr['cash_pending']) : __('pos.clear_word') }}</td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+        @endif
+        <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs">
+            @if(($existingReport->rider_summary['cash_out'] ?? 0) > 0)
+            <span class="text-amber-700 dark:text-amber-400">{{ __('pos.with_rider_at_close') }} <b>− PKR {{ number_format($existingReport->rider_summary['cash_out'], 2) }}</b></span>
+            @endif
+            @if(($existingReport->rider_summary['cash_in'] ?? 0) > 0)
+            <span class="text-emerald-700 dark:text-emerald-400">{{ __('pos.old_bills_settled_today') }} <b>+ PKR {{ number_format($existingReport->rider_summary['cash_in'], 2) }}</b></span>
+            @endif
+        </div>
+    </div>
+    @endif
+
     @if(!$existingReport)
     {{-- 'Khud Final' policy notice (Aug 2026, PRA UX mirror): when auto-finalize is
          ON and pending local bills exist, warn the cashier BEFORE the close so the
@@ -435,8 +485,10 @@
 
             {{-- Cash reconciliation (optional, Z-report style): live variance preview via Alpine --}}
             <div class="mb-4 p-4 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+                 @php $rf = $riderFigures ?? ['active' => false, 'cash_out' => 0, 'cash_in' => 0, 'riders' => []]; @endphp
                  x-data="{ float: '', counted: '', cashSales: {{ (float) $stats->cash_amount }},
-                           get expected() { return (parseFloat(this.float) || 0) + this.cashSales; },
+                           riderOut: {{ (float) ($rf['cash_out'] ?? 0) }}, riderIn: {{ (float) ($rf['cash_in'] ?? 0) }},
+                           get expected() { return (parseFloat(this.float) || 0) + this.cashSales - this.riderOut + this.riderIn; },
                            get variance() { return this.counted === '' ? null : (parseFloat(this.counted) || 0) - this.expected; } }">
                 <p class="text-sm font-bold text-gray-900 dark:text-white mb-1">{{ __('pos.cash_reconciliation_optional') }}</p>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ __('pos.cash_recon_hint') }}</p>
@@ -454,6 +506,12 @@
                 </div>
                 <div class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
                     <span class="text-gray-600 dark:text-gray-400">{!! __('pos.cash_sales_today_line', ['amount' => number_format($stats->cash_amount, 2)]) !!}</span>
+                    @if(!empty($rf['active']) && ($rf['cash_out'] ?? 0) > 0)
+                    <span class="text-amber-700 dark:text-amber-400">{{ __('pos.with_rider_unsettled') }} <b>− PKR {{ number_format($rf['cash_out'], 2) }}</b></span>
+                    @endif
+                    @if(!empty($rf['active']) && ($rf['cash_in'] ?? 0) > 0)
+                    <span class="text-emerald-700 dark:text-emerald-400">{{ __('pos.rider_settlements_old_bills') }} <b>+ PKR {{ number_format($rf['cash_in'], 2) }}</b></span>
+                    @endif
                     <span class="text-gray-600 dark:text-gray-400">{{ __('pos.expected_in_drawer_label') }} <b class="text-gray-900 dark:text-white" x-text="'PKR ' + expected.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></b></span>
                     <template x-if="variance !== null">
                         <span class="font-bold" :class="Math.abs(variance) < 0.01 ? 'text-emerald-600' : (variance < 0 ? 'text-red-600' : 'text-amber-600')"

@@ -58,16 +58,53 @@ class TrustCloudflare
         //     appends the CF edge IP to X-Forwarded-For, and Laravel's
         //     trustProxies('*') then resolves ip() to the EDGE ip — so we must
         //     normalize X-Forwarded-For to the real client in this shape too.
-        if ($peer && $cfIp && filter_var($cfIp, FILTER_VALIDATE_IP)
-            && (self::isCloudflareIp($peer) || $peer === $cfIp)) {
+        $cloudflareShape = $peer && $cfIp && filter_var($cfIp, FILTER_VALIDATE_IP)
+            && (self::isCloudflareIp($peer) || $peer === $cfIp);
+
+        if ($cloudflareShape) {
             $request->server->set('REMOTE_ADDR', $cfIp);
             // Normalize XFF so Symfony's trusted-proxy resolution can only
             // ever yield the true client IP (kills the appended-edge-IP form
-            // "client, edge" that otherwise wins under trustProxies('*')).
+            // "client, edge" that otherwise wins under trusted proxies).
             $request->headers->set('X-Forwarded-For', $cfIp);
         }
 
+        // ── Forwarded-header trust boundary ─────────────────────────────
+        // No upstream we use (Cloudflare, cPanel Apache, Replit dev proxy)
+        // needs X-Forwarded-Host/Port/Prefix — the Host header arrives
+        // correct on every path. A direct-origin caller could otherwise
+        // forge these to poison generated absolute/signed URLs, so drop
+        // them unconditionally BEFORE Laravel's TrustProxies consumes them.
+        $request->headers->remove('X-Forwarded-Host');
+        $request->headers->remove('X-Forwarded-Port');
+        $request->headers->remove('X-Forwarded-Prefix');
+
+        // X-Forwarded-Proto is required from exactly two upstreams:
+        // Cloudflare (verified shape above) and the local dev preview proxy
+        // (loopback/private peer). From any other (public, non-CF) peer it
+        // is attacker-supplied — drop it (and the now-untrusted XFF) so the
+        // scheme derives from the actual connection.
+        if (! $cloudflareShape && ! self::isPrivateOrLoopback($peer)) {
+            $request->headers->remove('X-Forwarded-Proto');
+            $request->headers->remove('X-Forwarded-For');
+        }
+
         return $next($request);
+    }
+
+    private static function isPrivateOrLoopback(?string $ip): bool
+    {
+        if (! $ip || filter_var($ip, FILTER_VALIDATE_IP) === false) {
+            return false;
+        }
+
+        // Public IP validates under NO_PRIV_RANGE|NO_RES_RANGE; private,
+        // loopback and reserved ranges fail it.
+        return filter_var(
+            $ip,
+            FILTER_VALIDATE_IP,
+            FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+        ) === false;
     }
 
     public static function isCloudflareIp(string $ip): bool

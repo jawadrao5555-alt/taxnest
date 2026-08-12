@@ -22,17 +22,17 @@ return Application::configure(basePath: dirname(__DIR__))
         // host's remoteip layer already restored it — spoof-safe either way).
         // Must run BEFORE TrustProxies / everything else.
         $middleware->prepend(\App\Http\Middleware\TrustCloudflare::class);
-        // Trust proxies for PROTO/HOST/PORT/PREFIX only — deliberately NOT
-        // X-Forwarded-For. Client IP must come from REMOTE_ADDR alone:
-        // TrustCloudflare sets it for Cloudflare traffic, and a direct-origin
-        // caller can no longer spoof ip() (throttle keys, audit logs) with a
-        // forged X-Forwarded-For header. X-Forwarded-Proto stays trusted so
-        // secure cookies keep working behind the dev preview proxy.
+        // Trust proxies for PROTO only — deliberately NOT X-Forwarded-For/
+        // Host/Port/Prefix. Client IP must come from REMOTE_ADDR alone
+        // (TrustCloudflare sets it for Cloudflare traffic), and host/port/
+        // prefix always derive from the real Host header / connection, so a
+        // direct-origin caller cannot poison ip(), generated absolute URLs,
+        // or signed URLs with forged forwarded headers. TrustCloudflare
+        // additionally strips X-Forwarded-Proto from public non-Cloudflare
+        // peers, so proto trust effectively covers only Cloudflare and the
+        // local dev preview proxy (which needs it for secure cookies).
         $middleware->trustProxies(at: '*', headers:
             \Illuminate\Http\Request::HEADER_X_FORWARDED_PROTO
-            | \Illuminate\Http\Request::HEADER_X_FORWARDED_HOST
-            | \Illuminate\Http\Request::HEADER_X_FORWARDED_PORT
-            | \Illuminate\Http\Request::HEADER_X_FORWARDED_PREFIX
         );
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
         // Slow-request telemetry: near-zero overhead on fast requests; logs

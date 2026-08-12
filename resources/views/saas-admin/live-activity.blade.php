@@ -4,7 +4,7 @@
         <h1 class="text-2xl font-bold text-white">Live Activity</h1>
         <span class="text-xs text-gray-500">Auto-refresh 60s &middot; {{ now()->format('h:i A') }}</span>
     </div>
-    <p class="text-sm text-gray-400 mb-6">POS dukanein — kaun abhi online hai aur aaj ({{ \Illuminate\Support\Carbon::parse($bizDate)->format('d M Y') }}, business day) kitni billing hui.</p>
+    <p class="text-sm text-gray-400 mb-6">POS shops — who is online right now and today's billing ({{ \Illuminate\Support\Carbon::parse($bizDate)->format('d M Y') }}, business day).</p>
 
     {{-- Summary tiles --}}
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
@@ -89,13 +89,13 @@
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">Koi POS company nahi mili.</td></tr>
+                    <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">No POS companies found.</td></tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
         <div class="px-5 py-3 border-t border-gray-800 text-[11px] text-gray-500">
-            Online = pichhle ~5 minute mein staff activity (heartbeat). PRA / Local = aaj ke bills ka breakdown (PRA-submitted / local ya NULL / baqi pending-offline-failed).
+            Online = staff activity within the last ~5 minutes (heartbeat). PRA / Local = today's bill breakdown (PRA-submitted / local or NULL / remaining pending-offline-failed).
         </div>
     </div>
 </div>

@@ -3137,8 +3137,13 @@ class PosController extends Controller
                     $q->where(function ($qa) {
                         $qa->whereNotNull('rider_id')
                             ->where(function ($qb) {
-                                // Abhi raste mein…
-                                $qb->whereIn('delivery_status', ['assigned', 'dispatched'])
+                                // Abhi raste mein… (Task 523: settle_all in
+                                // statuses ko bhi settle kar deta hai —
+                                // settled bill popup se ghayab, FBR fix mirror)
+                                $qb->where(function ($q1) {
+                                        $q1->whereIn('delivery_status', ['assigned', 'dispatched'])
+                                           ->whereNull('rider_settlement_id');
+                                    })
                                     // …ya deliver ho gaya par cash abhi rider ke paas.
                                     ->orWhere(function ($q2) {
                                         $q2->where('delivery_status', 'delivered')

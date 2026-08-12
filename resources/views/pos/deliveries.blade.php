@@ -449,13 +449,17 @@
          badge/count mein shamil NAHIN. Assign yahin se ho sakta hai (same
          pos.deliveries.assign form as the main table; koi naya path nahi). --}}
     @if($activeTab === 'pending' && ($oldUnassigned ?? collect())->count())
-    <div class="mt-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden" x-data="{ showOldDel: false }">
+    {{-- Task 536: search se auto-expand — script neeche CustomEvent bhejta hai. --}}
+    <div class="mt-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden" x-data="{ showOldDel: false }" @tn-open-olddel.window="showOldDel = true">
         <button type="button" @click="showOldDel = !showOldDel"
                 class="w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition">
             <span class="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
                 <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0" :class="showOldDel ? 'rotate-90' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                 {{ __('pos.old_del_section') }}
                 <span class="px-1.5 py-0.5 rounded-full text-[11px] font-extrabold bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">{{ $oldUnassigned->count() }}</span>
+                {{-- Task 536: search hone par yahan match ginti dikhti hai (main #del-count
+                     ko inflate kiye baghair). --}}
+                <span id="del-old-hits" style="display:none" class="px-1.5 py-0.5 rounded-full text-[11px] font-extrabold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300"></span>
             </span>
             <span class="hidden sm:inline text-[11px] text-gray-400 truncate">{{ __('pos.old_del_hint') }}</span>
         </button>
@@ -473,7 +477,9 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                     @foreach($oldUnassigned as $b)
-                    <tr>
+                    {{-- Task 536: data-oldrow (data-delrow NAHIN — main count alag rahe) + same
+                         data-search recipe as the main table so the one search box filters both. --}}
+                    <tr data-oldrow data-search="{{ Str::lower(($b->invoice_number ?: ('#' . $b->id)) . ' ' . ($b->customer_name ?? '') . ' ' . ($b->customer_phone ?? '') . ' ' . ($b->delivery_address ?? '') . ' ' . ($b->isLocalBill() ? 'local' : 'pra')) }}">
                         <td class="px-4 py-3">
                             <div class="font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5 flex-wrap">
                                 <span>{{ $b->invoice_number ?: ('#' . $b->id) }}</span>
@@ -512,6 +518,7 @@
                         </td>
                     </tr>
                     @endforeach
+                    <tr id="del-old-search-empty" style="display:none"><td colspan="6" class="px-4 py-6 text-center text-sm text-gray-400">{{ __('pos.del_no_match') }}</td></tr>
                 </tbody>
             </table>
         </div>
@@ -524,6 +531,8 @@
     if (!inp) return;
     var emptyRow = document.getElementById('del-search-empty');
     var cnt = document.getElementById('del-count');
+    var oldHits = document.getElementById('del-old-hits');
+    var oldEmpty = document.getElementById('del-old-search-empty');
     inp.addEventListener('input', function () {
         var q = inp.value.trim().toLowerCase(), shown = 0;
         document.querySelectorAll('tr[data-delrow]').forEach(function (tr) {
@@ -533,6 +542,23 @@
         });
         if (emptyRow) emptyRow.style.display = shown === 0 ? '' : 'none';
         if (cnt) cnt.textContent = shown;
+        // Task 536: purani-deliveries section ke rows bhi filter hon. Alag counter —
+        // main #del-count purane matches se inflate NAHIN hota. Match milne par
+        // section Alpine event se auto-khul jata hai aur header par match-ginti chip.
+        var oldRows = document.querySelectorAll('tr[data-oldrow]'), oldShown = 0;
+        oldRows.forEach(function (tr) {
+            var hit = !q || (tr.getAttribute('data-search') || '').indexOf(q) !== -1;
+            tr.style.display = hit ? '' : 'none';
+            if (hit) oldShown++;
+        });
+        if (oldRows.length) {
+            if (oldHits) {
+                oldHits.style.display = q ? '' : 'none';
+                oldHits.textContent = q ? ('\u2192 ' + oldShown) : '';
+            }
+            if (oldEmpty) oldEmpty.style.display = (q && oldShown === 0) ? '' : 'none';
+            if (q && oldShown > 0) window.dispatchEvent(new CustomEvent('tn-open-olddel'));
+        }
     });
 })();
 </script>

@@ -1059,6 +1059,7 @@ return [
     'delivery_prepaid_toggle' => 'گاہک نے پہلے ادائیگی کر دی (آن لائن)',
     'delivery_prepaid_active_hint' => 'بل آن لائن / QR پیمنٹ کے طور پر محفوظ ہوگا',
     'delivery_print_receipt' => 'رسید بھی پرنٹ کریں (ڈیفالٹ: نہیں — کسٹمر کاؤنٹر پر نہیں)',
+    'final_print_receipt' => 'رسید پرنٹ کریں (نشان ہٹائیں = کاغذ بچائیں، صرف اس بل کے لیے)',
     'delivery_riders' => 'ڈیلیوری رائیڈرز',
     'delivery_riders_day_summary' => 'ڈیلیوری رائیڈرز — دن کا خلاصہ',
     'delivery_status_assigned' => 'اسائنڈ',

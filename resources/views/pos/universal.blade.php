@@ -1581,11 +1581,11 @@ window.addEventListener('popstate', function() {
                          The PAY (F8) button below keeps the Pay modal (method choice + note).
                          Failures surface via showToast (modal-independent). --}}
                     <div class="grid grid-cols-2 gap-2">
-                        <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 0; processPayment('cash')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
+                        <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 0; payPrintReceipt = billPrintDefault(orderType); processPayment('cash')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
                             <span class="flex items-center gap-1.5 text-xs font-extrabold leading-none"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>CASH</span>
                             <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(cartTotalForMethod('cash')).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+1</kbd></span>
                         </button>
-                        <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 1; processPayment('card')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-gray-700 hover:bg-gray-800 dark:bg-gray-600 dark:hover:bg-gray-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
+                        <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 1; payPrintReceipt = billPrintDefault(orderType); processPayment('card')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-gray-700 hover:bg-gray-800 dark:bg-gray-600 dark:hover:bg-gray-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
                             <span class="flex items-center gap-1.5 text-xs font-extrabold leading-none"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>CARD</span>
                             <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(cartTotalForMethod('card')).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+2</kbd></span>
                         </button>
@@ -1743,7 +1743,7 @@ window.addEventListener('popstate', function() {
          (ESC / click-away / Cancel). Without this a cancelled held-order payment left the
          stale id behind and the NEXT normal cart sale silently routed to payHeldOrderDirect
          for that old held order (processPayment checks payingHeldOrderId first). --}}
-    <div x-show="showPayModal" x-cloak x-transition.opacity x-effect="if (showPayModal) { submitting = false; saveAsProvisional = false; payMethodIndex = (payPreselect === 1 ? 1 : 0); payPreselect = null; cashReceived = ''; } else if (!submitting) { payingHeldOrderId = null; }" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false">
+    <div x-show="showPayModal" x-cloak x-transition.opacity x-effect="if (showPayModal) { submitting = false; saveAsProvisional = false; payMethodIndex = (payPreselect === 1 ? 1 : 0); payPreselect = null; cashReceived = ''; payPrintReceipt = billPrintDefault(payModalOrderType()); } else if (!submitting) { payingHeldOrderId = null; payPrintReceipt = billPrintDefault(orderType); }" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
             <div class="p-5 text-center border-b border-gray-100 dark:border-gray-800">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ __('pos.payment') }}</h3>
@@ -1815,6 +1815,14 @@ window.addEventListener('popstate', function() {
                     autocomplete="off" name="pos_bill_note_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                     placeholder="{{ __('pos.ph_bill_note_multi') }}"
                     class="w-full text-xs bg-amber-50/60 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-lg px-2.5 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-amber-400 placeholder-gray-400 resize-y"></textarea>
+            </div>
+            {{-- Task 514: per-bill receipt auto-print choice (default = company setting;
+                 unticked = SIRF is bill ki receipt auto-print skip — KOT/PRA/popup untouched). --}}
+            <div class="px-4 pb-1" @click.stop>
+                <label class="flex items-center gap-2 text-[11px] text-gray-600 dark:text-gray-300 cursor-pointer select-none">
+                    <input type="checkbox" x-model="payPrintReceipt" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                    <span>{{ __('pos.final_print_receipt') }}</span>
+                </label>
             </div>
             <div class="px-4 pb-0.5">
                 <p class="text-center text-[10px] text-gray-400 dark:text-gray-500 font-medium">{{ __('pos.use_word') }} <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&larr;</kbd> <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&rarr;</kbd> to choose &middot; <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">Enter</kbd> to confirm</p>
@@ -1984,6 +1992,16 @@ window.addEventListener('popstate', function() {
                     <button @click="boardFinalPay('card')" :disabled="boardBusy" class="py-4 rounded-xl text-center border-2 transition disabled:opacity-50 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 hover:border-blue-400">
                         <p class="text-sm font-black text-blue-700 dark:text-blue-300">CARD</p>
                     </button>
+                </div>
+                {{-- Task 514 (Zahid Irfan, 12 Aug 2026): PER-BILL receipt print choice —
+                     default company setting se aata hai (dine-in → print_on_pay_dinein),
+                     cashier is EK bill ke liye override kar sakta hai. Sirf receipt
+                     AUTO-print skip hoti hai; KOT/PRA/popup/manual print untouched. --}}
+                <div class="px-4 pb-2">
+                    <label class="flex items-center gap-2 text-[11px] text-gray-600 dark:text-gray-300 cursor-pointer select-none">
+                        <input type="checkbox" x-model="boardPrintReceipt" class="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500">
+                        <span>{{ __('pos.final_print_receipt') }}</span>
+                    </label>
                 </div>
                 <div class="px-4 pb-4">
                     <button @click="boardConfirm = null" :disabled="boardBusy" class="w-full py-2 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 transition" x-text="boardBusy ? window.TXT.bill_creating : window.TXT.cancel_go_back"></button>
@@ -3951,6 +3969,13 @@ function restaurantPos() {
         // OFF = payment par dine-in ka final bill khud print NAHI hota (proof bill
         // pehle diya ja chuka hota hai). KOT logic + manual print untouched.
         dineinAutoPrint: {{ ($company->print_on_pay_dinein ?? true) ? 'true' : 'false' }},
+        // Task 514 (Zahid Irfan, 12 Aug 2026): PER-BILL receipt auto-print choice.
+        // Checkbox default = company setting (dine-in → print_on_pay_dinein, warna
+        // print_on_pay); cashier ek EK bill ke liye override karta hai. Sirf receipt
+        // AUTO-print skip hoti hai — KOT, PRA submission, receipt popup, manual print
+        // sab untouched (skipReceipt runAutoPrintChain + offline path dono se guzarta hai).
+        boardPrintReceipt: true,   // Table Board FINAL confirm modal ka checkbox
+        payPrintReceipt: true,     // Pay modal + one-tap CASH/CARD ka checkbox
         // Phase 5+ — Auto-print kitchen ticket on successful sale (mirrors companies.auto_print_kot)
         autoKotEnabled: {{ ($company->auto_print_kot ?? false) ? 'true' : 'false' }},
         // Silent printer routing via Desktop Sync Agent (companies.pos_printer_settings).
@@ -4434,7 +4459,7 @@ function restaurantPos() {
         // Queue a bill that could NOT reach the server (no internet). Mirrors the
         // success UX: receipt popup (offline variant) + optional auto-print of a
         // client-rendered interim receipt, cart cleared so billing continues.
-        async queueOfflineBill(payload, method, savedTotal) {
+        async queueOfflineBill(payload, method, savedTotal, skipReceipt = false) {
             // REUSE the uuid already attached by processPaymentManual (it rode on
             // the failed online attempt too) — minting a fresh one here would
             // reopen the lost-response duplicate window. Fallback only if absent.
@@ -4485,7 +4510,9 @@ function restaurantPos() {
             this.showReceipt = true;
             this.scheduleReceiptAutoClose();
             this.showToast(window.TXT.offline_bill_saved_will_sync, 'success');
-            if (this.autoPrintEnabled && !(this.orderType === 'dine_in' && !this.dineinAutoPrint)) {
+            // Task 514: per-bill checkbox offline path par bhi lago — unticked =
+            // is bill ki offline receipt bhi auto-print nahi hoti.
+            if (!skipReceipt && this.autoPrintEnabled && !(this.orderType === 'dine_in' && !this.dineinAutoPrint)) {
                 setTimeout(() => this.printOfflineReceipt(), 400);
             }
             this.clearCart();
@@ -5718,6 +5745,9 @@ function restaurantPos() {
                 this.payingHeldOrderId = null;
                 this.saveAsProvisional = false;
                 this.payMethodIndex = oneTapCard ? 1 : 0;
+                // Task 514: one-tap = no checkbox choice — company default, kabhi
+                // pichhle (cancel kiye) Pay modal ka stale untick inherit na ho.
+                this.payPrintReceipt = this.billPrintDefault(this.orderType);
                 this.processPayment(oneTapCard ? 'card' : 'cash');
                 return;
             }
@@ -6652,6 +6682,9 @@ function restaurantPos() {
             const t = this.boardMenuTable;
             if (!t || !t.order) return;
             this.boardMenuTable = null;
+            // Task 514: per-bill print checkbox ka default company setting se
+            // (tile ki apni order_type ke hisaab se) — har bill par fresh reset.
+            this.boardPrintReceipt = this.billPrintDefault(t.order.order_type || 'dine_in');
             this.boardConfirm = { table: t };
         },
         // FINAL — step 2 (CASH/CARD chosen): waiter orders claim FIRST, then the
@@ -6677,7 +6710,7 @@ function restaurantPos() {
                     }
                     orderId = (data.order && data.order.id) || orderId;
                 }
-                await this.payHeldOrderDirect(orderId, method, null, false, t.order.order_type || 'dine_in');
+                await this.payHeldOrderDirect(orderId, method, null, false, t.order.order_type || 'dine_in', !this.boardPrintReceipt);
                 this.boardConfirm = null;
                 this.loadTableStatus();
                 if (this.isRestaurantMode) this.loadIncoming();
@@ -7345,6 +7378,9 @@ function restaurantPos() {
             }
             this.saveAsProvisional = true;
             this.showPayModal = false;
+            // Task 514: direct provisional save = no checkbox surface — company
+            // default use karo, stale per-bill untick inherit na ho.
+            this.payPrintReceipt = this.billPrintDefault(this.orderType);
             await this.processPayment('cash');
         },
 
@@ -7363,6 +7399,9 @@ function restaurantPos() {
             // Capture provisional flag once at submission start so a stray
             // re-render/checkbox toggle mid-flight cannot flip the path.
             const provisional = !!this.saveAsProvisional;
+            // Task 514: per-bill receipt print choice snapshot (checkbox unticked =
+            // skip SIRF is bill ki receipt auto-print; KOT/PRA/popup untouched).
+            const skipReceipt = !this.payPrintReceipt;
 
             // Task 287 — Delivery Prepaid: override the method to qr_payment on ALL
             // paths (held-order pay, manual/direct, restaurant hold→pay, offline queue)
@@ -7375,7 +7414,7 @@ function restaurantPos() {
 
             if (this.payingHeldOrderId) {
                 this.submitting = true; this.stockError = '';
-                const paidHeld = await this.payHeldOrderDirect(this.payingHeldOrderId, method, null, provisional);
+                const paidHeld = await this.payHeldOrderDirect(this.payingHeldOrderId, method, null, provisional, null, skipReceipt);
                 this.submitting = false;
                 if (!paidHeld) {
                     // Pay failed (stock / already paid / quota) — the order is still
@@ -7414,7 +7453,7 @@ function restaurantPos() {
                 return;
             }
             if (!this.isRestaurantMode || this.hasManualItems() || this.hasDealItems() || this.incomingOrderId) {
-                return await this.processPaymentManual(method, provisional);
+                return await this.processPaymentManual(method, provisional, skipReceipt);
             }
 
             const now = Date.now();
@@ -7446,7 +7485,7 @@ function restaurantPos() {
                 const holdData = await holdRes.json();
                 if (!holdData.success) { this.showToast(holdData.message || window.TXT.failed_word, 'error'); this.submitting = false; return; }
                 const savedTotal = this.totalAmount;
-                const paid = await this.payHeldOrderDirect(holdData.order.id, method, savedTotal, provisional);
+                const paid = await this.payHeldOrderDirect(holdData.order.id, method, savedTotal, provisional, null, skipReceipt);
                 if (!paid) {
                     // Pay failed — KEEP the cart for instant retry and remember the
                     // freshly-created held order so the next Pay REUSES it via
@@ -7474,7 +7513,7 @@ function restaurantPos() {
         // master-product in resolveItemExemptions). Returns JSON when
         // wantsJson() — same shape used by payHeldOrderDirect for receipt
         // modal rendering.
-        async processPaymentManual(method, provisional = false) {
+        async processPaymentManual(method, provisional = false, skipReceipt = false) {
             const now = Date.now();
             // Same debounce toast as processPayment — one-tap must never look dead.
             if (now - this.lastPayTime < 3000) { this.showToast(window.TXT.wait_prev_bill_saved, 'error'); return; }
@@ -7535,7 +7574,7 @@ function restaurantPos() {
                     return;
                 }
                 if (!navigator.onLine) {
-                    await this.queueOfflineBill(payload, method, savedTotal);
+                    await this.queueOfflineBill(payload, method, savedTotal, skipReceipt);
                     this.showPayModal = false;
                     this.submitting = false;
                     this.saveAsProvisional = false;
@@ -7563,7 +7602,7 @@ function restaurantPos() {
                         this.submitting = false;
                         return;
                     }
-                    await this.queueOfflineBill(payload, method, savedTotal);
+                    await this.queueOfflineBill(payload, method, savedTotal, skipReceipt);
                     this.showPayModal = false;
                     this.submitting = false;
                     this.saveAsProvisional = false;
@@ -7582,7 +7621,7 @@ function restaurantPos() {
                         this.submitting = false;
                         if (confirm(window.TXT.quota_provisional_prompt || msg)) {
                             this.lastPayTime = 0; // bypass the 3s double-tap debounce for this deliberate retry
-                            return await this.processPaymentManual(method, true);
+                            return await this.processPaymentManual(method, true, skipReceipt);
                         }
                     }
                     this.showToast(msg, 'error');
@@ -7620,7 +7659,7 @@ function restaurantPos() {
                 const txnKotId = (this.isRestaurantMode && this.orderType === 'delivery' && !this.incomingOrderId && !kotHeldForPayment)
                     ? (data.transaction_id || null) : null;
                 if (kotHeldForPayment) this.showToast(window.TXT.kot_held_until_payment, 'info');
-                this.runAutoPrintChain(null, this.orderType, txnKotId);
+                this.runAutoPrintChain(null, this.orderType, txnKotId, skipReceipt);
                 // P7: settle the linked waiter order (atomic server-side claim) —
                 // frees the table and clears it from every cashier's Incoming list.
                 // FINAL bills only: a provisional is editable/deletable, so it must
@@ -8081,7 +8120,21 @@ function restaurantPos() {
         //
         // ✅ FIX (May-07): Tightened gap between receipt-finish → KOT-start (300ms → 80ms)
         // and initial chain start (400ms → 150ms) to feel snappier on thermal printers.
-        runAutoPrintChain(orderId, orderType = null, txnKotId = null) {
+        // Task 514: per-bill checkbox ka default — company setting ka mirror
+        // (dine-in par print_on_pay_dinein, warna print_on_pay).
+        billPrintDefault(orderType = null) {
+            return !!this.autoPrintEnabled && !((orderType === 'dine_in') && !this.dineinAutoPrint);
+        },
+        // Pay modal ke checkbox ka default order-type: held-order pay par us order
+        // ki apni type (widget se nahi), warna current order-type widget.
+        payModalOrderType() {
+            const held = this.payingHeldOrderId ? this.heldOrders.find(o => o.id === this.payingHeldOrderId) : null;
+            return (held && held.order_type) || this.orderType || null;
+        },
+        // skipReceiptOverride (Task 514): cashier ne per-bill "Receipt print karein"
+        // checkbox UNTICK kiya — SIRF is bill ki receipt auto-print skip; KOT gate
+        // (wantsKot) aur baaki chain waise hi chalti hai.
+        runAutoPrintChain(orderId, orderType = null, txnKotId = null, skipReceiptOverride = false) {
             // MASTER GATE — auto-print OFF means NOTHING fires automatically.
             // Telemetry (Task #63): silent-print shops expect paper on every sale —
             // record WHY the chain did nothing so a "bill never printed" report is
@@ -8105,7 +8158,7 @@ function restaurantPos() {
             // txnKotId (ZFC 28 Jul 2026): order-less delivery bills (provisional
             // rider khata / manual-cart finals) KOT from the TRANSACTION instead.
             const wantsKot = !!this.autoKotEnabled && (!!orderId || !!txnKotId) && orderType !== 'dine_in' && !this.kdsHandlesKot();
-            const wantsReceipt = hasReceipt && !dineinSkipReceipt;
+            const wantsReceipt = hasReceipt && !dineinSkipReceipt && !skipReceiptOverride;
             // KOT delta = ALWAYS in the auto chain (owner, Jul 2026): the kitchen
             // already has every line that printed at hold / waiter-send / recall —
             // auto-KOT at pay must fire ONLY still-unprinted rows (fresh takeaway
@@ -8587,7 +8640,7 @@ function restaurantPos() {
             } catch (e) { console.error('Delete held order error:', e); this.showToast(window.TXT.error_deleting_order, 'error'); }
         },
 
-        async payHeldOrderDirect(orderId, method, savedTotal, provisional = false, orderTypeOverride = null) {
+        async payHeldOrderDirect(orderId, method, savedTotal, provisional = false, orderTypeOverride = null, skipReceipt = false) {
             // Order type captured NOW (owner, Jul 2026): held-modal pays read it from
             // the heldOrders entry (removed from the list on success below); billing
             // pass-through orders are never in heldOrders → falls back to the current
@@ -8619,7 +8672,7 @@ function restaurantPos() {
                     // offer a one-click provisional settle instead of a dead-end error.
                     if (res.status === 403 && errData && errData.quota_full && errData.provisional_allowed && !provisional) {
                         if (confirm(window.TXT.quota_provisional_prompt || errData.message)) {
-                            return await this.payHeldOrderDirect(orderId, method, savedTotal, true, orderTypeOverride);
+                            return await this.payHeldOrderDirect(orderId, method, savedTotal, true, orderTypeOverride, skipReceipt);
                         }
                     }
                     this.showToast((errData && errData.message) || ('Payment failed (HTTP ' + res.status + ') — F12 console'), 'error');
@@ -8641,7 +8694,7 @@ function restaurantPos() {
                     // Uses postMessage-chained engine — KOT never fires before the receipt
                     // print dialog is dismissed (was a race in the old setTimeout(200/1800) impl
                     // on slow networks where KOT iframe loaded before receipt iframe).
-                    this.runAutoPrintChain(orderId, payOrderType);
+                    this.runAutoPrintChain(orderId, payOrderType, null, skipReceipt);
                     // Refresh provisional badge count when this save was provisional.
                     if (provisional) { this.loadLocalBills(); }
                     // Refresh failed badge so cashier sees pending/failed state in real time.

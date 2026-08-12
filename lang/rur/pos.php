@@ -1059,6 +1059,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'delivery_prepaid_toggle' => 'Customer ne pehle pay kar diya (Online)',
     'delivery_prepaid_active_hint' => 'Bill Online / QR payment ke tor par save hoga',
     'delivery_print_receipt' => 'Receipt bhi print karein (Default: Nahi — customer counter par nahi)',
+    'final_print_receipt' => 'Receipt print karein (untick = kaghaz bachayen, sirf is bill ke liye)',
     'delivery_riders' => 'Delivery Riders',
     'delivery_riders_day_summary' => 'Delivery Riders — din ka summary',
     'delivery_status_assigned' => 'Assigned',

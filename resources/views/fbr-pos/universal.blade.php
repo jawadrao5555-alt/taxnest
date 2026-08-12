@@ -1868,9 +1868,9 @@ window.addEventListener('popstate', function() {
     {{-- PENDING DELIVERIES panel (Task 122 — FBR port of PRA Task 114).        --}}
     {{-- TODAY's (business day) delivery provisionals — payment aate hi ek      --}}
     {{-- click Final (Cash/Card) via the SAME promote path as F10 Make Final.  --}}
-    {{-- Receipt print = opt-in checkbox (default NO). FBR POS has no riders   --}}
-    {{-- — rider-khata warning/settle from the PRA panel is intentionally      --}}
-    {{-- absent here (API mirrors the fields as null/false).                   --}}
+    {{-- Receipt print = opt-in checkbox (default NO). Task 517: UNASSIGNED    --}}
+    {{-- final delivery bills bhi listed with an inline rider dropdown (POST   --}}
+    {{-- fbrpos.deliveries.assign) — rider-khata warning/settle stays absent.  --}}
     {{-- ─────────────────────────────────────────────────────────────────────── --}}
     <div x-show="showPendingDeliveries" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPendingDeliveries = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden" x-transition.scale.90>
@@ -1912,6 +1912,13 @@ window.addEventListener('popstate', function() {
                                 <template x-if="bill.order_type === 'delivery'">
                                     <span class="text-[9px] bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide" x-text="window.TXT.delivery"></span>
                                 </template>
+                                <template x-if="bill.is_final">
+                                    <span class="text-[9px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">{{ __('pos.final_word') }}</span>
+                                </template>
+                                {{-- Task 517: unassigned final delivery bill — rider abhi tak nahi laga --}}
+                                <template x-if="bill.is_final && !bill.rider_id">
+                                    <span class="text-[9px] bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 px-2 py-0.5 rounded-full font-bold">{{ __('pos.del_status_unassigned') }}</span>
+                                </template>
                             </div>
                             <span class="text-sm font-bold text-amber-700 dark:text-amber-400" x-text="'Rs. ' + Number(bill.total_amount).toLocaleString()"></span>
                         </div>
@@ -1931,6 +1938,29 @@ window.addEventListener('popstate', function() {
                             </p>
                         </template>
                         <p class="text-[11px] text-gray-500 mb-2" x-text="bill.items_count + window.TXT.sfx_item_s_dot + (bill.created_time || bill.created_human)"></p>
+                        {{-- Task 517: UNASSIGNED final delivery bill — rider dropdown yahin se
+                             (POST fbrpos.deliveries.assign, same backend as the Deliveries board).
+                             Renders only when the API's can_assign_rider allows (plan gate +
+                             Delivery feature + custom-access verdict, mirrored server-side). --}}
+                        <template x-if="bill.is_final && !bill.rider_id && canAssignRider && deliveryRiders.length > 0">
+                            <div class="mb-2 flex items-center gap-2">
+                                <svg class="w-4 h-4 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 11-4 0m10 0a2 2 0 104 0"/></svg>
+                                <select @change="assignRider(bill, $event.target.value); $event.target.value = ''"
+                                        :disabled="riderAssignBusyId"
+                                        class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1.5 focus:ring-teal-500 focus:border-teal-500 disabled:opacity-50">
+                                    <option value="">{{ __('pos.no_rider_opt') }}</option>
+                                    <template x-for="r in deliveryRiders" :key="r.id">
+                                        <option :value="r.id" x-text="r.name"></option>
+                                    </template>
+                                </select>
+                                <template x-if="riderAssignBusyId === bill.id">
+                                    <svg class="w-4 h-4 animate-spin text-teal-500 shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                </template>
+                            </div>
+                        </template>
+                        {{-- PROVISIONAL bill: Final Cash/Card (promote path). FINAL bills
+                             par yeh buttons render hi nahi hote — promote unpar kabhi nahi. --}}
+                        <template x-if="!bill.is_final">
                         <div class="flex gap-2">
                             <button @click="finalizeDelivery(bill, 'cash')" :disabled="deliveryFinalBusyId" class="flex-1 py-2.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50">
                                 <template x-if="deliveryFinalBusyId === bill.id"><svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg></template>
@@ -1942,6 +1972,7 @@ window.addEventListener('popstate', function() {
                                 {{ __('pos.final_card') }}
                             </button>
                         </div>
+                        </template>
                     </div>
                 </template>
             </div>
@@ -2828,6 +2859,12 @@ function restaurantPos() {
         showPendingDeliveries: false,
         bizToday: '',
         deliveryFinalBusyId: null,
+        // Task 517 (FBR port of PRA Task 513): UNASSIGNED final delivery bills
+        // + rider dropdown right in the popup (POST fbrpos.deliveries.assign).
+        finalDeliveryBills: [],
+        deliveryRiders: [],
+        canAssignRider: false,
+        riderAssignBusyId: null,
         // Receipt print default = NO (delivery customer isn't at the counter).
         // Opt-in checkbox persisted per device.
         deliveryPrintReceipt: (function(){ try { return localStorage.getItem('fbrpos_delivery_final_print') === '1'; } catch(e) { return false; } })(),
@@ -5954,6 +5991,10 @@ function restaurantPos() {
                 if (data && data.success) {
                     this.localPinRequired = false;
                     this.localBills = data.bills || [];
+                    // Task 517: unassigned final deliveries + riders for the popup dropdown.
+                    this.finalDeliveryBills = data.final_deliveries || [];
+                    this.deliveryRiders = data.riders || [];
+                    this.canAssignRider = !!data.can_assign_rider;
                     if (data.business_today) this.bizToday = data.business_today;
                     if (this.activeLocalIndex >= this.filteredLocalBills().length) {
                         this.activeLocalIndex = Math.max(0, this.filteredLocalBills().length - 1);
@@ -5999,12 +6040,42 @@ function restaurantPos() {
         // created_at's date when business_date is missing, so old confidential
         // provisionals never flood the badge.
         pendingDeliveryBills() {
-            return this.localBills.filter(b => (b.order_type == null || b.order_type === 'delivery')
+            const prov = this.localBills.filter(b => (b.order_type == null || b.order_type === 'delivery')
                 && (!this.bizToday || !b.business_date || b.business_date === this.bizToday));
+            // Task 517: UNASSIGNED final delivery bills ride the 7-din server
+            // window like the Deliveries board — today-filter unpar nahi lagta,
+            // warna kal ka bina-rider bill popup se ghayab ho jata.
+            const finals = (this.finalDeliveryBills || []).filter(b => !b.rider_id && !b.delivery_status);
+            return [...prov, ...finals];
         },
         openPendingDeliveries() {
             this.showPendingDeliveries = true;
             this.loadLocalBills();
+        },
+        // ─── Rider assign from the panel (Task 517 — FBR port of PRA Task 513) ─
+        // UNASSIGNED final delivery bill par dropdown se rider chuno — reuses
+        // POST /fbr-pos/deliveries/{id}/assign (same backend as the Deliveries
+        // board; koi naya path nahi). Success = list refresh.
+        async assignRider(bill, riderId) {
+            if (!bill || !riderId || this.riderAssignBusyId) return;
+            this.riderAssignBusyId = bill.id;
+            try {
+                const res = await fetch('{{ url('/fbr-pos/deliveries') }}/' + bill.id + '/assign', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ rider_id: riderId }),
+                });
+                const data = await res.json().catch(() => null);
+                if (res.ok && data && data.success) {
+                    this.showToast(@json(__('pos.rider_assign_ok')), 'success');
+                    this.loadLocalBills();
+                } else {
+                    this.showToast((data && data.message) || @json(__('pos.rider_assign_failed')), 'error');
+                }
+            } catch (e) {
+                this.showToast(window.TXT.network_error, 'error');
+            }
+            this.riderAssignBusyId = null;
         },
         // One-click final — reuses the EXACT promote path (race-safe claim,
         // reporting-OFF invariant, PIN gate). Receipt print follows the panel's

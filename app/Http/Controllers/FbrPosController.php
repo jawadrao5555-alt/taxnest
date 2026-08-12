@@ -88,10 +88,97 @@ class FbrPosController extends Controller
                     'kot_pending' => false,
                 ];
             });
+        // Task 517 (FBR port of PRA Task 513): UNASSIGNED final delivery bills
+        // in the Pending Deliveries popup — cashier rider yahin se assign kare,
+        // Deliveries board kholne ki zaroorat na rahe. Same 7-din window as the
+        // PRA popup / board pending tab (purane pre-feature delivery bills popup
+        // ko flood na karein). Display + assign ONLY — promote (Final Cash/Card)
+        // in par KABHI nahi chalta (bill pehle se final hai).
+        $hasRiderCols  = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'rider_id');
+        $hasDelStatus  = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'delivery_status');
+        $hasSettleCol  = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'rider_settlement_id');
+        $finalData = collect();
+        if ($hasRiderCols && $hasDelStatus && $hasSettleCol && $hasOrderType) {
+            $finalData = \App\Models\FbrPosTransaction::where('company_id', $companyId)
+                ->where('status', 'completed')
+                // NOT a provisional (local+local pair = FBR provisional definition).
+                ->whereNot(function ($q) {
+                    $q->where('invoice_mode', 'local')->where('fbr_status', 'local');
+                })
+                ->whereNull('rider_id')
+                ->whereNull('delivery_status')
+                ->whereNull('rider_settlement_id')
+                ->where('order_type', 'delivery')
+                ->where('created_at', '>=', now()->subDays(7))
+                ->withCount('items')
+                ->orderByDesc('id')
+                ->limit(50)
+                ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'order_type',
+                       'total_amount', 'payment_method', 'created_at',
+                       ...($hasAddress ? ['delivery_address'] : []),
+                       ...($hasBizDate ? ['business_date'] : [])])
+                ->map(function ($b) use ($companyId, $hasBizDate, $hasAddress) {
+                    return [
+                        'id'               => $b->id,
+                        'is_final'         => true,
+                        'invoice_number'   => $b->invoice_number,
+                        'customer_name'    => $b->customer_name,
+                        'customer_phone'   => $b->customer_phone,
+                        'order_type'       => $b->order_type,
+                        'delivery_address' => $hasAddress ? $b->delivery_address : null,
+                        'total_amount'     => (float) $b->total_amount,
+                        'payment_method'   => $b->payment_method,
+                        'items_count'      => (int) ($b->items_count ?? 0),
+                        'created_human'    => $b->created_at?->diffForHumans(),
+                        'created_time'     => $b->created_at?->format('h:i A'),
+                        'business_date'    => ($hasBizDate && $b->business_date)
+                            ? (string) $b->business_date
+                            : ($b->created_at ? \App\Services\PosBusinessDay::forMomentFbr((int) $companyId, $b->created_at) : null),
+                        'delivery_status'  => null,
+                        'rider_id'         => null,
+                        'rider_name'       => null,
+                        'rider_unsettled'  => false,
+                        'rider_open_count' => 0,
+                        'rider_open_amount'=> 0,
+                    ];
+                })
+                ->values();
+        }
+
+        // Task 517: active riders list + assign permission — the popup renders a
+        // rider dropdown on UNASSIGNED bills (POST fbrpos.deliveries.assign, same
+        // backend as the board). Plan gate (riders_enabled) + Delivery feature
+        // toggle mirror FbrPosRiderController::deliveryGate(); custom-access
+        // 'deliveries' verdict mirrors the PRA popup's gating (deliveriesFallback
+        // included via customAllows).
+        // try/catch fail-closed: plan/feature lookups touch subscriptions —
+        // if that ever fails the popup simply hides the dropdown (board stays).
+        try {
+            $canAssignRider = \App\Services\PosFeatureService::planAllows($pinCompany, 'riders_enabled')
+                && !empty(\App\Services\PosFeatureService::forCompany($pinCompany)->delivery)
+                && \App\Services\PosAccessService::customAllows(Auth::guard('fbrpos')->user(), 'deliveries') !== false;
+        } catch (\Throwable $e) {
+            $canAssignRider = false;
+        }
+        $assignRiders = [];
+        if ($canAssignRider && $hasRiderCols && \Illuminate\Support\Facades\Schema::hasTable('pos_riders')) {
+            $assignRiders = DB::table('pos_riders')
+                ->where('company_id', $companyId)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn ($r) => ['id' => (int) $r->id, 'name' => $r->name])
+                ->values()
+                ->all();
+        }
+
         return response()->json([
             'success' => true,
             'bills' => $bills,
             'count' => $bills->count(),
+            'final_deliveries' => $finalData,
+            'riders' => $assignRiders,
+            'can_assign_rider' => $canAssignRider,
             // Current business day for the badge's client-side date filter.
             // PosBusinessDay is company-cutoff based (00:00–05:59 counts in
             // yesterday); the Fbr variant reads fbr_day_close_reports for the

@@ -354,13 +354,13 @@ class FbrPosRiderController extends Controller
         $txn = FbrPosTransaction::where('company_id', $companyId)->findOrFail($txnId);
 
         if ($txn->rider_settlement_id) {
-            return back()->with('error', 'This bill is already settled — rider cannot be changed.');
+            return $this->statusError($request, 'This bill is already settled — rider cannot be changed.');
         }
         if (in_array($txn->delivery_status, ['delivered', 'returned'], true)) {
-            return back()->with('error', 'This delivery is already ' . $txn->delivery_status . ' — rider can no longer be changed.');
+            return $this->statusError($request, 'This delivery is already ' . $txn->delivery_status . ' — rider can no longer be changed.');
         }
         if ($txn->order_type !== 'delivery' && !$txn->rider_id && !$txn->delivery_address) {
-            return back()->with('error', 'Only delivery bills can be assigned to a rider.');
+            return $this->statusError($request, 'Only delivery bills can be assigned to a rider.');
         }
 
         $riderId = null;
@@ -370,7 +370,7 @@ class FbrPosRiderController extends Controller
                 ->where('is_active', true)
                 ->value('id');
             if (!$riderId) {
-                return back()->with('error', 'Invalid rider.');
+                return $this->statusError($request, 'Invalid rider.');
             }
         }
 
@@ -388,6 +388,16 @@ class FbrPosRiderController extends Controller
             }
         }
         $txn->update($upd);
+
+        // Sale-screen Pending Deliveries popup (Task 517) assigns via fetch —
+        // JSON clients get JSON; the Deliveries board form keeps back().
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success'         => true,
+                'rider_id'        => $riderId,
+                'delivery_status' => $upd['delivery_status'],
+            ]);
+        }
 
         return back()->with('success', $riderId ? 'Rider assigned.' : 'Rider removed.');
     }

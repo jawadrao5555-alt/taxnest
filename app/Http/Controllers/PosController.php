@@ -1146,27 +1146,38 @@ class PosController extends Controller
      * row. Keyed by business_date (created_at date on pre-migration schemas).
      * Returns an ascending collection of Y-m-d strings (max 30 days back).
      */
-    private function unclosedPriorBusinessDays(int $companyId, ?string $excludeDate = null)
+    private function unclosedPriorBusinessDays(int $companyId, ?string $excludeDate = null, bool $oldestFirst = false)
     {
         $bizToday = \App\Services\PosBusinessDay::current($companyId);
         $hasBizDate = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'business_date');
+        // Closed dates FIRST, excluded inside the query (Task 516): the old
+        // shape limited to the newest 30 dates BEFORE dropping closed ones, so
+        // once the newest 30 were all closed, older still-open days became
+        // invisible — the bulk close could never finish a 31+ day backlog.
+        // Normalized in PHP (no whereIn on report_date — drivers that store
+        // DATE with a time part, e.g. sqlite tests, would miss every match
+        // and resurrect closed days); a company has few report rows.
+        $closedDates = PosDayCloseReport::where('company_id', $companyId)
+            ->pluck('report_date')
+            ->map(fn ($d) => \Carbon\Carbon::parse($d)->toDateString());
         $priorDates = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->when($hasBizDate,
                 fn ($q) => $q->where('business_date', '<', $bizToday)->selectRaw('business_date as d'),
                 fn ($q) => $q->whereDate('created_at', '<', $bizToday)->selectRaw('DATE(created_at) as d'))
+            ->when($closedDates->isNotEmpty(), fn ($q) => $q->when($hasBizDate,
+                fn ($qq) => $qq->whereNotIn('business_date', $closedDates->all()),
+                fn ($qq) => $qq->whereNotIn(\DB::raw('DATE(created_at)'), $closedDates->all())))
             ->groupBy('d')
-            ->orderByDesc('d')
+            // Banner shows the newest 30; the BULK close pages OLDEST-first
+            // (Task 516): performDayClose's backlog wash sweeps local bills
+            // with business_date <= close date, so closing a newer day before
+            // discovering an older one would steal the older day's bills into
+            // the wrong report and leave it an artificial zero-report.
+            ->orderBy('d', $oldestFirst ? 'asc' : 'desc')
             ->limit(30)
             ->pluck('d')
             ->map(fn ($d) => (string) $d);
-        if ($priorDates->isEmpty()) {
-            return collect();
-        }
-        $closedDates = PosDayCloseReport::where('company_id', $companyId)
-            ->whereIn('report_date', $priorDates)
-            ->pluck('report_date')
-            ->map(fn ($d) => \Carbon\Carbon::parse($d)->toDateString());
 
         return $priorDates
             ->reject(fn ($d) => $closedDates->contains($d) || $d === $excludeDate)
@@ -8678,7 +8689,16 @@ class PosController extends Controller
                 $cashRecon['counted_cash'] = $cashRecon['counted_cash'] ?? null;
             }
         }
-        $result = $this->performDayClose($companyId, $date, $user?->id, $request->input('notes'), $cashRecon);
+        // Task 516: a stranded PRIOR day may be legitimately empty (its local
+        // bills were archived by a newer day's backlog wash) — allow a
+        // zero-figure close so it leaves the stranded banner instead of
+        // erroring "no transactions" forever. STRICTLY limited to dates the
+        // stranded-day detector returns (i.e. days that actually have bills,
+        // archived included) — an arbitrary never-traded past date must NOT
+        // mint a fabricated zero Z-report. Today's close stays strict too.
+        $allowEmpty = $date < \App\Services\PosBusinessDay::current($companyId)
+            && $this->unclosedPriorBusinessDays($companyId)->contains($date);
+        $result = $this->performDayClose($companyId, $date, $user?->id, $request->input('notes'), $cashRecon, $allowEmpty);
 
         if ($result['status'] === 'exists') {
             return back()->with('error', __('pos.dayclose_report_exists'));
@@ -9373,10 +9393,99 @@ class PosController extends Controller
         return $sweep;
     }
 
-    public function performDayClose(int $companyId, string $date, ?int $closedBy, ?string $notes = null, ?array $cashRecon = null): array
+    /**
+     * Task 516: bulk-close ALL stranded prior business days in one click.
+     * Ends the "close one, another appears" whack-a-mole: shops that don't
+     * close daily pile up 20+ open days and had to close each one by one.
+     * Iterates chronologically and calls the SAME performDayClose routine per
+     * day (opening-float self-heal, local-bill wash policy, archive semantics
+     * all identical to a single close) — no parallel close path.
+     */
+    public function closeAllPriorDays(Request $request)
+    {
+        // Same authority gate as the single close (owner rule 5 Aug 2026).
+        $user = \Illuminate\Support\Facades\Auth::guard('pos')->user();
+        if ($user && !\App\Services\PosAccessService::dayCloseAllowed($user)) {
+            return redirect()->route('pos.dashboard')->with('error', __('pos.custom_access_denied'));
+        }
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+
+        // Same hard block as the single close: open restaurant orders freeze
+        // ALL manual closes (un-finalized orders can never be finalized after
+        // a close whose backlog wash may sweep their day).
+        $openAtClose = $this->openHeldOrdersSummary($companyId, $company);
+        if ($openAtClose->count > 0) {
+            return back()->with('error', __('pos.dayclose_blocked_open_orders', [
+                'count' => $openAtClose->count,
+                'tables' => $openAtClose->tableNumbers !== '' ? ' (' . __('pos.dc_open_tables_list', ['tables' => $openAtClose->tableNumbers]) . ')' : '',
+            ]));
+        }
+
+        if ($this->unclosedPriorBusinessDays($companyId)->isEmpty()) {
+            return back()->with('success', __('pos.dc_bulk_none_pending'));
+        }
+
+        $closed = 0;
+        $zeroDays = 0;
+        $archived = 0;
+        $deleted = 0;
+        // The detector returns at most 30 dates per query — RE-QUERY until the
+        // backlog is exhausted so 31+ open days still finish in ONE click
+        // ("all" must mean all). oldestFirst: pages must come CHRONOLOGICALLY
+        // (oldest day first) so each day's backlog wash only ever sweeps its
+        // own bills — a newer close would steal older days' local bills.
+        // Guard caps the loop; each pass must make progress or we bail.
+        for ($pass = 0; $pass < 30; $pass++) {
+            $pending = $this->unclosedPriorBusinessDays($companyId, null, true); // oldest 30, ascending
+            if ($pending->isEmpty()) {
+                break;
+            }
+            $closedThisPass = 0;
+            foreach ($pending as $day) {
+                // allowEmpty: stranded days with only already-archived bills get
+                // a zero-figure Z-report so they finally leave the banner. Safe:
+                // every $day comes from the detector (has real bills).
+                $result = $this->performDayClose($companyId, $day, $user?->id, null, null, true);
+                if ($result['status'] === 'created') {
+                    $closed++;
+                    $closedThisPass++;
+                    $archived += $result['archived'];
+                    $deleted += $result['deleted'] ?? 0;
+                    if ((int) ($result['report']->total_invoices ?? 0) === 0) {
+                        $zeroDays++;
+                    }
+                }
+                // 'exists' = already closed (race with another cashier) — skip silently.
+            }
+            if ($closedThisPass === 0) {
+                break; // no progress — never spin
+            }
+        }
+
+        $msg = __('pos.dc_bulk_done', ['closed' => $closed, 'zero' => $zeroDays]);
+        if ($archived > 0) {
+            $msg .= __('pos.dayclose_bills_archived', ['count' => $archived]);
+        }
+        if ($deleted > 0) {
+            $msg .= __('pos.dayclose_bills_deleted', ['count' => $deleted]);
+        }
+
+        // Honest "all": if anything is somehow still pending after the capped
+        // passes (900 days) or a stalled pass, say so instead of implying done.
+        $remaining = $this->unclosedPriorBusinessDays($companyId, null, true)->count();
+        if ($remaining > 0) {
+            return redirect()->route('pos.day-close')
+                ->with('error', $msg . ' ' . __('pos.dc_bulk_partial', ['remaining' => $remaining]));
+        }
+
+        return redirect()->route('pos.day-close')->with('success', $msg);
+    }
+
+    public function performDayClose(int $companyId, string $date, ?int $closedBy, ?string $notes = null, ?array $cashRecon = null, bool $allowEmpty = false): array
     {
         $existing = PosDayCloseReport::where('company_id', $companyId)
-            ->where('report_date', $date)
+            ->whereDate('report_date', $date)
             ->first();
 
         if ($existing) {
@@ -9445,7 +9554,14 @@ class PosController extends Controller
             })
             ->exists();
 
-        if ($transactions->isEmpty() && !$hasLocalBills) {
+        // Empty-day guard: TODAY's close with zero bills stays refused. But a
+        // STRANDED prior day can legitimately be empty — e.g. its local bills
+        // were already archived by a NEWER day's backlog wash (they still make
+        // the day show as "open" in the stranded banner, which counts archived
+        // rows, yet nothing is left to wash). Task 516: $allowEmpty lets those
+        // days get a zero-figure Z-report so they finally leave the banner —
+        // the "close one, another appears" whack-a-mole ender.
+        if ($transactions->isEmpty() && !$hasLocalBills && !$allowEmpty) {
             return ['status' => 'empty', 'report' => null, 'archived' => 0, 'deleted' => 0, 'report_number' => null];
         }
 

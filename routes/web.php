@@ -717,6 +717,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/reports/analytics-pdf', [PosController::class, 'reportsAnalyticsPdf'])->name('pos.reports.analytics-pdf');
     Route::get('/day-close', [PosController::class, 'dayCloseReport'])->name('pos.day-close');
     Route::post('/day-close', [PosController::class, 'closeDayReport'])->name('pos.close-day');
+    // Task 516: bulk-close every stranded prior business day in one click.
+    Route::post('/day-close/close-all-prior', [PosController::class, 'closeAllPriorDays'])->name('pos.close-all-days');
     Route::post('/day-opening', [PosController::class, 'saveDayOpening'])->name('pos.day-opening.save');
     Route::get('/day-close/{id}/pdf', [PosController::class, 'dayCloseReportPdf'])->name('pos.day-close-pdf');
     Route::get('/day-close/{id}/thermal', [PosController::class, 'dayCloseThermal'])->name('pos.day-close-thermal');

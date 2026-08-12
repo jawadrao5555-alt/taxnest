@@ -25,6 +25,17 @@
             <div class="flex-1 min-w-0">
                 <p class="font-bold text-red-800 dark:text-red-300">{{ __('pos.dc_prior_open_title') }}</p>
                 <p class="text-sm text-red-700 dark:text-red-400 mt-0.5">{{ __('pos.dc_prior_open_msg') }}</p>
+                {{-- Task 516: bulk close — one click closes ALL stranded prior days
+                     chronologically via the same performDayClose routine. --}}
+                <form method="POST" action="{{ route('pos.close-all-days') }}" class="mt-3"
+                      onsubmit="return confirm(@js(__('pos.dc_bulk_close_confirm', ['count' => $unclosedPriorDays->count()])));">
+                    @csrf
+                    <button type="submit"
+                        class="inline-flex items-center gap-2 px-4 py-2 bg-red-700 text-white text-sm font-bold rounded-lg hover:bg-red-800 transition shadow-sm">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        {{ __('pos.dc_close_all_days_btn', ['count' => $unclosedPriorDays->count()]) }}
+                    </button>
+                </form>
                 <div class="flex flex-wrap gap-2 mt-3">
                     @foreach($unclosedPriorDays as $openDay)
                     <a href="{{ route('pos.day-close', ['date' => $openDay]) }}"

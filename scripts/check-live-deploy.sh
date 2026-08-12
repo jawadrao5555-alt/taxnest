@@ -8,7 +8,8 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 KEY="/home/runner/workspace/.local/ssh/cpanel_deploy_key"
-HOST="taxnestc@taxnest.com.pk"
+# Cloudflare (Aug 2026): main domain is proxied — SSH must use the DNS-only host.
+HOST="taxnestc@cpanel.taxnest.com.pk"
 LIVE_DIR="/home/taxnestc/public_html"
 
 LOCAL_HEAD=$(git rev-parse HEAD 2>/dev/null)

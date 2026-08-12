@@ -72,7 +72,9 @@
                         <p class="text-xs text-gray-400 mt-1">{{ __('pos.printer_size_hint') }}</p>
                     </div>
                     <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                        <p class="text-xs text-blue-700 dark:text-blue-400">
+                        {{-- Mobile (Task 546): long unbreakable URLs pushed the card past
+                             ~390px viewports — break-all keeps them inside the box. --}}
+                        <p class="text-xs text-blue-700 dark:text-blue-400 break-all">
                             <strong>API Endpoints:</strong><br>
                             @if(($company->pra_connection_mode ?? 'cloud') === 'fiscal_device')
                             Fiscal Device (on shop PC): http://localhost:8524/api/IMSFiscal/GetInvoiceNumberByModel<br>

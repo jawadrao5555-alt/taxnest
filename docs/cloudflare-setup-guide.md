@@ -13,10 +13,14 @@ Code side taiyar hai (visitor IP restore middleware deploy ho chuka hai). Ab sir
    - `MX` + `mail` records — **DNS only (grey cloud)** — warna email band ho jayegi!
    - `cpanel`, `webmail`, `ftp` jese records — **DNS only (grey cloud)**
 
-## Step 2 — Nameservers change (Namecheap)
-1. Cloudflare 2 nameservers dega (misal: `xxx.ns.cloudflare.com`).
-2. Namecheap → Domain List → taxnest.com.pk → Manage → Nameservers → **Custom DNS** → dono Cloudflare nameservers dalen.
-3. 5 min – 24 ghante lagta hai. Cloudflare dashboard par "Active" status ka intezar karen.
+## Step 2 — Nameservers change (HostCry — registrar yehi hai)
+> Note: domain HostCry se registered hai (Namecheap nahi). HostCry ke client area ka
+> nameserver form is .pk domain ke liye kaam NahI karta — support ticket se hota hai.
+1. Cloudflare 2 nameservers dega (hamaray liye: `rihana.ns.cloudflare.com` / `ryan.ns.cloudflare.com`).
+2. HostCry Client Area → Support → Open Ticket → nameserver change request likhen
+   (dono Cloudflare nameservers de kar purane ns1/ns2.hostcry.com hatane ka kahen).
+3. Support kuch ghanton mein kar deta hai (12 Aug 2026 ko ~isi din ho gaya tha).
+   Cloudflare dashboard par "Active" status ka intezar karen.
 
 ## Step 3 — Cloudflare settings (Active hone ke baad)
 SSL/TLS tab:

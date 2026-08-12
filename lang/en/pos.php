@@ -4092,6 +4092,14 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'waiter_buttons_back'         => '← Back',
     'waiter_buttons_loading'      => 'Loading tables…',
 
+    // Admin-controlled waiter permissions (Task 527, owner 12 Aug 2026)
+    'waiter_cancel_toggle' => 'Waiter can cancel orders',
+    'waiter_cancel_toggle_sub' => 'Waiter may cancel their own un-claimed open orders from the tablet (off = cancel only from the counter)',
+    'waiter_takeaway_toggle' => 'Waiter can punch takeaway orders',
+    'waiter_takeaway_toggle_sub' => 'Waiter may punch takeaway (parcel) orders from the tablet (off = dine-in only)',
+    'waiter_cancel_not_allowed' => 'Order cancel is not allowed for waiters — the admin can enable this permission from POS settings.',
+    'waiter_takeaway_not_allowed' => 'Takeaway orders are not allowed for waiters — the admin can enable this permission from POS settings.',
+
     // DB-down friendly page (Aug 2026) — rendered when MySQL is unreachable
     'db_down_title' => 'Server is briefly busy',
     'db_down_body' => 'Sorry — the system is temporarily not responding. None of your data has been lost. Please try again in a moment.',

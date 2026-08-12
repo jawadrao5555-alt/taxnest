@@ -4092,6 +4092,14 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'waiter_buttons_back'         => '← Wapas',
     'waiter_buttons_loading'      => 'Tables load ho rahi hain…',
 
+    // Admin-controlled waiter permissions (Task 527, owner 12 Aug 2026)
+    'waiter_cancel_toggle' => 'Waiter order cancel kar sakta hai',
+    'waiter_cancel_toggle_sub' => 'Waiter apne un-claimed open orders tablet se cancel kar sake (band = cancel sirf counter se)',
+    'waiter_takeaway_toggle' => 'Waiter takeaway punch kar sakta hai',
+    'waiter_takeaway_toggle_sub' => 'Waiter tablet se takeaway (parcel) order punch kar sake (band = sirf dine-in)',
+    'waiter_cancel_not_allowed' => 'Order cancel ki ijazat nahi — admin POS settings se yeh permission on kar sakta hai.',
+    'waiter_takeaway_not_allowed' => 'Takeaway order ki ijazat nahi — admin POS settings se yeh permission on kar sakta hai.',
+
     // DB-down friendly page (Aug 2026) — rendered when MySQL is unreachable
     'db_down_title' => 'Server thori der ke liye masroof hai',
     'db_down_body' => 'Maazrat — system waqti tor par jawab nahi de raha. Aap ka koi data zaya nahi hua. Barah-e-karam thori der mein dobara koshish karein.',

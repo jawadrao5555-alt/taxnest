@@ -5429,6 +5429,42 @@ class PosController extends Controller
         ]);
     }
 
+    /**
+     * Task 527 (owner voice notes, 12 Aug 2026): admin-controlled waiter
+     * permissions — company-level toggles (waiters are excluded from the
+     * per-user Custom Access system):
+     *   'cancel'   → pos_waiter_cancel_enabled   (default OFF)
+     *   'takeaway' → pos_waiter_takeaway_enabled (default ON)
+     */
+    public function toggleWaiterPermission(Request $request)
+    {
+        // Waiter PERMISSION toggles are strictly admin/manager territory —
+        // stricter than posCashierBlocked(): a Custom-Access-granted cashier
+        // may reach other settings, but must never grant waiters abilities.
+        // (PosAuth already confines waiters to pos/waiter* paths; this is the
+        // in-controller defense-in-depth so the gate never depends on
+        // middleware ordering.)
+        $user = auth('pos')->user();
+        if (!$user || !$user->isPosAdmin()) {
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
+        }
+
+        $validated = $request->validate([
+            'permission' => 'required|in:cancel,takeaway',
+            'enabled' => 'required|boolean',
+        ]);
+
+        $column = $validated['permission'] === 'cancel'
+            ? 'pos_waiter_cancel_enabled'
+            : 'pos_waiter_takeaway_enabled';
+
+        $company = Company::find(app('currentCompanyId'));
+        $company->{$column} = (bool) $validated['enabled'];
+        $company->save();
+
+        return response()->json(['success' => true, 'enabled' => (bool) $company->{$column}]);
+    }
+
     public function updateLocalBillingSettings(Request $request)
     {
         $user = auth('pos')->user();

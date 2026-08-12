@@ -4092,6 +4092,14 @@ return [
     'waiter_buttons_back'         => '← واپس',
     'waiter_buttons_loading'      => 'میزیں لوڈ ہو رہی ہیں…',
 
+    // Admin-controlled waiter permissions (Task 527, owner 12 Aug 2026)
+    'waiter_cancel_toggle' => 'ویٹر آرڈر کینسل کر سکتا ہے',
+    'waiter_cancel_toggle_sub' => 'ویٹر اپنے کھلے آرڈر (جو کیشیئر نے ابھی نہیں لیے) ٹیبلٹ سے کینسل کر سکے (بند = کینسل صرف کاؤنٹر سے)',
+    'waiter_takeaway_toggle' => 'ویٹر ٹیک اوے پنچ کر سکتا ہے',
+    'waiter_takeaway_toggle_sub' => 'ویٹر ٹیبلٹ سے ٹیک اوے (پارسل) آرڈر پنچ کر سکے (بند = صرف ڈائن اِن)',
+    'waiter_cancel_not_allowed' => 'آرڈر کینسل کی اجازت نہیں — ایڈمن POS سیٹنگز سے یہ اجازت آن کر سکتا ہے۔',
+    'waiter_takeaway_not_allowed' => 'ٹیک اوے آرڈر کی اجازت نہیں — ایڈمن POS سیٹنگز سے یہ اجازت آن کر سکتا ہے۔',
+
     // DB-down friendly page (Aug 2026) — rendered when MySQL is unreachable
     'db_down_title' => 'سرور تھوڑی دیر کے لیے مصروف ہے',
     'db_down_body' => 'معذرت — سسٹم وقتی طور پر جواب نہیں دے رہا۔ آپ کا کوئی ڈیٹا ضائع نہیں ہوا۔ براہِ کرم تھوڑی دیر میں دوبارہ کوشش کریں۔',

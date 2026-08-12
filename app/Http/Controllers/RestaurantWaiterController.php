@@ -127,7 +127,15 @@ class RestaurantWaiterController extends Controller
         // tables to pick and the punch must stay possible.
         $tablesOn = (bool) (PosFeatureService::forCompany($company)->tables ?? false);
 
-        return view('pos.waiter', compact('company', 'products', 'cashiers', 'cashTaxRate', 'userGridPrefs', 'taxInclusive', 'appVersion', 'searchAnyWord', 'tablesOn'));
+        // Task 527 (owner, 12 Aug 2026): admin-controlled waiter permissions.
+        // Cancel = default OFF, takeaway punch = default ON. The toggles
+        // restrict WAITERS only — an admin/manager opening the tablet keeps
+        // both abilities (they ARE the control authority).
+        $isWaiter = $user->isPosWaiter();
+        $waiterCanCancel = !$isWaiter || (bool) ($company->pos_waiter_cancel_enabled ?? false);
+        $waiterCanTakeaway = !$isWaiter || (bool) ($company->pos_waiter_takeaway_enabled ?? true);
+
+        return view('pos.waiter', compact('company', 'products', 'cashiers', 'cashTaxRate', 'userGridPrefs', 'taxInclusive', 'appVersion', 'searchAnyWord', 'tablesOn', 'waiterCanCancel', 'waiterCanTakeaway'));
     }
 
     /** Live floors + tables — waiter-scoped twin of the sale screen's table-status API. */
@@ -291,6 +299,16 @@ class RestaurantWaiterController extends Controller
 
         $orderType = $validated['order_type'] ?? 'dine_in';
         $tableId = $orderType === 'dine_in' ? ($validated['table_id'] ?? null) : null;
+
+        // Task 527 (owner, 12 Aug 2026): takeaway punch is an admin-controlled
+        // permission (default ON — missing column fails OPEN so existing
+        // companies keep current behavior). Waiters only; admins/managers on
+        // the tablet are never blocked. Client hides the Takeaway button — this
+        // is the security boundary.
+        if ($orderType === 'takeaway' && $user->isPosWaiter()
+            && !(bool) ($company->pos_waiter_takeaway_enabled ?? true)) {
+            return response()->json(['success' => false, 'message' => __('pos.waiter_takeaway_not_allowed')], 403);
+        }
 
         // Table-required invariant (owner voice note, 9 Aug 2026): a live shop's
         // waiter punched a dine-in order WITHOUT selecting a table and the KOT
@@ -507,6 +525,17 @@ class RestaurantWaiterController extends Controller
 
         if (!is_numeric($id) || $id < 1) {
             return response()->json(['success' => false, 'message' => 'Invalid order ID'], 400);
+        }
+
+        // Task 527 (owner, 12 Aug 2026): waiter self-cancel is now an
+        // admin-controlled permission, DEFAULT OFF (missing column reads null
+        // → blocked, which IS the desired default). Waiters only —
+        // admins/managers using the tablet keep cancel.
+        if ($user->isPosWaiter()) {
+            $company = Company::find($companyId);
+            if (!(bool) ($company->pos_waiter_cancel_enabled ?? false)) {
+                return response()->json(['success' => false, 'message' => __('pos.waiter_cancel_not_allowed')], 403);
+            }
         }
 
         $updates = ['status' => 'cancelled', 'updated_at' => now()];

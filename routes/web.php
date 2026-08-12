@@ -666,6 +666,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/settings/cashier-dayclose-toggle', [PosController::class, 'toggleCashierDayclose'])->name('pos.settings.cashier-dayclose-toggle');
     Route::post('/settings/dayclose-cutoff', [PosController::class, 'updateDaycloseCutoff'])->name('pos.settings.dayclose-cutoff');
     Route::post('/settings/kds-auto-print', [PosController::class, 'toggleKdsAutoPrint'])->name('pos.settings.kds-auto-print');
+    // Task 527: admin-controlled waiter permissions (cancel default OFF, takeaway default ON).
+    Route::post('/settings/waiter-permission', [PosController::class, 'toggleWaiterPermission'])->name('pos.settings.waiter-permission');
     Route::get('/invoice/create', [PosController::class, 'createInvoice'])->name('pos.invoice.create');
     Route::get('/v2/invoice/create', [PosController::class, 'universalCreateInvoice'])->name('pos.v2.invoice.create');
     Route::get('/features', [PosController::class, 'featureSettings'])->name('pos.features');

@@ -4103,6 +4103,7 @@ return [
     'waiter_takeaway_toggle_sub' => 'ویٹر ٹیبلٹ سے ٹیک اوے (پارسل) آرڈر پنچ کر سکے (بند = صرف ڈائن اِن)',
     'waiter_cancel_not_allowed' => 'آرڈر کینسل کی اجازت نہیں — ایڈمن POS سیٹنگز سے یہ اجازت آن کر سکتا ہے۔',
     'waiter_takeaway_not_allowed' => 'ٹیک اوے آرڈر کی اجازت نہیں — ایڈمن POS سیٹنگز سے یہ اجازت آن کر سکتا ہے۔',
+    'waiter_delivery_not_allowed' => 'ویٹر ٹیبلٹ سے ڈلیوری آرڈر پنچ نہیں ہو سکتا۔',
 
     // DB-down friendly page (Aug 2026) — rendered when MySQL is unreachable
     'db_down_title' => 'سرور تھوڑی دیر کے لیے مصروف ہے',

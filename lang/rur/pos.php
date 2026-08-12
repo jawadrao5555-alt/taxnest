@@ -4103,6 +4103,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'waiter_takeaway_toggle_sub' => 'Waiter tablet se takeaway (parcel) order punch kar sake (band = sirf dine-in)',
     'waiter_cancel_not_allowed' => 'Order cancel ki ijazat nahi — admin POS settings se yeh permission on kar sakta hai.',
     'waiter_takeaway_not_allowed' => 'Takeaway order ki ijazat nahi — admin POS settings se yeh permission on kar sakta hai.',
+    'waiter_delivery_not_allowed' => 'Waiter tablet se delivery order punch nahi ho sakta.',
 
     // DB-down friendly page (Aug 2026) — rendered when MySQL is unreachable
     'db_down_title' => 'Server thori der ke liye masroof hai',

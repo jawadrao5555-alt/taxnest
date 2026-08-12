@@ -310,6 +310,13 @@ class RestaurantWaiterController extends Controller
             return response()->json(['success' => false, 'message' => __('pos.waiter_takeaway_not_allowed')], 403);
         }
 
+        // Task 534 (owner, 12 Aug 2026): delivery orders are ALWAYS blocked for
+        // waiters — the waiter UI never shows this option (security boundary here).
+        // Admins/managers opening the tablet are exempt (same pattern as takeaway).
+        if ($orderType === 'delivery' && $user->isPosWaiter()) {
+            return response()->json(['success' => false, 'message' => __('pos.waiter_delivery_not_allowed')], 403);
+        }
+
         // Table-required invariant (owner voice note, 9 Aug 2026): a live shop's
         // waiter punched a dine-in order WITHOUT selecting a table and the KOT
         // still printed. When the company actually manages tables (tables feature

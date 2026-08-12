@@ -3937,7 +3937,9 @@ return [
     'tutorials_pub_ask' => 'سوال پوچھیں',
 
     // Deliveries board tabs + date filter (owner, 4 Aug 2026)
-    'del_tab_pending_sub' => 'تفویض و روانہ',
+    'del_tab_pending_sub' => 'غیر تفویض، تفویض و روانہ',
+    // Task 512 (12 Aug 2026): unassigned delivery bills now surface on Pending.
+    'del_status_unassigned' => 'رائیڈر تفویض نہیں ہوا',
 
     // Deliveries board upgrades + Pending Deliveries popup finals (owner batch, 3 Aug 2026)
     'delivery_status_dispatched' => 'روانہ',

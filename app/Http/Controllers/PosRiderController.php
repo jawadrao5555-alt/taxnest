@@ -330,7 +330,24 @@ class PosRiderController extends Controller
                 $q->where('order_type', 'delivery')->orWhereNotNull('rider_id');
             })
             ->whereIn('status', ['completed'])
-            ->whereIn('delivery_status', ['assigned', 'dispatched'])
+            // Task 512 (Zahid Irfan, 12 Aug 2026): UNASSIGNED delivery bills
+            // (rider_id NULL, delivery_status NULL) were invisible on every tab —
+            // the assign dropdown existed but no bill ever reached it, so shops
+            // needed the confined delivery-manager login just to assign. Pending
+            // now also shows fresh unassigned delivery bills so the rider can be
+            // chosen right here (same pos.deliveries.assign backend, no new path).
+            // 7-din window on unassigned only: purane pre-feature delivery bills
+            // (kabhi rider use hi nahi hua) pending tab ko flood na karein.
+            ->where(function ($q) {
+                $q->whereIn('delivery_status', ['assigned', 'dispatched'])
+                    ->orWhere(function ($q2) {
+                        $q2->whereNull('delivery_status')
+                            ->whereNull('rider_id')
+                            ->whereNull('rider_settlement_id')
+                            ->where('order_type', 'delivery')
+                            ->where('created_at', '>=', now()->subDays(7));
+                    });
+            })
             ->with('rider')
             ->orderBy(DB::raw($assignedTsExpr));
         $this->applyStreamScope($openBillsAll);

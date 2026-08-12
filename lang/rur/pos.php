@@ -3936,7 +3936,9 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'tutorials_pub_ask' => 'Sawal poochein',
 
     // Deliveries board tabs + date filter (owner, 4 Aug 2026)
-    'del_tab_pending_sub' => 'Assigned aur dispatched',
+    'del_tab_pending_sub' => 'Unassigned, assigned aur dispatched',
+    // Task 512 (12 Aug 2026): unassigned delivery bills now surface on Pending.
+    'del_status_unassigned' => 'Rider assign nahi hua',
 
     // Deliveries board upgrades + Pending Deliveries popup finals (owner batch, 3 Aug 2026)
     'delivery_status_dispatched' => 'Rawana',

@@ -348,7 +348,14 @@
                                     'returned' => 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400',
                                 ][$st] ?? 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400';
                             @endphp
-                            <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold {{ $stClass }}">{{ $st ? (Lang::has('pos.delivery_status_' . $st) ? __('pos.delivery_status_' . $st) : ucfirst($st)) : '—' }}</span>
+                            @if(!$st && $activeTab === 'pending')
+                                {{-- Task 512: unassigned delivery bill now surfaces on Pending —
+                                     amber chip nudges the admin/manager to pick a rider in the
+                                     dropdown on this same row (no delivery-manager login needed). --}}
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">{{ __('pos.del_status_unassigned') }}</span>
+                            @else
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold {{ $stClass }}">{{ $st ? (Lang::has('pos.delivery_status_' . $st) ? __('pos.delivery_status_' . $st) : ucfirst($st)) : '—' }}</span>
+                            @endif
                             {{-- Delivery duration (owner, 3 Aug 2026): rider assign se
                                  delivered tak kitne minute lage. --}}
                             @if($st === 'delivered' && $b->delivered_at && $b->rider_assigned_at)

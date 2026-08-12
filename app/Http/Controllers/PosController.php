@@ -3101,6 +3101,10 @@ class PosController extends Controller
         $hasRiderCols = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_id')
             && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'rider_settlement_id');
         $hasBizDate = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'business_date');
+        // Current business day (00:00–05:59 counts in yesterday) — the Pending
+        // Deliveries badge filters bills to THIS date client-side, and Task 524
+        // stamps purani unassigned bills server-side against the same date.
+        $bizToday = $hasBizDate ? \App\Services\PosBusinessDay::current($companyId) : null;
         // Billing Scope (07 Aug 2026): pra-scoped staff never see local/provisional
         // bills — the provisional half of this list is emptied for them. The FINAL
         // delivery-bill half below stays (delivery tracking is stream-agnostic).
@@ -3241,7 +3245,14 @@ class PosController extends Controller
         // Open FINAL delivery bills — same shape as provisionals + is_final flag
         // + delivery_status (panel inhe alag actions deta hai: Delivered mark /
         // khata settle; Final Cash/Card buttons in par render hi nahi hote).
-        $finalData = $finalBills->map(function ($b) use ($hasBizDate, $riderNames, $riderOpen) {
+        $finalData = $finalBills->map(function ($b) use ($hasBizDate, $bizToday, $riderNames, $riderOpen) {
+            // Task 524: purana (pichhle business day ka) UNASSIGNED bill — popup
+            // ise alag collapsed "Purani deliveries" group mein dikhata hai aur
+            // badge ki ginti se bahar rakhta hai. Flag SERVER par banta hai
+            // (authoritative business day), client sirf parhta hai.
+            $billDay = ($hasBizDate && $b->business_date)
+                ? (string) $b->business_date
+                : $b->created_at?->format('Y-m-d');
             return [
                 'id'               => $b->id,
                 'is_final'         => true,
@@ -3263,6 +3274,9 @@ class PosController extends Controller
                 'rider_unsettled'  => (bool) ($b->rider_id && empty($b->rider_settlement_id) && $b->payment_method === 'cash' && $b->delivery_status !== 'returned'),
                 'rider_open_count' => $b->rider_id ? ($riderOpen[$b->rider_id]['count'] ?? 0) : 0,
                 'rider_open_amount'=> $b->rider_id ? ($riderOpen[$b->rider_id]['amount'] ?? 0) : 0,
+                // Task 524: purani unassigned = collapsed group + badge se bahar.
+                'is_stale_unassigned' => (bool) ($bizToday && $billDay && !$b->rider_id
+                    && !$b->delivery_status && $billDay < $bizToday),
             ];
         });
 
@@ -3297,7 +3311,7 @@ class PosController extends Controller
             'can_assign_rider' => $canAssignRider,
             // Current business day (00:00–05:59 counts in yesterday) — the
             // Pending Deliveries badge filters bills to THIS date client-side.
-            'business_today' => $hasBizDate ? \App\Services\PosBusinessDay::current($companyId) : null,
+            'business_today' => $bizToday,
         ]);
     }
 

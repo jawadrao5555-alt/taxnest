@@ -3948,6 +3948,10 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     // Task 513 (12 Aug 2026): rider assign right from the sale-screen popup.
     'rider_assign_ok' => 'Rider assigned.',
     'rider_assign_failed' => 'Rider could not be assigned.',
+    // Task 524 (12 Aug 2026): purane unassigned delivery bills — alag collapsed
+    // section, tab/badge counts se bahar.
+    'old_del_section' => 'Older deliveries',
+    'old_del_hint' => 'Unassigned delivery bills from previous days — a rider can still be assigned here.',
 
     // Deliveries board upgrades + Pending Deliveries popup finals (owner batch, 3 Aug 2026)
     'delivery_status_dispatched' => 'Dispatched',

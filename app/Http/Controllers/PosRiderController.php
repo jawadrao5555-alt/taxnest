@@ -353,9 +353,33 @@ class PosRiderController extends Controller
         $this->applyStreamScope($openBillsAll);
         $openBillsAll = $openBillsAll->get();
 
+        // Task 524 (customer voice note, 12 Aug 2026): purane (pichhle business
+        // days ke) UNASSIGNED delivery bills pending list mein "Rider Not
+        // Assigned" demand ki tarah na khalein — woh ek alag collapsed "Purani
+        // deliveries" section mein dikhte hain aur pending tab count mein NAHI
+        // ginte (owner Option C: chhupao nahi, alag karo). Assigned/dispatched
+        // bills har tareekh ke FRESH hi rehte hain (asal pending — unka behavior
+        // bilkul unchanged). Fresh unassigned = business_date (fallback
+        // created_at date) == current business day; 7-din window upar wali
+        // query mein pehle se lagi hai (us se purane aate hi nahi).
+        $bizToday = \App\Services\PosBusinessDay::current($companyId);
+        [$openBillsFresh, $oldUnassigned] = $openBillsAll->partition(function ($b) use ($hasBizDate, $bizToday) {
+            if ($b->rider_id || $b->delivery_status) {
+                return true; // assigned/dispatched — always in the main list
+            }
+            $billDay = ($hasBizDate && $b->business_date)
+                ? (string) $b->business_date
+                : $b->created_at?->format('Y-m-d');
+            return !$billDay || $billDay >= $bizToday;
+        });
+        $openBillsFresh = $openBillsFresh->values();
+        $oldUnassigned  = $oldUnassigned->values();
+
         // Tab counts (computed on the collections — single DB round-trip each).
+        // Pending = fresh unassigned + assigned/dispatched; purani unassigned
+        // ki ginti section ke apne label par hai, tab badge par NAHI (Task 524).
         $tabCounts = [
-            'pending'   => $openBillsAll->count(),
+            'pending'   => $openBillsFresh->count(),
             'delivered' => $allBills->where('delivery_status', 'delivered')->count(),
             'returned'  => $allBills->where('delivery_status', 'returned')->count(),
         ];
@@ -367,7 +391,7 @@ class PosRiderController extends Controller
             $activeTab = 'pending';
         }
         if ($activeTab === 'pending') {
-            $bills = $openBillsAll->values();
+            $bills = $openBillsFresh;
         } elseif ($activeTab === 'delivered') {
             $bills = $allBills->where('delivery_status', 'delivered')->values();
         } else {
@@ -458,7 +482,7 @@ class PosRiderController extends Controller
         $currentRole = auth('pos')->user()->pos_role ?? null;
         $isAdminOrManager = in_array($currentRole, ['pos_admin', 'pos_manager'], true);
 
-        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'openDeliveryOldest', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager'));
+        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'openDeliveryOldest', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager', 'oldUnassigned'));
     }
 
     /** Assign / reassign / unassign a rider on a delivery bill. */

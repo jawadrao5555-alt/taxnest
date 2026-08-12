@@ -3949,6 +3949,9 @@ return [
     // Task 513 (12 Aug 2026): rider assign right from the sale-screen popup.
     'rider_assign_ok' => 'رائیڈر تفویض ہو گیا۔',
     'rider_assign_failed' => 'رائیڈر تفویض نہیں ہو سکا۔',
+    // Task 524 (12 Aug 2026): پرانے بغیر رائیڈر ڈیلیوری بل — الگ سیکشن، گنتی سے باہر۔
+    'old_del_section' => 'پرانی ڈیلیوریز',
+    'old_del_hint' => 'پچھلے دنوں کے بغیر رائیڈر ڈیلیوری بل — رائیڈر اب بھی یہیں سے تفویض ہو سکتا ہے۔',
 
     // Deliveries board upgrades + Pending Deliveries popup finals (owner batch, 3 Aug 2026)
     'delivery_status_dispatched' => 'روانہ',

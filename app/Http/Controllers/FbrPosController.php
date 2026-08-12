@@ -101,6 +101,10 @@ class FbrPosController extends Controller
         // dispatched final bills and delivered-CASH bills still on the rider's
         // unsettled khata — Delivered mark + whole-khata Settle happen right in
         // the popup (PRA Tasks 123/513 port), Deliveries board na kholna pare.
+        // Current business day (00:00–05:59 counts in yesterday). The badge's
+        // client-side date filter uses it, and Task 524 stamps purani unassigned
+        // bills server-side against the same authoritative date.
+        $bizToday = \App\Services\PosBusinessDay::currentFbr($companyId);
         $finalData = collect();
         if ($hasRiderCols && $hasDelStatus && $hasSettleCol && $hasOrderType) {
             $finalBills = \App\Models\FbrPosTransaction::where('company_id', $companyId)
@@ -175,7 +179,14 @@ class FbrPosController extends Controller
             }
 
             $finalData = $finalBills
-                ->map(function ($b) use ($companyId, $hasBizDate, $hasAddress, $riderNames, $riderOpen) {
+                ->map(function ($b) use ($companyId, $hasBizDate, $bizToday, $hasAddress, $riderNames, $riderOpen) {
+                    // Task 524 (FBR mirror): purana (pichhle business day ka)
+                    // UNASSIGNED bill — popup ise alag collapsed "Purani
+                    // deliveries" group mein dikhata hai aur badge ki ginti se
+                    // bahar rakhta hai. Flag SERVER par banta hai.
+                    $billDay = ($hasBizDate && $b->business_date)
+                        ? (string) $b->business_date
+                        : ($b->created_at ? \App\Services\PosBusinessDay::forMomentFbr((int) $companyId, $b->created_at) : null);
                     return [
                         'id'               => $b->id,
                         'is_final'         => true,
@@ -189,9 +200,7 @@ class FbrPosController extends Controller
                         'items_count'      => (int) ($b->items_count ?? 0),
                         'created_human'    => $b->created_at?->diffForHumans(),
                         'created_time'     => $b->created_at?->format('h:i A'),
-                        'business_date'    => ($hasBizDate && $b->business_date)
-                            ? (string) $b->business_date
-                            : ($b->created_at ? \App\Services\PosBusinessDay::forMomentFbr((int) $companyId, $b->created_at) : null),
+                        'business_date'    => $billDay,
                         'delivery_status'  => $b->delivery_status,
                         'rider_id'         => $b->rider_id ? (int) $b->rider_id : null,
                         'rider_name'       => $b->rider_id ? ($riderNames[$b->rider_id] ?? null) : null,
@@ -199,6 +208,9 @@ class FbrPosController extends Controller
                         'rider_unsettled'  => (bool) ($b->rider_id && empty($b->rider_settlement_id) && $b->payment_method === 'cash' && $b->delivery_status !== 'returned'),
                         'rider_open_count' => $b->rider_id ? ($riderOpen[$b->rider_id]['count'] ?? 0) : 0,
                         'rider_open_amount'=> $b->rider_id ? ($riderOpen[$b->rider_id]['amount'] ?? 0) : 0,
+                        // Task 524: purani unassigned = collapsed group + badge se bahar.
+                        'is_stale_unassigned' => (bool) ($bizToday && $billDay && !$b->rider_id
+                            && !$b->delivery_status && $billDay < $bizToday),
                     ];
                 })
                 ->values();
@@ -242,7 +254,7 @@ class FbrPosController extends Controller
             // PosBusinessDay is company-cutoff based (00:00–05:59 counts in
             // yesterday); the Fbr variant reads fbr_day_close_reports for the
             // "already closed" check (Task 492).
-            'business_today' => \App\Services\PosBusinessDay::currentFbr($companyId),
+            'business_today' => $bizToday,
         ]);
     }
 

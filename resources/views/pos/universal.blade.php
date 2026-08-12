@@ -478,10 +478,12 @@ window.addEventListener('popstate', function() {
 
             {{-- Pending Deliveries (Task 114) — today's delivery provisionals, one-click final.
                  Button only appears when there IS something pending (light footprint). --}}
-            <button x-show="pendingDeliveryBills().length > 0" x-cloak @click="openPendingDeliveries()" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition flex-shrink-0" title="{{ __('pos.pending_deliveries_hint') }}">
+            {{-- Task 524: button purani unassigned par bhi khulta hai (reachability),
+                 magar numeric badge sirf FRESH ginti dikhata hai. --}}
+            <button x-show="pendingDeliveryBills().length > 0 || staleDeliveryBills().length > 0" x-cloak @click="openPendingDeliveries()" class="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition flex-shrink-0" title="{{ __('pos.pending_deliveries_hint') }}">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
                 <span class="hidden lg:inline">{{ __('pos.pending_deliveries') }}</span>
-                <span class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-amber-600 text-white text-[9px] rounded-full flex items-center justify-center font-bold" x-text="pendingDeliveryBills().length"></span>
+                <span x-show="pendingDeliveryBills().length > 0" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-amber-600 text-white text-[9px] rounded-full flex items-center justify-center font-bold" x-text="pendingDeliveryBills().length"></span>
             </button>
 
             {{-- Delivery Board (Task 431): rider assign / delivered / settle in a modal
@@ -1006,10 +1008,10 @@ window.addEventListener('popstate', function() {
         @endif
 
         {{-- Pending Deliveries (Task 114) — mobile copy of the nav badge --}}
-        <button x-show="pendingDeliveryBills().length > 0" x-cloak @click="openPendingDeliveries()" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition" title="{{ __('pos.pending_deliveries_hint') }}">
+        <button x-show="pendingDeliveryBills().length > 0 || staleDeliveryBills().length > 0" x-cloak @click="openPendingDeliveries()" class="relative flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition" title="{{ __('pos.pending_deliveries_hint') }}">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
             <span class="hidden sm:inline">{{ __('pos.pending_deliveries') }}</span>
-            <span class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-amber-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="pendingDeliveryBills().length"></span>
+            <span x-show="pendingDeliveryBills().length > 0" class="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-amber-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold" x-text="pendingDeliveryBills().length"></span>
         </button>
 
         {{-- Waiter box RETIRED (Table-se-Bill, Jul 2026): waiter orders now live inside
@@ -2344,7 +2346,7 @@ window.addEventListener('popstate', function() {
                         <p class="text-sm">{{ __('pos.loading_provisional_bills') }}</p>
                     </div>
                 </template>
-                <template x-if="!localBillsLoading && pendingDeliveryBills().length === 0">
+                <template x-if="!localBillsLoading && pendingDeliveryBills().length === 0 && staleDeliveryBills().length === 0">
                     <div class="p-12 text-center text-gray-400">
                         <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         <p class="text-sm font-medium">{{ __('pos.no_pending_deliveries') }}</p>
@@ -2460,6 +2462,61 @@ window.addEventListener('popstate', function() {
                                 </button>
                             </template>
                         </div>
+                        </template>
+                    </div>
+                </template>
+                {{-- Task 524: purane (pichhle business days ke) UNASSIGNED delivery
+                     bills — alag collapsed "Purani deliveries" group, badge/ginti
+                     mein shamil NAHIN. Assign dropdown wahi maujooda assignRider
+                     (POST pos.deliveries.assign) chalata hai. --}}
+                <template x-if="staleDeliveryBills().length > 0">
+                    <div class="border-t-4 border-gray-100 dark:border-gray-800">
+                        <button type="button" @click="showOldDeliveries = !showOldDeliveries"
+                                class="w-full flex items-center justify-between px-4 py-3 text-left bg-gray-50 dark:bg-gray-800/40 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                            <span class="flex items-center gap-2 text-xs font-bold text-gray-600 dark:text-gray-300">
+                                <svg class="w-3.5 h-3.5 text-gray-400 transition-transform" :class="showOldDeliveries ? 'rotate-90' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                {{ __('pos.old_del_section') }}
+                                <span class="px-1.5 py-0.5 rounded-full text-[10px] font-extrabold bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300" x-text="staleDeliveryBills().length"></span>
+                            </span>
+                        </button>
+                        <template x-if="showOldDeliveries">
+                            <div>
+                                <p class="px-4 pt-2 text-[10px] text-gray-400">{{ __('pos.old_del_hint') }}</p>
+                                <template x-for="bill in staleDeliveryBills().slice(0, 50)" :key="'old-' + bill.id">
+                                    <div class="p-4 border-b border-gray-100 dark:border-gray-800">
+                                        <div class="flex items-center justify-between mb-1.5">
+                                            <div class="flex items-center gap-2 flex-wrap">
+                                                <span class="text-sm font-bold text-gray-700 dark:text-gray-300" x-text="bill.invoice_number"></span>
+                                                {{-- Halka (gray) chip — purana bill koi RED demand nahi (Task 524) --}}
+                                                <span class="text-[9px] bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 px-2 py-0.5 rounded-full font-bold">{{ __('pos.del_status_unassigned') }}</span>
+                                            </div>
+                                            <span class="text-sm font-bold text-gray-700 dark:text-gray-300" x-text="'Rs. ' + Number(bill.total_amount).toLocaleString()"></span>
+                                        </div>
+                                        <template x-if="bill.customer_name || bill.customer_phone">
+                                            <p class="text-[11px] font-semibold text-gray-600 dark:text-gray-400" x-text="(bill.customer_name || window.TXT.customer_word) + (bill.customer_phone ? ' · ' + bill.customer_phone : '')"></p>
+                                        </template>
+                                        <template x-if="bill.delivery_address">
+                                            <p class="text-[11px] text-gray-500" x-text="bill.delivery_address"></p>
+                                        </template>
+                                        <p class="text-[11px] text-gray-400 mb-2" x-text="(bill.business_date ? bill.business_date + ' · ' : '') + (bill.created_time || '') + (bill.created_human ? ' (' + bill.created_human + ')' : '')"></p>
+                                        <template x-if="canAssignRider && deliveryRiders.length > 0">
+                                            <div class="flex items-center gap-2">
+                                                <select @change="assignRider(bill, $event.target.value); $event.target.value = ''"
+                                                        :disabled="riderAssignBusyId"
+                                                        class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1.5 focus:ring-purple-500 focus:border-purple-500 disabled:opacity-50">
+                                                    <option value="">{{ __('pos.no_rider_opt') }}</option>
+                                                    <template x-for="r in deliveryRiders" :key="'oldr-' + r.id">
+                                                        <option :value="r.id" x-text="r.name"></option>
+                                                    </template>
+                                                </select>
+                                                <template x-if="riderAssignBusyId === bill.id">
+                                                    <svg class="w-4 h-4 animate-spin text-purple-500 shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
                         </template>
                     </div>
                 </template>
@@ -3896,6 +3953,7 @@ function restaurantPos() {
         // ginti ab rider app / khata se milti hai. F10 Local Bills modal inhe
         // KABHI nahi dikhata (woh sirf localBills parhta hai).
         finalDeliveryBills: [],
+        showOldDeliveries: false, // Task 524: collapsed "Purani deliveries" group
         // Task 513: active riders + assign permission for the Pending Deliveries
         // popup's rider dropdown on UNASSIGNED bills (same pos.deliveries.assign
         // backend as the board — no new path).
@@ -8304,8 +8362,18 @@ function restaurantPos() {
             // Task 513: UNASSIGNED bills (rider NULL + status NULL) ride the 7-din
             // server window like the Deliveries board — today-filter unpar nahi lagta,
             // warna kal ka bina-rider bill popup se ghayab ho jata.
-            const finals = (this.finalDeliveryBills || []).filter(b => isToday(b) || (!b.rider_id && !b.delivery_status));
+            // Task 524: purani (pichhle business days ki) unassigned bills MAIN
+            // list/badge se bahar — woh neeche staleDeliveryBills() ke collapsed
+            // group mein hain. Flag SERVER par banta hai (business_date < aaj ka
+            // business day); yahan sirf parha jata hai.
+            const finals = (this.finalDeliveryBills || []).filter(b => !b.is_stale_unassigned && (isToday(b) || (!b.rider_id && !b.delivery_status)));
             return [...prov, ...finals];
+        },
+        // Task 524: purane (day-close ho chuke dinon ke) UNASSIGNED delivery
+        // bills — popup mein alag collapsed "Purani deliveries" group, badge ki
+        // ginti mein KABHI shamil nahi.
+        staleDeliveryBills() {
+            return (this.finalDeliveryBills || []).filter(b => b.is_stale_unassigned);
         },
         openPendingDeliveries() {
             this.showPendingDeliveries = true;
@@ -8323,7 +8391,7 @@ function restaurantPos() {
             } finally {
                 this.deliveryFinalBusyId = null;
             }
-            if (this.pendingDeliveryBills().length === 0) this.showPendingDeliveries = false;
+            if (this.pendingDeliveryBills().length === 0 && this.staleDeliveryBills().length === 0) this.showPendingDeliveries = false;
         },
         // FINAL delivery bill ko panel se Delivered mark karna (3 Aug 2026) —
         // reuses POST /pos/deliveries/{id}/status (JSON). Promote yahan kabhi

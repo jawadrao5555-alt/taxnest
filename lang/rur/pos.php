@@ -3948,6 +3948,10 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     // Task 513 (12 Aug 2026): rider assign right from the sale-screen popup.
     'rider_assign_ok' => 'Rider assign ho gaya.',
     'rider_assign_failed' => 'Rider assign nahi ho saka.',
+    // Task 524 (12 Aug 2026): purane unassigned delivery bills — alag collapsed
+    // section, tab/badge counts se bahar.
+    'old_del_section' => 'Purani deliveries',
+    'old_del_hint' => 'Pichhle dinon ke bina-rider delivery bills — rider ab bhi yahin se assign ho sakta hai.',
 
     // Deliveries board upgrades + Pending Deliveries popup finals (owner batch, 3 Aug 2026)
     'delivery_status_dispatched' => 'Rawana',

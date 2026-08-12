@@ -424,6 +424,80 @@
             </table>
         </div>
     </div>
+
+    {{-- Task 524 (customer voice note, 12 Aug 2026): purane (pichhle business
+         days ke) UNASSIGNED delivery bills — collapsed section, pending tab ke
+         badge/count mein shamil NAHIN. Assign yahin se ho sakta hai (same
+         pos.deliveries.assign form as the main table; koi naya path nahi). --}}
+    @if($activeTab === 'pending' && ($oldUnassigned ?? collect())->count())
+    <div class="mt-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden" x-data="{ showOldDel: false }">
+        <button type="button" @click="showOldDel = !showOldDel"
+                class="w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition">
+            <span class="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                <svg class="w-4 h-4 text-gray-400 transition-transform flex-shrink-0" :class="showOldDel ? 'rotate-90' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                {{ __('pos.old_del_section') }}
+                <span class="px-1.5 py-0.5 rounded-full text-[11px] font-extrabold bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">{{ $oldUnassigned->count() }}</span>
+            </span>
+            <span class="hidden sm:inline text-[11px] text-gray-400 truncate">{{ __('pos.old_del_hint') }}</span>
+        </button>
+        <div x-show="showOldDel" x-cloak class="border-t border-gray-100 dark:border-gray-800 overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 dark:bg-gray-800/60">
+                    <tr class="text-left text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        <th class="px-4 py-3">{{ __('pos.bill_label') }}</th>
+                        <th class="px-4 py-3">{{ __('pos.customer_word') }}</th>
+                        <th class="px-4 py-3">{{ __('pos.amount_label') }}</th>
+                        <th class="px-4 py-3">{{ __('pos.payment_label') }}</th>
+                        <th class="px-4 py-3">{{ __('pos.rider_label') }}</th>
+                        <th class="px-4 py-3">{{ __('pos.status_label') }}</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    @foreach($oldUnassigned as $b)
+                    <tr>
+                        <td class="px-4 py-3">
+                            <div class="font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5 flex-wrap">
+                                <span>{{ $b->invoice_number ?: ('#' . $b->id) }}</span>
+                                <span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold {{ $b->isLocalBill() ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' }}">{{ $b->isLocalBill() ? __('pos.local_word') : __('pos.pra_word') }}</span>
+                            </div>
+                            <div class="text-[11px] text-gray-400">{{ $b->created_at->format('d M · h:i A') }}</div>
+                        </td>
+                        <td class="px-4 py-3">
+                            <div class="text-gray-700 dark:text-gray-300">{{ $b->customer_name ?: __('pos.walk_in') }}</div>
+                            @if($b->delivery_address)<div class="text-[11px] text-gray-400 max-w-[200px] truncate">{{ $b->delivery_address }}</div>@endif
+                        </td>
+                        <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">Rs. {{ number_format((float) $b->total_amount) }}</td>
+                        <td class="px-4 py-3">
+                            @if($b->payment_method === 'cash')
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">{{ __('pos.cash_word') }}</span>
+                            @else
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">{{ ucwords(str_replace('_',' ', $b->payment_method)) }}</span>
+                            @endif
+                        </td>
+                        <td class="px-4 py-3">
+                            <form method="POST" action="{{ route('pos.deliveries.assign', $b->id) }}">
+                                @csrf
+                                <select name="rider_id" onchange="this.form.submit()" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1 focus:ring-purple-500 focus:border-purple-500">
+                                    <option value="">{{ __('pos.no_rider_opt') }}</option>
+                                    @foreach($riders as $r)
+                                    @if($r->is_active)
+                                    <option value="{{ $r->id }}">{{ $r->name }}{{ ($openDeliveryCounts[$r->id] ?? 0) > 0 ? ' — ' . __('pos.rider_out_pill', ['count' => $openDeliveryCounts[$r->id]]) : '' }}</option>
+                                    @endif
+                                    @endforeach
+                                </select>
+                            </form>
+                        </td>
+                        <td class="px-4 py-3">
+                            {{-- Halka (gray) chip — purana bill koi demand nahi kar raha (Task 524). --}}
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">{{ __('pos.del_status_unassigned') }}</span>
+                        </td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </div>
+    @endif
 </div>
 <script>
 (function () {

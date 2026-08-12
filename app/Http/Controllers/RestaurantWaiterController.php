@@ -745,6 +745,9 @@ class RestaurantWaiterController extends Controller
             'table_id' => $o->table_id !== null ? (int) $o->table_id : null,
             'table' => $o->table ? $o->table->table_number : null,
             'customer_name' => $o->customer_name,
+            // Task 530: daily Order-Matching token — parcel append banner shows
+            // customer name (if entered) warna yeh token, taake waiter pehchan sake.
+            'token_no' => $o->token_no !== null ? (int) $o->token_no : null,
             'customer_phone' => $o->customer_phone,
             'kitchen_notes' => $o->kitchen_notes,
             'waiter' => $o->creator?->name ?? 'Unknown',

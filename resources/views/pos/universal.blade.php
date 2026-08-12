@@ -8461,7 +8461,21 @@ function restaurantPos() {
                 .replace(':name', bill.rider_name || @json(__('pos.rider_word')))
                 .replace(':count', bill.rider_open_count || '?')
                 .replace(':amount', Number(bill.rider_open_amount || 0).toLocaleString());
-            if (!window.confirm(confirmMsg)) return;
+            // Partial receive (Task 532, parity with the Deliveries page Task 525):
+            // prompt asks "abhi kitna cash mila" — default = whole baqaya (Enter =
+            // full settle, unchanged behaviour). Backend re-validates everything.
+            const outstanding = Math.round(Number(bill.rider_open_amount || 0) * 100) / 100;
+            const raw = window.prompt(confirmMsg + '\n\n' + @json(__('pos.cash_received_now')) + ' — ' + @json(__('pos.settle_partial_hint')), String(outstanding));
+            if (raw === null) return; // cancel
+            const received = parseFloat(String(raw).replace(/,/g, ''));
+            if (!isFinite(received) || received <= 0) {
+                this.showToast(@json(__('pos.settle_amount_min_err')), 'error');
+                return;
+            }
+            if (received > outstanding + 0.009) {
+                this.showToast(@json(__('pos.settle_amount_over_err')).replace(':max', outstanding.toLocaleString()), 'error');
+                return;
+            }
             this.riderSettleBusyId = bill.rider_id;
             try {
                 const res = await fetch('{{ url('/pos/riders') }}/' + bill.rider_id + '/settle', {
@@ -8471,7 +8485,7 @@ function restaurantPos() {
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': '{{ csrf_token() }}',
                     },
-                    body: JSON.stringify({ settle_all: 1 }),
+                    body: JSON.stringify({ settle_all: 1, received_amount: received }),
                 });
                 const data = await res.json().catch(() => null);
                 if (res.ok && data && data.success) {

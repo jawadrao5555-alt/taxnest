@@ -6,31 +6,43 @@
     </div>
     <p class="text-sm text-gray-400 mb-6">POS dukanein — kaun abhi online hai aur aaj ({{ \Illuminate\Support\Carbon::parse($bizDate)->format('d M Y') }}, business day) kitni billing hui.</p>
 
-    {{-- Summary tiles --}}
+    {{-- Summary tiles (PRA + FBR combined) --}}
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
             <p class="text-[11px] uppercase tracking-wide text-gray-500">Abhi online</p>
-            <p class="text-xl font-bold text-emerald-400">{{ $summary['online'] }}</p>
+            <p class="text-xl font-bold text-emerald-400">{{ $summary['online'] + $fbrSummary['online'] }}</p>
+            <p class="text-[10px] text-gray-500">PRA {{ $summary['online'] }} &middot; FBR {{ $fbrSummary['online'] }}</p>
         </div>
         <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
             <p class="text-[11px] uppercase tracking-wide text-gray-500">Aaj ke bills</p>
-            <p class="text-xl font-bold text-white">{{ number_format($summary['bills']) }}</p>
+            <p class="text-xl font-bold text-white">{{ number_format($summary['bills'] + $fbrSummary['bills']) }}</p>
+            <p class="text-[10px] text-gray-500">PRA {{ number_format($summary['bills']) }} &middot; FBR {{ number_format($fbrSummary['bills']) }}</p>
         </div>
         <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
             <p class="text-[11px] uppercase tracking-wide text-gray-500">Aaj ki billing</p>
-            <p class="text-xl font-bold text-white">Rs {{ number_format($summary['total']) }}</p>
+            <p class="text-xl font-bold text-white">Rs {{ number_format($summary['total'] + $fbrSummary['total']) }}</p>
+            <p class="text-[10px] text-gray-500">PRA {{ number_format($summary['total']) }} &middot; FBR {{ number_format($fbrSummary['total']) }}</p>
         </div>
         <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
             <p class="text-[11px] uppercase tracking-wide text-gray-500">Active dukanein</p>
-            <p class="text-xl font-bold text-white">{{ $summary['active_shops'] }}</p>
+            <p class="text-xl font-bold text-white">{{ $summary['active_shops'] + $fbrSummary['active_shops'] }}</p>
+            <p class="text-[10px] text-gray-500">PRA {{ $summary['active_shops'] }} &middot; FBR {{ $fbrSummary['active_shops'] }}</p>
         </div>
     </div>
 
-    <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+    @php
+        $sections = [
+            ['title' => 'PRA POS companies', 'regLabel' => 'PRA / Local', 'regTitle' => 'PRA submitted', 'rows' => $rows, 'total' => $totalCompanies, 'empty' => 'Koi PRA POS company nahi mili.'],
+            ['title' => 'FBR POS companies', 'regLabel' => 'FBR / Local', 'regTitle' => 'FBR submitted', 'rows' => $fbrRows, 'total' => $fbrTotalCompanies, 'empty' => 'Koi FBR POS company nahi mili.'],
+        ];
+    @endphp
+
+    @foreach($sections as $sec)
+    <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden @if(!$loop->last) mb-6 @endif">
         <div class="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
-            <h3 class="text-sm font-semibold text-white">POS companies</h3>
-            @if($totalCompanies > $rows->count())
-                <span class="text-xs text-gray-500">Top {{ $rows->count() }} of {{ $totalCompanies }}</span>
+            <h3 class="text-sm font-semibold text-white">{{ $sec['title'] }}</h3>
+            @if($sec['total'] > $sec['rows']->count())
+                <span class="text-xs text-gray-500">Top {{ $sec['rows']->count() }} of {{ $sec['total'] }}</span>
             @endif
         </div>
         <div class="overflow-x-auto">
@@ -41,13 +53,13 @@
                         <th class="px-4 py-3 text-center">Status</th>
                         <th class="px-4 py-3 text-right">Aaj ke bills</th>
                         <th class="px-4 py-3 text-right">Aaj ka total (Rs)</th>
-                        <th class="px-4 py-3 text-center">PRA / Local</th>
+                        <th class="px-4 py-3 text-center">{{ $sec['regLabel'] }}</th>
                         <th class="px-4 py-3 text-right">Aakhri bill</th>
                         <th class="px-4 py-3 text-right">Aakhri activity</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-800">
-                    @forelse($rows as $r)
+                    @forelse($sec['rows'] as $r)
                     <tr class="hover:bg-gray-800/40">
                         <td class="px-4 py-3" data-label="Dukan">
                             <span class="font-medium text-white">{{ $r->name }}</span>
@@ -68,9 +80,9 @@
                         </td>
                         <td class="px-4 py-3 text-right text-white" data-label="Aaj ke bills">{{ number_format($r->bill_count) }}</td>
                         <td class="px-4 py-3 text-right font-semibold text-white" data-label="Aaj ka total">{{ number_format($r->total) }}</td>
-                        <td class="px-4 py-3 text-center text-xs" data-label="PRA / Local">
+                        <td class="px-4 py-3 text-center text-xs" data-label="{{ $sec['regLabel'] }}">
                             @if($r->bill_count > 0)
-                                <span class="text-sky-400" title="PRA submitted">{{ $r->pra_submitted }}</span>
+                                <span class="text-sky-400" title="{{ $sec['regTitle'] }}">{{ $r->reg_submitted }}</span>
                                 <span class="text-gray-600">/</span>
                                 <span class="text-gray-300" title="Local / NULL">{{ $r->local_bills }}</span>
                                 @if($r->other_bills > 0)
@@ -89,15 +101,16 @@
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">Koi POS company nahi mili.</td></tr>
+                    <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">{{ $sec['empty'] }}</td></tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
         <div class="px-5 py-3 border-t border-gray-800 text-[11px] text-gray-500">
-            Online = pichhle ~5 minute mein staff activity (heartbeat). PRA / Local = aaj ke bills ka breakdown (PRA-submitted / local ya NULL / baqi pending-offline-failed).
+            Online = pichhle ~5 minute mein staff activity (heartbeat). {{ $sec['regLabel'] }} = aaj ke bills ka breakdown ({{ $sec['regTitle'] }} / local ya NULL / baqi pending-offline-failed).
         </div>
     </div>
+    @endforeach
 </div>
 
 <script>

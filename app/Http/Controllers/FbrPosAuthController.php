@@ -210,6 +210,20 @@ class FbrPosAuthController extends Controller
 
     public function logout(Request $request)
     {
+        // Task 558 (Live Activity): logout par is user ki sab khuli session
+        // rows band karo — warna shop 6 minute tak online dikhta rehta.
+        try {
+            $u = Auth::guard('fbrpos')->user();
+            if ($u) {
+                \Illuminate\Support\Facades\DB::table('pos_user_sessions')
+                    ->where('user_id', $u->id)
+                    ->whereNull('logout_at')
+                    ->update(['logout_at' => now(), 'last_activity_at' => now(), 'updated_at' => now()]);
+            }
+        } catch (\Throwable $e) {
+            // Table not migrated yet — ignore.
+        }
+
         Auth::guard('fbrpos')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();

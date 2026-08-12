@@ -108,8 +108,12 @@ class AppServiceProvider extends ServiceProvider
             // writes one attendance row. Impersonation (admin session active)
             // is excluded — SaaS admin ka "View as" kabhi hazri na banaye.
             // Direct DB insert: no model events; failure NEVER blocks a login.
+            // Task 558: fbrpos guard bhi included — FBR POS shops ka "online"
+            // indicator (Live Activity) inhi session rows se chalta hai. FBR
+            // companies kabhi PRA Staff Hazri report mein nahi aatin (report
+            // company-scoped hai), is liye table share karna safe hai.
             try {
-                if (($event->guard ?? null) === 'pos'
+                if (in_array($event->guard ?? null, ['pos', 'fbrpos'], true)
                     && $event->user instanceof \App\Models\User
                     && $event->user->company_id
                     && !\Illuminate\Support\Facades\Auth::guard('admin')->check()) {

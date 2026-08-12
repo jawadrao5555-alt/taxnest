@@ -1288,6 +1288,7 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::get('/transaction/{id}/pdf-preview', [FbrPosController::class, 'previewPdf'])->name('fbrpos.pdf.preview');
     Route::get('/day-close', [FbrPosController::class, 'dayCloseReport'])->name('fbrpos.day-close');
     Route::post('/day-close', [FbrPosController::class, 'closeDayReport'])->name('fbrpos.close-day');
+    Route::post('/day-close/close-all-prior', [FbrPosController::class, 'closeAllPriorDays'])->name('fbrpos.close-all-days');
     Route::get('/day-close/{id}/pdf', [FbrPosController::class, 'dayCloseReportPdf'])->name('fbrpos.day-close-pdf');
     Route::get('/day-close/{id}/thermal', [FbrPosController::class, 'dayCloseThermal'])->name('fbrpos.day-close-thermal');
     Route::get('/reports/analytics-pdf', [FbrPosController::class, 'reportsAnalyticsPdf'])->name('fbrpos.reports.analytics-pdf');

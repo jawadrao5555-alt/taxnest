@@ -476,7 +476,7 @@ class FbrPosController extends Controller
      *   - Idempotent: returns existing report when already closed (never throws on duplicate intent)
      *   - Returns null only when no transactions exist for that date
      */
-    private function performDayClose(int $companyId, string $date, ?int $userId, ?string $notes = null, ?array $cashRecon = null): ?FbrDayCloseReport
+    private function performDayClose(int $companyId, string $date, ?int $userId, ?string $notes = null, ?array $cashRecon = null, bool $allowEmpty = false): ?FbrDayCloseReport
     {
         // Fast-path: already closed → return without locking
         $existing = FbrDayCloseReport::where('company_id', $companyId)
@@ -502,7 +502,10 @@ class FbrPosController extends Controller
         $transactions = FbrPosTransaction::where('company_id', $companyId)
             ->tap(fn ($q) => $this->whereBizDate($q, $date))
             ->with('creator')->orderBy('created_at')->get();
-        if ($transactions->isEmpty()) {
+        // Task 519 (FBR mirror of PRA Task 516): $allowEmpty lets a stranded
+        // PRIOR day close with a zero-figure Z-report so it finally leaves the
+        // banner. Today's empty close still refuses (allowEmpty=false).
+        if ($transactions->isEmpty() && !$allowEmpty) {
             return null;
         }
 
@@ -3590,26 +3593,31 @@ class FbrPosController extends Controller
      * open late-night yesterday is simply "today" and never flagged.
      * Returns an ascending collection of Y-m-d strings (max 30 days back).
      */
-    private function unclosedPriorBusinessDays(int $companyId, ?string $excludeDate = null)
+    private function unclosedPriorBusinessDays(int $companyId, ?string $excludeDate = null, bool $oldestFirst = false)
     {
         $bizToday = $this->fbrBizToday($companyId);
-        $priorDates = FbrPosTransaction::where('company_id', $companyId)
-            ->tap(fn ($q) => $this->whereBizDate($q, $bizToday, '<'))
-            ->selectRaw($this->bizDateExpr() . ' as d')
-            ->groupBy('d')
-            ->orderByDesc('d')
-            ->limit(30)
-            ->pluck('d')
-            ->map(fn ($d) => (string) $d);
-        if ($priorDates->isEmpty()) {
-            return collect();
-        }
-        // No whereIn on report_date: the column may hold datetimes (driver-
-        // dependent), so filter after normalizing — same convention as
-        // getPendingDayCloses.
+        // Closed dates FIRST, excluded inside the query (Task 519 — same fix
+        // as PRA Task 516): the old shape limited to the newest 30 dates
+        // BEFORE dropping closed ones, so once a 30-date page was all closed,
+        // remaining still-open days became invisible — the bulk close could
+        // never finish a 31+ day backlog. Normalized in PHP (no whereIn on
+        // report_date — drivers that store DATE with a time part would miss
+        // every match); a company has few report rows.
         $closedDates = FbrDayCloseReport::where('company_id', $companyId)
             ->pluck('report_date')
             ->map(fn ($d) => \Carbon\Carbon::parse($d)->toDateString());
+        $priorDates = FbrPosTransaction::where('company_id', $companyId)
+            ->tap(fn ($q) => $this->whereBizDate($q, $bizToday, '<'))
+            ->selectRaw($this->bizDateExpr() . ' as d')
+            ->when($closedDates->isNotEmpty(),
+                fn ($q) => $q->whereNotIn(\DB::raw($this->bizDateExpr()), $closedDates->all()))
+            ->groupBy('d')
+            // oldestFirst (Task 519 bulk close): page from the OLDEST open day so
+            // chronological closing never skips days beyond the 30-row window.
+            ->orderBy('d', $oldestFirst ? 'asc' : 'desc')
+            ->limit(30)
+            ->pluck('d')
+            ->map(fn ($d) => (string) $d);
 
         return $priorDates
             ->reject(fn ($d) => $closedDates->contains($d) || $d === $excludeDate)
@@ -3720,6 +3728,72 @@ class FbrPosController extends Controller
         ];
     }
 
+    /**
+     * Task 519 (FBR mirror of PRA Task 516): bulk-close ALL stranded prior
+     * trading days in one click. Iterates chronologically and calls the SAME
+     * performDayClose routine per day — no parallel close path. Empty stranded
+     * days get a zero-figure Z-report ($allowEmpty) so they leave the banner.
+     */
+    public function closeAllPriorDays(Request $request)
+    {
+        // Same authority gate as the single close (owner rule 5 Aug 2026).
+        $user = Auth::guard('fbrpos')->user();
+        if ($user && !\App\Services\PosAccessService::dayCloseAllowed($user)) {
+            return redirect()->route('fbrpos.dashboard')->with('error', __('pos.custom_access_denied'));
+        }
+        $companyId = app('currentCompanyId');
+
+        if ($this->unclosedPriorBusinessDays($companyId)->isEmpty()) {
+            return back()->with('success', __('pos.dc_bulk_none_pending'));
+        }
+
+        $closed = 0;
+        $zeroDays = 0;
+        // The detector returns at most 30 dates per query — RE-QUERY until the
+        // backlog is exhausted so 31+ open days still finish in ONE click.
+        // oldestFirst: pages come CHRONOLOGICALLY (oldest day first) so reports
+        // number in trading order. Guard caps the loop; each pass must make
+        // progress or we bail (never spin).
+        for ($pass = 0; $pass < 30; $pass++) {
+            $pending = $this->unclosedPriorBusinessDays($companyId, null, true); // oldest 30, ascending
+            if ($pending->isEmpty()) {
+                break;
+            }
+            $closedThisPass = 0;
+            foreach ($pending as $day) {
+                $report = $this->performDayClose($companyId, $day, $user?->id, null, null, true);
+                if ($report) {
+                    $closed++;
+                    $closedThisPass++;
+                    if ((int) ($report->total_invoices ?? 0) === 0) {
+                        $zeroDays++;
+                    }
+                }
+            }
+            if ($closedThisPass === 0) {
+                break;
+            }
+        }
+
+        $msg = __('pos.dc_bulk_done', ['closed' => $closed, 'zero' => $zeroDays]);
+        // Sweep summary (same as the single close): tell the cashier what the
+        // 'Khud Final' policy did across the bulk run, if anything.
+        $sweep = $this->lastFinalizeSweep;
+        if (($sweep['finalized'] ?? 0) > 0) {
+            $msg .= __('pos.dayclose_bills_finalized', ['count' => $sweep['finalized']]);
+        }
+
+        // Honest "all": if anything is somehow still pending after the capped
+        // passes (900 days) or a stalled pass, say so instead of implying done.
+        $remaining = $this->unclosedPriorBusinessDays($companyId, null, true)->count();
+        if ($remaining > 0) {
+            return redirect()->route('fbrpos.day-close')
+                ->with('error', $msg . ' ' . __('pos.dc_bulk_partial', ['remaining' => $remaining]));
+        }
+
+        return redirect()->route('fbrpos.day-close')->with('success', $msg);
+    }
+
     public function closeDayReport(Request $request)
     {
         // Owner rule (5 Aug 2026, mirrored from PRA): cashier day-close only
@@ -3752,8 +3826,11 @@ class FbrPosController extends Controller
             ];
         }
 
-        // Route through shared writer (transaction + atomic numbering + race-safe)
-        $report = $this->performDayClose($companyId, $date, $user->id, $request->input('notes'), $cashRecon);
+        // Route through shared writer (transaction + atomic numbering + race-safe).
+        // Task 519 (mirror of PRA Task 516): a PRIOR trading day may close with
+        // zero figures (stranded empty day) — today's empty close still refuses.
+        $allowEmpty = $date < $this->fbrBizToday($companyId);
+        $report = $this->performDayClose($companyId, $date, $user->id, $request->input('notes'), $cashRecon, $allowEmpty);
 
         if (!$report) {
             return back()->with('error', __('pos.dayclose_no_transactions'));

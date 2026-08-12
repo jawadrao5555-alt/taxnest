@@ -4,7 +4,7 @@
         <h1 class="text-2xl font-bold text-white">Live Activity</h1>
         <span class="text-xs text-gray-500">Auto-refresh 60s &middot; {{ now()->format('h:i A') }}</span>
     </div>
-    <p class="text-sm text-gray-400 mb-6">POS dukanein — kaun abhi online hai aur aaj ({{ \Illuminate\Support\Carbon::parse($bizDate)->format('d M Y') }}, business day) kitni billing hui.</p>
+    <p class="text-sm text-gray-400 mb-6">POS shops — who is online right now and today's billing ({{ \Illuminate\Support\Carbon::parse($bizDate)->format('d M Y') }}, business day).</p>
 
     {{-- Summary tiles (PRA + FBR combined) --}}
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
@@ -107,7 +107,7 @@
             </table>
         </div>
         <div class="px-5 py-3 border-t border-gray-800 text-[11px] text-gray-500">
-            Online = pichhle ~5 minute mein staff activity (heartbeat). {{ $sec['regLabel'] }} = aaj ke bills ka breakdown ({{ $sec['regTitle'] }} / local ya NULL / baqi pending-offline-failed).
+            Online = staff activity within the last ~5 minutes (heartbeat). {{ $sec['regLabel'] }} = today's bill breakdown ({{ $sec['regTitle'] }} / local or NULL / remaining pending-offline-failed).
         </div>
     </div>
     @endforeach

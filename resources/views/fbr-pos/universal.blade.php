@@ -1315,11 +1315,11 @@ window.addEventListener('popstate', function() {
                          charge equals the band total for either method. PAY (F8) keeps the
                          modal (method choice + buyer NTN etc.). --}}
                     <div class="grid grid-cols-2 gap-2">
-                        <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 0; processPayment('cash')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
+                        <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 0; payPrintReceipt = billPrintDefault(); processPayment('cash')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
                             <span class="flex items-center gap-1.5 text-xs font-extrabold leading-none"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>CASH</span>
                             <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(roundedTotal).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+1</kbd></span>
                         </button>
-                        <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 1; processPayment('card')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-gray-700 hover:bg-gray-800 dark:bg-gray-600 dark:hover:bg-gray-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
+                        <button @click="payingHeldOrderId = null; saveAsProvisional = false; payMethodIndex = 1; payPrintReceipt = billPrintDefault(); processPayment('card')" :disabled="cart.length === 0 || submitting" class="py-1.5 rounded-xl bg-gray-700 hover:bg-gray-800 dark:bg-gray-600 dark:hover:bg-gray-700 text-white disabled:opacity-30 shadow-sm transition flex flex-col items-center gap-0.5">
                             <span class="flex items-center gap-1.5 text-xs font-extrabold leading-none"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>CARD</span>
                             <span class="flex items-center gap-1 leading-none"><span class="text-[9px] text-white/75" x-text="cart.length ? 'Rs. ' + Number(roundedTotal).toLocaleString() : ''"></span><kbd class="text-[8px] bg-white/20 px-1 rounded font-mono">Alt+2</kbd></span>
                         </button>
@@ -1363,7 +1363,7 @@ window.addEventListener('popstate', function() {
          Provisional save is now a SEPARATE button + F9 shortcut
          in the right sidebar (no modal, no checkbox, no key conflict).
          ═══════════════════════════════════════════════════════════════ -->
-    <div x-show="showPayModal" x-cloak x-transition.opacity x-effect="if (showPayModal) { submitting = false; saveAsProvisional = false; payMethodIndex = 0; cashReceived = ''; }" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false">
+    <div x-show="showPayModal" x-cloak x-transition.opacity x-effect="if (showPayModal) { submitting = false; saveAsProvisional = false; payMethodIndex = 0; cashReceived = ''; payPrintReceipt = billPrintDefault(); } else if (!submitting) { payPrintReceipt = billPrintDefault(); }" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPayModal = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" x-transition.scale.90>
             <div class="p-5 text-center border-b border-gray-100 dark:border-gray-800">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ __('pos.payment') }}</h3>
@@ -1437,6 +1437,15 @@ window.addEventListener('popstate', function() {
                 <p x-show="cashReceived !== '' && parseFloat(cashReceived) > 0 && roundedTotal - parseFloat(cashReceived) > 0.001" x-cloak class="mt-1.5 text-center text-[11px] font-bold text-amber-600 dark:text-amber-400" x-text="window.TXT.short_by_rs + Math.round(roundedTotal - parseFloat(cashReceived)).toLocaleString() + window.TXT.more_needed_sfx"></p>
             </div>
             @endif
+            {{-- Task 520 (port of Task 514): per-bill receipt auto-print choice (default =
+                 company auto-print setting; unticked = SIRF is bill ki receipt auto-print
+                 skip — KOT/FBR submission/receipt popup untouched). --}}
+            <div class="px-4 pb-1" @click.stop>
+                <label class="flex items-center gap-2 text-[11px] text-gray-600 dark:text-gray-300 cursor-pointer select-none">
+                    <input type="checkbox" x-model="payPrintReceipt" class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                    <span>{{ __('pos.final_print_receipt') }}</span>
+                </label>
+            </div>
             <div class="px-4 pb-0.5">
                 <p class="text-center text-[10px] text-gray-400 dark:text-gray-500 font-medium">{{ __('pos.use_word') }} <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&larr;</kbd> <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">&rarr;</kbd> to choose &middot; <kbd class="px-1 font-mono text-gray-500 dark:text-gray-400">Enter</kbd> to confirm</p>
             </div>
@@ -2887,6 +2896,9 @@ function restaurantPos() {
         // Auto-Print receipt on successful sale — FBR POS persists this per-browser
         // (localStorage 'fbrpos_auto_print'), NOT via a server column. Default ON.
         autoPrintEnabled: (function(){ try { return localStorage.getItem('fbrpos_auto_print') !== '0'; } catch(e) { return true; } })(),
+        // Task 520 (port of Task 514): Pay modal ka per-bill "Receipt print karein"
+        // checkbox — default = billPrintDefault() (auto-print master ka mirror).
+        payPrintReceipt: true,
         // Kitchen ticket auto-print — persisted server-side in companies.auto_print_kot.
         // Gated on kitchen_printer_enabled; read at page boot so the toggle survives
         // a refresh. hasColumn guard keeps the site alive if migration has not run yet.
@@ -3233,7 +3245,7 @@ function restaurantPos() {
         // Queue a bill that could NOT reach the server (no internet). Mirrors the
         // success UX: receipt popup (offline variant) + optional auto-print of a
         // client-rendered interim receipt, cart cleared so billing continues.
-        async queueOfflineBill(payload, method, savedTotal) {
+        async queueOfflineBill(payload, method, savedTotal, skipReceipt = false) {
             // REUSE the uuid already attached by processPaymentManual (it rode on
             // the failed online attempt too) — minting a fresh one here would
             // reopen the lost-response duplicate window. Fallback only if absent.
@@ -3283,7 +3295,9 @@ function restaurantPos() {
             this.showReceipt = true;
             this.scheduleReceiptAutoClose();
             this.showToast(window.TXT.offline_bill_saved_will_sync, 'success');
-            if (this.autoPrintEnabled) {
+            // Task 520: per-bill untick = interim offline receipt bhi auto-print skip
+            // (popup + queue + sync untouched).
+            if (!skipReceipt && this.autoPrintEnabled) {
                 setTimeout(() => this.printOfflineReceipt(), 400);
             }
             this.clearCart();
@@ -4593,10 +4607,10 @@ function restaurantPos() {
             // ── RETAIL FAST BILLING shortcuts (Aug 2026) ──────────────────────────
             // Alt+1 / Alt+2 — one-tap CASH / CARD: skip modal entirely when cart has items.
             // Mirrors the mock-up (PRA-aligned): no confirmation step for simple retail sales.
-            if (e.altKey && e.key === '1') { e.preventDefault(); if (this.cart.length > 0 && !this.submitting && !this.showPayModal) { this.submitting = false; this.saveAsProvisional = false; this.processPayment('cash'); } return; }
-            if (e.altKey && e.key === '2') { e.preventDefault(); if (this.cart.length > 0 && !this.submitting && !this.showPayModal) { this.submitting = false; this.saveAsProvisional = false; this.processPayment('card'); } return; }
+            if (e.altKey && e.key === '1') { e.preventDefault(); if (this.cart.length > 0 && !this.submitting && !this.showPayModal) { this.submitting = false; this.saveAsProvisional = false; this.payPrintReceipt = this.billPrintDefault(); this.processPayment('cash'); } return; }
+            if (e.altKey && e.key === '2') { e.preventDefault(); if (this.cart.length > 0 && !this.submitting && !this.showPayModal) { this.submitting = false; this.saveAsProvisional = false; this.payPrintReceipt = this.billPrintDefault(); this.processPayment('card'); } return; }
             // Alt+3 — instant UDHAAR (khata) sale; needs a selected customer (payUdhaar guards).
-            if (e.altKey && e.key === '3') { e.preventDefault(); if (this.cart.length > 0 && !this.submitting && !this.showPayModal) { this.submitting = false; this.saveAsProvisional = false; this.payUdhaar(); } return; }
+            if (e.altKey && e.key === '3') { e.preventDefault(); if (this.cart.length > 0 && !this.submitting && !this.showPayModal) { this.submitting = false; this.saveAsProvisional = false; this.payPrintReceipt = this.billPrintDefault(); this.payUdhaar(); } return; }
             // Alt+R — Reprint last bill (Akhri Bills top entry).
             if (e.altKey && (e.key === 'r' || e.key === 'R')) { e.preventDefault(); const last = this.recentBills[0]; if (last) { this._printViaIframe('print-receipt-frame', '/fbr-pos/transaction/' + last.id + '/receipt?auto_print=1', 'width=400,height=700'); this.showToast('Reprinting #' + last.invoice_number, 'info'); } else if (this.lastTransactionId) { this.printReceipt(); this.showToast('Reprinting last bill...', 'info'); } else { this.showToast(window.TXT.no_bill_reprint, 'warning'); } return; }
             if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }
@@ -5488,6 +5502,9 @@ function restaurantPos() {
             if (this.cart.length === 0) { this.showToast(window.TXT.cart_is_empty, 'error'); return; }
             this.saveAsProvisional = true;
             this.showPayModal = false;
+            // Task 520: direct provisional save = no checkbox surface — company
+            // default use karo, stale per-bill untick inherit na ho.
+            this.payPrintReceipt = this.billPrintDefault();
             await this.processPayment('cash');
         },
 
@@ -5513,10 +5530,14 @@ function restaurantPos() {
             // Capture provisional flag once at submission start so a stray
             // re-render/checkbox toggle mid-flight cannot flip the path.
             const provisional = !!this.saveAsProvisional;
+            // Task 520 (port of Task 514): per-bill receipt print choice snapshot
+            // (checkbox unticked = skip SIRF is bill ki receipt auto-print;
+            // KOT/FBR submission/receipt popup untouched).
+            const skipReceipt = !this.payPrintReceipt;
 
             if (this.payingHeldOrderId) {
                 this.submitting = true; this.stockError = '';
-                await this.payHeldOrderDirect(this.payingHeldOrderId, method, null, provisional);
+                await this.payHeldOrderDirect(this.payingHeldOrderId, method, null, provisional, skipReceipt);
                 this.payingHeldOrderId = null;
                 this.showPayModal = false; this.submitting = false; this.saveAsProvisional = false;
                 return;
@@ -5536,7 +5557,7 @@ function restaurantPos() {
             // returns 403. Route ALL payments through processPaymentManual
             // which posts directly to pos.invoice.store (universal endpoint).
             if (!this.isRestaurantMode || this.hasManualItems()) {
-                return await this.processPaymentManual(method, provisional);
+                return await this.processPaymentManual(method, provisional, skipReceipt);
             }
 
             const now = Date.now();
@@ -5556,7 +5577,7 @@ function restaurantPos() {
                 const holdData = await holdRes.json();
                 if (!holdData.success) { this.showToast(holdData.message || window.TXT.failed_word, 'error'); this.submitting = false; return; }
                 const savedTotal = this.totalAmount;
-                await this.payHeldOrderDirect(holdData.order.id, method, savedTotal, provisional);
+                await this.payHeldOrderDirect(holdData.order.id, method, savedTotal, provisional, skipReceipt);
                 this.clearCart();
                 // Auto-focus phone input → ready for next sale, NO dead focus.
                 this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
@@ -5574,7 +5595,7 @@ function restaurantPos() {
         // master-product in resolveItemExemptions). Returns JSON when
         // wantsJson() — same shape used by payHeldOrderDirect for receipt
         // modal rendering.
-        async processPaymentManual(method, provisional = false) {
+        async processPaymentManual(method, provisional = false, skipReceipt = false) {
             const now = Date.now();
             if (now - this.lastPayTime < 3000) return;
             this.lastPayTime = now;
@@ -5641,7 +5662,7 @@ function restaurantPos() {
                         this.showPayModal = false; this.submitting = false;
                         return;
                     }
-                    await this.queueOfflineBill(payload, method, savedTotal);
+                    await this.queueOfflineBill(payload, method, savedTotal, skipReceipt);
                     this.showPayModal = false; this.submitting = false; this.saveAsProvisional = false;
                     return;
                 }
@@ -5664,7 +5685,7 @@ function restaurantPos() {
                         this.showPayModal = false; this.submitting = false;
                         return;
                     }
-                    await this.queueOfflineBill(payload, method, savedTotal);
+                    await this.queueOfflineBill(payload, method, savedTotal, skipReceipt);
                     this.showPayModal = false; this.submitting = false; this.saveAsProvisional = false;
                     return;
                 }
@@ -5711,7 +5732,7 @@ function restaurantPos() {
                 // Held row is deleted on recall, so post-pay KOT uses the TRANSACTION
                 // reprint endpoint (isFbrHeld=false). Passing the transaction_id (not null)
                 // lets autoKotEnabled=true fire when kitchen_printer is on.
-                this.runAutoPrintChain(data.transaction_id || null, /* isFbrHeld= */ false);
+                this.runAutoPrintChain(data.transaction_id || null, /* isFbrHeld= */ false, skipReceipt);
                 this.clearCart();
                 this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
                 // Refresh provisional badge count if this save was provisional.
@@ -5873,12 +5894,20 @@ function restaurantPos() {
         //
         // ✅ FIX (May-07): Tightened gap between receipt-finish → KOT-start (300ms → 80ms)
         // and initial chain start (400ms → 150ms) to feel snappier on thermal printers.
-        runAutoPrintChain(orderId, isFbrHeld) {
+        // Task 520 (port of Task 514): per-bill checkbox ka default — FBR POS par
+        // auto-print master switch ka mirror (koi dine-in variant nahi).
+        billPrintDefault() {
+            return !!this.autoPrintEnabled;
+        },
+        // skipReceiptOverride (Task 520, port of Task 514): cashier ne per-bill
+        // "Receipt print karein" checkbox UNTICK kiya — SIRF is bill ki receipt
+        // auto-print skip; KOT gate / FBR submission / receipt popup sab untouched.
+        runAutoPrintChain(orderId, isFbrHeld, skipReceiptOverride = false) {
             // MASTER GATE — auto-print OFF means NOTHING fires automatically.
             if (!this.autoPrintEnabled) return;
             const hasReceipt = !!this.lastTransactionId;
             const wantsKot = !!this.autoKotEnabled && !!orderId;
-            const wantsReceipt = hasReceipt;
+            const wantsReceipt = hasReceipt && !skipReceiptOverride;
             if (!wantsReceipt && !wantsKot) return;
             // isFbrHeld distinguishes held-sale KOT (uses /fbr-pos/held/{id}/kitchen-ticket)
             // from completed-transaction reprint (uses /fbr-pos/transaction/{id}/kot-reprint).
@@ -6155,7 +6184,7 @@ function restaurantPos() {
             } catch (e) { console.error('Delete held order error:', e); this.showToast(window.TXT.error_deleting_order, 'error'); }
         },
 
-        async payHeldOrderDirect(orderId, method, savedTotal, provisional = false) {
+        async payHeldOrderDirect(orderId, method, savedTotal, provisional = false, skipReceipt = false) {
             try {
                 // PROVISIONAL BILL FLOW — when true, RestaurantPosController::payOrder
                 // forces fbr_status='local' and skips FBR submission. Bill remains
@@ -6186,7 +6215,7 @@ function restaurantPos() {
                     // Uses postMessage-chained engine — KOT never fires before the receipt
                     // print dialog is dismissed (was a race in the old setTimeout(200/1800) impl
                     // on slow networks where KOT iframe loaded before receipt iframe).
-                    this.runAutoPrintChain(orderId, /* isFbrHeld= */ false); // PRA restaurant order ID
+                    this.runAutoPrintChain(orderId, /* isFbrHeld= */ false, skipReceipt); // PRA restaurant order ID
                     // Refresh provisional badge count when this save was provisional.
                     if (provisional) { this.loadLocalBills(); }
                     // Refresh failed badge so cashier sees pending/failed state in real time.

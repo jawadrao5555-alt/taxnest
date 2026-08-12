@@ -2322,6 +2322,33 @@ window.addEventListener('popstate', function() {
     {{-- click Final (Cash/Card) via the SAME promote path as F10 Make Final.  --}}
     {{-- Receipt print = opt-in checkbox (default NO); rider-khata warning.     --}}
     {{-- ─────────────────────────────────────────────────────────────────────── --}}
+    {{-- Task 543: Rider settle amount modal (replaces window.prompt) — deliveries.blade.php
+         pattern: default full baqaya, live "Baqaya:" line, over-amount disables confirm.
+         Sits ABOVE the pending-deliveries modal (inline z-index — no Tailwind rebuild dep). --}}
+    <div x-show="riderSettleBill" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" style="z-index: 60;" @click.self="riderSettleBill = null">
+        <div class="bg-white dark:bg-gray-900 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-sm p-5">
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.settle_cash') }} — <span x-text="riderSettleBill ? (riderSettleBill.rider_name || @json(__('pos.rider_word'))) : ''"></span></h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-3" x-text="riderSettleBill ? txtRiderSettleScope(riderSettleBill) : ''"></p>
+            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.cash_received_now') }}</label>
+            <input type="number" id="rider-settle-amount" x-model="riderSettleAmount" min="1" step="0.01" inputmode="decimal"
+                   @keydown.enter.prevent="submitRiderSettle()"
+                   class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm font-bold focus:ring-purple-500 focus:border-purple-500">
+            <p class="text-[11px] text-gray-400 mt-1">{{ __('pos.settle_partial_hint') }}</p>
+            <p class="text-[11px] font-semibold text-red-600 dark:text-red-400 mt-1" x-show="parseFloat(riderSettleAmount || 0) > riderSettleOutstanding + 0.009" x-cloak>{{ __('pos.settle_amount_over_live') }}</p>
+            <div class="flex items-center justify-between gap-3 mt-4">
+                <div class="text-xs font-bold" :class="(riderSettleOutstanding - (parseFloat(riderSettleAmount) || 0)) > 0.009 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'">{{ __('pos.baqaya_colon') }} Rs. <span x-text="Math.max(0, riderSettleOutstanding - (parseFloat(riderSettleAmount) || 0)).toLocaleString()"></span></div>
+                <div class="flex gap-2">
+                    <button type="button" class="px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition" @click="riderSettleBill = null">{{ __('pos.cancel') }}</button>
+                    <button type="button" class="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold shadow-sm hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                            :disabled="riderSettleBusyId || !(parseFloat(riderSettleAmount) > 0) || parseFloat(riderSettleAmount) > riderSettleOutstanding + 0.009"
+                            @click="submitRiderSettle()">
+                        <template x-if="riderSettleBusyId"><svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg></template>
+                        {{ __('pos.confirm_settlement') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
     <div x-show="showPendingDeliveries" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPendingDeliveries = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden" x-transition.scale.90>
             <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-amber-50 dark:bg-amber-900/20 flex-shrink-0">
@@ -3975,6 +4002,10 @@ function restaurantPos() {
         bizToday: '',
         deliveryFinalBusyId: null,
         riderSettleBusyId: null,
+        // Task 543: styled settle-amount modal (replaces window.prompt)
+        riderSettleBill: null,
+        riderSettleOutstanding: 0,
+        riderSettleAmount: '',
         // Receipt print default = NO (delivery customer isn't at the counter).
         // Opt-in checkbox persisted per device.
         deliveryPrintReceipt: (function(){ try { return localStorage.getItem('pos_delivery_final_print') === '1'; } catch(e) { return false; } })(),
@@ -6019,6 +6050,11 @@ function restaurantPos() {
             }
             // PENDING DELIVERIES panel (Task 114) — Esc closes. Clicks do the
             // work; no list-nav keys so nothing collides with the F10 mappings.
+            // Task 543: settle modal sits ABOVE pending-deliveries — Escape closes it FIRST
+            if (this.riderSettleBill) {
+                if (e.key === 'Escape') { e.preventDefault(); this.riderSettleBill = null; }
+                return;
+            }
             if (this.showPendingDeliveries) {
                 if (e.key === 'Escape') { e.preventDefault(); this.showPendingDeliveries = false; }
                 return;
@@ -8455,19 +8491,22 @@ function restaurantPos() {
                 .replace(':count', bill.rider_open_count)
                 .replace(':amount', Number(bill.rider_open_amount || 0).toLocaleString());
         },
-        async settleRider(bill) {
+        settleRider(bill) {
             if (!bill || !bill.rider_id || this.riderSettleBusyId) return;
-            const confirmMsg = @json(__('pos.rider_settle_confirm'))
-                .replace(':name', bill.rider_name || @json(__('pos.rider_word')))
-                .replace(':count', bill.rider_open_count || '?')
-                .replace(':amount', Number(bill.rider_open_amount || 0).toLocaleString());
-            // Partial receive (Task 532, parity with the Deliveries page Task 525):
-            // prompt asks "abhi kitna cash mila" — default = whole baqaya (Enter =
-            // full settle, unchanged behaviour). Backend re-validates everything.
-            const outstanding = Math.round(Number(bill.rider_open_amount || 0) * 100) / 100;
-            const raw = window.prompt(confirmMsg + '\n\n' + @json(__('pos.cash_received_now')) + ' — ' + @json(__('pos.settle_partial_hint')), String(outstanding));
-            if (raw === null) return; // cancel
-            const received = parseFloat(String(raw).replace(/,/g, ''));
+            // Task 543 (upgrades Task 532's window.prompt): styled inline modal —
+            // deliveries.blade.php parity: default = whole baqaya, live "Baqaya:"
+            // line, over-amount disables confirm. Backend re-validates everything.
+            this.riderSettleOutstanding = Math.round(Number(bill.rider_open_amount || 0) * 100) / 100;
+            this.riderSettleAmount = this.riderSettleOutstanding > 0 ? String(this.riderSettleOutstanding) : '';
+            this.riderSettleBill = bill;
+            // Root-level modal input — focus via document (x-for row $refs scope trap)
+            this.$nextTick(() => { const el = document.getElementById('rider-settle-amount'); if (el) { el.focus(); el.select(); } });
+        },
+        async submitRiderSettle() {
+            const bill = this.riderSettleBill;
+            if (!bill || this.riderSettleBusyId) return;
+            const outstanding = this.riderSettleOutstanding;
+            const received = parseFloat(String(this.riderSettleAmount).replace(/,/g, ''));
             if (!isFinite(received) || received <= 0) {
                 this.showToast(@json(__('pos.settle_amount_min_err')), 'error');
                 return;
@@ -8490,6 +8529,7 @@ function restaurantPos() {
                 const data = await res.json().catch(() => null);
                 if (res.ok && data && data.success) {
                     this.showToast(data.message || @json(__('pos.rider_settled_ok')), 'success');
+                    this.riderSettleBill = null; // close the settle modal
                     this.loadLocalBills(); // warning disappears on refresh
                 } else {
                     this.showToast((data && data.message) || @json(__('pos.rider_settle_failed')), 'error');

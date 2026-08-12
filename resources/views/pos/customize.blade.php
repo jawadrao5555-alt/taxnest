@@ -257,16 +257,20 @@
                 </div>
 
                 {{-- Company default language (owner, 30 Jul 2026) --}}
-                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400 flex items-center justify-center shrink-0">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/></svg>
-                    </div>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.company_default_language') }}</p>
-                        <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.company_default_language_hint') }}</p>
+                {{-- Mobile fix (Task 540): card wraps on phones so the 3 language buttons
+                     drop below the text instead of pushing off-screen; desktop unchanged. --}}
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm flex flex-wrap sm:flex-nowrap items-center gap-3">
+                    <div class="flex items-center gap-3 min-w-0 flex-1">
+                        <div class="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400 flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/></svg>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.company_default_language') }}</p>
+                            <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.company_default_language_hint') }}</p>
+                        </div>
                     </div>
                     @php $tnCoLang = \App\Support\PosLocale::normalize($company->default_language ?? null); @endphp
-                    <div class="flex gap-2 shrink-0">
+                    <div class="flex flex-wrap gap-2 w-full sm:w-auto sm:shrink-0">
                         <form method="POST" action="{{ route('pos.settings.default-language') }}">
                             @csrf
                             <input type="hidden" name="default_language" value="rur">
@@ -550,7 +554,7 @@
                                 <p class="text-[13px] font-semibold text-gray-800 dark:text-gray-200">{{ __('pos.provisional_bills') }}</p>
                                 <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.provisional_bills_sub') }}</p>
                             </div>
-                            <div class="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shrink-0">
+                            <div class="inline-flex flex-wrap sm:flex-nowrap max-w-full rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shrink-0">
                                 <button type="button" @click="lbProv='save'; saveLB()" class="px-4 py-1.5 text-[12px] font-bold transition" :class="lbProv==='save' ? 'bg-teal-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300'">{{ __('pos.save_btn') }}</button>
                                 <button type="button" @click="lbProv='delete'; saveLB()" class="px-4 py-1.5 text-[12px] font-bold transition border-l border-gray-200 dark:border-gray-700" :class="lbProv==='delete' ? 'bg-red-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300'">{{ __('pos.delete') }}</button>
                                 <button type="button" @click="lbProv='carry'; saveLB()" title="{{ __('pos.ti_carry_forward') }}" class="px-4 py-1.5 text-[12px] font-bold transition border-l border-gray-200 dark:border-gray-700" :class="lbProv==='carry' ? 'bg-indigo-600 text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300'">{{ __('pos.badge_carry') }}</button>

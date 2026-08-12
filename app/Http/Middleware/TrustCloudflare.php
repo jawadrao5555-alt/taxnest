@@ -49,10 +49,21 @@ class TrustCloudflare
         $peer = $request->server->get('REMOTE_ADDR');
         $cfIp = $request->headers->get('CF-Connecting-IP');
 
-        if ($peer && $cfIp && filter_var($cfIp, FILTER_VALIDATE_IP) && self::isCloudflareIp($peer)) {
+        // Two legitimate shapes (both verified on the cPanel host, Aug 2026):
+        //  1. peer IS a Cloudflare edge IP → classic case, restore from header.
+        //  2. peer === CF-Connecting-IP → the host's own remoteip layer already
+        //     restored REMOTE_ADDR (it only honours the header from real CF
+        //     peers — a direct spoof leaves REMOTE_ADDR as the attacker's IP,
+        //     so peer !== header and we correctly no-op). BUT that layer also
+        //     appends the CF edge IP to X-Forwarded-For, and Laravel's
+        //     trustProxies('*') then resolves ip() to the EDGE ip — so we must
+        //     normalize X-Forwarded-For to the real client in this shape too.
+        if ($peer && $cfIp && filter_var($cfIp, FILTER_VALIDATE_IP)
+            && (self::isCloudflareIp($peer) || $peer === $cfIp)) {
             $request->server->set('REMOTE_ADDR', $cfIp);
-            // Reset Symfony's cached client-IP resolution (if any) by
-            // re-initializing headers/server derived state.
+            // Normalize XFF so Symfony's trusted-proxy resolution can only
+            // ever yield the true client IP (kills the appended-edge-IP form
+            // "client, edge" that otherwise wins under trustProxies('*')).
             $request->headers->set('X-Forwarded-For', $cfIp);
         }
 

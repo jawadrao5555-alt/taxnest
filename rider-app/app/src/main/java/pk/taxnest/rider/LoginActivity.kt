@@ -1,10 +1,13 @@
 package pk.taxnest.rider
 
 import android.content.Intent
+import android.graphics.Typeface
 import android.os.Bundle
+import android.text.InputType
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import org.json.JSONObject
@@ -23,6 +26,25 @@ class LoginActivity : AppCompatActivity() {
         val password = findViewById<EditText>(R.id.password)
         val btn = findViewById<Button>(R.id.loginBtn)
         val error = findViewById<TextView>(R.id.errorText)
+        val toggle = findViewById<ImageView>(R.id.togglePassword)
+
+        // v1.4.2: show/hide password (eye) toggle — cursor position preserved.
+        var passwordVisible = false
+        toggle.setOnClickListener {
+            passwordVisible = !passwordVisible
+            val selStart = password.selectionStart
+            val selEnd = password.selectionEnd
+            password.inputType = if (passwordVisible)
+                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+            else
+                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            // inputType flip resets the typeface to monospace — keep it consistent.
+            password.typeface = Typeface.DEFAULT
+            password.setSelection(selStart, selEnd)
+            toggle.setImageResource(if (passwordVisible) R.drawable.ic_eye_off else R.drawable.ic_eye)
+            toggle.contentDescription =
+                getString(if (passwordVisible) R.string.hide_password else R.string.show_password)
+        }
 
         btn.setOnClickListener {
             val e = email.text.toString().trim()

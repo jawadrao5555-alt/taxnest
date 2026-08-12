@@ -7,6 +7,8 @@
     <string name="email">ای میل</string>
     <string name="password">پاس ورڈ</string>
     <string name="login_btn">لاگ ان کریں</string>
+    <string name="show_password">پاس ورڈ دکھائیں</string>
+    <string name="hide_password">پاس ورڈ چھپائیں</string>
     <string name="login_failed">لاگ ان ناکام — ای میل یا پاس ورڈ چیک کریں</string>
     <string name="network_error">انٹرنیٹ مسئلہ — دوبارہ کوشش کریں</string>
     <string name="duty_on">ڈیوٹی شروع کریں</string>

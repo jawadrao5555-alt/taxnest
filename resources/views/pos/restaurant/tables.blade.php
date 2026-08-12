@@ -53,7 +53,14 @@
                 </div>
                 <div class="mt-1 flex items-center justify-between text-[10px] text-gray-400">
                     <span class="font-mono">{{ $oo->order_number }}</span>
-                    <span data-since="{{ $oo->created_at->toIso8601String() }}">{{ $oo->created_at->diffForHumans(null, true) }}</span>
+                    <span class="flex items-center gap-1.5">
+                        {{-- Task 507 (11 Aug 2026): purane khule orders par saaf tareekh —
+                             "10 Aug se khula" — take ghost order foran pehchana jaye. --}}
+                        @if($oo->created_at->lt(now()->startOfDay()))
+                            <span class="px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 font-black whitespace-nowrap">{{ __('pos.open_since_date', ['date' => $oo->created_at->format('d M')]) }}</span>
+                        @endif
+                        <span data-since="{{ $oo->created_at->toIso8601String() }}">{{ $oo->created_at->diffForHumans(null, true) }}</span>
+                    </span>
                 </div>
             </a>
             @endforeach
@@ -135,6 +142,9 @@ function tableView() {
         if (isNaN(ms) || ms < 0) ms = 0;
         var mins = Math.floor(ms / 60000);
         var h = Math.floor(mins / 60), m = mins % 60;
+        // Task 507 (11 Aug 2026): multi-day stale orders used to render as
+        // "51h 22m" — show days so "kab se khula" is obvious at a glance.
+        if (h >= 24) { var d = Math.floor(h / 24); return d + 'd ' + (h % 24) + 'h'; }
         return h > 0 ? (h + 'h ' + m + 'm') : (m + 'm');
     }
     function tick() {

@@ -50,7 +50,7 @@
         </div>
 
         <div class="text-center text-[10px] text-gray-400 mt-4 border-t border-dashed border-gray-300 pt-2">
-            {{ $bill->is_archived ? 'Archived local bill' : 'Live local bill' }} · Reprinted {{ now()->format('d M Y, h:i A') }}
+            {{ $bill->is_archived ? 'Archived local bill — ' . __('pos.local_archived_explain') : 'Live local bill' }} · Reprinted {{ now()->format('d M Y, h:i A') }}
         </div>
     </div>
 

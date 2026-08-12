@@ -84,7 +84,7 @@
 
     {{-- ── Append-mode banner ─────────────────────────────────────────────── --}}
     <div x-show="appendOrderId" x-cloak class="mb-3 rounded-xl bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 px-4 py-2.5 flex items-center justify-between gap-2 flex-wrap">
-        <span class="text-sm font-bold text-amber-800 dark:text-amber-300">{{ __('pos.adding_items_to') }} <span class="font-mono" x-text="appendOrderNumber"></span> {{ __('pos.only_new_items_print') }}</span>
+        <span class="text-sm font-bold text-amber-800 dark:text-amber-300">{{ __('pos.adding_items_to') }} <span class="font-mono" x-text="appendOrderNumber"></span> <span x-show="appendTableLabel" x-cloak class="inline-block align-middle text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 dark:bg-amber-800/60 dark:text-amber-200" x-text="'T-' + appendTableLabel"></span> {{ __('pos.only_new_items_print') }}</span>
         <button @click="cancelAppend()" class="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-800 text-xs font-bold text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600">{{ __('pos.cancel') }}</button>
     </div>
 
@@ -708,6 +708,7 @@ function waiterApp() {
         myOrdersLoading: false,
         appendOrderId: null,
         appendOrderNumber: '',
+        appendTableLabel: '',    // Task 526: append banner mein table number dikhao (parcel = khali)
         parcelListOpen: false,   // Task #342: inline parcel sub-list on buttons home
         tableActionFor: null,    // occupied-tile chooser (Add Items / Shift)
         shiftFor: null,          // Table Shift (26 Jul 2026): order being shifted
@@ -989,11 +990,15 @@ function waiterApp() {
             this.cart = [];
             this.appendOrderId = o.id;
             this.appendOrderNumber = o.order_number;
+            // Task 526: My Orders API pehle hi order ka table bhejti hai (orderJson
+            // 'table' = table_number); parcel/takeaway par null → badge chhupa rehta hai.
+            this.appendTableLabel = o.table ? String(o.table) : '';
             this.showMyOrders = false;
         },
         cancelAppend() {
             this.appendOrderId = null;
             this.appendOrderNumber = '';
+            this.appendTableLabel = '';
             this.cart = [];
         },
 
@@ -1011,6 +1016,8 @@ function waiterApp() {
             }
             this.appendOrderId = t.order_id;
             this.appendOrderNumber = t.order_number || ('T-' + t.table_number);
+            // Task 526: order_number na ho to banner khud hi T-x dikhata hai — badge skip.
+            this.appendTableLabel = (t.order_number && t.table_number) ? String(t.table_number) : '';
             this.tableActionFor = null;
             this.showTables = false;
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1035,6 +1042,7 @@ function waiterApp() {
             if (!t || !o) return;
             this.appendOrderId = o.id;
             this.appendOrderNumber = o.order_number || ('T-' + t.table_number);
+            this.appendTableLabel = (o.order_number && t.table_number) ? String(t.table_number) : '';
             this.showTables = false;
             window.scrollTo({ top: 0, behavior: 'smooth' });
         },
@@ -1129,7 +1137,7 @@ function waiterApp() {
                     // khud "naya order" halat par wapas (cashier ka intikhab
                     // din bhar qaim rehta hai, jaan boojh kar reset NahiN).
                     this.orderType = 'dine_in'; this.moreOpen = false;
-                    this.appendOrderId = null; this.appendOrderNumber = '';
+                    this.appendOrderId = null; this.appendOrderNumber = ''; this.appendTableLabel = '';
                     this.loadMyOrders();
                     // Buttons style (Task #340, Aug 2026): after send, return to the
                     // home button list and silently refresh table counts/timers.

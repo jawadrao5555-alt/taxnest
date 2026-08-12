@@ -112,6 +112,10 @@ class FbrPosController extends Controller
                 ->where(function ($q) {
                     $q->where(function ($qa) {
                         $qa->whereNotNull('rider_id')
+                            // Settled bills kabhi popup mein na aayen — settle_all
+                            // assigned/dispatched cash bills ko bhi settle karta hai
+                            // (Task 522 review): settlement stamp = popup se bahar.
+                            ->whereNull('rider_settlement_id')
                             ->where(function ($qb) {
                                 // Abhi raste mein…
                                 $qb->whereIn('delivery_status', ['assigned', 'dispatched'])

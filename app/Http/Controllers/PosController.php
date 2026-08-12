@@ -3129,20 +3129,36 @@ class PosController extends Controller
             $finalBills = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->where('status', 'completed')
-                ->whereNotNull('rider_id')
                 // NOT a provisional (local+local triple = provisional definition).
                 ->whereNot(function ($q) {
                     $q->where('invoice_mode', 'local')->where('pra_status', 'local');
                 })
                 ->where(function ($q) {
-                    // Abhi raste mein…
-                    $q->whereIn('delivery_status', ['assigned', 'dispatched'])
-                        // …ya deliver ho gaya par cash abhi rider ke paas.
-                        ->orWhere(function ($q2) {
-                            $q2->where('delivery_status', 'delivered')
-                               ->where('payment_method', 'cash')
-                               ->whereNull('rider_settlement_id');
-                        });
+                    $q->where(function ($qa) {
+                        $qa->whereNotNull('rider_id')
+                            ->where(function ($qb) {
+                                // Abhi raste mein…
+                                $qb->whereIn('delivery_status', ['assigned', 'dispatched'])
+                                    // …ya deliver ho gaya par cash abhi rider ke paas.
+                                    ->orWhere(function ($q2) {
+                                        $q2->where('delivery_status', 'delivered')
+                                           ->where('payment_method', 'cash')
+                                           ->whereNull('rider_settlement_id');
+                                    });
+                            });
+                    })
+                    // Task 513: UNASSIGNED delivery bills (rider NULL, status NULL,
+                    // unsettled) bhi popup mein — cashier rider yahin se assign kare,
+                    // Deliveries board kholne ki zaroorat na rahe. Same 7-din window
+                    // as the Deliveries board pending tab (Task 512): purane
+                    // pre-feature delivery bills popup ko flood na karein.
+                    ->orWhere(function ($qu) {
+                        $qu->whereNull('rider_id')
+                            ->whereNull('delivery_status')
+                            ->whereNull('rider_settlement_id')
+                            ->where('order_type', 'delivery')
+                            ->where('created_at', '>=', now()->subDays(7));
+                    });
                 })
                 ->orderBy('id', 'desc')
                 ->limit(50)
@@ -3245,11 +3261,35 @@ class PosController extends Controller
             ];
         });
 
+        // Task 513: active riders list + assign permission — the popup renders a
+        // rider dropdown on UNASSIGNED bills (POST pos.deliveries.assign, same
+        // backend as the board). UI-gating mirrors the route gate: custom-access
+        // 'deliveries' verdict (deliveriesFallbackOpen included via customAllows).
+        // Plan gate (riders = Pro+) + Delivery feature toggle mirror the board's
+        // deliveryGate(); custom-access verdict mirrors PosAuth's route gate.
+        $assignCompany = Company::find($companyId);
+        $canAssignRider = \App\Services\PosFeatureService::planAllows($assignCompany, 'riders_enabled')
+            && !empty(\App\Services\PosFeatureService::forCompany($assignCompany)->delivery)
+            && \App\Services\PosAccessService::customAllows(auth('pos')->user(), 'deliveries') !== false;
+        $assignRiders = [];
+        if ($canAssignRider && $hasRiderCols && \Illuminate\Support\Facades\Schema::hasTable('pos_riders')) {
+            $assignRiders = \DB::table('pos_riders')
+                ->where('company_id', $companyId)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn ($r) => ['id' => (int) $r->id, 'name' => $r->name])
+                ->values()
+                ->all();
+        }
+
         return response()->json([
             'success' => true,
             'count'   => $data->count(),
             'bills'   => $data,
             'final_deliveries' => $finalData,
+            'riders'  => $assignRiders,
+            'can_assign_rider' => $canAssignRider,
             // Current business day (00:00–05:59 counts in yesterday) — the
             // Pending Deliveries badge filters bills to THIS date client-side.
             'business_today' => $hasBizDate ? \App\Services\PosBusinessDay::current($companyId) : null,

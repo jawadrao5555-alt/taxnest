@@ -3945,6 +3945,9 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'del_tab_pending_sub' => 'Unassigned, assigned & dispatched',
     // Task 512 (12 Aug 2026): unassigned delivery bills now surface on Pending.
     'del_status_unassigned' => 'Rider not assigned',
+    // Task 513 (12 Aug 2026): rider assign right from the sale-screen popup.
+    'rider_assign_ok' => 'Rider assigned.',
+    'rider_assign_failed' => 'Rider could not be assigned.',
 
     // Deliveries board upgrades + Pending Deliveries popup finals (owner batch, 3 Aug 2026)
     'delivery_status_dispatched' => 'Dispatched',

@@ -2364,6 +2364,10 @@ window.addEventListener('popstate', function() {
                                 <template x-if="bill.is_final">
                                     <span class="text-[9px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">{{ __('pos.final_word') }}</span>
                                 </template>
+                                {{-- Task 513: unassigned final delivery bill — rider abhi tak nahi laga --}}
+                                <template x-if="bill.is_final && !bill.rider_id">
+                                    <span class="text-[9px] bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 px-2 py-0.5 rounded-full font-bold">{{ __('pos.del_status_unassigned') }}</span>
+                                </template>
                             </div>
                             <span class="text-sm font-bold text-amber-700 dark:text-amber-400" x-text="'Rs. ' + Number(bill.total_amount).toLocaleString()"></span>
                         </div>
@@ -2403,6 +2407,26 @@ window.addEventListener('popstate', function() {
                                 </button>
                             </div>
                         </template>
+                        {{-- Task 513: UNASSIGNED final delivery bill — rider dropdown yahin se
+                             (POST pos.deliveries.assign, same backend as the Deliveries board).
+                             Renders only when the user's deliveries access allows assign
+                             (can_assign_rider from the API mirrors PosAccessService verdict). --}}
+                        <template x-if="bill.is_final && !bill.rider_id && canAssignRider && deliveryRiders.length > 0">
+                            <div class="mb-2 flex items-center gap-2">
+                                <svg class="w-4 h-4 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 11-4 0m10 0a2 2 0 104 0"/></svg>
+                                <select @change="assignRider(bill, $event.target.value); $event.target.value = ''"
+                                        :disabled="riderAssignBusyId"
+                                        class="flex-1 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs py-1.5 focus:ring-purple-500 focus:border-purple-500 disabled:opacity-50">
+                                    <option value="">{{ __('pos.no_rider_opt') }}</option>
+                                    <template x-for="r in deliveryRiders" :key="r.id">
+                                        <option :value="r.id" x-text="r.name"></option>
+                                    </template>
+                                </select>
+                                <template x-if="riderAssignBusyId === bill.id">
+                                    <svg class="w-4 h-4 animate-spin text-purple-500 shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                </template>
+                            </div>
+                        </template>
                         {{-- PROVISIONAL bill: Final Cash/Card (promote path). FINAL bills
                              par yeh buttons render hi nahi hote — promote unpar kabhi nahi. --}}
                         <template x-if="!bill.is_final">
@@ -2420,7 +2444,10 @@ window.addEventListener('popstate', function() {
                         </template>
                         {{-- FINAL bill (3 Aug 2026): status chip + Delivered mark. Cash
                              khata settle upar wale orange rider block se hota hai. --}}
-                        <template x-if="bill.is_final">
+                        {{-- Task 513: rider_id guard — UNASSIGNED bill par status chip /
+                             Delivered button nahi (updateStatus rider-less bill 404 karta);
+                             pehle upar wale dropdown se rider lage. --}}
+                        <template x-if="bill.is_final && bill.rider_id">
                         <div class="flex gap-2 items-stretch">
                             <span class="flex items-center px-2.5 rounded-xl text-[10px] font-bold"
                                   :class="bill.delivery_status === 'delivered' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300'"
@@ -3869,6 +3896,12 @@ function restaurantPos() {
         // ginti ab rider app / khata se milti hai. F10 Local Bills modal inhe
         // KABHI nahi dikhata (woh sirf localBills parhta hai).
         finalDeliveryBills: [],
+        // Task 513: active riders + assign permission for the Pending Deliveries
+        // popup's rider dropdown on UNASSIGNED bills (same pos.deliveries.assign
+        // backend as the board — no new path).
+        deliveryRiders: [],
+        canAssignRider: false,
+        riderAssignBusyId: null,
         showLocalBills: false,
         activeLocalIndex: 0,
         localBillsLoading: false,
@@ -8219,6 +8252,8 @@ function restaurantPos() {
                 if (data && data.success) {
                     this.localBills = data.bills || [];
                     this.finalDeliveryBills = data.final_deliveries || [];
+                    this.deliveryRiders = data.riders || [];
+                    this.canAssignRider = !!data.can_assign_rider;
                     if (data.business_today) this.bizToday = data.business_today;
                     if (this.activeLocalIndex >= this.filteredLocalBills().length) {
                         this.activeLocalIndex = Math.max(0, this.filteredLocalBills().length - 1);
@@ -8266,7 +8301,10 @@ function restaurantPos() {
             const prov = this.localBills.filter(b => b.order_type === 'delivery' && isToday(b));
             // FINAL delivery bills bhi (3 Aug 2026): jo abhi deliver nahi hue ya
             // cash rider ke khaate par hai — popup ki ginti ab rider app se milti hai.
-            const finals = (this.finalDeliveryBills || []).filter(isToday);
+            // Task 513: UNASSIGNED bills (rider NULL + status NULL) ride the 7-din
+            // server window like the Deliveries board — today-filter unpar nahi lagta,
+            // warna kal ka bina-rider bill popup se ghayab ho jata.
+            const finals = (this.finalDeliveryBills || []).filter(b => isToday(b) || (!b.rider_id && !b.delivery_status));
             return [...prov, ...finals];
         },
         openPendingDeliveries() {
@@ -8312,6 +8350,32 @@ function restaurantPos() {
                 this.showToast(window.TXT.network_error, 'error');
             }
             this.deliveryFinalBusyId = null;
+        },
+        // ─── Rider assign from the panel (Task 513) ─────────────────────────
+        // UNASSIGNED delivery bill par dropdown se rider chuno — reuses POST
+        // /pos/deliveries/{id}/assign (same backend as the Deliveries board;
+        // koi naya path nahi). Success = list refresh (bill assigned-section
+        // mein chala jata hai, khata rider_id follow karta hai).
+        async assignRider(bill, riderId) {
+            if (!bill || !riderId || this.riderAssignBusyId) return;
+            this.riderAssignBusyId = bill.id;
+            try {
+                const res = await fetch('{{ url('/pos/deliveries') }}/' + bill.id + '/assign', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ rider_id: riderId }),
+                });
+                const data = await res.json().catch(() => null);
+                if (res.ok && data && data.success) {
+                    this.showToast(@json(__('pos.rider_assign_ok')), 'success');
+                    this.loadLocalBills();
+                } else {
+                    this.showToast((data && data.message) || @json(__('pos.rider_assign_failed')), 'error');
+                }
+            } catch (e) {
+                this.showToast(window.TXT.network_error, 'error');
+            }
+            this.riderAssignBusyId = null;
         },
         // ─── Rider WHOLE-khata settle from the panel (Task 123) ─────────────
         // Reuses POST /pos/riders/{id}/settle with settle_all — settles EVERY

@@ -474,7 +474,7 @@ class PosRiderController extends Controller
         }
 
         if ($txn->rider_settlement_id) {
-            return back()->with('error', 'This bill is already settled — rider cannot be changed.');
+            return $this->statusError($request, 'This bill is already settled — rider cannot be changed.');
         }
         // Rider is LOCKED once the delivery reached a terminal state (owner,
         // Jul 2026): delivered/returned bills keep the rider who actually ran
@@ -482,11 +482,11 @@ class PosRiderController extends Controller
         // never carried the order. Reassign stays open while assigned/dispatched
         // (rider suddenly unavailable → pick another; khata follows rider_id).
         if (in_array($txn->delivery_status, ['delivered', 'returned'], true)) {
-            return back()->with('error', 'This delivery is already ' . $txn->delivery_status . ' — rider can no longer be changed.');
+            return $this->statusError($request, 'This delivery is already ' . $txn->delivery_status . ' — rider can no longer be changed.');
         }
         // Only delivery-shaped bills can carry a rider.
         if ($txn->order_type !== 'delivery' && !$txn->rider_id && !$txn->delivery_address) {
-            return back()->with('error', 'Only delivery bills can be assigned to a rider.');
+            return $this->statusError($request, 'Only delivery bills can be assigned to a rider.');
         }
 
         $riderId = null;
@@ -496,7 +496,7 @@ class PosRiderController extends Controller
                 ->where('is_active', true)
                 ->value('id');
             if (!$riderId) {
-                return back()->with('error', 'Invalid rider.');
+                return $this->statusError($request, 'Invalid rider.');
             }
         }
 
@@ -515,6 +515,16 @@ class PosRiderController extends Controller
             }
         }
         $txn->update($upd);
+
+        // Sale-screen Pending Deliveries popup (Task 513) assigns via fetch —
+        // JSON clients get JSON; the Deliveries board form keeps back().
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success'         => true,
+                'rider_id'        => $riderId,
+                'delivery_status' => $upd['delivery_status'],
+            ]);
+        }
 
         return back()->with('success', $riderId ? 'Rider assigned.' : 'Rider removed.');
     }

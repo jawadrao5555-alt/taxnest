@@ -3946,6 +3946,9 @@ return [
     'del_tab_pending_sub' => 'غیر تفویض، تفویض و روانہ',
     // Task 512 (12 Aug 2026): unassigned delivery bills now surface on Pending.
     'del_status_unassigned' => 'رائیڈر تفویض نہیں ہوا',
+    // Task 513 (12 Aug 2026): rider assign right from the sale-screen popup.
+    'rider_assign_ok' => 'رائیڈر تفویض ہو گیا۔',
+    'rider_assign_failed' => 'رائیڈر تفویض نہیں ہو سکا۔',
 
     // Deliveries board upgrades + Pending Deliveries popup finals (owner batch, 3 Aug 2026)
     'delivery_status_dispatched' => 'روانہ',

@@ -1870,7 +1870,9 @@ window.addEventListener('popstate', function() {
     {{-- click Final (Cash/Card) via the SAME promote path as F10 Make Final.  --}}
     {{-- Receipt print = opt-in checkbox (default NO). Task 517: UNASSIGNED    --}}
     {{-- final delivery bills bhi listed with an inline rider dropdown (POST   --}}
-    {{-- fbrpos.deliveries.assign) — rider-khata warning/settle stays absent.  --}}
+    {{-- fbrpos.deliveries.assign). Task 521 (PRA parity): assigned/dispatched --}}
+    {{-- + delivered-cash-unsettled finals bhi — Delivered mark (POST          --}}
+    {{-- fbrpos.deliveries.status) + whole-khata Settle (fbrpos.riders.settle).--}}
     {{-- ─────────────────────────────────────────────────────────────────────── --}}
     <div x-show="showPendingDeliveries" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showPendingDeliveries = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden" x-transition.scale.90>
@@ -1912,6 +1914,9 @@ window.addEventListener('popstate', function() {
                                 <template x-if="bill.order_type === 'delivery'">
                                     <span class="text-[9px] bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide" x-text="window.TXT.delivery"></span>
                                 </template>
+                                <template x-if="bill.rider_name">
+                                    <span class="text-[9px] bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300 px-2 py-0.5 rounded-full font-bold" x-text="'{{ __('pos.rider_word') }}: ' + bill.rider_name"></span>
+                                </template>
                                 <template x-if="bill.is_final">
                                     <span class="text-[9px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">{{ __('pos.final_word') }}</span>
                                 </template>
@@ -1938,6 +1943,25 @@ window.addEventListener('popstate', function() {
                             </p>
                         </template>
                         <p class="text-[11px] text-gray-500 mb-2" x-text="bill.items_count + window.TXT.sfx_item_s_dot + (bill.created_time || bill.created_human)"></p>
+                        {{-- Task 521: rider-khata warning — bill is still on the rider's
+                             unsettled khata (cash rider ke paas). Settle button covers the
+                             rider's WHOLE khata (FbrPosRiderController::settle settle_all). --}}
+                        <template x-if="bill.rider_unsettled">
+                            <div class="mb-2 px-3 py-2 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 text-[11px] font-semibold text-orange-700 dark:text-orange-300 flex items-start gap-1.5">
+                                <svg class="w-3.5 h-3.5 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                <div class="flex-1 min-w-0">
+                                    <span><span x-text="bill.rider_name || '{{ __('pos.rider_word') }}'"></span> {{ __('pos.rider_unsettled_warn') }}</span>
+                                    {{-- Scope line: settle covers the rider's WHOLE khata, not just this bill --}}
+                                    <p class="mt-1 font-normal text-orange-600 dark:text-orange-400" x-text="txtRiderSettleScope(bill)"></p>
+                                </div>
+                                {{-- One-click WHOLE-khata settle (reuses POST /fbr-pos/riders/{id}/settle) --}}
+                                <button @click="settleRider(bill)" :disabled="riderSettleBusyId || deliveryFinalBusyId"
+                                        class="shrink-0 self-center px-3 py-1.5 text-[11px] font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition shadow-sm flex items-center gap-1 disabled:opacity-50">
+                                    <template x-if="riderSettleBusyId === bill.rider_id"><svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg></template>
+                                    {{ __('pos.rider_settle_btn') }}
+                                </button>
+                            </div>
+                        </template>
                         {{-- Task 517: UNASSIGNED final delivery bill — rider dropdown yahin se
                              (POST fbrpos.deliveries.assign, same backend as the Deliveries board).
                              Renders only when the API's can_assign_rider allows (plan gate +
@@ -1971,6 +1995,24 @@ window.addEventListener('popstate', function() {
                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                                 {{ __('pos.final_card') }}
                             </button>
+                        </div>
+                        </template>
+                        {{-- Task 521: FINAL bill — status chip + Delivered mark (PRA parity).
+                             Cash khata settle upar wale orange rider block se hota hai.
+                             rider_id guard: UNASSIGNED bill par chip/button nahi
+                             (updateStatus rider-less bill 404 karta); pehle rider lage. --}}
+                        <template x-if="bill.is_final && bill.rider_id">
+                        <div class="flex gap-2 items-stretch">
+                            <span class="flex items-center px-2.5 rounded-xl text-[10px] font-bold"
+                                  :class="bill.delivery_status === 'delivered' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-300'"
+                                  x-text="bill.delivery_status === 'delivered' ? @json(__('pos.delivery_status_delivered')) : (bill.delivery_status === 'dispatched' ? @json(__('pos.delivery_status_dispatched')) : @json(__('pos.delivery_status_assigned')))"></span>
+                            <template x-if="bill.delivery_status !== 'delivered'">
+                                <button @click="markFinalDelivered(bill)" :disabled="deliveryFinalBusyId" class="flex-1 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50">
+                                    <template x-if="deliveryFinalBusyId === bill.id"><svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg></template>
+                                    <template x-if="deliveryFinalBusyId !== bill.id"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg></template>
+                                    {{ __('pos.delivered_word') }}
+                                </button>
+                            </template>
                         </div>
                         </template>
                     </div>
@@ -2865,6 +2907,7 @@ function restaurantPos() {
         deliveryRiders: [],
         canAssignRider: false,
         riderAssignBusyId: null,
+        riderSettleBusyId: null,
         // Receipt print default = NO (delivery customer isn't at the counter).
         // Opt-in checkbox persisted per device.
         deliveryPrintReceipt: (function(){ try { return localStorage.getItem('fbrpos_delivery_final_print') === '1'; } catch(e) { return false; } })(),
@@ -6040,12 +6083,13 @@ function restaurantPos() {
         // created_at's date when business_date is missing, so old confidential
         // provisionals never flood the badge.
         pendingDeliveryBills() {
-            const prov = this.localBills.filter(b => (b.order_type == null || b.order_type === 'delivery')
-                && (!this.bizToday || !b.business_date || b.business_date === this.bizToday));
-            // Task 517: UNASSIGNED final delivery bills ride the 7-din server
-            // window like the Deliveries board — today-filter unpar nahi lagta,
-            // warna kal ka bina-rider bill popup se ghayab ho jata.
-            const finals = (this.finalDeliveryBills || []).filter(b => !b.rider_id && !b.delivery_status);
+            const isToday = b => (!this.bizToday || !b.business_date || b.business_date === this.bizToday);
+            const prov = this.localBills.filter(b => (b.order_type == null || b.order_type === 'delivery') && isToday(b));
+            // Task 521 (PRA parity): assigned/dispatched + delivered-cash-unsettled
+            // finals show for TODAY; UNASSIGNED bills (rider NULL + status NULL)
+            // ride the 7-din server window like the Deliveries board — today-filter
+            // unpar nahi lagta, warna kal ka bina-rider bill popup se ghayab ho jata.
+            const finals = (this.finalDeliveryBills || []).filter(b => isToday(b) || (!b.rider_id && !b.delivery_status));
             return [...prov, ...finals];
         },
         openPendingDeliveries() {
@@ -6076,6 +6120,73 @@ function restaurantPos() {
                 this.showToast(window.TXT.network_error, 'error');
             }
             this.riderAssignBusyId = null;
+        },
+        // ─── Delivered mark from the panel (Task 521 — PRA parity) ──────────
+        // FINAL delivery bill ko panel se Delivered mark karna — reuses POST
+        // /fbr-pos/deliveries/{id}/status (JSON). Promote yahan kabhi nahi
+        // chalta: bill pehle se final hai, sirf delivery status badalta hai.
+        async markFinalDelivered(bill) {
+            if (!bill || !bill.is_final || this.deliveryFinalBusyId) return;
+            this.deliveryFinalBusyId = bill.id;
+            try {
+                const res = await fetch('{{ url('/fbr-pos/deliveries') }}/' + bill.id + '/status', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ delivery_status: 'delivered' }),
+                });
+                const data = await res.json().catch(() => null);
+                if (res.ok && data && data.success) {
+                    bill.delivery_status = 'delivered';
+                    this.showToast(@json(__('pos.marked_delivered_ok')), 'success');
+                    // Card bill delivered = khata par nahi → refresh par list se nikal jata hai.
+                    this.loadLocalBills();
+                } else {
+                    this.showToast((data && data.message) || @json(__('pos.status_update_failed')), 'error');
+                }
+            } catch (e) {
+                this.showToast(window.TXT.network_error, 'error');
+            }
+            this.deliveryFinalBusyId = null;
+        },
+        // ─── Rider WHOLE-khata settle from the panel (Task 521 — PRA parity) ─
+        // Reuses POST /fbr-pos/riders/{id}/settle with settle_all — settles EVERY
+        // unsettled cash bill on the rider's khata (all dates), not just this
+        // bill. Riders never touch invoice_mode/serials.
+        txtRiderSettleScope(bill) {
+            if (!bill || !bill.rider_open_count) return '';
+            return @json(__('pos.rider_settle_scope'))
+                .replace(':count', bill.rider_open_count)
+                .replace(':amount', Number(bill.rider_open_amount || 0).toLocaleString());
+        },
+        async settleRider(bill) {
+            if (!bill || !bill.rider_id || this.riderSettleBusyId) return;
+            const confirmMsg = @json(__('pos.rider_settle_confirm'))
+                .replace(':name', bill.rider_name || @json(__('pos.rider_word')))
+                .replace(':count', bill.rider_open_count || '?')
+                .replace(':amount', Number(bill.rider_open_amount || 0).toLocaleString());
+            if (!window.confirm(confirmMsg)) return;
+            this.riderSettleBusyId = bill.rider_id;
+            try {
+                const res = await fetch('{{ url('/fbr-pos/riders') }}/' + bill.rider_id + '/settle', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    },
+                    body: JSON.stringify({ settle_all: 1 }),
+                });
+                const data = await res.json().catch(() => null);
+                if (res.ok && data && data.success) {
+                    this.showToast(data.message || @json(__('pos.rider_settled_ok')), 'success');
+                    this.loadLocalBills(); // warning disappears on refresh
+                } else {
+                    this.showToast((data && data.message) || @json(__('pos.rider_settle_failed')), 'error');
+                }
+            } catch (e) {
+                this.showToast(@json(__('pos.rider_settle_failed')), 'error');
+            }
+            this.riderSettleBusyId = null;
         },
         // One-click final — reuses the EXACT promote path (race-safe claim,
         // reporting-OFF invariant, PIN gate). Receipt print follows the panel's

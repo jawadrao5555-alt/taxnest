@@ -97,27 +97,81 @@ class FbrPosController extends Controller
         $hasRiderCols  = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'rider_id');
         $hasDelStatus  = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'delivery_status');
         $hasSettleCol  = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'rider_settlement_id');
+        // Task 521 (FBR port of PRA parity): the popup now ALSO lists assigned/
+        // dispatched final bills and delivered-CASH bills still on the rider's
+        // unsettled khata — Delivered mark + whole-khata Settle happen right in
+        // the popup (PRA Tasks 123/513 port), Deliveries board na kholna pare.
         $finalData = collect();
         if ($hasRiderCols && $hasDelStatus && $hasSettleCol && $hasOrderType) {
-            $finalData = \App\Models\FbrPosTransaction::where('company_id', $companyId)
+            $finalBills = \App\Models\FbrPosTransaction::where('company_id', $companyId)
                 ->where('status', 'completed')
                 // NOT a provisional (local+local pair = FBR provisional definition).
                 ->whereNot(function ($q) {
                     $q->where('invoice_mode', 'local')->where('fbr_status', 'local');
                 })
-                ->whereNull('rider_id')
-                ->whereNull('delivery_status')
-                ->whereNull('rider_settlement_id')
-                ->where('order_type', 'delivery')
-                ->where('created_at', '>=', now()->subDays(7))
+                ->where(function ($q) {
+                    $q->where(function ($qa) {
+                        $qa->whereNotNull('rider_id')
+                            ->where(function ($qb) {
+                                // Abhi raste mein…
+                                $qb->whereIn('delivery_status', ['assigned', 'dispatched'])
+                                    // …ya deliver ho gaya par cash abhi rider ke paas.
+                                    ->orWhere(function ($q2) {
+                                        $q2->where('delivery_status', 'delivered')
+                                           ->where('payment_method', 'cash')
+                                           ->whereNull('rider_settlement_id');
+                                    });
+                            });
+                    })
+                    // Task 517: UNASSIGNED delivery bills (rider NULL, status NULL,
+                    // unsettled) — cashier rider yahin se assign kare. Same 7-din
+                    // window as the board pending tab (purane bills flood na karein).
+                    ->orWhere(function ($qu) {
+                        $qu->whereNull('rider_id')
+                            ->whereNull('delivery_status')
+                            ->whereNull('rider_settlement_id')
+                            ->where('order_type', 'delivery')
+                            ->where('created_at', '>=', now()->subDays(7));
+                    });
+                })
                 ->withCount('items')
                 ->orderByDesc('id')
                 ->limit(50)
                 ->get(['id', 'invoice_number', 'customer_name', 'customer_phone', 'order_type',
                        'total_amount', 'payment_method', 'created_at',
+                       'rider_id', 'rider_settlement_id', 'delivery_status',
                        ...($hasAddress ? ['delivery_address'] : []),
-                       ...($hasBizDate ? ['business_date'] : [])])
-                ->map(function ($b) use ($companyId, $hasBizDate, $hasAddress) {
+                       ...($hasBizDate ? ['business_date'] : [])]);
+
+            // Rider names + open-khata summary — one batch lookup (PRA Task 123
+            // port). Settle button settles the rider's ENTIRE khata (all dates),
+            // same scope as FbrPosRiderController::settle with settle_all — show
+            // the cashier the real count+amount so "poore rider ka settle" is clear.
+            $riderNames = [];
+            $riderOpen  = []; // rider_id => ['count' => n, 'amount' => rs]
+            $riderIds = $finalBills->pluck('rider_id')->filter()->unique();
+            if ($riderIds->isNotEmpty() && \Illuminate\Support\Facades\Schema::hasTable('pos_riders')) {
+                $riderNames = DB::table('pos_riders')
+                    ->where('company_id', $companyId)
+                    ->whereIn('id', $riderIds)
+                    ->pluck('name', 'id')
+                    ->all();
+                $riderOpen = \App\Models\FbrPosTransaction::where('company_id', $companyId)
+                    ->whereIn('rider_id', $riderIds)
+                    ->where('payment_method', 'cash')
+                    ->whereNull('rider_settlement_id')
+                    ->where(function ($q) {
+                        $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
+                    })
+                    ->selectRaw('rider_id, COUNT(*) as c, COALESCE(SUM(total_amount),0) as amt')
+                    ->groupBy('rider_id')
+                    ->get()
+                    ->mapWithKeys(fn ($r) => [$r->rider_id => ['count' => (int) $r->c, 'amount' => (float) $r->amt]])
+                    ->all();
+            }
+
+            $finalData = $finalBills
+                ->map(function ($b) use ($companyId, $hasBizDate, $hasAddress, $riderNames, $riderOpen) {
                     return [
                         'id'               => $b->id,
                         'is_final'         => true,
@@ -134,12 +188,13 @@ class FbrPosController extends Controller
                         'business_date'    => ($hasBizDate && $b->business_date)
                             ? (string) $b->business_date
                             : ($b->created_at ? \App\Services\PosBusinessDay::forMomentFbr((int) $companyId, $b->created_at) : null),
-                        'delivery_status'  => null,
-                        'rider_id'         => null,
-                        'rider_name'       => null,
-                        'rider_unsettled'  => false,
-                        'rider_open_count' => 0,
-                        'rider_open_amount'=> 0,
+                        'delivery_status'  => $b->delivery_status,
+                        'rider_id'         => $b->rider_id ? (int) $b->rider_id : null,
+                        'rider_name'       => $b->rider_id ? ($riderNames[$b->rider_id] ?? null) : null,
+                        // Cash bill jo rider ke khaate par hai (card bills khata par nahi hote).
+                        'rider_unsettled'  => (bool) ($b->rider_id && empty($b->rider_settlement_id) && $b->payment_method === 'cash' && $b->delivery_status !== 'returned'),
+                        'rider_open_count' => $b->rider_id ? ($riderOpen[$b->rider_id]['count'] ?? 0) : 0,
+                        'rider_open_amount'=> $b->rider_id ? ($riderOpen[$b->rider_id]['amount'] ?? 0) : 0,
                     ];
                 })
                 ->values();

@@ -18,10 +18,22 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // Cloudflare in front of the origin: restore the real visitor IP from
-        // CF-Connecting-IP (only when the peer is a genuine CF edge — spoof-safe).
+        // CF-Connecting-IP (only when the peer is a genuine CF edge, or the
+        // host's remoteip layer already restored it — spoof-safe either way).
         // Must run BEFORE TrustProxies / everything else.
         $middleware->prepend(\App\Http\Middleware\TrustCloudflare::class);
-        $middleware->trustProxies(at: '*');
+        // Trust proxies for PROTO/HOST/PORT/PREFIX only — deliberately NOT
+        // X-Forwarded-For. Client IP must come from REMOTE_ADDR alone:
+        // TrustCloudflare sets it for Cloudflare traffic, and a direct-origin
+        // caller can no longer spoof ip() (throttle keys, audit logs) with a
+        // forged X-Forwarded-For header. X-Forwarded-Proto stays trusted so
+        // secure cookies keep working behind the dev preview proxy.
+        $middleware->trustProxies(at: '*', headers:
+            \Illuminate\Http\Request::HEADER_X_FORWARDED_PROTO
+            | \Illuminate\Http\Request::HEADER_X_FORWARDED_HOST
+            | \Illuminate\Http\Request::HEADER_X_FORWARDED_PORT
+            | \Illuminate\Http\Request::HEADER_X_FORWARDED_PREFIX
+        );
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
         // Slow-request telemetry: near-zero overhead on fast requests; logs
         // >2s requests to storage/logs/slow-requests-*.log in terminate().

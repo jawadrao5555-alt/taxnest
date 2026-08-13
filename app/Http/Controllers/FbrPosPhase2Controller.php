@@ -127,6 +127,26 @@ class FbrPosPhase2Controller extends Controller
         // Embed token/code into cart_data so recall returns them to the JS cart state,
         // enabling a re-hold to recognise the existing identifier (same-token invariant).
         $cartData = $r->cart_data;
+
+        // Task 641: identity-autofill note discard (parity with PRA Task 636).
+        // Browser autofill can dump the cashier's login identity (email/name/phone)
+        // into item note / order note fields; a note that is EXACTLY such an
+        // identity string is never a real kitchen instruction — discard it before
+        // the cart is parked (held-sale cart_data feeds the KOT print directly).
+        $noteUser = $this->user();
+        if (is_array($cartData['items'] ?? null)) {
+            foreach ($cartData['items'] as $k => $it) {
+                if (is_array($it) && array_key_exists('special_notes', $it)) {
+                    $cartData['items'][$k]['special_notes'] =
+                        \App\Http\Controllers\RestaurantWaiterController::stripIdentityNote($it['special_notes'] ?? null, $noteUser);
+                }
+            }
+        }
+        if (array_key_exists('kitchen_notes', $cartData)) {
+            $cartData['kitchen_notes'] =
+                \App\Http\Controllers\RestaurantWaiterController::stripIdentityNote($cartData['kitchen_notes'], $noteUser);
+        }
+
         if ($tokenNo !== null) {
             $cartData['token_no'] = $tokenNo;
         }

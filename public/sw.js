@@ -192,4 +192,24 @@ self.addEventListener('message', e => {
     // Sale screen detected it is stale (boot fingerprint mismatch) — drop the
     // cached copy so its imminent reload fetches fresh from the network.
     if (e.data && e.data.type === 'TN_DROP_SALE_CACHE') e.waitUntil(caches.delete(SALE_CACHE));
+    // Task 644 (ZFC, Aug 2026): SALE_CACHE re-prime after a browser-data clear.
+    // The very first navigation after a clear is NOT SW-controlled (the SW
+    // registers post-load), so SALE_CACHE stayed empty and the SECOND open was
+    // still a full network fetch on shop internet. The sale screen posts this
+    // when it boots with no controller — fetch+cache it once in the background
+    // so the next open is offline-first again. URL is whitelisted (never cache
+    // arbitrary pages into SALE_CACHE); redirects/non-HTML rejected same as the
+    // navigate path above.
+    if (e.data && e.data.type === 'TN_PRIME_SALE_CACHE') {
+        e.waitUntil((async () => {
+            try {
+                const url = e.data.url === '/fbr-pos/create' ? '/fbr-pos/create' : '/pos/invoice/create';
+                const c = await caches.open(SALE_CACHE);
+                if (await c.match(url)) return; // already primed
+                const res = await fetch(url, { credentials: 'same-origin' });
+                const ct = res.headers.get('content-type') || '';
+                if (res.ok && !res.redirected && ct.includes('text/html')) await c.put(url, res.clone());
+            } catch (err) { /* best-effort — normal second-load prime still applies */ }
+        })());
+    }
 });

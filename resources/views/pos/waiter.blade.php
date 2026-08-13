@@ -292,8 +292,12 @@
                             </div>
                             <span class="text-sm font-black text-gray-700 dark:text-gray-200" x-text="'Rs ' + Math.round(line.quantity * line.unit_price).toLocaleString()"></span>
                         </div>
+                        {{-- Task 632 (ZFC "NOTE: waiter"): mobile Chrome/keyboard ignores
+                             autocomplete="off" on text inputs and autofills the saved login
+                             (username "waiter" landed in an item note). one-time-code is the
+                             strongest suppressor per the anti-autofill guard set. --}}
                         <input type="text" x-model="line.special_notes" placeholder="{{ __('pos.ph_note_for_kitchen') }}"
-                               autocomplete="off" :name="'waiter_note_' + i + '_nofill'" data-lpignore="true" data-form-type="other" data-1p-ignore
+                               autocomplete="one-time-code" :name="'waiter_note_' + i + '_nofill'" data-lpignore="true" data-form-type="other" data-1p-ignore
                                class="mt-2 w-full rounded-lg border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-xs px-2.5 py-1.5 focus:ring-teal-500 focus:border-teal-500">
                     </div>
                 </template>

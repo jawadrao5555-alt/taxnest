@@ -278,6 +278,11 @@ class RestaurantWaiterController extends Controller
             'priority' => 'nullable|boolean',
         ]);
 
+        // Task 632 (ZFC "NOTE: waiter", 13 Aug 2026): browser autofill drops the
+        // waiter's OWN login identity into note boxes — discard exact matches on
+        // EVERY waiter note-persisting path (storeOrder + appendItems).
+        $validated = $this->stripIdentityNotes($validated, $user);
+
         // Cashier pick is OPTIONAL (customer feedback, 23 Jul 2026). No pick =
         // unassigned order → EVERY cashier's incoming list shows it (incomingOrders
         // already treats NULL assigned_cashier_id as "for anyone"). When a cashier
@@ -418,6 +423,46 @@ class RestaurantWaiterController extends Controller
     }
 
     /** Append items to an already-sent held order — the delta prints alone (kot_printed_at NULL rows). */
+    /**
+     * Task 632 (ZFC "NOTE: waiter", 13 Aug 2026): live data proved mobile browser
+     * autofill drops the punching user's OWN login identity (name/username/email/
+     * email-prefix/phone) into note boxes — the KOT then prints a confusing
+     * "NOTE: waiter". A note that is EXACTLY such an identity string is never a
+     * real kitchen instruction — discard it (log user id only, never the raw
+     * value: it can be an email/phone). Notes that merely CONTAIN the word stay.
+     * Must be applied on EVERY path that persists waiter item/kitchen notes.
+     */
+    public static function stripIdentityNotes(array $validated, $user): array
+    {
+        $identity = array_filter(array_unique(array_map(
+            fn ($v) => mb_strtolower(trim((string) $v)),
+            [
+                $user->name ?? null,
+                $user->username ?? null,
+                $user->email ?? null,
+                strstr((string) ($user->email ?? ''), '@', true) ?: null, // email prefix
+                $user->phone ?? null,
+            ]
+        )));
+        $strip = function (?string $note) use ($identity, $user) {
+            $clean = mb_strtolower(trim((string) $note));
+            if ($clean !== '' && in_array($clean, $identity, true)) {
+                \Log::warning('Waiter note discarded: exact match with login identity (autofill)', [
+                    'user_id' => $user->id ?? null,
+                ]);
+                return null;
+            }
+            return $note;
+        };
+        foreach (($validated['items'] ?? []) as $k => $it) {
+            $validated['items'][$k]['special_notes'] = $strip($it['special_notes'] ?? null);
+        }
+        if (array_key_exists('kitchen_notes', $validated)) {
+            $validated['kitchen_notes'] = $strip($validated['kitchen_notes']);
+        }
+        return $validated;
+    }
+
     public function appendItems(Request $request, $id)
     {
         $companyId = app('currentCompanyId');
@@ -431,6 +476,10 @@ class RestaurantWaiterController extends Controller
             'items.*.item_id' => 'nullable|integer',
             'items.*.special_notes' => 'nullable|string|max:500',
         ]);
+
+        // Task 632: same identity-autofill note discard as storeOrder — this
+        // path also persists + immediately prints special_notes on a KOT.
+        $validated = self::stripIdentityNotes($validated, $user);
 
         return DB::transaction(function () use ($companyId, $validated, $user, $id) {
             // ZFC (1 Aug 2026): waiter DESKTOP (cashier) ke lagaye held orders mein

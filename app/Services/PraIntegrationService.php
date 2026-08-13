@@ -431,13 +431,26 @@ class PraIntegrationService
                 'pra_invoice_number' => $praInvoiceNumber,
             ]);
 
-            $this->storePraResponse($praLog, $transaction, $responseData, $responseCode, $success, $praInvoiceNumber);
-
             $message = $responseData['Response'] ?? ($responseData['Errors'] ?? 'No response message');
             if (!$success && (string) $responseCode === '112') {
                 // PRAL retired the cloud bulk PostData API for newer POS registrations.
                 $message = 'PRA has retired the old cloud API for this POS ID (Code 112). Open PRA Settings and switch Connection Mode to "PRA Fiscal Device", then install PRAL\'s IMS Fiscal Device software + TaxNest Desktop Agent on the shop PC.';
             }
+
+            // Task 624: store the real reason on the bill so the F11 modal can show it.
+            $errorForBill = null;
+            if (!$success) {
+                $hasPraMessage = isset($responseData['Response']) || isset($responseData['Errors']);
+                if ($hasPraMessage || (string) $responseCode === '112') {
+                    $errorForBill = is_string($message) ? $message : json_encode($message);
+                } elseif ((int) $httpCode >= 500) {
+                    // Non-JSON / empty body with a 5xx status = PRA server failure.
+                    $errorForBill = 'PRA server error (HTTP ' . $httpCode . ') — PRA ki taraf se masla, aapka token theek hai. Retry karein.';
+                } else {
+                    $errorForBill = 'PRA ne bill accept nahi kiya (HTTP ' . $httpCode . ', code ' . $responseCode . ') — PRA response mein koi wajah nahi mili.';
+                }
+            }
+            $this->storePraResponse($praLog, $transaction, $responseData, $responseCode, $success, $praInvoiceNumber, $errorForBill);
 
             return [
                 'success' => $success,
@@ -456,13 +469,16 @@ class PraIntegrationService
                 $userMessage = 'PRA server not reachable. Invoice saved offline — will auto-retry later.';
             }
 
+            // Task 624: short human reason stored on the bill (shown in F11 modal).
+            $billError = self::shortTransportError($errorMsg);
+
             Log::error('PRA Integration Error', [
                 'transaction_id' => $transaction->id,
                 'error' => $errorMsg,
                 'url' => $this->getApiUrl(),
             ]);
 
-            $this->storePraResponse($praLog, $transaction, ['error' => $errorMsg], '500', false, null);
+            $this->storePraResponse($praLog, $transaction, ['error' => $errorMsg], '500', false, null, $billError);
 
             // ENTERPRISE SAFE MODE: Agent-Sync companies should never go to 'offline' on TLS/transport errors —
             // the desktop agent will pick up these rows and submit them from a Pakistani IP.
@@ -482,7 +498,7 @@ class PraIntegrationService
         }
     }
 
-    public function storePraResponse(PraLog $praLog, PosTransaction $transaction, ?array $responseData, string $responseCode, bool $success, ?string $praInvoiceNumber): void
+    public function storePraResponse(PraLog $praLog, PosTransaction $transaction, ?array $responseData, string $responseCode, bool $success, ?string $praInvoiceNumber, ?string $errorMessage = null): void
     {
         $praLog->update([
             'response_payload' => $responseData,
@@ -496,11 +512,41 @@ class PraIntegrationService
             'pra_invoice_number' => $praInvoiceNumber ?? $transaction->pra_invoice_number,
         ];
 
+        // Task 624: persist the failure reason for the F11 modal; clear it on success.
+        // hasColumn guard = prod-schema-drift-selfheal (live cPanel may lag the migration).
+        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'pra_error_message')) {
+            $updateData['pra_error_message'] = $success ? null : mb_substr((string) ($errorMessage ?? 'PRA submission failed'), 0, 1000);
+        }
+
         if ($success && $praInvoiceNumber) {
             $updateData['pra_qr_code'] = $this->generateQrCode($praInvoiceNumber);
         }
 
         $transaction->update($updateData);
+    }
+
+    /**
+     * Task 624: turn a raw transport exception into a short cashier-readable reason.
+     * Roman-Urdu on purpose — this shows verbatim in the F11 Failed Bills modal.
+     */
+    public static function shortTransportError(string $errorMsg): string
+    {
+        $lower = strtolower($errorMsg);
+
+        if (str_contains($lower, 'timed out') || str_contains($lower, 'timeout')) {
+            return 'PRA server timeout — PRA ki taraf se masla, aapka token theek hai. Retry karein.';
+        }
+        if (str_contains($lower, 'tls connect error') || str_contains($lower, 'ssl')) {
+            return 'PRA server SSL/TLS error — PRA server se secure connection nahi bana.';
+        }
+        if (str_contains($lower, 'connection refused') || str_contains($lower, 'could not resolve') || str_contains($lower, 'no response')) {
+            return 'PRA server not reachable — internet ya PRA server down. Auto-retry hoga.';
+        }
+        if (str_contains($lower, 'relay error')) {
+            return 'PRA relay error — ' . mb_substr($errorMsg, 0, 200);
+        }
+
+        return mb_substr($errorMsg, 0, 300);
     }
 
     public function generateQrCode(string $praInvoiceNumber): string

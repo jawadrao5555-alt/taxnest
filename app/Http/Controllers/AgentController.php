@@ -393,12 +393,17 @@ class AgentController extends Controller
             $response = $request->input('response');
             $code = is_array($response) ? ($response['Code'] ?? $response['response_code'] ?? $response['code'] ?? '100') : '100';
 
-            DB::table('pos_transactions')->where('id', $txnId)->update([
+            $successUpdate = [
                 'pra_status' => 'submitted',
                 'pra_invoice_number' => $praInvoiceNumber,
                 'pra_response_code' => substr((string) $code, 0, 250),
                 'updated_at' => now(),
-            ]);
+            ];
+            // Task 624: clear stale failure reason once the bill goes through.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'pra_error_message')) {
+                $successUpdate['pra_error_message'] = null;
+            }
+            DB::table('pos_transactions')->where('id', $txnId)->update($successUpdate);
 
             Log::info('Agent: PRA submission success', [
                 'company_id' => $company->id,
@@ -418,11 +423,16 @@ class AgentController extends Controller
                 || $this->isTransportError($errMsg);
             $newStatus = $transportError ? 'offline' : 'failed';
 
-            DB::table('pos_transactions')->where('id', $txnId)->update([
+            $failUpdate = [
                 'pra_status' => $newStatus,
                 'pra_response_code' => substr($errMsg, 0, 250),
                 'updated_at' => now(),
-            ]);
+            ];
+            // Task 624: store a short cashier-readable reason for the F11 modal.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'pra_error_message')) {
+                $failUpdate['pra_error_message'] = \App\Services\PraIntegrationService::shortTransportError($errMsg);
+            }
+            DB::table('pos_transactions')->where('id', $txnId)->update($failUpdate);
 
             Log::log($transportError ? 'info' : 'warning', 'Agent: PRA submission ' . ($transportError ? 'deferred (offline/IMS unreachable — queued)' : 'failed'), [
                 'company_id' => $company->id,

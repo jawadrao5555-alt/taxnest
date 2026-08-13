@@ -2906,7 +2906,12 @@ window.addEventListener('popstate', function() {
                             <span class="text-sm font-bold text-red-700 dark:text-red-400" x-text="'Rs. ' + Number(bill.total_amount).toLocaleString()"></span>
                         </div>
                         <p class="text-[11px] text-gray-500 ml-7 mb-1" x-text="bill.items_count + window.TXT.sfx_item_s_dot + bill.created_human"></p>
-                        <template x-if="bill.error_code">
+                        {{-- Task 624: asal wajah (PRA timeout / server error) — human message pehle, warna raw code. --}}
+                        <template x-if="bill.error_message">
+                            <p class="text-[10px] text-red-600 dark:text-red-400 ml-7 mb-2 leading-snug" x-text="'⚠ ' + bill.error_message"></p>
+                        </template>
+                        {{-- Raw response code hamesha dikhe (reviewer: generic message ke saath bhi code na chhupe) --}}
+                        <template x-if="bill.error_code && (!bill.error_message || !String(bill.error_message).includes(String(bill.error_code)))">
                             <p class="text-[10px] text-red-500 ml-7 mb-2 font-mono truncate" x-text="'⚠ ' + bill.error_code"></p>
                         </template>
                         <div class="flex gap-2 ml-7 mt-2">

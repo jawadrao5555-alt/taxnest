@@ -3946,7 +3946,7 @@ class PosController extends Controller
             ->whereNull('pra_invoice_number')
             ->orderBy('id', 'desc')
             ->limit(100)
-            ->get(['id', 'invoice_number', 'customer_name', 'total_amount', 'pra_status', 'pra_response_code', 'created_at']);
+            ->get(['id', 'invoice_number', 'customer_name', 'total_amount', 'pra_status', 'pra_response_code', 'pra_error_message', 'created_at']);
 
         $data = $bills->map(function ($b) {
             return [
@@ -3956,6 +3956,8 @@ class PosController extends Controller
                 'total_amount'   => (float) $b->total_amount,
                 'pra_status'     => $b->pra_status,
                 'error_code'     => $b->pra_response_code,
+                // Task 624: asal wajah (timeout / HTTP code / PRA message) — F11 modal.
+                'error_message'  => $b->pra_error_message,
                 'items_count'    => PosTransactionItem::where('transaction_id', $b->id)->count(),
                 'created_human'  => $b->created_at?->diffForHumans(),
                 'created_at'     => $b->created_at?->toDateTimeString(),

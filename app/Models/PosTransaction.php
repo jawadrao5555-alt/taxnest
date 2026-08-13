@@ -14,7 +14,7 @@ class PosTransaction extends Model
         'tax_rate', 'tax_amount', 'exempt_amount', 'total_amount', 'tax_inclusive', 'tax_menu_rate', 'payment_method',
         'cash_received', 'change_due',
         'status', 'locked_by_terminal_id', 'lock_time',
-        'pra_invoice_number', 'pra_response_code', 'pra_status', 'submission_hash', 'pra_qr_code', 'created_by',
+        'pra_invoice_number', 'pra_response_code', 'pra_error_message', 'pra_status', 'submission_hash', 'pra_qr_code', 'created_by',
         'business_date',
         'offline_uuid',
         'bill_token',

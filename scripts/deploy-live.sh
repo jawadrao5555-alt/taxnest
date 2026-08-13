@@ -113,6 +113,10 @@ else
   fi
 fi
 
+step "Preflight: service-worker smoke check (sw.js fetch/message handlers)"
+node scripts/sw-smoke-check.mjs \
+  || fail "sw smoke check FAILED — public/sw.js handler broken (offline-first + logout cache hygiene would silently die on every client); fix before deploying"
+
 step "Preflight: POS plan-gate matrix check (Starter/Business/Pro/Pro Max/Unlimited)"
 if [ "${SKIP_PLAN_GATE_CHECK:-0}" = "1" ]; then
   echo "SKIPPED (SKIP_PLAN_GATE_CHECK=1) — only skip for emergency hotfixes." >&2

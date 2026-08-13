@@ -1161,6 +1161,63 @@ class PosController extends Controller
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
 
+        // ── Task 666: "Aaj ka Khaata" — stream-wise today sale/tax summary ──
+        // Canonical stream split = PosTransaction::applyStreamTab (the SAME
+        // predicates as the Transactions/Reports tabs — never hand-rolled).
+        // Money figures are SIGNED (returns net out, Task 570 convention);
+        // bill counts stay SALES-only. Cash/card tax split uses the full
+        // card-alias bucket (PosPaymentBuckets) — matching ='card' would
+        // report Rs 0 card tax. Exempt bills (pra_status='exempt_internal')
+        // belong to NO stream: they are aggregated ONCE as their own bucket
+        // so the both-scope view never double-counts them; each stream card's
+        // "exempt items" line is the mixed-bill share only (header
+        // exempt_amount — post-discount, PosTaxMath). hasColumn guard keeps
+        // pre-migration PROD schemas alive (exempt_amount may be missing).
+        $hasKhataExempt = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'exempt_amount');
+        $khataExemptExpr = $hasKhataExempt ? 'COALESCE(exempt_amount,0)' : '0';
+        $khataCardIn = "'" . implode("','", PosPaymentBuckets::CARD_ALIASES) . "'";
+        $khataCash = PosPaymentBuckets::CASH;
+        $khataAgg = function (string $tab) use ($companyId, $bizToday, $dashSignExpr, $dashSaleRowExpr, $khataExemptExpr, $khataCardIn, $khataCash) {
+            $row = PosTransaction::where('company_id', $companyId)
+                ->where('status', 'completed')
+                ->where('business_date', $bizToday)
+                ->tap(fn ($q) => PosTransaction::applyStreamTab($q, $tab))
+                ->selectRaw("
+                    COALESCE(SUM({$dashSaleRowExpr}),0) as bills,
+                    COALESCE(SUM(({$dashSignExpr}) * total_amount),0) as sale,
+                    COALESCE(SUM(({$dashSignExpr}) * COALESCE(tax_amount,0)),0) as tax,
+                    COALESCE(SUM(CASE WHEN payment_method = '{$khataCash}' THEN ({$dashSignExpr}) * COALESCE(tax_amount,0) ELSE 0 END),0) as cash_tax,
+                    COALESCE(SUM(CASE WHEN payment_method IN ({$khataCardIn}) THEN ({$dashSignExpr}) * COALESCE(tax_amount,0) ELSE 0 END),0) as card_tax,
+                    COALESCE(SUM(({$dashSignExpr}) * {$khataExemptExpr}),0) as exempt_items,
+                    COALESCE(SUM(CASE WHEN pra_status = 'submitted' THEN ({$dashSignExpr}) * total_amount ELSE 0 END),0) as reported
+                ")->first();
+
+            return [
+                'bills'        => (int) ($row->bills ?? 0),
+                'sale'         => (float) ($row->sale ?? 0),
+                'tax'          => (float) ($row->tax ?? 0),
+                'cash_tax'     => (float) ($row->cash_tax ?? 0),
+                'card_tax'     => (float) ($row->card_tax ?? 0),
+                'exempt_items' => (float) ($row->exempt_items ?? 0),
+                'reported'     => (float) ($row->reported ?? 0),
+            ];
+        };
+        // Stream visibility mirrors the Transactions tabs: single-scope staff
+        // see exactly their own stream; for both-scope users the LOCAL block
+        // is admin/manager-only (the Local tab itself is isPosAdmin-gated —
+        // a plain both-scope cashier must not see local-stream figures here).
+        // Exempt bills are visible to EVERY scope (they belong to no stream).
+        $khataShowPra = $dashScope !== 'local';
+        $khataShowLocal = $dashScope === 'local' || ($dashScope === 'both' && $user->isPosAdmin());
+        $todayKhata = [
+            'scope'  => $dashScope,
+            'date'   => $bizToday,
+            'pra'    => $khataShowPra ? $khataAgg('pra') : null,
+            'local'  => $khataShowLocal ? $khataAgg('local') : null,
+            'exempt' => $khataAgg('exempt'),
+        ];
+        // ─────────────────────────────────────────────────────────────────────
+
         $allowedStyles = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify', 'saaf'];
         $dashboardStyle = in_array($company->pos_dashboard_style, $allowedStyles) ? $company->pos_dashboard_style : 'default';
         $isRestaurant = false;
@@ -1219,7 +1276,7 @@ class PosController extends Controller
             'dashboardStyle', 'isRestaurant', 'isAdmin', 'notifications',
             'profitStats', 'topSold', 'topProfit', 'lowMargin', 'costCoverage',
             'dayOpening', 'todayClosed', 'yesterdayRevenue', 'praSyncedToday',
-            'pendingProvisional', 'unclosedPriorDays', 'canDayClose'
+            'pendingProvisional', 'unclosedPriorDays', 'canDayClose', 'todayKhata'
         ));
     }
 

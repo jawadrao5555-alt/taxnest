@@ -4460,4 +4460,17 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'admin_agent_offline_sub' => 'Silent printing wahan band hai — cashiers Chrome print popup par gir gaye hain. Details ke liye click karein →',
     'admin_wa_intro' => 'Owner alerts (jaise Desktop Agent offline) TaxNest ke APNE WhatsApp Business number se bheje jate hain — companies ke buyer-invoice WhatsApp credentials se bilkul alag.',
     'admin_wa_template_body' => '"{{1}} — aap ka NestPOS Desktop Agent {{2}} ghante se offline hai (aakhri raabta: {{3}}). PC/agent chalu karein warna bills silent-print nahi hon ge."',
+    // Task 666: Dashboard "Aaj ka Khaata" — stream-wise today sale/tax summary
+    'khata_title' => 'Aaj ka Khaata',
+    'khata_net_note' => 'Returns minha ho kar',
+    'khata_pra_stream' => 'PRA Sale',
+    'khata_local_stream' => 'Local Sale',
+    'khata_total_sale' => 'Total sale',
+    'khata_bills_word' => 'bills',
+    'khata_pra_reported' => 'PRA reported sale',
+    'khata_total_tax' => 'Total tax',
+    'khata_cash_tax' => 'Cash par tax',
+    'khata_card_tax' => 'Card par tax',
+    'khata_exempt_items' => 'Exempt items (bill ke andar)',
+    'khata_exempt_bills' => 'Exempt bills',
 ];

@@ -4459,4 +4459,17 @@ return [
     'admin_agent_offline_sub' => 'وہاں سائلنٹ پرنٹنگ بند ہے — کیشیئر Chrome پرنٹ پاپ اپ پر آ گئے ہیں۔ تفصیل کے لیے کلک کریں ←',
     'admin_wa_intro' => 'مالک الرٹس (جیسے Desktop Agent آف لائن) TaxNest کے اپنے WhatsApp Business نمبر سے بھیجے جاتے ہیں — کمپنیوں کی خریدار انوائس WhatsApp تفصیلات سے بالکل الگ۔',
     'admin_wa_template_body' => '"{{1}} — آپ کا NestPOS Desktop Agent {{2}} گھنٹے سے آف لائن ہے (آخری رابطہ: {{3}})۔ PC چالو کریں ورنہ بلز سائلنٹ پرنٹ نہیں ہوں گے۔"',
+    // Task 666: Dashboard "Aaj ka Khaata" — stream-wise today sale/tax summary
+    'khata_title' => 'آج کا کھاتہ',
+    'khata_net_note' => 'ریٹرن منہا کر کے',
+    'khata_pra_stream' => 'PRA سیل',
+    'khata_local_stream' => 'لوکل سیل',
+    'khata_total_sale' => 'کل سیل',
+    'khata_bills_word' => 'بل',
+    'khata_pra_reported' => 'PRA پر رپورٹ شدہ سیل',
+    'khata_total_tax' => 'کل ٹیکس',
+    'khata_cash_tax' => 'کیش پر ٹیکس',
+    'khata_card_tax' => 'کارڈ پر ٹیکس',
+    'khata_exempt_items' => 'چھوٹ والی اشیا (بل کے اندر)',
+    'khata_exempt_bills' => 'چھوٹ والے بل',
 ];

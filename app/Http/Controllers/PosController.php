@@ -1698,7 +1698,11 @@ class PosController extends Controller
         return [
             'u' => (int) $user->id,
             'c' => (int) $companyId,
-            's' => is_file($screenPath) ? (string) @filemtime($screenPath) : '0',
+            // Task 658: baked i18n is now a USED-KEYS subset — a lang-file-only
+            // edit (blade untouched) must still refresh cached copies, so the
+            // 's' rev appends the active-locale pos.php mtimes (+ locale).
+            's' => (is_file($screenPath) ? (string) @filemtime($screenPath) : '0')
+                . '-' . \App\Support\PosI18n::langRev(),
             'cat' => $catalogRev,
             'set' => $settingsRev,
         ];

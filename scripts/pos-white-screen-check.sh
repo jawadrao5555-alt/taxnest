@@ -117,6 +117,19 @@ else
 fi
 
 # ------------------------------------------------------------------
+# 1b2. STATIC: sale-screen i18n subset guard (Task 658). The sale screens bake
+#      only the TXT.* keys they use — this fails if a referenced key is
+#      missing in ANY of en/rur/ur, or if a dynamic TXT[expr] access appears
+#      (the extractor can't see it → silently unbaked key → undefined label).
+# ------------------------------------------------------------------
+say "Static scan: sale-screen i18n baked-subset keys (en/rur/ur)"
+if php scripts/pos-i18n-check.php; then
+  echo "    OK: every TXT.* key the sale screens use exists in all three locales."
+else
+  bad "pos-i18n-check failed — a sale-screen TXT.* key is missing from a locale or accessed dynamically"
+fi
+
+# ------------------------------------------------------------------
 # 1c. STATIC: hardcoded Roman Urdu in USER-VISIBLE text (Task 238).
 #     English mode must never show Roman Urdu again — Task 237 cleaned the
 #     live screens; this scan blocks any regression. Checks HTML text nodes,

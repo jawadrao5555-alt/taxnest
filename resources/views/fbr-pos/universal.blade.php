@@ -256,7 +256,10 @@ input:focus:not(:focus-visible) { outline: none; }
     *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 </style>
-<script type="application/json" id="tn-pos-i18n">{!! json_encode(__('pos'), JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}' !!}</script>
+{{-- Task 658 (Aug 2026): bake only the TXT.* keys this screen actually uses —
+     see pos/universal.blade.php twin note. QA: scripts/pos-i18n-check.php in
+     the deploy preflight. --}}
+<script type="application/json" id="tn-pos-i18n">{!! json_encode(\App\Support\PosI18n::baked('fbr-pos/universal'), JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}' !!}</script>
 <script>window.TXT = (function () { try { return JSON.parse(document.getElementById('tn-pos-i18n').textContent) || {}; } catch (e) { return {}; } })();</script>
 <script>
 // Task 644 (ZFC, Aug 2026): SALE_CACHE re-prime after a browser-data clear —

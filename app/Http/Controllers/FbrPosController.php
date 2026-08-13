@@ -974,7 +974,10 @@ class FbrPosController extends Controller
         return [
             'u' => (int) $user->id,
             'c' => (int) $companyId,
-            's' => is_file($screenPath) ? (string) @filemtime($screenPath) : '0',
+            // Task 658: baked i18n = used-keys subset — lang-file-only edits
+            // must refresh cached copies (see PRA twin note).
+            's' => (is_file($screenPath) ? (string) @filemtime($screenPath) : '0')
+                . '-' . \App\Support\PosI18n::langRev(),
             'cat' => $catalogRev,
             'set' => $settingsRev,
         ];

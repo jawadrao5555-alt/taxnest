@@ -26,7 +26,12 @@
     <div class="tn-boot-title" style="font-weight:800;color:#374151;font-size:15px;">{{ __('pos.nestpos_loading') }}</div>
     <div style="color:#9ca3af;font-size:12px;">{{ __('pos.slow_internet_hint') }}</div>
 </div>
-<script type="application/json" id="tn-pos-i18n">{!! json_encode(__('pos'), JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}' !!}</script>
+{{-- Task 658 (Aug 2026): bake only the TXT.* keys this screen actually uses
+     (PosI18n scans this blade — extraction can never go stale). Full __('pos')
+     was ~245KB / ~4,400 keys; the used subset is a few hundred. QA: deploy
+     preflight runs scripts/pos-i18n-check.php (missing keys in en/rur/ur or
+     dynamic non-literal TXT subscript access fail the deploy). --}}
+<script type="application/json" id="tn-pos-i18n">{!! json_encode(\App\Support\PosI18n::baked('pos/universal'), JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}' !!}</script>
 <script>window.TXT = (function () { try { return JSON.parse(document.getElementById('tn-pos-i18n').textContent) || {}; } catch (e) { return {}; } })();</script>
 <script>
 // Task 644 (ZFC, Aug 2026): SALE_CACHE re-prime after a browser-data clear.

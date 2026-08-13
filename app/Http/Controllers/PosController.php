@@ -2993,6 +2993,11 @@ class PosController extends Controller
         // bill actually has a PRA fiscal number — a credit note against a USIN
         // PRA never saw is meaningless. Local returns stay local by design.
         if (($transaction->transaction_type ?? 'sale') === 'return') {
+            // Returns are manager+ only (mirrors PosReturnController::gate):
+            // cashiers see the row in the bills panel but cannot retry it.
+            if (auth('pos')->user()?->posCashierBlocked()) {
+                return back()->with('error', __('pos.return_manager_only'));
+            }
             $returnParent = $transaction->parent_transaction_id
                 ? PosTransaction::withoutGlobalScope('hide_archived')
                     ->where('company_id', $companyId)
@@ -3119,11 +3124,18 @@ class PosController extends Controller
             return back()->with('error', __('pos.billing_scope_local_only'));
         }
 
-        $pendingInvoices = PosTransaction::where('company_id', $companyId)
+        $bulkQuery = PosTransaction::where('company_id', $companyId)
             ->whereIn('pra_status', ['failed', 'offline', 'pending'])
-            ->whereNull('pra_invoice_number')
-            ->orderBy('id', 'asc')
-            ->get();
+            ->whereNull('pra_invoice_number');
+        // Task 582: return/credit-note rows are manager+ only — a cashier's
+        // bulk "Sync all" must never sweep them into the PRA pipeline.
+        if (auth('pos')->user()?->posCashierBlocked()
+            && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type')) {
+            $bulkQuery->where(function ($q) {
+                $q->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
+            });
+        }
+        $pendingInvoices = $bulkQuery->orderBy('id', 'asc')->get();
 
         if ($pendingInvoices->isEmpty()) {
             return back()->with('info', __('pos.no_failed_offline_retry'));

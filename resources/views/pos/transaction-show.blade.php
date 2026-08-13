@@ -324,7 +324,9 @@
                 <p class="text-[11px] text-purple-500/80 dark:text-purple-400/70 italic">{{ __('pos.pra_reporting_disabled_note') }}</p>
                 @endif
             </div>
-            @elseif($transaction->pra_status === 'offline')
+            @elseif($transaction->pra_status === 'offline'
+                && (!$isReturnBill || !auth('pos')->user()->posCashierBlocked()))
+            {{-- Task 582: return rows are manager+ only — cashiers see the bill, no sync box. --}}
             <div class="bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-700 p-5">
                 <h3 class="text-sm font-semibold text-orange-800 dark:text-orange-300 mb-2">{{ __('pos.offline_pending_sync') }}</h3>
                 <p class="text-xs text-orange-700 dark:text-orange-400 mb-3">{{ __('pos.offline_pending_sync_desc') }}</p>
@@ -336,7 +338,9 @@
                     </button>
                 </form>
             </div>
-            @elseif(!$transaction->pra_invoice_number && in_array($transaction->pra_status, ['pending', 'failed']))
+            @elseif(!$transaction->pra_invoice_number && in_array($transaction->pra_status, ['pending', 'failed'])
+                && (!$isReturnBill || !auth('pos')->user()->posCashierBlocked()))
+            {{-- Task 582: return rows are manager+ only — cashiers see the bill, no retry box. --}}
             <div class="bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-700 p-5">
                 <h3 class="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2">{{ __('pos.pra_retry_available') }}</h3>
                 <p class="text-xs text-amber-700 dark:text-amber-400 mb-3">{{ __('pos.pra_retry_available_desc') }}</p>

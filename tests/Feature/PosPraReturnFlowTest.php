@@ -453,6 +453,66 @@ class PosPraReturnFlowTest extends TestCase
         $this->assertNull($ret->fresh()->pra_status, 'local return must never be promoted to PRA');
     }
 
+    public function test_cashier_cannot_retry_failed_return(): void
+    {
+        // Task 582: cashiers see failed return rows in the bills panel but the
+        // retry path is manager+ only (mirrors PosReturnController::gate).
+        $this->actAs('pos_admin');
+        $parent = $this->seedParent(['pra_invoice_number' => 'PRA-FISCAL-1']);
+        $ids = $this->itemIds($parent);
+        $this->postReturn($parent, [['item_id' => $ids[0], 'return_qty' => 1]]);
+        $ret = $this->returnRows($parent)->first();
+        DB::table('pos_transactions')->where('id', $ret->id)->update(['pra_status' => 'failed']);
+
+        Auth::guard('pos')->logout();
+        $this->actAs('pos_cashier');
+        $resp = (new \App\Http\Controllers\PosController())->retryPra($ret->id);
+
+        $this->assertTrue($resp->isRedirect());
+        $this->assertSame('failed', $ret->fresh()->pra_status, 'cashier retry must not touch the return row');
+    }
+
+    public function test_offline_return_retry_box_hidden_from_cashier_visible_to_manager(): void
+    {
+        // Task 582 (review): the transaction-show OFFLINE sync box must follow
+        // the same manager+-only rule as the pending/failed box. Rendered-view
+        // check: stub the heavy pos-app layout with a slot-only shim.
+        $stubRoot = sys_get_temp_dir() . '/tn-view-stubs-' . getmypid();
+        @mkdir($stubRoot . '/layouts', 0777, true);
+        file_put_contents($stubRoot . '/layouts/pos-app.blade.php', '{{ $slot }}');
+        view()->getFinder()->prependLocation($stubRoot);
+
+        foreach (['pra_logs' => null, 'pos_terminals' => null] as $tbl => $_) {
+            if (!Schema::hasTable($tbl)) {
+                Schema::create($tbl, function (Blueprint $table) {
+                    $table->id();
+                    $table->unsignedBigInteger('transaction_id')->nullable();
+                    $table->unsignedBigInteger('company_id')->nullable();
+                    $table->string('status')->nullable();
+                    $table->string('terminal_name')->nullable();
+                    $table->string('response_code')->nullable();
+                    $table->timestamps();
+                });
+            }
+        }
+
+        $this->actAs('pos_manager');
+        $parent = $this->seedParent(['pra_invoice_number' => 'PRA-FISCAL-9']);
+        $ids = $this->itemIds($parent);
+        $this->postReturn($parent, [['item_id' => $ids[0], 'return_qty' => 1]]);
+        $ret = $this->returnRows($parent)->first();
+        DB::table('pos_transactions')->where('id', $ret->id)->update(['pra_status' => 'offline']);
+        $fresh = fn () => PosTransaction::withoutGlobalScope('hide_archived')->with('items')->findOrFail($ret->id);
+
+        $managerHtml = view('pos.transaction-show', ['transaction' => $fresh()])->render();
+        $this->assertStringContainsString('retry-pra', $managerHtml, 'manager must see the offline sync button on a return row');
+
+        Auth::guard('pos')->logout();
+        $this->actAs('pos_cashier');
+        $cashierHtml = view('pos.transaction-show', ['transaction' => $fresh()])->render();
+        $this->assertStringNotContainsString('retry-pra', $cashierHtml, 'cashier must see the return row but NO retry/sync button');
+    }
+
     // ── 5. stock symmetry ────────────────────────────────────────────────────
 
     public function test_stock_restored_only_for_originally_deducted_products(): void

@@ -179,7 +179,10 @@
                                     </button>
                                 </form>
                                 @endif
-                                @if(in_array($txn->pra_status, ['failed', 'offline', 'pending']) && !$txn->pra_invoice_number)
+                                {{-- Retry PRA: sale rows = everyone on the PRA stream; return rows
+                                     (Task 582) = manager+ only — cashiers see the row, no button. --}}
+                                @if(in_array($txn->pra_status, ['failed', 'offline', 'pending']) && !$txn->pra_invoice_number
+                                    && (!$rowIsReturn || !auth('pos')->user()->posCashierBlocked()))
                                 <form method="POST" action="{{ route('pos.transaction.retry-pra', $txn->id) }}" class="inline">
                                     @csrf
                                     <button type="submit" class="text-orange-600 hover:text-orange-700 text-xs font-medium" title="{{ __('pos.ti_retry_pra') }}">

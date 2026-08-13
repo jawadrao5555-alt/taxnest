@@ -14,8 +14,9 @@ class PosFeatureService
     ];
 
     /**
-     * Plan-gated Restaurant & Kitchen flags (Jul 2026): available only on
-     * Pro / Unlimited POS plans (pricing_plans.restaurant_enabled), active
+     * Plan-gated Restaurant & Kitchen flags (Jul 2026): available on plans
+     * with pricing_plans.restaurant_enabled — Business and above since
+     * Aug 2026 (business_gains_kitchen_analytics migration) — active
      * admin overrides, or internal accounts. Masked OFF at runtime for
      * everyone else — stored feature_flags stay untouched so a later plan
      * upgrade restores the shop's previous kitchen configuration.

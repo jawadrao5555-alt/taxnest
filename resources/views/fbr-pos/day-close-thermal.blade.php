@@ -187,6 +187,21 @@
     <div class="hr"></div>
     @endif
 
+    {{-- Biometric Punches (Task #563): from registered ZKTeco/ADMS devices.
+         Same plan gate as session hazri; empty = section hidden. --}}
+    @if(!empty($bioPunches))
+    <div class="sec">{{ __('pos.bio_hazri_section') }}</div>
+    <table>
+        @foreach($bioPunches as $bp)
+        <tr>
+            <td>{{ \Illuminate\Support\Str::limit($bp->name ?? __('pos.bio_unmapped_pin', ['pin' => $bp->device_pin ?? '?']), 14) }}</td>
+            <td class="r">{{ $bp->first_in ? \Carbon\Carbon::parse($bp->first_in)->format('h:iA') : '-' }} &rarr; {{ $bp->last_out ? \Carbon\Carbon::parse($bp->last_out)->format('h:iA') : '-' }} &middot; {{ \App\Support\PosHazriDutyHours::format($bp->duty_minutes ?? 0) }}{{ !empty($bp->duty_open) ? '*' : '' }}</td>
+        </tr>
+        @endforeach
+    </table>
+    <div class="hr"></div>
+    @endif
+
     <div class="sec">{{ __('pos.dc_stats') }}</div>
     <table>
         <tr><td>{{ __('pos.dc_avg_bill') }}</td><td class="r">{{ number_format($analytics->avg_bill, 2) }}</td></tr>

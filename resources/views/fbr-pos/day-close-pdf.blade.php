@@ -344,6 +344,36 @@
     <div style="font-size:8px; color:#6b7280; margin-top:2px;">{{ __('pos.dcp_no_logout_note') }}</div>
     @endif
 
+    {{-- ═══ Biometric Punches (Task #563): from registered ZKTeco/ADMS devices ═══
+         Shown only when hazri plan gate is ON and there are punches for this day. --}}
+    @if(!empty($bioPunches))
+    <div class="section-title">{{ __('pos.bio_hazri_section') }}</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>{{ __('pos.dcp_staff') }}</th>
+                <th class="c">{{ __('pos.dcp_first_in') }}</th>
+                <th class="c">{{ __('pos.dcp_last_out') }}</th>
+                <th class="c">{{ __('pos.bio_punch_in') }}</th>
+                <th class="c">{{ __('pos.bio_punch_out') }}</th>
+                <th class="c">{{ __('pos.bio_duty_hours') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($bioPunches as $bp)
+            <tr>
+                <td>{{ $bp->name ?? __('pos.bio_unmapped_pin', ['pin' => $bp->device_pin ?? '?']) }}</td>
+                <td class="c">{{ $bp->first_in ? \Carbon\Carbon::parse($bp->first_in)->format('h:i A') : '-' }}</td>
+                <td class="c">{{ $bp->last_out ? \Carbon\Carbon::parse($bp->last_out)->format('h:i A') : '-' }}</td>
+                <td class="c">{{ $bp->in_count }}</td>
+                <td class="c">{{ $bp->out_count }}</td>
+                <td class="c">{{ \App\Support\PosHazriDutyHours::format($bp->duty_minutes ?? 0) }}{{ !empty($bp->duty_open) ? '*' : '' }}</td>
+            </tr>
+            @endforeach
+        </tbody>
+    </table>
+    @endif
+
     @if($analytics->top_products->isNotEmpty())
     <div class="section-title">{{ __('pos.dc_top_products') }}</div>
     <table class="data">

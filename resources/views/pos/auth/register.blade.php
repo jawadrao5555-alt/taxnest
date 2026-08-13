@@ -170,6 +170,14 @@
                             <input id="company_ntn" type="text" name="company_ntn" value="{{ old('company_ntn') }}" placeholder="{{ __('pos.auth_ph_ntn_optional') }}" class="w-full rounded-xl text-sm text-white placeholder-purple-300/30 transition" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(139,92,246,0.15)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
                         </div>
 
+                        <div>
+                            <label for="company_cnic" class="block text-sm font-medium text-purple-100/70 mb-1.5">{{ __('pos.auth_cnic_label') }} <span class="text-purple-300/50 font-normal">{{ __('pos.auth_optional_dash') }}</span></label>
+                            <input id="company_cnic" type="text" name="company_cnic" value="{{ old('company_cnic') }}" placeholder="{{ __('pos.auth_ph_cnic_optional') }}" class="w-full rounded-xl text-sm text-white placeholder-purple-300/30 transition" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(139,92,246,0.15)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
+                            @error('company_cnic')
+                            <p class="text-sm text-red-400 mt-1.5">{{ $message }}</p>
+                            @enderror
+                        </div>
+
                         <div style="border-top: 1px solid rgba(255,255,255,0.08); margin-top: 8px; padding-top: 12px;">
                             <p class="text-xs font-semibold text-purple-300/50 uppercase tracking-wider">{{ __('pos.auth_admin_account') }}</p>
                         </div>

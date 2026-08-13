@@ -74,6 +74,13 @@
                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500" placeholder="{{ __('pos.ph_eg_ntn') }}">
                 </div>
                 <div>
+                    <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.owner_cnic_label') }}</label>
+                    <input type="text" name="cnic" value="{{ old('cnic', $company->cnic) }}"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500" placeholder="35299-1234567-1">
+                    <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{{ __('pos.cnic_login_hint') }}</p>
+                    @error('cnic') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                </div>
+                <div>
                     <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.business_activity') }}</label>
                     <input type="text" name="business_activity" value="{{ old('business_activity', $company->business_activity) }}"
                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500" placeholder="{{ __('pos.ph_eg_activity') }}">

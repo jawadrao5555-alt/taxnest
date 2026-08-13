@@ -3712,13 +3712,16 @@ class FbrPosController extends Controller
                 'phone' => 'nullable|string|max:20',
                 'email' => 'nullable|email|max:255',
                 'ntn' => 'nullable|string|max:20',
+                // Task 579: owner-facing CNIC — same rules the login router
+                // understands (13 digits, dash-tolerant, globally unique).
+                'cnic' => \App\Services\LoginIdentifierResolver::cnicRules($company->id),
                 'print_paper_size' => 'nullable|in:thermal,thermal58,a4',
                 'kot_align_center' => 'nullable|in:0,1',
                 'kot_left_margin_mm' => 'nullable|integer|min:0|max:30',
                 'receipt_footer_note' => 'nullable|string|max:255',
                 'logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
                 'remove_logo' => 'nullable|boolean',
-            ]);
+            ], \App\Services\LoginIdentifierResolver::cnicMessages());
 
             // Handle logo upload / removal
             if ($request->boolean('remove_logo') && $company->logo_path) {
@@ -3765,7 +3768,15 @@ class FbrPosController extends Controller
                 'kot_left_margin_mm' => max(0, min(30, (int) $request->input('kot_left_margin_mm', 0))),
                 'receipt_footer_note' => $validated['receipt_footer_note'] ?? null,
                 'invoice_display_prefs' => $prefs,
-            ])->save();
+            ]);
+
+            // Task 579: owner-facing CNIC — stored as plain digits (login
+            // compares the digit form). hasColumn = PROD schema-drift guard.
+            if ($request->has('cnic') && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'cnic')) {
+                $company->cnic = \App\Services\LoginIdentifierResolver::normalizeCnic($validated['cnic'] ?? null);
+            }
+
+            $company->save();
 
             return redirect()->route('fbrpos.business-profile')->with('success', __('pos.business_profile_updated'));
         }

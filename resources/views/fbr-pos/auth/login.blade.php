@@ -85,6 +85,7 @@
                         <div>
                             <label for="login" class="block text-[12px] font-bold text-gray-700 mb-1.5 uppercase tracking-wide">{{ __('pos.auth_login_field') }}</label>
                             <input id="login" type="text" name="login" value="{{ old('login') }}" required autofocus autocomplete="username" placeholder="{{ __('pos.auth_ph_credential') }}" class="w-full rounded-xl text-sm text-gray-900 placeholder-gray-400 input-premium">
+                            <p class="text-[11px] text-gray-400 mt-1.5 leading-snug">{{ __('pos.auth_login_id_hint') }}</p>
                             @error('login')<p class="text-xs text-red-600 mt-1.5 font-medium">{{ $message }}</p>@enderror
                         </div>
 

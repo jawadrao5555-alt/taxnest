@@ -61,6 +61,7 @@
                             <div>
                                 <label for="login" class="block text-sm font-medium text-purple-100/70 mb-1.5">{{ __('pos.auth_login_field') }}</label>
                                 <input id="login" type="text" name="login" value="{{ old('login') }}" required autofocus autocomplete="username" placeholder="{{ __('pos.auth_ph_credential') }}" class="w-full rounded-xl text-sm text-white placeholder-purple-300/30 transition" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); padding: 11px 14px; outline: none;" onfocus="this.style.borderColor='rgba(139,92,246,0.5)'; this.style.boxShadow='0 0 0 3px rgba(139,92,246,0.15)';" onblur="this.style.borderColor='rgba(255,255,255,0.12)'; this.style.boxShadow='none';">
+                                <p class="text-[11px] text-purple-200/40 mt-1.5 leading-snug">{{ __('pos.auth_login_id_hint') }}</p>
                                 @error('login')
                                 <p class="text-sm text-red-400 mt-1.5">{{ $message }}</p>
                                 @enderror

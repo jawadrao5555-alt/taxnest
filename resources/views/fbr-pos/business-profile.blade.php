@@ -54,6 +54,14 @@
                     class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
                 @error('ntn') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
             </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.owner_cnic_label') }}</label>
+                <input type="text" name="cnic" value="{{ old('cnic', $company->cnic) }}" placeholder="35299-1234567-1"
+                    class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.cnic_login_hint') }}</p>
+                @error('cnic') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+            </div>
         </div>
 
         {{-- Logo --}}

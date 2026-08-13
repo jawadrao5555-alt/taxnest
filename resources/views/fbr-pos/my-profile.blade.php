@@ -44,6 +44,7 @@
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.username_label') }}</label>
                     <input type="text" name="username" value="{{ old('username', $user->username) }}"
                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="{{ __('pos.ph_eg_johndoe123') }}">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.username_self_login_hint') }}</p>
                     @error('username') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                 </div>
             </div>

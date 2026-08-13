@@ -8543,6 +8543,9 @@ class PosController extends Controller
                 'name' => 'required|string|max:255',
                 'owner_name' => 'nullable|string|max:255',
                 'ntn' => 'nullable|string|max:50',
+                // Task 579: owner-facing CNIC — same rules the login router
+                // understands (13 digits, dash-tolerant, globally unique).
+                'cnic' => \App\Services\LoginIdentifierResolver::cnicRules($company->id),
                 'email' => 'nullable|email|max:255',
                 'phone' => 'nullable|string|max:30',
                 'mobile' => 'nullable|string|max:30',
@@ -8554,7 +8557,7 @@ class PosController extends Controller
                 'rp_footer_text' => 'nullable|string|max:150',
             ];
 
-            $request->validate($rules);
+            $request->validate($rules, \App\Services\LoginIdentifierResolver::cnicMessages());
 
             // NTN is submitted with EVERY PRA fiscal invoice — do not allow clearing it
             // while PRA reporting is live, or subsequent submissions would carry a null NTN.
@@ -8564,6 +8567,13 @@ class PosController extends Controller
             }
 
             $data = $request->only(['name', 'owner_name', 'ntn', 'email', 'phone', 'mobile', 'address', 'city', 'business_activity', 'website']);
+
+            // Task 579: store the CNIC as plain digits — the login routers
+            // compare both raw and digit-only forms, DB convention is digits.
+            // hasColumn = PROD schema-drift guard.
+            if ($request->has('cnic') && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'cnic')) {
+                $data['cnic'] = \App\Services\LoginIdentifierResolver::normalizeCnic($request->input('cnic'));
+            }
 
             // Receipt display preferences (per-company, POS product scope)
             if ($request->has('receipt_prefs_submitted')) {

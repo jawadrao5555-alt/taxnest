@@ -76,6 +76,72 @@ class LoginIdentifierResolver
         ];
     }
 
+    /**
+     * Shared validation rules for every owner-facing companies.cnic WRITE path
+     * (Task 579: POS/FBR Business Profile + registration). Single source of
+     * truth so the profile pages can never save a CNIC the login routers
+     * would refuse to resolve.
+     *
+     * Format: 13 digits, dash/space tolerant (input like 35299-1234567-1 is
+     * fine — it is normalized to plain digits before storage, matching the
+     * digit-only comparison both login controllers already do).
+     *
+     * Uniqueness: GLOBAL across companies (any product type). Two companies
+     * with the same CNIC would make the login lookup pick one of them
+     * arbitrarily — dashed/spaced legacy values are compared via REPLACE so
+     * an admin-set "35299-1234567-1" still blocks a plain "3529912345671".
+     *
+     * @param  int|null $exceptCompanyId own company row to exempt
+     */
+    public static function cnicRules(?int $exceptCompanyId = null): array
+    {
+        return [
+            'nullable',
+            'string',
+            'max:20',
+            'regex:/^[0-9\-\s]+$/',
+            function ($attribute, $value, $fail) use ($exceptCompanyId) {
+                $digits = preg_replace('/\D/', '', (string) $value);
+                if (strlen($digits) !== 13) {
+                    $fail(__('pos.cnic_format_invalid'));
+
+                    return;
+                }
+                $dupe = Company::where(function ($q) use ($value, $digits) {
+                    $q->where('cnic', $value)
+                      ->orWhere('cnic', $digits)
+                      ->orWhereRaw("REPLACE(REPLACE(cnic, '-', ''), ' ', '') = ?", [$digits]);
+                });
+                if ($exceptCompanyId) {
+                    $dupe->where('id', '!=', $exceptCompanyId);
+                }
+                if ($dupe->exists()) {
+                    $fail(__('pos.cnic_taken'));
+                }
+            },
+        ];
+    }
+
+    /** Companion error messages for cnicRules(). */
+    public static function cnicMessages(string $field = 'cnic'): array
+    {
+        return [
+            $field . '.regex' => __('pos.cnic_format_invalid'),
+        ];
+    }
+
+    /**
+     * Normalize a CNIC input to the plain-digit form the DB stores
+     * (both login controllers compare raw AND digit-only forms, so
+     * digits-only storage always matches). Empty input → null (clear).
+     */
+    public static function normalizeCnic($value): ?string
+    {
+        $digits = preg_replace('/\D/', '', (string) $value);
+
+        return $digits === '' ? null : $digits;
+    }
+
     public static function resolveUsername(string $login, array $productTypes): array
     {
         // Exact username match is honoured ONLY when the account belongs to

@@ -60,6 +60,19 @@
             </label>
         </div>
 
+        {{-- Task 565: opt-in "Print se pehle poocho (Yes/No)" — payment success par
+             auto-print chain se pehle ek fauri Yes/No dialog. Silent print se
+             AZAAD (iframe/popup shops par bhi kaam karta hai). Default OFF. --}}
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
+            <label class="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" name="print_confirm_ask" value="1" {{ !empty($settings['print_confirm_ask']) ? 'checked' : '' }} class="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4">
+                <span>
+                    <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.print_confirm_ask_label') }}</span>
+                    <span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.print_confirm_ask_hint') }}</span>
+                </span>
+            </label>
+        </div>
+
         {{-- Printer pickers --}}
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.choose_printers') }}</h3>

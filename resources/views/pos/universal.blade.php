@@ -2040,6 +2040,32 @@ window.addEventListener('popstate', function() {
         </template>
     </div>
 
+    {{-- ═══ Task 565: PRINT-CONFIRM YES/NO DIALOG (opt-in per company) ═══
+         Flag ON: payment success par auto-print chain se pehle FORAN yeh chhota
+         in-screen dialog (naya browser popup nahi). Keyboard handleKey ke TOPMOST
+         block se chalta hai (Enter=Yes default, Tab=toggle, Esc=No) — yahan sirf
+         mouse clicks. z-index inline (arbitrary Tailwind class = Vite rebuild trap);
+         receipt popup / board modals (z-50/60) ke UPAR rehna zaroori hai. --}}
+    <div x-show="showPrintConfirm" x-cloak x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" style="display:none;z-index:80;">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden" x-transition.scale.90>
+            <div class="p-5 text-center">
+                <div class="w-12 h-12 mx-auto rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-2">
+                    <svg class="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                </div>
+                <p class="text-lg font-black text-gray-900 dark:text-white">{{ __('pos.print_confirm_q') }}</p>
+                <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{{ __('pos.print_confirm_keys_hint') }}</p>
+            </div>
+            <div class="px-4 pb-4 grid grid-cols-2 gap-2">
+                <button type="button" x-ref="printConfirmYes" @click="resolvePrintConfirm(true)" @focus="printConfirmChoice = 'yes'"
+                        class="py-3 rounded-xl text-sm font-bold text-white bg-purple-600 hover:bg-purple-700 transition ring-offset-2 dark:ring-offset-gray-900 focus:outline-none"
+                        :class="printConfirmChoice === 'yes' ? 'ring-2 ring-purple-500' : ''">{{ __('pos.print_confirm_yes') }}</button>
+                <button type="button" x-ref="printConfirmNo" @click="resolvePrintConfirm(false)" @focus="printConfirmChoice = 'no'"
+                        class="py-3 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition ring-offset-2 dark:ring-offset-gray-900 focus:outline-none"
+                        :class="printConfirmChoice === 'no' ? 'ring-2 ring-gray-500 border-gray-400 dark:border-gray-500' : ''">{{ __('pos.print_confirm_no') }}</button>
+            </div>
+        </div>
+    </div>
+
     {{-- ═══ CANCEL-ORDER WARNING MODAL (ZFC, 2 Aug 2026) ═══
          Bare confirm() ki jagah: items ki list + KOT-kitchen warning, taake
          bana hua khana anjane mein cancel na ho. --}}
@@ -4109,6 +4135,14 @@ function restaurantPos() {
         @php $__ps = $company->printerSettings(); @endphp
         silentBillPrint: {{ ($__ps['silent_print_enabled'] && $__ps['receipt_printer']) ? 'true' : 'false' }},
         silentKotPrint: {{ ($__ps['silent_print_enabled'] && $__ps['kot_printer']) ? 'true' : 'false' }},
+        // Task 565 (customer voice note): opt-in "Print se pehle poocho" — payment
+        // success par auto-print chain se PEHLE ek fauri Yes/No dialog. Flag OFF
+        // (default) = purana behavior byte-identical. Flag posConfigRev/boot
+        // fingerprint mein shamil hai (SW-cached copy toggle par refresh hoti hai).
+        printConfirmAsk: {{ !empty($__ps['print_confirm_ask']) ? 'true' : 'false' }},
+        showPrintConfirm: false,
+        printConfirmChoice: 'yes',
+        printConfirmAction: null,
         // Receipt popup auto-close (owner, 23 Jul 2026 — re-enabled after being persistent-only):
         // popup closes itself after N seconds (companies.pos_receipt_autoclose_seconds,
         // NULL = 10s default, 0 = never). Hover PAUSES the countdown; any click/keypress
@@ -4638,7 +4672,13 @@ function restaurantPos() {
             // Task 514: per-bill checkbox offline path par bhi lago — unticked =
             // is bill ki offline receipt bhi auto-print nahi hoti.
             if (!skipReceipt && this.autoPrintEnabled && !(this.orderType === 'dine_in' && !this.dineinAutoPrint)) {
-                setTimeout(() => this.printOfflineReceipt(), 400);
+                // Task 565: offline bill bhi "bill complete" hai — flag ON ho to
+                // wahi Yes/No gate; Yes par mojooda 400ms timing waisi hi.
+                if (this.printConfirmAsk) {
+                    this.openPrintConfirm(() => setTimeout(() => this.printOfflineReceipt(), 400));
+                } else {
+                    setTimeout(() => this.printOfflineReceipt(), 400);
+                }
             }
             this.clearCart();
             this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
@@ -5674,6 +5714,30 @@ function restaurantPos() {
         },
 
         handleKey(e) {
+            // ═══════════════════════════════════════════════════════════════
+            // Task 565: PRINT-CONFIRM YES/NO DIALOG — sab se TOPMOST; khula ho
+            // to keyboard SIRF isi ka hai. Enter = highlighted choice (Yes
+            // default), Tab/arrows = Yes ↔ No, Esc/N = No, Y = Yes. Baqi SAB
+            // keys swallow (guided flow / T,D,N shortcuts / search ko kuch na
+            // jaye) — band hote hi sab pehle jaisa. stopPropagation zaroori:
+            // window-level @keydown.escape.window listeners (receipt popup /
+            // board modals) warna Esc par saath hi band ho jate.
+            // ═══════════════════════════════════════════════════════════════
+            if (this.showPrintConfirm) {
+                e.stopPropagation();
+                if (e.key === 'Tab' || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    this.printConfirmChoice = this.printConfirmChoice === 'yes' ? 'no' : 'yes';
+                    try { (this.printConfirmChoice === 'yes' ? this.$refs.printConfirmYes : this.$refs.printConfirmNo)?.focus(); } catch (err) {}
+                    return;
+                }
+                if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); this.resolvePrintConfirm(this.printConfirmChoice === 'yes'); return; }
+                if (e.key === 'Escape') { e.preventDefault(); this.resolvePrintConfirm(false); return; }
+                if (e.key === 'y' || e.key === 'Y') { e.preventDefault(); this.resolvePrintConfirm(true); return; }
+                if (e.key === 'n' || e.key === 'N') { e.preventDefault(); this.resolvePrintConfirm(false); return; }
+                if (/^F\d+$/.test(e.key) || (e.key && e.key.length === 1) || ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'e'))) { e.preventDefault(); }
+                return;
+            }
             // ═══════════════════════════════════════════════════════════════
             // ZFC UNSENT-CART SWITCH PROMPT — TOPMOST modal, owns the keyboard
             // while open (renders above the table picker / board). 1/arrows
@@ -8275,6 +8339,42 @@ function restaurantPos() {
         //
         // ✅ FIX (May-07): Tightened gap between receipt-finish → KOT-start (300ms → 80ms)
         // and initial chain start (400ms → 150ms) to feel snappier on thermal printers.
+        // ═══ Task 565: opt-in Yes/No print-confirm dialog ═══
+        // openPrintConfirm: dialog foran dikhao (koi artificial delay nahi) aur
+        // Yes-action pending rakho. Focus Yes button par setTimeout se jata hai
+        // ($nextTick nahi): post-sale code customerPhoneInput ko $nextTick par
+        // focus karta hai — dialog ka Yes USKE BAAD jeetna chahiye.
+        openPrintConfirm(onYes) {
+            this.printConfirmAction = onYes;
+            this.printConfirmChoice = 'yes';
+            this.showPrintConfirm = true;
+            setTimeout(() => { try { if (this.showPrintConfirm) this.$refs.printConfirmYes?.focus(); } catch (err) {} }, 50);
+        },
+        // resolvePrintConfirm: Yes → pending action (confirmed auto-print chain /
+        // offline receipt) bilkul mojooda timings ke saath. No → KUCH nahi khulta
+        // (na iframe, na popup, na silent job). Dono surat mein focus sale screen
+        // par wapas — shortcuts zinda rahen (iframe focus-recovery pattern).
+        resolvePrintConfirm(yes) {
+            if (!this.showPrintConfirm) return;
+            const action = this.printConfirmAction;
+            this.showPrintConfirm = false;
+            this.printConfirmAction = null;
+            this.$nextTick(() => {
+                try {
+                    const ae = document.activeElement;
+                    if (ae && typeof ae.blur === 'function') ae.blur();
+                    window.focus();
+                    this.$refs.customerPhoneInput?.focus();
+                } catch (err) {}
+            });
+            if (yes && typeof action === 'function') {
+                action();
+            } else if (!yes && (this.silentBillPrint || this.silentKotPrint)) {
+                // Silent-print shops expect paper on every sale — record the
+                // deliberate "No" so a "bill never printed" report is diagnosable.
+                this.printBeacon('print-confirm-no', { transaction_id: this.lastTransactionId || '', order_id: this.lastOrderId || '' });
+            }
+        },
         // Task 514: per-bill checkbox ka default — company setting ka mirror
         // (dine-in par print_on_pay_dinein, warna print_on_pay).
         billPrintDefault(orderType = null) {
@@ -8289,7 +8389,7 @@ function restaurantPos() {
         // skipReceiptOverride (Task 514): cashier ne per-bill "Receipt print karein"
         // checkbox UNTICK kiya — SIRF is bill ki receipt auto-print skip; KOT gate
         // (wantsKot) aur baaki chain waise hi chalti hai.
-        runAutoPrintChain(orderId, orderType = null, txnKotId = null, skipReceiptOverride = false) {
+        runAutoPrintChain(orderId, orderType = null, txnKotId = null, skipReceiptOverride = false, askConfirmed = false) {
             // MASTER GATE — auto-print OFF means NOTHING fires automatically.
             // Telemetry (Task #63): silent-print shops expect paper on every sale —
             // record WHY the chain did nothing so a "bill never printed" report is
@@ -8325,6 +8425,14 @@ function restaurantPos() {
                 // Nothing to print at pay-success = the 30 Jul failure signature
                 // (lastTransactionId missing → no receipt job was ever attempted).
                 if (this.silentBillPrint || this.silentKotPrint) this.printBeacon('auto-chain-nothing', { order_id: orderId || txnKotId, type: orderType || '' });
+                return;
+            }
+            // Task 565: opt-in Yes/No confirm — kuch print hone WALA hai aur flag
+            // ON hai to pehle poocho (dialog foran, koi delay nahi). Yes = YEHI
+            // chain confirmed re-entry se chale — silent-first / iframe fallback /
+            // 150ms-80ms timings sab waisa ka waisa. No = receipt + KOT dono skip.
+            if (this.printConfirmAsk && !askConfirmed) {
+                this.openPrintConfirm(() => this.runAutoPrintChain(orderId, orderType, txnKotId, skipReceiptOverride, true));
                 return;
             }
             // Blind-spot beacon (review catch): KOT will print but NO receipt is

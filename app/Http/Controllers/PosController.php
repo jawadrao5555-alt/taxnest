@@ -389,6 +389,7 @@ class PosController extends Controller
                 'kot_printer' => 'nullable|string|max:255',
                 'counter_kot_printer' => 'nullable|string|max:255',
                 'counter_kot_enabled' => 'nullable|boolean',
+                'print_confirm_ask' => 'nullable|boolean',
             ]);
 
             $settings = $company->printerSettings();
@@ -405,6 +406,9 @@ class PosController extends Controller
             $settings['counter_kot_enabled'] = $request->boolean('counter_kot_enabled') && $settings['counter_kot_printer'];
             $settings['silent_print_enabled'] = $request->boolean('silent_print_enabled')
                 && ($settings['receipt_printer'] || $settings['kot_printer']);
+            // Task 565: opt-in Yes/No print-confirm dialog — independent of the
+            // silent-print master (works for iframe/popup shops too).
+            $settings['print_confirm_ask'] = $request->boolean('print_confirm_ask');
             // Manual save = deliberate choice — the sale-screen one-click prompt
             // must never nag this shop again (even if they chose to stay OFF).
             $settings['prompt_dismissed_at'] = $settings['prompt_dismissed_at'] ?? now()->toIso8601String();

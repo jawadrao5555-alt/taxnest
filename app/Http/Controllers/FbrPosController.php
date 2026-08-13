@@ -2465,6 +2465,7 @@ class FbrPosController extends Controller
                 'rp_style_bold'   => 'nullable|in:1',
                 'rp_logo_style'   => 'required|in:side,center',
                 'rp_order_match'  => 'nullable|in:off,token,code',
+                'rp_print_confirm' => 'nullable|in:1',
             ]);
 
             $prefs = $company->invoice_display_prefs ?? [];
@@ -2483,6 +2484,13 @@ class FbrPosController extends Controller
             if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'order_match_style')) {
                 $company->order_match_style = $request->input('rp_order_match', 'off');
             }
+
+            // Task 565: opt-in Yes/No print-confirm dialog — shared flag with PRA
+            // POS, stored in pos_printer_settings (normalized-shape rebuild so no
+            // other key gets dropped).
+            $pset = $company->printerSettings();
+            $pset['print_confirm_ask'] = $request->has('rp_print_confirm');
+            $company->pos_printer_settings = $pset;
 
             $company->save();
 

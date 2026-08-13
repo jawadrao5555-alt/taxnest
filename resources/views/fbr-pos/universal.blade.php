@@ -1601,6 +1601,31 @@ window.addEventListener('popstate', function() {
         </template>
     </div>
 
+    {{-- ═══ Task 565: PRINT-CONFIRM YES/NO DIALOG (opt-in per company, PRA port) ═══
+         Flag ON: payment success par auto-print chain se pehle FORAN yeh chhota
+         in-screen dialog (naya browser popup nahi). Keyboard handleKey ke TOPMOST
+         block se chalta hai (Enter=Yes default, Tab=toggle, Esc=No) — yahan sirf
+         mouse clicks. z-index inline (arbitrary Tailwind class = Vite rebuild trap). --}}
+    <div x-show="showPrintConfirm" x-cloak x-transition.opacity class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" style="display:none;z-index:80;">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden" x-transition.scale.90>
+            <div class="p-5 text-center">
+                <div class="w-12 h-12 mx-auto rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-2">
+                    <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                </div>
+                <p class="text-lg font-black text-gray-900 dark:text-white">{{ __('pos.print_confirm_q') }}</p>
+                <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{{ __('pos.print_confirm_keys_hint') }}</p>
+            </div>
+            <div class="px-4 pb-4 grid grid-cols-2 gap-2">
+                <button type="button" x-ref="printConfirmYes" @click="resolvePrintConfirm(true)" @focus="printConfirmChoice = 'yes'"
+                        class="py-3 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 transition ring-offset-2 dark:ring-offset-gray-900 focus:outline-none"
+                        :class="printConfirmChoice === 'yes' ? 'ring-2 ring-blue-500' : ''">{{ __('pos.print_confirm_yes') }}</button>
+                <button type="button" x-ref="printConfirmNo" @click="resolvePrintConfirm(false)" @focus="printConfirmChoice = 'no'"
+                        class="py-3 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition ring-offset-2 dark:ring-offset-gray-900 focus:outline-none"
+                        :class="printConfirmChoice === 'no' ? 'ring-2 ring-gray-500 border-gray-400 dark:border-gray-500' : ''">{{ __('pos.print_confirm_no') }}</button>
+            </div>
+        </div>
+    </div>
+
     <div x-show="showHeldOrders" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="showHeldOrders = false">
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden" x-transition.scale.90>
             <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
@@ -3068,6 +3093,15 @@ function restaurantPos() {
         // Auto-Print receipt on successful sale — FBR POS persists this per-browser
         // (localStorage 'fbrpos_auto_print'), NOT via a server column. Default ON.
         autoPrintEnabled: (function(){ try { return localStorage.getItem('fbrpos_auto_print') !== '0'; } catch(e) { return true; } })(),
+        // Task 565 (port of PRA universal): opt-in "Print se pehle poocho" —
+        // payment success par auto-print chain se PEHLE fauri Yes/No dialog.
+        // Per-company flag pos_printer_settings mein (PRA ke saath shared);
+        // posConfigRev → boot fingerprint mein shamil. Default OFF.
+        @php $__fps = $company->printerSettings(); @endphp
+        printConfirmAsk: {{ !empty($__fps['print_confirm_ask']) ? 'true' : 'false' }},
+        showPrintConfirm: false,
+        printConfirmChoice: 'yes',
+        printConfirmAction: null,
         // Task 520 (port of Task 514): Pay modal ka per-bill "Receipt print karein"
         // checkbox — default = billPrintDefault() (auto-print master ka mirror).
         payPrintReceipt: true,
@@ -3470,7 +3504,13 @@ function restaurantPos() {
             // Task 520: per-bill untick = interim offline receipt bhi auto-print skip
             // (popup + queue + sync untouched).
             if (!skipReceipt && this.autoPrintEnabled) {
-                setTimeout(() => this.printOfflineReceipt(), 400);
+                // Task 565: offline bill bhi "bill complete" hai — flag ON ho to
+                // wahi Yes/No gate; Yes par mojooda 400ms timing waisi hi.
+                if (this.printConfirmAsk) {
+                    this.openPrintConfirm(() => setTimeout(() => this.printOfflineReceipt(), 400));
+                } else {
+                    setTimeout(() => this.printOfflineReceipt(), 400);
+                }
             }
             this.clearCart();
             this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
@@ -4722,6 +4762,28 @@ function restaurantPos() {
         },
 
         handleKey(e) {
+            // ═══════════════════════════════════════════════════════════════
+            // Task 565 (mirror of PRA universal): PRINT-CONFIRM YES/NO DIALOG —
+            // sab se TOPMOST; khula ho to keyboard SIRF isi ka hai. Enter =
+            // highlighted choice (Yes default), Tab/arrows = Yes ↔ No, Esc/N =
+            // No, Y = Yes. Baqi SAB keys swallow — band hote hi sab pehle jaisa.
+            // stopPropagation: window-level escape listeners saath band na hon.
+            // ═══════════════════════════════════════════════════════════════
+            if (this.showPrintConfirm) {
+                e.stopPropagation();
+                if (e.key === 'Tab' || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    this.printConfirmChoice = this.printConfirmChoice === 'yes' ? 'no' : 'yes';
+                    try { (this.printConfirmChoice === 'yes' ? this.$refs.printConfirmYes : this.$refs.printConfirmNo)?.focus(); } catch (err) {}
+                    return;
+                }
+                if (e.key === 'Enter' && !e.repeat) { e.preventDefault(); this.resolvePrintConfirm(this.printConfirmChoice === 'yes'); return; }
+                if (e.key === 'Escape') { e.preventDefault(); this.resolvePrintConfirm(false); return; }
+                if (e.key === 'y' || e.key === 'Y') { e.preventDefault(); this.resolvePrintConfirm(true); return; }
+                if (e.key === 'n' || e.key === 'N') { e.preventDefault(); this.resolvePrintConfirm(false); return; }
+                if (/^F\d+$/.test(e.key) || (e.key && e.key.length === 1) || ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'e'))) { e.preventDefault(); }
+                return;
+            }
             // ═══════════════════════════════════════════════════════════════
             // ZFC UNSENT-CART SWITCH PROMPT (mirror of PRA universal) — TOPMOST
             // modal, owns the keyboard while open. 1/2/arrows toggle the
@@ -6084,6 +6146,35 @@ function restaurantPos() {
         //
         // ✅ FIX (May-07): Tightened gap between receipt-finish → KOT-start (300ms → 80ms)
         // and initial chain start (400ms → 150ms) to feel snappier on thermal printers.
+        // ═══ Task 565 (port of PRA universal): opt-in Yes/No print-confirm ═══
+        // openPrintConfirm: dialog foran (koi artificial delay nahi), Yes-action
+        // pending. Focus setTimeout se ($nextTick nahi — post-sale code
+        // customerPhoneInput ko $nextTick par focus karta hai, Yes baad mein jeete).
+        openPrintConfirm(onYes) {
+            this.printConfirmAction = onYes;
+            this.printConfirmChoice = 'yes';
+            this.showPrintConfirm = true;
+            setTimeout(() => { try { if (this.showPrintConfirm) this.$refs.printConfirmYes?.focus(); } catch (err) {} }, 50);
+        },
+        // resolvePrintConfirm: Yes → pending action (confirmed chain / offline
+        // receipt) mojooda timings ke saath. No → KUCH nahi khulta (FBR par
+        // silent branch nahi — iframe/popup hi skip hota hai). Focus wapas sale
+        // screen par taake shortcuts zinda rahen.
+        resolvePrintConfirm(yes) {
+            if (!this.showPrintConfirm) return;
+            const action = this.printConfirmAction;
+            this.showPrintConfirm = false;
+            this.printConfirmAction = null;
+            this.$nextTick(() => {
+                try {
+                    const ae = document.activeElement;
+                    if (ae && typeof ae.blur === 'function') ae.blur();
+                    window.focus();
+                    this.$refs.customerPhoneInput?.focus();
+                } catch (err) {}
+            });
+            if (yes && typeof action === 'function') action();
+        },
         // Task 520 (port of Task 514): per-bill checkbox ka default — FBR POS par
         // auto-print master switch ka mirror (koi dine-in variant nahi).
         billPrintDefault() {
@@ -6092,13 +6183,21 @@ function restaurantPos() {
         // skipReceiptOverride (Task 520, port of Task 514): cashier ne per-bill
         // "Receipt print karein" checkbox UNTICK kiya — SIRF is bill ki receipt
         // auto-print skip; KOT gate / FBR submission / receipt popup sab untouched.
-        runAutoPrintChain(orderId, isFbrHeld, skipReceiptOverride = false) {
+        runAutoPrintChain(orderId, isFbrHeld, skipReceiptOverride = false, askConfirmed = false) {
             // MASTER GATE — auto-print OFF means NOTHING fires automatically.
             if (!this.autoPrintEnabled) return;
             const hasReceipt = !!this.lastTransactionId;
             const wantsKot = !!this.autoKotEnabled && !!orderId;
             const wantsReceipt = hasReceipt && !skipReceiptOverride;
             if (!wantsReceipt && !wantsKot) return;
+            // Task 565: opt-in Yes/No confirm — kuch print hone WALA hai aur flag
+            // ON hai to pehle poocho (foran, koi delay nahi). Yes = YEHI chain
+            // confirmed re-entry se (FBR par silent branch nahi — Yes seedha
+            // iframe chain, 150ms/80ms timings waisi hi). No = receipt+KOT skip.
+            if (this.printConfirmAsk && !askConfirmed) {
+                this.openPrintConfirm(() => this.runAutoPrintChain(orderId, isFbrHeld, skipReceiptOverride, true));
+                return;
+            }
             // isFbrHeld distinguishes held-sale KOT (uses /fbr-pos/held/{id}/kitchen-ticket)
             // from completed-transaction reprint (uses /fbr-pos/transaction/{id}/kot-reprint).
             // Always pass explicitly so printKitchenTicket never guesses the ID type.

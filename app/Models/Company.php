@@ -438,6 +438,9 @@ class Company extends Model
             'silent_print_enabled' => $ps['silent_print_enabled'],
             'receipt_printer' => $ps['receipt_printer'],
             'kot_printer' => $ps['kot_printer'],
+            // Task 565: print-confirm flag is BAKED into both universal sale
+            // screens — a toggle must refresh SW-cached copies (boot fingerprint).
+            'print_confirm_ask' => $ps['print_confirm_ask'],
         ];
 
         return md5(json_encode($vals));
@@ -462,6 +465,11 @@ class Company extends Model
             'counter_kot_enabled' => (bool) ($s['counter_kot_enabled'] ?? false),
             'available_printers' => is_array($s['available_printers'] ?? null) ? $s['available_printers'] : [],
             'printers_reported_at' => $s['printers_reported_at'] ?? null,
+            // Task 565 (customer voice note, Aug 2026): opt-in "Print se pehle
+            // poocho" — payment-success auto-print chain se pehle ek fauri Yes/No
+            // dialog. Default OFF = existing shops bilkul unaffected. MUST stay
+            // in this normalized shape (POST rebuild trap — see prompt_dismissed_at).
+            'print_confirm_ask' => (bool) ($s['print_confirm_ask'] ?? false),
             // One-click silent-print prompt (Jul 2026): timestamp when an admin
             // dismissed the sale-screen banner OR manually saved printer settings
             // (deliberate choice either way — never nag again). MUST stay in this

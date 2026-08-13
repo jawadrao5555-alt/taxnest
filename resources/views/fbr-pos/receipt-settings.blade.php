@@ -48,6 +48,21 @@
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.logo_style_hint') }}</p>
         </div>
 
+        {{-- Task 565: opt-in "Print se pehle poocho (Yes/No)" — shared flag with
+             PRA POS (pos_printer_settings). Payment success par auto-print chain
+             se pehle fauri Yes/No dialog. Default OFF. --}}
+        @php $pconf = $company->printerSettings(); @endphp
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
+            <label class="flex items-start gap-3 cursor-pointer p-3 rounded-lg border {{ !empty($pconf['print_confirm_ask']) ? 'border-blue-400 bg-blue-50/40 dark:bg-blue-900/10' : 'border-gray-200 dark:border-gray-700' }} transition">
+                <input type="checkbox" name="rp_print_confirm" value="1" {{ !empty($pconf['print_confirm_ask']) ? 'checked' : '' }}
+                       class="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4">
+                <span class="flex-1 min-w-0">
+                    <span class="block text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.print_confirm_ask_label') }}</span>
+                    <span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.print_confirm_ask_hint') }}</span>
+                </span>
+            </label>
+        </div>
+
         {{-- Order Matching (Aug 2026) — mirrors PRA receipt-settings placement.
              Applies to receipt AND to KOT (when kitchen_printer_enabled is on). --}}
         @if(\Illuminate\Support\Facades\Schema::hasColumn('companies', 'order_match_style'))

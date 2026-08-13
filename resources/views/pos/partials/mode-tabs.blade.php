@@ -6,6 +6,32 @@
     // Billing Scope (07 Aug 2026): stream-locked staff see ONLY their own
     // stream's tab — controllers force the tab server-side too.
     $tabScope = auth('pos')->user()?->posBillingScope() ?? 'both';
+    // Exempt tab (Task 647): shown ONLY when this company actually deals in
+    // exempt bills/products (all-exempt bills = pra_status='exempt_internal',
+    // never reported to PRA) — everyone else's UI stays unchanged. Visible to
+    // EVERY role and BOTH billing scopes (exempt bills belong to no stream).
+    // Cheap cached existence check; caller opts in via 'showExempt'.
+    $showExemptTab = false;
+    if (($showExempt ?? false)) {
+        try {
+            $tabCompanyId = (int) app('currentCompanyId');
+            $showExemptTab = \Illuminate\Support\Facades\Cache::remember(
+                "pos_exempt_tab_{$tabCompanyId}",
+                300,
+                function () use ($tabCompanyId) {
+                    return \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
+                            ->where('company_id', $tabCompanyId)
+                            ->where('pra_status', \App\Models\PosTransaction::EXEMPT_INTERNAL)
+                            ->exists()
+                        || \App\Models\PosProduct::where('company_id', $tabCompanyId)
+                            ->where('is_tax_exempt', true)
+                            ->exists();
+                }
+            );
+        } catch (\Throwable $e) {
+            $showExemptTab = false;
+        }
+    }
 @endphp
 <div class="flex items-center gap-2 mb-6">
     @if($tabScope !== 'local')
@@ -27,6 +53,14 @@
         {{ $currentTab === 'local' ? 'bg-purple-600 text-white shadow-md' : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800' }}">
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
         {{ __('pos.local_invoices') }}
+    </a>
+    @endif
+    @if($showExemptTab)
+    <a href="{{ $baseUrl }}?tab=exempt"
+        class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
+        {{ $currentTab === 'exempt' ? 'bg-purple-600 text-white shadow-md' : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800' }}">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+        {{ __('pos.exempt_invoices') }}
     </a>
     @endif
 </div>

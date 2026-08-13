@@ -276,8 +276,9 @@
         // Bill Number Style (07 Aug 2026): token = BIG display number; serial
         // stays underneath as reference. Mirrors receipt_80mm exactly.
         $rcptBillToken = null;
-        $rcptIsLocalStream = ($transaction->invoice_mode ?? null) === 'local'
-            || (($transaction->pra_status ?? null) === null && ($transaction->pra_invoice_number ?? null) === null);
+        // Task 647: single predicate (PosTransaction helpers) — exempt bills
+        // follow the LOCAL number style; mirrors receipt_80mm.
+        $rcptIsLocalStream = $transaction->isLocalBill() || $transaction->isExemptStream();
         try {
             if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'bill_token') && $transaction->bill_token) {
                 $rcptNumStyle = $rcptIsLocalStream ? ($company->local_number_style ?? 'serial') : ($company->pra_number_style ?? 'serial');
@@ -587,6 +588,12 @@
         </tr>
         @endif
     </table>
+
+    {{-- Task 647: exempt-bill clarifier — approved neutral wording, small/plain,
+         no box, render-time locale. Mirrors receipt_80mm. --}}
+    @if($transaction->isExemptStream())
+    <div style="font-size:8px; font-weight:normal; color:#000; text-align:center; margin:2px 0; padding:1px 0;">{{ __('pos.receipt_exempt_clarifier') }}</div>
+    @endif
 
     @if(($transaction->order_type ?? '') === 'delivery' || !empty($transaction->delivery_address) || $transaction->rider)
     @php

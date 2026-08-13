@@ -39,6 +39,10 @@ class FbrPosDashboardReturnNettingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Freeze the clock at a safe mid-day hour: the FBR business-day rule
+        // maps 00:00–05:59 to YESTERDAY, so a real run just after midnight
+        // (app TZ) made all "today" seeds land on the previous business date.
+        \Carbon\Carbon::setTestNow(now()->hour < 6 ? now()->setTime(12, 0) : now());
         PosFeatureService::flushGateCaches();
         Schema::dropAllTables();
         $this->buildSchema();
@@ -48,6 +52,7 @@ class FbrPosDashboardReturnNettingTest extends TestCase
 
     protected function tearDown(): void
     {
+        \Carbon\Carbon::setTestNow();
         PosFeatureService::flushGateCaches();
         parent::tearDown();
     }

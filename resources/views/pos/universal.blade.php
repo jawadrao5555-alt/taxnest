@@ -2667,9 +2667,10 @@ window.addEventListener('popstate', function() {
                                           'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300': bill.badge === 'provisional',
                                           'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300': bill.badge === 'queue',
                                           'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300': bill.badge === 'failed',
+                                          'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300': bill.badge === 'exempt',
                                           'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300': bill.badge === 'local'
                                       }"
-                                      x-text="bill.badge === 'pra' ? window.TXT.pra_word : (bill.badge === 'provisional' ? window.TXT.provisional_word : (bill.badge === 'queue' ? window.TXT.sync_queue : (bill.badge === 'failed' ? window.TXT.failed_word : window.TXT.local_word)))"></span>
+                                      x-text="bill.badge === 'pra' ? window.TXT.pra_word : (bill.badge === 'provisional' ? window.TXT.provisional_word : (bill.badge === 'queue' ? window.TXT.sync_queue : (bill.badge === 'failed' ? window.TXT.failed_word : (bill.badge === 'exempt' ? window.TXT.exempt_badge : window.TXT.local_word))))"></span>
                                 {{-- Order-type badge (ZFC, 30 Jul 2026): Dine-in/Takeaway/Delivery + table --}}
                                 <template x-if="bill.order_type">
                                     <span class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide"

@@ -333,8 +333,10 @@
         // Stream mirrors applyReportFilters: local = L-series OR reporting-OFF
         // final (NULL pra_status + no fiscal number).
         $rcptBillToken = null;
-        $rcptIsLocalStream = ($transaction->invoice_mode ?? null) === 'local'
-            || (($transaction->pra_status ?? null) === null && ($transaction->pra_invoice_number ?? null) === null);
+        // Task 647: single predicate (PosTransaction helpers). Exempt bills
+        // (all items tax-exempt, never reported) follow the LOCAL number style —
+        // they never get a PRA fiscal, so the PRA style would mislead.
+        $rcptIsLocalStream = $transaction->isLocalBill() || $transaction->isExemptStream();
         try {
             if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'bill_token') && $transaction->bill_token) {
                 $rcptNumStyle = $rcptIsLocalStream ? ($company->local_number_style ?? 'serial') : ($company->pra_number_style ?? 'serial');
@@ -657,6 +659,12 @@
         </tr>
         @endif
     </table>
+
+    {{-- Task 647: exempt-bill clarifier — approved neutral wording, small/plain,
+         no box, render-time locale. --}}
+    @if($transaction->isExemptStream())
+    <div style="font-size:9px; font-weight:normal; color:#000; text-align:center; margin:2px 0; padding:1px 0;">{{ __('pos.receipt_exempt_clarifier') }}</div>
+    @endif
 
     @if(($transaction->order_type ?? '') === 'delivery' || !empty($transaction->delivery_address) || $transaction->rider)
     @php

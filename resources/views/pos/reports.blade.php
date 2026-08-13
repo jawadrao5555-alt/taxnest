@@ -29,7 +29,7 @@
         </div>
     </div>
 
-    @include('pos.partials.mode-tabs', ['baseUrl' => route('pos.reports')])
+    @include('pos.partials.mode-tabs', ['baseUrl' => route('pos.reports'), 'showExempt' => true])
 
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-4 mb-6">
         <form method="GET" action="{{ route('pos.reports') }}" class="flex flex-col sm:flex-row items-start sm:items-end gap-3">

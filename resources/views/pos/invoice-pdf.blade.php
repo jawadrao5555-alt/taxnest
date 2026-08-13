@@ -261,6 +261,12 @@
             <div class="val">PKR {{ number_format($showTaxLines ? $transaction->total_amount : round((float) $transaction->total_amount), 2) }}</div>
         </div>
 
+        {{-- Task 647: exempt-bill clarifier — approved neutral wording, small/plain,
+             no box, render-time locale. Mirrors the thermal receipts. --}}
+        @if($transaction->isExemptStream())
+        <div style="font-size:9px; font-weight:normal; color:#000; text-align:center; margin:4px 0;">{{ __('pos.receipt_exempt_clarifier') }}</div>
+        @endif
+
         @if($transaction->pra_status === 'submitted' && $transaction->pra_invoice_number)
         <div class="pra-box">
             <div class="title">✓ {{ __('pos.rcpt_pra_fiscal_invoice') }}</div>

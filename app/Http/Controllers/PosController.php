@@ -3523,18 +3523,8 @@ class PosController extends Controller
             // Billing Scope (07 Aug 2026): stream-locked staff get ONLY their own
             // stream in the Reprint list — mirrors applyReportFilters' split.
             ->where(function ($q) {
-                $scope = auth('pos')->user()?->posBillingScope() ?? 'both';
-                if ($scope === 'local') {
-                    $q->where('invoice_mode', 'local')->orWhere(function ($s) {
-                        $s->whereNull('pra_status')->whereNull('pra_invoice_number');
-                    });
-                } elseif ($scope === 'pra') {
-                    $q->where(function ($s) {
-                        $s->where('invoice_mode', '!=', 'local')->orWhereNull('invoice_mode');
-                    })->where(function ($s) {
-                        $s->whereNotNull('pra_status')->orWhereNotNull('pra_invoice_number');
-                    });
-                }
+                // Single predicate (Task 647): exempt bills visible to both scopes.
+                PosTransaction::applyBillingScopeFilter($q, auth('pos')->user()?->posBillingScope() ?? 'both');
             })
             ->orderBy('id', 'desc')
             ->limit(300)
@@ -3561,6 +3551,8 @@ class PosController extends Controller
             // ACTUAL PRA outcome decides, not invoice_mode alone.
             if (!empty($b->pra_invoice_number)) {
                 $badge = 'pra';           // fiscal number issued = PRA-reported
+            } elseif ($b->pra_status === PosTransaction::EXEMPT_INTERNAL) {
+                $badge = 'exempt';        // all-exempt bill — never reported (Task 647)
             } elseif ($b->pra_status === 'local') {
                 $badge = 'provisional';   // deliberate provisional (completed+local+local)
             } elseif (in_array($b->pra_status, ['offline', 'pending'], true)) {
@@ -4153,12 +4145,17 @@ class PosController extends Controller
         //   Local tab → ADMIN-ONLY: L-series bills + reporting-OFF finals (no PRA fiscal).
         // Cashiers are always forced to PRA server-side.
         $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin()) ? 'local' : 'pra';
+        // Exempt tab (Task 647): all-exempt bills (never reported to PRA) —
+        // visible to EVERY role and BOTH billing scopes (they belong to no stream).
+        if ($request->get('tab') === 'exempt') {
+            $tab = 'exempt';
+        }
         // Billing Scope (07 Aug 2026): scope-locked staff are FORCED onto their
         // own stream's tab — a local-scoped manager/cashier IS the offline-billing
         // admin (overrides the admin-only Local rule), a pra-scoped one never
         // sees the Local tab. The other tab is hidden in the view too.
         $scope = $user?->posBillingScope() ?? 'both';
-        if ($scope !== 'both') {
+        if ($scope !== 'both' && $tab !== 'exempt') {
             $tab = $scope === 'local' ? 'local' : 'pra';
         }
 
@@ -4208,13 +4205,9 @@ class PosController extends Controller
      */
     private function billingScopeAllowsRow(PosTransaction $txn): bool
     {
+        // Single predicate (Task 647): exempt bills are visible to EVERY scope.
         $scope = auth('pos')->user()?->posBillingScope() ?? 'both';
-        if ($scope === 'both') {
-            return true;
-        }
-        $isLocal = $txn->invoice_mode === 'local'
-            || ($txn->pra_status === null && $txn->pra_invoice_number === null);
-        return $scope === 'local' ? $isLocal : !$isLocal;
+        return $txn->allowedForBillingScope($scope);
     }
 
     public function transactionShow($id)
@@ -4488,20 +4481,11 @@ class PosController extends Controller
         //                 fiscal number — "jis pe PRA fiscal nahi aya wo local hai").
         //                 INCLUDING archived ones, so hide_archived is bypassed.
         //                 Admin-only (callers force 'pra' for cashiers).
-        if ($tab === 'local') {
-            $query->withoutGlobalScope('hide_archived')->where(function ($sub) {
-                $sub->where('invoice_mode', 'local')
-                    ->orWhere(function ($s) {
-                        $s->whereNull('pra_status')->whereNull('pra_invoice_number');
-                    });
-            });
-        } else {
-            $query->where(function ($sub) {
-                $sub->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
-            })->where(function ($sub) {
-                $sub->whereNotNull('pra_status')->orWhereNotNull('pra_invoice_number');
-            });
-        }
+        //   tab='exempt' → all-exempt bills (pra_status='exempt_internal') — PRA
+        //                 never sees them by design (Task 647). Excluded from the
+        //                 PRA tab; own tab, visible to both billing scopes.
+        // SINGLE predicate — PosTransaction::applyStreamTab is the only truth.
+        PosTransaction::applyStreamTab($query, $tab);
 
         if ($cashierFilter && $cashierFilter !== 'all') {
             $query->where('created_by', $cashierFilter);
@@ -4551,10 +4535,14 @@ class PosController extends Controller
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
         // Local Invoices tab is ADMIN-ONLY — cashiers are always forced to PRA.
         $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin()) ? 'local' : 'pra';
+        // Exempt tab (Task 647): every role + both scopes may view it.
+        if ($request->get('tab') === 'exempt') {
+            $tab = 'exempt';
+        }
         // Billing Scope (07 Aug 2026): scope-locked staff report ONLY their own
         // stream — mirrors the Transactions tab forcing.
         $reportScope = $user?->posBillingScope() ?? 'both';
-        if ($reportScope !== 'both') {
+        if ($reportScope !== 'both' && $tab !== 'exempt') {
             $tab = $reportScope === 'local' ? 'local' : 'pra';
         }
         $cashierFilter = $request->get('cashier', 'all');
@@ -4640,14 +4628,9 @@ class PosController extends Controller
             $localBills = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->where('status', 'completed')
-                // Same non-reported set as applyReportFilters: L-series bills PLUS
-                // reporting-OFF finals (no PRA fiscal ever).
-                ->where(function ($sub) {
-                    $sub->where('invoice_mode', 'local')
-                        ->orWhere(function ($s) {
-                            $s->whereNull('pra_status')->whereNull('pra_invoice_number');
-                        });
-                })
+                // Same non-reported set as applyReportFilters — SINGLE predicate
+                // (Task 647): exempt_internal is excluded regardless of mode.
+                ->tap(fn ($q) => PosTransaction::applyStreamTab($q, 'local'))
                 ->when($cashierFilter && $cashierFilter !== 'all', fn ($q) => $q->where('created_by', $cashierFilter))
                 ->with('creator')
                 ->orderByDesc('created_at')
@@ -4678,6 +4661,9 @@ class PosController extends Controller
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
         $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin()) ? 'local' : 'pra';
+        if ($request->get('tab') === 'exempt') {
+            $tab = 'exempt'; // Task 647: exempt stream, open to every role/scope
+        }
         $cashierFilter = $request->get('cashier', 'all');
         // Owner rule (5 Aug 2026): cashier reports are locked to OWN sales.
         if ($isCashier) {
@@ -4706,6 +4692,9 @@ class PosController extends Controller
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
         // Local export is ADMIN-ONLY — cashiers always export PRA data.
         $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin()) ? 'local' : 'pra';
+        if ($request->get('tab') === 'exempt') {
+            $tab = 'exempt'; // Task 647: exempt stream, open to every role/scope
+        }
         $cashierFilter = $request->get('cashier', 'all');
 
         // Owner rule (5 Aug 2026): a cashier ALWAYS sees only their own sales

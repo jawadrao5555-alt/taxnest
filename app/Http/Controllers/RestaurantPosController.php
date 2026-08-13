@@ -457,7 +457,12 @@ class RestaurantPosController extends Controller
                 'tax_amount' => $taxAmount,
                 'total_amount' => $totalAmount,
                 'estimated_cost' => round($estimatedCost, 2),
-                'kitchen_notes' => $request->kitchen_notes,
+                // Task 636: kitchen_notes on the held order header is printed on every
+                // KOT — apply the same identity-autofill discard as per-item notes.
+                'kitchen_notes' => RestaurantWaiterController::stripIdentityNote(
+                    $request->kitchen_notes,
+                    $user
+                ),
                 'priority' => (bool)($request->priority ?? false),
                 'created_by' => $user->id,
                 // Phase 5 — every held order is implicitly "sent to kitchen".

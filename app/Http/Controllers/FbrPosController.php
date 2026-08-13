@@ -369,17 +369,22 @@ class FbrPosController extends Controller
         // the PosBusinessDay cutoff rule), so a 1 AM sale of a late-night shop
         // stays in yesterday's figures until that day is closed.
         $bizToday = $this->fbrBizToday($companyId);
+        // Return / credit-note netting (Task 591 — FBR mirror of PRA Task 578):
+        // money figures are SIGNED (returns subtract), bill counts stay
+        // SALES-only (a credit note is not a bill). Schema-guarded for prod
+        // drift — pre-migration boxes fall back to the old unsigned sums.
+        [$dashSignExpr, $dashSaleRowExpr] = $this->fbrReturnNettingExprs();
         $todayStats = FbrPosTransaction::where('company_id', $companyId)
             ->tap($branchScope)
             ->tap(fn ($q) => $this->whereBizDate($q, $bizToday))
-            ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue, COALESCE(SUM(tax_amount), 0) as tax')
+            ->selectRaw("COALESCE(SUM({$dashSaleRowExpr}),0) as count, COALESCE(SUM(({$dashSignExpr}) * total_amount),0) as revenue, COALESCE(SUM(({$dashSignExpr}) * tax_amount),0) as tax")
             ->first();
 
         $monthStats = FbrPosTransaction::where('company_id', $companyId)
             ->tap($branchScope)
             ->whereYear('created_at', now()->year)
             ->whereMonth('created_at', now()->month)
-            ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue, COALESCE(SUM(tax_amount), 0) as tax')
+            ->selectRaw("COALESCE(SUM({$dashSaleRowExpr}),0) as count, COALESCE(SUM(({$dashSignExpr}) * total_amount),0) as revenue, COALESCE(SUM(({$dashSignExpr}) * tax_amount),0) as tax")
             ->first();
 
         $fbrSubmitted = FbrPosTransaction::where('company_id', $companyId)
@@ -2936,26 +2941,30 @@ class FbrPosController extends Controller
             ? $q->whereBetween('business_date', [$monthStart, $monthEnd])
             : $q->whereYear('created_at', now()->year)->whereMonth('created_at', now()->month);
 
+        // Return / credit-note netting (Task 591 — FBR mirror of PRA Task 570/578
+        // reports convention): SIGNED money sums, SALES-only bill counts.
+        [$signExpr, $saleRowExpr] = $this->fbrReturnNettingExprs();
+
         $todayStats = FbrPosTransaction::where('company_id', $companyId)
             ->tap(fn ($q) => $this->whereBizDate($q, $bizToday))
-            ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue, COALESCE(SUM(tax_amount), 0) as tax, COALESCE(SUM(discount_amount), 0) as discount')
+            ->selectRaw("COALESCE(SUM({$saleRowExpr}),0) as count, COALESCE(SUM(({$signExpr}) * total_amount),0) as revenue, COALESCE(SUM(({$signExpr}) * tax_amount),0) as tax, COALESCE(SUM(({$signExpr}) * discount_amount),0) as discount")
             ->first();
 
         $monthStats = FbrPosTransaction::where('company_id', $companyId)
             ->tap($monthScope)
-            ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue, COALESCE(SUM(tax_amount), 0) as tax, COALESCE(SUM(discount_amount), 0) as discount')
+            ->selectRaw("COALESCE(SUM({$saleRowExpr}),0) as count, COALESCE(SUM(({$signExpr}) * total_amount),0) as revenue, COALESCE(SUM(({$signExpr}) * tax_amount),0) as tax, COALESCE(SUM(({$signExpr}) * discount_amount),0) as discount")
             ->first();
 
         $dailySales = FbrPosTransaction::where('company_id', $companyId)
             ->tap($monthScope)
-            ->selectRaw($this->bizDateExpr() . ' as date, COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue')
+            ->selectRaw($this->bizDateExpr() . " as date, COALESCE(SUM({$saleRowExpr}),0) as count, COALESCE(SUM(({$signExpr}) * total_amount),0) as revenue")
             ->groupByRaw($this->bizDateExpr())
             ->orderBy('date')
             ->get();
 
         $paymentBreakdown = FbrPosTransaction::where('company_id', $companyId)
             ->tap($monthScope)
-            ->selectRaw('payment_method, COUNT(*) as count, COALESCE(SUM(total_amount), 0) as revenue')
+            ->selectRaw("payment_method, COALESCE(SUM({$saleRowExpr}),0) as count, COALESCE(SUM(({$signExpr}) * total_amount),0) as revenue")
             ->groupBy('payment_method')
             ->get();
 
@@ -3365,8 +3374,25 @@ class FbrPosController extends Controller
     {
         $isAdminView = $user && $user->role === 'company_admin';
 
+        // Return / credit-note rows are EXCLUDED from the range deep-dive
+        // entirely (Task 591 — same convention as the PRA range analytics):
+        // item rankings, hourly/cashier/payment breakdowns must never be
+        // polluted or netted by return lines. Schema-guarded for prod drift.
+        $excludeReturns = function ($q) {
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'transaction_type')) {
+                    $q->where(function ($w) {
+                        $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
+                    });
+                }
+            } catch (\Throwable $e) {
+                // pre-migration schema — keep the old all-rows behaviour
+            }
+        };
+
         $transactions = FbrPosTransaction::where('company_id', $companyId)
             ->whereBetween('created_at', [$from, $to])
+            ->tap($excludeReturns)
             ->get(['id', 'created_at', 'created_by', 'customer_id', 'customer_name', 'customer_phone', 'subtotal', 'total_amount', 'tax_amount', 'discount_amount', 'payment_method', 'fbr_status']);
 
         $ids = $transactions->pluck('id')->all();
@@ -3489,6 +3515,7 @@ class FbrPosController extends Controller
         $prevTo = $from->copy()->subDay()->endOfDay();
         $prevRow = FbrPosTransaction::where('company_id', $companyId)
             ->whereBetween('created_at', [$prevFrom, $prevTo])
+            ->tap($excludeReturns)
             ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as revenue, COALESCE(SUM(tax_amount),0) as tax')
             ->first();
         $pct = function (float $prev, float $cur): ?float {
@@ -3887,6 +3914,28 @@ class FbrPosController extends Controller
     private function bizDateExpr(): string
     {
         return $this->hasBizDate() ? 'business_date' : 'DATE(created_at)';
+    }
+
+    /**
+     * Return / credit-note netting expressions (Task 591 — FBR mirror of PRA
+     * Tasks 570/578): [signExpr, saleRowExpr]. Money sums multiply by signExpr
+     * (returns subtract, amounts are stored POSITIVE on return rows); bill
+     * counts SUM saleRowExpr (a credit note is not a bill). Schema-guarded for
+     * prod drift — pre-migration boxes fall back to the old unsigned sums.
+     */
+    private function fbrReturnNettingExprs(): array
+    {
+        $ready = false;
+        try {
+            $ready = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'transaction_type');
+        } catch (\Throwable $e) {
+            $ready = false;
+        }
+
+        return $ready
+            ? ["CASE WHEN transaction_type = 'return' THEN -1 ELSE 1 END",
+               "CASE WHEN transaction_type = 'return' THEN 0 ELSE 1 END"]
+            : ['1', '1'];
     }
 
     /**

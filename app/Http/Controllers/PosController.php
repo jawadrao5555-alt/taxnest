@@ -1681,6 +1681,11 @@ class PosController extends Controller
             // Task 643: the Order Cancel verdict is BAKED into the sale screen —
             // toggling the company switch / custom access must refresh the cache.
             (bool) \App\Services\PosAccessService::orderCancelAllowed($user, $company),
+            // Task 657: restaurant flags (KOT/tables buttons) are BAKED into the
+            // sale screen after the restaurantAllowed() mask — a plan flip
+            // (e.g. Starter→Business now unlocks Kitchen mode) must refresh the
+            // offline-cached copy even though feature_flags itself is unchanged.
+            (bool) \App\Services\PosFeatureService::restaurantAllowed($company),
         ]));
 
         $screenPath = resource_path('views/pos/universal.blade.php');

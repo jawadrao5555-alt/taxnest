@@ -75,17 +75,69 @@ class CheckCloudflareRocketLoader extends Command
         }
 
         Log::error('Rocket Loader DETECTED on live site', ['url' => $url]);
-        $this->error('Rocket Loader DETECTED — alerting admins.');
-        $this->alertAdmins($url);
+        $this->error('Rocket Loader DETECTED — attempting auto-fix via Cloudflare API.');
+
+        $autoFixed = $this->turnOffViaApi();
+        $this->alertAdmins($url, $autoFixed);
 
         return self::FAILURE;
+    }
+
+    /**
+     * PATCH zone settings/rocket_loader = off via the Cloudflare API.
+     * Returns true only when Cloudflare confirms success. Any failure
+     * (missing token/zone, HTTP error, API error) is logged and returns
+     * false so the urgent manual-fix email still goes out unchanged.
+     */
+    private function turnOffViaApi(): bool
+    {
+        $token = (string) config('services.cloudflare.api_token', '');
+        $zoneId = (string) config('services.cloudflare.zone_id', '');
+
+        if ($token === '' || $zoneId === '') {
+            Log::warning('Rocket Loader auto-fix skipped: CLOUDFLARE_API_TOKEN / CLOUDFLARE_ZONE_ID not configured');
+            $this->warn('Auto-fix skipped — Cloudflare API token/zone not configured.');
+
+            return false;
+        }
+
+        try {
+            $response = Http::withToken($token)
+                ->timeout(30)
+                ->patch("https://api.cloudflare.com/client/v4/zones/{$zoneId}/settings/rocket_loader", [
+                    'value' => 'off',
+                ]);
+
+            $json = $response->json();
+            $ok = $response->successful() && (bool) ($json['success'] ?? false);
+
+            if ($ok) {
+                Log::warning('Rocket Loader auto-fixed: turned OFF via Cloudflare API');
+                $this->info('Auto-fix OK — Rocket Loader turned OFF via Cloudflare API.');
+
+                return true;
+            }
+
+            Log::error('Rocket Loader auto-fix FAILED: Cloudflare API rejected the request', [
+                'status' => $response->status(),
+                'errors' => $json['errors'] ?? null,
+            ]);
+            $this->error("Auto-fix FAILED — Cloudflare API status {$response->status()}.");
+
+            return false;
+        } catch (\Throwable $e) {
+            Log::error('Rocket Loader auto-fix FAILED: API call threw', ['error' => $e->getMessage()]);
+            $this->error("Auto-fix FAILED — {$e->getMessage()}");
+
+            return false;
+        }
     }
 
     /**
      * Email every admin account. Mirrors the payment-proof alert pattern:
      * synchronous send, failures logged + MailHealth-recorded.
      */
-    private function alertAdmins(string $url): void
+    private function alertAdmins(string $url, bool $autoFixed = false): void
     {
         try {
             $emails = \App\Models\AdminUser::whereNotNull('email')
@@ -97,21 +149,39 @@ class CheckCloudflareRocketLoader extends Command
                 return;
             }
 
-            $body = "WARNING: Cloudflare Rocket Loader appears to be ON for the live site.\n\n"
-                . "Checked page: {$url}\n"
-                . "Marker found: /cdn-cgi/scripts/.../rocket-loader script injection\n\n"
-                . "Rocket Loader delays/rewrites inline scripts and BREAKS the POS sale screen\n"
-                . "(Alpine x-data stops booting — cashiers cannot add items to bills).\n\n"
-                . "Fix NOW:\n"
-                . "1. https://dash.cloudflare.com -> taxnest.com.pk -> Speed -> Optimization\n"
-                . "2. Turn Rocket Loader OFF\n"
-                . "3. Hard-refresh a POS sale screen to confirm items register again\n\n"
-                . "(See docs/cloudflare-setup-guide.md — Rocket Loader must stay OFF.)\n\n"
-                . 'TaxNest automated check';
+            if ($autoFixed) {
+                $subject = 'FIXED: Cloudflare Rocket Loader was ON — auto-turned OFF';
+                $body = "Cloudflare Rocket Loader was detected ON for the live site and has been\n"
+                    . "AUTOMATICALLY turned OFF via the Cloudflare API.\n\n"
+                    . "Checked page: {$url}\n"
+                    . "Marker found: /cdn-cgi/scripts/.../rocket-loader script injection\n"
+                    . "Action taken: PATCH settings/rocket_loader = off (success)\n\n"
+                    . "Someone flipped Rocket Loader ON in the Cloudflare dashboard — please find out\n"
+                    . "who/why so it does not happen again. Rocket Loader BREAKS the POS sale screen.\n\n"
+                    . "Verify: hard-refresh a POS sale screen and confirm items register again.\n"
+                    . "(Cloudflare edge cache may take a few minutes to serve clean HTML.)\n\n"
+                    . "(See docs/cloudflare-setup-guide.md — Rocket Loader must stay OFF.)\n\n"
+                    . 'TaxNest automated check';
+            } else {
+                $subject = 'URGENT: Cloudflare Rocket Loader is ON — POS sale screen at risk';
+                $body = "WARNING: Cloudflare Rocket Loader appears to be ON for the live site.\n\n"
+                    . "Checked page: {$url}\n"
+                    . "Marker found: /cdn-cgi/scripts/.../rocket-loader script injection\n\n"
+                    . "Automatic fix via the Cloudflare API FAILED or is not configured\n"
+                    . "(CLOUDFLARE_API_TOKEN / CLOUDFLARE_ZONE_ID) — manual fix needed NOW.\n\n"
+                    . "Rocket Loader delays/rewrites inline scripts and BREAKS the POS sale screen\n"
+                    . "(Alpine x-data stops booting — cashiers cannot add items to bills).\n\n"
+                    . "Fix NOW:\n"
+                    . "1. https://dash.cloudflare.com -> taxnest.com.pk -> Speed -> Optimization\n"
+                    . "2. Turn Rocket Loader OFF\n"
+                    . "3. Hard-refresh a POS sale screen to confirm items register again\n\n"
+                    . "(See docs/cloudflare-setup-guide.md — Rocket Loader must stay OFF.)\n\n"
+                    . 'TaxNest automated check';
+            }
 
-            Mail::raw($body, function ($m) use ($emails) {
+            Mail::raw($body, function ($m) use ($emails, $subject) {
                 $m->to($emails->all())
-                    ->subject('URGENT: Cloudflare Rocket Loader is ON — POS sale screen at risk');
+                    ->subject($subject);
             });
 
             \App\Services\MailHealth::recordSuccess();

@@ -80,6 +80,82 @@ class CloudflareRocketLoaderCheckTest extends TestCase
         $this->assertStringContainsString('Rocket Loader OFF', $email->getTextBody());
     }
 
+    public function test_detected_with_api_configured_auto_fixes_and_sends_fixed_email(): void
+    {
+        $this->makeAdmin();
+        config(['services.cloudflare.api_token' => 'test-token', 'services.cloudflare.zone_id' => 'zone123']);
+        Http::fake([
+            self::URL => Http::response(
+                '<html><head><script src="/cdn-cgi/scripts/7d0fa10a/cloudflare-static/rocket-loader.min.js"></script></head></html>',
+                200
+            ),
+            'https://api.cloudflare.com/client/v4/zones/zone123/settings/rocket_loader' => Http::response(
+                ['success' => true, 'result' => ['id' => 'rocket_loader', 'value' => 'off']],
+                200
+            ),
+        ]);
+
+        // Still exit 1 — detection happened; scheduler/log should show the incident.
+        $this->artisan('cloudflare:check-rocket-loader')->assertExitCode(1);
+
+        Http::assertSent(function ($request) {
+            return $request->url() === 'https://api.cloudflare.com/client/v4/zones/zone123/settings/rocket_loader'
+                && $request->method() === 'PATCH'
+                && ($request->data()['value'] ?? null) === 'off'
+                && $request->hasHeader('Authorization', 'Bearer test-token');
+        });
+
+        $messages = $this->sentMessages();
+        $this->assertCount(1, $messages);
+        $email = $messages[0]->getOriginalMessage();
+        $this->assertStringContainsString('FIXED', (string) $email->getSubject());
+        $this->assertStringContainsString('AUTOMATICALLY turned OFF', $email->getTextBody());
+    }
+
+    public function test_detected_with_api_failure_falls_back_to_urgent_email(): void
+    {
+        $this->makeAdmin();
+        config(['services.cloudflare.api_token' => 'test-token', 'services.cloudflare.zone_id' => 'zone123']);
+        Http::fake([
+            self::URL => Http::response(
+                '<html><head><script src="/cdn-cgi/scripts/7d0fa10a/cloudflare-static/rocket-loader.min.js"></script></head></html>',
+                200
+            ),
+            'https://api.cloudflare.com/client/v4/zones/zone123/settings/rocket_loader' => Http::response(
+                ['success' => false, 'errors' => [['code' => 9109, 'message' => 'Invalid access token']]],
+                403
+            ),
+        ]);
+
+        $this->artisan('cloudflare:check-rocket-loader')->assertExitCode(1);
+
+        $messages = $this->sentMessages();
+        $this->assertCount(1, $messages);
+        $email = $messages[0]->getOriginalMessage();
+        $this->assertStringContainsString('URGENT', (string) $email->getSubject());
+        $this->assertStringContainsString('Fix NOW', $email->getTextBody());
+    }
+
+    public function test_detected_without_api_config_sends_urgent_email(): void
+    {
+        $this->makeAdmin();
+        config(['services.cloudflare.api_token' => '', 'services.cloudflare.zone_id' => '']);
+        Http::fake([self::URL => Http::response(
+            '<html><head><script src="/cdn-cgi/scripts/7d0fa10a/cloudflare-static/rocket-loader.min.js"></script></head></html>',
+            200
+        )]);
+
+        $this->artisan('cloudflare:check-rocket-loader')->assertExitCode(1);
+
+        // No API call attempted at all.
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'api.cloudflare.com'));
+
+        $messages = $this->sentMessages();
+        $this->assertCount(1, $messages);
+        $email = $messages[0]->getOriginalMessage();
+        $this->assertStringContainsString('URGENT', (string) $email->getSubject());
+    }
+
     public function test_marker_words_apart_do_not_false_positive(): void
     {
         // "rocket-loader" mentioned in page copy without a cdn-cgi injection

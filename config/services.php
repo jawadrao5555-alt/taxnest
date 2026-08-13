@@ -45,6 +45,12 @@ return [
         'relay_token' => env('PRA_RELAY_TOKEN', ''),
     ],
 
+    'cloudflare' => [
+        // API token with Zone Settings Edit permission (auto-fix Rocket Loader).
+        'api_token' => env('CLOUDFLARE_API_TOKEN', ''),
+        'zone_id' => env('CLOUDFLARE_ZONE_ID', ''),
+    ],
+
     'vapid' => [
         'public'  => env('VAPID_PUBLIC_KEY'),
         'private' => env('VAPID_PRIVATE_KEY'),

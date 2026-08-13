@@ -29,7 +29,8 @@ SSL/TLS tab:
 
 Speed tab — **YEH BOHOT ZAROORI HAI**:
 - **Rocket Loader: OFF rakhen** (POS sale screen ke scripts kharab kar dega)
-  - Automated guard: nightly `cloudflare:check-rocket-loader` command (05:15) live homepage check karta hai — agar Rocket Loader ka script mila to sab admins ko urgent email jati hai.
+  - Automated guard: nightly `cloudflare:check-rocket-loader` command (05:15) live homepage check karta hai — agar Rocket Loader ka script mila to pehle Cloudflare API se Rocket Loader khud-ba-khud OFF kiya jata hai (PATCH `settings/rocket_loader = off`), phir sab admins ko email jati hai ("detected + auto-fixed"). Agar API fail ho (ya token set na ho) to purani urgent manual-fix email jati hai.
+  - Auto-fix ke liye 2 env values chahiye (live `.env` + Replit secrets): `CLOUDFLARE_API_TOKEN` (Cloudflare dashboard → My Profile → API Tokens → Create Token → "Edit zone settings" template ya custom **Zone → Zone Settings → Edit** permission, sirf taxnest.com.pk zone) aur `CLOUDFLARE_ZONE_ID` (dashboard → taxnest.com.pk Overview page, right side "Zone ID"). Token set karne ke baad live par `php artisan config:cache` zaroor chalayen.
 - **Auto Minify: sab OFF rakhen** (HTML/CSS/JS teeno)
 
 Caching tab:

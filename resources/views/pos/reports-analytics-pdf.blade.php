@@ -103,6 +103,31 @@
         </div>
     </div>
 
+    {{-- Top wasted items (Task 600): same item-wise list the on-screen report shows (Task 597) --}}
+    @if((($analytics->wastage ?? null) !== null) && ($analytics->wastage->items ?? collect())->isNotEmpty())
+    <div class="section-title">{{ __('pos.ra_wastage_top_items') }}</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th class="c" style="width:8%;">#</th>
+                <th>{{ __('pos.th_product') }}</th>
+                <th class="r">{{ __('pos.receipt_qty') }}</th>
+                <th class="r">{{ __('pos.amount_word') }} (PKR)</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($analytics->wastage->items as $i => $wi)
+            <tr>
+                <td class="c">{{ $i + 1 }}</td>
+                <td>{{ $wi->name }}</td>
+                <td class="r">{{ rtrim(rtrim(number_format($wi->qty, 2), '0'), '.') }}</td>
+                <td class="r">{{ number_format($wi->amount, 2) }}</td>
+            </tr>
+            @endforeach
+        </tbody>
+    </table>
+    @endif
+
     @if($analytics->profit !== null && ($analytics->profit->cost > 0 || $analytics->profit->revenue > 0))
     <div class="section-title">{{ __('pos.ra_profit_estimate', ['pct' => $analytics->profit->coverage_pct]) }}</div>
     <table class="data">

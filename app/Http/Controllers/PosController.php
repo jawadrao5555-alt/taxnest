@@ -680,17 +680,29 @@ class PosController extends Controller
 
         $delta = $request->boolean('delta');
         $deltaQ = $delta ? '&delta=1' : '';
+        // Delta snapshot (Pizza Master edit-path bug, Aug 2026): compute the
+        // unprinted rows ONCE and bake their ids into EVERY job of this send
+        // (printed_item_ids). The agent prints jobs sequentially and stamps
+        // kot_printed_at at result time — without the snapshot, the kitchen
+        // ticket's success emptied the counter-copy delta (rendered later,
+        // whereNull found nothing → 204 → no slip at the counter). Baked ids
+        // keep all copies of one kitchen-send identical.
+        $deltaIds = $delta
+            ? $order->items->whereNull('kot_printed_at')->pluck('id')->map(fn ($i) => (int) $i)->values()->all()
+            : null;
         $stations = \App\Models\PosStation::activeFor($companyId);
         // Counter KOT Copy (owner request 30 Jul 2026): DINE-IN orders only —
         // one FULL (non-station-split) copy of the KOT on the counter printer,
         // in ADDITION to the normal kitchen job(s). Best-effort: never blocks
         // or fails the main kitchen print.
-        $counterCopy = function () use ($settings, $order, $companyId, $user, $delta) {
+        $counterCopy = function () use ($settings, $order, $companyId, $user, $delta, $deltaIds) {
             try {
                 if (!($settings['counter_kot_enabled'] ?? false)) return;
                 $printer = $settings['counter_kot_printer'] ?? null;
                 if (!$printer || ($order->order_type ?? null) !== 'dine_in') return;
                 // In-flight dedupe — client retry must not double the counter copy.
+                // Delta dedupe-hit MERGES fresh ids into the still-PENDING job
+                // (same rule as $makeJob) so a rapid second edit isn't dropped.
                 $dupe = \App\Models\PosPrintJob::where('company_id', $companyId)
                     ->where('type', 'kot')
                     ->where('restaurant_order_id', $order->id)
@@ -698,24 +710,37 @@ class PosController extends Controller
                     ->where(fn($q) => $delta ? $q->where('render_query', 'delta=1') : $q->whereNull('render_query'))
                     ->whereIn('status', ['pending', 'printing'])
                     ->where('created_at', '>=', now()->subMinutes(2))
-                    ->exists();
-                if ($dupe) return;
+                    ->orderByDesc('id')->first();
+                if ($dupe) {
+                    if ($delta && $deltaIds && $dupe->status === 'pending') {
+                        $merged = collect($dupe->printed_item_ids ?? [])->map(fn ($i) => (int) $i)
+                            ->merge($deltaIds)->unique()->values()->all();
+                        if ($merged !== ($dupe->printed_item_ids ?? [])) {
+                            $dupe->update(['printed_item_ids' => $merged]);
+                        }
+                    }
+                    return;
+                }
                 \App\Models\PosPrintJob::create([
                     'company_id' => $companyId,
                     'type' => 'kot',
                     'target_printer' => $printer,
                     'restaurant_order_id' => $order->id,
                     'render_query' => $delta ? 'delta=1' : null,
+                    'printed_item_ids' => $delta ? $deltaIds : null,
                     'status' => 'pending',
                     'created_by' => $user->id,
                 ]);
             } catch (\Throwable $e) { /* copy is optional — kitchen print already queued */ }
         };
-        $makeJob = function (?string $printer, ?string $renderQuery) use ($companyId, $order, $user) {
+        $makeJob = function (?string $printer, ?string $renderQuery) use ($companyId, $order, $user, $delta, $deltaIds) {
             // In-flight dedupe (client retry + KDS/cashier race, 30 Jul 2026):
             // an identical queued/printing job < 2 min old = same physical ticket
-            // already on its way. Safe for deltas too — a PENDING delta job
-            // renders unprinted rows at PRINT time, so one job covers both fires.
+            // already on its way. Delta jobs now carry a BAKED id snapshot, so a
+            // deduped second fire MERGES any newly-unprinted ids into the still-
+            // PENDING job (render reads the row fresh at claim time); an already-
+            // printing job keeps its rendered set — result-time stamping must
+            // only cover rows that physically printed.
             $inFlight = \App\Models\PosPrintJob::where('company_id', $companyId)
                 ->where('type', 'kot')
                 ->where('restaurant_order_id', $order->id)
@@ -724,17 +749,34 @@ class PosController extends Controller
                 ->whereIn('status', ['pending', 'printing'])
                 ->where('created_at', '>=', now()->subMinutes(2))
                 ->orderByDesc('id')->first();
-            if ($inFlight) return $inFlight;
+            if ($inFlight) {
+                if ($delta && $deltaIds && $inFlight->status === 'pending') {
+                    $merged = collect($inFlight->printed_item_ids ?? [])->map(fn ($i) => (int) $i)
+                        ->merge($deltaIds)->unique()->values()->all();
+                    if ($merged !== ($inFlight->printed_item_ids ?? [])) {
+                        $inFlight->update(['printed_item_ids' => $merged]);
+                    }
+                }
+                return $inFlight;
+            }
             return \App\Models\PosPrintJob::create([
                 'company_id' => $companyId,
                 'type' => 'kot',
                 'target_printer' => $printer,
                 'restaurant_order_id' => $order->id,
                 'render_query' => $renderQuery,
+                'printed_item_ids' => ($delta && $deltaIds) ? $deltaIds : null,
                 'status' => 'pending',
                 'created_by' => $user->id,
             ]);
         };
+
+        // Delta with nothing unprinted = nothing to print anywhere — succeed with
+        // no jobs (mirrors the station-split empty case; the agent would only
+        // 204 the job anyway, and the counter copy must not fire either).
+        if ($delta && empty($deltaIds)) {
+            return response()->json(['success' => true, 'job_ids' => []]);
+        }
 
         // Zero stations => single full/delta KOT on the company KOT printer
         // (byte-identical to pre-station behavior).

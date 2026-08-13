@@ -844,7 +844,20 @@ class AgentController extends Controller
             // flagged NEW); delta with nothing new stays empty => 204 (no blank,
             // no duplicate). Explicit full prints unchanged.
             $fullMode = (bool) ($company->pos_kot_full_mode ?? false);
-            $unprinted = $order->items->whereNull('kot_printed_at');
+            // Delta snapshot (Pizza Master edit-path bug, Aug 2026): delta jobs
+            // now BAKE their unprinted row ids at enqueue (printed_item_ids).
+            // Without it, the FIRST job's result-time stamping emptied every
+            // LATER overlapping delta job in the same kitchen-send — the counter
+            // KOT copy rendered after the kitchen ticket printed found zero
+            // whereNull rows → 204 → no slip at the counter. Baked ids keep all
+            // copies of one send identical; legacy/blank jobs fall back to the
+            // old whereNull resolution.
+            $baked = ($delta && is_array($job->printed_item_ids) && count($job->printed_item_ids))
+                ? array_map('intval', $job->printed_item_ids)
+                : null;
+            $unprinted = $baked !== null
+                ? $order->items->whereIn('id', $baked)->values()
+                : $order->items->whereNull('kot_printed_at');
             if ($delta && $fullMode && $unprinted->isNotEmpty()) {
                 $ticketItems = $order->items;
             } else {

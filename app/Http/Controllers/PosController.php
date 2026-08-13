@@ -9996,6 +9996,15 @@ class PosController extends Controller
             $data['returns_amount'] = round((float) $returnRows->sum('total_amount'), 2);
         }
 
+        // Wastage detail (Task 596): spoiled-goods returns — same is_wastage
+        // filter the day-close SCREEN preview uses, so print matches screen.
+        if (\Schema::hasColumn('pos_day_close_reports', 'wastage_count')
+            && \Schema::hasColumn('pos_transactions', 'is_wastage')) {
+            $wastageRows = $returnRows->filter(fn ($t) => (bool) ($t->is_wastage ?? false));
+            $data['wastage_count'] = $wastageRows->count();
+            $data['wastage_amount'] = round((float) $wastageRows->sum('total_amount'), 2);
+        }
+
         // Delivery Riders (Jul 2026): rider cash figures for this day — computed
         // BEFORE the wash so archived/deleted local bills still count.
         $riderFigures = $this->buildRiderDayFigures($companyId, $date);

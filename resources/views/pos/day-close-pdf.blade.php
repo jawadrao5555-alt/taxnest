@@ -235,6 +235,12 @@
                 <td class="r" style="color:#dc2626;">-{{ number_format($report->returns_amount, 2) }}</td>
             </tr>
             @endif
+            {{-- Wastage (Task 596): spoiled-goods returns — matches the screen line --}}
+            @if(($report->wastage_count ?? 0) > 0)
+            <tr>
+                <td colspan="2" style="color:#b45309;">{{ __('pos.dc_wastage_line', ['count' => $report->wastage_count, 'amount' => number_format($report->wastage_amount, 2)]) }}</td>
+            </tr>
+            @endif
             {{-- PRA segregation (owner 9 Aug 2026): taxable vs exempt split of net sales --}}
             @if(isset($taxSplit))
             <tr>

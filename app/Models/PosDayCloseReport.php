@@ -19,6 +19,8 @@ class PosDayCloseReport extends Model
         'rider_summary',
         // Return / credit-note netting (Task 570).
         'returns_count', 'returns_amount',
+        // Wastage (Task 596): spoiled-goods return figures on the stored Z-report.
+        'wastage_count', 'wastage_amount',
     ];
 
     protected $casts = [

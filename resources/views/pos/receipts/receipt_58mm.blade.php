@@ -416,6 +416,7 @@
     @if($omRcptToken)
     <div style="text-align:center; padding:2px 0 3px;">
         <span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:14px; font-weight:900;">{{ __('pos.order_match_token_label') }} {{ $omRcptToken }}</span>
+        <div style="font-size:8px; font-weight:400; padding-top:1px;">{{ __('pos.order_match_token_caption') }}</div>
     </div>
     @elseif($omRcptCode && !$rcptPraFiscal)
     {{-- Short-code box: only for non-fiscal bills; fiscal bills show the full order number in the top invoice box --}}

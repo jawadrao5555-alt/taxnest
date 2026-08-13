@@ -356,7 +356,28 @@
                 if ($omEarlyRO) { $omRcptFullNum = $omEarlyRO->order_number; }
             }
         } catch (\Throwable $e) { $omRcptFullNum = null; }
+
+        // Return / credit-note receipt (Task 570): explicit query, never a lazy
+        // relation (live has strict lazy loading).
+        $rcptIsReturn = ($transaction->transaction_type ?? 'sale') === 'return';
+        $rcptReturnParent = null;
+        if ($rcptIsReturn && $transaction->parent_transaction_id) {
+            try {
+                $rcptReturnParent = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
+                    ->where('company_id', $transaction->company_id)
+                    ->find($transaction->parent_transaction_id);
+            } catch (\Throwable $e) { $rcptReturnParent = null; }
+        }
     @endphp
+    @if($rcptIsReturn)
+    <div class="separator"></div>
+    <div style="text-align:center; padding:3px 0;">
+        <strong style="font-size:13px; color:#000;">*** {{ __('pos.receipt_credit_note') }} ***</strong>
+        @if($rcptReturnParent)
+        <br><span style="font-size:9px; color:#000;">{{ __('pos.original_invoice_colon') }} {{ $rcptReturnParent->pra_invoice_number ?: $rcptReturnParent->invoice_number }}</span>
+        @endif
+    </div>
+    @endif
     @if($rcptTopBadge)
     <div class="separator"></div>
     <div class="invoice-numbers" style="text-align:center; padding:4px 5px;">

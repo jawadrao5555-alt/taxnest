@@ -116,6 +116,10 @@
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ __('pos.kpi_net_revenue') }}</p>
             <p class="text-2xl font-bold text-emerald-600 mt-1">PKR {{ number_format($stats->total_amount) }}</p>
+            {{-- Returns / credit notes (Task 570): figures above are already netted --}}
+            @if(($stats->returns_count ?? 0) > 0)
+            <p class="text-xs text-rose-500 mt-1">{{ __('pos.dc_returns_netted', ['count' => $stats->returns_count, 'amount' => number_format($stats->returns_amount, 2)]) }}</p>
+            @endif
         </div>
     </div>
 

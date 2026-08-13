@@ -17,6 +17,8 @@ class PosDayCloseReport extends Model
         'deleted_final_count', 'deleted_provisional_count', 'local_summary',
         'opening_float', 'counted_cash', 'expected_cash', 'cash_variance',
         'rider_summary',
+        // Return / credit-note netting (Task 570).
+        'returns_count', 'returns_amount',
     ];
 
     protected $casts = [

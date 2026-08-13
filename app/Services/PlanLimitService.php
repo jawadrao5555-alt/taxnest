@@ -83,14 +83,21 @@ class PlanLimitService
         }
 
         $monthlyCount = function () use ($companyId): int {
-            $live = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
+            $liveQuery = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->where('status', 'completed')
                 ->where(function ($q) {
                     $q->whereNull('invoice_mode')->orWhere('invoice_mode', '!=', 'local');
                 })
-                ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])
-                ->count();
+                ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()]);
+            // Returns/credit notes (Task 570) never consume bill quota — they
+            // reverse a sale that already paid for its slot.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type')) {
+                $liveQuery->where(function ($q) {
+                    $q->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
+                });
+            }
+            $live = $liveQuery->count();
 
             // Reporting-OFF finals hard-deleted by the day-close DELETE policy would
             // otherwise vanish from this count (quota bypass) — add back the counts

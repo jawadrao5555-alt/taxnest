@@ -2452,6 +2452,12 @@ class PosController extends Controller
                 ->with('error', __('pos.cannot_edit_submitted_pra_num', ['number' => $transaction->pra_invoice_number]));
         }
 
+        // Return rows are immutable credit notes (Task 570) — never editable.
+        if (($transaction->transaction_type ?? 'sale') === 'return') {
+            return redirect()->route('pos.transaction.show', $id)
+                ->with('error', __('pos.return_bill_immutable'));
+        }
+
         // Edit screen weight fix (ZFC 11k customers, Aug 2026): the old code
         // hydrated EVERY customer here even though the view's customer fields
         // are plain name/phone text inputs — the list was never rendered. Do
@@ -2488,6 +2494,15 @@ class PosController extends Controller
             }
             return redirect()->route('pos.transaction.show', $id)
                 ->with('error', __('pos.cannot_edit_submitted_pra'));
+        }
+
+        // Return rows are immutable credit notes (Task 570) — never editable.
+        if (($transaction->transaction_type ?? 'sale') === 'return') {
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => __('pos.return_bill_immutable')], 422);
+            }
+            return redirect()->route('pos.transaction.show', $id)
+                ->with('error', __('pos.return_bill_immutable'));
         }
 
         // Snapshot the OLD line items before they are replaced, so the edit can
@@ -2795,6 +2810,13 @@ class PosController extends Controller
                 ->with('error', __('pos.cannot_delete_submitted_pra_num', ['number' => $transaction->pra_invoice_number]));
         }
 
+        // Return rows are immutable credit notes (Task 570): deleting one would
+        // desync the parent's returned_quantity and un-net the reports.
+        if (($transaction->transaction_type ?? 'sale') === 'return') {
+            return redirect()->route('pos.transaction.show', $id)
+                ->with('error', __('pos.return_bill_immutable'));
+        }
+
         DB::beginTransaction();
         try {
             // Return the sold stock to inventory before the items disappear —
@@ -2965,6 +2987,29 @@ class PosController extends Controller
 
         if ($transaction->pra_status === 'submitted') {
             return back()->with('error', __('pos.invoice_already_submitted_pra'));
+        }
+
+        // Return / credit-note rows (Task 570): retryable ONLY when the parent
+        // bill actually has a PRA fiscal number — a credit note against a USIN
+        // PRA never saw is meaningless. Local returns stay local by design.
+        if (($transaction->transaction_type ?? 'sale') === 'return') {
+            $returnParent = $transaction->parent_transaction_id
+                ? PosTransaction::withoutGlobalScope('hide_archived')
+                    ->where('company_id', $companyId)
+                    ->find($transaction->parent_transaction_id)
+                : null;
+            if (empty($returnParent?->pra_invoice_number)) {
+                return back()->with('error', __('pos.return_parent_not_reported'));
+            }
+            if (!in_array($transaction->pra_status, ['pending', 'failed', 'offline'], true)) {
+                return back()->with('error', __('pos.invoice_cannot_submit_status', ['status' => $transaction->pra_status ?? 'local']));
+            }
+            $praService = new PraIntegrationService($company);
+            $result = $praService->sendInvoice($transaction);
+            if (!empty($result['success'])) {
+                return back()->with('success', __('pos.invoice_submitted_pra_num', ['number' => $transaction->fresh()->pra_invoice_number]));
+            }
+            return back()->with('error', $result['message'] ?? __('pos.pra_submission_failed'));
         }
 
         // Reporting-OFF final = LOCAL-category bill: completed, NULL pra_status,
@@ -4434,6 +4479,13 @@ class PosController extends Controller
             $this->applyReportFilters($q, $tab, $cashierFilter);
         };
 
+        // Return / credit-note netting (Task 570): revenue figures are SIGNED
+        // (returns subtract), bill counts stay sales-only. Schema-guarded for
+        // prod drift — pre-migration boxes fall back to the old unsigned sums.
+        $typeReady = \Schema::hasColumn('pos_transactions', 'transaction_type');
+        $signExpr = $typeReady ? "CASE WHEN transaction_type = 'return' THEN -1 ELSE 1 END" : '1';
+        $saleRowExpr = $typeReady ? "CASE WHEN transaction_type = 'return' THEN 0 ELSE 1 END" : '1';
+
         // Sales reports group by BUSINESS day (owner rule 26 Jul 2026): an
         // after-midnight bill counts toward the previous day's business.
         // Tax reports (buildTaxReportQuery) stay on created_at — PRA legal truth.
@@ -4441,7 +4493,7 @@ class PosController extends Controller
             ->where('status', 'completed')
             ->where('business_date', '>=', now()->subDays(30)->toDateString())
             ->tap($modeFilter)
-            ->selectRaw("business_date as date, COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue")
+            ->selectRaw("business_date as date, COALESCE(SUM({$saleRowExpr}),0) as count, COALESCE(SUM(({$signExpr}) * total_amount),0) as revenue")
             ->groupBy('business_date')
             ->orderBy('date', 'desc')
             ->get();
@@ -4450,12 +4502,19 @@ class PosController extends Controller
             ->where('status', 'completed')
             ->where('business_date', '>=', now()->startOfMonth()->toDateString())
             ->tap($modeFilter)
-            ->selectRaw("payment_method, COUNT(*) as count, COALESCE(SUM(total_amount),0) as total, COALESCE(SUM(tax_amount),0) as tax")
+            ->selectRaw("payment_method, COALESCE(SUM({$saleRowExpr}),0) as count, COALESCE(SUM(({$signExpr}) * total_amount),0) as total, COALESCE(SUM(({$signExpr}) * tax_amount),0) as tax")
             ->groupBy('payment_method')
             ->get();
 
-        $topItems = PosTransactionItem::whereHas('transaction', function ($q) use ($companyId, $tab, $cashierFilter) {
+        $topItems = PosTransactionItem::whereHas('transaction', function ($q) use ($companyId, $tab, $cashierFilter, $typeReady) {
             $q->where('company_id', $companyId)->where('status', 'completed')->where('business_date', '>=', now()->startOfMonth()->toDateString());
+            // Top-seller ranking stays GROSS sales — return rows (RET- lines)
+            // are excluded rather than netted so rankings don't go negative.
+            if ($typeReady) {
+                $q->where(function ($w) {
+                    $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
+                });
+            }
             $this->applyReportFilters($q, $tab, $cashierFilter);
         })
             ->selectRaw("item_name, SUM(quantity) as total_qty, SUM(subtotal) as total_revenue")
@@ -4468,7 +4527,7 @@ class PosController extends Controller
             ->where('status', 'completed')
             ->where('business_date', '>=', now()->subMonths(6)->startOfMonth()->toDateString())
             ->tap($modeFilter)
-            ->selectRaw(\App\Helpers\DbCompat::dateFormat('business_date', 'YYYY-MM') . " as month, COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue")
+            ->selectRaw(\App\Helpers\DbCompat::dateFormat('business_date', 'YYYY-MM') . " as month, COALESCE(SUM({$saleRowExpr}),0) as count, COALESCE(SUM(({$signExpr}) * total_amount),0) as revenue")
             ->groupByRaw(\App\Helpers\DbCompat::dateFormat('business_date', 'YYYY-MM'))
             ->orderBy('month')
             ->get();
@@ -8646,38 +8705,59 @@ class PosController extends Controller
             ->orderBy('created_at')
             ->get();
 
+        // Return / credit-note netting (Task 570): the day-close preview nets
+        // returns exactly like the stored Z-report (performDayClose) so the
+        // page, PDF and thermal never disagree.
+        $dcTypeReady = \Schema::hasColumn('pos_transactions', 'transaction_type');
+        $dcReturnRows = $dcTypeReady
+            ? $transactions->filter(fn ($t) => ($t->transaction_type ?? 'sale') === 'return')->values()
+            : collect();
+        $dcSaleRows = $dcTypeReady
+            ? $transactions->reject(fn ($t) => ($t->transaction_type ?? 'sale') === 'return')->values()
+            : $transactions;
+
         // Cash/card/other via the ONE shared alias set (PosPaymentBuckets):
         // universal-screen 'card' is stored as 'debit_card', so matching only
         // 'card' would report Rs 0 card sales (and dump them into "Other").
-        $payBuckets = PosPaymentBuckets::split($transactions);
+        $payBuckets = PosPaymentBuckets::split($dcSaleRows);
+        $refundBuckets = PosPaymentBuckets::split($dcReturnRows);
 
         $stats = (object) [
-            'total_invoices' => $transactions->count(),
-            'pra_invoices' => $transactions->where('pra_status', 'submitted')->count(),
-            'local_invoices' => $transactions->whereIn('pra_status', ['local', null])->count(),
-            'offline_invoices' => $transactions->where('pra_status', 'offline')->count(),
-            'gross_sales' => $transactions->sum('subtotal'),
-            'total_discount' => $transactions->sum('discount_amount'),
-            'net_sales' => $transactions->sum('subtotal') - $transactions->sum('discount_amount'),
+            'total_invoices' => $dcSaleRows->count(),
+            'pra_invoices' => $dcSaleRows->where('pra_status', 'submitted')->count(),
+            'local_invoices' => $dcSaleRows->whereIn('pra_status', ['local', null])->count(),
+            'offline_invoices' => $dcSaleRows->where('pra_status', 'offline')->count(),
+            'gross_sales' => $dcSaleRows->sum('subtotal') - $dcReturnRows->sum('subtotal'),
+            'total_discount' => $dcSaleRows->sum('discount_amount') - $dcReturnRows->sum('discount_amount'),
+            'net_sales' => ($dcSaleRows->sum('subtotal') - $dcReturnRows->sum('subtotal'))
+                - ($dcSaleRows->sum('discount_amount') - $dcReturnRows->sum('discount_amount')),
             // PRA segregation (owner 9 Aug 2026): taxable vs exempt split —
             // same formula as the tax report (taxable = subtotal − discount −
             // exempt share; exempt_amount is post-discount, PosTaxMath).
-            'taxable_value' => $transactions->sum(fn ($t) => max(0, (float) $t->subtotal - (float) $t->discount_amount - (float) ($t->exempt_amount ?? 0))),
-            'exempt_value' => $transactions->sum(fn ($t) => (float) ($t->exempt_amount ?? 0)),
-            'total_tax' => $transactions->sum('tax_amount'),
-            'total_amount' => $transactions->sum('total_amount'),
-            'cash_amount' => $payBuckets['cash'],
-            'card_amount' => $payBuckets['card'],
-            'other_amount' => $payBuckets['other'],
-            'first_invoice' => $transactions->first(),
-            'last_invoice' => $transactions->last(),
+            'taxable_value' => $dcSaleRows->sum(fn ($t) => max(0, (float) $t->subtotal - (float) $t->discount_amount - (float) ($t->exempt_amount ?? 0)))
+                - $dcReturnRows->sum(fn ($t) => max(0, (float) $t->subtotal - (float) $t->discount_amount - (float) ($t->exempt_amount ?? 0))),
+            'exempt_value' => $dcSaleRows->sum(fn ($t) => (float) ($t->exempt_amount ?? 0))
+                - $dcReturnRows->sum(fn ($t) => (float) ($t->exempt_amount ?? 0)),
+            'total_tax' => $dcSaleRows->sum('tax_amount') - $dcReturnRows->sum('tax_amount'),
+            'total_amount' => $dcSaleRows->sum('total_amount') - $dcReturnRows->sum('total_amount'),
+            'cash_amount' => round($payBuckets['cash'] - $refundBuckets['cash'], 2),
+            'card_amount' => round($payBuckets['card'] - $refundBuckets['card'], 2),
+            'other_amount' => round($payBuckets['other'] - $refundBuckets['other'], 2),
+            'first_invoice' => $dcSaleRows->first(),
+            'last_invoice' => $dcSaleRows->last(),
+            // Returns detail line for the page/PDF/thermal.
+            'returns_count' => $dcReturnRows->count(),
+            'returns_amount' => round((float) $dcReturnRows->sum('total_amount'), 2),
         ];
 
+        // Cashier figures are SIGNED (Task 570): refunds net revenue/tax;
+        // counts stay sales-only.
         $cashierBreakdown = $transactions->groupBy(fn($t) => $t->creator ? $t->creator->name : 'Unknown')->map(function ($group) {
+            $sign = fn ($t) => ($t->transaction_type ?? 'sale') === 'return' ? -1 : 1;
             return (object) [
-                'count' => $group->count(),
-                'revenue' => $group->sum('total_amount'),
-                'tax' => $group->sum('tax_amount'),
+                'count' => $group->filter(fn ($t) => ($t->transaction_type ?? 'sale') !== 'return')->count(),
+                'revenue' => $group->sum(fn ($t) => $sign($t) * (float) $t->total_amount),
+                'tax' => $group->sum(fn ($t) => $sign($t) * (float) $t->tax_amount),
             ];
         });
 
@@ -9101,6 +9181,15 @@ class PosController extends Controller
 
         $transactions = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
+            // Range analytics are GROSS sales analytics (categories, profit,
+            // hourly, cashier ranking) — return/credit-note rows are EXCLUDED
+            // here (like topItems), not netted; netted figures live in the
+            // reports() headline queries and day-close. Schema-guarded.
+            ->when(\Schema::hasColumn('pos_transactions', 'transaction_type'), function ($q) {
+                $q->where(function ($w) {
+                    $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
+                });
+            })
             ->tap(fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter))
             ->whereBetween('business_date', [$from->toDateString(), $to->toDateString()])
             ->get(['id', 'created_at', 'business_date', 'created_by', 'customer_id', 'customer_name', 'customer_phone', 'subtotal', 'total_amount', 'tax_amount', 'discount_amount', 'payment_method']);
@@ -9772,34 +9861,55 @@ class PosController extends Controller
         $reportCount = PosDayCloseReport::where('company_id', $companyId)->count();
         $reportNumber = 'ZRPT-POS-' . str_pad($reportCount + 1, 5, '0', STR_PAD_LEFT);
 
+        // Return / credit-note netting (Task 570): returns live in the PRA set
+        // ($transactions) but must NET the Z-report figures, not inflate them.
+        // Counts + fiscal serial range stay SALES-only (returns carry RET-
+        // numbers outside the USIN sequence).
+        $typeReady = \Schema::hasColumn('pos_transactions', 'transaction_type');
+        $returnRows = $typeReady
+            ? $transactions->filter(fn ($t) => ($t->transaction_type ?? 'sale') === 'return')->values()
+            : collect();
+        $saleRows = $typeReady
+            ? $transactions->reject(fn ($t) => ($t->transaction_type ?? 'sale') === 'return')->values()
+            : $transactions;
+
         // Cash/card/other via the ONE shared alias set (PosPaymentBuckets) —
         // 'card' is stored as 'debit_card'; ='card' matching reported Rs 0 card
-        // sales on the Z-report (live incident, Jul 2026).
-        $payBuckets = PosPaymentBuckets::split($transactions);
+        // sales on the Z-report (live incident, Jul 2026). Refunds net their
+        // bucket (cash refund reduces expected drawer cash).
+        $payBuckets = PosPaymentBuckets::split($saleRows);
+        $refundBuckets = PosPaymentBuckets::split($returnRows);
 
         $data = [
             'company_id' => $companyId,
             'report_date' => $date,
             'report_number' => $reportNumber,
-            'total_invoices' => $transactions->count(),
-            'pra_invoices' => $transactions->where('pra_status', 'submitted')->count(),
-            'local_invoices' => $transactions->whereIn('pra_status', ['local', null])->count(),
-            'offline_invoices' => $transactions->where('pra_status', 'offline')->count(),
-            'gross_sales' => $transactions->sum('subtotal'),
-            'total_discount' => $transactions->sum('discount_amount'),
-            'net_sales' => $transactions->sum('subtotal') - $transactions->sum('discount_amount'),
-            'total_tax' => $transactions->sum('tax_amount'),
-            'total_amount' => $transactions->sum('total_amount'),
-            'cash_amount' => $payBuckets['cash'],
-            'card_amount' => $payBuckets['card'],
-            'other_amount' => $payBuckets['other'],
-            'first_invoice_number' => $transactions->first()->invoice_number ?? null,
-            'last_invoice_number' => $transactions->last()->invoice_number ?? null,
-            'first_invoice_time' => $transactions->first()->created_at ?? null,
-            'last_invoice_time' => $transactions->last()->created_at ?? null,
+            'total_invoices' => $saleRows->count(),
+            'pra_invoices' => $saleRows->where('pra_status', 'submitted')->count(),
+            'local_invoices' => $saleRows->whereIn('pra_status', ['local', null])->count(),
+            'offline_invoices' => $saleRows->where('pra_status', 'offline')->count(),
+            'gross_sales' => $saleRows->sum('subtotal') - $returnRows->sum('subtotal'),
+            'total_discount' => $saleRows->sum('discount_amount') - $returnRows->sum('discount_amount'),
+            'net_sales' => ($saleRows->sum('subtotal') - $returnRows->sum('subtotal'))
+                - ($saleRows->sum('discount_amount') - $returnRows->sum('discount_amount')),
+            'total_tax' => $saleRows->sum('tax_amount') - $returnRows->sum('tax_amount'),
+            'total_amount' => $saleRows->sum('total_amount') - $returnRows->sum('total_amount'),
+            'cash_amount' => round($payBuckets['cash'] - $refundBuckets['cash'], 2),
+            'card_amount' => round($payBuckets['card'] - $refundBuckets['card'], 2),
+            'other_amount' => round($payBuckets['other'] - $refundBuckets['other'], 2),
+            'first_invoice_number' => $saleRows->first()->invoice_number ?? null,
+            'last_invoice_number' => $saleRows->last()->invoice_number ?? null,
+            'first_invoice_time' => $saleRows->first()->created_at ?? null,
+            'last_invoice_time' => $saleRows->last()->created_at ?? null,
             'closed_by' => $closedBy,
             'notes' => $notes,
         ];
+
+        // Returns detail on the Z-report (schema-guarded, drift self-heal).
+        if (\Schema::hasColumn('pos_day_close_reports', 'returns_count')) {
+            $data['returns_count'] = $returnRows->count();
+            $data['returns_amount'] = round((float) $returnRows->sum('total_amount'), 2);
+        }
 
         // Delivery Riders (Jul 2026): rider cash figures for this day — computed
         // BEFORE the wash so archived/deleted local bills still count.
@@ -9904,7 +10014,16 @@ class PosController extends Controller
                         ->where(function ($q) {
                             $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
                         })
-                        ->whereNull('pra_status'),
+                        ->whereNull('pra_status')
+                        // Returns/credit notes (Task 570) are NEVER washed:
+                        // deleting one would desync the parent's returned_quantity,
+                        // un-net the reports, and (via deleted_final_count) eat
+                        // quota the return never consumed. Schema-guarded.
+                        ->when(\Schema::hasColumn('pos_transactions', 'transaction_type'), function ($q) {
+                            $q->where(function ($w) {
+                                $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
+                            });
+                        }),
                 ],
             ];
 
@@ -10103,11 +10222,14 @@ class PosController extends Controller
             ->orderBy('created_at')
             ->get();
 
+        // Cashier figures are SIGNED (Task 570): refunds net revenue/tax;
+        // counts stay sales-only.
         $cashierBreakdown = $transactions->groupBy(fn($t) => $t->creator ? $t->creator->name : 'Unknown')->map(function ($group) {
+            $sign = fn ($t) => ($t->transaction_type ?? 'sale') === 'return' ? -1 : 1;
             return (object) [
-                'count' => $group->count(),
-                'revenue' => $group->sum('total_amount'),
-                'tax' => $group->sum('tax_amount'),
+                'count' => $group->filter(fn ($t) => ($t->transaction_type ?? 'sale') !== 'return')->count(),
+                'revenue' => $group->sum(fn ($t) => $sign($t) * (float) $t->total_amount),
+                'tax' => $group->sum(fn ($t) => $sign($t) * (float) $t->tax_amount),
             ];
         });
 
@@ -10158,11 +10280,14 @@ class PosController extends Controller
             ->orderBy('created_at')
             ->get();
 
+        // Cashier figures are SIGNED (Task 570): refunds net revenue/tax;
+        // counts stay sales-only.
         $cashierBreakdown = $transactions->groupBy(fn ($t) => $t->creator ? $t->creator->name : 'Unknown')->map(function ($group) {
+            $sign = fn ($t) => ($t->transaction_type ?? 'sale') === 'return' ? -1 : 1;
             return (object) [
-                'count' => $group->count(),
-                'revenue' => $group->sum('total_amount'),
-                'tax' => $group->sum('tax_amount'),
+                'count' => $group->filter(fn ($t) => ($t->transaction_type ?? 'sale') !== 'return')->count(),
+                'revenue' => $group->sum(fn ($t) => $sign($t) * (float) $t->total_amount),
+                'tax' => $group->sum(fn ($t) => $sign($t) * (float) $t->tax_amount),
             ];
         });
 

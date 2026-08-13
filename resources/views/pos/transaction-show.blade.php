@@ -19,12 +19,60 @@
     </div>
     @endif
 
+    {{-- Return / credit-note flow (Task 570) --}}
+    @php
+        $isReturnBill = ($transaction->transaction_type ?? 'sale') === 'return';
+        $canReturnHere = auth('pos')->user() && !auth('pos')->user()->posCashierBlocked()
+            && (auth('pos')->user()->posBillingScope() ?? 'both') !== 'local'
+            && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type')
+            && \App\Http\Controllers\PosReturnController::returnableReason($transaction) === null;
+        $returnRows = $isReturnBill || !\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type')
+            ? collect() : $transaction->returns()->withoutGlobalScope('hide_archived')->get();
+        // Explicit parent lookup — live has strict lazy loading, so never
+        // touch $transaction->parentTransaction as a lazy attribute here.
+        $returnParentRow = $isReturnBill && $transaction->parent_transaction_id
+            ? \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $transaction->company_id)
+                ->find($transaction->parent_transaction_id)
+            : null;
+    @endphp
+
+    @if($isReturnBill)
+    <div class="mb-6 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-700 rounded-xl p-4">
+        <div class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-rose-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z"/></svg>
+            <div class="text-sm text-rose-800 dark:text-rose-300">
+                <span class="font-bold">{{ __('pos.return_bill_banner') }}</span>
+                @if($returnParentRow)
+                — {{ __('pos.original_invoice_colon') }}
+                <a href="{{ route('pos.transaction.show', $transaction->parent_transaction_id) }}" class="font-mono font-semibold underline">{{ $returnParentRow->invoice_number }}</a>
+                @endif
+            </div>
+        </div>
+    </div>
+    @elseif($returnRows->isNotEmpty())
+    <div class="mb-6 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-700 rounded-xl p-4">
+        <div class="text-sm text-rose-800 dark:text-rose-300">
+            <span class="font-bold">{{ __('pos.bill_has_returns') }}:</span>
+            @foreach($returnRows as $ret)
+                <a href="{{ route('pos.transaction.show', $ret->id) }}" class="font-mono font-semibold underline mr-2">{{ $ret->invoice_number }} (Rs {{ number_format((float) $ret->total_amount) }})</a>
+            @endforeach
+        </div>
+    </div>
+    @endif
+
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ $transaction->invoice_number }}</h1>
             <p class="text-sm text-gray-500 mt-1">{{ $transaction->created_at->format('d M Y H:i:s') }}</p>
         </div>
         <div class="flex flex-wrap gap-2">
+            @if($canReturnHere)
+            <a href="{{ route('pos.transaction.return-form', $transaction->id) }}" class="inline-flex items-center gap-2 px-4 py-2 bg-rose-600 text-white text-sm font-semibold rounded-lg hover:bg-rose-700 transition">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3"/></svg>
+                {{ __('pos.return_refund') }}
+            </a>
+            @endif
             @if(!$transaction->pra_invoice_number)
             <a href="{{ route('pos.transaction.edit', $transaction->id) }}" class="inline-flex items-center gap-2 px-4 py-2 bg-amber-500 text-white text-sm font-semibold rounded-lg hover:bg-amber-600 transition">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>

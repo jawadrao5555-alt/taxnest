@@ -195,6 +195,36 @@ class PraIntegrationService
         $totalTaxCharged = round($totalTaxCharged, 2);
         $totalBillAmount = round($totalBillAmount, 2);
 
+        // ── Return / credit-note (Task 570, Aug 2026) ─────────────────────────
+        // Return rows store POSITIVE amounts (FBR Phase-2 convention); the PRA
+        // payload flips the sign AFTER all rounding/reconciler math so the
+        // whole-rupee logic above stays untouched. IMS credit-note model
+        // (SRO 1279-style, same as FBR IMS): InvoiceType=3, RefUSIN = the
+        // ORIGINAL bill's merchant USIN, negative quantities/values.
+        $isReturn = ($transaction->transaction_type ?? 'sale') === 'return';
+        $refUsin = null;
+        $invoiceType = 1;
+        if ($isReturn) {
+            $invoiceType = 3;
+            $parent = $transaction->parent_transaction_id
+                ? PosTransaction::withoutGlobalScope('hide_archived')
+                    ->where('company_id', $transaction->company_id)
+                    ->find($transaction->parent_transaction_id)
+                : null;
+            $refUsin = $parent?->invoice_number;
+            foreach ($items as $i => $ln) {
+                $items[$i]['Quantity'] = -$ln['Quantity'];
+                $items[$i]['SaleValue'] = round(-$ln['SaleValue'], 2);
+                $items[$i]['TaxCharged'] = round(-$ln['TaxCharged'], 2);
+                $items[$i]['TotalAmount'] = round(-$ln['TotalAmount'], 2);
+                $items[$i]['InvoiceType'] = 3;
+                $items[$i]['RefUSIN'] = $refUsin;
+            }
+            $totalSaleValue = round(-$totalSaleValue, 2);
+            $totalTaxCharged = round(-$totalTaxCharged, 2);
+            $totalBillAmount = round(-$totalBillAmount, 2);
+        }
+
         return [
             'InvoiceNumber' => '',
             'POSID' => (int) ($this->company->pra_pos_id ?? 0),
@@ -211,8 +241,8 @@ class PraIntegrationService
             'FurtherTax' => 0.0,
             'TotalBillAmount' => $totalBillAmount,
             'PaymentMode' => $paymentMode,
-            'RefUSIN' => null,
-            'InvoiceType' => 1,
+            'RefUSIN' => $refUsin,
+            'InvoiceType' => $invoiceType,
             'Items' => $items,
         ];
     }

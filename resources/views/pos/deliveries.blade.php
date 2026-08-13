@@ -20,6 +20,27 @@
          this.settleAmount = t > 0 ? t : '';
      } }">
 
+    {{-- Return / credit-note prompt (Task 570): a PRA-reported bill just came
+         back with the rider — nudge the admin/manager straight into the
+         return-bill form so tax/stock/cash reconcile (khata drop alone is not
+         a credit note). Flash-driven, shows once after the status change. --}}
+    @if(session('return_prompt_url'))
+    <div class="mb-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-700 rounded-xl p-4">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="text-sm text-rose-800 dark:text-rose-300">
+                <span class="font-bold">{{ __('pos.return_prompt_title', ['invoice' => session('return_prompt_invoice')]) }}</span>
+                <span class="block text-xs mt-0.5">{{ __('pos.return_prompt_body') }}</span>
+                @if((float) session('return_prompt_partial', 0) > 0)
+                <span class="block text-xs mt-0.5 font-semibold text-amber-700 dark:text-amber-400">{{ __('pos.return_rider_partial_notice', ['amount' => number_format((float) session('return_prompt_partial'))]) }}</span>
+                @endif
+            </div>
+            <a href="{{ session('return_prompt_url') }}" class="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-rose-600 text-white text-sm font-semibold rounded-lg hover:bg-rose-700 transition">
+                {{ __('pos.return_create_bill_btn') }}
+            </a>
+        </div>
+    </div>
+    @endif
+
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
         <div class="flex items-center gap-3">
             {{-- Back (owner request Jul 2026): return to whatever screen the user came from;
@@ -374,6 +395,27 @@
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">{{ __('pos.del_status_unassigned') }}</span>
                             @else
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold {{ $stClass }}">{{ $st ? (Lang::has('pos.delivery_status_' . $st) ? __('pos.delivery_status_' . $st) : ucfirst($st)) : '—' }}</span>
+                            @endif
+                            {{-- Return / credit-note CTA (Task 570): returned PRA-stream bill →
+                                 admin/manager can jump straight to the return-bill form. Shows
+                                 existing-return state instead once a credit note exists. Cheap
+                                 per-row exists() runs ONLY on returned rows. --}}
+                            @if($st === 'returned' && $isAdminOrManager && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type'))
+                                @php
+                                    $hasReturnBill = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
+                                        ->where('company_id', $b->company_id)
+                                        ->where('parent_transaction_id', $b->id)
+                                        ->exists();
+                                    $canMakeReturn = !$hasReturnBill && \App\Http\Controllers\PosReturnController::returnableReason($b) === null;
+                                @endphp
+                                @if($hasReturnBill)
+                                    <div class="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">{{ __('pos.return_already_made') }}</div>
+                                @elseif($canMakeReturn)
+                                    <a href="{{ route('pos.transaction.return-form', $b->id) }}" class="inline-flex mt-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-rose-600 text-white hover:bg-rose-700 transition">{{ __('pos.return_create_bill_btn') }}</a>
+                                    @if((float) ($b->rider_partial_paid ?? 0) > 0)
+                                    <div class="text-[10px] font-semibold text-amber-600 dark:text-amber-400 mt-0.5">{{ __('pos.return_rider_partial_notice', ['amount' => number_format((float) $b->rider_partial_paid)]) }}</div>
+                                    @endif
+                                @endif
                             @endif
                             {{-- Delivery duration (owner, 3 Aug 2026): rider assign se
                                  delivered tak kitne minute lage. --}}

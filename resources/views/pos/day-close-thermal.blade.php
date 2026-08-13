@@ -61,6 +61,10 @@
         <tr><td>{{ __('pos.dc_discount') }}</td><td class="r">-{{ number_format($report->total_discount, 2) }}</td></tr>
         @endif
         <tr><td>{{ __('pos.dc_net_sales') }}</td><td class="r">{{ number_format($report->net_sales, 2) }}</td></tr>
+        {{-- Returns / credit notes (Task 570): informational — totals already netted --}}
+        @if(($report->returns_count ?? 0) > 0)
+        <tr><td>{{ __('pos.dc_returns_row', ['count' => $report->returns_count]) }}</td><td class="r">-{{ number_format($report->returns_amount, 2) }}</td></tr>
+        @endif
         {{-- PRA segregation (owner 9 Aug 2026): taxable vs exempt split --}}
         @if(isset($taxSplit))
         <tr><td>{{ __('pos.dc_taxable_value') }}</td><td class="r">{{ number_format($taxSplit['taxable'], 2) }}</td></tr>

@@ -228,6 +228,13 @@
                 <td>{{ __('pos.dc_net_sales') }}</td>
                 <td class="r">{{ number_format($report->net_sales, 2) }}</td>
             </tr>
+            {{-- Returns / credit notes (Task 570): informational — totals above are already netted --}}
+            @if(($report->returns_count ?? 0) > 0)
+            <tr>
+                <td>{{ __('pos.dc_returns_row', ['count' => $report->returns_count]) }}</td>
+                <td class="r" style="color:#dc2626;">-{{ number_format($report->returns_amount, 2) }}</td>
+            </tr>
+            @endif
             {{-- PRA segregation (owner 9 Aug 2026): taxable vs exempt split of net sales --}}
             @if(isset($taxSplit))
             <tr>

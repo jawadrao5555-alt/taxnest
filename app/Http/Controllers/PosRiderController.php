@@ -590,10 +590,29 @@ class PosRiderController extends Controller
         }
         $txn->update($upd);
 
+        // Return / credit-note prompt (Task 570): a PRA-reported bill coming
+        // back with the rider should flow straight into the return-bill form —
+        // "returned" alone only drops the rider khata, it never fixes tax/stock.
+        // Cashiers never see the prompt (returns are manager/owner-only).
+        $returnUrl = null;
+        if ($newStatus === 'returned'
+            && Schema::hasColumn('pos_transactions', 'transaction_type')
+            && !(auth('pos')->user()?->posCashierBlocked())
+            && \App\Http\Controllers\PosReturnController::returnableReason($txn->fresh()) === null) {
+            $returnUrl = route('pos.transaction.return-form', $txn->id, false);
+        }
+
         // Sale-screen Pending Deliveries panel (3 Aug 2026) marks FINAL bills
         // delivered via fetch — JSON clients get JSON; page forms keep back().
         if ($request->expectsJson()) {
-            return response()->json(['success' => true, 'delivery_status' => $newStatus]);
+            return response()->json(['success' => true, 'delivery_status' => $newStatus, 'return_url' => $returnUrl]);
+        }
+
+        if ($returnUrl) {
+            return back()->with('success', 'Delivery status updated.')
+                ->with('return_prompt_url', $returnUrl)
+                ->with('return_prompt_invoice', $txn->invoice_number)
+                ->with('return_prompt_partial', (float) ($txn->rider_partial_paid ?? 0));
         }
 
         return back()->with('success', 'Delivery status updated.');

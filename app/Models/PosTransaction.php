@@ -27,6 +27,8 @@ class PosTransaction extends Model
         'rider_assigned_at', 'delivered_at',
         // Prepaid conversion audit (Task 285, Aug 2026) — cash→qr_payment correction on deliveries board.
         'prepaid_converted_at', 'prepaid_converted_by',
+        // Return / credit-note flow (Task 570, Aug 2026) — 'sale' | 'return' + parent link.
+        'transaction_type', 'parent_transaction_id',
     ];
 
     /**
@@ -101,6 +103,24 @@ class PosTransaction extends Model
     public function items()
     {
         return $this->hasMany(PosTransactionItem::class, 'transaction_id');
+    }
+
+    /** Return / credit-note flow (Task 570). */
+    public function parentTransaction()
+    {
+        return $this->belongsTo(self::class, 'parent_transaction_id');
+    }
+
+    public function returns()
+    {
+        return $this->hasMany(self::class, 'parent_transaction_id')
+            ->where('transaction_type', 'return');
+    }
+
+    /** Schema-drift-safe check: is this row a return/credit-note bill? */
+    public function isReturnBill(): bool
+    {
+        return ($this->transaction_type ?? 'sale') === 'return';
     }
 
     /**

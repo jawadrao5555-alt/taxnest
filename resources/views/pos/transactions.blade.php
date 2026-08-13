@@ -102,8 +102,12 @@
                 <tbody>
                     @forelse($transactions as $txn)
                     <tr class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 {{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }}">
+                        @php $rowIsReturn = ($txn->transaction_type ?? 'sale') === 'return'; @endphp
                         <td class="px-4 py-3 font-medium text-emerald-600">
                             <a href="{{ route('pos.transaction.show', $txn->id) }}" class="hover:underline">{{ $txn->invoice_number }}</a>
+                            @if($rowIsReturn)
+                                <span class="inline-flex items-center ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 uppercase">{{ __('pos.return_badge') }}</span>
+                            @endif
                         </td>
                         <td class="px-4 py-3 text-gray-700 dark:text-gray-300 hidden md:table-cell">
                             {{ $txn->customer_name ?? __("pos.walk_in") }}
@@ -121,9 +125,9 @@
                                 {{ ucwords(str_replace('_', ' ', $txn->payment_method)) }}
                             </span>
                         </td>
-                        <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300 hidden lg:table-cell">{{ number_format($txn->subtotal) }}</td>
-                        <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300 hidden lg:table-cell">{{ number_format($txn->tax_amount) }}</td>
-                        <td class="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">PKR {{ number_format($txn->total_amount) }}</td>
+                        <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300 hidden lg:table-cell">{{ $rowIsReturn ? '−' : '' }}{{ number_format($txn->subtotal) }}</td>
+                        <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300 hidden lg:table-cell">{{ $rowIsReturn ? '−' : '' }}{{ number_format($txn->tax_amount) }}</td>
+                        <td class="px-4 py-3 text-right font-semibold {{ $rowIsReturn ? 'text-rose-600 dark:text-rose-400' : 'text-gray-900 dark:text-white' }}">{{ $rowIsReturn ? '−' : '' }}PKR {{ number_format($txn->total_amount) }}</td>
                         <td class="px-4 py-3 hidden lg:table-cell">
                             @if($txn->pra_invoice_number)
                                 <span class="text-xs font-mono text-purple-700 dark:text-purple-400">{{ $txn->pra_invoice_number }}</span>
@@ -163,7 +167,7 @@
                         <td class="px-4 py-3">
                             <div class="flex items-center gap-2">
                                 <a href="{{ route('pos.receipt', $txn->id) }}" class="text-emerald-600 hover:underline text-xs font-medium">{{ __("pos.receipt_word") }}</a>
-                                @if(!$txn->pra_invoice_number)
+                                @if(!$txn->pra_invoice_number && !$rowIsReturn)
                                 <a href="{{ route('pos.transaction.edit', $txn->id) }}" class="text-amber-600 hover:text-amber-700 text-xs font-medium" title="{{ __('pos.edit') }}">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                 </a>
@@ -186,7 +190,7 @@
                                 {{-- LOCAL tab (owner rule Jul 2026 update): every local bill
                                      (provisional L-series OR reporting-OFF final) gets a per-bill
                                      "Submit to PRA" — CURRENT month only; older months are closed. --}}
-                                @if(($tab ?? 'pra') === 'local' && !$txn->pra_invoice_number && ($txn->pra_status === 'local' || is_null($txn->pra_status)))
+                                @if(($tab ?? 'pra') === 'local' && !$rowIsReturn && !$txn->pra_invoice_number && ($txn->pra_status === 'local' || is_null($txn->pra_status)))
                                     @if($txn->created_at->gte(now()->startOfMonth()))
                                     <form method="POST" action="{{ route('pos.transaction.retry-pra', $txn->id) }}" class="inline" onsubmit="return confirm(@js(__('pos.confirm_submit_to_pra', ['invoice' => $txn->invoice_number])))">
                                         @csrf

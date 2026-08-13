@@ -259,6 +259,11 @@ class AgentController extends Controller
         $invoices = [];
         foreach ($pending as $txn) {
             try {
+                // Live runs with strict lazy-loading: touching $txn->items without an
+                // eager load throws, killing payload generation on EVERY poll (bills
+                // stuck 'pending' forever). Mirror the FBR loop's loadMissing pattern.
+                $txn->loadMissing(['items', 'company']);
+
                 // All-exempt bills are never reported to PRA (mirrors sendInvoice) —
                 // without this, the agent would receive an empty-Items payload.
                 if ($txn->items->isNotEmpty() && $txn->items->every(fn ($item) => (bool) $item->is_tax_exempt)) {
@@ -280,6 +285,19 @@ class AgentController extends Controller
                     'transaction_id' => $txn->id,
                     'error' => $e->getMessage(),
                 ]);
+                // Surface the reason in the F11 Failed Bills modal (Task 624 line)
+                // instead of leaving the bill silently stuck in 'pending'.
+                try {
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'pra_error_message')) {
+                        $txn->pra_error_message = 'Bill ka PRA payload nahi ban saka — ' . mb_substr($e->getMessage(), 0, 200);
+                        $txn->save();
+                    }
+                } catch (\Throwable $saveErr) {
+                    Log::warning('Agent: could not persist payload-generation error', [
+                        'transaction_id' => $txn->id,
+                        'error' => $saveErr->getMessage(),
+                    ]);
+                }
             }
         }
 

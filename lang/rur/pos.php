@@ -1586,6 +1586,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'kot_note' => 'NOTE:',
     'kot_notes' => 'NOTES:',
     'kot_order_by' => 'Order lene wala:',
+    'kot_waiter' => 'Waiter:',
     'kot_print_by_station' => 'Station ke Hisaab se Print:',
     'kot_print_full' => 'Poora KOT Print Karein',
     'kot_print_position' => 'KOT print position (kitchen parchi)',

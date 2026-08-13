@@ -1586,6 +1586,7 @@ return [
     'kot_note' => 'نوٹ:',
     'kot_notes' => 'نوٹس:',
     'kot_order_by' => 'آرڈر از:',
+    'kot_waiter' => 'ویٹر:',
     'kot_print_by_station' => 'اسٹیشن کے حساب سے پرنٹ کریں:',
     'kot_print_full' => 'مکمل KOT پرنٹ کریں',
     'kot_print_position' => 'کچن پرچی کی پرنٹ پوزیشن',

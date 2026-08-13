@@ -260,6 +260,17 @@
         <span class="bold">{{ $order->created_at->format('M d') }} {{ $order->created_at->format('h:i A') }}</span>
     </div>
 
+    {{-- Task 620 (ZFC, Aug 2026): waiter-punched orders must ALWAYS carry the
+         waiter's REAL display name on the KOT — the footer "Order by" line is a
+         paper-saving toggle (kot_show_orderby) and vanished at shops that turned
+         it off, leaving no name at all. This line is independent of that toggle
+         and prints only for source='waiter' orders. --}}
+    @if(($order->source ?? null) === 'waiter' && ($order->creator->name ?? null))
+    <div class="mt-1">
+        <span class="bold text-sm">{{ __('pos.kot_waiter') }} {{ $order->creator->name }}</span>
+    </div>
+    @endif
+
     @if($kotShowCustomer && $order->customer_name)
     <div class="mt-1">
         <span class="bold text-sm">{{ __('pos.receipt_customer') }}: {{ $order->customer_name }}</span>

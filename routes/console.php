@@ -157,3 +157,8 @@ Schedule::command('pos:auto-dayclose')->hourly()->withoutOverlapping();
 // the Cloudflare API and emails admins (throttled inside the command so a
 // lingering edge-cached marker can't spam one email per run).
 Schedule::command('cloudflare:check-rocket-loader')->everyThirtyMinutes();
+// Cloudflare guard #2: other dangerous zone settings read straight from the
+// Cloudflare API — Auto Minify must be OFF, SSL mode Full (strict), Browser
+// Cache TTL "Respect Existing Headers". Drift is auto-PATCHed back and admins
+// get a "detected + auto-fixed" email; API failures send an urgent email.
+Schedule::command('cloudflare:check-settings')->dailyAt('05:20');

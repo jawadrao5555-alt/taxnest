@@ -346,6 +346,12 @@ class PosController extends Controller
             if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'order_match_style')
                 && in_array($request->input('rp_order_match'), ['off', 'token', 'code'], true)) {
                 $companyUpdates['order_match_style'] = $request->input('rp_order_match');
+                // Task 662: manual save = deliberate choice — lock it so future
+                // bulk rollout migrations (which must WHERE locked=false) can
+                // never override this shop's pick again.
+                if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'order_match_style_locked')) {
+                    $companyUpdates['order_match_style_locked'] = true;
+                }
             }
             // Bill Number Style (07 Aug 2026): per-stream receipt numbering display —
             // 'serial' = chalti series (POS-YYYY-NNNNN / L-NNN), 'token' = roz ka

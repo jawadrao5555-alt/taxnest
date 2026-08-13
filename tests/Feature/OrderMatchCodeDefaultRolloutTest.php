@@ -69,6 +69,31 @@ class OrderMatchCodeDefaultRolloutTest extends TestCase
         );
     }
 
+    // Task 662: a company whose owner manually picked a style in Receipt
+    // Settings (order_match_style_locked = true) must survive a bulk rollout.
+    public function test_locked_companies_keep_their_manual_choice(): void
+    {
+        Schema::table('companies', function (Blueprint $t) {
+            $t->boolean('order_match_style_locked')->default(false);
+        });
+
+        DB::table('companies')->insert([
+            ['name' => 'Frost and Brew', 'order_match_style' => 'token', 'order_match_style_locked' => true],
+            ['name' => 'Unset Shop',     'order_match_style' => 'off',   'order_match_style_locked' => false],
+        ]);
+
+        $this->runRolloutMigration();
+
+        $this->assertSame(
+            'token',
+            DB::table('companies')->where('name', 'Frost and Brew')->value('order_match_style')
+        );
+        $this->assertSame(
+            'code',
+            DB::table('companies')->where('name', 'Unset Shop')->value('order_match_style')
+        );
+    }
+
     public function test_migration_is_idempotent(): void
     {
         DB::table('companies')->insert(['name' => 'Twice Shop', 'order_match_style' => 'token']);

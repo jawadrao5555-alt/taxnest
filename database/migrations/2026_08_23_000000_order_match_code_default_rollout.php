@@ -36,12 +36,20 @@ return new class extends Migration
             $table->string('order_match_style', 10)->default('code')->change();
         });
 
-        DB::table('companies')
+        // Task 662 CONVENTION for every bulk order_match_style rollout: skip
+        // companies whose owner manually picked a style in Receipt Settings
+        // (order_match_style_locked = true). hasColumn guard: on a fresh
+        // environment this migration runs BEFORE the locked column exists —
+        // that's fine, nothing can be locked yet at that point.
+        $query = DB::table('companies')
             ->where(function ($q) {
                 $q->whereNull('order_match_style')
                   ->orWhere('order_match_style', '!=', 'code');
-            })
-            ->update(['order_match_style' => 'code']);
+            });
+        if (Schema::hasColumn('companies', 'order_match_style_locked')) {
+            $query->where('order_match_style_locked', false);
+        }
+        $query->update(['order_match_style' => 'code']);
     }
 
     public function down(): void

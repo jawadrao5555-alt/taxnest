@@ -2518,6 +2518,12 @@ class FbrPosController extends Controller
             if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'order_match_style')
                 && in_array($request->input('rp_order_match'), ['off', 'token', 'code'], true)) {
                 $company->order_match_style = $request->input('rp_order_match');
+                // Task 662: manual save = deliberate choice — lock it so future
+                // bulk rollout migrations (which must WHERE locked=false) can
+                // never override this shop's pick again.
+                if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'order_match_style_locked')) {
+                    $company->order_match_style_locked = true;
+                }
             }
 
             // Task 565: opt-in Yes/No print-confirm dialog — shared flag with PRA

@@ -61,9 +61,26 @@ class AdminSystemController extends Controller
             || ($queueHeartbeatAt && $queueHeartbeatAt->lt(now()->subMinutes(30)))
             || (!$queueHeartbeatAt && $heartbeatAt && !$heartbeatStale);
 
+        // Logging health: daily logs:health-check probe (LogHealth service).
+        $logHealthFailure = \App\Services\LogHealth::current();
+        $logHealthLastPassRaw = SystemSetting::get('log_health_last_success_at');
+        $logHealthLastPassAt = null;
+        if ($logHealthLastPassRaw) {
+            try {
+                $logHealthLastPassAt = \Carbon\Carbon::parse($logHealthLastPassRaw);
+            } catch (\Throwable $e) {
+                $logHealthLastPassAt = null;
+            }
+        }
+        // Stale if the last pass is older than 26h AND no active failure is
+        // recorded — means the daily probe itself stopped running (cron gap).
+        $logHealthStale = !$logHealthFailure
+            && (!$logHealthLastPassAt || $logHealthLastPassAt->lt(now()->subHours(26)));
+
         return view('saas-admin.system-control', compact(
             'controls', 'heartbeatAt', 'heartbeatStale',
-            'queueHeartbeatAt', 'queueStale', 'stuckJobs', 'oldestStuckAt'
+            'queueHeartbeatAt', 'queueStale', 'stuckJobs', 'oldestStuckAt',
+            'logHealthFailure', 'logHealthLastPassAt', 'logHealthStale'
         ));
     }
 

@@ -42,6 +42,32 @@
         </div>
     </div>
 
+    {{-- Logging health: daily logs:health-check probe (LOG_LEVEL + log writability) --}}
+    @php $logHealthBad = $logHealthFailure || $logHealthStale; @endphp
+    <div class="mb-6 rounded-xl border p-4 flex items-start gap-3 {{ $logHealthBad ? 'border-red-800/60 bg-red-900/15' : 'border-emerald-800/50 bg-emerald-900/10' }}">
+        <span class="mt-0.5 inline-block w-2.5 h-2.5 rounded-full flex-shrink-0 {{ $logHealthBad ? 'bg-red-500' : 'bg-emerald-500' }}"></span>
+        <div>
+            <p class="text-sm font-semibold text-white">Logging Health (Daily Watchdog)</p>
+            @if($logHealthLastPassAt)
+                <p class="text-xs mt-0.5 {{ $logHealthBad ? 'text-red-400' : 'text-gray-400' }}">
+                    Last passed: {{ $logHealthLastPassAt->diffForHumans() }} ({{ $logHealthLastPassAt->format('d M Y, h:i A') }})
+                </p>
+            @else
+                <p class="text-xs mt-0.5 {{ $logHealthBad ? 'text-red-400 font-medium' : 'text-gray-400' }}">Never ran — the daily <code class="{{ $logHealthBad ? 'text-red-300' : 'text-gray-300' }}">logs:health-check</code> job has not recorded a pass yet (check the <code class="{{ $logHealthBad ? 'text-red-300' : 'text-gray-300' }}">schedule:run</code> cron).</p>
+            @endif
+            @if($logHealthFailure)
+                <p class="text-xs text-red-400 mt-1 font-medium">
+                    Failing{{ !empty($logHealthFailure['ago']) ? ' since ' . $logHealthFailure['ago'] : '' }} ({{ $logHealthFailure['count'] }} {{ Str::plural('check', $logHealthFailure['count']) }} failed):
+                </p>
+                @foreach($logHealthFailure['issues'] as $issue)
+                    <p class="text-xs text-red-400 mt-0.5">• {{ $issue }}</p>
+                @endforeach
+            @elseif($logHealthStale && $logHealthLastPassAt)
+                <p class="text-xs text-red-400 mt-1 font-medium">Warning: last pass is over a day old — the daily logging watchdog may have stopped running.</p>
+            @endif
+        </div>
+    </div>
+
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-5">Emergency switches to control platform-wide features. Changes take effect immediately.</p>
 

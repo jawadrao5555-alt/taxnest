@@ -1943,6 +1943,19 @@ class RestaurantPosController extends Controller
         $openOrdersCount = RestaurantOrder::where('company_id', $companyId)
             ->whereIn('status', ['held', 'preparing', 'ready'])
             ->count();
+        // Task 644 (ZFC video, 13 Aug 2026): EXCEPTION to the note above —
+        // TABLELESS waiter ("counter") orders are DELIBERATELY invisible on the
+        // Tables page (owner rule 5 Aug 2026: counter orders surface ONLY in the
+        // sale screen's incoming-orders bell panel). Lumping them under "Open
+        // orders → Tables page" made the tile a DEAD END ("bill khulta hi
+        // nahi"). Split them out: the tile shows this slice as its own chip that
+        // opens the sale screen with the bell panel auto-opened
+        // (?open_incoming=1); claiming stays on the atomic claim path.
+        $counterOrdersCount = RestaurantOrder::where('company_id', $companyId)
+            ->whereIn('status', ['held', 'preparing', 'ready'])
+            ->where('source', 'waiter')
+            ->whereNull('table_id')
+            ->count();
 
         // Task 113 (ZFC, 2 Aug 2026): Cancelled Orders tile — current BUSINESS
         // day's cancelled count, same cutoff window the dashboard's "today"
@@ -2093,7 +2106,8 @@ class RestaurantPosController extends Controller
             'peakHour', 'todayTax', 'todayDiscount',
             'todayCost', 'todayProfit', 'kitchenStats',
             'dashboardStyle', 'isRestaurant', 'isAdmin', 'praStatus', 'isCashier',
-            'pendingProvisional', 'openOrdersCount', 'cancelledTodayCount'
+            'pendingProvisional', 'openOrdersCount', 'cancelledTodayCount',
+            'counterOrdersCount'
         ));
     }
 

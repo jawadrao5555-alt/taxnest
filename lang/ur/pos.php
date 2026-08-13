@@ -2263,6 +2263,8 @@ return [
     'pending_deliveries_title' => 'پینڈنگ ڈیلیوریز',
     'pending_open_tables' => 'اوپن آرڈرز',
     'pending_open_tables_sub' => 'ابھی سیٹل نہیں ہوئے',
+    'pending_counter_orders' => 'کاؤنٹر آرڈرز',
+    'pending_counter_orders_sub' => 'سیل اسکرین کے گھنٹی پینل سے کھلیں گے',
     'open_since_date' => ':date سے کھلا',
     'local_archived_explain' => 'ڈے کلوز پر محفوظ ہو چکا — کوئی کارروائی درکار نہیں',
     'pending_provisional_bills' => 'عارضی بل',

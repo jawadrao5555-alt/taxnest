@@ -259,6 +259,23 @@ input:focus:not(:focus-visible) { outline: none; }
 <script type="application/json" id="tn-pos-i18n">{!! json_encode(__('pos'), JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}' !!}</script>
 <script>window.TXT = (function () { try { return JSON.parse(document.getElementById('tn-pos-i18n').textContent) || {}; } catch (e) { return {}; } })();</script>
 <script>
+// Task 644 (ZFC, Aug 2026): SALE_CACHE re-prime after a browser-data clear —
+// FBR twin of the PRA sale-screen snippet (see pos/universal.blade.php). First
+// visit after a clear = no controlling SW, so SALE_CACHE stayed empty and the
+// SECOND open was still a full network fetch. Ask the fresh SW to fetch+cache
+// this screen once in the background.
+(function () {
+    try {
+        if (!('serviceWorker' in navigator) || navigator.serviceWorker.controller) return;
+        window.addEventListener('load', function () {
+            navigator.serviceWorker.ready.then(function (reg) {
+                if (reg.active) reg.active.postMessage({ type: 'TN_PRIME_SALE_CACHE', url: '/fbr-pos/create' });
+            }).catch(function () {});
+        });
+    } catch (e) { /* best-effort */ }
+})();
+</script>
+<script>
 window.history.pushState(null, null, window.location.href);
 window.addEventListener('popstate', function() {
     window.history.pushState(null, null, window.location.href);

@@ -94,7 +94,15 @@ function rDash() {
                 this.renderOrderTypeChart();
                 this.animateStatNumbers();
             });
-            setInterval(() => this.refreshDashboard(), 30000);
+            // Task 644: auto-refresh used to double-fetch the FULL page every 30s
+            // (XHR reachability GET + reload) even in hidden tabs — real weight on
+            // shop internet. Now: skip entirely while the tab is hidden, and do a
+            // catch-up refresh when the cashier comes back after 30s+ away.
+            setInterval(() => { if (!document.hidden) this.refreshDashboard(); }, 30000);
+            this._lastRefresh = Date.now();
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden && Date.now() - this._lastRefresh > 30000) this.refreshDashboard();
+            });
         },
         animateStatNumbers() {
             document.querySelectorAll('[data-count-target]').forEach(function(el) {
@@ -106,9 +114,13 @@ function rDash() {
             });
         },
         async refreshDashboard() {
+            if (this.refreshing) return;
             this.refreshing = true;
+            this._lastRefresh = Date.now();
             try {
-                const res = await fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                // Task 644: HEAD = body-less reachability probe (was a full-page
+                // GET whose 230KB body was thrown away before the reload refetched it).
+                const res = await fetch(window.location.href, { method: 'HEAD', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
                 if (res.ok) {
                     window.location.reload();
                 }

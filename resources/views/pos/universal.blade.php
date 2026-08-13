@@ -7848,6 +7848,11 @@ function restaurantPos() {
                     // pra_status='local' regardless of company.pra_reporting_enabled
                     // and skips PRA submission. Bill stays editable / deletable.
                     save_as_provisional: !!provisional,
+                    // Task 646: waiter order loaded in the cart — FINAL bills carry
+                    // its id so storeInvoice settles it (links pos_transaction_id)
+                    // BEFORE responding: the very first receipt print can then show
+                    // the "Waiter:" line. Provisionals never consume the order.
+                    incoming_order_id: (!provisional && this.incomingOrderId) ? this.incomingOrderId : null,
                     // OFFLINE-FIRST dedupe key rides on EVERY attempt (online too).
                     // If the response is lost mid-flight (flaky WiFi: server saved
                     // the bill but the reply never arrived), the queued replay
@@ -7957,7 +7962,11 @@ function restaurantPos() {
                 // NOT consume the waiter order — the order stays in Incoming until
                 // a final settles it (conscious decision per review).
                 if (this.incomingOrderId && data.transaction_id && !provisional) {
-                    this.completeIncomingOrder(this.incomingOrderId, data.transaction_id);
+                    // Task 646: storeInvoice already settled the order server-side
+                    // (waiter_order_settled) — only fall back to the old client
+                    // call when it didn't (older queued payload / settle failure).
+                    if (data.waiter_order_settled) { this.loadIncoming(); }
+                    else { this.completeIncomingOrder(this.incomingOrderId, data.transaction_id); }
                 }
                 this.clearCart();
                 this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });

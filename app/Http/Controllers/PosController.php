@@ -1884,6 +1884,10 @@ class PosController extends Controller
             // Branch the bill was rung up on (multi-branch shops): snapshot from
             // the offline queue so a later sync books it under the right branch.
             'offline_branch_id' => 'nullable|integer',
+            // Task 646: waiter order loaded into the cart — FINAL bills settle
+            // it server-side BEFORE the response so the receipt can print the
+            // waiter's name on the very first (auto-)print.
+            'incoming_order_id' => 'nullable|integer',
         ]);
 
         // OFFLINE-FIRST replay guard: if an earlier sync attempt already stored
@@ -2412,6 +2416,28 @@ class PosController extends Controller
             auth('pos')->id()
         );
 
+        // Task 646: settle the linked WAITER order server-side, BEFORE this
+        // response — the receipt templates look the waiter up via
+        // restaurant_orders.pos_transaction_id, so the link must exist by the
+        // time the (auto-)print chain renders the first receipt. FINAL bills
+        // only: the client omits incoming_order_id on provisional saves (a
+        // provisional must never consume the waiter order — conscious P7 rule).
+        $waiterOrderSettled = false;
+        if (!$saveAsProvisional && $request->filled('incoming_order_id')) {
+            try {
+                $waiterOrderSettled = RestaurantWaiterController::settleWaiterOrder(
+                    $companyId, (int) $request->input('incoming_order_id'), $transaction, auth('pos')->user()
+                );
+            } catch (\Throwable $e) {
+                // Never fail a stored sale over the settle — the client's
+                // completeIncomingOrder fallback retries it.
+                \Log::warning('Waiter order settle in storeInvoice failed: ' . $e->getMessage(), [
+                    'transaction_id' => $transaction->id,
+                    'incoming_order_id' => $request->input('incoming_order_id'),
+                ]);
+            }
+        }
+
         // F3 Dine-In (Jul 2026): a table reserved from the universal sale screen is
         // auto-freed the moment its bill is stored (final OR provisional). Only
         // touches status='reserved' — 'occupied' belongs to the held-order lifecycle
@@ -2470,6 +2496,9 @@ class PosController extends Controller
                 'total_amount' => $totalAmount,
                 'pra_invoice_number' => $transaction->pra_invoice_number ?? null,
                 'pra_status' => $transaction->pra_status ?? null,
+                // Task 646: true = waiter order already settled server-side;
+                // the client skips its completeIncomingOrder fallback call.
+                'waiter_order_settled' => $waiterOrderSettled,
                 'message' => $successMessage,
             ]);
         }

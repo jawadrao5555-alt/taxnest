@@ -2823,6 +2823,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'receipt_qty' => 'Qty',
     'receipt_rate' => 'Rate',
     'receipt_rider' => 'Rider',
+    'receipt_waiter' => 'Waiter',
     'receipt_sale_receipt' => 'SALE RASEED',
     'receipt_scan_details' => 'Tafseel ke liye scan karein',
     'receipt_scan_invoice' => 'Invoice ki tafseel ke liye scan karein',

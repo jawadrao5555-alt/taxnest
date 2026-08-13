@@ -775,11 +775,43 @@ class RestaurantWaiterController extends Controller
             return response()->json(['success' => false, 'message' => 'Transaction not found.'], 422);
         }
 
+        if (!self::settleWaiterOrder($companyId, (int) $id, $txn, auth('pos')->user())) {
+            return response()->json(['success' => false, 'message' => 'Order already settled.'], 409);
+        }
+
+        return response()->json(['success' => true, 'message' => 'Waiter order settled.']);
+    }
+
+    /**
+     * Task 646: atomic waiter-order settle, shared by completeIncoming (client
+     * fallback) AND PosController::storeInvoice. storeInvoice calls this BEFORE
+     * returning the paid transaction so the receipt templates (auto-print
+     * included) can already look the waiter up via pos_transaction_id — the
+     * old client-only completeIncomingOrder fetch raced the print chain and
+     * the first receipt could miss the "Waiter:" line.
+     *
+     * Authorization mirrors claimIncoming (architect review): a non-admin may
+     * settle only an order that is UNASSIGNED or assigned to THEM; POS admins/
+     * managers may settle any (same off-shift-cashier rescue policy). The
+     * order id is client-supplied on both call paths, so this guard is the
+     * security boundary — never relax it to company-scope alone.
+     */
+    public static function settleWaiterOrder(int $companyId, int $orderId, \App\Models\PosTransaction $txn, ?\App\Models\User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
         // Atomic claim — double-click / two cashiers can't settle the same order twice.
-        $claimed = RestaurantOrder::where('company_id', $companyId)
-            ->where('id', $id)
+        $claimQuery = RestaurantOrder::where('company_id', $companyId)
+            ->where('id', $orderId)
             ->where('source', 'waiter')
-            ->where('status', 'held')
+            ->where('status', 'held');
+        if (!$user->isPosAdmin()) {
+            $claimQuery->where(function ($w) use ($user) {
+                $w->whereNull('assigned_cashier_id')->orWhere('assigned_cashier_id', $user->id);
+            });
+        }
+        $claimed = $claimQuery
             ->update([
                 'status' => 'completed',
                 'pos_transaction_id' => $txn->id,
@@ -787,10 +819,10 @@ class RestaurantWaiterController extends Controller
                 'updated_at' => now(),
             ]);
         if (!$claimed) {
-            return response()->json(['success' => false, 'message' => 'Order already settled.'], 409);
+            return false;
         }
 
-        $order = RestaurantOrder::where('company_id', $companyId)->with('table')->find($id);
+        $order = RestaurantOrder::where('company_id', $companyId)->with('table')->find($orderId);
 
         // Free the table if no other live order still sits on it (P4 pattern).
         if ($order && $order->table_id) {
@@ -805,7 +837,7 @@ class RestaurantWaiterController extends Controller
             }
         }
 
-        return response()->json(['success' => true, 'message' => 'Waiter order settled.']);
+        return true;
     }
 
     private function orderJson(RestaurantOrder $o): array

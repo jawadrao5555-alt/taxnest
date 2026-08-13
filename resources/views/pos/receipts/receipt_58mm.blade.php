@@ -444,6 +444,29 @@
         @if($transaction->creator && $rp['show_cashier'])
         <tr><td class="info-label">{{ __('pos.receipt_cashier') }}:</td><td class="info-value">{{ $transaction->creator->name }}</td></tr>
         @endif
+        {{-- Task 646 (Aug 2026): waiter-originated bills also print the WAITER's
+             name (KOT already carries it since Task 620). Explicit guarded query —
+             live has strict lazy loading + PROD schema drift convention; only
+             source='waiter' orders qualify, cashier-punched bills add no line. --}}
+        @php
+            // hasColumn guard = PROD schema-drift convention only; any other
+            // failure must surface (no blanket catch — a silently missing
+            // waiter line is invisible to everyone).
+            $rcptWaiterName = null;
+            if (($transaction->order_type ?? null)
+                && \Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'source')) {
+                $rcptWaiterRO = \App\Models\RestaurantOrder::where('company_id', $transaction->company_id)
+                    ->where('pos_transaction_id', $transaction->id)
+                    ->where('source', 'waiter')
+                    ->with('creator')
+                    ->orderByDesc('id')
+                    ->first();
+                $rcptWaiterName = $rcptWaiterRO?->creator?->name;
+            }
+        @endphp
+        @if($rcptWaiterName)
+        <tr><td class="info-label">{{ __('pos.receipt_waiter') }}:</td><td class="info-value">{{ $rcptWaiterName }}</td></tr>
+        @endif
     </table>
 
     <div class="separator"></div>

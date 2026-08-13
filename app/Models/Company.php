@@ -493,6 +493,25 @@ class Company extends Model
     }
 
     /**
+     * Admin Agent Health (Task 629): true when this shop RELIES on the Desktop
+     * Sync Agent for silent printing but the agent has not heartbeat for hours —
+     * cashiers are silently falling back to Chrome print popups. Threshold is
+     * deliberately long (default 2h) so brief restarts / net blips never alarm.
+     */
+    public function agentLongOffline(int $hours = 2): bool
+    {
+        if (!$this->agent_enabled) {
+            return false;
+        }
+        if (!$this->printerSettings()['silent_print_enabled']) {
+            return false; // agent outage has no cashier impact without silent print
+        }
+        // Never-seen agents (silent print ON but agent never connected) count too.
+        return !$this->agent_last_seen
+            || $this->agent_last_seen->lt(now()->subHours($hours));
+    }
+
+    /**
      * True when PRA SUBMISSION is routed through the Desktop Sync Agent
      * ("Agent Sync" mode). False = "Direct Production" — the server submits
      * to PRA itself.

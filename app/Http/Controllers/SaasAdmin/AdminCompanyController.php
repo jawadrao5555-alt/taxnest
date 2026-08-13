@@ -254,7 +254,25 @@ class AdminCompanyController extends Controller
         }
 
         $companies = $query->orderBy('created_at', 'desc')->paginate(20)->appends($request->all());
-        return view('saas-admin.companies.index', compact('companies'));
+
+        // Agent Health (Task 629): shops that RELY on the Desktop Agent for silent
+        // printing but whose agent has been offline for hours — cashiers there are
+        // silently degraded to Chrome print popups (Frost & Brew incident, Aug 2026).
+        // silent_print_enabled lives inside the pos_printer_settings JSON, so the
+        // SQL narrows to agent-enabled active shops and PHP applies the JSON gate.
+        $offlineAgents = Company::query()
+            ->where('agent_enabled', true)
+            ->whereIn('status', ['approved', 'active'])
+            ->where(function ($q) {
+                $q->whereNull('agent_last_seen')
+                  ->orWhere('agent_last_seen', '<', now()->subHours(2));
+            })
+            ->orderBy('agent_last_seen')
+            ->get(['id', 'name', 'product_type', 'agent_enabled', 'agent_last_seen', 'agent_version', 'pos_printer_settings'])
+            ->filter(fn ($c) => $c->agentLongOffline())
+            ->values();
+
+        return view('saas-admin.companies.index', compact('companies', 'offlineAgents'));
     }
 
     public function show($id)

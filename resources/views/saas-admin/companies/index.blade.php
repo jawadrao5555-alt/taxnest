@@ -14,6 +14,33 @@
         </div>
     </div>
 
+    {{-- Agent Health (Task 629): silent-print shops whose Desktop Agent has been
+         offline > 2 hours — cashiers there are on Chrome popup fallback right now. --}}
+    @if(($offlineAgents ?? collect())->isNotEmpty())
+    <div class="bg-red-900/20 border border-red-800/60 rounded-xl p-4 mb-6">
+        <div class="flex items-center gap-2 mb-3">
+            <svg class="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+            <h2 class="text-sm font-bold text-red-300">Agent Health — {{ $offlineAgents->count() }} {{ $offlineAgents->count() === 1 ? 'shop' : 'shops' }} with Desktop Agent offline &gt; 2 hours (silent print enabled)</h2>
+        </div>
+        <div class="space-y-1.5">
+            @foreach($offlineAgents as $oa)
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <a href="{{ route('saas.admin.companies.show', $oa->id) }}" class="text-white font-semibold hover:text-red-300 transition">{{ $oa->name }}</a>
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-gray-800 text-gray-400">{{ $oa->product_type }}</span>
+                <span class="text-red-400">
+                    @if($oa->agent_last_seen)
+                        Last seen {{ $oa->agent_last_seen->diffForHumans() }} ({{ $oa->agent_last_seen->format('d M, h:i A') }})
+                    @else
+                        Agent never connected
+                    @endif
+                </span>
+                <span class="text-gray-500">Silent print: ON{{ $oa->agent_version ? ' · v'.$oa->agent_version : '' }}</span>
+            </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
+
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
         <form method="GET" class="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <input type="text" name="search" value="{{ request('search') }}" placeholder="Search name, NTN, owner..." class="w-full bg-gray-800 border border-gray-700 rounded-lg text-white text-sm px-4 py-2 focus:ring-2 focus:ring-indigo-500">
@@ -56,6 +83,11 @@
                     <tr class="hover:bg-gray-800/50">
                         <td class="px-4 py-3">
                             <a href="{{ route('saas.admin.companies.show', $company->id) }}" class="text-white font-medium hover:text-indigo-400 transition">{{ $company->name }}</a>
+                            @if($company->agentLongOffline())
+                            <span class="inline-flex items-center gap-1 ml-1 px-1.5 py-0.5 rounded bg-red-900/40 text-red-400 text-[10px] font-bold" title="Desktop Agent offline > 2 hours — silent print shop on popup fallback. Last seen: {{ $company->agent_last_seen ? $company->agent_last_seen->format('d M, h:i A') : 'never' }}">
+                                <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Agent Offline
+                            </span>
+                            @endif
                             <p class="text-[10px] text-gray-600 dark:text-gray-400">{{ $company->owner_name ?? '' }}</p>
                             {{-- Package picked at registration — what approval will activate for 1 year --}}
                             @if($company->status === 'pending' && $company->requestedPlan)

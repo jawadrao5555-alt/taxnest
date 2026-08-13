@@ -12,6 +12,8 @@ class FbrPosTransaction extends Model
         'subtotal', 'discount_type', 'discount_value', 'discount_amount',
         'tax_rate', 'tax_amount', 'fbr_service_charge', 'total_amount', 'payment_method',
         'status', 'fbr_invoice_number', 'fbr_status', 'fbr_response_code',
+        // Task 627: short human failure reason (timeout / HTTP code / FBR message) — F11 modal.
+        'fbr_error_message',
         'fbr_response', 'fbr_submission_hash', 'created_by',
         'share_token', 'share_token_created_at',
         // Phase 2 fields

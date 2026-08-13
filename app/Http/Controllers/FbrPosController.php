@@ -5282,7 +5282,7 @@ class FbrPosController extends Controller
             ->whereIn('fbr_status', ['failed', 'offline', 'pending'])
             ->orderBy('id', 'desc')
             ->limit(100)
-            ->get(['id', 'invoice_number', 'customer_name', 'total_amount', 'fbr_status', 'created_at']);
+            ->get(['id', 'invoice_number', 'customer_name', 'total_amount', 'fbr_status', 'fbr_response_code', 'fbr_error_message', 'created_at']);
 
         $mapBill = fn ($b) => [
             'id'             => (int) $b->id,
@@ -5290,6 +5290,9 @@ class FbrPosController extends Controller
             'customer_name'  => $b->customer_name,
             'total_amount'   => (float) $b->total_amount,
             'fbr_status'     => $b->fbr_status,
+            'error_code'     => $b->fbr_response_code,
+            // Task 627: asal wajah (timeout / HTTP code / FBR message) — F11 modal.
+            'error_message'  => $b->fbr_error_message,
             'created_human'  => $b->created_at?->diffForHumans(),
             'created_at'     => $b->created_at?->toDateTimeString(),
         ];
@@ -5302,7 +5305,7 @@ class FbrPosController extends Controller
             ->where('fbr_status', 'config_error')
             ->orderBy('id', 'desc')
             ->limit(20)
-            ->get(['id', 'invoice_number', 'customer_name', 'total_amount', 'fbr_status', 'created_at'])
+            ->get(['id', 'invoice_number', 'customer_name', 'total_amount', 'fbr_status', 'fbr_response_code', 'fbr_error_message', 'created_at'])
             ->map($mapBill);
 
         return response()->json([

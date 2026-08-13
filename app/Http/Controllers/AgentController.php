@@ -503,13 +503,13 @@ class AgentController extends Controller
             $response = $request->input('response');
             $code = is_array($response) ? ($response['Code'] ?? $response['response_code'] ?? $response['code'] ?? '100') : '100';
 
-            $txn->update([
+            $txn->update(array_merge([
                 'fbr_status' => 'submitted',
                 'fbr_invoice_number' => $fbrInvoiceNumber,
                 'fbr_response_code' => substr((string) $code, 0, 250),
                 'fbr_response' => is_array($response) ? $response : null,
                 'fbr_submission_hash' => null,
-            ]);
+            ], \App\Services\FbrService::fbrErrorPatch(null)));
 
             Log::info('Agent: FBR submission success', [
                 'company_id' => $company->id,
@@ -525,11 +525,15 @@ class AgentController extends Controller
                 || $this->isTransportError($errMsg);
             $newStatus = $transportError ? 'offline' : 'failed';
 
-            $txn->update([
+            // Task 627: asal wajah bill par save (F11 modal) — transport errors get the
+            // short Roman-Urdu reason, real FBR rejections keep the raw message.
+            $txn->update(array_merge([
                 'fbr_status' => $newStatus,
                 'fbr_response_code' => substr($errMsg, 0, 250),
                 'fbr_submission_hash' => null,
-            ]);
+            ], \App\Services\FbrService::fbrErrorPatch(
+                $transportError ? \App\Services\FbrService::shortFbrTransportError($errMsg) : $errMsg
+            )));
 
             Log::log($transportError ? 'info' : 'warning', 'Agent: FBR submission ' . ($transportError ? 'deferred (offline/IMS unreachable — queued)' : 'failed'), [
                 'company_id' => $company->id,

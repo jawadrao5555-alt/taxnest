@@ -1844,6 +1844,40 @@ class FbrService
         return $env === 'production' ? self::IMS_POS_PRODUCTION_URL : self::IMS_POS_SANDBOX_URL;
     }
 
+    /**
+     * Task 627: turn a raw transport error into a short cashier-readable reason.
+     * Roman-Urdu on purpose — this shows verbatim in the FBR F11 Failed Bills modal.
+     */
+    public static function shortFbrTransportError(string $errorMsg): string
+    {
+        $lower = strtolower($errorMsg);
+
+        if (str_contains($lower, 'timed out') || str_contains($lower, 'timeout')) {
+            return 'FBR server timeout — FBR ki taraf se masla, aapka token theek hai. Retry karein.';
+        }
+        if (str_contains($lower, 'tls connect error') || str_contains($lower, 'ssl')) {
+            return 'FBR server SSL/TLS error — FBR server se secure connection nahi bana.';
+        }
+        if (str_contains($lower, 'connection refused') || str_contains($lower, 'could not resolve') || str_contains($lower, 'no response')) {
+            return 'FBR server not reachable — internet ya FBR server down. Auto-retry hoga.';
+        }
+
+        return mb_substr($errorMsg, 0, 300);
+    }
+
+    /**
+     * Task 627: build the fbr_error_message part of a transaction update.
+     * hasColumn guard = prod-schema-drift-selfheal (live cPanel may lag the migration).
+     * Pass null to CLEAR the reason (success paths).
+     */
+    public static function fbrErrorPatch(?string $reason): array
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'fbr_error_message')) {
+            return [];
+        }
+        return ['fbr_error_message' => $reason === null ? null : mb_substr($reason, 0, 1000)];
+    }
+
     public function submitFbrPosTransaction(\App\Models\FbrPosTransaction $transaction): array
     {
         $company = $transaction->company;
@@ -1900,7 +1934,10 @@ class FbrService
                 'status' => 'failed',
                 'error_message' => 'FBR POS Registration ID (POSID) not configured. Set it in FBR Settings.',
             ]);
-            $transaction->update(['fbr_status' => 'config_error']);
+            $transaction->update(array_merge(
+                ['fbr_status' => 'config_error'],
+                self::fbrErrorPatch('FBR POS Registration ID (POSID) set nahi hai — FBR Settings mein add karein.')
+            ));
             return [
                 'status' => 'config_error',
                 'errors' => ['FBR POS Registration ID not set. Add it in FBR Settings before submitting.'],
@@ -1934,7 +1971,10 @@ class FbrService
                 'error_message' => 'FBR token not configured. Set up FBR credentials in company settings.',
             ]);
             // Permanent config error — same terminal-state logic as POSID missing above.
-            $transaction->update(['fbr_status' => 'config_error']);
+            $transaction->update(array_merge(
+                ['fbr_status' => 'config_error'],
+                self::fbrErrorPatch('FBR token configured nahi hai — company FBR settings mein token set karein.')
+            ));
             return [
                 'status' => 'config_error',
                 'errors' => ['FBR token not configured for this company.'],
@@ -1972,7 +2012,10 @@ class FbrService
                     'error_message' => 'FBR connection failed: ' . $curlError,
                     'response_code' => '0',
                 ]);
-                $transaction->update(['fbr_status' => 'failed']);
+                $transaction->update(array_merge(
+                    ['fbr_status' => 'failed'],
+                    self::fbrErrorPatch(self::shortFbrTransportError($curlError))
+                ));
                 return [
                     'status' => 'failed',
                     'errors' => ['FBR connection failed: ' . $curlError],
@@ -1990,7 +2033,10 @@ class FbrService
                     'response_code' => (string) $httpCode,
                     'error_message' => implode('; ', $errors),
                 ]);
-                $transaction->update(['fbr_status' => 'failed']);
+                $transaction->update(array_merge(
+                    ['fbr_status' => 'failed'],
+                    self::fbrErrorPatch('FBR HTTP ' . $httpCode . ' — ' . implode('; ', $errors))
+                ));
                 return [
                     'status' => 'failed',
                     'errors' => $errors,
@@ -2006,7 +2052,10 @@ class FbrService
                         'error_message' => 'FBR returned empty 200 response (WAF challenge). Retry later.',
                     ]);
                     $clearHashOnFailure();
-                    $transaction->update(['fbr_status' => 'pending']);
+                    $transaction->update(array_merge(
+                        ['fbr_status' => 'pending'],
+                        self::fbrErrorPatch('FBR ne khali 200 response bheja (WAF challenge) — auto-retry hoga.')
+                    ));
                     return [
                         'status' => 'retry',
                         'errors' => ['FBR returned empty response. May need retry.'],
@@ -2018,7 +2067,10 @@ class FbrService
                     'response_code' => (string) $httpCode,
                     'error_message' => 'FBR returned non-JSON: ' . substr($responseBody, 0, 500),
                 ]);
-                $transaction->update(['fbr_status' => 'failed']);
+                $transaction->update(array_merge(
+                    ['fbr_status' => 'failed'],
+                    self::fbrErrorPatch('FBR ne ghair-mutawaqqa (non-JSON) jawab bheja: ' . substr($responseBody, 0, 200))
+                ));
                 return [
                     'status' => 'failed',
                     'errors' => ['FBR returned unexpected response format.'],
@@ -2029,12 +2081,12 @@ class FbrService
 
             if ($fbrResult['valid']) {
                 $fbrInvoiceNumber = $fbrResult['invoiceNumber'];
-                $transaction->update([
+                $transaction->update(array_merge([
                     'fbr_invoice_number' => $fbrInvoiceNumber,
                     'fbr_status' => 'submitted',
                     'fbr_response_code' => '100',
                     'fbr_response' => $responseData,
-                ]);
+                ], self::fbrErrorPatch(null)));
                 $log->update([
                     'status' => 'success',
                     'response_payload' => $responseData,
@@ -2060,10 +2112,10 @@ class FbrService
                 'response_code' => (string) ($responseData['Code'] ?? 'unknown'),
                 'error_message' => implode('; ', $fbrResult['errors']),
             ]);
-            $transaction->update([
+            $transaction->update(array_merge([
                 'fbr_status' => 'failed',
                 'fbr_response' => $responseData,
-            ]);
+            ], self::fbrErrorPatch('FBR rejection: ' . implode('; ', $fbrResult['errors']))));
 
             return [
                 'status' => 'failed',
@@ -2077,7 +2129,10 @@ class FbrService
                 'status' => 'failed',
                 'error_message' => $e->getMessage(),
             ]);
-            $transaction->update(['fbr_status' => 'failed']);
+            $transaction->update(array_merge(
+                ['fbr_status' => 'failed'],
+                self::fbrErrorPatch(self::shortFbrTransportError($e->getMessage()))
+            ));
 
             Log::error("FBR POS submission exception for Transaction #{$transaction->id}", [
                 'error' => $e->getMessage(),

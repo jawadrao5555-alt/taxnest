@@ -1836,7 +1836,12 @@ window.addEventListener('popstate', function() {
                             <span class="text-sm font-bold text-red-700 dark:text-red-400" x-text="'Rs. ' + Number(bill.total_amount).toLocaleString()"></span>
                         </div>
                         <p class="text-[11px] text-gray-500 ml-7 mb-1" x-text="bill.items_count + window.TXT.sfx_item_s_dot + bill.created_human"></p>
-                        <template x-if="bill.error_code">
+                        {{-- Task 627: asal wajah (FBR timeout / server error) — human message pehle, warna raw code. --}}
+                        <template x-if="bill.error_message">
+                            <p class="text-[10px] text-red-600 dark:text-red-400 ml-7 mb-2 leading-snug" x-text="'⚠ ' + bill.error_message"></p>
+                        </template>
+                        {{-- Raw response code hamesha dikhe (reviewer: generic message ke saath bhi code na chhupe) --}}
+                        <template x-if="bill.error_code && (!bill.error_message || !String(bill.error_message).includes(String(bill.error_code)))">
                             <p class="text-[10px] text-red-500 ml-7 mb-2 font-mono truncate" x-text="'⚠ ' + bill.error_code"></p>
                         </template>
                         <div class="flex gap-2 ml-7 mt-2">
@@ -1871,6 +1876,10 @@ window.addEventListener('popstate', function() {
                                 <span class="text-xs font-bold text-gray-800 dark:text-gray-200" x-text="bill.invoice_number"></span>
                                 <span class="ml-1 text-[10px] text-gray-500" x-text="'Rs. ' + Number(bill.total_amount).toLocaleString()"></span>
                                 <span class="ml-1 text-[9px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 font-bold">Settings Error</span>
+                                {{-- Task 627: asal wajah (kaun si setting missing hai) --}}
+                                <template x-if="bill.error_message">
+                                    <p class="text-[10px] text-orange-600 dark:text-orange-400 leading-snug" x-text="'⚠ ' + bill.error_message"></p>
+                                </template>
                             </div>
                             <button @click="retryFailed(bill)" :disabled="bill._retrying" title="{{ __('pos.retry_after_fix_title') }}"
                                 class="shrink-0 px-2.5 py-1 text-[10px] font-bold text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition disabled:opacity-40 flex items-center gap-1">

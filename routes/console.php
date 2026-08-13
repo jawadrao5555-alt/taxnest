@@ -151,6 +151,11 @@ Schedule::command('import-batches:prune')->dailyAt('04:45');
 // (6 AM next-morning rule, owner 23 Jul 2026 — a day closes at 6:00 AM the next
 // morning if nobody closed it manually; before 6 AM yesterday stays open).
 Schedule::command('pos:auto-dayclose')->hourly()->withoutOverlapping();
+// Owner-facing agent-offline alert (Task 630, Frost & Brew): silent-print POS
+// shops whose Desktop Agent has been offline >2h get ONE email per outage
+// ("PC/agent chalu karein") — dedup via agent_offline_notified_at, cleared on
+// the next heartbeat. Every 30 min keeps detection prompt without hammering.
+Schedule::command('pos:agent-offline-alerts')->everyThirtyMinutes()->withoutOverlapping();
 // Cloudflare guard: Rocket Loader rewrites inline scripts and kills the POS
 // sale screen's Alpine boot. Every 30 min: GET the live homepage; if the
 // rocket-loader injection marker is found the command auto-turns it OFF via

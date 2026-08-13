@@ -266,17 +266,13 @@
             <svg class="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm0 18.03c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.26 8.26 0 01-1.26-4.38c0-4.54 3.7-8.24 8.25-8.24 4.54 0 8.24 3.7 8.24 8.24s-3.7 8.24-8.24 8.24z"/></svg>
             WhatsApp Alerts (TaxNest Central Number)
         </h2>
-        @php
-            // Deliberate Roman Urdu (owner-facing saas-admin only) + the VERBATIM Meta
-            // template body — kept in @php so the deploy Roman-Urdu scan (which guards
-            // CUSTOMER-visible English mode) doesn't block deploys.
-            $waIntroLine = 'Owner alerts (jaise Desktop Agent offline) TaxNest ke APNE WhatsApp Business number se bheje jate hain — companies ke buyer-invoice WhatsApp credentials se bilkul alag.';
-            $waTemplateBody = '"{{1}} — aap ka NestPOS Desktop Agent {{2}} ghante se offline hai (aakhri raabta: {{3}}). PC/agent chalu karein warna bills silent-print nahi hon ge."';
-        @endphp
+        {{-- Owner-facing saas-admin has no locale system — force the 'rur' (Roman
+             Urdu) lang keys so the owner keeps the Roman Urdu intro + the VERBATIM
+             Meta template body while the deploy Roman-Urdu scan stays clean (Task 650). --}}
         <p class="text-[11px] text-gray-500 mb-4">
-            {{ $waIntroLine }}
+            {{ __('pos.admin_wa_intro', [], 'rur') }}
             Requires a Meta Business account with an approved UTILITY template. Default template <span class="font-mono">agent_offline_alert</span> body:
-            <span class="font-mono text-gray-400">{{ $waTemplateBody }}</span>
+            <span class="font-mono text-gray-400">{{ __('pos.admin_wa_template_body', [], 'rur') }}</span>
             When disabled or unconfigured, alerts go by email only (current behaviour).
         </p>
 

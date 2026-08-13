@@ -10,15 +10,11 @@
         <div class="flex items-center gap-3">
             <svg class="w-6 h-6 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
             <div class="min-w-0">
-                @php
-                    // Deliberate Roman Urdu (owner-facing saas-admin only — no locale
-                    // system here). Kept in @php so the deploy Roman-Urdu scan (which
-                    // guards CUSTOMER-visible English mode) doesn't block deploys.
-                    $agentAlertTitle = 'Agent Health: ' . $offlineAgentCount . ' ' . ($offlineAgentCount === 1 ? 'shop ka' : 'shops ka') . ' Desktop Agent offline hai (> 2 hours)';
-                    $agentAlertSub = 'Silent printing wahan band hai — cashiers Chrome print popup par gir gaye hain. Details ke liye click karein →';
-                @endphp
-                <p class="text-sm font-bold text-red-300">{{ $agentAlertTitle }}</p>
-                <p class="text-xs text-red-400/80 mt-0.5">{{ $agentAlertSub }}</p>
+                {{-- Owner-facing saas-admin has no locale system — force the 'rur'
+                     (Roman Urdu) lang keys so the owner keeps the Roman Urdu text
+                     while the deploy Roman-Urdu scan stays clean (Task 650). --}}
+                <p class="text-sm font-bold text-red-300">{{ __($offlineAgentCount === 1 ? 'pos.admin_agent_offline_title_one' : 'pos.admin_agent_offline_title_many', ['count' => $offlineAgentCount], 'rur') }}</p>
+                <p class="text-xs text-red-400/80 mt-0.5">{{ __('pos.admin_agent_offline_sub', [], 'rur') }}</p>
             </div>
         </div>
     </a>

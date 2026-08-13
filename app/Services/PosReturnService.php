@@ -323,6 +323,16 @@ class PosReturnService
         if (empty($result['praEligible']) || empty($result['return'])) {
             return;
         }
+        // ENTERPRISE SAFE MODE (Task 639, mirrors 637/638 retry fix): when the
+        // desktop agent handles PRA submission (Agent Sync or fiscal-device),
+        // NEVER curl PRA cloud from the server at bill time — the US-IP hop
+        // freezes the cashier ~8s. The row is already 'pending', so the agent
+        // picks it up on its next poll. fiscal_device would self-queue inside
+        // sendInvoice anyway, but agent_enabled cloud mode would NOT.
+        $company = $result['company'] ?? null;
+        if ($company && $company->agentHandlesPra()) {
+            return;
+        }
         try {
             $svc = new PraIntegrationService($result['company']);
             $svc->sendInvoice($result['return']->fresh());

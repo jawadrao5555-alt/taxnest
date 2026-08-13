@@ -581,6 +581,37 @@ class PosPraReturnFlowTest extends TestCase
             'no NEW pra_logs row from the retry = sendInvoice() (and its PRA HTTP call) was never attempted');
     }
 
+    public function test_agent_sync_return_creation_requeues_without_pra_http_call(): void
+    {
+        // ENTERPRISE SAFE MODE (Task 639): CREATING a credit note on an Agent
+        // Sync (cloud + agent_enabled) company must NOT curl PRA cloud from the
+        // server post-commit — same ~8s freeze the retry fix (638) removed.
+        // submitToPraPostCommit must skip sendInvoice when agentHandlesPra();
+        // the row stays 'pending' for the desktop agent. Spy: cloud-mode
+        // sendInvoice() writes a pra_logs row BEFORE curling, so zero new rows
+        // proves it was never entered.
+        $this->ensurePraLogsTable();
+        DB::table('companies')->where('id', $this->companyId)->update([
+            'pra_reporting_enabled' => 1,
+            'pra_connection_mode' => 'cloud',
+            'agent_enabled' => 1,
+            'agent_submits_pra' => 1,
+        ]);
+        $this->actAs('pos_admin');
+        $parent = $this->seedParent(['pra_invoice_number' => 'PRA-USIN-639']);
+        $ids = $this->itemIds($parent);
+        $logsBefore = DB::table('pra_logs')->count();
+
+        $this->postReturn($parent, [['item_id' => $ids[0], 'return_qty' => 1]]);
+
+        $ret = $this->returnRows($parent)->first();
+        $this->assertNotNull($ret, 'return bill must still be created');
+        $this->assertSame('pending', $ret->pra_status,
+            'return must stay queued as pending for the desktop agent');
+        $this->assertSame($logsBefore, DB::table('pra_logs')->count(),
+            'no NEW pra_logs row from creation = sendInvoice() (and its PRA HTTP call) was never attempted');
+    }
+
     public function test_direct_production_return_retry_still_goes_through_send_invoice(): void
     {
         // Companion pin: a Direct Production company (no agent) must still enter

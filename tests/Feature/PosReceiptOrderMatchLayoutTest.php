@@ -176,6 +176,36 @@ class PosReceiptOrderMatchLayoutTest extends TestCase
             );
             // Token mode never prints the short code
             $this->assertStringNotContainsString(self::SHORT_CODE, $body, "no short code in token mode ({$template})");
+            // Task 649: the queue-number caption prints under the token box, exactly once.
+            $caption = __('pos.order_match_token_caption');
+            $this->assertStringContainsString($caption, $body, "queue-number caption prints ({$template})");
+            $this->assertSame(1, substr_count($body, $caption), "caption prints exactly once ({$template})");
+        }
+    }
+
+    // ── Task 649: token caption locale rendering ──────────────────────────
+
+    public function test_token_caption_renders_in_every_pos_locale(): void
+    {
+        $this->linkOrder(tokenNo: 42);
+
+        $original = app()->getLocale();
+        try {
+            foreach (['en', 'rur', 'ur'] as $locale) {
+                app()->setLocale($locale);
+                $expected = trans('pos.order_match_token_caption', [], $locale);
+                $this->assertNotSame('pos.order_match_token_caption', $expected, "caption key exists in {$locale}");
+
+                foreach (self::TEMPLATES as $template) {
+                    $company = $this->makeCompany('token');
+                    $txn = $this->makeTransaction($company);
+
+                    $body = $this->body($this->render($template, $company, $txn));
+                    $this->assertStringContainsString($expected, $body, "caption renders in {$locale} ({$template})");
+                }
+            }
+        } finally {
+            app()->setLocale($original);
         }
     }
 
@@ -192,6 +222,7 @@ class PosReceiptOrderMatchLayoutTest extends TestCase
 
             $this->assertStringNotContainsString(__('pos.order_match_token_label'), $body, "no empty token box ({$template})");
             $this->assertStringNotContainsString($this->boxFingerprint($template), $body, "no bordered om box ({$template})");
+            $this->assertStringNotContainsString(__('pos.order_match_token_caption'), $body, "no token caption without a token ({$template})");
         }
     }
 
@@ -209,8 +240,9 @@ class PosReceiptOrderMatchLayoutTest extends TestCase
 
             $this->assertStringContainsString(self::SHORT_CODE, $body, "short code prints ({$template})");
             $this->assertStringContainsString($this->boxFingerprint($template), $body, "code rides the bordered box ({$template})");
-            // Code mode never prints the token label
+            // Code mode never prints the token label — nor the token caption (Task 649)
             $this->assertStringNotContainsString(__('pos.order_match_token_label'), $body, "no TOKEN label in code mode ({$template})");
+            $this->assertStringNotContainsString(__('pos.order_match_token_caption'), $body, "no token caption in code mode ({$template})");
         }
     }
 
@@ -315,6 +347,7 @@ class PosReceiptOrderMatchLayoutTest extends TestCase
             $this->assertStringNotContainsString(__('pos.order_match_token_label'), $body, "no token box when off ({$template})");
             $this->assertStringNotContainsString(self::SHORT_CODE, $body, "no short code when off ({$template})");
             $this->assertStringNotContainsString($this->boxFingerprint($template), $body, "no bordered om box when off ({$template})");
+            $this->assertStringNotContainsString(__('pos.order_match_token_caption'), $body, "no token caption when off ({$template})");
         }
     }
 

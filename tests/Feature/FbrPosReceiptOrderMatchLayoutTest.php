@@ -156,6 +156,34 @@ class FbrPosReceiptOrderMatchLayoutTest extends TestCase
                 $body,
                 "TOKEN 42 rides inside the bordered box ({$paper})"
             );
+            // Task 649: the queue-number caption prints under the token box, exactly once.
+            $caption = __('pos.order_match_token_caption');
+            $this->assertStringContainsString($caption, $body, "queue-number caption prints ({$paper})");
+            $this->assertSame(1, substr_count($body, $caption), "caption prints exactly once ({$paper})");
+        }
+    }
+
+    // ── Task 649: token caption locale rendering ──────────────────────────
+
+    public function test_token_caption_renders_in_every_pos_locale(): void
+    {
+        $original = app()->getLocale();
+        try {
+            foreach (['en', 'rur', 'ur'] as $locale) {
+                app()->setLocale($locale);
+                $expected = trans('pos.order_match_token_caption', [], $locale);
+                $this->assertNotSame('pos.order_match_token_caption', $expected, "caption key exists in {$locale}");
+
+                foreach (self::PAPERS as $paper) {
+                    $company = $this->makeCompany('token', $paper);
+                    $txn = $this->makeTransaction($company, tokenNo: 42);
+
+                    $body = $this->renderBody($company, $txn);
+                    $this->assertStringContainsString($expected, $body, "caption renders in {$locale} ({$paper})");
+                }
+            }
+        } finally {
+            app()->setLocale($original);
         }
     }
 
@@ -185,6 +213,7 @@ class FbrPosReceiptOrderMatchLayoutTest extends TestCase
 
             $this->assertStringNotContainsString(__('pos.order_match_token_label'), $body, "no empty token box ({$paper})");
             $this->assertStringNotContainsString($this->boxFingerprint($paper), $body, "no bordered om box ({$paper})");
+            $this->assertStringNotContainsString(__('pos.order_match_token_caption'), $body, "no token caption without a token ({$paper})");
         }
     }
 
@@ -208,8 +237,9 @@ class FbrPosReceiptOrderMatchLayoutTest extends TestCase
                 $body,
                 "code rides inside the bordered box ({$paper})"
             );
-            // Code mode never prints the token label
+            // Code mode never prints the token label — nor the token caption (Task 649)
             $this->assertStringNotContainsString(__('pos.order_match_token_label'), $body, "no TOKEN label in code mode ({$paper})");
+            $this->assertStringNotContainsString(__('pos.order_match_token_caption'), $body, "no token caption in code mode ({$paper})");
         }
     }
 
@@ -252,6 +282,7 @@ class FbrPosReceiptOrderMatchLayoutTest extends TestCase
             $this->assertStringNotContainsString(__('pos.order_match_token_label'), $body, "no token box when off ({$paper})");
             $this->assertStringNotContainsString(self::ORDER_CODE, $body, "no order code when off ({$paper})");
             $this->assertStringNotContainsString($this->boxFingerprint($paper), $body, "no bordered om box when off ({$paper})");
+            $this->assertStringNotContainsString(__('pos.order_match_token_caption'), $body, "no token caption when off ({$paper})");
         }
     }
 }

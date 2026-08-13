@@ -230,6 +230,7 @@
     @if($omRcptToken)
     <div style="text-align:center; margin:5px 0 3px;">
         <span style="display:inline-block; border:2px solid #000; padding:2px {{ $is58 ? '10px' : '14px' }}; font-size:{{ $is58 ? '14px' : '16px' }}; font-weight:900; color:#000;">{{ __('pos.order_match_token_label') }} {{ $omRcptToken }}</span>
+        <div style="font-size:{{ $is58 ? '8px' : '9px' }}; font-weight:400; padding-top:1px;">{{ __('pos.order_match_token_caption') }}</div>
     </div>
     @elseif($omRcptCode)
     <div style="text-align:center; margin:5px 0 3px;">

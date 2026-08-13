@@ -302,6 +302,48 @@
     </table>
     @endif
 
+    {{-- ═══ Staff Attendance / Hazri (Task #561 — FBR mirror of the PRA section) ═══
+         From pos_user_sessions: first login, last logout (or last-seen when
+         Logout was never pressed), bills + first/last sale per staff member. --}}
+    @if(!empty($hazri))
+    <div class="section-title">{{ __('pos.dcp_staff_attendance') }}</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>{{ __('pos.dcp_staff') }}</th>
+                <th class="c">{{ __('pos.dcp_first_in') }}</th>
+                <th class="c">{{ __('pos.dcp_last_out') }}</th>
+                <th class="c">{{ __('pos.dcp_logins') }}</th>
+                <th class="c">{{ __('pos.dcp_bills') }}</th>
+                <th class="c">{{ __('pos.dcp_first_sale') }}</th>
+                <th class="c">{{ __('pos.dcp_last_sale') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($hazri as $h)
+            <tr>
+                <td>{{ $h->name }}</td>
+                <td class="c">{{ $h->first_in ? \Carbon\Carbon::parse($h->first_in)->format('h:i A') : '-' }}</td>
+                <td class="c">
+                    @if($h->last_out)
+                        {{ \Carbon\Carbon::parse($h->last_out)->format('h:i A') }}
+                    @elseif($h->last_seen)
+                        {{ \Carbon\Carbon::parse($h->last_seen)->format('h:i A') }}*
+                    @else
+                        -
+                    @endif
+                </td>
+                <td class="c">{{ $h->session_count }}</td>
+                <td class="c">{{ $h->bill_count }}</td>
+                <td class="c">{{ $h->first_sale ? \Carbon\Carbon::parse($h->first_sale)->format('h:i A') : '-' }}</td>
+                <td class="c">{{ $h->last_sale ? \Carbon\Carbon::parse($h->last_sale)->format('h:i A') : '-' }}</td>
+            </tr>
+            @endforeach
+        </tbody>
+    </table>
+    <div style="font-size:8px; color:#6b7280; margin-top:2px;">{{ __('pos.dcp_no_logout_note') }}</div>
+    @endif
+
     @if($analytics->top_products->isNotEmpty())
     <div class="section-title">{{ __('pos.dc_top_products') }}</div>
     <table class="data">

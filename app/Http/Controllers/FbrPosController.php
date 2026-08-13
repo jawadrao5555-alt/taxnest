@@ -4328,9 +4328,15 @@ class FbrPosController extends Controller
             ? (float) $report->other_amount
             : max(0.0, (float) $report->other_amount - $derivedUdhaarAmount);
 
+        // Staff Hazri section (Task #561 — FBR mirror of the PRA day-close PDF).
+        // Same plan gate as the hazri report page; builder returns [] on any error.
+        $hazri = $this->fbrPlanAllows('hazri_enabled')
+            ? $this->buildFbrHazriRows($companyId, $report->report_date->toDateString())
+            : [];
+
         return $this->renderReportPdf(
             'fbr-pos.day-close-pdf',
-            compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'displayUdhaar', 'displayOther'),
+            compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'displayUdhaar', 'displayOther', 'hazri'),
             "Day-Close-{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf"
         );
     }
@@ -4371,7 +4377,12 @@ class FbrPosController extends Controller
             ? (float) $report->other_amount
             : max(0.0, (float) $report->other_amount - $derivedUdhaarAmount);
 
-        return view('fbr-pos.day-close-thermal', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'displayUdhaar', 'displayOther'));
+        // Staff Hazri section (Task #561 — FBR mirror of the PRA thermal Z-report).
+        $hazri = $this->fbrPlanAllows('hazri_enabled')
+            ? $this->buildFbrHazriRows($companyId, $report->report_date->toDateString())
+            : [];
+
+        return view('fbr-pos.day-close-thermal', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'displayUdhaar', 'displayOther', 'hazri'));
     }
 
     public function products(Request $request)

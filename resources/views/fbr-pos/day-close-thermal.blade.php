@@ -172,6 +172,21 @@
     <div class="hr"></div>
     @endif
 
+    {{-- Staff Attendance / Hazri (Task #561 — FBR mirror of the PRA section).
+         * = no logout pressed — last activity time shown instead. --}}
+    @if(!empty($hazri))
+    <div class="sec">{{ __('pos.dc_staff_hazri') }}</div>
+    <table>
+        @foreach($hazri as $h)
+        <tr>
+            <td>{{ \Illuminate\Support\Str::limit($h->name, 14) }}</td>
+            <td class="r">{{ $h->first_in ? \Carbon\Carbon::parse($h->first_in)->format('h:iA') : '-' }} &rarr; {{ $h->last_out ? \Carbon\Carbon::parse($h->last_out)->format('h:iA') : ($h->last_seen ? \Carbon\Carbon::parse($h->last_seen)->format('h:iA') . '*' : '-') }} &middot; {{ $h->bill_count }} {{ __('pos.dcp_bills_word') }}</td>
+        </tr>
+        @endforeach
+    </table>
+    <div class="hr"></div>
+    @endif
+
     <div class="sec">{{ __('pos.dc_stats') }}</div>
     <table>
         <tr><td>{{ __('pos.dc_avg_bill') }}</td><td class="r">{{ number_format($analytics->avg_bill, 2) }}</td></tr>

@@ -4446,4 +4446,10 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'wastage_only_filter' => 'Wastage only',
     'receipt_credit_note' => 'CREDIT NOTE / RETURN',
     'invoice_submitted_pra_num' => 'Invoice submitted to PRA. PRA Fiscal #: :number',
+    // saas-admin owner-facing texts (Task 650) — rendered with forced 'rur' locale
+    'admin_agent_offline_title_one' => 'Agent Health: :count shop\'s Desktop Agent is offline (> 2 hours)',
+    'admin_agent_offline_title_many' => 'Agent Health: :count shops\' Desktop Agents are offline (> 2 hours)',
+    'admin_agent_offline_sub' => 'Silent printing is down there — cashiers have fallen back to the Chrome print popup. Click for details →',
+    'admin_wa_intro' => 'Owner alerts (such as Desktop Agent offline) are sent from TaxNest\'s OWN WhatsApp Business number — completely separate from companies\' buyer-invoice WhatsApp credentials.',
+    'admin_wa_template_body' => '"{{1}} — your NestPOS Desktop Agent has been offline for {{2}} hours (last contact: {{3}}). Start the PC/agent or bills will not silent-print."',
 ];

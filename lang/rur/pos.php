@@ -4446,4 +4446,10 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'wastage_only_filter' => 'Sirf wastage',
     'receipt_credit_note' => 'CREDIT NOTE / WAPSI',
     'invoice_submitted_pra_num' => 'Invoice PRA ko submit ho gayi. PRA Fiscal #: :number',
+    // saas-admin owner-facing texts (Task 650) — rendered with forced 'rur' locale
+    'admin_agent_offline_title_one' => 'Agent Health: :count shop ka Desktop Agent offline hai (> 2 hours)',
+    'admin_agent_offline_title_many' => 'Agent Health: :count shops ka Desktop Agent offline hai (> 2 hours)',
+    'admin_agent_offline_sub' => 'Silent printing wahan band hai — cashiers Chrome print popup par gir gaye hain. Details ke liye click karein →',
+    'admin_wa_intro' => 'Owner alerts (jaise Desktop Agent offline) TaxNest ke APNE WhatsApp Business number se bheje jate hain — companies ke buyer-invoice WhatsApp credentials se bilkul alag.',
+    'admin_wa_template_body' => '"{{1}} — aap ka NestPOS Desktop Agent {{2}} ghante se offline hai (aakhri raabta: {{3}}). PC/agent chalu karein warna bills silent-print nahi hon ge."',
 ];

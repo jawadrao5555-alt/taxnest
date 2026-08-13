@@ -56,6 +56,8 @@ class PosPraReturnFlowTest extends TestCase
             $table->string('name');
             $table->boolean('pra_reporting_enabled')->default(false);
             $table->string('pra_connection_mode')->nullable();
+            $table->boolean('agent_enabled')->default(false);
+            $table->boolean('agent_submits_pra')->default(false);
             $table->boolean('inventory_enabled')->default(false);
             $table->boolean('pos_setup_completed')->default(true);
             $table->softDeletes();
@@ -86,6 +88,7 @@ class PosPraReturnFlowTest extends TestCase
             $table->string('status');
             $table->string('invoice_mode')->nullable();
             $table->string('pra_status')->nullable();
+            $table->string('pra_response_code')->nullable();
             $table->string('pra_invoice_number')->nullable();
             $table->boolean('is_archived')->default(false);
             $table->unsignedBigInteger('customer_id')->nullable();
@@ -511,6 +514,99 @@ class PosPraReturnFlowTest extends TestCase
         $this->actAs('pos_cashier');
         $cashierHtml = view('pos.transaction-show', ['transaction' => $fresh()])->render();
         $this->assertStringNotContainsString('retry-pra', $cashierHtml, 'cashier must see the return row but NO retry/sync button');
+    }
+
+    // ── 4b. Agent Sync vs Direct Production retry (Task 638) ────────────────
+
+    protected function seedFailedReturn(): PosTransaction
+    {
+        $parent = $this->seedParent(['pra_status' => 'submitted', 'pra_invoice_number' => 'PRA-FISCAL-638']);
+        $ids = $this->itemIds($parent);
+        $this->postReturn($parent, [['item_id' => $ids[0], 'return_qty' => 1]]);
+        $ret = $this->returnRows($parent)->first();
+        $this->assertNotNull($ret);
+        DB::table('pos_transactions')->where('id', $ret->id)
+            ->update(['pra_status' => 'failed', 'pra_response_code' => '102']);
+        // Drop any flash the return POST left behind so the retry's own flash
+        // is the only thing the assertions can see.
+        session()->flush();
+
+        return $ret;
+    }
+
+    protected function ensurePraLogsTable(): void
+    {
+        if (!Schema::hasTable('pra_logs')) {
+            Schema::create('pra_logs', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('company_id')->nullable();
+                $table->unsignedBigInteger('transaction_id')->nullable();
+                $table->text('request_payload')->nullable();
+                $table->text('response_payload')->nullable();
+                $table->string('response_code')->nullable();
+                $table->string('status')->nullable();
+                $table->timestamps();
+            });
+        }
+    }
+
+    public function test_agent_sync_return_retry_requeues_without_pra_http_call(): void
+    {
+        // ENTERPRISE SAFE MODE (Task 637/638): an Agent Sync company retrying a
+        // failed credit note must return INSTANTLY — re-queue as 'pending' for
+        // the desktop agent, NEVER curl PRA cloud from the server (US IP = ~8s
+        // cashier-facing freeze). Spy: every cloud-mode sendInvoice() writes a
+        // pra_logs row BEFORE curling, so zero rows + the requeue flash proves
+        // sendInvoice was never entered.
+        $this->ensurePraLogsTable();
+        DB::table('companies')->where('id', $this->companyId)->update([
+            'pra_reporting_enabled' => 1,
+            'pra_connection_mode' => 'cloud',
+            'agent_enabled' => 1,
+            'agent_submits_pra' => 1,
+        ]);
+        $this->actAs('pos_admin');
+        $ret = $this->seedFailedReturn();
+        $logsBefore = DB::table('pra_logs')->count();
+
+        $resp = (new \App\Http\Controllers\PosController())->retryPra($ret->id);
+
+        $this->assertTrue($resp->isRedirect());
+        $this->assertSame(__('pos.requeued_desktop_agent'), session()->get('success'),
+            'agent-sync return retry must flash the requeue success, not a PRA result');
+        $fresh = $ret->fresh();
+        $this->assertSame('pending', $fresh->pra_status, 'return row must be re-queued for the agent');
+        $this->assertNull($fresh->pra_response_code, 'stale failure code must be cleared on requeue');
+        $this->assertSame($logsBefore, DB::table('pra_logs')->count(),
+            'no NEW pra_logs row from the retry = sendInvoice() (and its PRA HTTP call) was never attempted');
+    }
+
+    public function test_direct_production_return_retry_still_goes_through_send_invoice(): void
+    {
+        // Companion pin: a Direct Production company (no agent) must still enter
+        // PraIntegrationService::sendInvoice(). Reporting is left OFF so
+        // sendInvoice's own isEnabled() guard bounces it back with its literal
+        // "PRA reporting is disabled" message BEFORE any network call — that
+        // exact flash proves the call site was reached (a requeue would have
+        // flashed pos.requeued_desktop_agent instead).
+        $this->ensurePraLogsTable();
+        DB::table('companies')->where('id', $this->companyId)->update([
+            'pra_reporting_enabled' => 0,
+            'pra_connection_mode' => 'cloud',
+            'agent_enabled' => 0,
+            'agent_submits_pra' => 0,
+        ]);
+        $this->actAs('pos_admin');
+        $ret = $this->seedFailedReturn();
+
+        $resp = (new \App\Http\Controllers\PosController())->retryPra($ret->id);
+
+        $this->assertTrue($resp->isRedirect());
+        $this->assertNull(session()->get('success'), 'direct company must NOT get the agent requeue success');
+        $this->assertSame('PRA reporting is disabled', session()->get('error'),
+            'sendInvoice() must have been entered (its isEnabled() message surfaced)');
+        $this->assertSame('failed', $ret->fresh()->pra_status,
+            'sendInvoice early-guard path must leave the row untouched');
     }
 
     // ── 5. stock symmetry ────────────────────────────────────────────────────

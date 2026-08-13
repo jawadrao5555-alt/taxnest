@@ -48,6 +48,10 @@ class PosRestaurantOrderCancelTest extends TestCase
             $table->string('name');
             $table->boolean('pra_reporting_enabled')->default(false);
             $table->boolean('inventory_enabled')->default(false);
+            // Task #643: cashier order-cancel company switch (default OFF).
+            $table->boolean('pos_cashier_order_cancel')->default(false);
+            // Internal account → planAllows() passes → Custom Access sets are live.
+            $table->boolean('is_internal_account')->default(false);
             $table->softDeletes();
             $table->timestamps();
         });
@@ -58,6 +62,7 @@ class PosRestaurantOrderCancelTest extends TestCase
             $table->string('name')->nullable();
             $table->string('role')->nullable();
             $table->string('pos_role')->nullable();
+            $table->text('pos_custom_access')->nullable();
             $table->timestamps();
         });
 
@@ -110,6 +115,7 @@ class PosRestaurantOrderCancelTest extends TestCase
 
         $this->companyId = DB::table('companies')->insertGetId([
             'name' => 'Karahi House',
+            'is_internal_account' => true,
             'created_at' => now(), 'updated_at' => now(),
         ]);
         app()->bind('currentCompanyId', fn () => $this->companyId);
@@ -166,6 +172,12 @@ class PosRestaurantOrderCancelTest extends TestCase
         ]);
     }
 
+    /** Task #643: flip the company switch so a plain cashier may cancel. */
+    protected function allowCashierCancel(): void
+    {
+        DB::table('companies')->where('id', $this->companyId)->update(['pos_cashier_order_cancel' => true]);
+    }
+
     protected function cancel(int $orderId, array $payload = []): \Illuminate\Http\JsonResponse
     {
         $request = Request::create('/pos/restaurant/orders/' . $orderId, 'DELETE', $payload);
@@ -189,6 +201,7 @@ class PosRestaurantOrderCancelTest extends TestCase
     {
         $waiter = $this->makeUser('pos_waiter', 'Waiter Wali');
         $cashier = $this->actAs($this->makeUser('pos_cashier', 'Cashier Chacha'));
+        $this->allowCashierCancel();
 
         $tableId = $this->table('occupied');
         $orderId = $this->order(['table_id' => $tableId, 'created_by' => $waiter->id]);
@@ -235,6 +248,7 @@ class PosRestaurantOrderCancelTest extends TestCase
     public function test_cancel_takeaway_and_delivery_orders_soft_cancels_with_audit_stamps(): void
     {
         $cashier = $this->actAs($this->makeUser('pos_cashier'));
+        $this->allowCashierCancel();
 
         // Takeaway/delivery board orders: pos-source, no table, typed.
         $takeawayId = $this->order(['source' => 'pos', 'order_type' => 'takeaway', 'table_id' => null]);
@@ -323,6 +337,7 @@ class PosRestaurantOrderCancelTest extends TestCase
     {
         $waiter = $this->makeUser('pos_waiter');
         $cashier = $this->actAs($this->makeUser('pos_cashier'));
+        $this->allowCashierCancel();
 
         $cancelledId = $this->order(['created_by' => $waiter->id]);
         $liveId = $this->order(['created_by' => $waiter->id]);
@@ -350,5 +365,70 @@ class PosRestaurantOrderCancelTest extends TestCase
         $claim = $waiterController->claimIncoming(Request::create('/', 'POST'), $liveId);
         $this->assertSame(200, $claim->getStatusCode());
         $this->assertEquals($cashier->id, DB::table('restaurant_orders')->find($liveId)->assigned_cashier_id);
+    }
+
+    // ── Task #643: role gating (cashier deny by default, admin/manager allow) ──
+
+    public function test_cashier_cancel_denied_by_default_403(): void
+    {
+        $waiter = $this->makeUser('pos_waiter');
+        $this->actAs($this->makeUser('pos_cashier'));
+
+        $orderId = $this->order(['created_by' => $waiter->id]);
+
+        $response = $this->cancel($orderId);
+
+        $this->assertSame(403, $response->getStatusCode());
+        $this->assertFalse($response->getData()->success);
+        // Order untouched — still held, no cancel audit stamps.
+        $row = DB::table('restaurant_orders')->find($orderId);
+        $this->assertSame('held', $row->status);
+        $this->assertNull($row->cancelled_at);
+    }
+
+    public function test_manager_and_admin_can_cancel_without_toggle(): void
+    {
+        $waiter = $this->makeUser('pos_waiter');
+        foreach (['pos_manager', 'pos_admin'] as $role) {
+            $this->actAs($this->makeUser($role));
+            $orderId = $this->order(['created_by' => $waiter->id]);
+            $response = $this->cancel($orderId);
+            $this->assertSame(200, $response->getStatusCode(), $role);
+            $this->assertSame('cancelled', DB::table('restaurant_orders')->find($orderId)->status, $role);
+        }
+    }
+
+    public function test_company_toggle_reopens_cashier_cancel(): void
+    {
+        $waiter = $this->makeUser('pos_waiter');
+        $this->actAs($this->makeUser('pos_cashier'));
+        $this->allowCashierCancel();
+
+        $orderId = $this->order(['created_by' => $waiter->id]);
+
+        $response = $this->cancel($orderId);
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('cancelled', DB::table('restaurant_orders')->find($orderId)->status);
+    }
+
+    public function test_custom_access_tick_wins_both_ways(): void
+    {
+        $waiter = $this->makeUser('pos_waiter');
+
+        // Ticked order_cancel → allowed even though the company switch is OFF.
+        $granted = $this->makeUser('pos_cashier');
+        DB::table('users')->where('id', $granted->id)->update(['pos_custom_access' => '["order_cancel"]']);
+        $this->actAs($granted->fresh());
+        $orderId = $this->order(['created_by' => $waiter->id]);
+        $this->assertSame(200, $this->cancel($orderId)->getStatusCode());
+
+        // Unticked (set exists without order_cancel) → denied even with switch ON.
+        $this->allowCashierCancel();
+        $denied = $this->makeUser('pos_cashier');
+        DB::table('users')->where('id', $denied->id)->update(['pos_custom_access' => '["reports"]']);
+        $this->actAs($denied->fresh());
+        $orderId2 = $this->order(['created_by' => $waiter->id]);
+        $this->assertSame(403, $this->cancel($orderId2)->getStatusCode());
+        $this->assertSame('held', DB::table('restaurant_orders')->find($orderId2)->status);
     }
 }

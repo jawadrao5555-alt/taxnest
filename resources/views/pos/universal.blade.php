@@ -1240,6 +1240,14 @@ window.addEventListener('popstate', function() {
                     <span x-text="cartMode ? window.TXT.editing_word : window.TXT.edit"></span>
                 </button>
                 <template x-if="priorityOrder"><span class="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold">URGENT</span></template>
+                {{-- Task #643: loaded waiter order ki pehchaan — order number + waiter naam
+                     badge, taake cashier ko pata ho kis ka order cart mein khula hai. --}}
+                <template x-if="incomingOrderId && incomingOrderInfo">
+                    <span class="text-[10px] bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 px-2 py-0.5 rounded-full font-bold truncate max-w-[160px]" :title="(incomingOrderInfo.order_number || '') + (incomingOrderInfo.waiter ? ' · ' + incomingOrderInfo.waiter : '')" x-text="(incomingOrderInfo.order_number || '') + (incomingOrderInfo.waiter ? ' · ' + incomingOrderInfo.waiter : '')"></span>
+                </template>
+                {{-- Task #643: claimed waiter order par Order Cancel — wohi warning modal
+                     (items + KOT alert); sirf allowed roles (baked verdict). --}}
+                <button x-show="incomingOrderId && canOrderCancel" x-cloak @click="cartCancelIncoming()" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-100 transition" :title="window.TXT.incoming_cancel_btn || 'Cancel'">{{ __('pos.incoming_cancel_btn') }}</button>
                 {{-- Order-type badge: restaurant-category companies only (matches the header widget gate). --}}
                 @if(($features->tables ?? false) || ($features->kot ?? false) || ($features->kitchen ?? false) || ($features->delivery ?? false))
                 <span class="text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full font-semibold" x-text="orderType.replace('_', ' ').toUpperCase()"></span>
@@ -1965,7 +1973,7 @@ window.addEventListener('popstate', function() {
                                  HERE too — same warning modal + soft-cancel endpoint as cashier
                                  orders. The old "cancel from waiter/admin side only" note lied:
                                  no such cancel existed anywhere. --}}
-                            <button @click="boardFree()" :disabled="boardBusy" class="w-full py-2 rounded-xl text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-40 transition">{{ __('pos.order_cancel_table_free') }}</button>
+                            <button x-show="canOrderCancel" @click="boardFree()" :disabled="boardBusy" class="w-full py-2 rounded-xl text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-40 transition">{{ __('pos.order_cancel_table_free') }}</button>
                         </div>
                     </template>
                     <template x-if="!boardMenuTable.order && boardMenuTable.status === 'reserved'">
@@ -2077,18 +2085,22 @@ window.addEventListener('popstate', function() {
                         <svg class="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.947-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"/></svg>
                     </div>
                     <p class="text-base font-black text-gray-900 dark:text-white">{{ __('pos.cancel_order_title') }}</p>
-                    <p class="text-xl font-black text-gray-900 dark:text-white mt-0.5" x-text="'T-' + boardCancelAsk.table.table_number + ' • Rs ' + Math.round(boardCancelAsk.order.total_amount).toLocaleString()"></p>
+                    {{-- Task #643: table optional — claimed waiter takeaway/delivery has none;
+                         show the order number instead. --}}
+                    <p class="text-xl font-black text-gray-900 dark:text-white mt-0.5" x-text="(boardCancelAsk.table ? 'T-' + boardCancelAsk.table.table_number : (boardCancelAsk.order.order_number || '')) + ' • Rs ' + Math.round(boardCancelAsk.order.total_amount).toLocaleString()"></p>
                 </div>
                 <div class="px-5 py-3 max-h-48 overflow-y-auto">
                     <template x-if="boardCancelAsk.items === null"><p class="text-xs text-gray-400 text-center py-2">…</p></template>
                     <template x-if="Array.isArray(boardCancelAsk.items)">
                         <div class="space-y-1">
-                            <p x-show="boardCancelAsk.order.kot_sent_at && boardCancelAsk.items.length" class="text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.cancel_mark_made_hint') }}</p>
+                            {{-- Task #643: noTicks — claimed-cart cancel has no real item ids
+                                 (Made/Not-Made marking = Task #645); KOT alert still shows. --}}
+                            <p x-show="boardCancelAsk.order.kot_sent_at && boardCancelAsk.items.length && !boardCancelAsk.noTicks" class="text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.cancel_mark_made_hint') }}</p>
                             <template x-for="it in boardCancelAsk.items" :key="it.id">
                                 <div class="flex items-center justify-between gap-2 text-xs text-gray-700 dark:text-gray-300">
                                     <span class="flex-1" x-text="it.quantity + ' × ' + it.item_name"></span>
                                     <span class="text-gray-400" x-text="Math.round(it.subtotal).toLocaleString()"></span>
-                                    <button x-show="boardCancelAsk.order.kot_sent_at" type="button" @click="boardCancelMade[it.id] = !boardCancelMade[it.id]" class="px-2 py-1 rounded-lg text-[10px] font-bold border transition" :class="boardCancelMade[it.id] ? 'bg-orange-100 dark:bg-orange-900/30 border-orange-400 text-orange-700 dark:text-orange-300' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400'" x-text="boardCancelMade[it.id] ? '{{ __('pos.item_made_yes') }}' : '{{ __('pos.item_made_no') }}'"></button>
+                                    <button x-show="boardCancelAsk.order.kot_sent_at && !boardCancelAsk.noTicks" type="button" @click="boardCancelMade[it.id] = !boardCancelMade[it.id]" class="px-2 py-1 rounded-lg text-[10px] font-bold border transition" :class="boardCancelMade[it.id] ? 'bg-orange-100 dark:bg-orange-900/30 border-orange-400 text-orange-700 dark:text-orange-300' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400'" x-text="boardCancelMade[it.id] ? '{{ __('pos.item_made_yes') }}' : '{{ __('pos.item_made_no') }}'"></button>
                                 </div>
                             </template>
                         </div>
@@ -2789,7 +2801,7 @@ window.addEventListener('popstate', function() {
                             {{-- Task #409 (owner, 10 Aug 2026): waiter ke takeaway/delivery orders
                                  SIRF yahan dikhte hain — cancel bhi yahin se (soft-cancel →
                                  Cancelled Orders report, cancelled_by saved). --}}
-                            <button @click="cancelIncoming(o)" class="px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 hover:bg-red-100 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs font-bold transition">{{ __('pos.incoming_cancel_btn') }}</button>
+                            <button x-show="canOrderCancel" @click="cancelIncoming(o)" class="px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 hover:bg-red-100 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs font-bold transition">{{ __('pos.incoming_cancel_btn') }}</button>
                         </div>
                     </div>
                 </template>
@@ -3967,6 +3979,10 @@ function restaurantPos() {
         showHeldOrders: false,
         // ─── Table Board (Jul 2026): "TABLE" button below cart → board modal ───
         tableBoardEnabled: {{ ($features->tables ?? false) ? 'true' : 'false' }},
+        // Task #643 (owner 13 Aug 2026): baked Order Cancel verdict — hides board
+        // "Order Cancel", bell-panel Cancel AND the claimed-cart Cancel when false.
+        // Server (deleteOrder) re-enforces the SAME verdict with a 403.
+        canOrderCancel: {{ !empty($canOrderCancel) ? 'true' : 'false' }},
         tableBoardOpen: false, // board ab MODAL hai (owner 26 Jul 2026) — load par band, Alt+B / TABLE button se khulta hai
         boardMenuTable: null,   // tile clicked → action menu modal
         boardMenuItems: null,   // lazy-fetched items of the open table's order (null = loading)
@@ -4071,6 +4087,10 @@ function restaurantPos() {
         showIncoming: false,
         incomingLoading: false,
         incomingOrderId: null,
+        // Task #643: FULL claim snapshot of the loaded waiter order (waiter name,
+        // order_number, kot_sent_at, items) — drives the cart-header badge and
+        // the claimed-cart Cancel modal. Cleared with incomingOrderId.
+        incomingOrderInfo: null,
         // Table-se-Bill (Jul 2026): auto-load RETIRED — new waiter orders get a
         // one-time toast nudge (per-session dedupe) and wait inside the Select-Table
         // picker as purple "Order Tayyar" cards until a cashier claims them.
@@ -5877,7 +5897,7 @@ function restaurantPos() {
             //   the old empty-search shortcut ate the first letter of "Tapal"/"tea".
             // Always operates on activeCartIndex if valid, else on the LAST cart row.
             // ═══════════════════════════════════════════════════════════════
-            if ((e.key === 't' || e.key === 'T' || e.code === 'KeyT') && !e.ctrlKey && !e.metaKey && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.boardShift && !this.heldMenu && !this.tableSwitchPrompt) {
+            if ((e.key === 't' || e.key === 'T' || e.code === 'KeyT') && !e.ctrlKey && !e.metaKey && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.boardCancelAsk && !this.boardShift && !this.heldMenu && !this.tableSwitchPrompt) {
                 const tgt = e.target;
                 const isSearchInput = tgt && tgt === this.$refs.searchInput;
                 const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
@@ -5911,7 +5931,7 @@ function restaurantPos() {
             // F10 keystroke would steal focus from Pay/Held/Receipt/etc.
             if (e.key === 'F10') {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
                 this.openLocalBills();
                 return;
             }
@@ -5919,7 +5939,7 @@ function restaurantPos() {
             // Same gating as F10. Browser's native F11 = fullscreen toggle is overridden.
             if (e.key === 'F11') {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
                 this.openFailedBills();
                 return;
             }
@@ -5930,7 +5950,7 @@ function restaurantPos() {
                 e.preventDefault();
                 if (this.tableBoardOpen) {
                     this.tableBoardOpen = false;
-                } else if (!(this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardShift || this.heldMenu || this.tableSwitchPrompt)) {
+                } else if (!(this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt)) {
                     this.tableBoardOpen = true;
                 }
                 return;
@@ -5940,7 +5960,7 @@ function restaurantPos() {
             // search input is never hijacked. Same modal-gating as F10/F11.
             if (e.altKey && (e.key === 'r' || e.key === 'R' || e.code === 'KeyR')) {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
                 this.openReprint();
                 return;
             }
@@ -5950,7 +5970,7 @@ function restaurantPos() {
             // keeps the modal. Alt-chord so plain digits keep qty-typing.
             if (e.altKey && (e.code === 'Digit1' || e.code === 'Digit2' || e.key === '1' || e.key === '2')) {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
                 if (this.cart.length === 0 || this.submitting) return;
                 const oneTapCard = (e.code === 'Digit2' || e.key === '2');
                 this.payingHeldOrderId = null;
@@ -5970,7 +5990,7 @@ function restaurantPos() {
             // Whole block Blade-gated like the button — no KOT feature, no chord.
             if (e.altKey && (e.key === 'k' || e.key === 'K' || e.code === 'KeyK')) {
                 e.preventDefault();
-                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
                 if (this.cart.length === 0 || this.submitting || this.hasManualItems() || this.hasDealItems() || !this.canHold()) return;
                 this.sendToKitchen();
                 return;
@@ -5988,7 +6008,7 @@ function restaurantPos() {
                 && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills && !this.showPendingDeliveries
                 && !this.showPayModal && !this.showReceipt && !this.showQuickType
                 && !this.showManualItem && !this.showCustomerPicker && !this.showShortcuts
-                && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.boardShift && !this.heldMenu && !this.tableSwitchPrompt) {
+                && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.boardCancelAsk && !this.boardShift && !this.heldMenu && !this.tableSwitchPrompt) {
                 const tgt = e.target;
                 const isSearchInput = tgt && tgt === this.$refs.searchInput;
                 const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
@@ -6023,7 +6043,7 @@ function restaurantPos() {
                 && !this.showHeldOrders && !this.showLocalBills && !this.showFailedBills && !this.showPendingDeliveries
                 && !this.showPayModal && !this.showReceipt && !this.showQuickType
                 && !this.showManualItem && !this.showCustomerPicker && !this.showShortcuts
-                && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.boardShift && !this.heldMenu && !this.tableSwitchPrompt) {
+                && !this.showManagerPinModal && !this.showTablePicker && !this.showReprint && !this.boardMenuTable && !this.boardConfirm && !this.boardCancelAsk && !this.boardShift && !this.heldMenu && !this.tableSwitchPrompt) {
                 const tgt = e.target;
                 const isSearchInput = tgt && tgt === this.$refs.searchInput;
                 const isCustPhone   = tgt && tgt === this.$refs.customerPhoneInput;
@@ -6298,7 +6318,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.kitchenNotes = ''; this.showCartNote = false; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.incomingOrderId = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.deliveryPrepaid = false; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this.fixCartIndex(); this.clearCartStorage(); },
+        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.kitchenNotes = ''; this.showCartNote = false; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.incomingOrderId = null; this.incomingOrderInfo = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.deliveryPrepaid = false; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm(window.TXT.current_order_has + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast(window.TXT.new_sale_started, 'success');
@@ -6693,6 +6713,31 @@ function restaurantPos() {
                 this.showToast(window.TXT.cancel_failed_conn, 'error');
             } finally { this._claimBusy = false; }
         },
+        // Task #643: Order Cancel for the CLAIMED waiter order in the cart —
+        // reuses the boardCancelAsk warning modal (items + KOT alert) with a
+        // null table; confirm posts the same deleteOrder soft-cancel.
+        cartCancelIncoming() {
+            const o = this.incomingOrderInfo;
+            if (!this.incomingOrderId || !this.canOrderCancel) return;
+            const items = ((o && o.items) || []).map((it, ix) => ({
+                id: it.id || ('x' + ix),
+                quantity: it.quantity,
+                item_name: it.name || it.item_name || '',
+                subtotal: it.subtotal != null ? it.subtotal : ((parseFloat(it.unit_price) || 0) * (parseFloat(it.quantity) || 0)),
+            }));
+            this.boardCancelAsk = {
+                table: null,
+                noTicks: true, // no real item ids from the claim snapshot (see Task #645)
+                order: {
+                    id: this.incomingOrderId,
+                    order_number: (o && o.order_number) || null,
+                    total_amount: (o && o.total_amount) || this.totalAmount || 0,
+                    kot_sent_at: (o && o.kot_sent_at) || null,
+                },
+                items: items,
+            };
+            this.boardCancelMade = {};
+        },
         // Fire-and-forget: backend only flips status='reserved' → available, so this
         // is harmless after payment (already freed) or on occupied tables (held-order
         // lifecycle owns those).
@@ -7052,7 +7097,7 @@ function restaurantPos() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                     // made_item_ids sirf tab bhejo jab KOT gayi thi (warna sawal hi nahi banta)
-                    body: JSON.stringify(ask.order.kot_sent_at ? { made_item_ids: madeIds } : {}),
+                    body: JSON.stringify((ask.order.kot_sent_at && !ask.noTicks) ? { made_item_ids: madeIds } : {}),
                 });
                 const data = res.ok ? await res.json().catch(() => null) : null;
                 if (data && data.success) {
@@ -7060,7 +7105,12 @@ function restaurantPos() {
                     // Waiter order cancelled from the board → drop it from the ghanti
                     // (incoming) list too, warna badge stale reh jata (Task #409).
                     this.incomingOrders = this.incomingOrders.filter(o => o.id !== ask.order.id);
-                    this.showToast(window.TXT.order_cancel_t_prefix + t.table_number + window.TXT.table_freed_suffix, 'success');
+                    // Task #643: claimed-cart cancel — cart clear + loaded-order link reset.
+                    if (this.incomingOrderId && ask.order.id === this.incomingOrderId) {
+                        this.clearCart();
+                        this.loadIncoming();
+                    }
+                    this.showToast(t ? (window.TXT.order_cancel_t_prefix + t.table_number + window.TXT.table_freed_suffix) : window.TXT.order_cancelled_toast, 'success');
                 } else {
                     this.showToast((data && data.message) || window.TXT.cancel_failed, 'error');
                 }
@@ -8308,6 +8358,7 @@ function restaurantPos() {
                 item_discount_type: 'percentage', item_discount_value: 0, showItemDiscount: false,
             }));
             this.incomingOrderId = o.id;
+            this.incomingOrderInfo = o; // Task #643: waiter/order badge + cart-cancel modal data
             // Table stays attached to the RESTAURANT order — settlement frees it.
             // Carry the waiter order's type onto the bill: pos_transactions.order_type
             // snapshot drives the DINE-IN / TAKE AWAY / DELIVERY receipt badge, so a

@@ -550,6 +550,13 @@ class RestaurantPosController extends Controller
         if (!is_numeric($orderId) || $orderId < 1) {
             return response()->json(['success' => false, 'message' => 'Invalid order ID'], 400);
         }
+        // Task #643 (owner voice note 13 Aug 2026): cancel = owner/manager work.
+        // Single verdict (PosAccessService::orderCancelAllowed) drives this gate
+        // AND every cancel UI entry point (board / bell panel / claimed cart).
+        // Waiter self-cancel has its OWN endpoint + toggle — untouched.
+        if (!\App\Services\PosAccessService::orderCancelAllowed(Auth::guard('pos')->user())) {
+            return response()->json(['success' => false, 'message' => __('pos.order_cancel_not_allowed')], 403);
+        }
         $order = RestaurantOrder::where('company_id', $companyId)->find($orderId);
         if (!$order) {
             return response()->json(['success' => false, 'message' => 'Order not found'], 404);

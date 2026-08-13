@@ -4429,6 +4429,9 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'return_auto_bulk' => ':count deliveries marked returned — :made return bill(s) created automatically.',
     'return_auto_bulk_none' => ':count deliveries marked returned.',
     'return_wastage_chip' => 'Wastage',
+    // Wastage reporting (Task 593, Aug 2026)
+    'dc_wastage_line' => 'Wastage (:count): Rs :amount — spoiled goods, not restocked',
+    'wastage_only_filter' => 'Wastage only',
     'receipt_credit_note' => 'CREDIT NOTE / RETURN',
     'invoice_submitted_pra_num' => 'Invoice submitted to PRA. PRA Fiscal #: :number',
 ];

@@ -4428,6 +4428,9 @@ return [
     'return_auto_bulk' => ':count ڈیلیوریاں واپس نشان ہو گئیں — :made واپسی بل خود بن گئے۔',
     'return_auto_bulk_none' => ':count ڈیلیوریاں واپس نشان ہو گئیں۔',
     'return_wastage_chip' => 'ضیاع',
+    // Wastage reporting (Task 593, Aug 2026)
+    'dc_wastage_line' => 'ضیاع (:count): :amount روپے — خراب سامان، اسٹاک میں واپس نہیں گیا',
+    'wastage_only_filter' => 'صرف ضیاع',
     'receipt_credit_note' => 'کریڈٹ نوٹ / واپسی',
     'invoice_submitted_pra_num' => 'انوائس PRA کو جمع ہو گئی۔ PRA فسکل #: :number',
 ];

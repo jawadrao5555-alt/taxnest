@@ -4429,6 +4429,9 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'return_auto_bulk' => ':count deliveries returned mark ho gayin — :made return bill khud ban gaye.',
     'return_auto_bulk_none' => ':count deliveries returned mark ho gayin.',
     'return_wastage_chip' => 'Wastage',
+    // Wastage reporting (Task 593, Aug 2026)
+    'dc_wastage_line' => 'Wastage (:count): Rs :amount — kharab maal, stock mein wapis nahi gaya',
+    'wastage_only_filter' => 'Sirf wastage',
     'receipt_credit_note' => 'CREDIT NOTE / WAPSI',
     'invoice_submitted_pra_num' => 'Invoice PRA ko submit ho gayi. PRA Fiscal #: :number',
 ];

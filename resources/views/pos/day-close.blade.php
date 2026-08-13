@@ -120,6 +120,10 @@
             @if(($stats->returns_count ?? 0) > 0)
             <p class="text-xs text-rose-500 mt-1">{{ __('pos.dc_returns_netted', ['count' => $stats->returns_count, 'amount' => number_format($stats->returns_amount, 2)]) }}</p>
             @endif
+            {{-- Wastage line (Task 593): spoiled-goods returns, shown separately --}}
+            @if(($stats->wastage_count ?? 0) > 0)
+            <p class="text-xs text-amber-600 dark:text-amber-400 mt-0.5">{{ __('pos.dc_wastage_line', ['count' => $stats->wastage_count, 'amount' => number_format($stats->wastage_amount, 2)]) }}</p>
+            @endif
         </div>
     </div>
 

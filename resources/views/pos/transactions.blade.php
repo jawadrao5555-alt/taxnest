@@ -87,7 +87,14 @@
             </select>
             <input type="date" name="date_from" value="{{ request('date_from') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
             <input type="date" name="date_to" value="{{ request('date_to') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-emerald-500 focus:border-emerald-500">
-            <button type="submit" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition">{{ __("pos.filter_btn") }}</button>
+            <div class="flex items-center gap-3">
+                <button type="submit" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition">{{ __("pos.filter_btn") }}</button>
+                {{-- Wastage filter (Task 593): spoiled-goods return bills only --}}
+                <label class="inline-flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap cursor-pointer">
+                    <input type="checkbox" name="wastage" value="1" {{ request()->boolean('wastage') ? 'checked' : '' }} onchange="this.form.submit()" class="rounded border-gray-300 dark:border-gray-600 text-amber-600 focus:ring-amber-500">
+                    {{ __('pos.wastage_only_filter') }}
+                </label>
+            </div>
         </form>
     </div>
 
@@ -116,6 +123,9 @@
                             <a href="{{ route('pos.transaction.show', $txn->id) }}" class="hover:underline">{{ $txn->invoice_number }}</a>
                             @if($rowIsReturn)
                                 <span class="inline-flex items-center ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 uppercase">{{ __('pos.return_badge') }}</span>
+                                @if(!empty($txn->is_wastage))
+                                    <span class="inline-flex items-center ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 uppercase">{{ __('pos.return_wastage_chip') }}</span>
+                                @endif
                             @endif
                         </td>
                         <td class="px-4 py-3 text-gray-700 dark:text-gray-300 hidden md:table-cell">

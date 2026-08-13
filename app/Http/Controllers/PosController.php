@@ -4132,6 +4132,12 @@ class PosController extends Controller
             $query->where('payment_method', $request->payment_method);
         }
 
+        // Wastage filter (Task 593): only wastage-flagged return bills —
+        // spoiled goods whose stock was NOT restored. Schema-drift guarded.
+        if ($request->boolean('wastage') && \Schema::hasColumn('pos_transactions', 'is_wastage')) {
+            $query->where('transaction_type', 'return')->where('is_wastage', true);
+        }
+
         if ($request->filled('date_from')) {
             $query->where('created_at', '>=', $request->date_from);
         }
@@ -8801,6 +8807,10 @@ class PosController extends Controller
             // Returns detail line for the page/PDF/thermal.
             'returns_count' => $dcReturnRows->count(),
             'returns_amount' => round((float) $dcReturnRows->sum('total_amount'), 2),
+            // Wastage line (Task 593): spoiled-goods returns — subset of the
+            // returns above, shown separately so the owner sees the loss.
+            'wastage_count' => $dcReturnRows->filter(fn ($t) => (bool) ($t->is_wastage ?? false))->count(),
+            'wastage_amount' => round((float) $dcReturnRows->filter(fn ($t) => (bool) ($t->is_wastage ?? false))->sum('total_amount'), 2),
         ];
 
         // Cashier figures are SIGNED (Task 570): refunds net revenue/tax;

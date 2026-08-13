@@ -42,10 +42,19 @@
         </h1>
         <div class="flex flex-wrap items-center gap-2 sm:gap-3">
             @php
-                $failedCount = \App\Models\PosTransaction::where('company_id', app('currentCompanyId'))
+                $failedCountQuery = \App\Models\PosTransaction::where('company_id', app('currentCompanyId'))
                     ->whereIn('pra_status', ['failed', 'offline', 'pending'])
-                    ->whereNull('pra_invoice_number')
-                    ->count();
+                    ->whereNull('pra_invoice_number');
+                // Task 583: mirror bulkRetryPra — a cashier's "Sync all" skips
+                // return rows (manager+ only, Task 582), so the badge must not
+                // count them either or the count over-promises.
+                if (auth('pos')->user()?->posCashierBlocked()
+                    && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type')) {
+                    $failedCountQuery->where(function ($q) {
+                        $q->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
+                    });
+                }
+                $failedCount = $failedCountQuery->count();
             @endphp
             @if($failedCount > 0)
             <form method="POST" action="{{ route('pos.transactions.bulk-retry-pra') }}" onsubmit="return confirm(@js(__('pos.confirm_bulk_retry_pra', ['count' => $failedCount])))">

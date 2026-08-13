@@ -7,9 +7,11 @@
     <link rel="icon" type="image/svg+xml" href="/images/brand/taxnest-mark.svg">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <title>FBR POS — Bank-Grade Point of Sale by TaxNest</title>
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap" rel="stylesheet">
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
+    <link rel="preload" as="style" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap">
+    <link rel="stylesheet" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap"></noscript>
+    @include('partials.fast-first-paint')
     <style>
         :root {
             --teal-dark: #052730;
@@ -112,6 +114,7 @@
     </style>
 </head>
 <body x-data="{ scrolled: false, mobileOpen: false, showLoginModal: {{ ($errors->any() || old('login')) ? 'true' : 'false' }} }" @scroll.window="scrolled = (window.pageYOffset > 20)">
+    <div id="tn-boot" aria-hidden="true"><span>FBR&nbsp;<b>POS</b></span></div>
 
     <!-- Login Modal -->
     <div x-show="showLoginModal" x-cloak 

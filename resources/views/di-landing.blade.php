@@ -19,7 +19,7 @@
     <link rel="stylesheet" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap" media="print" onload="this.media='all'">
     <noscript><link rel="stylesheet" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700|inter:400,500,600,700,800&display=swap"></noscript>
     
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @include('partials.fast-first-paint')
     
     <style>
         :root {
@@ -234,6 +234,7 @@
     </script>
 </head>
 <body class="relative min-h-[100dvh] flex flex-col" x-data="{ showLoginModal: {{ isset($showLogin) && $showLogin ? 'true' : 'false' }}, scrolled: false, mobileOpen: false }" @scroll.window="scrolled = (window.pageYOffset > 20)">
+    <div id="tn-boot" aria-hidden="true"><span>Tax<b>Nest</b></span></div>
 
     <!-- Login Modal -->
     <div x-show="showLoginModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-4">

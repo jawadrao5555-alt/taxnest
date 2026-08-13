@@ -18,7 +18,7 @@
     <link rel="preload" as="style" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700,900|inter:400,500,600,700,800|jetbrains-mono:400,700&display=swap">
     <link rel="stylesheet" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700,900|inter:400,500,600,700,800|jetbrains-mono:400,700&display=swap" media="print" onload="this.media='all'">
     <noscript><link rel="stylesheet" href="https://fonts.bunny.net/css?family=playfair-display:400,600,700,900|inter:400,500,600,700,800|jetbrains-mono:400,700&display=swap"></noscript>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @include('partials.fast-first-paint')
     <style>
         :root {
             --teal-dark: #052730;
@@ -157,6 +157,7 @@
     </script>
 </head>
 <body x-data="{ scrolled: false, mobileMenuOpen: false }" @scroll.window="scrolled = (window.pageYOffset > 20)">
+    <div id="tn-boot" aria-hidden="true"><span>Nest<b>POS</b></span></div>
 
     <!-- Navigation -->
     <nav :class="(scrolled || mobileMenuOpen) ? 'nav-scrolled' : 'nav-transparent'" class="fixed top-0 w-full z-50 transition-all duration-300">

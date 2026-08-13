@@ -1053,19 +1053,42 @@ class RestaurantPosController extends Controller
             $praMs = null;
             if ($praEnabled) {
                 $praT0 = microtime(true);
-                try {
-                    $praService = new \App\Services\PraIntegrationService($company);
-                    $praResult = $praService->sendInvoice($transaction);
-                    if ($praResult && isset($praResult['success']) && $praResult['success']) {
-                        $transaction->update([
-                            'pra_status' => 'submitted',
-                            'pra_invoice_number' => $praResult['pra_invoice_number'] ?? null,
-                            'pra_response_code' => $praResult['response_code'] ?? null,
-                        ]);
+                // Agent Sync / Fiscal Device (Task 631, ZFC video 13 Aug 2026): NEVER
+                // direct-submit from the server on the settle path — the US server's
+                // curl to PRA cloud times out after 8s (confirmed live: txn 1786
+                // "Operation timed out after 8002 milliseconds"), freezing the
+                // cashier's "Creating bill" spinner for the full timeout before the
+                // bill fell back to 'pending' anyway. Mirrors PosController::storeInvoice:
+                // the bill is already 'pending' at birth — the desktop agent polls it
+                // within seconds and submits from the shop PC's Pakistani IP.
+                if ($company->agentHandlesPra()) {
+                    // bill stays 'pending'; nothing to do — settle returns instantly.
+                } else {
+                    try {
+                        $praService = new \App\Services\PraIntegrationService($company);
+                        $praResult = $praService->sendInvoice($transaction);
+                        // exempt_only success = all-exempt bill the service already
+                        // stamped 'exempt_internal' (never reported to PRA) — do NOT
+                        // overwrite it to 'submitted' with an empty fiscal number
+                        // (live bug: ZFC bills 1787/1791, 13 Aug 2026).
+                        if ($praResult && !empty($praResult['success']) && empty($praResult['exempt_only'])) {
+                            $transaction->update([
+                                'pra_status' => 'submitted',
+                                'pra_invoice_number' => $praResult['pra_invoice_number'] ?? null,
+                                'pra_response_code' => $praResult['response_code'] ?? null,
+                            ]);
+                        }
+                    } catch (\Throwable $e) {
+                        $transaction->update(['pra_status' => 'offline']);
+                        Log::warning('PRA submission failed: ' . $e->getMessage());
                     }
-                } catch (\Throwable $e) {
-                    $transaction->update(['pra_status' => 'offline']);
-                    Log::warning('PRA submission failed: ' . $e->getMessage());
+                }
+                $praMs = (int) round((microtime(true) - $praT0) * 1000);
+                if ($praMs > 3000) {
+                    Log::warning('Slow settle: PRA leg took ' . $praMs . 'ms', [
+                        'company_id' => $companyId,
+                        'transaction_id' => $transaction->id,
+                    ]);
                 }
             }
 

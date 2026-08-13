@@ -3004,8 +3004,14 @@ class FbrPosController extends Controller
             ->groupBy('payment_method')
             ->get();
 
-        [$from, $to] = $this->resolveFbrReportRange($request);
-        $rangeAnalytics = $this->buildFbrReportRangeAnalytics($companyId, $from, $to, Auth::guard('fbrpos')->user());
+        // Plan gate (Task 664 review, FBR mirror): analytics deep dive is a paid
+        // entitlement (analytics_enabled — Pro on the FBR ladder). Ineligible
+        // plans get NULL; the view renders an upgrade-locked card instead.
+        $rangeAnalytics = null;
+        if (\App\Services\PosFeatureService::planAllows($company, 'analytics_enabled')) {
+            [$from, $to] = $this->resolveFbrReportRange($request);
+            $rangeAnalytics = $this->buildFbrReportRangeAnalytics($companyId, $from, $to, Auth::guard('fbrpos')->user());
+        }
 
         return view('fbr-pos.reports', compact('company', 'todayStats', 'monthStats', 'dailySales', 'paymentBreakdown', 'rangeAnalytics'));
     }

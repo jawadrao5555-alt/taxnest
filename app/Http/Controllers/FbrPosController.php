@@ -2512,8 +2512,12 @@ class FbrPosController extends Controller
 
             // Order Matching style — stored directly on the companies row (shared with PRA).
             // hasColumn guard: silently no-ops on a not-yet-migrated PROD schema.
-            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'order_match_style')) {
-                $company->order_match_style = $request->input('rp_order_match', 'off');
+            // Task 652: validate against the allowed set (mirrors PRA) — a missing
+            // or garbage value keeps the company's current style instead of
+            // silently forcing 'off' (which would break the new 'code' default).
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'order_match_style')
+                && in_array($request->input('rp_order_match'), ['off', 'token', 'code'], true)) {
+                $company->order_match_style = $request->input('rp_order_match');
             }
 
             // Task 565: opt-in Yes/No print-confirm dialog — shared flag with PRA

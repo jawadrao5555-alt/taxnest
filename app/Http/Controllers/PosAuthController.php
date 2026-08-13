@@ -84,8 +84,17 @@ class PosAuthController extends Controller
                 // Frost & Brew (Aug 2026): NTN/CNIC typed WITH dashes must still
                 // match — DB stores plain digits, so compare BOTH the raw input
                 // and the digit-only form.
-                $company = Company::where('ntn', $login)->orWhere('cnic', $login)
-                    ->orWhere('ntn', $phone)->orWhere('cnic', $phone)->first();
+                // Task 579: panel-aware pick — if the same NTN/CNIC exists on
+                // companies of different products (legacy admin-set dupes),
+                // prefer THIS panel's company; otherwise the post-password
+                // product check turns a valid login into a failure. Dashed
+                // legacy CNICs are matched via the REPLACE digit-compare.
+                $matches = Company::where(function ($q) use ($login, $phone) {
+                    $q->where('ntn', $login)->orWhere('cnic', $login)
+                      ->orWhere('ntn', $phone)->orWhere('cnic', $phone)
+                      ->orWhereRaw("REPLACE(REPLACE(cnic, '-', ''), ' ', '') = ?", [$phone]);
+                })->get();
+                $company = $matches->firstWhere('product_type', 'pos') ?? $matches->first();
                 if ($company) {
                     $user = User::where('company_id', $company->id)->where('role', 'company_admin')->orderBy('id')->first();
                 }
@@ -175,13 +184,15 @@ class PosAuthController extends Controller
         $request->validate([
             'company_name' => 'required|string|max:255',
             'company_ntn' => 'nullable|string|max:50|unique:companies,ntn',
+            // Task 579: optional owner CNIC — becomes a login identifier.
+            'company_cnic' => \App\Services\LoginIdentifierResolver::cnicRules(),
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'phone' => 'nullable|string|max:20',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'pos_type' => 'required|in:restaurant,retail,general,pharmacy,grocery,clothing,electronics,hardware,salon,autoparts,bakery',
             'pricing_plan_id' => 'required|integer|exists:pricing_plans,id',
-        ]);
+        ], \App\Services\LoginIdentifierResolver::cnicMessages('company_cnic'));
 
         // The selected package must be a real, non-trial POS plan — the admin
         // approves exactly this plan for 1 year (owner rule Jul 2026).
@@ -212,6 +223,7 @@ class PosAuthController extends Controller
         $companyData = [
             'name' => $request->company_name,
             'ntn' => $request->company_ntn,
+            'cnic' => \App\Services\LoginIdentifierResolver::normalizeCnic($request->company_cnic),
             'email' => $request->email,
             'phone' => $request->phone,
             'company_status' => 'pending',

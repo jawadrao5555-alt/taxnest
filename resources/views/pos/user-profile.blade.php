@@ -51,6 +51,7 @@
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.username_label') }}</label>
                         <input type="text" name="username" value="{{ old('username', $user->username) }}"
                             class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500" placeholder="{{ __('pos.ph_eg_username') }}">
+                        <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{{ __('pos.username_self_login_hint') }}</p>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{{ __('pos.role_label') }}</label>

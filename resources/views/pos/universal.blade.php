@@ -8624,7 +8624,13 @@ function restaurantPos() {
                     // IMMEDIATELY (agent prints them in order anyway) instead of
                     // waiting for the receipt roundtrip before creating the KOT job.
                     if (this.silentBillPrint && this.silentKotPrint) {
-                        this.queuePrintTimer(() => { this.printReceipt(); fireKot(); }, 150);
+                        // Task 655 review fix: printReceipt() is async now (bounded
+                        // fiscal grace while pra_status='pending') — enqueue order
+                        // must stay RECEIPT-FIRST → KOT-AFTER, so await the receipt
+                        // enqueue before creating the KOT job. Grace is bounded
+                        // (~5s worst case, agent normally submits in 2-5s) so the
+                        // kitchen is never meaningfully delayed.
+                        this.queuePrintTimer(async () => { await this.printReceipt(); fireKot(); }, 150);
                         return;
                     }
                     this.queuePrintTimer(() => {

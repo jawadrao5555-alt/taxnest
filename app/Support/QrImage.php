@@ -17,25 +17,34 @@ class QrImage
      * (best DomPDF / thermal-print fidelity) and falls back to an inline SVG,
      * returning an empty string only if QR generation is impossible.
      */
-    public static function dataUri(string $data, int $scale = 5): string
+    /**
+     * @param int|null $minVersion QR version floor (ZFC 13 Aug 2026): receipts
+     *        print the PRA fiscal QR (short payload → v1-2, chunky modules) and
+     *        the local invoice QR (longer payload → v5+, fine modules) at the
+     *        SAME rendered size — customers read the density mismatch as two
+     *        "different" QR types. A shared floor (v4) makes short payloads
+     *        render on the same 33x33 grid; longer payloads still auto-grow.
+     */
+    public static function dataUri(string $data, int $scale = 5, ?int $minVersion = null): string
     {
+        $base = [
+            'eccLevel'      => EccLevel::M,
+            'scale'         => $scale,
+            'quietzoneSize' => 2,
+            'outputBase64'  => true,
+        ];
+        if ($minVersion !== null) {
+            $base['versionMin'] = $minVersion;
+        }
         try {
-            return (new QRCode(new QROptions([
+            return (new QRCode(new QROptions($base + [
                 'outputType'       => QROutputInterface::GDIMAGE_PNG,
-                'outputBase64'     => true,
-                'eccLevel'         => EccLevel::M,
-                'scale'            => $scale,
-                'quietzoneSize'    => 2,
                 'imageTransparent' => false,
             ])))->render($data);
         } catch (\Throwable $e) {
             try {
-                return (new QRCode(new QROptions([
-                    'outputType'    => QROutputInterface::MARKUP_SVG,
-                    'outputBase64'  => true,
-                    'eccLevel'      => EccLevel::M,
-                    'scale'         => $scale,
-                    'quietzoneSize' => 2,
+                return (new QRCode(new QROptions($base + [
+                    'outputType' => QROutputInterface::MARKUP_SVG,
                 ])))->render($data);
             } catch (\Throwable $e2) {
                 return '';

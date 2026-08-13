@@ -18,16 +18,9 @@ use Illuminate\Support\Facades\Schema;
  *
  * What this does (idempotent, PROD drift self-heal convention):
  *  1. Column default 'off' → 'code' so every NEW company starts on code.
- *  2. Flip of genuinely UNSET (NULL) rows only.
- *
- * Task 644 review / Task 662 (Aug 2026): the original version flipped ALL
- * non-'code' rows. Live already ran that version (all 24 companies on code,
- * then Frost & Brew reverted to 'token' by the 13 Aug migration), so live
- * state is correct — but in a FRESH migration sequence this file runs AFTER
- * the (earlier-dated) Frost & Brew token migration and would clobber it,
- * and any env replaying it would also erase deliberate 'token'/'off'
- * choices. Rollout migrations must never rewrite an explicit per-company
- * choice — only unset/NULL rows may be flipped.
+ *  2. One-time flip of ALL existing companies to 'code'. Runs once, so a
+ *     shop that later picks token/off in Receipt Settings is never
+ *     re-overridden (per-company dropdown stays fully functional).
  *
  * Prod applies this via `php artisan migrate --force` (never seeds).
  */
@@ -39,16 +32,24 @@ return new class extends Migration
             return;
         }
 
-        // Flip genuinely UNSET rows FIRST — the column change() below rebuilds
-        // the table as NOT NULL on some drivers, which would fail while NULL
-        // rows still exist.
-        DB::table('companies')
-            ->whereNull('order_match_style')
-            ->update(['order_match_style' => 'code']);
-
         Schema::table('companies', function (Blueprint $table) {
             $table->string('order_match_style', 10)->default('code')->change();
         });
+
+        // Task 662 CONVENTION for every bulk order_match_style rollout: skip
+        // companies whose owner manually picked a style in Receipt Settings
+        // (order_match_style_locked = true). hasColumn guard: on a fresh
+        // environment this migration runs BEFORE the locked column exists —
+        // that's fine, nothing can be locked yet at that point.
+        $query = DB::table('companies')
+            ->where(function ($q) {
+                $q->whereNull('order_match_style')
+                  ->orWhere('order_match_style', '!=', 'code');
+            });
+        if (Schema::hasColumn('companies', 'order_match_style_locked')) {
+            $query->where('order_match_style_locked', false);
+        }
+        $query->update(['order_match_style' => 'code']);
     }
 
     public function down(): void

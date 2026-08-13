@@ -2,6 +2,21 @@
 <div class="p-4 sm:p-6 max-w-7xl mx-auto" x-data="{ activeTab: 'di' }">
     <h1 class="text-2xl font-bold text-white mb-6">Admin Dashboard</h1>
 
+    {{-- Agent Health (Task 635): same rule as /admin/companies (Task 629) —
+         silent-print shops whose Desktop Agent is offline > 2 hours. Shown only
+         when there is a problem so the dashboard stays clean on good days. --}}
+    @if(($offlineAgentCount ?? 0) > 0)
+    <a href="{{ route('saas.admin.companies') }}" class="block bg-red-900/20 border border-red-800/60 rounded-xl p-4 mb-6 hover:bg-red-900/30 transition">
+        <div class="flex items-center gap-3">
+            <svg class="w-6 h-6 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+            <div class="min-w-0">
+                <p class="text-sm font-bold text-red-300">Agent Health: {{ $offlineAgentCount }} {{ $offlineAgentCount === 1 ? 'shop ka' : 'shops ka' }} Desktop Agent offline hai (&gt; 2 hours)</p>
+                <p class="text-xs text-red-400/80 mt-0.5">Silent printing wahan band hai — cashiers Chrome print popup par gir gaye hain. Details ke liye click karein →</p>
+            </div>
+        </div>
+    </a>
+    @endif
+
     <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mb-8">
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
             <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Total Companies</p>

@@ -111,6 +111,23 @@ class AdminDashboardController extends Controller
             $dc->di_revenue = (float) ($diAgg[$dc->id]->revenue ?? 0);
         }
 
+        // Agent Health (Task 635): same logic as /admin/companies (Task 629) —
+        // silent-print shops whose Desktop Agent is >2h offline. Red alert card
+        // on the dashboard so the admin sees it without opening the companies page.
+        $offlineAgentCount = 0;
+        if (Schema::hasColumn('companies', 'agent_enabled')) {
+            $offlineAgentCount = Company::query()
+                ->where('agent_enabled', true)
+                ->whereIn('status', ['approved', 'active'])
+                ->where(function ($q) {
+                    $q->whereNull('agent_last_seen')
+                      ->orWhere('agent_last_seen', '<', now()->subHours(2));
+                })
+                ->get(['id', 'agent_enabled', 'agent_last_seen', 'pos_printer_settings'])
+                ->filter(fn ($c) => $c->agentLongOffline())
+                ->count();
+        }
+
         $recentAuditLogs = Schema::hasTable('admin_audit_logs')
             ? AdminAuditLog::with('admin')->orderBy('created_at', 'desc')->take(10)->get()
             : collect();
@@ -118,7 +135,7 @@ class AdminDashboardController extends Controller
 
         return view('saas-admin.dashboard', compact(
             'stats', 'diCompaniesList', 'posCompaniesList', 'fbrposCompaniesList',
-            'recentAuditLogs', 'systemControls'
+            'recentAuditLogs', 'systemControls', 'offlineAgentCount'
         ));
     }
 }

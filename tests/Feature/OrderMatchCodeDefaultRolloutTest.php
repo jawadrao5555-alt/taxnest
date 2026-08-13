@@ -32,7 +32,6 @@ use Illuminate\Support\Facades\Schema;
 class OrderMatchCodeDefaultRolloutTest extends TestCase
 {
     private const MIGRATION = 'database/migrations/2026_08_23_000000_order_match_code_default_rollout.php';
-    private const FROST_MIGRATION = 'database/migrations/2026_08_13_000000_frost_and_brew_order_match_token.php';
 
     protected function setUp(): void
     {
@@ -78,25 +77,6 @@ class OrderMatchCodeDefaultRolloutTest extends TestCase
         );
     }
 
-    public function test_frost_and_brew_token_survives_fresh_sequence_ordering(): void
-    {
-        // Fresh-sequence ordering: the 13 Aug Frost & Brew migration runs
-        // BEFORE the 23 Aug rollout. Its 'token' choice must survive.
-        DB::table('companies')->insert([
-            'id' => 26,
-            'name' => 'Frost and Brew',
-            'order_match_style' => 'code',
-        ]);
-
-        $this->runMigration(self::FROST_MIGRATION); // sets id 26 → token
-        $this->runMigration(self::MIGRATION);       // rollout must NOT clobber it
-
-        $this->assertSame(
-            'token',
-            DB::table('companies')->where('id', 26)->value('order_match_style')
-        );
-    }
-
     public function test_migration_is_idempotent_and_never_rewrites_choices(): void
     {
         DB::table('companies')->insert([
@@ -132,7 +112,11 @@ class OrderMatchCodeDefaultRolloutTest extends TestCase
             'name' => 'Frost and Brew',
             'order_match_style' => 'token',
         ]);
-        DB::table('companies')->insert(['name' => 'Other Shop', 'order_match_style' => 'off']);
+        // Task 644 review / Task 662: an explicit 'off' choice must SURVIVE the
+        // full sequence (rollout flips only unset/NULL rows); an unset row ends
+        // on 'code'.
+        DB::table('companies')->insert(['name' => 'Off Shop', 'order_match_style' => 'off']);
+        DB::table('companies')->insert(['name' => 'Unset Shop', 'order_match_style' => null]);
 
         $files = glob(base_path('database/migrations/*order_match*.php'))
             ?: [];
@@ -150,9 +134,14 @@ class OrderMatchCodeDefaultRolloutTest extends TestCase
             'Frost and Brew must end on token after ALL order_match migrations in filename order'
         );
         $this->assertSame(
+            'off',
+            DB::table('companies')->where('name', 'Off Shop')->value('order_match_style'),
+            'explicit off choice must never be rewritten by the rollout'
+        );
+        $this->assertSame(
             'code',
-            DB::table('companies')->where('name', 'Other Shop')->value('order_match_style'),
-            'other companies still end on code'
+            DB::table('companies')->where('name', 'Unset Shop')->value('order_match_style'),
+            'unset companies still end on code'
         );
     }
 }

@@ -1216,7 +1216,7 @@ window.addEventListener('popstate', function() {
                         {{-- Per-item kitchen note (e.g. "no onions") — parity with restaurant screen, gated by kitchen_notes feature --}}
                         <div class="mt-1" @click.stop>
                             <input type="text" x-model="item.special_notes"
-                                autocomplete="off" name="pos_item_note_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                                autocomplete="one-time-code" name="pos_item_note_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                                 @keydown.enter.prevent.stop="$event.target.blur()"
                                 @keydown.escape.prevent.stop="$event.target.blur()"
                                 placeholder="{{ __('pos.ph_item_note') }}"
@@ -1245,7 +1245,7 @@ window.addEventListener('popstate', function() {
                 </div>
                 <div class="px-3 pb-1.5" x-show="showCartNote" x-transition x-cloak>
                     <textarea x-model="kitchenNotes" x-ref="orderNotesInput" rows="2"
-                        autocomplete="off" name="pos_order_notes_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                        autocomplete="one-time-code" name="pos_order_notes_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                         @keydown.enter.prevent.stop="$event.target.blur()"
                         @keydown.escape.prevent.stop="showCartNote = false"
                         placeholder="{{ __('pos.ph_order_notes_n') }}"
@@ -5667,6 +5667,9 @@ function restaurantPos() {
                     customer_id: this.selectedCustomer?.id || null,
                     customer_phone: this.selectedCustomer?.phone || null,
                     customer_ntn: this.customerNtn || null,
+                    // Task 641: persist the order note so the KOT print shows it and
+                    // the server-side identity-autofill discard can run on it.
+                    kitchen_notes: this.kitchenNotes || null,
                     // Task 170: snapshot order type + delivery address so a recalled
                     // hold restores a typed/one-off address (same expression as the
                     // final-bill payload builder — falls back to customer default).
@@ -6685,6 +6688,7 @@ function restaurantPos() {
                 this.cart = items.map(i => ({ cart_uid: 'c' + Date.now() + '_' + Math.random().toString(36).slice(2,9), item_id: i.item_id ?? null, item_type: i.item_type || 'product', item_name: i.item_name, quantity: parseFloat(i.quantity) || 1, unit_price: parseFloat(i.unit_price) || 0, special_notes: i.special_notes || '', is_tax_exempt: !!i.is_tax_exempt, hs_code: i.hs_code ?? null, uom: i.uom || 'U', tax_rate: (i.tax_rate === 0 || i.tax_rate) ? parseFloat(i.tax_rate) : 18, item_discount_type: i.item_discount_type || 'percentage', item_discount_value: parseFloat(i.item_discount_value) || 0, showItemDiscount: (parseFloat(i.item_discount_value) || 0) > 0, showFbrPanel: false }));
                 if (cd.discount_type && parseFloat(cd.discount_value) > 0) { this.discountType = cd.discount_type; this.discountValue = parseFloat(cd.discount_value) || 0; this.showDiscount = true; } else { this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; }
                 this.customerNtn = cd.customer_ntn || '';
+                this.kitchenNotes = cd.kitchen_notes || ''; // Task 641: restore order note on recall
                 this.recalledOrderId = null;
                 this.selectedCustomer = cd.customer_id ? { id: cd.customer_id, name: order.customer_name || window.TXT.customer_word, phone: cd.customer_phone || '' } : null;
                 this.customerPhoneQuery = this.selectedCustomer ? (this.selectedCustomer.phone || this.selectedCustomer.name) : '';

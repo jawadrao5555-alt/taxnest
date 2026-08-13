@@ -374,7 +374,7 @@ PRA_PAGES=(
   "/pos/customers|id=\"addCustomerForm\"|id=\"custSearchInput\""
   "/pos/receipt-settings|receipt-settings\""
   "/pos/restaurant/kitchen-settings|name=\"kot_compact\"|name=\"print_on_pay\""
-  "/pos/reports|pos/reports/csv|raDailyTrend"
+  "/pos/reports|pos/reports/csv|raDailyTrend|analyticsLockedCard"
   "/pos/invoice/create|restaurantPos\(|manualItemNameInput"
   "/pos/riders/tracking|rt-page|rt-map|riderTracking\("
   "/pos/billing|or PKR|3 months"
@@ -382,9 +382,10 @@ PRA_PAGES=(
 FBR_PAGES=(
   "/fbr-pos/dashboard|fbr-pos/day-close|fbr-pos/create"
   "/fbr-pos/customize|dashboard-style"
-  # Aug 2026 strict plan binding: analytics-pdf/export links are plan-gated and
-  # the charts need bills in range — marker = the always-rendered date filter.
-  "/fbr-pos/reports|name=\"from\"|raDailyTrend"
+  # Aug 2026 strict plan binding: the whole analytics deep dive is plan-gated
+  # (Task 664) — ineligible plans render the locked upgrade card instead of
+  # the date filter, so accept either as proof of real content.
+  "/fbr-pos/reports|name=\"from\"|raDailyTrend|analyticsLockedCard"
   "/fbr-pos/settings|name=\"fbr_pos_token\"|name=\"fbr_pos_id\""
   "/fbr-pos/create|manualItemNameInput|restaurantPos\("
 )

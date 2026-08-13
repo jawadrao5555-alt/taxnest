@@ -10,16 +10,19 @@ use Illuminate\Support\Facades\Schema;
 /**
  * ORDER MATCHING — LOCK vs ROLLOUT CHRONOLOGY — Task 662.
  *
- * Applies the real migrations in the exact chronological order a fresh /
- * rebuilt database runs them:
- *   1. 08_13 Frost & Brew restore → 'token'
- *   2. 08_23 all-company 'code' rollout (flips 26 back to 'code'!)
- *   3. 08_24_000000 add order_match_style_locked
- *   4. 08_24_000001 lock backfill (must RE-restore 'token' + lock, because
- *      step 2 already undid step 1 on a fresh database)
+ * Applies the real migrations in the exact chronological (filename) order a
+ * fresh / rebuilt database runs them. Aligned with the Task 644 review-fix
+ * generation of the rollout (only genuinely UNSET/NULL rows flip to 'code';
+ * the mis-timestamped 08_13 Frost revert is neutralized and re-applied as
+ * 08_23_100000 AFTER the rollout):
+ *   1. 08_13 Frost & Brew token restore (neutralized no-op)
+ *   2. 08_23_000000 'code' default rollout (flips only NULL rows)
+ *   3. 08_23_100000 Frost & Brew re-restore → 'token' (post-rollout)
+ *   4. 08_24_000000 add order_match_style_locked
+ *   5. 08_24_000001 lock backfill (locks Frost & Brew's token choice)
  *
  * End state must be: Frost & Brew (id 26) on 'token' AND locked, every
- * other company on 'code'. Also proves a locked row survives a re-run of
+ * unset company on 'code'. Also proves a locked row survives a re-run of
  * the bulk rollout (the whole point of Task 662).
  *
  * Run:
@@ -30,6 +33,7 @@ class OrderMatchLockChronologyTest extends TestCase
     private const MIGRATIONS_IN_ORDER = [
         'database/migrations/2026_08_13_000000_frost_and_brew_order_match_token.php',
         'database/migrations/2026_08_23_000000_order_match_code_default_rollout.php',
+        'database/migrations/2026_08_23_100000_frost_and_brew_order_match_token_after_rollout.php',
         'database/migrations/2026_08_24_000000_add_order_match_style_locked.php',
         'database/migrations/2026_08_24_000001_lock_manually_set_order_match_styles.php',
     ];
@@ -40,12 +44,13 @@ class OrderMatchLockChronologyTest extends TestCase
         Schema::dropAllTables();
 
         // Companies table shaped like the original 06 Aug migration
-        // (pre-rollout: order_match_style default 'off', no locked column —
-        // the 08_24 migration under test adds it).
+        // (pre-rollout: order_match_style default 'off', NULLABLE so the
+        // genuinely-unset case exists; no locked column — the 08_24
+        // migration under test adds it).
         Schema::create('companies', function (Blueprint $t) {
             $t->id();
             $t->string('name');
-            $t->string('order_match_style', 10)->default('off');
+            $t->string('order_match_style', 10)->nullable()->default('off');
         });
     }
 
@@ -57,11 +62,12 @@ class OrderMatchLockChronologyTest extends TestCase
 
     public function test_fresh_database_chronology_ends_with_frost_and_brew_token_and_locked(): void
     {
-        // id 26 must really be 26 — pad the table up to it.
+        // id 26 must really be 26 — pad the table up to it. All rows are
+        // genuinely UNSET (NULL): the corrected rollout flips only these.
         for ($i = 1; $i <= 25; $i++) {
-            DB::table('companies')->insert(['id' => $i, 'name' => "Shop {$i}", 'order_match_style' => 'off']);
+            DB::table('companies')->insert(['id' => $i, 'name' => "Shop {$i}", 'order_match_style' => null]);
         }
-        DB::table('companies')->insert(['id' => 26, 'name' => 'Frost and Brew', 'order_match_style' => 'off']);
+        DB::table('companies')->insert(['id' => 26, 'name' => 'Frost and Brew', 'order_match_style' => null]);
 
         foreach (self::MIGRATIONS_IN_ORDER as $path) {
             $this->runMigration($path);
@@ -81,7 +87,7 @@ class OrderMatchLockChronologyTest extends TestCase
 
     public function test_locked_row_survives_a_rerun_of_the_bulk_rollout(): void
     {
-        DB::table('companies')->insert(['id' => 26, 'name' => 'Frost and Brew', 'order_match_style' => 'off']);
+        DB::table('companies')->insert(['id' => 26, 'name' => 'Frost and Brew', 'order_match_style' => null]);
 
         foreach (self::MIGRATIONS_IN_ORDER as $path) {
             $this->runMigration($path);

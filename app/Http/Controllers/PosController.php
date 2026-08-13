@@ -4712,8 +4712,15 @@ class PosController extends Controller
         }
 
         // ── Range analytics (owner request Jul 2026): date-window deep dive ──
-        [$rangeFrom, $rangeTo] = $this->resolveReportRange($request);
-        $rangeAnalytics = $this->buildReportRangeAnalytics($companyId, $rangeFrom, $rangeTo, $tab, $cashierFilter, $company, $user);
+        // Plan gate (Task 664 review): the analytics deep dive is a paid
+        // entitlement (analytics_enabled, Business+ since Aug 2026). Ineligible
+        // plans get NULL — the data is never built for them; the view renders
+        // an upgrade-locked card instead. The PDF endpoint has its own gate.
+        $rangeAnalytics = null;
+        if (PosFeatureService::planAllows($company, 'analytics_enabled')) {
+            [$rangeFrom, $rangeTo] = $this->resolveReportRange($request);
+            $rangeAnalytics = $this->buildReportRangeAnalytics($companyId, $rangeFrom, $rangeTo, $tab, $cashierFilter, $company, $user);
+        }
 
         return view('pos.reports', compact('dailySales', 'paymentSummary', 'topItems', 'monthlyTrend', 'tab', 'hasPinSet', 'localCount', 'user', 'teamMembers', 'isCashier', 'selectedCashier', 'localBills', 'monthStart', 'rangeAnalytics'));
     }

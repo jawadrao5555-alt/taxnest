@@ -87,6 +87,12 @@
             <div class="lbl">{{ __('pos.ra_total_discounts') }}</div>
             <div class="val">PKR {{ number_format($analytics->summary->discount, 2) }}</div>
         </div>
+        @if(($analytics->wastage ?? null) !== null)
+        <div class="info-row">
+            <div class="lbl">{{ __('pos.ra_wastage_label') }}</div>
+            <div class="val">{{ number_format($analytics->wastage->count) }} / PKR {{ number_format($analytics->wastage->amount, 2) }}</div>
+        </div>
+        @endif
         <div class="info-row">
             <div class="lbl">{{ __('pos.dcp_unique_customers') }}</div>
             <div class="val">{{ $analytics->summary->unique_customers }}</div>

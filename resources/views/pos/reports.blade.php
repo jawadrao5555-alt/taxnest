@@ -144,6 +144,19 @@
                 <p class="text-lg font-bold text-gray-900 dark:text-white mt-0.5">{{ number_format($ra->summary->unique_customers) }}</p>
             </div>
         </div>
+        {{-- Range wastage line (Task 595): month/range-wide spoiled-goods total --}}
+        @if(($rangeAnalytics->wastage ?? null) !== null)
+        <div class="p-3 rounded-lg border mb-5 {{ $rangeAnalytics->wastage->count > 0 ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700' }}">
+            <p class="text-sm font-semibold {{ $rangeAnalytics->wastage->count > 0 ? 'text-amber-800 dark:text-amber-300' : 'text-gray-500' }}">
+                @if($rangeAnalytics->wastage->count > 0)
+                    ⚠️ {{ __('pos.ra_wastage_line', ['count' => number_format($rangeAnalytics->wastage->count), 'amount' => number_format($rangeAnalytics->wastage->amount, 2)]) }}
+                @else
+                    {{ __('pos.ra_wastage_none') }}
+                @endif
+            </p>
+        </div>
+        @endif
+
         <p class="text-xs text-gray-500 -mt-3 mb-5">{{ __('pos.comparison_vs_previous', ['days' => \Carbon\Carbon::parse($ra->previous->from)->diffInDays(\Carbon\Carbon::parse($ra->previous->to)) + 1, 'from' => \Carbon\Carbon::parse($ra->previous->from)->format('d M'), 'to' => \Carbon\Carbon::parse($ra->previous->to)->format('d M Y'), 'amount' => number_format($ra->previous->revenue), 'bills' => $ra->previous->bills]) }}</p>
 
         {{-- Profit (ADMIN-ONLY, cost-price based) --}}

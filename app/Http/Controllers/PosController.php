@@ -9456,6 +9456,27 @@ class PosController extends Controller
             return $prev > 0 ? round(($cur - $prev) / $prev * 100, 1) : null;
         };
 
+        // Monthly/range wastage line (Task 595): owner's "mahine mein kitna maal
+        // zaya hua" — spoiled-goods returns (transaction_type='return' AND
+        // is_wastage=1) for the SAME range/tab/cashier filters. Separate query
+        // because $transactions excludes return rows. Schema-guarded (PROD drift):
+        // null = column missing, hide the line entirely.
+        $wastage = null;
+        if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'is_wastage')) {
+            $wRow = PosTransaction::where('company_id', $companyId)
+                ->where('status', 'completed')
+                ->where('transaction_type', 'return')
+                ->where('is_wastage', true)
+                ->tap(fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter))
+                ->whereBetween('business_date', [$from->toDateString(), $to->toDateString()])
+                ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as amt')
+                ->first();
+            $wastage = (object) [
+                'count' => (int) ($wRow->cnt ?? 0),
+                'amount' => round((float) ($wRow->amt ?? 0), 2),
+            ];
+        }
+
         $revenue = (float) $transactions->sum('total_amount');
         $tax = (float) $transactions->sum('tax_amount');
         $billCount = $transactions->count();
@@ -9485,6 +9506,7 @@ class PosController extends Controller
             'from' => $from->toDateString(),
             'to' => $to->toDateString(),
             'summary' => $summary,
+            'wastage' => $wastage,
             'previous' => $previous,
             'categories' => $categories,
             'profit' => $profit,

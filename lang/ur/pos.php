@@ -4430,6 +4430,9 @@ return [
     'return_wastage_chip' => 'ضیاع',
     // Wastage reporting (Task 593, Aug 2026)
     'dc_wastage_line' => 'ضیاع (:count): :amount روپے — خراب سامان، اسٹاک میں واپس نہیں گیا',
+    'ra_wastage_line' => 'اس عرصے کا ضیاع (:count): :amount روپے — خراب سامان، اسٹاک میں واپس نہیں گیا',
+    'ra_wastage_none' => 'اس عرصے میں کوئی ضیاع نہیں',
+    'ra_wastage_label' => 'ضیاع (تعداد / رقم)',
     'wastage_only_filter' => 'صرف ضیاع',
     'receipt_credit_note' => 'کریڈٹ نوٹ / واپسی',
     'invoice_submitted_pra_num' => 'انوائس PRA کو جمع ہو گئی۔ PRA فسکل #: :number',

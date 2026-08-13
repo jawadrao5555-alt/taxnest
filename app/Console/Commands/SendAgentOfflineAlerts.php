@@ -26,9 +26,12 @@ use Illuminate\Support\Facades\Mail;
  *    the moment the agent is seen again, so a week-long outage never spams and
  *    a NEW outage after recovery notifies again.
  *  - Sent SYNCHRONOUSLY (no queue worker on cPanel), same as trial:reminders.
- *    WhatsApp was considered but the existing WhatsApp Business infra is
- *    per-company buyer invoice templates (Meta-approved templates only) — not
- *    usable for owner alerts, so registered email is the channel.
+ *  - Task 634: WhatsApp FIRST from TaxNest's CENTRAL WhatsApp Business number
+ *    (Meta-approved utility template, configured on SaaS Admin → Settings),
+ *    to the company mobile normalized via PkPhone. Email is the FALLBACK —
+ *    sent when central WhatsApp is unconfigured, the mobile is unroutable, or
+ *    the WhatsApp send fails. Until the owner completes Meta setup, behaviour
+ *    is identical to Task 630 (email only).
  */
 class SendAgentOfflineAlerts extends Command
 {
@@ -54,6 +57,7 @@ class SendAgentOfflineAlerts extends Command
             ->get();
 
         $sent = 0;
+        $whatsapped = 0;
 
         foreach ($companies as $company) {
             if (!$company->printerSettings()['silent_print_enabled']) {
@@ -77,16 +81,42 @@ class SendAgentOfflineAlerts extends Command
             }
 
             $email = $this->recipientEmail($company);
-            if (!$email) {
-                // No reachable address — mark anyway so we don't re-scan forever;
-                // the in-app Notification row below still covers the panel bell.
-                Log::warning('Agent offline alert: no recipient email', ['company_id' => $company->id]);
-            }
 
             $hours = (int) floor($company->agent_last_seen->diffInMinutes(now()) / 60);
             $lastSeen = $company->agent_last_seen->timezone(config('app.timezone'))->format('d M Y, h:i A');
 
-            if ($email) {
+            // WhatsApp first (TaxNest central number, Task 634). Email only as fallback.
+            $waSent = false;
+            if (\App\Services\WhatsAppBusinessApi::centralConfigured()) {
+                $digits = \App\Services\PkPhone::normalize($company->mobile ?: $company->phone);
+                if ($digits) {
+                    $wa = \App\Services\WhatsAppBusinessApi::sendAgentOfflineAlert(
+                        $digits,
+                        (string) ($company->name ?? 'your shop'),
+                        $hours,
+                        $lastSeen,
+                    );
+                    if ($wa['ok']) {
+                        $waSent = true;
+                        $whatsapped++;
+                    } else {
+                        Log::warning('Agent offline alert WhatsApp failed — falling back to email', [
+                            'company_id' => $company->id,
+                            'error' => $wa['error'] ?? 'unknown',
+                        ]);
+                    }
+                } else {
+                    Log::warning('Agent offline alert: company mobile not routable for WhatsApp', ['company_id' => $company->id]);
+                }
+            }
+
+            if (!$waSent && !$email) {
+                // No reachable channel — mark anyway so we don't re-scan forever;
+                // the in-app Notification row below still covers the panel bell.
+                Log::warning('Agent offline alert: no recipient email', ['company_id' => $company->id]);
+            }
+
+            if (!$waSent && $email) {
                 try {
                     Mail::to($email)->send(new \App\Mail\TrialReminderMail(
                         subjectLine: 'NestPOS Desktop Agent offline hai — printing ruk sakti hai',
@@ -128,7 +158,7 @@ class SendAgentOfflineAlerts extends Command
             $company->forceFill(['agent_offline_notified_at' => now()])->save();
         }
 
-        $this->info("Agent offline alerts processed. Emails sent: {$sent}.");
+        $this->info("Agent offline alerts processed. WhatsApp sent: {$whatsapped}, emails sent: {$sent}.");
 
         return self::SUCCESS;
     }

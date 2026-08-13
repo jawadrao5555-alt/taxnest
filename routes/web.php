@@ -1166,6 +1166,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::post('/settings', [AdminSettingsController::class, 'update'])->name('saas.admin.settings.update');
     Route::post('/settings/test-email', [AdminSettingsController::class, 'sendTestEmail'])->middleware('throttle:5,1')->name('saas.admin.settings.test-email');
     Route::post('/settings/smtp', [AdminSettingsController::class, 'updateSmtp'])->name('saas.admin.settings.smtp');
+    Route::post('/settings/whatsapp', [AdminSettingsController::class, 'updateWhatsApp'])->name('saas.admin.settings.whatsapp');
     Route::get('/audit-logs', [AdminAuditController::class, 'index'])->name('saas.admin.audit');
 
     // Support Inbox — support@taxnest.com.pk (super admin only, guarded in controller)

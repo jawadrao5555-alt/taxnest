@@ -54,7 +54,15 @@ class AdminSettingsController extends Controller
             'has_password' => \App\Services\SmtpRuntimeConfig::hasPassword(),
         ];
 
-        return view('saas-admin.settings', compact('settings', 'smtp'));
+        $wa = [
+            'enabled' => \App\Models\SystemSetting::get(\App\Services\WhatsAppBusinessApi::CENTRAL_ENABLED_KEY, '0') === '1',
+            'phone_number_id' => (string) \App\Models\SystemSetting::get(\App\Services\WhatsAppBusinessApi::CENTRAL_PHONE_ID_KEY, ''),
+            'template' => (string) \App\Models\SystemSetting::get(\App\Services\WhatsAppBusinessApi::CENTRAL_OFFLINE_TEMPLATE_KEY, ''),
+            'lang' => (string) \App\Models\SystemSetting::get(\App\Services\WhatsAppBusinessApi::CENTRAL_LANG_KEY, ''),
+            'has_token' => \App\Services\WhatsAppBusinessApi::centralHasToken(),
+        ];
+
+        return view('saas-admin.settings', compact('settings', 'smtp', 'wa'));
     }
 
     public function update(Request $request)
@@ -163,6 +171,55 @@ class AdminSettingsController extends Controller
         return back()->with('success', $enabled
             ? 'Email (SMTP) settings saved and ACTIVE — use "Send Test Email" below to confirm delivery.'
             : 'Email (SMTP) settings saved but DISABLED — the server\'s .env settings will be used.');
+    }
+
+    /**
+     * TaxNest-central WhatsApp Business number (Task 634) — owner alerts like
+     * agent-offline are sent as a Meta-approved UTILITY template from this
+     * number. Separate from per-company buyer-invoice credentials. Token is
+     * stored ENCRYPTED; leave the token field blank to keep the saved one.
+     */
+    public function updateWhatsApp(Request $request)
+    {
+        $enabled = $request->boolean('wa_enabled');
+
+        $data = $request->validate([
+            'wa_phone_number_id' => [$enabled ? 'required' : 'nullable', 'string', 'max:60'],
+            'wa_token' => ['nullable', 'string', 'max:500'],
+            'wa_template' => ['nullable', 'string', 'max:120'],
+            'wa_lang' => ['nullable', 'string', 'max:10'],
+        ], [], [
+            'wa_phone_number_id' => 'Phone Number ID',
+            'wa_token' => 'API token',
+        ]);
+
+        $newToken = trim((string) ($data['wa_token'] ?? ''));
+
+        if ($enabled && $newToken === '' && !\App\Services\WhatsAppBusinessApi::centralHasToken()) {
+            return back()->withInput()->withErrors(['wa_token' => 'Enter the Meta API token (none saved yet).']);
+        }
+
+        \App\Models\SystemSetting::set(\App\Services\WhatsAppBusinessApi::CENTRAL_ENABLED_KEY, $enabled ? '1' : '0', 'Central WhatsApp owner alerts on/off');
+        \App\Models\SystemSetting::set(\App\Services\WhatsAppBusinessApi::CENTRAL_PHONE_ID_KEY, trim((string) ($data['wa_phone_number_id'] ?? '')), 'Central WhatsApp phone number ID');
+        \App\Models\SystemSetting::set(\App\Services\WhatsAppBusinessApi::CENTRAL_OFFLINE_TEMPLATE_KEY, trim((string) ($data['wa_template'] ?? '')), 'Agent-offline template name');
+        \App\Models\SystemSetting::set(\App\Services\WhatsAppBusinessApi::CENTRAL_LANG_KEY, trim((string) ($data['wa_lang'] ?? '')), 'Central WhatsApp template language code');
+        if ($newToken !== '') {
+            \App\Models\SystemSetting::set(
+                \App\Services\WhatsAppBusinessApi::CENTRAL_TOKEN_KEY,
+                \Illuminate\Support\Facades\Crypt::encryptString($newToken),
+                'Central WhatsApp API token (encrypted)'
+            );
+        }
+
+        AdminAuditLog::log(auth('admin')->id(), 'Central WhatsApp settings updated', 'SystemSetting', null, [
+            'enabled' => $enabled,
+            'phone_number_id' => trim((string) ($data['wa_phone_number_id'] ?? '')),
+            'token_changed' => $newToken !== '',
+        ]);
+
+        return back()->with('success', $enabled
+            ? 'WhatsApp alert settings saved and ACTIVE — agent-offline alerts will try WhatsApp first (email stays the fallback).'
+            : 'WhatsApp alert settings saved but DISABLED — agent-offline alerts will go by email only.');
     }
 
     /**

@@ -261,6 +261,68 @@
         </form>
     </div>
 
+    <div id="whatsapp-alerts" class="bg-gray-900 border border-gray-800 rounded-xl p-5 mt-6">
+        <h2 class="text-sm font-semibold text-white mb-1 flex items-center gap-2">
+            <svg class="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm0 18.03c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.26 8.26 0 01-1.26-4.38c0-4.54 3.7-8.24 8.25-8.24 4.54 0 8.24 3.7 8.24 8.24s-3.7 8.24-8.24 8.24z"/></svg>
+            WhatsApp Alerts (TaxNest Central Number)
+        </h2>
+        <p class="text-[11px] text-gray-500 mb-4">
+            Owner alerts (jaise Desktop Agent offline) TaxNest ke APNE WhatsApp Business number se bheje jate hain — companies ke buyer-invoice WhatsApp credentials se bilkul alag.
+            Requires a Meta Business account with an approved UTILITY template. Default template <span class="font-mono">agent_offline_alert</span> body:
+            <span class="font-mono text-gray-400">"@{{1}} — aap ka NestPOS Desktop Agent @{{2}} ghante se offline hai (aakhri raabta: @{{3}}). PC/agent chalu karein warna bills silent-print nahi hon ge."</span>
+            When disabled or unconfigured, alerts go by email only (current behaviour).
+        </p>
+
+        <form method="POST" action="{{ route('saas.admin.settings.whatsapp') }}" class="space-y-4">
+            @csrf
+
+            <label class="flex items-center gap-3 cursor-pointer select-none">
+                <input type="checkbox" name="wa_enabled" value="1" {{ old('wa_enabled', $wa['enabled'] ? '1' : '') ? 'checked' : '' }}
+                       class="rounded bg-gray-800 border-gray-600 text-emerald-600 focus:ring-emerald-500 w-4 h-4" />
+                <span class="text-sm text-white font-medium">Send owner alerts on WhatsApp (email stays the fallback)</span>
+            </label>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Phone Number ID (Meta)</label>
+                    <input type="text" name="wa_phone_number_id" value="{{ old('wa_phone_number_id', $wa['phone_number_id']) }}"
+                           placeholder="e.g. 123456789012345" autocomplete="off"
+                           class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
+                    @error('wa_phone_number_id') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">
+                        Meta API Token
+                        @if($wa['has_token'])<span class="text-emerald-400 font-semibold">(saved — leave blank to keep)</span>@endif
+                    </label>
+                    <input type="password" name="wa_token" value=""
+                           placeholder="{{ $wa['has_token'] ? '••••••••••••' : 'Permanent system-user access token' }}" autocomplete="new-password"
+                           class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
+                    @error('wa_token') <p class="text-xs text-red-400 mt-1">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Agent-Offline Template Name (optional)</label>
+                    <input type="text" name="wa_template" value="{{ old('wa_template', $wa['template']) }}"
+                           placeholder="Defaults to agent_offline_alert"
+                           class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Template Language Code (optional)</label>
+                    <input type="text" name="wa_lang" value="{{ old('wa_lang', $wa['lang']) }}"
+                           placeholder="Defaults to en"
+                           class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-sm px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500" />
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-3">
+                <p class="text-[11px] text-gray-500">The token is stored encrypted. Alerts try WhatsApp first; on any failure the email goes out as before.</p>
+                <button type="submit" class="px-5 py-2.5 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-500 transition shrink-0">
+                    Save WhatsApp Settings
+                </button>
+            </div>
+        </form>
+    </div>
+
     <div id="email-test" class="bg-gray-900 border border-gray-800 rounded-xl p-5 mt-6">
         <h2 class="text-sm font-semibold text-white mb-1 flex items-center gap-2">
             <svg class="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>

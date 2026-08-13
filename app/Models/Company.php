@@ -291,7 +291,14 @@ class Company extends Model
      */
     public function posReceiptPrefsFor($transaction): array
     {
-        $isPra = (($transaction->invoice_mode ?? 'pra') === 'pra') && $transaction->pra_status !== null;
+        // ZFC (13 Aug 2026): 'exempt_internal' = all-items-exempt bill that is
+        // NEVER reported to PRA (no fiscal number, prints as a plain SALE
+        // RECEIPT with the bottom invoice QR). Customers see it as a local-style
+        // bill, so it must follow the LOCAL display set — with the old rule
+        // (any non-NULL status = PRA) these bills ignored every Local-tab toggle.
+        $isPra = (($transaction->invoice_mode ?? 'pra') === 'pra')
+            && $transaction->pra_status !== null
+            && $transaction->pra_status !== 'exempt_internal';
 
         return $this->posReceiptPrefs($isPra ? 'pra' : 'local');
     }

@@ -316,7 +316,10 @@
         @if($company->business_activity)<p>{{ $company->business_activity }}</p>@endif
         @if(!empty($addressLine) && $rp['show_address'])<p>{{ $addressLine }}</p>@endif
         @if($phoneLine && $rp['show_mobile'])<p>{{ __('pos.rcpt_tel') }} {{ $phoneLine }}</p>@endif
-        @if($company->email && $rp['show_email'])<p>{{ $company->email }}</p>@endif
+        {{-- email_off wrappers (ZFC 13 Aug 2026): Cloudflare Scrape Shield rewrites
+             bare emails into "[email protected]" in proxied HTML — receipts printed
+             the literal placeholder. The comments disable obfuscation for this run. --}}
+        @if($company->email && $rp['show_email'])<p><!--email_off-->{{ $company->email }}<!--/email_off--></p>@endif
         @if($company->website)<p>{{ $company->website }}</p>@endif
         @if($company->ntn && $rp['show_ntn'])<p><strong>NTN:</strong> {{ $company->ntn }}</p>@endif
         @if(!empty($company->fbr_registration_no))<p><strong>STRN:</strong> {{ $company->fbr_registration_no }}</p>@endif
@@ -654,8 +657,10 @@
     @if($transaction->pra_status === 'submitted' && $transaction->pra_invoice_number)
     @php
         // QR carries the RAW PRA invoice number (PRA Sahulat app format).
+        // minVersion 4 (ZFC 13 Aug 2026): same module grid as the local invoice
+        // QR so both QR types look visually consistent — content untouched.
         $praQr = $transaction->pra_invoice_number
-            ? \App\Support\QrImage::dataUri($transaction->pra_invoice_number)
+            ? \App\Support\QrImage::dataUri($transaction->pra_invoice_number, 5, 4)
             : ($transaction->pra_qr_code ?: '');
     @endphp
     @if($praQr)
@@ -684,22 +689,25 @@
         if ($showReceiptQr) {
             $publicUrl = \App\Http\Controllers\PublicProfileController::publicUrlFor($transaction->company);
             if ($publicUrl) {
-                $qrUrl = \App\Support\QrImage::dataUri($publicUrl);
+                $qrUrl = \App\Support\QrImage::dataUri($publicUrl, 5, 4);
                 $qrCaption = __('pos.receipt_scan_menu');
             } else {
                 // ZFC issue #9 (28 Jul 2026): business name OFF => QR payload must
                 // not leak the name either (owner scanned QR, saw "business" field).
-                $qrPayload = [
-                    'type' => $rcptIsProvisional ? 'Provisional Bill' : 'Sale Receipt',
-                    'inv' => $transaction->invoice_number,
-                    'date' => $transaction->created_at->format('d/m/Y H:i'),
-                    'total' => number_format($transaction->total_amount, 2),
+                // Compact plain-text payload + shared minVersion 4 (ZFC 13 Aug 2026):
+                // the old JSON payload rendered a much denser QR than the PRA fiscal
+                // QR at the same size — customers read them as different QR types.
+                $qrLines = [
+                    $rcptIsProvisional ? 'Provisional Bill' : 'Sale Receipt',
+                    $transaction->invoice_number,
+                    $transaction->created_at->format('d/m/Y H:i'),
+                    'Total: ' . number_format($transaction->total_amount, 2),
                 ];
                 if ($rp['show_business_name'] ?? true) {
-                    $qrPayload['business'] = $transaction->company->name ?? 'NestPOS';
+                    $qrLines[] = $transaction->company->name ?? 'NestPOS';
                 }
-                $qrData = json_encode($qrPayload);
-                $qrUrl = \App\Support\QrImage::dataUri($qrData);
+                $qrData = implode("\n", $qrLines);
+                $qrUrl = \App\Support\QrImage::dataUri($qrData, 5, 4);
                 $qrCaption = __('pos.receipt_scan_invoice');
             }
         } else {

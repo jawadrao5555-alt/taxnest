@@ -682,8 +682,8 @@ class RestaurantWaiterController extends Controller
 
         $q = RestaurantOrder::where('company_id', $companyId)
             ->where('source', 'waiter')
-            ->where('status', 'held')
             ->with(['items', 'table', 'creator', 'assignedCashier']);
+        self::whereOpenWaiterOrder($q);
 
         // Cashiers see orders sent to THEM (or unassigned); admins/managers see all.
         if ($user->isPosCashier()) {
@@ -722,8 +722,8 @@ class RestaurantWaiterController extends Controller
 
         $claimQuery = RestaurantOrder::where('company_id', $companyId)
             ->where('id', $id)
-            ->where('source', 'waiter')
-            ->where('status', 'held');
+            ->where('source', 'waiter');
+        self::whereOpenWaiterOrder($claimQuery);
         // Admin/manager override (Jul 2026): admins see ALL held waiter orders in
         // the table picker — without an override, an order assigned to an
         // off-shift cashier stays stuck for everyone else. Admin claim simply
@@ -738,9 +738,11 @@ class RestaurantWaiterController extends Controller
         if (!$claimed) {
             // MySQL reports 0 affected rows when the value is unchanged (order
             // already assigned to this same cashier) — re-check before failing.
-            $mine = RestaurantOrder::where('company_id', $companyId)
-                ->where('id', $id)->where('source', 'waiter')->where('status', 'held')
-                ->where('assigned_cashier_id', $user->id)->exists();
+            $mineQ = RestaurantOrder::where('company_id', $companyId)
+                ->where('id', $id)->where('source', 'waiter')
+                ->where('assigned_cashier_id', $user->id);
+            self::whereOpenWaiterOrder($mineQ);
+            $mine = $mineQ->exists();
             if (!$mine) {
                 return response()->json(['success' => false, 'message' => 'Order already taken by another cashier.'], 409);
             }
@@ -775,11 +777,43 @@ class RestaurantWaiterController extends Controller
             return response()->json(['success' => false, 'message' => 'Transaction not found.'], 422);
         }
 
+        if (!self::settleWaiterOrder($companyId, (int) $id, $txn, auth('pos')->user())) {
+            return response()->json(['success' => false, 'message' => 'Order already settled.'], 409);
+        }
+
+        return response()->json(['success' => true, 'message' => 'Waiter order settled.']);
+    }
+
+    /**
+     * Task 646: atomic waiter-order settle, shared by completeIncoming (client
+     * fallback) AND PosController::storeInvoice. storeInvoice calls this BEFORE
+     * returning the paid transaction so the receipt templates (auto-print
+     * included) can already look the waiter up via pos_transaction_id — the
+     * old client-only completeIncomingOrder fetch raced the print chain and
+     * the first receipt could miss the "Waiter:" line.
+     *
+     * Authorization mirrors claimIncoming (architect review): a non-admin may
+     * settle only an order that is UNASSIGNED or assigned to THEM; POS admins/
+     * managers may settle any (same off-shift-cashier rescue policy). The
+     * order id is client-supplied on both call paths, so this guard is the
+     * security boundary — never relax it to company-scope alone.
+     */
+    public static function settleWaiterOrder(int $companyId, int $orderId, \App\Models\PosTransaction $txn, ?\App\Models\User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
         // Atomic claim — double-click / two cashiers can't settle the same order twice.
-        $claimed = RestaurantOrder::where('company_id', $companyId)
-            ->where('id', $id)
-            ->where('source', 'waiter')
-            ->where('status', 'held')
+        $claimQuery = RestaurantOrder::where('company_id', $companyId)
+            ->where('id', $orderId)
+            ->where('source', 'waiter');
+        self::whereOpenWaiterOrder($claimQuery);
+        if (!$user->isPosAdmin()) {
+            $claimQuery->where(function ($w) use ($user) {
+                $w->whereNull('assigned_cashier_id')->orWhere('assigned_cashier_id', $user->id);
+            });
+        }
+        $claimed = $claimQuery
             ->update([
                 'status' => 'completed',
                 'pos_transaction_id' => $txn->id,
@@ -787,10 +821,10 @@ class RestaurantWaiterController extends Controller
                 'updated_at' => now(),
             ]);
         if (!$claimed) {
-            return response()->json(['success' => false, 'message' => 'Order already settled.'], 409);
+            return false;
         }
 
-        $order = RestaurantOrder::where('company_id', $companyId)->with('table')->find($id);
+        $order = RestaurantOrder::where('company_id', $companyId)->with('table')->find($orderId);
 
         // Free the table if no other live order still sits on it (P4 pattern).
         if ($order && $order->table_id) {
@@ -805,7 +839,31 @@ class RestaurantWaiterController extends Controller
             }
         }
 
-        return response()->json(['success' => true, 'message' => 'Waiter order settled.']);
+        return true;
+    }
+
+    /**
+     * Task 644 review fix (Aug 2026): the incoming/claim/settle trio used a bare
+     * status='held' filter, but the legacy KDS status route (updateStatus) can
+     * move an order held→preparing→ready. A TABLELESS waiter ("counter") order
+     * in those states was counted as pending on the dashboard yet invisible in
+     * the bell panel and unclaimable/unsettleable — a true dead end, because the
+     * bell panel is its ONLY surface (owner rule 5 Aug 2026: counter orders never
+     * appear on the table board/picker). Open = held, OR tableless in
+     * preparing/ready. Table-attached waiter orders keep the old held-only panel
+     * behaviour: the Tables board already lists/settles them in every open status.
+     * Keep this predicate the mirror of the dashboard's counterOrdersCount slice
+     * (RestaurantPosController::dashboard) — every counted order must be
+     * reachable and settleable through this trio.
+     */
+    private static function whereOpenWaiterOrder($q)
+    {
+        return $q->where(function ($w) {
+            $w->where('status', 'held')
+              ->orWhere(function ($x) {
+                  $x->whereNull('table_id')->whereIn('status', ['preparing', 'ready']);
+              });
+        });
     }
 
     private function orderJson(RestaurantOrder $o): array

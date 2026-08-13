@@ -286,4 +286,81 @@ class PosNeverReportedReceiptDisplayTest extends TestCase
             'PDF header email must ride inside email_off comments'
         );
     }
+
+    // ── 5. invoice-pdf FOOTER respects the resolved display set (Task 654:
+    //      the footer + "Developed by" lines used to print unconditionally,
+    //      ignoring show_footer / show_developed_by) ────────────────────────
+
+    public function test_invoice_pdf_footer_omits_developed_by_and_footer_when_local_toggles_off(): void
+    {
+        $company = $this->makeCompany();
+        $prefs = $company->invoice_display_prefs;
+        $prefs['pos_local']['show_footer'] = false;
+        $prefs['pos_local']['show_developed_by'] = false;
+        $company->invoice_display_prefs = $prefs;
+        $txn = $this->makeTransaction($company); // exempt_internal → Local set
+
+        $body = $this->body($this->render('pos.invoice-pdf', $company, $txn));
+
+        $this->assertStringNotContainsString(__('pos.brand_developed_by'), $body,
+            'PDF footer must not print Developed-by when show_developed_by=false');
+        $this->assertStringNotContainsString(__('pos.receipt_thank_purchase'), $body,
+            'PDF footer must not print thank-you line when show_footer=false');
+    }
+
+    public function test_invoice_pdf_footer_prints_by_default_and_uses_custom_footer_text(): void
+    {
+        $company = $this->makeCompany();
+        $prefs = $company->invoice_display_prefs;
+        $prefs['pos_local']['footer_text'] = 'Shukriya - phir aayen';
+        $company->invoice_display_prefs = $prefs;
+        $txn = $this->makeTransaction($company); // Local set, footer defaults ON
+
+        $body = $this->body($this->render('pos.invoice-pdf', $company, $txn));
+
+        $this->assertStringContainsString(__('pos.brand_developed_by'), $body,
+            'PDF footer prints Developed-by by default');
+        $this->assertStringContainsString('Shukriya - phir aayen', $body,
+            'PDF footer uses the Local set custom footer_text');
+    }
+
+    // ── 6. Default thank-you line parity (Task 663) ───────────────────────
+    //      58mm used pos.receipt_thank_you while 80mm + PDF used
+    //      pos.receipt_thank_purchase — the SAME bill printed a different
+    //      footer depending on paper width. Standardized on
+    //      receipt_thank_purchase; this locks all three surfaces to one key.
+
+    public function test_default_thank_you_line_identical_on_all_receipt_surfaces(): void
+    {
+        $company = $this->makeCompany();
+        $txn = $this->makeTransaction($company); // Local set, no custom footer_text
+
+        $expected = __('pos.receipt_thank_purchase');
+        $legacy = __('pos.receipt_thank_you');
+
+        foreach (self::TEMPLATES as $template) {
+            $body = $this->body($this->render($template, $company, $txn));
+            $this->assertStringContainsString($expected, $body,
+                "{$template} must use the standardized pos.receipt_thank_purchase default footer");
+            $this->assertStringNotContainsString($legacy, $body,
+                "{$template} must not use the legacy pos.receipt_thank_you default footer");
+        }
+
+        $pdfBody = $this->body($this->render('pos.invoice-pdf', $company, $txn));
+        $this->assertStringContainsString($expected, $pdfBody,
+            'invoice-pdf must use the standardized pos.receipt_thank_purchase default footer');
+        $this->assertStringNotContainsString($legacy, $pdfBody,
+            'invoice-pdf must not use the legacy pos.receipt_thank_you default footer');
+    }
+
+    public function test_thank_you_key_synced_across_all_languages(): void
+    {
+        foreach (['en', 'rur', 'ur'] as $locale) {
+            $line = trans('pos.receipt_thank_purchase', [], $locale);
+            $this->assertNotSame('pos.receipt_thank_purchase', $line,
+                "pos.receipt_thank_purchase must exist in lang/{$locale}");
+            $this->assertNotSame('', trim($line),
+                "pos.receipt_thank_purchase must be non-empty in lang/{$locale}");
+        }
+    }
 }

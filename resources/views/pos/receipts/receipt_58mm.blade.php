@@ -276,8 +276,9 @@
         // Bill Number Style (07 Aug 2026): token = BIG display number; serial
         // stays underneath as reference. Mirrors receipt_80mm exactly.
         $rcptBillToken = null;
-        $rcptIsLocalStream = ($transaction->invoice_mode ?? null) === 'local'
-            || (($transaction->pra_status ?? null) === null && ($transaction->pra_invoice_number ?? null) === null);
+        // Task 647: single predicate (PosTransaction helpers) — exempt bills
+        // follow the LOCAL number style; mirrors receipt_80mm.
+        $rcptIsLocalStream = $transaction->isLocalBill() || $transaction->isExemptStream();
         try {
             if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'bill_token') && $transaction->bill_token) {
                 $rcptNumStyle = $rcptIsLocalStream ? ($company->local_number_style ?? 'serial') : ($company->pra_number_style ?? 'serial');
@@ -447,6 +448,29 @@
         @if($transaction->creator && $rp['show_cashier'])
         <tr><td class="info-label">{{ __('pos.receipt_cashier') }}:</td><td class="info-value">{{ $transaction->creator->name }}</td></tr>
         @endif
+        {{-- Task 646 (Aug 2026): waiter-originated bills also print the WAITER's
+             name (KOT already carries it since Task 620). Explicit guarded query —
+             live has strict lazy loading + PROD schema drift convention; only
+             source='waiter' orders qualify, cashier-punched bills add no line. --}}
+        @php
+            // hasColumn guard = PROD schema-drift convention only; any other
+            // failure must surface (no blanket catch — a silently missing
+            // waiter line is invisible to everyone).
+            $rcptWaiterName = null;
+            if (($transaction->order_type ?? null)
+                && \Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'source')) {
+                $rcptWaiterRO = \App\Models\RestaurantOrder::where('company_id', $transaction->company_id)
+                    ->where('pos_transaction_id', $transaction->id)
+                    ->where('source', 'waiter')
+                    ->with('creator')
+                    ->orderByDesc('id')
+                    ->first();
+                $rcptWaiterName = $rcptWaiterRO?->creator?->name;
+            }
+        @endphp
+        @if($rcptWaiterName)
+        <tr><td class="info-label">{{ __('pos.receipt_waiter') }}:</td><td class="info-value">{{ $rcptWaiterName }}</td></tr>
+        @endif
     </table>
 
     <div class="separator"></div>
@@ -568,6 +592,12 @@
         @endif
     </table>
 
+    {{-- Task 647: exempt-bill clarifier — approved neutral wording, small/plain,
+         no box, render-time locale. Mirrors receipt_80mm. --}}
+    @if($transaction->isExemptStream())
+    <div style="font-size:8px; font-weight:normal; color:#000; text-align:center; margin:2px 0; padding:1px 0;">{{ __('pos.receipt_exempt_clarifier') }}</div>
+    @endif
+
     @if(($transaction->order_type ?? '') === 'delivery' || !empty($transaction->delivery_address) || $transaction->rider)
     @php
         // ZFC feedback Jul 2026: riders must see AT A GLANCE cash vs card/online.
@@ -650,7 +680,7 @@
     @endif
 
     <div class="footer text-center">
-        @if($rp['show_footer'])<p>{{ $rp['footer_text'] ?? __('pos.receipt_thank_you') }}</p>@endif
+        @if($rp['show_footer'])<p>{{ $rp['footer_text'] ?? __('pos.receipt_thank_purchase') }}</p>@endif
         @if($rp['show_developed_by'] ?? true)<p>{{ __('pos.brand_developed_by') }}</p>@endif
         <p>{{ now()->format('d/m/Y h:i A') }}</p>
     </div>

@@ -71,8 +71,10 @@ $MATRIX = [
     // 10 Aug 2026 FBR infrastructure pass: khata/loyalty/kot columns added
     // TRUE for every plan of every product (behaviour-preserving — nothing
     // was gated on them before). The FBR ladder flip comes later.
+    // 13 Aug 2026 (owner, market-capture move): Business gains Kitchen mode
+    // (restaurant_enabled — asserted separately below) + Analytics.
     'Starter'   => [false, false, false, false, false, false, false, false, false, false, true, true, true],
-    'Business'  => [true,  false, false, false, true,  false, false, false, true,  true,  true, true, true],
+    'Business'  => [true,  false, false, true,  true,  false, false, false, true,  true,  true, true, true],
     'Pro'       => [true,  true,  false, true,  true,  false, false, true,  true,  true,  true, true, true],
     'Pro Max'   => [true,  true,  true,  true,  true,  false, false, true,  true,  true,  true, true, true],
     'Unlimited' => [true,  true,  true,  true,  true,  true,  true,  true,  true,  true,  true, true, true],
@@ -80,6 +82,9 @@ $MATRIX = [
 // Derived-surface expectations per plan:
 $CUSTOM_SET_PLANS = ['Unlimited'];                   // customSet() honored only here
 $QR_URL_PLANS     = ['Pro', 'Pro Max', 'Unlimited']; // publicUrlFor() non-null only here
+// Restaurant module (pricing_plans.restaurant_enabled → restaurantAllowed()):
+// Business+ since 13 Aug 2026 (Kitchen mode opened up for Business).
+$RESTAURANT_PLANS = ['Business', 'Pro', 'Pro Max', 'Unlimited'];
 
 $fail = 0;
 $pass = 0;
@@ -151,6 +156,13 @@ try {
         $c = $mkCompany($planName);
         $mkSub($c, $plans[$planName]->id);
         $assertGates($c, $expected, "plan {$planName}");
+
+        // Restaurant & Kitchen module (restaurant_enabled column, not a
+        // PLAN_GATES entry — it rides through restaurantAllowed()).
+        $wantResto = in_array($planName, $RESTAURANT_PLANS, true);
+        $gotResto = PosFeatureService::restaurantAllowed($c);
+        check($gotResto === $wantResto,
+            "plan {$planName}: restaurantAllowed() expected " . var_export($wantResto, true) . ', got ' . var_export($gotResto, true));
 
         // Team Custom Access: stored set goes inert unless plan allows it.
         $set = PosAccessService::customSet($mkUser($c));

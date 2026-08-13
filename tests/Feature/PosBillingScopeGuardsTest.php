@@ -236,6 +236,19 @@ class PosBillingScopeGuardsTest extends TestCase
             $table->timestamps();
         });
 
+        // Needed by the reports() waiter-attribution lookup (Task 647 tests).
+        Schema::create('restaurant_orders', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->unsignedBigInteger('pos_transaction_id')->nullable();
+            $table->string('order_number')->nullable();
+            $table->unsignedInteger('token_no')->nullable();
+            $table->string('source')->nullable();
+            $table->string('status')->nullable();
+            $table->unsignedBigInteger('created_by')->nullable();
+            $table->timestamps();
+        });
+
         // Needed by PlanLimitService::canCreatePosBill (day-close deleted finals).
         Schema::create('pos_day_close_reports', function (Blueprint $table) {
             $table->id();
@@ -912,5 +925,73 @@ class PosBillingScopeGuardsTest extends TestCase
             'owner must be able to set pos_billing_scope to local');
         $this->assertSame(0, (int) $fresh->pra_reporting_enabled,
             "'local' scope lock must force pra_reporting_enabled=false (reporting alignment)");
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Coverage — Exempt stream isolation (Task 647)
+    // exempt_internal bills are their OWN stream: excluded from the Local
+    // Reports "Local Invoices" list even when invoice_mode='local' (data
+    // drift), and never promotable via the Local-to-PRA retry action.
+    // ════════════════════════════════════════════════════════════════════════
+
+    public function test_reports_local_invoices_list_excludes_exempt_bills_regardless_of_mode(): void
+    {
+        $cid   = $this->makeCompany();
+        $owner = $this->makeOwner($cid);
+        $this->subscribe($cid);
+
+        $provId = $this->makeTxn($cid, ['invoice_number' => 'L-PROV-1']);
+        // The precedence/data-drift case: exempt status must win over local mode.
+        $this->makeTxn($cid, [
+            'invoice_number' => 'EX-LOCALMODE',
+            'invoice_mode'   => 'local',
+            'pra_status'     => 'exempt_internal',
+        ]);
+        $this->makeTxn($cid, [
+            'invoice_number' => 'EX-PRAMODE',
+            'invoice_mode'   => 'pra',
+            'pra_status'     => 'exempt_internal',
+        ]);
+
+        $response = $this->actingAs($owner, 'pos')->get('/pos/reports?tab=local');
+        $response->assertOk();
+
+        $localBills = $response->viewData('localBills');
+        $this->assertNotNull($localBills, 'local tab must expose the localBills list');
+        $numbers = collect($localBills->items())->pluck('invoice_number')->all();
+
+        $this->assertContains('L-PROV-1', $numbers, 'provisional stays in the Local Invoices list');
+        $this->assertNotContains('EX-LOCALMODE', $numbers,
+            'exempt_internal bill must NOT appear in Local Invoices even with invoice_mode=local');
+        $this->assertNotContains('EX-PRAMODE', $numbers,
+            'exempt_internal bill must NOT appear in Local Invoices');
+    }
+
+    public function test_retry_pra_refuses_exempt_bills_in_both_modes(): void
+    {
+        $cid   = $this->makeCompany();
+        $owner = $this->makeOwner($cid);
+        $this->subscribe($cid);
+
+        foreach (['local', 'pra'] as $mode) {
+            $billId = $this->makeTxn($cid, [
+                'invoice_number' => "EX-RETRY-{$mode}",
+                'invoice_mode'   => $mode,
+                'pra_status'     => 'exempt_internal',
+            ]);
+
+            $response = $this->actingAs($owner, 'pos')
+                ->from('/pos/reports?tab=local')
+                ->post("/pos/transaction/{$billId}/retry-pra");
+
+            $response->assertRedirect();
+            $response->assertSessionHas('error');
+
+            $fresh = DB::table('pos_transactions')->where('id', $billId)->first();
+            $this->assertSame('exempt_internal', $fresh->pra_status,
+                "retry-pra must never touch an exempt bill (mode={$mode})");
+            $this->assertNull($fresh->pra_invoice_number,
+                "exempt bill must never gain a fiscal number (mode={$mode})");
+        }
     }
 }

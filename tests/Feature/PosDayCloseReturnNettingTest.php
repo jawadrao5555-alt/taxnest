@@ -41,6 +41,10 @@ class PosDayCloseReturnNettingTest extends TestCase
 
         Schema::dropAllTables();
         User::flushScopeColumnCache();
+        // planAllows caches per company id statically — ids restart at 1 after
+        // dropAllTables, so a stale cache would leak between tests (the
+        // analytics_enabled gate on reports() reads it since Task 664).
+        \App\Services\PosFeatureService::flushGateCaches();
 
         Schema::create('companies', function (Blueprint $table) {
             $table->id();
@@ -501,6 +505,18 @@ class PosDayCloseReturnNettingTest extends TestCase
         $companyId = $this->makeCompany();
         $user = $this->makePosUser($companyId);
         $this->seedNettingDay($companyId, $user->id);
+
+        // reports() now plan-gates the analytics deep dive (Task 664 review):
+        // give the company an active subscription so rangeAnalytics is built.
+        // pricing_plans here lacks analytics_enabled → gate fails OPEN by the
+        // schema-lag convention, which is exactly what this minimal schema needs.
+        $planId = DB::table('pricing_plans')->insertGetId([
+            'name' => 'Business', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('subscriptions')->insert([
+            'company_id' => $companyId, 'pricing_plan_id' => $planId,
+            'active' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
 
         Auth::guard('pos')->setUser($user);
         app()->instance('currentCompanyId', $companyId);

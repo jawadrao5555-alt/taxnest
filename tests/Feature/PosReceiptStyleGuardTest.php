@@ -363,6 +363,31 @@ class PosReceiptStyleGuardTest extends TestCase
         $this->assertSame($seeded['pos_local'], $prefs['pos_local']);
     }
 
+    // ── Task 662: manual order-match save locks the choice ────────────────
+
+    public function test_manual_order_match_save_sets_locked_flag_on_both_panels(): void
+    {
+        Schema::table('companies', function (Blueprint $t) {
+            $t->boolean('order_match_style_locked')->default(false);
+        });
+
+        // PRA panel manual save.
+        $this->actingAs(User::find($this->posAdminId), 'pos')
+            ->post('/pos/receipt-settings', ['rp_order_match' => 'token'])
+            ->assertRedirect();
+        $posRow = DB::table('companies')->find($this->posCompanyId);
+        $this->assertSame('token', $posRow->order_match_style);
+        $this->assertEquals(1, $posRow->order_match_style_locked, 'PRA manual save must lock the choice');
+
+        // FBR panel manual save (rp_logo_style is required by its validator).
+        $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')
+            ->post('/fbr-pos/receipt-settings', ['rp_order_match' => 'token', 'rp_logo_style' => 'center'])
+            ->assertRedirect();
+        $fbrRow = DB::table('companies')->find($this->fbrCompanyId);
+        $this->assertSame('token', $fbrRow->order_match_style);
+        $this->assertEquals(1, $fbrRow->order_match_style_locked, 'FBR manual save must lock the choice');
+    }
+
     // ── 6. Cashier stays blocked ──────────────────────────────────────────
 
     public function test_cashier_receipt_settings_post_is_blocked_and_prefs_untouched(): void

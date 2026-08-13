@@ -46,14 +46,34 @@
                 </span>
             </a>
             @if($pbIsRestaurant)
+            @php
+                // Task 644 (ZFC, 13 Aug 2026): TABLELESS waiter ("counter") orders
+                // are invisible on the Tables page by owner rule (5 Aug 2026: they
+                // live ONLY in the sale screen's bell panel) — linking them to the
+                // Tables page was a DEAD END. Split the open count: table orders →
+                // Tables page (unchanged), counter orders → sale screen with the
+                // bell panel auto-opened (?open_incoming=1; claim stays atomic).
+                $pbCounter = (int) ($counterOrdersCount ?? 0);
+                $pbTableOpen = max(0, $pbOpen - $pbCounter);
+            @endphp
             <a href="{{ route('pos.restaurant.tables') }}"
-               class="flex items-center gap-2.5 px-3.5 py-2 rounded-lg border bg-white dark:bg-gray-800 {{ $pbOpen > 0 ? 'border-amber-200 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700' }} transition">
-                <span class="text-xl font-extrabold {{ $pbOpen > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400' }}">{{ $pbOpen }}</span>
+               class="flex items-center gap-2.5 px-3.5 py-2 rounded-lg border bg-white dark:bg-gray-800 {{ $pbTableOpen > 0 ? 'border-amber-200 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700' }} transition">
+                <span class="text-xl font-extrabold {{ $pbTableOpen > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400' }}">{{ $pbTableOpen }}</span>
                 <span class="text-left">
                     <span class="block text-[11px] font-bold text-gray-800 dark:text-gray-200">{{ __('pos.pending_open_tables') }}</span>
                     <span class="block text-[10px] text-gray-400">{{ __('pos.pending_open_tables_sub') }}</span>
                 </span>
             </a>
+            @if($pbCounter > 0)
+            <a href="{{ route('pos.invoice.create', ['open_incoming' => 1]) }}"
+               class="flex items-center gap-2.5 px-3.5 py-2 rounded-lg border bg-white dark:bg-gray-800 border-amber-200 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition">
+                <span class="text-xl font-extrabold text-amber-600 dark:text-amber-400">{{ $pbCounter }}</span>
+                <span class="text-left">
+                    <span class="block text-[11px] font-bold text-gray-800 dark:text-gray-200">{{ __('pos.pending_counter_orders') }}</span>
+                    <span class="block text-[10px] text-gray-400">{{ __('pos.pending_counter_orders_sub') }}</span>
+                </span>
+            </a>
+            @endif
             {{-- Task 113: Cancelled Orders count (current business day) → report page.
                  Informational only — NOT part of the pending total (cancelled ≠ pending). --}}
             @php $pbCancelled = (int) ($cancelledTodayCount ?? 0); @endphp

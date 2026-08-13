@@ -346,6 +346,12 @@ class PosController extends Controller
             if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'order_match_style')
                 && in_array($request->input('rp_order_match'), ['off', 'token', 'code'], true)) {
                 $companyUpdates['order_match_style'] = $request->input('rp_order_match');
+                // Task 662: manual save = deliberate choice — lock it so future
+                // bulk rollout migrations (which must WHERE locked=false) can
+                // never override this shop's pick again.
+                if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'order_match_style_locked')) {
+                    $companyUpdates['order_match_style_locked'] = true;
+                }
             }
             // Bill Number Style (07 Aug 2026): per-stream receipt numbering display —
             // 'serial' = chalti series (POS-YYYY-NNNNN / L-NNN), 'token' = roz ka
@@ -1681,6 +1687,11 @@ class PosController extends Controller
             // Task 643: the Order Cancel verdict is BAKED into the sale screen —
             // toggling the company switch / custom access must refresh the cache.
             (bool) \App\Services\PosAccessService::orderCancelAllowed($user, $company),
+            // Task 657: restaurant flags (KOT/tables buttons) are BAKED into the
+            // sale screen after the restaurantAllowed() mask — a plan flip
+            // (e.g. Starter→Business now unlocks Kitchen mode) must refresh the
+            // offline-cached copy even though feature_flags itself is unchanged.
+            (bool) \App\Services\PosFeatureService::restaurantAllowed($company),
         ]));
 
         $screenPath = resource_path('views/pos/universal.blade.php');
@@ -1884,6 +1895,10 @@ class PosController extends Controller
             // Branch the bill was rung up on (multi-branch shops): snapshot from
             // the offline queue so a later sync books it under the right branch.
             'offline_branch_id' => 'nullable|integer',
+            // Task 646: waiter order loaded into the cart — FINAL bills settle
+            // it server-side BEFORE the response so the receipt can print the
+            // waiter's name on the very first (auto-)print.
+            'incoming_order_id' => 'nullable|integer',
         ]);
 
         // OFFLINE-FIRST replay guard: if an earlier sync attempt already stored
@@ -2412,6 +2427,28 @@ class PosController extends Controller
             auth('pos')->id()
         );
 
+        // Task 646: settle the linked WAITER order server-side, BEFORE this
+        // response — the receipt templates look the waiter up via
+        // restaurant_orders.pos_transaction_id, so the link must exist by the
+        // time the (auto-)print chain renders the first receipt. FINAL bills
+        // only: the client omits incoming_order_id on provisional saves (a
+        // provisional must never consume the waiter order — conscious P7 rule).
+        $waiterOrderSettled = false;
+        if (!$saveAsProvisional && $request->filled('incoming_order_id')) {
+            try {
+                $waiterOrderSettled = RestaurantWaiterController::settleWaiterOrder(
+                    $companyId, (int) $request->input('incoming_order_id'), $transaction, auth('pos')->user()
+                );
+            } catch (\Throwable $e) {
+                // Never fail a stored sale over the settle — the client's
+                // completeIncomingOrder fallback retries it.
+                \Log::warning('Waiter order settle in storeInvoice failed: ' . $e->getMessage(), [
+                    'transaction_id' => $transaction->id,
+                    'incoming_order_id' => $request->input('incoming_order_id'),
+                ]);
+            }
+        }
+
         // F3 Dine-In (Jul 2026): a table reserved from the universal sale screen is
         // auto-freed the moment its bill is stored (final OR provisional). Only
         // touches status='reserved' — 'occupied' belongs to the held-order lifecycle
@@ -2470,6 +2507,9 @@ class PosController extends Controller
                 'total_amount' => $totalAmount,
                 'pra_invoice_number' => $transaction->pra_invoice_number ?? null,
                 'pra_status' => $transaction->pra_status ?? null,
+                // Task 646: true = waiter order already settled server-side;
+                // the client skips its completeIncomingOrder fallback call.
+                'waiter_order_settled' => $waiterOrderSettled,
                 'message' => $successMessage,
             ]);
         }
@@ -3494,18 +3534,8 @@ class PosController extends Controller
             // Billing Scope (07 Aug 2026): stream-locked staff get ONLY their own
             // stream in the Reprint list — mirrors applyReportFilters' split.
             ->where(function ($q) {
-                $scope = auth('pos')->user()?->posBillingScope() ?? 'both';
-                if ($scope === 'local') {
-                    $q->where('invoice_mode', 'local')->orWhere(function ($s) {
-                        $s->whereNull('pra_status')->whereNull('pra_invoice_number');
-                    });
-                } elseif ($scope === 'pra') {
-                    $q->where(function ($s) {
-                        $s->where('invoice_mode', '!=', 'local')->orWhereNull('invoice_mode');
-                    })->where(function ($s) {
-                        $s->whereNotNull('pra_status')->orWhereNotNull('pra_invoice_number');
-                    });
-                }
+                // Single predicate (Task 647): exempt bills visible to both scopes.
+                PosTransaction::applyBillingScopeFilter($q, auth('pos')->user()?->posBillingScope() ?? 'both');
             })
             ->orderBy('id', 'desc')
             ->limit(300)
@@ -3532,6 +3562,8 @@ class PosController extends Controller
             // ACTUAL PRA outcome decides, not invoice_mode alone.
             if (!empty($b->pra_invoice_number)) {
                 $badge = 'pra';           // fiscal number issued = PRA-reported
+            } elseif ($b->pra_status === PosTransaction::EXEMPT_INTERNAL) {
+                $badge = 'exempt';        // all-exempt bill — never reported (Task 647)
             } elseif ($b->pra_status === 'local') {
                 $badge = 'provisional';   // deliberate provisional (completed+local+local)
             } elseif (in_array($b->pra_status, ['offline', 'pending'], true)) {
@@ -4147,12 +4179,17 @@ class PosController extends Controller
         //   Local tab → ADMIN-ONLY: L-series bills + reporting-OFF finals (no PRA fiscal).
         // Cashiers are always forced to PRA server-side.
         $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin()) ? 'local' : 'pra';
+        // Exempt tab (Task 647): all-exempt bills (never reported to PRA) —
+        // visible to EVERY role and BOTH billing scopes (they belong to no stream).
+        if ($request->get('tab') === 'exempt') {
+            $tab = 'exempt';
+        }
         // Billing Scope (07 Aug 2026): scope-locked staff are FORCED onto their
         // own stream's tab — a local-scoped manager/cashier IS the offline-billing
         // admin (overrides the admin-only Local rule), a pra-scoped one never
         // sees the Local tab. The other tab is hidden in the view too.
         $scope = $user?->posBillingScope() ?? 'both';
-        if ($scope !== 'both') {
+        if ($scope !== 'both' && $tab !== 'exempt') {
             $tab = $scope === 'local' ? 'local' : 'pra';
         }
 
@@ -4202,13 +4239,9 @@ class PosController extends Controller
      */
     private function billingScopeAllowsRow(PosTransaction $txn): bool
     {
+        // Single predicate (Task 647): exempt bills are visible to EVERY scope.
         $scope = auth('pos')->user()?->posBillingScope() ?? 'both';
-        if ($scope === 'both') {
-            return true;
-        }
-        $isLocal = $txn->invoice_mode === 'local'
-            || ($txn->pra_status === null && $txn->pra_invoice_number === null);
-        return $scope === 'local' ? $isLocal : !$isLocal;
+        return $txn->allowedForBillingScope($scope);
     }
 
     public function transactionShow($id)
@@ -4482,20 +4515,11 @@ class PosController extends Controller
         //                 fiscal number — "jis pe PRA fiscal nahi aya wo local hai").
         //                 INCLUDING archived ones, so hide_archived is bypassed.
         //                 Admin-only (callers force 'pra' for cashiers).
-        if ($tab === 'local') {
-            $query->withoutGlobalScope('hide_archived')->where(function ($sub) {
-                $sub->where('invoice_mode', 'local')
-                    ->orWhere(function ($s) {
-                        $s->whereNull('pra_status')->whereNull('pra_invoice_number');
-                    });
-            });
-        } else {
-            $query->where(function ($sub) {
-                $sub->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
-            })->where(function ($sub) {
-                $sub->whereNotNull('pra_status')->orWhereNotNull('pra_invoice_number');
-            });
-        }
+        //   tab='exempt' → all-exempt bills (pra_status='exempt_internal') — PRA
+        //                 never sees them by design (Task 647). Excluded from the
+        //                 PRA tab; own tab, visible to both billing scopes.
+        // SINGLE predicate — PosTransaction::applyStreamTab is the only truth.
+        PosTransaction::applyStreamTab($query, $tab);
 
         if ($cashierFilter && $cashierFilter !== 'all') {
             $query->where('created_by', $cashierFilter);
@@ -4545,10 +4569,14 @@ class PosController extends Controller
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
         // Local Invoices tab is ADMIN-ONLY — cashiers are always forced to PRA.
         $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin()) ? 'local' : 'pra';
+        // Exempt tab (Task 647): every role + both scopes may view it.
+        if ($request->get('tab') === 'exempt') {
+            $tab = 'exempt';
+        }
         // Billing Scope (07 Aug 2026): scope-locked staff report ONLY their own
         // stream — mirrors the Transactions tab forcing.
         $reportScope = $user?->posBillingScope() ?? 'both';
-        if ($reportScope !== 'both') {
+        if ($reportScope !== 'both' && $tab !== 'exempt') {
             $tab = $reportScope === 'local' ? 'local' : 'pra';
         }
         $cashierFilter = $request->get('cashier', 'all');
@@ -4634,14 +4662,9 @@ class PosController extends Controller
             $localBills = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
                 ->where('status', 'completed')
-                // Same non-reported set as applyReportFilters: L-series bills PLUS
-                // reporting-OFF finals (no PRA fiscal ever).
-                ->where(function ($sub) {
-                    $sub->where('invoice_mode', 'local')
-                        ->orWhere(function ($s) {
-                            $s->whereNull('pra_status')->whereNull('pra_invoice_number');
-                        });
-                })
+                // Same non-reported set as applyReportFilters — SINGLE predicate
+                // (Task 647): exempt_internal is excluded regardless of mode.
+                ->tap(fn ($q) => PosTransaction::applyStreamTab($q, 'local'))
                 ->when($cashierFilter && $cashierFilter !== 'all', fn ($q) => $q->where('created_by', $cashierFilter))
                 ->with('creator')
                 ->orderByDesc('created_at')
@@ -4651,8 +4674,15 @@ class PosController extends Controller
         }
 
         // ── Range analytics (owner request Jul 2026): date-window deep dive ──
-        [$rangeFrom, $rangeTo] = $this->resolveReportRange($request);
-        $rangeAnalytics = $this->buildReportRangeAnalytics($companyId, $rangeFrom, $rangeTo, $tab, $cashierFilter, $company, $user);
+        // Plan gate (Task 664 review): the analytics deep dive is a paid
+        // entitlement (analytics_enabled, Business+ since Aug 2026). Ineligible
+        // plans get NULL — the data is never built for them; the view renders
+        // an upgrade-locked card instead. The PDF endpoint has its own gate.
+        $rangeAnalytics = null;
+        if (PosFeatureService::planAllows($company, 'analytics_enabled')) {
+            [$rangeFrom, $rangeTo] = $this->resolveReportRange($request);
+            $rangeAnalytics = $this->buildReportRangeAnalytics($companyId, $rangeFrom, $rangeTo, $tab, $cashierFilter, $company, $user);
+        }
 
         return view('pos.reports', compact('dailySales', 'paymentSummary', 'topItems', 'monthlyTrend', 'tab', 'hasPinSet', 'localCount', 'user', 'teamMembers', 'isCashier', 'selectedCashier', 'localBills', 'monthStart', 'rangeAnalytics'));
     }
@@ -4672,6 +4702,9 @@ class PosController extends Controller
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
         $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin()) ? 'local' : 'pra';
+        if ($request->get('tab') === 'exempt') {
+            $tab = 'exempt'; // Task 647: exempt stream, open to every role/scope
+        }
         $cashierFilter = $request->get('cashier', 'all');
         // Owner rule (5 Aug 2026): cashier reports are locked to OWN sales.
         if ($isCashier) {
@@ -4700,6 +4733,9 @@ class PosController extends Controller
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
         // Local export is ADMIN-ONLY — cashiers always export PRA data.
         $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin()) ? 'local' : 'pra';
+        if ($request->get('tab') === 'exempt') {
+            $tab = 'exempt'; // Task 647: exempt stream, open to every role/scope
+        }
         $cashierFilter = $request->get('cashier', 'all');
 
         // Owner rule (5 Aug 2026): a cashier ALWAYS sees only their own sales

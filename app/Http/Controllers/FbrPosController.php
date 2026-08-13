@@ -2534,8 +2534,18 @@ class FbrPosController extends Controller
 
             // Order Matching style — stored directly on the companies row (shared with PRA).
             // hasColumn guard: silently no-ops on a not-yet-migrated PROD schema.
-            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'order_match_style')) {
-                $company->order_match_style = $request->input('rp_order_match', 'off');
+            // Task 652: validate against the allowed set (mirrors PRA) — a missing
+            // or garbage value keeps the company's current style instead of
+            // silently forcing 'off' (which would break the new 'code' default).
+            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'order_match_style')
+                && in_array($request->input('rp_order_match'), ['off', 'token', 'code'], true)) {
+                $company->order_match_style = $request->input('rp_order_match');
+                // Task 662: manual save = deliberate choice — lock it so future
+                // bulk rollout migrations (which must WHERE locked=false) can
+                // never override this shop's pick again.
+                if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'order_match_style_locked')) {
+                    $company->order_match_style_locked = true;
+                }
             }
 
             // Task 565: opt-in Yes/No print-confirm dialog — shared flag with PRA
@@ -3016,8 +3026,14 @@ class FbrPosController extends Controller
             ->groupBy('payment_method')
             ->get();
 
-        [$from, $to] = $this->resolveFbrReportRange($request);
-        $rangeAnalytics = $this->buildFbrReportRangeAnalytics($companyId, $from, $to, Auth::guard('fbrpos')->user());
+        // Plan gate (Task 664 review, FBR mirror): analytics deep dive is a paid
+        // entitlement (analytics_enabled — Pro on the FBR ladder). Ineligible
+        // plans get NULL; the view renders an upgrade-locked card instead.
+        $rangeAnalytics = null;
+        if (\App\Services\PosFeatureService::planAllows($company, 'analytics_enabled')) {
+            [$from, $to] = $this->resolveFbrReportRange($request);
+            $rangeAnalytics = $this->buildFbrReportRangeAnalytics($companyId, $from, $to, Auth::guard('fbrpos')->user());
+        }
 
         return view('fbr-pos.reports', compact('company', 'todayStats', 'monthStats', 'dailySales', 'paymentBreakdown', 'rangeAnalytics'));
     }

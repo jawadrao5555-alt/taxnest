@@ -108,7 +108,7 @@
                     </div>
                 </div>
 
-                {{-- Restaurant module plan-lock notice (Pro / Unlimited only) --}}
+                {{-- Restaurant module plan-lock notice (Business+ since Aug 2026) --}}
                 <div x-show="restaurantLocked" x-cloak class="mb-4 p-3.5 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 flex items-start gap-2.5">
                     <span class="text-lg leading-none">🔒</span>
                     <div>

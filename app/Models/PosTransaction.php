@@ -127,6 +127,104 @@ class PosTransaction extends Model
     }
 
     /**
+     * Exempt stream (Task 647): an all-exempt bill is stamped
+     * pra_status='exempt_internal' by PraIntegrationService/AgentController —
+     * there is nothing to report, PRA never sees it. These bills are their OWN
+     * stream: not PRA (no fiscal ever), not Local (deliberate provisional /
+     * reporting-OFF). SINGLE SOURCE OF TRUTH — report tabs, billing scope,
+     * reprint list and receipt number-style must all route through the
+     * helpers below (memory rule pos-billing-scope: never inline a ternary).
+     */
+    public const EXEMPT_INTERNAL = 'exempt_internal';
+
+    /** Is this bill in the Exempt stream (all items tax-exempt, never reported)? */
+    public function isExemptStream(): bool
+    {
+        return ($this->pra_status ?? null) === self::EXEMPT_INTERNAL;
+    }
+
+    /**
+     * THE stream predicate (query side) — drives the Transactions/Reports tab
+     * split everywhere (PosController::applyReportFilters delegates here).
+     *   'pra'    → bills in the PRA pipeline (pra_status NOT NULL or fiscal
+     *              number) EXCLUDING exempt_internal.
+     *   'local'  → L-series bills + reporting-OFF finals (NULL status + no
+     *              fiscal). exempt_internal has a non-NULL status → excluded
+     *              by construction. Bypasses hide_archived (admin-only tab).
+     *   'exempt' → exempt_internal bills only.
+     */
+    public static function applyStreamTab($query, string $tab)
+    {
+        if ($tab === 'exempt') {
+            $query->where('pra_status', self::EXEMPT_INTERNAL);
+        } elseif ($tab === 'local') {
+            // exempt_internal takes PRECEDENCE over invoice_mode: even a (data-
+            // drifted) local-mode exempt row belongs ONLY to the Exempt tab.
+            $query->withoutGlobalScope('hide_archived')->where(function ($sub) {
+                $sub->where('invoice_mode', 'local')
+                    ->orWhere(function ($s) {
+                        $s->whereNull('pra_status')->whereNull('pra_invoice_number');
+                    });
+            })->where(function ($sub) {
+                $sub->whereNull('pra_status')->orWhere('pra_status', '!=', self::EXEMPT_INTERNAL);
+            });
+        } else {
+            $query->where(function ($sub) {
+                $sub->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+            })->where(function ($sub) {
+                $sub->whereNotNull('pra_status')->orWhereNotNull('pra_invoice_number');
+            })->where(function ($sub) {
+                $sub->whereNull('pra_status')->orWhere('pra_status', '!=', self::EXEMPT_INTERNAL);
+            });
+        }
+
+        return $query;
+    }
+
+    /**
+     * Billing-scope stream lock (query side) — mirrors applyStreamTab. Owner
+     * decision (14 Aug 2026): exempt bills belong to NO stream, so BOTH
+     * pra-scoped and local-scoped staff see them.
+     */
+    public static function applyBillingScopeFilter($query, string $scope)
+    {
+        if ($scope === 'local') {
+            $query->where('invoice_mode', 'local')
+                ->orWhere(function ($s) {
+                    $s->whereNull('pra_status')->whereNull('pra_invoice_number');
+                })
+                ->orWhere('pra_status', self::EXEMPT_INTERNAL);
+        } elseif ($scope === 'pra') {
+            // Exempt bills are ORed in EXPLICITLY, regardless of invoice_mode —
+            // exempt status always takes precedence (visible to both scopes).
+            $query->where(function ($outer) {
+                $outer->where(function ($w) {
+                    $w->where(function ($s) {
+                        $s->where('invoice_mode', '!=', 'local')->orWhereNull('invoice_mode');
+                    })->where(function ($s) {
+                        $s->whereNotNull('pra_status')->orWhereNotNull('pra_invoice_number');
+                    });
+                })->orWhere('pra_status', self::EXEMPT_INTERNAL);
+            });
+        }
+
+        return $query;
+    }
+
+    /**
+     * Billing-scope stream lock (row side) — may a user with this scope see
+     * this bill? Exempt bills are visible to EVERY scope.
+     */
+    public function allowedForBillingScope(string $scope): bool
+    {
+        if ($scope === 'both' || $this->isExemptStream()) {
+            return true;
+        }
+
+        return $scope === 'local' ? $this->isLocalBill() : !$this->isLocalBill();
+    }
+
+    /**
      * "Local" bill for display/tag purposes = no PRA fiscal trail at all:
      * deliberate provisionals (invoice_mode='local') OR reporting-OFF finals
      * (pra_status NULL + no fiscal number). Anything with a non-NULL pra_status

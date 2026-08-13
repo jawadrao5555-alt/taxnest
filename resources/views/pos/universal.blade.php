@@ -29,6 +29,23 @@
 <script type="application/json" id="tn-pos-i18n">{!! json_encode(__('pos'), JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}' !!}</script>
 <script>window.TXT = (function () { try { return JSON.parse(document.getElementById('tn-pos-i18n').textContent) || {}; } catch (e) { return {}; } })();</script>
 <script>
+// Task 644 (ZFC, Aug 2026): SALE_CACHE re-prime after a browser-data clear.
+// First visit after a clear = no controlling SW (it registers post-load), so
+// SALE_CACHE stayed empty and the SECOND open was still a full network fetch.
+// No controller yet → once the fresh SW activates, ask it to fetch+cache this
+// screen in the background, so the very next open boots offline-first again.
+(function () {
+    try {
+        if (!('serviceWorker' in navigator) || navigator.serviceWorker.controller) return;
+        window.addEventListener('load', function () {
+            navigator.serviceWorker.ready.then(function (reg) {
+                if (reg.active) reg.active.postMessage({ type: 'TN_PRIME_SALE_CACHE', url: '/pos/invoice/create' });
+            }).catch(function () {});
+        });
+    } catch (e) { /* best-effort */ }
+})();
+</script>
+<script>
     (function () {
         var kill = function () { var el = document.getElementById('tn-boot-splash'); if (el) el.remove(); };
         document.addEventListener('alpine:initialized', kill);
@@ -2667,9 +2684,10 @@ window.addEventListener('popstate', function() {
                                           'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300': bill.badge === 'provisional',
                                           'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300': bill.badge === 'queue',
                                           'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300': bill.badge === 'failed',
+                                          'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300': bill.badge === 'exempt',
                                           'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300': bill.badge === 'local'
                                       }"
-                                      x-text="bill.badge === 'pra' ? window.TXT.pra_word : (bill.badge === 'provisional' ? window.TXT.provisional_word : (bill.badge === 'queue' ? window.TXT.sync_queue : (bill.badge === 'failed' ? window.TXT.failed_word : window.TXT.local_word)))"></span>
+                                      x-text="bill.badge === 'pra' ? window.TXT.pra_word : (bill.badge === 'provisional' ? window.TXT.provisional_word : (bill.badge === 'queue' ? window.TXT.sync_queue : (bill.badge === 'failed' ? window.TXT.failed_word : (bill.badge === 'exempt' ? window.TXT.exempt_badge : window.TXT.local_word))))"></span>
                                 {{-- Order-type badge (ZFC, 30 Jul 2026): Dine-in/Takeaway/Delivery + table --}}
                                 <template x-if="bill.order_type">
                                     <span class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide"
@@ -3665,6 +3683,50 @@ $servicesJson = $services->map(function($s) {
 })->values();
 $selectedTableJson = $selectedTable ? ['id' => $selectedTable->id, 'table_number' => $selectedTable->table_number, 'seats' => $selectedTable->seats] : null;
 $customersJson = $customers->map(fn($c) => ['id' => $c->id, 'name' => $c->name, 'phone' => $c->phone])->values();
+// Task 644 (payload trim, Aug 2026): held orders were baked as FULL Eloquent
+// rows (every column + full table row + full item rows) — dead weight on every
+// sale-screen load. Project to exactly what the JS reads (held-list template,
+// recallOrder, heldOrderEstimate, payModalOrderType, payHeldOrderDirect,
+// autoRecallFromUrl). NOTE: holdOrder's POST response unshifts a FULL row into
+// this list at runtime — that shape is a superset, so both coexist. If new JS
+// starts reading another held-order field, add it HERE too.
+$heldOrdersJson = $heldOrders->map(function ($o) {
+    return [
+        'id' => $o->id,
+        'order_number' => $o->order_number,
+        'token_no' => $o->token_no ?? null,
+        'status' => $o->status,
+        'source' => $o->source,
+        'order_type' => $o->order_type,
+        'priority' => (bool) ($o->priority ?? false),
+        'customer_id' => $o->customer_id,
+        'customer_name' => $o->customer_name,
+        'customer_phone' => $o->customer_phone,
+        'kitchen_notes' => $o->kitchen_notes,
+        'delivery_address' => $o->delivery_address ?? null,
+        'discount_type' => $o->discount_type,
+        'discount_value' => (float) ($o->discount_value ?? 0),
+        'discount_amount' => (float) ($o->discount_amount ?? 0),
+        'total_amount' => (float) ($o->total_amount ?? 0),
+        'table' => $o->table ? [
+            'id' => $o->table->id,
+            'table_number' => $o->table->table_number,
+            'occupied_since' => optional($o->table->occupied_since)->toJSON(),
+        ] : null,
+        'items' => $o->items->map(fn ($i) => [
+            'item_id' => $i->item_id,
+            'item_type' => $i->item_type,
+            'item_name' => $i->item_name,
+            'quantity' => (float) $i->quantity,
+            'unit_price' => (float) $i->unit_price,
+            'subtotal' => (float) $i->subtotal,
+            'special_notes' => $i->special_notes,
+            'is_tax_exempt' => (bool) ($i->is_tax_exempt ?? false),
+            'item_discount_type' => $i->item_discount_type,
+            'item_discount_value' => (float) ($i->item_discount_value ?? 0),
+        ])->values(),
+    ];
+})->values();
 $kitchenSettings = [
     'kds_enabled' => (bool)($company->kds_enabled ?? true),
     // KDS Auto-Print (owner, Jul 2026): when the KDS station itself prints
@@ -3933,7 +3995,7 @@ function restaurantPos() {
         cart: [],
         kitchenNotes: '',
         selectedTable: {!! $jsEnc($selectedTableJson, 'null') !!},
-        heldOrders: {!! $jsEnc($heldOrders) !!},
+        heldOrders: {!! $jsEnc($heldOrdersJson) !!},
         // Task 502: Tables page open-order card → boot par isi order ka direct recall.
         bootRecallOrderId: {!! $jsEnc($recallOrderIdForJs ?? null, 'null') !!},
         showTablePicker: false,
@@ -4503,6 +4565,23 @@ function restaurantPos() {
                 if (up) {
                     history.replaceState({}, '', '{{ route('pos.invoice.create') }}');
                     setTimeout(() => this.showToast(window.TXT.bill_word + up + window.TXT.sfx_updated_f10_final, 'success'), 400);
+                }
+            } catch (e) {}
+            // Task 644 (ZFC, 13 Aug 2026): dashboard Pending-tile ka "counter
+            // orders" chip ?open_incoming=1 ke saath aata hai — TABLELESS waiter
+            // (counter) orders SIRF bell panel mein dikhte hain (owner rule 5 Aug
+            // 2026), is liye boot par wohi panel khud khul jaye (dead-end fix).
+            // Claim purane atomic claimAndLoadIncoming raste se hi hota hai —
+            // yahan sirf panel khulta hai. Param foran strip: SW SALE_CACHE sirf
+            // bina-query URL cache karta hai, agla reload normal cached boot ho.
+            try {
+                if (this.isRestaurantMode && new URLSearchParams(window.location.search).get('open_incoming')) {
+                    // Panel open PEHLE schedule ho — phir URL strip. replaceState
+                    // RELATIVE pathname se: route() yahan https-absolute URL deta
+                    // hai jo http (dev) par cross-origin SecurityError phenk kar
+                    // poora handler maar deta tha (route-absolute-https-fetch trap).
+                    setTimeout(() => this.openIncoming(), 900);
+                    history.replaceState({}, '', window.location.pathname);
                 }
             } catch (e) {}
             // Lazy-load provisional bill list on mount (for header badge count).
@@ -7848,6 +7927,11 @@ function restaurantPos() {
                     // pra_status='local' regardless of company.pra_reporting_enabled
                     // and skips PRA submission. Bill stays editable / deletable.
                     save_as_provisional: !!provisional,
+                    // Task 646: waiter order loaded in the cart — FINAL bills carry
+                    // its id so storeInvoice settles it (links pos_transaction_id)
+                    // BEFORE responding: the very first receipt print can then show
+                    // the "Waiter:" line. Provisionals never consume the order.
+                    incoming_order_id: (!provisional && this.incomingOrderId) ? this.incomingOrderId : null,
                     // OFFLINE-FIRST dedupe key rides on EVERY attempt (online too).
                     // If the response is lost mid-flight (flaky WiFi: server saved
                     // the bill but the reply never arrived), the queued replay
@@ -7958,7 +8042,11 @@ function restaurantPos() {
                 // NOT consume the waiter order — the order stays in Incoming until
                 // a final settles it (conscious decision per review).
                 if (this.incomingOrderId && data.transaction_id && !provisional) {
-                    this.completeIncomingOrder(this.incomingOrderId, data.transaction_id);
+                    // Task 646: storeInvoice already settled the order server-side
+                    // (waiter_order_settled) — only fall back to the old client
+                    // call when it didn't (older queued payload / settle failure).
+                    if (data.waiter_order_settled) { this.loadIncoming(); }
+                    else { this.completeIncomingOrder(this.incomingOrderId, data.transaction_id); }
                 }
                 this.clearCart();
                 this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });

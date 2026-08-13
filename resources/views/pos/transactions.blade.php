@@ -38,7 +38,7 @@
 
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-            {{ ($tab ?? "pra") === "local" ? __("pos.local_transactions") : __("pos.pos_transactions") }}
+            {{ ($tab ?? "pra") === "local" ? __("pos.local_transactions") : (($tab ?? "pra") === "exempt" ? __("pos.exempt_transactions") : __("pos.pos_transactions")) }}
         </h1>
         <div class="flex flex-wrap items-center gap-2 sm:gap-3">
             @php
@@ -72,7 +72,7 @@
         </div>
     </div>
 
-    @include('pos.partials.mode-tabs', ['baseUrl' => route('pos.transactions')])
+    @include('pos.partials.mode-tabs', ['baseUrl' => route('pos.transactions'), 'showExempt' => true])
 
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <form method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -176,6 +176,9 @@
                                 @else
                                     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">⚠️ {{ __("pos.offline") }}</span>
                                 @endif
+                            @elseif($txn->isExemptStream())
+                                {{-- Task 647: all-exempt bill — never reported to PRA by design --}}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 uppercase">{{ __("pos.exempt_badge") }}</span>
                             @elseif($txn->pra_status === 'local')
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">{{ __("pos.local_word") }}</span>
                             @else

@@ -677,7 +677,7 @@
     @endif
 
     <div class="footer text-center">
-        @if($rp['show_footer'])<p>{{ $rp['footer_text'] ?? __('pos.receipt_thank_you') }}</p>@endif
+        @if($rp['show_footer'])<p>{{ $rp['footer_text'] ?? __('pos.receipt_thank_purchase') }}</p>@endif
         @if($rp['show_developed_by'] ?? true)<p>{{ __('pos.brand_developed_by') }}</p>@endif
         <p>{{ now()->format('d/m/Y h:i A') }}</p>
     </div>

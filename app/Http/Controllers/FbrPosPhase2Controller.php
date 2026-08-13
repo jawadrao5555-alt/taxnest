@@ -655,8 +655,9 @@ class FbrPosPhase2Controller extends Controller
             // ── FBR CREDIT NOTE (Aug 2026 — Retail Core) ─────────────────────────
             // If the ORIGINAL bill was FBR-submitted and reporting is ON, queue this
             // return for the Desktop Agent exactly like a sale — buildFbrPosPayload
-            // detects transaction_type='return' and emits InvoiceType=3 + RefUSIN +
-            // negative quantities (IMS credit-note model). Without an FBR-numbered
+            // detects transaction_type='return' and emits InvoiceType=3 + RefUSIN with
+            // POSITIVE amounts (IMS credit-note model — negative amounts are rejected
+            // with Code 102, same as PRA). Without an FBR-numbered
             // parent the credit note has no RefUSIN, so it stays local.
             if ($company && $company->fbr_reporting_enabled
                 && !empty($original->fbr_invoice_number)

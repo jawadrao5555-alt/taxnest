@@ -1610,11 +1610,14 @@ class FbrService
         $company = $transaction->company;
 
         // ── RETURN / CREDIT NOTE (Aug 2026 — Retail Core) ────────────────────────
-        // FBR IMS spec (SRO 1279/2021): a refund invoice carries InvoiceType=3,
-        // RefUSIN = the ORIGINAL bill's USIN, and NEGATIVE quantities/amounts.
+        // FBR IMS spec (SRO 1279/2021): a refund invoice carries InvoiceType=3 and
+        // RefUSIN = the ORIGINAL bill's USIN. ALL amounts/quantities stay POSITIVE —
+        // the IMS signals the reversal via InvoiceType=3 alone. PRA's identical IMS
+        // model rejects negative amounts with Code 102 "Invalid Total Bill Amount…"
+        // (confirmed live Aug 2026); the FBRIMS local component uses the same model,
+        // so the earlier sign-flip here was removed to match.
         // transaction_type='return' rows reference their parent via parent_transaction_id.
         $isReturn = ($transaction->transaction_type ?? 'sale') === 'return';
-        $sign = $isReturn ? -1 : 1;
         $refUsin = null;
         $invoiceType = 1;
         if ($isReturn) {
@@ -1634,7 +1637,7 @@ class FbrService
 
         foreach ($transaction->items as $item) {
             $index++;
-            $quantity = $sign * round(floatval($item->quantity), 4);
+            $quantity = round(floatval($item->quantity), 4);
             $isExempt = (bool) $item->is_tax_exempt;
             $taxRate = $isExempt ? 0.0 : floatval($item->tax_rate);
 
@@ -1642,10 +1645,10 @@ class FbrService
             // and tax-exclusive cart modes (see FbrPosController::store). `subtotal` = net taxable
             // value (excl tax, after this line's item discount); `tax_amount` = tax on that value.
             // Do NOT re-derive from unit_price — that breaks tax-inclusive bills.
-            $saleValue  = $sign * round(floatval($item->subtotal), 2);
-            $taxCharged = $isExempt ? 0.00 : $sign * round(floatval($item->tax_amount), 2);
-            $itemDiscount = $sign * round(floatval($item->item_discount ?? 0), 2);
-            $totalAmount = round($saleValue + $taxCharged, 2); // = stored `total` (negated for returns)
+            $saleValue  = round(floatval($item->subtotal), 2);
+            $taxCharged = $isExempt ? 0.00 : round(floatval($item->tax_amount), 2);
+            $itemDiscount = round(floatval($item->item_discount ?? 0), 2);
+            $totalAmount = round($saleValue + $taxCharged, 2); // = stored `total` (positive even for returns)
 
             $items[] = [
                 'ItemCode'    => (string) ($item->product_id ?: ('IT-' . $index)),
@@ -1680,7 +1683,7 @@ class FbrService
         // transaction. Item SaleValues are already net of their own item discounts, so the header
         // Discount carries ONLY this bill-level amount (avoids double-subtraction). FBR IMS header rule:
         // TotalBillAmount = TotalSaleValue + TotalTaxCharged - Discount.
-        $billDiscount = $sign * round(floatval($transaction->discount_amount ?? 0), 2);
+        $billDiscount = round(floatval($transaction->discount_amount ?? 0), 2);
 
         // Fiscal goods total = net sale + tax - bill discount. This equals exactly what the customer
         // pays for goods. The app-only Rs 1 FBR service fee and loyalty redemption are deliberately

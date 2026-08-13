@@ -4417,6 +4417,17 @@ return [
     'return_prompt_body' => 'یہ بل PRA رپورٹڈ ہے — واپسی بل بنائیں تاکہ ٹیکس، اسٹاک اور کیش سب درست ملاپ ہوں۔',
     'return_create_bill_btn' => 'واپسی بل بنائیں',
     'return_already_made' => 'واپسی بل بن چکا ہے',
+    // Rider auto return + wastage choice (Task 586, Aug 2026)
+    'return_mark_title' => 'بل واپس ہوا نشان لگائیں؟',
+    'return_wastage_q' => 'واپس آئے سامان کا کیا کرنا ہے؟',
+    'return_opt_restock' => 'اسٹاک میں واپس ڈالیں — سامان دوبارہ بک سکے (عام صورت)',
+    'return_opt_wastage' => 'ضیاع — سامان خراب ہو گیا، اسٹاک میں واپس نہ ڈالیں',
+    'return_auto_note' => 'پورا واپسی بل (کریڈٹ نوٹ) خود بن جائے گا — کوئی اضافی فارم نہیں۔',
+    'return_mark_btn' => 'واپس نشان لگائیں',
+    'return_auto_created' => 'واپس نشان لگ گیا — واپسی بل :invoice خود بن گیا۔',
+    'return_auto_bulk' => ':count ڈیلیوریاں واپس نشان ہو گئیں — :made واپسی بل خود بن گئے۔',
+    'return_auto_bulk_none' => ':count ڈیلیوریاں واپس نشان ہو گئیں۔',
+    'return_wastage_chip' => 'ضیاع',
     'receipt_credit_note' => 'کریڈٹ نوٹ / واپسی',
     'invoice_submitted_pra_num' => 'انوائس PRA کو جمع ہو گئی۔ PRA فسکل #: :number',
 ];

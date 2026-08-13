@@ -29,6 +29,8 @@ class PosTransaction extends Model
         'prepaid_converted_at', 'prepaid_converted_by',
         // Return / credit-note flow (Task 570, Aug 2026) — 'sale' | 'return' + parent link.
         'transaction_type', 'parent_transaction_id',
+        // Rider auto-return wastage flag (Task 586) — spoiled goods, stock NOT restored.
+        'is_wastage',
     ];
 
     /**
@@ -83,6 +85,7 @@ class PosTransaction extends Model
         'tax_inclusive' => 'boolean',
         'tax_menu_rate' => 'decimal:2',
         'lock_time' => 'datetime',
+        'is_wastage' => 'boolean',
     ];
 
     public function company()

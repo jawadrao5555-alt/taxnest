@@ -4418,6 +4418,17 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'return_prompt_body' => 'Yeh bill PRA-reported hai — return bill banayen taake tax, stock aur cash sab theek reconcile hon.',
     'return_create_bill_btn' => 'Return Bill Banayen',
     'return_already_made' => 'Return bill ban chuka hai',
+    // Rider auto return + wastage choice (Task 586, Aug 2026)
+    'return_mark_title' => 'Bill returned mark karein?',
+    'return_wastage_q' => 'Wapis aaye items ka kya karna hai?',
+    'return_opt_restock' => 'Stock mein wapis daalein — items dobara bik saken (default)',
+    'return_opt_wastage' => 'Wastage — items kharab ho gaye, stock mein wapis NA daalein',
+    'return_auto_note' => 'Poora return bill (credit note) khud ban jaye ga — koi extra form nahi.',
+    'return_mark_btn' => 'Returned Karein',
+    'return_auto_created' => 'Returned mark ho gaya — return bill :invoice khud ban gaya.',
+    'return_auto_bulk' => ':count deliveries returned mark ho gayin — :made return bill khud ban gaye.',
+    'return_auto_bulk_none' => ':count deliveries returned mark ho gayin.',
+    'return_wastage_chip' => 'Wastage',
     'receipt_credit_note' => 'CREDIT NOTE / WAPSI',
     'invoice_submitted_pra_num' => 'Invoice PRA ko submit ho gayi. PRA Fiscal #: :number',
 ];

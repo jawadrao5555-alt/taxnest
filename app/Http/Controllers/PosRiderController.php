@@ -590,22 +590,46 @@ class PosRiderController extends Controller
         }
         $txn->update($upd);
 
+        // Auto full return / credit note (Task 586): the moment a bill is
+        // marked returned, the FULL return bill is created automatically via
+        // the shared PosReturnService — no manual form. Runs for EVERY
+        // deliveries-board role (cashier/delivery manager included); the
+        // manager-only gate stays on the MANUAL form only. Status + khata
+        // drop are already applied above — a failed auto return NEVER blocks
+        // the board (falls back to the Task 570 manual prompt below).
+        $autoReturn = null;
+        if ($newStatus === 'returned') {
+            $autoReturn = $this->attemptAutoReturn($txn, $request->boolean('wastage'));
+        }
+
         // Return / credit-note prompt (Task 570): a PRA-reported bill coming
         // back with the rider should flow straight into the return-bill form —
         // "returned" alone only drops the rider khata, it never fixes tax/stock.
-        // Cashiers never see the prompt (returns are manager/owner-only).
+        // Shown ONLY when the auto return did not happen (existing partial
+        // return, or a failure). Cashiers never see the prompt (the manual
+        // form is manager/owner-only).
         $returnUrl = null;
-        if ($newStatus === 'returned'
+        if ($newStatus === 'returned' && !$autoReturn
             && Schema::hasColumn('pos_transactions', 'transaction_type')
             && !(auth('pos')->user()?->posCashierBlocked())
-            && \App\Http\Controllers\PosReturnController::returnableReason($txn->fresh()) === null) {
+            && \App\Services\PosReturnService::returnableReason($txn->fresh()) === null) {
             $returnUrl = route('pos.transaction.return-form', $txn->id, false);
         }
 
         // Sale-screen Pending Deliveries panel (3 Aug 2026) marks FINAL bills
         // delivered via fetch — JSON clients get JSON; page forms keep back().
         if ($request->expectsJson()) {
-            return response()->json(['success' => true, 'delivery_status' => $newStatus, 'return_url' => $returnUrl]);
+            return response()->json([
+                'success' => true,
+                'delivery_status' => $newStatus,
+                'return_url' => $returnUrl,
+                'auto_return_id' => $autoReturn?->id,
+                'auto_return_invoice' => $autoReturn?->invoice_number,
+            ]);
+        }
+
+        if ($autoReturn) {
+            return back()->with('success', __('pos.return_auto_created', ['invoice' => $autoReturn->invoice_number]));
         }
 
         if ($returnUrl) {
@@ -616,6 +640,59 @@ class PosRiderController extends Controller
         }
 
         return back()->with('success', 'Delivery status updated.');
+    }
+
+    /**
+     * Task 586: attempt the automatic FULL return (credit note) for a bill
+     * just marked returned. Refund method is always CASH — the rider never
+     * handed the cash over, so the day-close stays net-zero.
+     *
+     * Guards (skip → NULL, caller falls back to the manual prompt):
+     *  - any existing (partial) return on the bill — double refund kabhi nahi;
+     *  - non-returnable parents (returns-of-returns, non-completed) — except
+     *    PROVISIONAL parents, which produce a LOCAL return (record/stock only,
+     *    nothing goes to PRA);
+     *  - any exception — logged, never blocks the status/khata drop.
+     */
+    private function attemptAutoReturn(PosTransaction $txn, bool $wastage): ?PosTransaction
+    {
+        if (!Schema::hasColumn('pos_transactions', 'transaction_type')) {
+            return null; // prod schema drift — manual prompt handles it
+        }
+        try {
+            $fresh = PosTransaction::withoutGlobalScope('hide_archived')->find($txn->id);
+            if (!$fresh) {
+                return null;
+            }
+            $reason = \App\Services\PosReturnService::returnableReason($fresh);
+            if ($reason !== null && $reason !== 'provisional') {
+                return null;
+            }
+            // Double-refund guard: koi (partial) return pehle se ban chuka ho
+            // to auto SKIP — remaining items manual form se hi wapis hon.
+            if (\App\Services\PosReturnService::hasExistingReturn($fresh)) {
+                return null;
+            }
+            $result = \App\Services\PosReturnService::createReturn(
+                (int) $fresh->company_id,
+                (int) $fresh->id,
+                null,          // NULL = full return of every remaining line
+                'cash',        // cash was never collected — net-zero day close
+                auth('pos')->id(),
+                ['wastage' => $wastage, 'allow_provisional' => true]
+            );
+            if (isset($result['error'])) {
+                \Illuminate\Support\Facades\Log::warning('Rider auto-return refused', ['tx' => $txn->id, 'err' => $result['error']]);
+                return null;
+            }
+            // Post-commit PRA queue/submit (fiscal-device rows just queue).
+            \App\Services\PosReturnService::submitToPraPostCommit($result);
+
+            return $result['return'];
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Rider auto-return failed', ['tx' => $txn->id, 'err' => $e->getMessage()]);
+            return null;
+        }
     }
 
     /** Guard-failure reply: JSON clients (sale-screen popup fetch) get JSON 422,
@@ -643,11 +720,35 @@ class PosRiderController extends Controller
         $newStatus = $request->input('delivery_status');
 
         // Task 353: bulk action only touches the current user's own stream.
-        $count = $this->applyStreamScope(PosTransaction::withoutGlobalScope('hide_archived')
+        $openQuery = fn () => $this->applyStreamScope(PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->where('rider_id', $rider->id)
             ->whereNull('rider_settlement_id')
-            ->whereIn('delivery_status', ['assigned', 'dispatched']))
+            ->whereIn('delivery_status', ['assigned', 'dispatched']));
+
+        // Bulk RETURNED (Task 586): per-bill so every bill also gets its auto
+        // full return (credit note) — the wastage choice applies to ALL of
+        // them. Status flips first per bill; a failed auto return never blocks
+        // the rest (same fallback rule as the single-bill path).
+        if ($newStatus === 'returned') {
+            $bills = $openQuery()->orderBy('id')->get();
+            if ($bills->isEmpty()) {
+                return back()->with('error', 'No open deliveries for ' . $rider->name . '.');
+            }
+            $wastage = $request->boolean('wastage');
+            $made = 0;
+            foreach ($bills as $b) {
+                $b->update(['delivery_status' => 'returned']);
+                if ($this->attemptAutoReturn($b, $wastage)) {
+                    $made++;
+                }
+            }
+            $key = $made > 0 ? 'pos.return_auto_bulk' : 'pos.return_auto_bulk_none';
+
+            return back()->with('success', __($key, ['count' => $bills->count(), 'made' => $made]));
+        }
+
+        $count = $openQuery()
             ->update(array_merge(
                 ['delivery_status' => $newStatus],
                 // Bulk "All Delivered" bhi duration stamp kare (3 Aug 2026).

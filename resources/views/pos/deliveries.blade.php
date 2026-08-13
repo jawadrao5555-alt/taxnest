@@ -13,7 +13,7 @@
     .tn-embedded .tn-embed-hide { display: none !important; }
 </style>
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6"
-     x-data="{ settleRider: null, settleTotal: 0, settleAmount: '', recalcSettle(form) {
+     x-data="{ settleRider: null, settleTotal: 0, settleAmount: '', retBill: null, retBulk: null, retCount: 0, recalcSettle(form) {
          let t = 0;
          form.querySelectorAll('input[name=\'bill_ids[]\']:checked').forEach(cb => t += parseFloat(cb.dataset.amount || 0));
          this.settleTotal = t;
@@ -126,12 +126,11 @@
                         <input type="hidden" name="delivery_status" value="delivered">
                         <button type="submit" class="w-full px-2 py-1.5 rounded-lg bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700 transition">{{ __('pos.all_delivered') }}</button>
                     </form>
-                    <form method="POST" action="{{ route('pos.deliveries.bulk', $rider->id) }}" class="flex-1"
-                          onsubmit="return confirm({{ Js::from(__('pos.confirm_all_returned', ['count' => $openDel])) }});">
-                        @csrf
-                        <input type="hidden" name="delivery_status" value="returned">
-                        <button type="submit" class="w-full px-2 py-1.5 rounded-lg bg-red-600 text-white text-[11px] font-semibold hover:bg-red-700 transition">{{ __('pos.all_returned') }}</button>
-                    </form>
+                    {{-- Task 586: bulk returned goes through the wastage-choice
+                         modal — the choice applies to ALL of this rider's open
+                         deliveries, and each gets its auto return bill. --}}
+                    <button type="button" class="flex-1 px-2 py-1.5 rounded-lg bg-red-600 text-white text-[11px] font-semibold hover:bg-red-700 transition"
+                            @click="retBulk = {{ $rider->id }}; retBill = null; retCount = {{ $openDel }}">{{ __('pos.all_returned') }}</button>
                 </div>
             </div>
             @endif
@@ -400,16 +399,29 @@
                                  admin/manager can jump straight to the return-bill form. Shows
                                  existing-return state instead once a credit note exists. Cheap
                                  per-row exists() runs ONLY on returned rows. --}}
-                            @if($st === 'returned' && $isAdminOrManager && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type'))
+                            @if($st === 'returned' && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type'))
                                 @php
-                                    $hasReturnBill = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
+                                    // Task 586: status/link now visible to EVERY board role
+                                    // (cashier bhi auto return banata hai); create-CTA link
+                                    // stays admin/manager-only (manual form is gated).
+                                    $returnRow = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
                                         ->where('company_id', $b->company_id)
                                         ->where('parent_transaction_id', $b->id)
-                                        ->exists();
-                                    $canMakeReturn = !$hasReturnBill && \App\Http\Controllers\PosReturnController::returnableReason($b) === null;
+                                        ->orderByDesc('id')
+                                        ->first();
+                                    $canMakeReturn = !$returnRow && $isAdminOrManager && \App\Http\Controllers\PosReturnController::returnableReason($b) === null;
                                 @endphp
-                                @if($hasReturnBill)
-                                    <div class="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">{{ __('pos.return_already_made') }}</div>
+                                @if($returnRow)
+                                    <div class="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                        @if($isAdminOrManager)
+                                            <a href="{{ route('pos.transaction.show', $returnRow->id) }}" class="underline hover:text-emerald-700 dark:hover:text-emerald-300">{{ __('pos.return_already_made') }} — {{ $returnRow->invoice_number }}</a>
+                                        @else
+                                            {{ __('pos.return_already_made') }} — {{ $returnRow->invoice_number }}
+                                        @endif
+                                        @if(!empty($returnRow->is_wastage))
+                                            <span class="inline-flex ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">{{ __('pos.return_wastage_chip') }}</span>
+                                        @endif
+                                    </div>
                                 @elseif($canMakeReturn)
                                     <a href="{{ route('pos.transaction.return-form', $b->id) }}" class="inline-flex mt-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-rose-600 text-white hover:bg-rose-700 transition">{{ __('pos.return_create_bill_btn') }}</a>
                                     @if((float) ($b->rider_partial_paid ?? 0) > 0)
@@ -440,10 +452,10 @@
                                 </form>
                                 @endif
                                 @if($st !== 'returned')
-                                <form method="POST" action="{{ route('pos.deliveries.status', $b->id) }}" class="inline" onsubmit="return confirm({{ Js::from(__('pos.confirm_mark_returned')) }});">
-                                    @csrf<input type="hidden" name="delivery_status" value="returned">
-                                    <button type="submit" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 transition">{{ __('pos.returned_word') }}</button>
-                                </form>
+                                {{-- Task 586: returned goes through the wastage-choice modal —
+                                     the auto return bill (credit note) is created right there. --}}
+                                <button type="button" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 transition"
+                                        @click="retBill = {{ $b->id }}; retBulk = null">{{ __('pos.returned_word') }}</button>
                                 @endif
                             @endif
                             {{-- Prepaid conversion button (Task 285, Aug 2026): admin/manager only,
@@ -566,6 +578,49 @@
         </div>
     </div>
     @endif
+
+    {{-- ── Returned + wastage choice modal (Task 586) ─────────────────────────
+         One shared modal for single-bill Returned AND bulk All Returned.
+         Marking returned auto-creates the FULL return bill (credit note); the
+         wastage choice decides whether stock goes back into inventory. --}}
+    <template x-teleport="body">
+        <div x-show="retBill !== null || retBulk !== null" x-cloak
+             @keydown.escape.window="retBill = null; retBulk = null"
+             class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/50" @click="retBill = null; retBulk = null"></div>
+            <div class="relative bg-white dark:bg-gray-900 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-5">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.return_mark_title') }}</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                    <span x-show="retBill !== null">{{ __('pos.confirm_mark_returned') }}</span>
+                    <span x-show="retBulk !== null" x-text="{{ Js::from(__('pos.confirm_all_returned', ['count' => ':count'])) }}.replace(':count', retCount)"></span>
+                </p>
+                <form method="POST"
+                      :action="retBulk !== null
+                          ? '{{ url('/pos/deliveries/rider') }}/' + retBulk + '/bulk-status'
+                          : '{{ url('/pos/deliveries') }}/' + retBill + '/status'">
+                    @csrf
+                    <input type="hidden" name="delivery_status" value="returned">
+                    <p class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">{{ __('pos.return_wastage_q') }}</p>
+                    <div class="space-y-1.5 mb-3">
+                        <label class="flex items-start gap-2.5 p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/60 cursor-pointer">
+                            <input type="radio" name="wastage" value="0" checked class="mt-0.5 border-gray-300 text-purple-600 focus:ring-purple-500">
+                            <span class="text-xs text-gray-700 dark:text-gray-300">{{ __('pos.return_opt_restock') }}</span>
+                        </label>
+                        <label class="flex items-start gap-2.5 p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/60 cursor-pointer">
+                            <input type="radio" name="wastage" value="1" class="mt-0.5 border-gray-300 text-amber-600 focus:ring-amber-500">
+                            <span class="text-xs text-gray-700 dark:text-gray-300">{{ __('pos.return_opt_wastage') }}</span>
+                        </label>
+                    </div>
+                    <p class="text-[11px] text-gray-400 mb-4">{{ __('pos.return_auto_note') }}</p>
+                    <div class="flex gap-2 justify-end">
+                        <button type="button" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+                                @click="retBill = null; retBulk = null">{{ __('pos.cancel') }}</button>
+                        <button type="submit" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition">{{ __('pos.return_mark_btn') }}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </template>
 </div>
 <script>
 (function () {

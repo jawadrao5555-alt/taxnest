@@ -1446,7 +1446,7 @@ window.addEventListener('popstate', function() {
                             <div class="mt-1.5" @click.stop>
                                 <input type="text" maxlength="190" x-model="item.special_notes"
                                     :data-item-note="index"
-                                    autocomplete="off" name="item_note_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                                    autocomplete="one-time-code" name="item_note_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
                                     @keydown.stop
                                     @keydown.enter.prevent="item._showNote = false"
                                     @keydown.escape.prevent="item._showNote = false"

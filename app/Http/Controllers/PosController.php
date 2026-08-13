@@ -2246,7 +2246,7 @@ class PosController extends Controller
                     'submission_hash' => $submissionHash,
                     'locked_by_terminal_id' => null,
                     'lock_time' => null,
-                    'notes' => $request->input('kitchen_notes'),
+                    'notes' => RestaurantWaiterController::stripIdentityNote($request->input('kitchen_notes'), auth('pos')->user()),
                 ] + $riderFields + $taxInclusiveFields
                   // Draft resume: NEVER overwrite an already-frozen token — a
                   // replayed/duplicate submit must reprint the same number.
@@ -2291,7 +2291,7 @@ class PosController extends Controller
                     // Offline sync: credit the cashier who RANG UP the bill, not
                     // whoever's session replayed the queue next morning.
                     'created_by' => $offlineQueuedBy ?: auth('pos')->id(),
-                    'notes' => $request->input('kitchen_notes'),
+                    'notes' => RestaurantWaiterController::stripIdentityNote($request->input('kitchen_notes'), auth('pos')->user()),
                 ] + $riderFields + $taxInclusiveFields + $billTokenFields);
             }
 
@@ -2691,7 +2691,7 @@ class PosController extends Controller
                 'pra_status' => $isProvisionalEdit
                     ? 'local'
                     : ($goingToPra ? 'pending' : null),
-                'notes' => $request->input('kitchen_notes'),
+                'notes' => RestaurantWaiterController::stripIdentityNote($request->input('kitchen_notes'), auth('pos')->user()),
             ]);
 
             $transaction->items()->delete();
@@ -8462,7 +8462,13 @@ class PosController extends Controller
                 'lineTotal' => round($qty * $itemPrice, 2),
                 'isExempt' => $isExempt,
                 'isThirdSchedule' => $isThirdSchedule,
-                'notes' => isset($item['special_notes']) ? (string) $item['special_notes'] : null,
+                // Task 636: same identity-autofill note discard as the waiter path —
+                // a note that is EXACTLY the cashier's login email/username/name/phone
+                // is browser autofill garbage, never a kitchen instruction.
+                'notes' => RestaurantWaiterController::stripIdentityNote(
+                    isset($item['special_notes']) ? (string) $item['special_notes'] : null,
+                    auth('pos')->user()
+                ),
                 'deal_snapshot' => $dealSnapshot,
             ];
         }

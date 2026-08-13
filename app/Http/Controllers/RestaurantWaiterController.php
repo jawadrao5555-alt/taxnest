@@ -434,6 +434,26 @@ class RestaurantWaiterController extends Controller
      */
     public static function stripIdentityNotes(array $validated, $user): array
     {
+        foreach (($validated['items'] ?? []) as $k => $it) {
+            $validated['items'][$k]['special_notes'] = self::stripIdentityNote($it['special_notes'] ?? null, $user);
+        }
+        if (array_key_exists('kitchen_notes', $validated)) {
+            $validated['kitchen_notes'] = self::stripIdentityNote($validated['kitchen_notes'], $user);
+        }
+        return $validated;
+    }
+
+    /**
+     * Task 636: single-note variant of the identity-autofill discard, shared by
+     * the CASHIER sale-screen paths (RestaurantPosController::holdOrder,
+     * PosController::resolveItemExemptions) as well as the waiter paths above.
+     * Returns the note unchanged unless it is EXACTLY a login identity string.
+     */
+    public static function stripIdentityNote(?string $note, $user): ?string
+    {
+        if ($note === null || trim($note) === '' || !$user) {
+            return $note;
+        }
         $identity = array_filter(array_unique(array_map(
             fn ($v) => mb_strtolower(trim((string) $v)),
             [
@@ -444,23 +464,14 @@ class RestaurantWaiterController extends Controller
                 $user->phone ?? null,
             ]
         )));
-        $strip = function (?string $note) use ($identity, $user) {
-            $clean = mb_strtolower(trim((string) $note));
-            if ($clean !== '' && in_array($clean, $identity, true)) {
-                \Log::warning('Waiter note discarded: exact match with login identity (autofill)', [
-                    'user_id' => $user->id ?? null,
-                ]);
-                return null;
-            }
-            return $note;
-        };
-        foreach (($validated['items'] ?? []) as $k => $it) {
-            $validated['items'][$k]['special_notes'] = $strip($it['special_notes'] ?? null);
+        $clean = mb_strtolower(trim($note));
+        if ($clean !== '' && in_array($clean, $identity, true)) {
+            \Log::warning('Item note discarded: exact match with login identity (autofill)', [
+                'user_id' => $user->id ?? null,
+            ]);
+            return null;
         }
-        if (array_key_exists('kitchen_notes', $validated)) {
-            $validated['kitchen_notes'] = $strip($validated['kitchen_notes']);
-        }
-        return $validated;
+        return $note;
     }
 
     public function appendItems(Request $request, $id)

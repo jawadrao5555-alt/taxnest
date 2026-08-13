@@ -88,7 +88,10 @@
         <p class="text-lg font-bold text-gray-900 dark:text-white">{{ \Carbon\Carbon::parse($date)->format('l, d F Y') }}</p>
     </div>
 
-    @if($stats->total_invoices > 0)
+    {{-- Task 607: gate on the day's transactions (sales OR credit notes) —
+         total_invoices is now SALES-only, so a return-only day must still
+         render its (negative) Z-report and stay closable. --}}
+    @if($transactions->count() > 0)
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">
             <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ __('pos.total_invoices') }}</p>
@@ -143,7 +146,8 @@
                     </div>
                     <span class="font-bold text-gray-900 dark:text-white">PKR {{ number_format($stats->card_amount, 2) }}</span>
                 </div>
-                @if($stats->udhaar_amount > 0)
+                {{-- Task 607: udhaar is SIGNED (credit refunds net it) — render any non-zero value --}}
+                @if(abs((float) $stats->udhaar_amount) > 0.004)
                 <div class="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                     <div class="flex items-center gap-2">
                         <div class="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
@@ -157,7 +161,7 @@
                     <span class="font-bold text-orange-700 dark:text-orange-400">PKR {{ number_format($stats->udhaar_amount, 2) }}</span>
                 </div>
                 @endif
-                @if($stats->other_amount > 0)
+                @if(abs((float) $stats->other_amount) > 0.004)
                 <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                     <div class="flex items-center gap-2">
                         <div class="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">

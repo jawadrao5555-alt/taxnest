@@ -502,11 +502,15 @@ class FbrPosController extends Controller
         // to the still-open yesterday and are never offered for auto-close.
         $bizToday = $this->fbrBizToday($companyId);
         $expr = $this->hasBizDate() ? 'business_date' : 'DATE(created_at)';
+        // Return / credit-note netting (Task 607 — FBR mirror of the PRA
+        // day-close netting): totals SIGNED (returns subtract), counts
+        // SALES-only (a credit note is not a bill).
+        [$signExpr, $saleRowExpr] = $this->fbrReturnNettingExprs();
         $rows = \DB::table('fbr_pos_transactions')
             ->select(
                 \DB::raw($expr . ' as d'),
-                \DB::raw('COUNT(*) as cnt'),
-                \DB::raw('SUM(total_amount) as total')
+                \DB::raw("COALESCE(SUM({$saleRowExpr}),0) as cnt"),
+                \DB::raw("COALESCE(SUM(({$signExpr}) * total_amount),0) as total")
             )
             ->where('company_id', $companyId)
             ->when($this->hasBizDate(),
@@ -672,35 +676,50 @@ class FbrPosController extends Controller
             return null;
         }
 
+        // Return / credit-note netting (Task 607 — FBR mirror of the PRA
+        // Task 570 Z-report netting): returns NET the stored figures, never
+        // inflate them. Counts + fiscal serial range stay SALES-only (credit
+        // notes carry FRET- numbers outside the sale sequence). Schema-guarded
+        // for prod drift — pre-migration boxes treat every row as a sale.
+        [$saleRows, $returnRows] = $this->splitFbrSaleReturnRows($transactions);
+
         $baseData = [
             'company_id' => $companyId,
             'report_date' => $date,
-            'total_invoices' => $transactions->count(),
-            'fbr_invoices' => $transactions->where('fbr_status', 'submitted')->count(),
-            'local_invoices' => $transactions->where('fbr_status', 'local')->count(),
-            'failed_invoices' => $transactions->whereIn('fbr_status', ['failed', 'pending'])->count(),
-            'gross_sales' => $transactions->sum('subtotal'),
-            'total_discount' => $transactions->sum('discount_amount'),
-            'net_sales' => $transactions->sum('subtotal') - $transactions->sum('discount_amount'),
-            'total_tax' => $transactions->sum('tax_amount'),
-            'total_fbr_fee' => $transactions->sum('fbr_service_charge'),
-            'total_amount' => $transactions->sum('total_amount'),
-            'cash_amount' => $transactions->where('payment_method', 'cash')->sum('total_amount'),
-            // Card bucket includes stored aliases (debit/credit card) so card sales
-            // never silently land in "Other" — mirrors the PRA POS day-close fix.
-            'card_amount' => $transactions->whereIn('payment_method', ['card', 'debit_card', 'credit_card'])->sum('total_amount'),
-            // Udhaar (credit/khata) is its own bucket — excluded from cash counting.
-            // 'credit' bills are never in the cash drawer so the recon stays clean.
-            'udhaar_amount' => $transactions->where('payment_method', 'credit')->sum('total_amount'),
-            // "Other" = every method that is not cash, card alias, or udhaar.
-            'other_amount' => $transactions->whereNotIn('payment_method', ['cash', 'card', 'debit_card', 'credit_card', 'credit'])->sum('total_amount'),
-            'first_invoice_number' => $transactions->first()->invoice_number ?? null,
-            'last_invoice_number' => $transactions->last()->invoice_number ?? null,
-            'first_invoice_time' => $transactions->first()->created_at ?? null,
-            'last_invoice_time' => $transactions->last()->created_at ?? null,
+            'total_invoices' => $saleRows->count(),
+            'fbr_invoices' => $saleRows->where('fbr_status', 'submitted')->count(),
+            'local_invoices' => $saleRows->where('fbr_status', 'local')->count(),
+            'failed_invoices' => $saleRows->whereIn('fbr_status', ['failed', 'pending'])->count(),
+            'gross_sales' => $saleRows->sum('subtotal') - $returnRows->sum('subtotal'),
+            'total_discount' => $saleRows->sum('discount_amount') - $returnRows->sum('discount_amount'),
+            'net_sales' => ($saleRows->sum('subtotal') - $returnRows->sum('subtotal'))
+                - ($saleRows->sum('discount_amount') - $returnRows->sum('discount_amount')),
+            'total_tax' => $saleRows->sum('tax_amount') - $returnRows->sum('tax_amount'),
+            'total_fbr_fee' => $saleRows->sum('fbr_service_charge') - $returnRows->sum('fbr_service_charge'),
+            'total_amount' => $saleRows->sum('total_amount') - $returnRows->sum('total_amount'),
+            // Refunds net their own bucket (a cash refund reduces the expected
+            // drawer cash) — mirrors the PRA POS Z-report netting. Buckets use
+            // the shared classifier so khata refunds net udhaar (Task 607).
+            'cash_amount' => $this->fbrBucketNet($saleRows, $returnRows, 'cash'),
+            'card_amount' => $this->fbrBucketNet($saleRows, $returnRows, 'card'),
+            'udhaar_amount' => $this->fbrBucketNet($saleRows, $returnRows, 'udhaar'),
+            'other_amount' => $this->fbrBucketNet($saleRows, $returnRows, 'other'),
+            'first_invoice_number' => $saleRows->first()->invoice_number ?? null,
+            'last_invoice_number' => $saleRows->last()->invoice_number ?? null,
+            'first_invoice_time' => $saleRows->first()->created_at ?? null,
+            'last_invoice_time' => $saleRows->last()->created_at ?? null,
             'closed_by' => $userId,
             'notes' => $notes,
         ];
+
+        // Returns detail on the Z-report (schema-guarded — the columns arrive
+        // with a later migration; drift self-heal convention).
+        if (\Schema::hasColumn('fbr_day_close_reports', 'returns_count')) {
+            $baseData['returns_count'] = $returnRows->count();
+        }
+        if (\Schema::hasColumn('fbr_day_close_reports', 'returns_amount')) {
+            $baseData['returns_amount'] = round((float) $returnRows->sum('total_amount'), 2);
+        }
 
         // Delivery Riders (Task 541 — FBR mirror of the PRA Jul 2026 figures):
         // computed BEFORE the recon so expected cash reflects rider khata.
@@ -734,8 +753,15 @@ class FbrPosController extends Controller
 
                     // Atomic MAX+1 — parses trailing digits from existing 'ZRPT-XXXXX' numbers.
                     // Far safer than count()+1 (which double-counts under concurrency).
-                    $maxNum = (int) FbrDayCloseReport::where('company_id', $companyId)
-                        ->max(\DB::raw("CAST(SUBSTRING_INDEX(report_number, '-', -1) AS UNSIGNED)"));
+                    // SUBSTRING_INDEX is MySQL-only — sqlite (test suite) computes in PHP;
+                    // the row-level lock above keeps both paths race-safe.
+                    $maxNum = in_array(\DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)
+                        ? (int) FbrDayCloseReport::where('company_id', $companyId)
+                            ->max(\DB::raw("CAST(SUBSTRING_INDEX(report_number, '-', -1) AS UNSIGNED)"))
+                        : (int) FbrDayCloseReport::where('company_id', $companyId)
+                            ->pluck('report_number')
+                            ->map(fn ($n) => (int) \Illuminate\Support\Str::afterLast((string) $n, '-'))
+                            ->max();
                     $reportNumber = 'ZRPT-' . str_pad($maxNum + 1, 5, '0', STR_PAD_LEFT);
 
                     $data = array_merge($baseData, ['report_number' => $reportNumber]);
@@ -3811,36 +3837,38 @@ class FbrPosController extends Controller
             ->orderBy('created_at')
             ->get();
 
+        // Return / credit-note netting (Task 607): the preview nets returns
+        // exactly like the stored Z-report (performDayClose) so the page, PDF
+        // and thermal never disagree. Counts + serial range stay SALES-only.
+        [$dcSaleRows, $dcReturnRows] = $this->splitFbrSaleReturnRows($transactions);
+
         $stats = (object) [
-            'total_invoices' => $transactions->count(),
-            'fbr_invoices' => $transactions->where('fbr_status', 'submitted')->count(),
-            'local_invoices' => $transactions->where('fbr_status', 'local')->count(),
-            'failed_invoices' => $transactions->whereIn('fbr_status', ['failed', 'pending'])->count(),
-            'gross_sales' => $transactions->sum('subtotal'),
-            'total_discount' => $transactions->sum('discount_amount'),
-            'net_sales' => $transactions->sum('subtotal') - $transactions->sum('discount_amount'),
-            'total_tax' => $transactions->sum('tax_amount'),
-            'total_fbr_fee' => $transactions->sum('fbr_service_charge'),
-            'total_amount' => $transactions->sum('total_amount'),
-            'cash_amount' => $transactions->where('payment_method', 'cash')->sum('total_amount'),
-            // Card bucket includes stored aliases (debit/credit card) so card sales
-            // never silently land in "Other" — mirrors the PRA POS day-close fix.
-            'card_amount' => $transactions->whereIn('payment_method', ['card', 'debit_card', 'credit_card'])->sum('total_amount'),
-            // Udhaar (credit/khata) is its own bucket — excluded from cash counting.
-            'udhaar_amount' => $transactions->where('payment_method', 'credit')->sum('total_amount'),
-            // "Other" = every method that is not cash, card alias, or udhaar.
-            'other_amount' => $transactions->whereNotIn('payment_method', ['cash', 'card', 'debit_card', 'credit_card', 'credit'])->sum('total_amount'),
-            'first_invoice' => $transactions->first(),
-            'last_invoice' => $transactions->last(),
+            'total_invoices' => $dcSaleRows->count(),
+            'fbr_invoices' => $dcSaleRows->where('fbr_status', 'submitted')->count(),
+            'local_invoices' => $dcSaleRows->where('fbr_status', 'local')->count(),
+            'failed_invoices' => $dcSaleRows->whereIn('fbr_status', ['failed', 'pending'])->count(),
+            'gross_sales' => $dcSaleRows->sum('subtotal') - $dcReturnRows->sum('subtotal'),
+            'total_discount' => $dcSaleRows->sum('discount_amount') - $dcReturnRows->sum('discount_amount'),
+            'net_sales' => ($dcSaleRows->sum('subtotal') - $dcReturnRows->sum('subtotal'))
+                - ($dcSaleRows->sum('discount_amount') - $dcReturnRows->sum('discount_amount')),
+            'total_tax' => $dcSaleRows->sum('tax_amount') - $dcReturnRows->sum('tax_amount'),
+            'total_fbr_fee' => $dcSaleRows->sum('fbr_service_charge') - $dcReturnRows->sum('fbr_service_charge'),
+            'total_amount' => $dcSaleRows->sum('total_amount') - $dcReturnRows->sum('total_amount'),
+            // Refunds net their own bucket (cash refund reduces drawer cash).
+            'cash_amount' => $this->fbrBucketNet($dcSaleRows, $dcReturnRows, 'cash'),
+            'card_amount' => $this->fbrBucketNet($dcSaleRows, $dcReturnRows, 'card'),
+            'udhaar_amount' => $this->fbrBucketNet($dcSaleRows, $dcReturnRows, 'udhaar'),
+            'other_amount' => $this->fbrBucketNet($dcSaleRows, $dcReturnRows, 'other'),
+            'first_invoice' => $dcSaleRows->first(),
+            'last_invoice' => $dcSaleRows->last(),
+            // Returns detail line for the page/PDF/thermal.
+            'returns_count' => $dcReturnRows->count(),
+            'returns_amount' => round((float) $dcReturnRows->sum('total_amount'), 2),
         ];
 
-        $cashierBreakdown = $transactions->groupBy(fn($t) => $t->creator ? $t->creator->name : 'Unknown')->map(function ($group) {
-            return (object) [
-                'count' => $group->count(),
-                'revenue' => $group->sum('total_amount'),
-                'tax' => $group->sum('tax_amount'),
-            ];
-        });
+        // Cashier figures are SIGNED (Task 607): refunds net revenue/tax;
+        // counts stay sales-only. Shared with the A4 PDF + thermal Z-report.
+        $cashierBreakdown = $this->fbrCashierBreakdown($transactions);
 
         $previousReports = FbrDayCloseReport::where('company_id', $companyId)
             ->orderBy('report_date', 'desc')
@@ -3939,6 +3967,101 @@ class FbrPosController extends Controller
     }
 
     /**
+     * Split a loaded day's transactions into [saleRows, returnRows] for the
+     * day-close netting (Task 607 — FBR mirror of the PRA Task 570 split).
+     * Schema-guarded: pre-migration boxes treat every row as a sale.
+     */
+    private function splitFbrSaleReturnRows($transactions): array
+    {
+        $ready = false;
+        try {
+            $ready = \Illuminate\Support\Facades\Schema::hasColumn('fbr_pos_transactions', 'transaction_type');
+        } catch (\Throwable $e) {
+            $ready = false;
+        }
+        if (!$ready) {
+            return [$transactions, collect()];
+        }
+
+        return [
+            $transactions->reject(fn ($t) => ($t->transaction_type ?? 'sale') === 'return')->values(),
+            $transactions->filter(fn ($t) => ($t->transaction_type ?? 'sale') === 'return')->values(),
+        ];
+    }
+
+    /**
+     * Per-cashier day-close figures — SIGNED revenue/tax (refunds subtract),
+     * SALES-only counts (Task 607). Single source shared by the day-close
+     * page, the A4 PDF and the 80mm thermal Z-report so they never disagree.
+     */
+    /**
+     * Shared payment-bucket classifier for day-close figures (Task 607).
+     * 'cash' | 'card' (all stored card aliases) | 'udhaar' | 'other'.
+     * Sales pay with 'credit' for udhaar; the return flow refunds onto the
+     * ledger with 'khata' — BOTH must land in the udhaar bucket or a khata
+     * refund silently inflates "Other" and misses the udhaar netting.
+     */
+    private function fbrPayBucket(?string $method): string
+    {
+        return match ($method) {
+            'cash' => 'cash',
+            'card', 'debit_card', 'credit_card' => 'card',
+            'credit', 'khata' => 'udhaar',
+            default => 'other',
+        };
+    }
+
+    /** Signed (sale − return) total_amount for one payment bucket. */
+    private function fbrBucketNet($saleRows, $returnRows, string $bucket): float
+    {
+        $sum = fn ($rows) => (float) $rows
+            ->filter(fn ($t) => $this->fbrPayBucket($t->payment_method) === $bucket)
+            ->sum('total_amount');
+        return $sum($saleRows) - $sum($returnRows);
+    }
+
+    /**
+     * Render-time udhaar figures for the PDF / thermal Z-report:
+     * [$displayUdhaar, $displayOther].
+     *
+     * New rows store a SIGNED udhaar_amount (credit refunds net it — may be
+     * negative) which is trusted verbatim whenever it is non-zero. Old
+     * pre-column / zero rows fall back to a SIGNED derivation from the day's
+     * transactions (credit sales minus credit returns, Task 607); only the
+     * legacy POSITIVE portion was ever baked into other_amount, so only that
+     * portion is subtracted back out for display.
+     */
+    private function fbrUdhaarDisplay($report, $transactions): array
+    {
+        [$uSaleRows, $uReturnRows] = $this->splitFbrSaleReturnRows($transactions);
+        $derivedUdhaar = $this->fbrBucketNet($uSaleRows, $uReturnRows, 'udhaar');
+
+        $hasUdhaarColumn = \Illuminate\Support\Facades\Schema::hasColumn('fbr_day_close_reports', 'udhaar_amount');
+        $storedUdhaar = $hasUdhaarColumn ? (float) $report->udhaar_amount : 0.0;
+
+        if ($hasUdhaarColumn && $storedUdhaar != 0.0) {
+            return [$storedUdhaar, (float) $report->other_amount];
+        }
+
+        return [
+            $derivedUdhaar,
+            max(0.0, (float) $report->other_amount - max(0.0, $derivedUdhaar)),
+        ];
+    }
+
+    private function fbrCashierBreakdown($transactions)
+    {
+        return $transactions->groupBy(fn ($t) => $t->creator ? $t->creator->name : 'Unknown')->map(function ($group) {
+            $sign = fn ($t) => ($t->transaction_type ?? 'sale') === 'return' ? -1 : 1;
+            return (object) [
+                'count' => $group->filter(fn ($t) => ($t->transaction_type ?? 'sale') !== 'return')->count(),
+                'revenue' => $group->sum(fn ($t) => $sign($t) * (float) $t->total_amount),
+                'tax' => $group->sum(fn ($t) => $sign($t) * (float) $t->tax_amount),
+            ];
+        });
+    }
+
+    /**
      * Stranded-day detection (Task 479 — FBR mirror of PosController::
      * unclosedPriorBusinessDays): prior TRADING days that have bills but NO
      * FbrDayCloseReport row. Task 492: keyed on real business_date (created_at
@@ -3990,23 +4113,33 @@ class FbrPosController extends Controller
      */
     private function buildFbrDayCloseAnalytics(int $companyId, string $date, $transactions): object
     {
+        // Return / credit-note netting (Task 607): analytics follow the SAME
+        // signed / sales-only convention as the report totals — return item
+        // lines net product figures, hourly revenue is signed, counts are
+        // sales-only, averages divide signed revenue by sale count.
+        [$anSaleRows, $anReturnRows] = $this->splitFbrSaleReturnRows($transactions);
+        $returnIds = $anReturnRows->pluck('id')->flip();
+        $rowSign = fn ($t) => $returnIds->has($t->id) ? -1 : 1;
+        $itemSign = fn ($it) => $returnIds->has($it->transaction_id) ? -1 : 1;
+
         $ids = $transactions->pluck('id')->all();
 
         $items = empty($ids) ? collect() : FbrPosTransactionItem::whereIn('transaction_id', $ids)
             ->get(['transaction_id', 'product_id', 'item_name', 'quantity', 'subtotal', 'tax_amount', 'item_discount', 'promotion_discount']);
 
-        $itemRevenueTotal = (float) $items->sum('subtotal');
-        $topProducts = $items->groupBy('item_name')->map(function ($g) use ($itemRevenueTotal) {
-            $revenue = (float) $g->sum('subtotal');
+        $itemRevenueTotal = (float) $items->sum(fn ($it) => $itemSign($it) * (float) $it->subtotal);
+        $topProducts = $items->groupBy('item_name')->map(function ($g) use ($itemRevenueTotal, $itemSign) {
+            $revenue = (float) $g->sum(fn ($it) => $itemSign($it) * (float) $it->subtotal);
             return (object) [
-                'qty' => (float) $g->sum('quantity'),
+                'qty' => (float) $g->sum(fn ($it) => $itemSign($it) * (float) $it->quantity),
                 'revenue' => $revenue,
-                'tax' => (float) $g->sum('tax_amount'),
+                'tax' => (float) $g->sum(fn ($it) => $itemSign($it) * (float) $it->tax_amount),
                 'share' => $itemRevenueTotal > 0 ? round($revenue / $itemRevenueTotal * 100, 1) : 0,
             ];
         })->sortByDesc('revenue')->take(10);
 
         // Hourly sales — full 24-slot map so the chart x-axis stays stable.
+        // Revenue SIGNED (a refund dents its hour), counts sales-only.
         $hourly = [];
         for ($h = 0; $h < 24; $h++) {
             $hourly[$h] = (object) ['count' => 0, 'revenue' => 0.0];
@@ -4016,39 +4149,50 @@ class FbrPosController extends Controller
                 continue;
             }
             $h = (int) $t->created_at->format('G');
-            $hourly[$h]->count++;
-            $hourly[$h]->revenue += (float) $t->total_amount;
+            if ($rowSign($t) > 0) {
+                $hourly[$h]->count++;
+            }
+            $hourly[$h]->revenue += $rowSign($t) * (float) $t->total_amount;
         }
 
         // FBR submission health — every pipeline state at a glance.
+        // SALES-only: a submitted credit note is not a submitted bill (it
+        // would contradict the sales-only invoice counts on the same report).
         $fbrHealth = (object) [
-            'submitted' => $transactions->where('fbr_status', 'submitted')->count(),
-            'pending' => $transactions->where('fbr_status', 'pending')->count(),
-            'failed' => $transactions->where('fbr_status', 'failed')->count(),
-            'local' => $transactions->where('fbr_status', 'local')->count(),
+            'submitted' => $anSaleRows->where('fbr_status', 'submitted')->count(),
+            'pending' => $anSaleRows->where('fbr_status', 'pending')->count(),
+            'failed' => $anSaleRows->where('fbr_status', 'failed')->count(),
+            'local' => $anSaleRows->where('fbr_status', 'local')->count(),
         ];
 
-        $discountBills = $transactions->filter(fn ($t) => (float) $t->discount_amount > 0);
-        $itemDiscountTotal = (float) $items->sum('item_discount') + (float) $items->sum('promotion_discount');
+        // Discounts: sale-side counts, SIGNED totals (returned discount share
+        // leaves the day's discount figure — mirrors the report totals).
+        $discountBills = $anSaleRows->filter(fn ($t) => (float) $t->discount_amount > 0);
+        $itemDiscountTotal = (float) $items->sum(fn ($it) => $itemSign($it) * ((float) $it->item_discount + (float) $it->promotion_discount));
+        $billDiscountTotal = (float) $discountBills->sum('discount_amount')
+            - (float) $anReturnRows->sum('discount_amount');
         $discounts = (object) [
             'bill_count' => $discountBills->count(),
-            'bill_total' => (float) $discountBills->sum('discount_amount'),
+            'bill_total' => $billDiscountTotal,
             'item_total' => $itemDiscountTotal,
-            'total' => (float) $discountBills->sum('discount_amount') + $itemDiscountTotal,
+            'total' => $billDiscountTotal + $itemDiscountTotal,
         ];
 
-        $billCount = $transactions->count();
-        $avgBill = $billCount > 0 ? (float) $transactions->sum('total_amount') / $billCount : 0.0;
-        $uniqueCustomers = $transactions
+        $billCount = $anSaleRows->count();
+        $netRevenue = (float) $transactions->sum(fn ($t) => $rowSign($t) * (float) $t->total_amount);
+        $avgBill = $billCount > 0 ? $netRevenue / $billCount : 0.0;
+        $uniqueCustomers = $anSaleRows
             ->filter(fn ($t) => $t->customer_id || !empty($t->customer_phone) || !empty($t->customer_name))
             ->unique(fn ($t) => $t->customer_id ?: ($t->customer_phone ?: mb_strtolower(trim((string) $t->customer_name))))
             ->count();
 
-        // Yesterday + same-day-last-week comparison.
-        $compareFor = function (string $cmpDate) use ($companyId) {
+        // Yesterday + same-day-last-week comparison — SIGNED (Task 607):
+        // returns net the revenue/tax, credit notes never count as invoices.
+        [$cmpSignExpr, $cmpSaleRowExpr] = $this->fbrReturnNettingExprs();
+        $compareFor = function (string $cmpDate) use ($companyId, $cmpSignExpr, $cmpSaleRowExpr) {
             $row = FbrPosTransaction::where('company_id', $companyId)
                 ->tap(fn ($q) => $this->whereBizDate($q, $cmpDate))
-                ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as revenue, COALESCE(SUM(tax_amount),0) as tax')
+                ->selectRaw("COALESCE(SUM({$cmpSaleRowExpr}),0) as cnt, COALESCE(SUM(({$cmpSignExpr}) * total_amount),0) as revenue, COALESCE(SUM(({$cmpSignExpr}) * tax_amount),0) as tax")
                 ->first();
             return (object) [
                 'date' => $cmpDate,
@@ -4057,7 +4201,10 @@ class FbrPosController extends Controller
                 'tax' => (float) ($row->tax ?? 0),
             ];
         };
-        $todayRevenue = (float) $transactions->sum('total_amount');
+        // Today's side of the comparison must use the SAME signed convention
+        // as $compareFor, or the pct would compare gross-today vs netted-prev.
+        $todayRevenue = $netRevenue;
+        $cmpBillCount = $billCount;
         $pct = function (float $prev, float $cur): ?float {
             return $prev > 0 ? round(($cur - $prev) / $prev * 100, 1) : null;
         };
@@ -4067,9 +4214,9 @@ class FbrPosController extends Controller
             'yesterday' => $yesterday,
             'last_week' => $lastWeek,
             'vs_yesterday_revenue_pct' => $pct($yesterday->revenue, $todayRevenue),
-            'vs_yesterday_invoices_pct' => $pct((float) $yesterday->invoices, (float) $billCount),
+            'vs_yesterday_invoices_pct' => $pct((float) $yesterday->invoices, (float) $cmpBillCount),
             'vs_last_week_revenue_pct' => $pct($lastWeek->revenue, $todayRevenue),
-            'vs_last_week_invoices_pct' => $pct((float) $lastWeek->invoices, (float) $billCount),
+            'vs_last_week_invoices_pct' => $pct((float) $lastWeek->invoices, (float) $cmpBillCount),
         ];
 
         return (object) [
@@ -4334,31 +4481,15 @@ class FbrPosController extends Controller
             ->orderBy('created_at')
             ->get();
 
-        $cashierBreakdown = $transactions->groupBy(fn($t) => $t->creator ? $t->creator->name : 'Unknown')->map(function ($group) {
-            return (object) [
-                'count' => $group->count(),
-                'revenue' => $group->sum('total_amount'),
-                'tax' => $group->sum('tax_amount'),
-            ];
-        });
+        // Cashier figures SIGNED, counts sales-only (Task 607) — same helper
+        // as the day-close page so page/PDF/thermal never disagree.
+        $cashierBreakdown = $this->fbrCashierBreakdown($transactions);
 
         $analytics = $this->buildFbrDayCloseAnalytics($companyId, $report->report_date->toDateString(), $transactions);
 
-        // Historical reports: derive udhaar at read time (render-time derivation per
-        // decision 2 — never rewrite frozen snapshot rows).
-        // New rows have udhaar_amount stored explicitly; old rows default to 0.
-        // Either way we re-derive from transactions so old reports display correctly.
-        $derivedUdhaarAmount = (float) $transactions->where('payment_method', 'credit')->sum('total_amount');
-        // If the stored snapshot already has a non-zero udhaar_amount trust it (it
-        // was subtracted from other_amount at write time); otherwise fall back to the
-        // derived figure and subtract it from stored other_amount for display.
-        $hasUdhaarColumn = \Illuminate\Support\Facades\Schema::hasColumn('fbr_day_close_reports', 'udhaar_amount');
-        $displayUdhaar = $hasUdhaarColumn && (float) $report->udhaar_amount > 0
-            ? (float) $report->udhaar_amount
-            : $derivedUdhaarAmount;
-        $displayOther  = $hasUdhaarColumn && (float) $report->udhaar_amount > 0
-            ? (float) $report->other_amount
-            : max(0.0, (float) $report->other_amount - $derivedUdhaarAmount);
+        // Historical reports: render-time udhaar derivation — shared signed
+        // helper (Task 607) so PDF/thermal honor negative netted udhaar.
+        [$displayUdhaar, $displayOther] = $this->fbrUdhaarDisplay($report, $transactions);
 
         // Staff Hazri section (Task #561 — FBR mirror of the PRA day-close PDF).
         // Same plan gate as the hazri report page; builder returns [] on any error.
@@ -4395,25 +4526,15 @@ class FbrPosController extends Controller
             ->orderBy('created_at')
             ->get();
 
-        $cashierBreakdown = $transactions->groupBy(fn ($t) => $t->creator ? $t->creator->name : 'Unknown')->map(function ($group) {
-            return (object) [
-                'count' => $group->count(),
-                'revenue' => $group->sum('total_amount'),
-                'tax' => $group->sum('tax_amount'),
-            ];
-        });
+        // Cashier figures SIGNED, counts sales-only (Task 607) — same helper
+        // as the day-close page so page/PDF/thermal never disagree.
+        $cashierBreakdown = $this->fbrCashierBreakdown($transactions);
 
         $analytics = $this->buildFbrDayCloseAnalytics($companyId, $report->report_date->toDateString(), $transactions);
 
-        // Historical reports: render-time derivation (same logic as dayCloseReportPdf).
-        $derivedUdhaarAmount = (float) $transactions->where('payment_method', 'credit')->sum('total_amount');
-        $hasUdhaarColumn = \Illuminate\Support\Facades\Schema::hasColumn('fbr_day_close_reports', 'udhaar_amount');
-        $displayUdhaar = $hasUdhaarColumn && (float) $report->udhaar_amount > 0
-            ? (float) $report->udhaar_amount
-            : $derivedUdhaarAmount;
-        $displayOther  = $hasUdhaarColumn && (float) $report->udhaar_amount > 0
-            ? (float) $report->other_amount
-            : max(0.0, (float) $report->other_amount - $derivedUdhaarAmount);
+        // Historical reports: render-time derivation (same signed helper as
+        // dayCloseReportPdf — Task 607).
+        [$displayUdhaar, $displayOther] = $this->fbrUdhaarDisplay($report, $transactions);
 
         // Staff Hazri section (Task #561 — FBR mirror of the PRA thermal Z-report).
         $hazri = $this->fbrPlanAllows('hazri_enabled')

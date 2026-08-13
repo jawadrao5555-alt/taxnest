@@ -13,6 +13,7 @@ class FbrDayCloseReport extends Model
         'cash_amount', 'card_amount', 'other_amount', 'udhaar_amount',
         'first_invoice_number', 'last_invoice_number',
         'first_invoice_time', 'last_invoice_time',
+        'returns_count', 'returns_amount',
         'closed_by', 'notes', 'hash',
         'opening_float', 'counted_cash', 'expected_cash', 'cash_variance',
         'rider_summary',

@@ -162,3 +162,9 @@ Schedule::command('cloudflare:check-rocket-loader')->everyThirtyMinutes();
 // Cache TTL "Respect Existing Headers". Drift is auto-PATCHed back and admins
 // get a "detected + auto-fixed" email; API failures send an urgent email.
 Schedule::command('cloudflare:check-settings')->dailyAt('05:20');
+// Logging-health watchdog: deploy-live.sh only checks LOG_LEVEL/laravel.log at
+// deploy time — between deploys a quiet LOG_LEVEL=error or dead log file would
+// go unnoticed for weeks. Daily end-to-end probe (Log::warning nonce must land
+// in laravel.log); failures raise the LogHealth admin banner and email admins
+// synchronously (Log:: alerts are useless when logging itself is dead).
+Schedule::command('logs:health-check')->dailyAt('07:20');

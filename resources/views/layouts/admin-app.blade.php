@@ -448,6 +448,29 @@
                     </div>
                 </div>
                 @endif
+                @php($tnLogHealthFailure = \App\Services\LogHealth::current())
+                @if($tnLogHealthFailure)
+                <div class="mx-4 mt-4 bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-sm">
+                    <div class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                        <div class="min-w-0">
+                            <p class="font-semibold text-red-300">
+                                Live logging has gone silent — the daily log health check has failed {{ $tnLogHealthFailure['count'] }} {{ $tnLogHealthFailure['count'] === 1 ? 'time' : 'times' }}@if($tnLogHealthFailure['ago']), failing since {{ $tnLogHealthFailure['ago'] }}@endif.
+                            </p>
+                            @if(!empty($tnLogHealthFailure['issues']))
+                            <ul class="text-red-400 mt-1 list-disc list-inside break-words">
+                                @foreach($tnLogHealthFailure['issues'] as $tnLogIssue)
+                                <li>{{ $tnLogIssue }}</li>
+                                @endforeach
+                            </ul>
+                            @endif
+                            <p class="text-red-300 mt-2">
+                                While logging is muted, scheduler/guard warnings vanish silently. Fix on live: set <code class="text-red-200">LOG_LEVEL=warning</code> (or lower) in the .env, run <code class="text-red-200">php artisan config:cache</code>, and verify <code class="text-red-200">storage/logs/laravel.log</code> is writable — this warning clears automatically once the daily check passes.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                @endif
                 @php($tnHeartbeatWarn = \App\Services\HeartbeatHealth::warning())
                 @if($tnHeartbeatWarn)
                 <div class="mx-4 mt-4 bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-sm">

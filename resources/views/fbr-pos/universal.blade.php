@@ -848,6 +848,7 @@ window.addEventListener('popstate', function() {
             <button @click="sendToKitchen()" :disabled="cart.length === 0 || submitting || hasManualItems()" :title="hasManualItems() ? window.TXT.ti_manual_pay_first_cart : window.TXT.ti_kot_saves_no_payment" class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition">
                 <span class="text-base leading-none">🍳</span>
                 <span x-text="submitting ? window.TXT.sending_ellipsis : window.TXT.send_to_kitchen"></span>
+                <kbd class="text-[9px] bg-orange-700/40 px-1.5 py-0.5 rounded font-mono flex-shrink-0">Alt+K</kbd>
             </button>
         </div>
         @endif
@@ -4782,6 +4783,19 @@ function restaurantPos() {
             if (e.altKey && e.key === '2') { e.preventDefault(); if (this.cart.length > 0 && !this.submitting && !this.showPayModal) { this.submitting = false; this.saveAsProvisional = false; this.payPrintReceipt = this.billPrintDefault(); this.processPayment('card'); } return; }
             // Alt+3 — instant UDHAAR (khata) sale; needs a selected customer (payUdhaar guards).
             if (e.altKey && e.key === '3') { e.preventDefault(); if (this.cart.length > 0 && !this.submitting && !this.showPayModal) { this.submitting = false; this.saveAsProvisional = false; this.payPrintReceipt = this.billPrintDefault(); this.payUdhaar(); } return; }
+            @if($features->kot ?? false)
+            // Alt+K — Kitchen mein send karein (owner video, Aug 2026): mirrors
+            // the PRA screen; guards match the button's :disabled (no deals/
+            // canHold on FBR). Blocking modals gate the chord like F10/F11.
+            // Whole block Blade-gated like the button — no KOT feature, no chord.
+            if (e.altKey && (e.key === 'k' || e.key === 'K' || e.code === 'KeyK')) {
+                e.preventDefault();
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.tableSwitchPrompt) return;
+                if (this.cart.length === 0 || this.submitting || this.hasManualItems()) return;
+                this.sendToKitchen();
+                return;
+            }
+            @endif
             // Alt+R — Reprint last bill (Akhri Bills top entry).
             if (e.altKey && (e.key === 'r' || e.key === 'R')) { e.preventDefault(); const last = this.recentBills[0]; if (last) { this._printViaIframe('print-receipt-frame', '/fbr-pos/transaction/' + last.id + '/receipt?auto_print=1', 'width=400,height=700'); this.showToast('Reprinting #' + last.invoice_number, 'info'); } else if (this.lastTransactionId) { this.printReceipt(); this.showToast('Reprinting last bill...', 'info'); } else { this.showToast(window.TXT.no_bill_reprint, 'warning'); } return; }
             if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); this.enterSearchMode(); return; }

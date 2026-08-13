@@ -1614,6 +1614,7 @@ window.addEventListener('popstate', function() {
                     <button @click="sendToKitchen()" :disabled="cart.length === 0 || submitting || hasManualItems() || hasDealItems() || !canHold()" :title="!canHold() ? window.TXT.ti_kitchen_dine_in_only : ((hasManualItems() || hasDealItems()) ? window.TXT.ti_manual_deals_pay_first_cart : window.TXT.ti_kot_saves_no_payment)" class="w-full py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-30 disabled:cursor-not-allowed shadow-sm transition flex items-center justify-center gap-1.5">
                         <span class="text-sm leading-none">🍳</span>
                         <span x-text="submitting ? window.TXT.sending_ellipsis : window.TXT.send_to_kitchen"></span>
+                        <kbd class="text-[9px] bg-orange-700/40 px-1.5 py-0.5 rounded font-mono flex-shrink-0">Alt+K</kbd>
                     </button>
                     @endif
                     <div class="grid grid-cols-5 gap-2">
@@ -5875,6 +5876,20 @@ function restaurantPos() {
                 this.processPayment(oneTapCard ? 'card' : 'cash');
                 return;
             }
+            @if($features->kot ?? false)
+            // Alt+K — Kitchen mein send karein (owner video, Aug 2026): Alt-chord
+            // so plain K keeps typing in search/inputs; same modal-gating as the
+            // other Alt chords; guards mirror the button's :disabled exactly.
+            // Enter untouched (PAY flow) — kitchen-send ka apna chord hai.
+            // Whole block Blade-gated like the button — no KOT feature, no chord.
+            if (e.altKey && (e.key === 'k' || e.key === 'K' || e.code === 'KeyK')) {
+                e.preventDefault();
+                if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
+                if (this.cart.length === 0 || this.submitting || this.hasManualItems() || this.hasDealItems() || !this.canHold()) return;
+                this.sendToKitchen();
+                return;
+            }
+            @endif
             // ═══════════════════════════════════════════════════════════════
             // D / Alt+D — UNIVERSAL DISCOUNT TOGGLE
             // Cart rows v3 (owner, 26 Jul 2026): per-item discount UI removed —
@@ -6720,6 +6735,12 @@ function restaurantPos() {
             const t = this.boardMenuTable;
             if (!t || !t.order) return;
             const url = '/pos/restaurant/orders/' + t.order.id + '/proof-bill?auto_print=1';
+            // Owner video (Aug 2026): proof ke baad menu WAHIN khula rehta tha —
+            // baqi board actions ki tarah menu band karo, cashier table board par
+            // wapas. Order khula rehta hai (proof final nahi); print trigger `t`
+            // capture par chalta hai, aur _printViaIframe focus wapas deta hai
+            // (shortcuts zinda rehte hain).
+            this.boardMenuTable = null;
             const fallback = () => this._printViaIframe('print-receipt-frame', url, 'width=400,height=700');
             // Silent-first (ZFC 28 Jul 2026): the iframe path pops the Windows
             // print dialog inside the desktop app — route through the agent
@@ -8021,13 +8042,18 @@ function restaurantPos() {
         kdsHandlesKot() { return !!(this.kitchenSettings.kds_enabled && this.kitchenSettings.kds_auto_print && this.kitchenSettings.kds_alive); },
 
         // KOT gateway for the popup-window call sites (hold / resend-kitchen):
-        // silent first, identical popup fallback. delta=true prints ONLY
+        // silent first, hidden-iframe fallback. delta=true prints ONLY
         // not-yet-printed rows (updated orders — kitchen has the rest).
+        // Aug 2026 (edit-path KOT reliability): fallback was window.open — after
+        // the awaited hold/resend fetches the user-gesture is GONE, so popup
+        // blockers silently killed the slip. The hidden print-kot-frame iframe
+        // (same path as printKitchenTicket) is immune and gives focus back.
         kotPrintOrPopup(orderId, delta = false) {
-            const popup = () => window.open('/pos/restaurant/orders/' + orderId + '/kitchen-ticket?auto_print=1' + (delta ? '&delta=1' : ''), '_blank', 'width=380,height=620');
-            if (!this.silentKotPrint) { popup(); return; }
+            const url = '/pos/restaurant/orders/' + orderId + '/kitchen-ticket?auto_print=1' + (delta ? '&delta=1' : '');
+            const fallback = () => this._printViaIframe('print-kot-frame', url, 'width=380,height=620');
+            if (!this.silentKotPrint) { fallback(); return; }
             this.trySilentPrint({ type: 'kot', restaurant_order_id: orderId, delta: delta }).then(ok => {
-                if (ok) this.showToast(window.TXT.kot_sent_to_printer, 'success'); else popup();
+                if (ok) this.showToast(window.TXT.kot_sent_to_printer, 'success'); else fallback();
             });
         },
 

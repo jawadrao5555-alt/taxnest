@@ -36,13 +36,24 @@ class KotPrintService
 
             $order->loadMissing('items');
             $deltaQ = $delta ? '&delta=1' : '';
-            $makeJob = function (?string $printer, ?string $renderQuery) use ($company, $order, $userId) {
+            // Delta snapshot (Pizza Master edit-path bug, Aug 2026): bake the
+            // unprinted row ids into EVERY job of this send — result-time
+            // stamping from the first printed job must not empty the later
+            // overlapping delta jobs (counter copy). Mirrors apiCreatePrintJob.
+            $deltaIds = $delta
+                ? $order->items->whereNull('kot_printed_at')->pluck('id')->map(fn ($i) => (int) $i)->values()->all()
+                : null;
+            if ($delta && empty($deltaIds)) {
+                return ['printed' => true, 'job_ids' => []];
+            }
+            $makeJob = function (?string $printer, ?string $renderQuery) use ($company, $order, $userId, $delta, $deltaIds) {
                 return PosPrintJob::create([
                     'company_id' => $company->id,
                     'type' => 'kot',
                     'target_printer' => $printer,
                     'restaurant_order_id' => $order->id,
                     'render_query' => $renderQuery,
+                    'printed_item_ids' => ($delta && $deltaIds) ? $deltaIds : null,
                     'status' => 'pending',
                     'created_by' => $userId,
                 ]);

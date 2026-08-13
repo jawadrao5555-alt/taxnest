@@ -106,4 +106,43 @@ class OrderMatchCodeDefaultRolloutTest extends TestCase
             DB::table('companies')->where('name', 'Twice Shop')->value('order_match_style')
         );
     }
+
+    /**
+     * Task 654 review fix: run EVERY order_match migration in real filename
+     * order (the exact order `php artisan migrate` uses on a fresh database)
+     * and assert Frost and Brew (id 26) still ends on 'token'. This is the
+     * regression the mis-timestamped 2026_08_13 revert caused: it sorted
+     * before the 2026_08_23 rollout, so fresh databases ended on 'code' while
+     * already-migrated production ended on 'token'.
+     */
+    public function test_fresh_database_migration_order_leaves_frost_and_brew_on_token(): void
+    {
+        DB::table('companies')->insert([
+            'id' => 26,
+            'name' => 'Frost and Brew',
+            'order_match_style' => 'token',
+        ]);
+        DB::table('companies')->insert(['name' => 'Other Shop', 'order_match_style' => 'off']);
+
+        $files = glob(base_path('database/migrations/*order_match*.php'))
+            ?: [];
+        sort($files, SORT_STRING); // artisan migrate runs in filename order
+        $this->assertNotEmpty($files);
+
+        foreach ($files as $file) {
+            $migration = require $file;
+            $migration->up();
+        }
+
+        $this->assertSame(
+            'token',
+            DB::table('companies')->where('id', 26)->value('order_match_style'),
+            'Frost and Brew must end on token after ALL order_match migrations in filename order'
+        );
+        $this->assertSame(
+            'code',
+            DB::table('companies')->where('name', 'Other Shop')->value('order_match_style'),
+            'other companies still end on code'
+        );
+    }
 }

@@ -3702,6 +3702,14 @@ class FbrPosController extends Controller
 
     public function businessProfile(Request $request)
     {
+        // Task 579: ADMIN-ONLY (FBR twin of the POS PosAdminOnly route group).
+        // Business Profile now edits the company CNIC — a LOGIN identifier —
+        // so a cashier must never reach this page's GET or POST.
+        $gateUser = Auth::guard('fbrpos')->user();
+        if (!$gateUser || !$gateUser->isPosAdmin()) {
+            abort(403);
+        }
+
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 

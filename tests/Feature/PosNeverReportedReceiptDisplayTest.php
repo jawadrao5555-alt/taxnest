@@ -286,4 +286,41 @@ class PosNeverReportedReceiptDisplayTest extends TestCase
             'PDF header email must ride inside email_off comments'
         );
     }
+
+    // ── 5. invoice-pdf FOOTER respects the resolved display set (Task 654:
+    //      the footer + "Developed by" lines used to print unconditionally,
+    //      ignoring show_footer / show_developed_by) ────────────────────────
+
+    public function test_invoice_pdf_footer_omits_developed_by_and_footer_when_local_toggles_off(): void
+    {
+        $company = $this->makeCompany();
+        $prefs = $company->invoice_display_prefs;
+        $prefs['pos_local']['show_footer'] = false;
+        $prefs['pos_local']['show_developed_by'] = false;
+        $company->invoice_display_prefs = $prefs;
+        $txn = $this->makeTransaction($company); // exempt_internal → Local set
+
+        $body = $this->body($this->render('pos.invoice-pdf', $company, $txn));
+
+        $this->assertStringNotContainsString(__('pos.brand_developed_by'), $body,
+            'PDF footer must not print Developed-by when show_developed_by=false');
+        $this->assertStringNotContainsString(__('pos.receipt_thank_purchase'), $body,
+            'PDF footer must not print thank-you line when show_footer=false');
+    }
+
+    public function test_invoice_pdf_footer_prints_by_default_and_uses_custom_footer_text(): void
+    {
+        $company = $this->makeCompany();
+        $prefs = $company->invoice_display_prefs;
+        $prefs['pos_local']['footer_text'] = 'Shukriya - phir aayen';
+        $company->invoice_display_prefs = $prefs;
+        $txn = $this->makeTransaction($company); // Local set, footer defaults ON
+
+        $body = $this->body($this->render('pos.invoice-pdf', $company, $txn));
+
+        $this->assertStringContainsString(__('pos.brand_developed_by'), $body,
+            'PDF footer prints Developed-by by default');
+        $this->assertStringContainsString('Shukriya - phir aayen', $body,
+            'PDF footer uses the Local set custom footer_text');
+    }
 }

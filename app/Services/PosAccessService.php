@@ -40,6 +40,7 @@ class PosAccessService
         'reports',
         'tax_reports',
         'day_close',
+        'order_cancel',
         'inventory',
         'customize',
         'team',
@@ -231,6 +232,39 @@ class PosAccessService
             // hasColumn guard: PROD drift (migration not yet run) → column
             // missing → attribute null → default OFF for cashiers.
             return (bool) ($company->pos_cashier_dayclose ?? false);
+        } catch (\Throwable $e) {
+            return false; // fail closed — admin/manager path unaffected
+        }
+    }
+
+    /**
+     * Order Cancel verdict (Task #643, owner voice note 13 Aug 2026) — SINGLE
+     * source of truth for the restaurant soft-cancel (board "Order Cancel",
+     * bell-panel Cancel, claimed-cart Cancel) UI AND the deleteOrder server
+     * gate. Same shape as dayCloseAllowed:
+     * - Custom Access set (Unlimited/trial) → its explicit tick wins, both ways.
+     * - No set + admin/manager → allowed (unchanged).
+     * - No set + cashier → company switch `pos_cashier_order_cancel` (default
+     *   OFF — cancel is owner/manager work; ANY plan can re-open it in Customize).
+     */
+    public static function orderCancelAllowed(?User $user, $company = null): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        $custom = self::customAllows($user, 'order_cancel');
+        if ($custom !== null) {
+            return $custom;
+        }
+        if (!$user->isPosCashier()) {
+            return true;
+        }
+        try {
+            $company = $company ?: \App\Models\Company::find($user->company_id);
+
+            // hasColumn guard: PROD drift (migration not yet run) → column
+            // missing → attribute null → default OFF for cashiers.
+            return (bool) ($company->pos_cashier_order_cancel ?? false);
         } catch (\Throwable $e) {
             return false; // fail closed — admin/manager path unaffected
         }

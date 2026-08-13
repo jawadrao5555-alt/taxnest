@@ -265,7 +265,9 @@
         @if($company->business_activity)<p>{{ $company->business_activity }}</p>@endif
         @if(!empty($addressLine) && $rp['show_address'])<p>{{ $addressLine }}</p>@endif
         @if($phoneLine && $rp['show_mobile'])<p>{{ __('pos.rcpt_tel') }} {{ $phoneLine }}</p>@endif
-        @if($company->email && $rp['show_email'])<p>{{ $company->email }}</p>@endif
+        {{-- email_off wrappers (ZFC 13 Aug 2026): stop Cloudflare Scrape Shield from
+             printing "[email protected]" — mirrors receipt_80mm; keep in sync. --}}
+        @if($company->email && $rp['show_email'])<p><!--email_off-->{{ $company->email }}<!--/email_off--></p>@endif
         @if($company->ntn && $rp['show_ntn'])<p><strong>NTN:</strong> {{ $company->ntn }}</p>@endif
         @if(!empty($company->fbr_registration_no))<p><strong>STRN:</strong> {{ $company->fbr_registration_no }}</p>@endif
     </div>
@@ -414,6 +416,7 @@
     @if($omRcptToken)
     <div style="text-align:center; padding:2px 0 3px;">
         <span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:14px; font-weight:900;">{{ __('pos.order_match_token_label') }} {{ $omRcptToken }}</span>
+        <div style="font-size:8px; font-weight:400; padding-top:1px;">{{ __('pos.order_match_token_caption') }}</div>
     </div>
     @elseif($omRcptCode && !$rcptPraFiscal)
     {{-- Short-code box: only for non-fiscal bills; fiscal bills show the full order number in the top invoice box --}}
@@ -581,8 +584,10 @@
 
     @if($transaction->pra_status === 'submitted' && $transaction->pra_invoice_number)
     @php
+        // minVersion 4 (ZFC 13 Aug 2026): same module grid as the local invoice
+        // QR — visually consistent QRs, content untouched. Mirrors receipt_80mm.
         $praQr = $transaction->pra_invoice_number
-            ? \App\Support\QrImage::dataUri($transaction->pra_invoice_number)
+            ? \App\Support\QrImage::dataUri($transaction->pra_invoice_number, 5, 4)
             : ($transaction->pra_qr_code ?: '');
     @endphp
     @if($praQr)
@@ -606,22 +611,24 @@
         if ($showReceiptQr) {
             $publicUrl = \App\Http\Controllers\PublicProfileController::publicUrlFor($transaction->company);
             if ($publicUrl) {
-                $qrUrl = \App\Support\QrImage::dataUri($publicUrl);
+                $qrUrl = \App\Support\QrImage::dataUri($publicUrl, 5, 4);
                 $qrCaption = __('pos.receipt_scan_menu');
             } else {
                 // ZFC issue #9 (28 Jul 2026): business name OFF => QR payload must
                 // not leak the name either.
-                $qrPayload = [
-                    'type' => $rcptIsProvisional ? 'Provisional Bill' : 'Sale Receipt',
-                    'inv' => $transaction->invoice_number,
-                    'date' => $transaction->created_at->format('d/m/Y H:i'),
-                    'total' => number_format($transaction->total_amount, 2),
+                // Compact plain-text payload + shared minVersion 4 (ZFC 13 Aug 2026)
+                // — mirrors receipt_80mm; keep in sync.
+                $qrLines = [
+                    $rcptIsProvisional ? 'Provisional Bill' : 'Sale Receipt',
+                    $transaction->invoice_number,
+                    $transaction->created_at->format('d/m/Y H:i'),
+                    'Total: ' . number_format($transaction->total_amount, 2),
                 ];
                 if ($rp['show_business_name'] ?? true) {
-                    $qrPayload['business'] = $transaction->company->name ?? 'NestPOS';
+                    $qrLines[] = $transaction->company->name ?? 'NestPOS';
                 }
-                $qrData = json_encode($qrPayload);
-                $qrUrl = \App\Support\QrImage::dataUri($qrData);
+                $qrData = implode("\n", $qrLines);
+                $qrUrl = \App\Support\QrImage::dataUri($qrData, 5, 4);
                 $qrCaption = __('pos.receipt_scan_details');
             }
         } else {

@@ -249,7 +249,8 @@ class RestaurantPosController extends Controller
                     'quantity' => $qty,
                     'unit_price' => $manualPrice,
                     'subtotal' => round($lineTotal - $itemDiscountAmount, 2),
-                    'special_notes' => $item['special_notes'] ?? null,
+                    // Task 636: cashier path gets the same identity-autofill note discard as waiter punches
+                    'special_notes' => RestaurantWaiterController::stripIdentityNote($item['special_notes'] ?? null, $user),
                     'is_tax_exempt' => $itemExempt,
                     'item_discount_type' => $itemDiscountValue > 0 ? $itemDiscountType : null,
                     'item_discount_value' => $itemDiscountValue,
@@ -283,7 +284,7 @@ class RestaurantPosController extends Controller
                     'quantity' => $qty,
                     'unit_price' => (float)$product->price,
                     'subtotal' => round($lineTotal - $itemDiscountAmount, 2),
-                    'special_notes' => $item['special_notes'] ?? null,
+                    'special_notes' => RestaurantWaiterController::stripIdentityNote($item['special_notes'] ?? null, $user),
                     'is_tax_exempt' => $itemExempt,
                     'item_discount_type' => $itemDiscountValue > 0 ? $itemDiscountType : null,
                     'item_discount_value' => $itemDiscountValue,
@@ -313,7 +314,7 @@ class RestaurantPosController extends Controller
                     'quantity' => $qty,
                     'unit_price' => (float)$service->price,
                     'subtotal' => round($lineTotal - $itemDiscountAmount, 2),
-                    'special_notes' => $item['special_notes'] ?? null,
+                    'special_notes' => RestaurantWaiterController::stripIdentityNote($item['special_notes'] ?? null, $user),
                     'is_tax_exempt' => $itemExempt,
                     'item_discount_type' => $itemDiscountValue > 0 ? $itemDiscountType : null,
                     'item_discount_value' => $itemDiscountValue,
@@ -456,7 +457,12 @@ class RestaurantPosController extends Controller
                 'tax_amount' => $taxAmount,
                 'total_amount' => $totalAmount,
                 'estimated_cost' => round($estimatedCost, 2),
-                'kitchen_notes' => $request->kitchen_notes,
+                // Task 636: kitchen_notes on the held order header is printed on every
+                // KOT — apply the same identity-autofill discard as per-item notes.
+                'kitchen_notes' => RestaurantWaiterController::stripIdentityNote(
+                    $request->kitchen_notes,
+                    $user
+                ),
                 'priority' => (bool)($request->priority ?? false),
                 'created_by' => $user->id,
                 // Phase 5 — every held order is implicitly "sent to kitchen".
@@ -543,6 +549,13 @@ class RestaurantPosController extends Controller
         $companyId = app('currentCompanyId');
         if (!is_numeric($orderId) || $orderId < 1) {
             return response()->json(['success' => false, 'message' => 'Invalid order ID'], 400);
+        }
+        // Task #643 (owner voice note 13 Aug 2026): cancel = owner/manager work.
+        // Single verdict (PosAccessService::orderCancelAllowed) drives this gate
+        // AND every cancel UI entry point (board / bell panel / claimed cart).
+        // Waiter self-cancel has its OWN endpoint + toggle — untouched.
+        if (!\App\Services\PosAccessService::orderCancelAllowed(Auth::guard('pos')->user())) {
+            return response()->json(['success' => false, 'message' => __('pos.order_cancel_not_allowed')], 403);
         }
         $order = RestaurantOrder::where('company_id', $companyId)->find($orderId);
         if (!$order) {

@@ -1614,6 +1614,11 @@ class PosController extends Controller
         // SW-cached copy of this screen can detect staleness via /pos/api/boot-check.
         $bootFp = $this->posBootFingerprint($company, $user);
 
+        // Task #643: baked Order Cancel verdict — the sale screen's board menu,
+        // bell-panel Cancel and claimed-cart Cancel all hide on this flag; the
+        // deleteOrder server gate re-enforces the SAME verdict.
+        $canOrderCancel = \App\Services\PosAccessService::orderCancelAllowed($user, $company);
+
         return response(view('pos.universal', compact(
             'company', 'features', 'products', 'services', 'categories',
             'recipeLookup', 'tables', 'selectedTable', 'heldOrders',
@@ -1621,7 +1626,7 @@ class PosController extends Controller
             'posRole', 'discountLimit', 'hasManagerPin', 'ingredientCosts',
             'lowStockAlerts', 'inventoryEnabled', 'dealsForJs',
             'editBillForJs', 'userGridPrefs', 'bootFp', 'customersTruncated',
-            'recallOrderIdForJs'
+            'recallOrderIdForJs', 'canOrderCancel'
         )))
         ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         ->header('Pragma', 'no-cache')
@@ -1673,6 +1678,9 @@ class PosController extends Controller
             // Task 431: the Delivery Board button is BAKED into the sale screen —
             // a riders plan-gate change must refresh the offline-cached copy.
             (bool) \App\Services\PosFeatureService::planAllows($company, 'riders_enabled'),
+            // Task 643: the Order Cancel verdict is BAKED into the sale screen —
+            // toggling the company switch / custom access must refresh the cache.
+            (bool) \App\Services\PosAccessService::orderCancelAllowed($user, $company),
         ]));
 
         $screenPath = resource_path('views/pos/universal.blade.php');
@@ -2246,7 +2254,7 @@ class PosController extends Controller
                     'submission_hash' => $submissionHash,
                     'locked_by_terminal_id' => null,
                     'lock_time' => null,
-                    'notes' => $request->input('kitchen_notes'),
+                    'notes' => RestaurantWaiterController::stripIdentityNote($request->input('kitchen_notes'), auth('pos')->user()),
                 ] + $riderFields + $taxInclusiveFields
                   // Draft resume: NEVER overwrite an already-frozen token — a
                   // replayed/duplicate submit must reprint the same number.
@@ -2291,7 +2299,7 @@ class PosController extends Controller
                     // Offline sync: credit the cashier who RANG UP the bill, not
                     // whoever's session replayed the queue next morning.
                     'created_by' => $offlineQueuedBy ?: auth('pos')->id(),
-                    'notes' => $request->input('kitchen_notes'),
+                    'notes' => RestaurantWaiterController::stripIdentityNote($request->input('kitchen_notes'), auth('pos')->user()),
                 ] + $riderFields + $taxInclusiveFields + $billTokenFields);
             }
 
@@ -2691,7 +2699,7 @@ class PosController extends Controller
                 'pra_status' => $isProvisionalEdit
                     ? 'local'
                     : ($goingToPra ? 'pending' : null),
-                'notes' => $request->input('kitchen_notes'),
+                'notes' => RestaurantWaiterController::stripIdentityNote($request->input('kitchen_notes'), auth('pos')->user()),
             ]);
 
             $transaction->items()->delete();
@@ -5709,6 +5717,35 @@ class PosController extends Controller
     }
 
     /**
+     * Customize POS → persist "Cashier bhi Order Cancel kar sake" (Task #643,
+     * owner voice note 13 Aug 2026). Default OFF = restaurant order cancel is
+     * owner/manager work; this switch re-opens it for cashiers on ANY plan
+     * (Team Custom Access stays the per-member override on Unlimited).
+     * Verdict: PosAccessService::orderCancelAllowed.
+     */
+    public function toggleCashierOrderCancel(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->posCashierBlocked()) {
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
+        }
+        // PROD drift guard: code can land before the migration on live — fail
+        // gracefully instead of a SQL "unknown column" 500.
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_cashier_order_cancel')) {
+            return response()->json(['success' => false, 'message' => __('pos.setting_save_failed')], 503);
+        }
+        $company = Company::find(app('currentCompanyId'));
+        $company->pos_cashier_order_cancel = $request->boolean('enabled');
+        $company->save();
+
+        return response()->json([
+            'success' => true,
+            'enabled' => (bool) $company->pos_cashier_order_cancel,
+            'message' => $company->pos_cashier_order_cancel ? __('pos.cashier_ordercancel_enabled') : __('pos.cashier_ordercancel_disabled'),
+        ]);
+    }
+
+    /**
      * Day Close page — persist the company's business-day cutoff time
      * ("Din band hone ka waqt", owner request 30 Jul 2026). Sales before this
      * time count in the PREVIOUS trading day (business_date) and the auto
@@ -8470,7 +8507,13 @@ class PosController extends Controller
                 'lineTotal' => round($qty * $itemPrice, 2),
                 'isExempt' => $isExempt,
                 'isThirdSchedule' => $isThirdSchedule,
-                'notes' => isset($item['special_notes']) ? (string) $item['special_notes'] : null,
+                // Task 636: same identity-autofill note discard as the waiter path —
+                // a note that is EXACTLY the cashier's login email/username/name/phone
+                // is browser autofill garbage, never a kitchen instruction.
+                'notes' => RestaurantWaiterController::stripIdentityNote(
+                    isset($item['special_notes']) ? (string) $item['special_notes'] : null,
+                    auth('pos')->user()
+                ),
                 'deal_snapshot' => $dealSnapshot,
             ];
         }

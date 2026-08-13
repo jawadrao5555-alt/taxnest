@@ -68,6 +68,7 @@ class Company extends Model
         'bill_token_counter_local',
         'bill_token_date_local',
         'pos_cashier_dayclose',
+        'pos_cashier_order_cancel',
         'pos_cash_received_enabled',
         'pra_reporting_enabled',
         'pos_integration_mode',
@@ -167,6 +168,7 @@ class Company extends Model
         'pos_auto_purge_local_on_dayclose' => 'boolean',
         'pos_auto_dayclose_24h' => 'boolean',
         'pos_cashier_dayclose' => 'boolean',
+        'pos_cashier_order_cancel' => 'boolean',
         'force_watermark' => 'boolean',
         'pra_reporting_enabled' => 'boolean',
         'pos_tax_inclusive' => 'boolean',
@@ -291,7 +293,14 @@ class Company extends Model
      */
     public function posReceiptPrefsFor($transaction): array
     {
-        $isPra = (($transaction->invoice_mode ?? 'pra') === 'pra') && $transaction->pra_status !== null;
+        // ZFC (13 Aug 2026): 'exempt_internal' = all-items-exempt bill that is
+        // NEVER reported to PRA (no fiscal number, prints as a plain SALE
+        // RECEIPT with the bottom invoice QR). Customers see it as a local-style
+        // bill, so it must follow the LOCAL display set — with the old rule
+        // (any non-NULL status = PRA) these bills ignored every Local-tab toggle.
+        $isPra = (($transaction->invoice_mode ?? 'pra') === 'pra')
+            && $transaction->pra_status !== null
+            && $transaction->pra_status !== 'exempt_internal';
 
         return $this->posReceiptPrefs($isPra ? 'pra' : 'local');
     }

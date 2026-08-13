@@ -183,7 +183,7 @@
         </div>
         @endif
 
-        <p class="text-xs text-gray-500 -mt-3 mb-5">{{ __('pos.comparison_vs_previous', ['days' => \Carbon\Carbon::parse($ra->previous->from)->diffInDays(\Carbon\Carbon::parse($ra->previous->to)) + 1, 'from' => \Carbon\Carbon::parse($ra->previous->from)->format('d M'), 'to' => \Carbon\Carbon::parse($ra->previous->to)->format('d M Y'), 'amount' => number_format($ra->previous->revenue), 'bills' => $ra->previous->bills]) }}</p>
+        <p class="text-xs text-gray-500 -mt-3 mb-5">{{ __('pos.comparison_vs_previous', ['days' => \Carbon\Carbon::parse($ra->previous->from)->diffInDays(\Carbon\Carbon::parse($ra->previous->to)) + 1, 'from' => \Carbon\Carbon::parse($ra->previous->from)->format('d M'), 'to' => \Carbon\Carbon::parse($ra->previous->to)->format('d M Y'), 'revenue' => number_format($ra->previous->revenue), 'bills' => $ra->previous->bills]) }}</p>
 
         {{-- Profit (ADMIN-ONLY, cost-price based) --}}
         @if($ra->profit !== null)

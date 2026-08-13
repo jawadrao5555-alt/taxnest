@@ -53,7 +53,9 @@
 
             {{-- ============ PRA (fiscal) receipt panel ============ --}}
             <div x-show="tab === 'pra'" class="p-6">
-                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">{!! __('pos.pra_panel_note_html', ['reported' => '<span class="font-semibold">' . e(__('pos.reported_to_pra')) . '</span>', 'series' => '<span class="font-mono">POS-</span>']) !!}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{!! __('pos.pra_panel_note_html', ['reported' => '<span class="font-semibold">' . e(__('pos.reported_to_pra')) . '</span>', 'series' => '<span class="font-mono">POS-</span>']) !!}</p>
+                {{-- Task 654 (ZFC): stream clarity — reporting-OFF finals + exempt bills follow the LOCAL tab. --}}
+                <p class="text-[11px] text-amber-700 dark:text-amber-400 mb-4">{{ __('pos.pra_panel_stream_hint') }}</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <label class="flex items-center gap-2.5 cursor-pointer p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700 transition">
                         <input type="checkbox" name="rp_show_address" value="1" {{ $rp['show_address'] ? 'checked' : '' }} class="rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4">
@@ -107,7 +109,9 @@
 
             {{-- ============ Local receipt panel ============ --}}
             <div x-show="tab === 'local'" class="p-6" style="display:none;">
-                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">{!! __('pos.local_panel_note_html', ['local' => '<span class="font-semibold">' . e(__('pos.local_bills')) . '</span>', 'series' => '<span class="font-mono">L-</span>']) !!}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{!! __('pos.local_panel_note_html', ['local' => '<span class="font-semibold">' . e(__('pos.local_bills')) . '</span>', 'series' => '<span class="font-mono">L-</span>']) !!}</p>
+                {{-- Task 654 (ZFC): stream clarity — reporting-OFF finals + exempt bills land HERE. --}}
+                <p class="text-[11px] text-amber-700 dark:text-amber-400 mb-4">{{ __('pos.local_panel_stream_hint') }}</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <label class="flex items-center gap-2.5 cursor-pointer p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700 transition">
                         <input type="checkbox" name="lp_show_address" value="1" {{ $lp['show_address'] ? 'checked' : '' }} class="rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4">

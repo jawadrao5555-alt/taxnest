@@ -1599,6 +1599,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'kot_resend_btn' => '↻ KOT Dobara Bhejo',
     'kot_rush' => '*** URGENT - JALDI ***',
     'order_match_token_label' => 'TOKEN',
+    'order_match_token_caption' => 'Order queue number — bill number alag hai',
     'order_match_title' => 'Order Matching Number',
     'order_match_scope' => '(receipt aur kitchen KOT dono par chapta hai)',
     'order_match_intro' => 'Customer receipt aur kitchen KOT par AIK jaisa number chape ga — counter staff ready order ko bill se foran mila sake ga.',

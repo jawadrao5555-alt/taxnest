@@ -1599,6 +1599,7 @@ return [
     'kot_resend_btn' => '↻ دوبارہ بھیجیں KOT',
     'kot_rush' => '*** انتہائی ضروری ***',
     'order_match_token_label' => 'ٹوکن',
+    'order_match_token_caption' => 'آرڈر قطار نمبر — بل نمبر الگ ہے',
     'order_match_title' => 'آرڈر ملاپ نمبر',
     'order_match_scope' => '(رسید اور کچن پرچی دونوں پر چھپتا ہے)',
     'order_match_intro' => 'گاہک کی رسید اور کچن پرچی پر ایک جیسا نمبر چھپے گا تاکہ کاؤنٹر عملہ تیار آرڈر کو بل سے فوراً ملا سکے۔',

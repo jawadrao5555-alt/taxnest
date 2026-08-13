@@ -83,17 +83,22 @@
 </head>
 <body>
     <div class="receipt">
+        {{-- Receipt display prefs (ZFC 13 Aug 2026): this header used to print
+             address/phone/email/NTN UNCONDITIONALLY — the ONLY render path that
+             bypassed posReceiptPrefsFor(). Gate every optional line on the same
+             per-transaction set the thermal receipts use. --}}
+        @php $rpPdf = optional($transaction->company)->posReceiptPrefsFor($transaction) ?? \App\Models\Company::defaultDisplayPrefs(); @endphp
         <div class="header-bar">
             @if($company->logo_path)
             <div class="logo">
                 <img src="{{ public_path('storage/' . $company->logo_path) }}" alt="{{ $company->name }}">
             </div>
             @endif
-            <h1>{{ $company->name }}</h1>
-            @if($company->address)<p>{{ $company->address }}</p>@endif
-            @if($company->phone)<p>{{ __('pos.rcpt_tel') }} {{ $company->phone }}</p>@endif
-            @if($company->email)<p>{{ $company->email }}</p>@endif
-            @if($company->ntn)<p>NTN: {{ $company->ntn }}</p>@endif
+            @if($rpPdf['show_business_name'] ?? true)<h1>{{ $company->name }}</h1>@endif
+            @if($company->address && ($rpPdf['show_address'] ?? true))<p>{{ $company->address }}</p>@endif
+            @if($company->phone && ($rpPdf['show_mobile'] ?? true))<p>{{ __('pos.rcpt_tel') }} {{ $company->phone }}</p>@endif
+            @if($company->email && ($rpPdf['show_email'] ?? true))<p><!--email_off-->{{ $company->email }}<!--/email_off--></p>@endif
+            @if($company->ntn && ($rpPdf['show_ntn'] ?? true))<p>NTN: {{ $company->ntn }}</p>@endif
             @if($company->pra_pos_id)<p>{{ __('pos.rcpt_pos_reg') }} {{ $company->pra_pos_id }}</p>@endif
         </div>
 
@@ -135,8 +140,8 @@
                 <div class="lbl">{{ __('pos.receipt_payment_mode') }}</div>
                 <div class="val">{{ ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</div>
             </div>
-            {{-- Owner (Jul 2026): PRA and Local bills each have their OWN display set. --}}
-            @php $rpPdf = optional($transaction->company)->posReceiptPrefsFor($transaction) ?? \App\Models\Company::defaultDisplayPrefs(); @endphp
+            {{-- Owner (Jul 2026): PRA and Local bills each have their OWN display set
+                 — $rpPdf resolved once at the header above. --}}
             @if($transaction->creator && $rpPdf['show_cashier'])
             <div class="info-row">
                 <div class="lbl">{{ __('pos.receipt_cashier') }}</div>
@@ -263,8 +268,10 @@
             <div class="num">PRA: {{ $transaction->pra_invoice_number }}</div>
         </div>
         @php
+            // minVersion 4 (ZFC 13 Aug 2026): same module grid as the local invoice
+            // QR — visually consistent QRs, content untouched.
             $praQr = $transaction->pra_invoice_number
-                ? \App\Support\QrImage::dataUri($transaction->pra_invoice_number)
+                ? \App\Support\QrImage::dataUri($transaction->pra_invoice_number, 5, 4)
                 : ($transaction->pra_qr_code ?: '');
         @endphp
         @if($praQr)
@@ -285,14 +292,25 @@
             // they are REAL completed sales, NOT provisionals. Only deliberate
             // provisionals (invoice_mode 'local') may carry the PROVISIONAL badge.
             $rcptIsProvisional = ($transaction->invoice_mode ?? 'pra') === 'local';
-            $qrData = json_encode([
-                'type' => $rcptIsProvisional ? 'Provisional Bill' : 'Sale Receipt',
-                'inv' => $transaction->invoice_number,
-                'date' => $transaction->created_at->format('d/m/Y H:i'),
-                'total' => number_format($transaction->total_amount, 2),
-                'business' => $transaction->company->name ?? 'NestPOS',
-            ]);
-            $qrUrl = \App\Support\QrImage::dataUri($qrData);
+            // Task #292 parity (ZFC 13 Aug 2026): the PDF used to print the invoice
+            // QR even when "Print Menu QR Code" was OFF — honor the same gate as the
+            // thermal receipts. Compact plain-text payload + minVersion 4 mirrors
+            // receipt_80mm (visual consistency with the PRA QR); business name only
+            // when the resolved display set allows it.
+            $pdfShowQr = (bool) (optional($transaction->company)->posReceiptStyle()['show_menu_qr'] ?? true);
+            $qrUrl = null;
+            if ($pdfShowQr) {
+                $qrLines = [
+                    $rcptIsProvisional ? 'Provisional Bill' : 'Sale Receipt',
+                    $transaction->invoice_number,
+                    $transaction->created_at->format('d/m/Y H:i'),
+                    'Total: ' . number_format($transaction->total_amount, 2),
+                ];
+                if ($rpPdf['show_business_name'] ?? true) {
+                    $qrLines[] = $transaction->company->name ?? 'NestPOS';
+                }
+                $qrUrl = \App\Support\QrImage::dataUri(implode("\n", $qrLines), 5, 4);
+            }
         @endphp
         @if($rcptIsProvisional)
         <div class="local-box" style="border: 1.5px dashed #7c3aed; color: #5b21b6;">
@@ -308,7 +326,8 @@
         @endif
         @if($qrUrl)
         <div class="qr-section" style="text-align: center; margin: 8px 0;">
-            <img src="{{ $qrUrl }}" alt="Invoice QR" style="width: 120px; height: 120px; margin: 0 auto;">
+            {{-- 90px = same rendered size as the PRA QR above (ZFC 13 Aug 2026). --}}
+            <img src="{{ $qrUrl }}" alt="Invoice QR" style="width: 90px; height: 90px; margin: 0 auto;">
             <p style="font-size: 9px; color: #6b7280; margin-top: 4px;">{{ __('pos.receipt_scan_invoice') }}</p>
         </div>
         @endif

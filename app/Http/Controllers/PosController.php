@@ -898,12 +898,33 @@ class PosController extends Controller
             };
         }
 
+        // Return / credit-note netting (Task 578, same convention as day-close &
+        // reports, Task 570): revenue figures are SIGNED (returns subtract),
+        // bill counts stay SALES-only. Schema-guarded for prod drift —
+        // pre-migration boxes fall back to the old unsigned sums.
+        $dashTypeReady = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type');
+        $dashSignExpr = $dashTypeReady ? "CASE WHEN transaction_type = 'return' THEN -1 ELSE 1 END" : '1';
+        $dashSaleRowExpr = $dashTypeReady ? "CASE WHEN transaction_type = 'return' THEN 0 ELSE 1 END" : '1';
+        // Item-level joins (profit / top products / coverage) EXCLUDE return
+        // transactions entirely — same as range analytics (never netted there).
+        $dashExcludeReturnsRaw = function ($q) use ($dashTypeReady) {
+            if ($dashTypeReady) {
+                $q->where(function ($w) {
+                    $w->whereNull('t.transaction_type')->orWhere('t.transaction_type', '!=', 'return');
+                });
+            }
+        };
+
         $todayStats = PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
             ->where('business_date', $bizToday)
             ->where($excludeLocal)
-            ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue, COALESCE(AVG(total_amount),0) as avg_ticket')
+            ->selectRaw("COALESCE(SUM({$dashSaleRowExpr}),0) as count, COALESCE(SUM(({$dashSignExpr}) * total_amount),0) as revenue")
             ->first();
+        // Avg ticket = netted revenue over sales-only bills (a raw AVG would
+        // count the return row as a bill and average its positive amount in).
+        $todayStats->avg_ticket = ((int) $todayStats->count) > 0
+            ? (float) $todayStats->revenue / (int) $todayStats->count : 0;
 
         // Task 109 (ZFC, 2 Aug 2026): Pending Bills — provisional bills of the
         // current BUSINESS day that are still not FINAL. Triple-filter per
@@ -920,7 +941,7 @@ class PosController extends Controller
             ->where('status', 'completed')
             ->where('business_date', '>=', now()->startOfMonth()->toDateString())
             ->where($excludeLocal)
-            ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue')
+            ->selectRaw("COALESCE(SUM({$dashSaleRowExpr}),0) as count, COALESCE(SUM(({$dashSignExpr}) * total_amount),0) as revenue")
             ->first();
 
         // ── PROFIT + BI ENGINE (v18) ─────────────────────────────────────────
@@ -949,6 +970,7 @@ class PosController extends Controller
                 ->where('t.business_date', '>=', $periodStart)
                 ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
                 ->where($excludeLocalRaw)
+                ->where($dashExcludeReturnsRaw)
                 ->selectRaw('
                     COALESCE(SUM(CASE WHEN COALESCE(i.cost_price,0) > 0 THEN i.subtotal ELSE 0 END), 0) as gross_revenue,
                     COALESCE(SUM(CASE WHEN COALESCE(i.cost_price,0) > 0 THEN i.cost_price * i.quantity ELSE 0 END), 0) as total_cost
@@ -965,6 +987,7 @@ class PosController extends Controller
                 ->where('t.business_date', '>=', $periodStart)
                 ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
                 ->where($excludeLocalRaw)
+                ->where($dashExcludeReturnsRaw)
                 ->selectRaw('
                     COALESCE(SUM(i.subtotal), 0) as gross_revenue,
                     COALESCE(SUM(COALESCE(p.cost_price, 0) * i.quantity), 0) as total_cost
@@ -975,7 +998,7 @@ class PosController extends Controller
             ->where('status', 'completed')
             ->where('business_date', '>=', $periodStart)
             ->where($excludeLocal)
-            ->selectRaw('COUNT(*) as count, COALESCE(SUM(total_amount),0) as revenue')
+            ->selectRaw("COALESCE(SUM({$dashSaleRowExpr}),0) as count, COALESCE(SUM(({$dashSignExpr}) * total_amount),0) as revenue")
             ->first();
 
         // PROFIT-FREEZE alignment: use costed-lines revenue (gross_revenue) as the
@@ -1009,6 +1032,7 @@ class PosController extends Controller
             ->where('t.business_date', '>=', $periodStart)
             ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
             ->where($excludeLocalRaw)
+            ->where($dashExcludeReturnsRaw)
             ->where('i.item_type', 'product')
             ->selectRaw('i.item_id, MAX(i.item_name) as name, SUM(i.quantity) as qty, SUM(i.subtotal) as revenue')
             ->groupBy('i.item_id')
@@ -1025,6 +1049,7 @@ class PosController extends Controller
                 ->where('t.business_date', '>=', $periodStart)
                 ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
                 ->where($excludeLocalRaw)
+                ->where($dashExcludeReturnsRaw)
                 ->where('i.item_type', 'product')
                 ->where('i.cost_price', '>', 0)   // only lines with a frozen snapshot
                 ->selectRaw('
@@ -1047,6 +1072,7 @@ class PosController extends Controller
                 ->where('t.business_date', '>=', $periodStart)
                 ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
                 ->where($excludeLocalRaw)
+                ->where($dashExcludeReturnsRaw)
                 ->where('i.item_type', 'product')
                 ->selectRaw('
                     i.item_id, MAX(i.item_name) as name,
@@ -1081,6 +1107,7 @@ class PosController extends Controller
                 ->where('t.business_date', '>=', $periodStart)
                 ->where(function ($q) { $q->where('t.is_archived', false)->orWhereNull('t.is_archived'); })
                 ->where($excludeLocalRaw)
+                ->where($dashExcludeReturnsRaw)
                 ->where('i.item_type', 'product')
                 ->selectRaw('COUNT(*) as total, SUM(CASE WHEN COALESCE(i.cost_price,0) > 0 THEN 1 ELSE 0 END) as with_cost')
                 ->first();
@@ -1110,7 +1137,7 @@ class PosController extends Controller
             ->where('status', 'completed')
             ->where('business_date', $bizToday)
             ->where($excludeLocal)
-            ->selectRaw("payment_method, COUNT(*) as count, COALESCE(SUM(total_amount),0) as total")
+            ->selectRaw("payment_method, COALESCE(SUM({$dashSaleRowExpr}),0) as count, COALESCE(SUM(({$dashSignExpr}) * total_amount),0) as total")
             ->groupBy('payment_method')
             ->get();
 
@@ -1138,17 +1165,21 @@ class PosController extends Controller
         $yesterdayRevenue = null;
         $praSyncedToday = null;
         if ($dashboardStyle === 'saaf') {
-            $yesterdayRevenue = (float) PosTransaction::where('company_id', $companyId)
+            $yesterdayRevenue = (float) (PosTransaction::where('company_id', $companyId)
                 ->where('status', 'completed')
                 ->where('business_date', \Carbon\Carbon::parse($bizToday)->subDay()->toDateString())
                 ->where($excludeLocal)
-                ->sum('total_amount');
-            $praSyncedToday = PosTransaction::where('company_id', $companyId)
+                ->selectRaw("COALESCE(SUM(({$dashSignExpr}) * total_amount),0) as revenue")
+                ->value('revenue') ?? 0);
+            // Synced-bill count stays SALES-only (a submitted credit note is
+            // not a bill; counting it would disagree with the today tile).
+            $praSyncedToday = (int) PosTransaction::where('company_id', $companyId)
                 ->where('status', 'completed')
                 ->where('business_date', $bizToday)
                 ->where($excludeLocal)
                 ->where('pra_status', 'submitted')
-                ->count();
+                ->selectRaw("COALESCE(SUM({$dashSaleRowExpr}),0) as c")
+                ->value('c');
         }
 
         // Same pattern as DI dashboard: unread company notifications, 30-day auto-expiry.

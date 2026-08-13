@@ -3040,6 +3040,14 @@ class PosController extends Controller
             if (!in_array($transaction->pra_status, ['pending', 'failed', 'offline'], true)) {
                 return back()->with('error', __('pos.invoice_cannot_submit_status', ['status' => $transaction->pra_status ?? 'local']));
             }
+            // ENTERPRISE SAFE MODE (Task 637): Agent-Sync companies never curl PRA
+            // from the server (US IP = guaranteed ~8s timeout). Credit notes re-queue
+            // as 'pending' just like the non-return branch below; the desktop agent
+            // picks them up on its next poll.
+            if ($company->agentHandlesPra()) {
+                $transaction->update(['pra_status' => 'pending', 'pra_response_code' => null]);
+                return back()->with('success', __('pos.requeued_desktop_agent'));
+            }
             $praService = new PraIntegrationService($company);
             $result = $praService->sendInvoice($transaction);
             if (!empty($result['success'])) {

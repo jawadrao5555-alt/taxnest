@@ -1625,8 +1625,11 @@ class FbrService
             $parent = $transaction->parent_transaction_id
                 ? \App\Models\FbrPosTransaction::find($transaction->parent_transaction_id)
                 : null;
-            // RefUSIN must be the original USIN — without it FBR rejects the credit note.
-            $refUsin = $parent?->invoice_number;
+            // RefUSIN must be the FBR fiscal USIN of the original bill (fbr_invoice_number),
+            // NOT the local invoice_number (e.g. FPOS-2026-00003). Using invoice_number caused
+            // TaxAsaan to show "no record" because the RefUSIN didn't match any fiscal USIN
+            // in FBR's portal (Aug 2026, X-Way Shoes live return test, credit note 196354FHGP22214428).
+            $refUsin = $parent?->fbr_invoice_number;
         }
 
         $items = [];

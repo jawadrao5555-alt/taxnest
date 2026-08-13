@@ -19,7 +19,10 @@ use Illuminate\Database\Schema\Blueprint;
  * invoice model, so buildFbrPosPayload() must NEVER sign-flip return amounts.
  *
  * Locks:
- *   1. Return payload: InvoiceType=3 (header + every line), RefUSIN = parent USIN.
+ *   1. Return payload: InvoiceType=3 (header + every line), RefUSIN = parent fbr_invoice_number
+ *      (fiscal USIN assigned by FBRIMS), NOT invoice_number (local app ref like FPOS-2026-NNNNN).
+ *      Bug fixed Aug 2026: using invoice_number caused TaxAsaan to show "no record" for credit
+ *      notes (X-Way Shoes live return test, credit note 196354FHGP22214428).
  *   2. ALL amounts and quantities POSITIVE (header + lines) — no sign flip.
  *   3. Header math: TotalBillAmount = TotalSaleValue + TotalTaxCharged - Discount.
  *   4. Sale payload unchanged: InvoiceType=1, RefUSIN null, positive amounts.
@@ -178,7 +181,10 @@ class FbrPosReturnCreditNotePayloadTest extends TestCase
 
         // 1. Credit-note markers.
         $this->assertSame(3, $payload['InvoiceType']);
-        $this->assertSame($parent->invoice_number, $payload['RefUSIN'], 'RefUSIN = parent merchant USIN');
+        // RefUSIN must be the parent's FBR fiscal USIN (fbr_invoice_number), NOT the local
+        // invoice_number. Bug fixed Aug 2026: wrong RefUSIN caused TaxAsaan "no record".
+        $this->assertSame($parent->fbr_invoice_number, $payload['RefUSIN'], 'RefUSIN = parent FBR fiscal USIN (fbr_invoice_number)');
+        $this->assertNotSame($parent->invoice_number, $payload['RefUSIN'], 'RefUSIN must NOT be the local invoice_number');
 
         // 2. ALL header amounts stay POSITIVE — IMS rejects negatives (Code 102).
         $this->assertSame(500.0, (float) $payload['TotalSaleValue']);
@@ -198,7 +204,7 @@ class FbrPosReturnCreditNotePayloadTest extends TestCase
             $this->assertGreaterThan(0, $line['TotalAmount']);
             $this->assertGreaterThanOrEqual(0, $line['Discount']);
             $this->assertSame(3, $line['InvoiceType']);
-            $this->assertSame($parent->invoice_number, $line['RefUSIN']);
+            $this->assertSame($parent->fbr_invoice_number, $line['RefUSIN']);
         }
     }
 

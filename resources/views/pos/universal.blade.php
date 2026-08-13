@@ -8305,15 +8305,20 @@ function restaurantPos() {
                 this._printViaIframe('print-receipt-frame', url, 'width=400,height=700', onAfterPrint);
             };
             if (this.silentBillPrint) {
-                this.trySilentPrint({ type: 'bill', transaction_id: this.lastTransactionId }).then(ok => {
-                    if (ok) {
-                        // deduped = this bill is ALREADY on its way to the printer
-                        // (double-press guard) — tell the cashier to wait, no 2nd copy.
-                        if (ok.deduped) this.showToast(window.TXT.receipt_already_printing, 'info');
-                        else this.showToast(window.TXT.receipt_sent_to_printer, 'success');
-                        if (typeof onAfterPrint === 'function') onAfterPrint();
-                    } else { fallback(); }
-                });
+                // Task 655 review fix: AWAIT the enqueue attempt (trySilentPrint never
+                // rejects — it retries internally and resolves false on failure) so
+                // printReceipt()'s promise settles only after the receipt job has
+                // actually reached the queue (or fallen back). runAutoPrintChain's
+                // silent fast path awaits this before creating the KOT job —
+                // receipt-first → KOT-after holds even under network/agent latency.
+                const ok = await this.trySilentPrint({ type: 'bill', transaction_id: this.lastTransactionId });
+                if (ok) {
+                    // deduped = this bill is ALREADY on its way to the printer
+                    // (double-press guard) — tell the cashier to wait, no 2nd copy.
+                    if (ok.deduped) this.showToast(window.TXT.receipt_already_printing, 'info');
+                    else this.showToast(window.TXT.receipt_sent_to_printer, 'success');
+                    if (typeof onAfterPrint === 'function') onAfterPrint();
+                } else { fallback(); }
                 return;
             }
             fallback();

@@ -51,7 +51,12 @@ const comp = Object.assign({
   printBeacon: () => {}, showToast: () => {}, openPrintConfirm: () => {},
   queuePrintTimer: (fn) => fn(),
   $nextTick: (fn) => fn(),
-  trySilentPrint: async (job) => { events.push(job.type); return { deduped: false }; },
+  // DEFERRED enqueue (review catch): the real trySilentPrint is a network
+  // round-trip — the job is only "enqueued" when its promise RESOLVES. Record
+  // the event after a real async delay so a fire-and-forget printReceipt()
+  // (promise settling before the enqueue completes) lets KOT jump the queue
+  // and the ordering assertion below catches it.
+  trySilentPrint: async (job) => { await sleep(120); events.push(job.type); return { deduped: false }; },
   printKitchenTicket: (id, cb) => { events.push('kot'); if (cb) cb(); },
   printTxnKitchenTicket: (id, cb) => { events.push('kot'); if (cb) cb(); },
   _printViaIframe: () => { events.push('iframe'); },

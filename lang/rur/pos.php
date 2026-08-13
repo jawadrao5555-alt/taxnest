@@ -4433,6 +4433,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'dc_wastage_line' => 'Wastage (:count): Rs :amount — kharab maal, stock mein wapis nahi gaya',
     'ra_wastage_line' => 'Is period ka wastage (:count): Rs :amount — kharab maal, stock mein wapis nahi gaya',
     'ra_wastage_none' => 'Is period mein koi wastage nahi',
+    'ra_wastage_top_items' => 'Sab se zyada zaya hone wale items',
     'ra_wastage_label' => 'Wastage (tadaad / raqam)',
     'wastage_only_filter' => 'Sirf wastage',
     'receipt_credit_note' => 'CREDIT NOTE / WAPSI',

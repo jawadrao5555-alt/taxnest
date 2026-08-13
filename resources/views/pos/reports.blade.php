@@ -154,6 +154,32 @@
                     {{ __('pos.ra_wastage_none') }}
                 @endif
             </p>
+            {{-- Top wasted items (Task 597): kaunsa maal sab se zyada kharab hua --}}
+            @if(($rangeAnalytics->wastage->items ?? collect())->isNotEmpty())
+            <div class="mt-3 overflow-x-auto">
+                <p class="text-xs font-semibold uppercase text-amber-700 dark:text-amber-400 mb-1">{{ __('pos.ra_wastage_top_items') }}</p>
+                <table class="w-full text-xs table-cards">
+                    <thead>
+                        <tr class="text-left text-amber-700/70 dark:text-amber-400/70 uppercase border-b border-amber-200 dark:border-amber-800">
+                            <th class="py-1">#</th>
+                            <th class="py-1">{{ __('pos.th_product') }}</th>
+                            <th class="py-1 text-right">{{ __('pos.receipt_qty') }}</th>
+                            <th class="py-1 text-right">{{ __('pos.amount_word') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($rangeAnalytics->wastage->items as $i => $wi)
+                        <tr class="border-b border-amber-100 dark:border-amber-900/40">
+                            <td class="py-1.5 text-amber-700/60 dark:text-amber-400/60">{{ $i + 1 }}</td>
+                            <td class="py-1.5 font-medium text-amber-900 dark:text-amber-200">{{ $wi->name }}</td>
+                            <td class="py-1.5 text-right text-amber-800 dark:text-amber-300">{{ rtrim(rtrim(number_format($wi->qty, 2), '0'), '.') }}</td>
+                            <td class="py-1.5 text-right font-semibold text-amber-900 dark:text-amber-200">Rs {{ number_format($wi->amount, 2) }}</td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            @endif
         </div>
         @endif
 

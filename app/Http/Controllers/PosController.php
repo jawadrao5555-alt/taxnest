@@ -9463,17 +9463,32 @@ class PosController extends Controller
         // null = column missing, hide the line entirely.
         $wastage = null;
         if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'is_wastage')) {
-            $wRow = PosTransaction::where('company_id', $companyId)
+            $wRows = PosTransaction::where('company_id', $companyId)
                 ->where('status', 'completed')
                 ->where('transaction_type', 'return')
                 ->where('is_wastage', true)
                 ->tap(fn ($q) => $this->applyReportFilters($q, $tab, $cashierFilter))
                 ->whereBetween('business_date', [$from->toDateString(), $to->toDateString()])
-                ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as amt')
-                ->first();
+                ->get(['id', 'total_amount']);
+            // Top wasted items (Task 597): item-wise ranking so the owner sees
+            // WHICH maal is spoiling — qty + Rs per item_name, worst first.
+            // Return-line quantities/subtotals are stored positive on return rows.
+            $wItems = collect();
+            if ($wRows->isNotEmpty()) {
+                $wItems = PosTransactionItem::whereIn('transaction_id', $wRows->pluck('id'))
+                    ->get(['item_name', 'quantity', 'subtotal'])
+                    ->groupBy(fn ($it) => trim((string) $it->item_name) !== '' ? $it->item_name : '—')
+                    ->map(fn ($g, $name) => (object) [
+                        'name' => $name,
+                        'qty' => abs((float) $g->sum('quantity')),
+                        'amount' => round(abs((float) $g->sum('subtotal')), 2),
+                    ])
+                    ->sortByDesc('amount')->take(15)->values();
+            }
             $wastage = (object) [
-                'count' => (int) ($wRow->cnt ?? 0),
-                'amount' => round((float) ($wRow->amt ?? 0), 2),
+                'count' => $wRows->count(),
+                'amount' => round(abs((float) $wRows->sum('total_amount')), 2),
+                'items' => $wItems,
             ];
         }
 

@@ -4432,6 +4432,7 @@ return [
     'dc_wastage_line' => 'ضیاع (:count): :amount روپے — خراب سامان، اسٹاک میں واپس نہیں گیا',
     'ra_wastage_line' => 'اس عرصے کا ضیاع (:count): :amount روپے — خراب سامان، اسٹاک میں واپس نہیں گیا',
     'ra_wastage_none' => 'اس عرصے میں کوئی ضیاع نہیں',
+    'ra_wastage_top_items' => 'سب سے زیادہ ضائع ہونے والی اشیاء',
     'ra_wastage_label' => 'ضیاع (تعداد / رقم)',
     'wastage_only_filter' => 'صرف ضیاع',
     'receipt_credit_note' => 'کریڈٹ نوٹ / واپسی',

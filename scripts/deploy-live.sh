@@ -30,6 +30,64 @@ step() { echo ""; echo "==> $*"; }
 
 run_ssh() { timeout 120 ssh "${SSH_OPTS[@]}" "$HOST" "$@"; }
 
+# Live logging health: LOG_LEVEL must be 'warning' or lower (debug/info) so
+# scheduler/guard Log::warning lines actually land in laravel.log
+# (13 Aug 2026: LOG_LEVEL=error silently swallowed them all). Also flag a
+# frozen laravel.log (no writes for hours = logging likely dead).
+# Loud WARNING only — never blocks the deploy.
+check_live_logging() {
+  step "Verify: live logging health (LOG_LEVEL + laravel.log freshness)"
+  local OUT
+  OUT=$(run_ssh "cd $LIVE_DIR && grep -E '^LOG_LEVEL=' .env | head -1; echo \"MTIME=\$(stat -c %Y storage/logs/laravel.log 2>/dev/null || echo MISSING)\"; echo \"NOW=\$(date +%s)\"" 2>/dev/null)
+  if [ -z "$OUT" ]; then
+    echo "WARNING: could not read live .env/log over SSH — verify LOG_LEVEL manually." >&2
+    return 0
+  fi
+  local LEVEL_LINE MTIME NOW
+  LEVEL_LINE=$(echo "$OUT" | sed -n '1{/^LOG_LEVEL=/p}')
+  MTIME=$(echo "$OUT" | sed -n 's/^MTIME=//p' | head -1)
+  NOW=$(echo "$OUT" | sed -n 's/^NOW=//p' | head -1)
+
+  local LEVEL="${LEVEL_LINE#LOG_LEVEL=}"
+  LEVEL=$(echo "$LEVEL" | tr -d "\"' \r" | tr 'A-Z' 'a-z')
+  case "$LEVEL" in
+    debug|info|notice|warning)
+      echo "LOG_LEVEL=$LEVEL — OK (warnings will be logged)."
+      ;;
+    "")
+      # No LOG_LEVEL line: Laravel defaults to debug — fine, but note it.
+      echo "LOG_LEVEL not set in live .env (defaults to debug) — OK."
+      ;;
+    *)
+      echo "" >&2
+      echo "!!! WARNING: live .env has LOG_LEVEL=$LEVEL — Log::warning lines are being SILENTLY DROPPED !!!" >&2
+      echo "!!! Scheduler/guard warnings (Cloudflare guards, day-close, trial reminders) will vanish.      !!!" >&2
+      echo "!!! Fix on live: set LOG_LEVEL=warning in $LIVE_DIR/.env then artisan config:cache.            !!!" >&2
+      echo "" >&2
+      ;;
+  esac
+
+  if [ "$MTIME" = "MISSING" ] || [ -z "$MTIME" ]; then
+    echo "" >&2
+    echo "!!! WARNING: live laravel.log is MISSING or unreadable — logging may be silently dead !!!" >&2
+    echo "!!! Check LOG_CHANNEL/permissions on $LIVE_DIR/storage/logs.                          !!!" >&2
+    echo "" >&2
+  elif [ -n "$NOW" ] && [ "$MTIME" -eq "$MTIME" ] 2>/dev/null && [ "$NOW" -eq "$NOW" ] 2>/dev/null; then
+    local AGE=$(( NOW - MTIME ))
+    if [ "$AGE" -gt 21600 ]; then  # 6 hours
+      echo "" >&2
+      echo "!!! WARNING: live laravel.log last written $((AGE/3600))h ago — logging may be silently dead !!!" >&2
+      echo "!!! Check LOG_LEVEL/LOG_CHANNEL in live .env and file permissions on storage/logs.           !!!" >&2
+      echo "" >&2
+    else
+      echo "laravel.log last write: $((AGE/60)) min ago — logging alive."
+    fi
+  else
+    echo "NOTE: could not stat live laravel.log mtime — skip freshness check." >&2
+  fi
+  return 0
+}
+
 [ -f "$KEY" ] || fail "SSH key not found at $KEY"
 
 # ---------------------------------------------------------------- 0. Preflight
@@ -98,6 +156,8 @@ if [ "$LIVE_HEAD_BEFORE" = "$LOCAL_HEAD" ]; then
   HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$LIVE_URL/")
   echo "GET $LIVE_URL/ -> $HTTP_CODE"
   [ "$HTTP_CODE" = "200" ] || fail "homepage returned $HTTP_CODE after refresh"
+
+  check_live_logging
 
   echo "DEPLOY OK (refresh-only): live already at workspace HEAD; migrate + caches + OPcache refreshed."
   exit 0
@@ -186,6 +246,8 @@ if [ -n "$FRESH_ERRORS" ]; then
   echo "NOTE: today's production.ERROR lines (may be pre-existing noise, e.g. 02:00 Compliance cron):"
   echo "$FRESH_ERRORS"
 fi
+
+check_live_logging
 
 echo ""
 echo "==============================================================="

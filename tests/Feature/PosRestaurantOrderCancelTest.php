@@ -273,6 +273,52 @@ class PosRestaurantOrderCancelTest extends TestCase
         );
     }
 
+    // ── Task #645: made/unmade marking on takeaway/delivery cancel ──────────
+
+    public function test_takeaway_cancel_with_made_item_ids_marks_waste_for_report(): void
+    {
+        $this->actAs($this->makeUser('pos_manager'));
+
+        $orderId = $this->order(['source' => 'pos', 'order_type' => 'takeaway', 'table_id' => null, 'total_amount' => 1350]);
+        $madeId = DB::table('restaurant_order_items')->insertGetId([
+            'order_id' => $orderId, 'item_name' => 'Zinger', 'quantity' => 2,
+            'subtotal' => 900, 'kot_printed_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $notMadeId = DB::table('restaurant_order_items')->insertGetId([
+            'order_id' => $orderId, 'item_name' => 'Fries', 'quantity' => 1,
+            'subtotal' => 450, 'kot_printed_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $response = $this->cancel($orderId, ['made_item_ids' => [$madeId]]);
+        $this->assertSame(200, $response->getStatusCode());
+
+        // Made tick persisted per item; unticked explicitly false (asked, said no).
+        $this->assertEquals(1, DB::table('restaurant_order_items')->find($madeId)->was_made);
+        $this->assertEquals(0, DB::table('restaurant_order_items')->find($notMadeId)->was_made);
+
+        // Report waste (same query as the Cancelled Orders summary): only the
+        // MADE item's value counts — takeaway rows included, no Rs 0 gap.
+        $waste = (float) \App\Models\RestaurantOrderItem::where('was_made', true)
+            ->whereIn('order_id', $this->cancelledReportOrders()->pluck('id'))
+            ->sum('subtotal');
+        $this->assertSame(900.0, $waste);
+    }
+
+    public function test_delivery_cancel_without_made_item_ids_leaves_was_made_null(): void
+    {
+        $this->actAs($this->makeUser('pos_admin'));
+
+        // No-KOT cancel path: client never sends made_item_ids → NULL = not asked.
+        $orderId = $this->order(['source' => 'waiter', 'order_type' => 'delivery', 'table_id' => null]);
+        $itemId = DB::table('restaurant_order_items')->insertGetId([
+            'order_id' => $orderId, 'item_name' => 'Karahi', 'quantity' => 1,
+            'subtotal' => 500, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->assertSame(200, $this->cancel($orderId)->getStatusCode());
+        $this->assertNull(DB::table('restaurant_order_items')->find($itemId)->was_made);
+    }
+
     // ── completed orders are protected ───────────────────────────────────────
 
     public function test_completed_order_cannot_be_cancelled(): void

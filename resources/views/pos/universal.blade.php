@@ -2088,6 +2088,8 @@ window.addEventListener('popstate', function() {
                     {{-- Task #643: table optional — claimed waiter takeaway/delivery has none;
                          show the order number instead. --}}
                     <p class="text-xl font-black text-gray-900 dark:text-white mt-0.5" x-text="(boardCancelAsk.table ? 'T-' + boardCancelAsk.table.table_number : (boardCancelAsk.order.order_number || '')) + ' • Rs ' + Math.round(boardCancelAsk.order.total_amount).toLocaleString()"></p>
+                    {{-- Task #645: takeaway/delivery cancel — type badge (dine-in shows the table number above instead). --}}
+                    <span x-show="!boardCancelAsk.table && boardCancelAsk.order.order_type && boardCancelAsk.order.order_type !== 'dine_in'" x-cloak class="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 uppercase tracking-wide" x-text="({ takeaway: '{{ __('pos.takeaway') }}', delivery: '{{ __('pos.delivery') }}' })[boardCancelAsk.order.order_type] || boardCancelAsk.order.order_type"></span>
                 </div>
                 <div class="px-5 py-3 max-h-48 overflow-y-auto">
                     <template x-if="boardCancelAsk.items === null"><p class="text-xs text-gray-400 text-center py-2">…</p></template>
@@ -6691,27 +6693,40 @@ function restaurantPos() {
         // ghanti (incoming) panel — the ONLY surface where waiter takeaway/delivery
         // orders live. Soft-cancel (deleteOrder) → Cancelled Orders report with
         // cancelled_by; table (if any) freed server-side.
-        async cancelIncoming(o) {
+        // Task #645 (owner voice note 13 Aug 2026): plain confirm() ki jagah wohi
+        // shared cancel-warning modal — takeaway/delivery cancel par bhi Made/Not-Made
+        // toggles, taake kitchen waste report mein aaye. Confirm = boardCancelConfirm
+        // (same deleteOrder endpoint + made_item_ids), jo incoming/held lists khud
+        // filter karta hai.
+        cancelIncoming(o) {
             if (this._claimBusy || !o) return;
-            if (!confirm(window.TXT.cancel_incoming_q + (o.order_number || '#' + o.id) + (o.waiter ? ' (' + o.waiter + ')' : '') + '?')) return;
-            this._claimBusy = true;
-            try {
-                const res = await fetch('/pos/restaurant/orders/' + o.id + '/delete', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                });
-                const data = res.ok ? await res.json().catch(() => null) : null;
-                if (data && data.success) {
-                    this.incomingOrders = this.incomingOrders.filter(x => x.id !== o.id);
-                    this.heldOrders = this.heldOrders.filter(x => x.id !== o.id);
-                    this.showToast(window.TXT.order_cancelled_toast, 'success');
-                    if (this.tableBoardEnabled) this.loadTableStatus();
-                } else {
-                    this.showToast((data && data.message) || window.TXT.cancel_failed, 'error');
-                }
-            } catch (e) {
-                this.showToast(window.TXT.cancel_failed_conn, 'error');
-            } finally { this._claimBusy = false; }
+            this.boardCancelAsk = this.buildOrderCancelAsk(o);
+            this.boardCancelMade = {};
+        },
+        // Shared builder (bell panel + claimed cart): normalizes an orderJson-style
+        // snapshot into the modal's { table, order, items, noTicks } shape. noTicks
+        // is DERIVED — stale clients/carts without real item row ids fall back to
+        // no-toggles (KOT alert still shows) instead of posting junk ids.
+        buildOrderCancelAsk(o) {
+            const items = ((o && o.items) || []).map((it, ix) => ({
+                id: it.id || ('x' + ix),
+                _real: !!it.id,
+                quantity: it.quantity,
+                item_name: it.name || it.item_name || '',
+                subtotal: it.subtotal != null ? it.subtotal : ((parseFloat(it.unit_price) || 0) * (parseFloat(it.quantity) || 0)),
+            }));
+            return {
+                table: null,
+                noTicks: !items.some(it => it._real),
+                order: {
+                    id: o.id,
+                    order_number: o.order_number || null,
+                    order_type: o.order_type || null,
+                    total_amount: o.total_amount || 0,
+                    kot_sent_at: o.kot_sent_at || null,
+                },
+                items: items,
+            };
         },
         // Task #643: Order Cancel for the CLAIMED waiter order in the cart —
         // reuses the boardCancelAsk warning modal (items + KOT alert) with a
@@ -6719,23 +6734,13 @@ function restaurantPos() {
         cartCancelIncoming() {
             const o = this.incomingOrderInfo;
             if (!this.incomingOrderId || !this.canOrderCancel) return;
-            const items = ((o && o.items) || []).map((it, ix) => ({
-                id: it.id || ('x' + ix),
-                quantity: it.quantity,
-                item_name: it.name || it.item_name || '',
-                subtotal: it.subtotal != null ? it.subtotal : ((parseFloat(it.unit_price) || 0) * (parseFloat(it.quantity) || 0)),
+            // Task #645: claim snapshot now carries real item row ids (orderJson),
+            // so Made/Not-Made toggles work here too; buildOrderCancelAsk degrades
+            // to noTicks for stale pre-#645 snapshots restored from localStorage.
+            this.boardCancelAsk = this.buildOrderCancelAsk(Object.assign({}, o || {}, {
+                id: this.incomingOrderId,
+                total_amount: (o && o.total_amount) || this.totalAmount || 0,
             }));
-            this.boardCancelAsk = {
-                table: null,
-                noTicks: true, // no real item ids from the claim snapshot (see Task #645)
-                order: {
-                    id: this.incomingOrderId,
-                    order_number: (o && o.order_number) || null,
-                    total_amount: (o && o.total_amount) || this.totalAmount || 0,
-                    kot_sent_at: (o && o.kot_sent_at) || null,
-                },
-                items: items,
-            };
             this.boardCancelMade = {};
         },
         // Fire-and-forget: backend only flips status='reserved' → available, so this

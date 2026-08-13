@@ -831,6 +831,10 @@ class RestaurantWaiterController extends Controller
             // Waiter self-cancel modal (Task 412): KOT-already-sent warning gate.
             'kot_sent_at' => $o->kot_sent_at,
             'items' => $o->items->map(fn($i) => [
+                // Task #645: real row id + subtotal — cancel modal's Made/Not-Made
+                // ticks post these ids as made_item_ids to deleteOrder.
+                'id' => $i->id,
+                'subtotal' => (float) $i->subtotal,
                 'item_id' => $i->item_id,
                 'item_type' => $i->item_type,
                 'name' => $i->item_name,

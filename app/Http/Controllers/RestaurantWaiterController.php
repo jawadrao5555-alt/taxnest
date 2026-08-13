@@ -445,6 +445,18 @@ class RestaurantWaiterController extends Controller
                 return response()->json(['success' => false, 'message' => 'Order not found or already settled.'], 404);
             }
 
+            // Task 626 (owner, 13 Aug 2026): takeaway toggle OFF = waiter ka
+            // append rasta TAKEAWAY orders par bhi band (Task 527 ka append-allow
+            // khatam). Waiters only — admin/manager tablet par exempt. Purane
+            // orders ka settle path cashier side untouched. Missing column
+            // fails OPEN (default ON), same as storeOrder.
+            if ($order->order_type === 'takeaway' && $user->isPosWaiter()) {
+                $gateCompany = Company::find($companyId);
+                if (!(bool) ($gateCompany->pos_waiter_takeaway_enabled ?? true)) {
+                    return response()->json(['success' => false, 'message' => __('pos.waiter_takeaway_not_allowed')], 403);
+                }
+            }
+
             $added = 0;
             foreach ($validated['items'] as $it) {
                 RestaurantOrderItem::create([

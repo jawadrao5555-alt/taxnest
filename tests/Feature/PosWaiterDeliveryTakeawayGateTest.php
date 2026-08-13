@@ -257,4 +257,81 @@ class PosWaiterDeliveryTakeawayGateTest extends TestCase
         $this->assertSame(200, $res->getStatusCode());
         $this->assertSame(1, DB::table('restaurant_orders')->where('order_type', 'takeaway')->count());
     }
+
+    // ── 3. Append gate — Task 626 (13 Aug 2026) ──────────────────────────
+    // Toggle OFF = waiter append to an EXISTING takeaway order is also 403
+    // (Task 527's append-allow retired by owner decision). Dine-in appends
+    // and admin/manager tablets stay untouched.
+
+    private function seedHeldOrder(Company $c, string $orderType): int
+    {
+        return (int) DB::table('restaurant_orders')->insertGetId([
+            'company_id' => $c->id,
+            'order_number' => 'ORD-TEST-' . strtoupper(substr(md5($orderType . mt_rand()), 0, 5)),
+            'order_type' => $orderType,
+            'status' => 'held',
+            'subtotal' => 100, 'tax_amount' => 0, 'total_amount' => 100,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
+
+    private function append(int $orderId)
+    {
+        $request = Request::create('/pos/waiter/orders/' . $orderId . '/items', 'POST', [
+            'items' => [['name' => 'Extra Bottle', 'quantity' => 1, 'unit_price' => 50]],
+        ]);
+        return app(RestaurantWaiterController::class)->appendItems($request, $orderId);
+    }
+
+    public function test_waiter_append_to_takeaway_403_when_toggle_off(): void
+    {
+        $c = $this->makeCompany(['pos_waiter_takeaway_enabled' => false]);
+        $this->makeUser($c, 'pos_waiter');
+        $id = $this->seedHeldOrder($c, 'takeaway');
+
+        $res = $this->append($id);
+
+        $this->assertSame(403, $res->getStatusCode());
+        $body = json_decode($res->getContent(), true);
+        $this->assertFalse($body['success']);
+        $this->assertSame(__('pos.waiter_takeaway_not_allowed'), $body['message']);
+        $this->assertSame(0, DB::table('restaurant_order_items')->count(), 'no items may be appended');
+        $this->assertEquals(100, DB::table('restaurant_orders')->where('id', $id)->value('subtotal'), 'totals untouched');
+    }
+
+    public function test_waiter_append_to_takeaway_allowed_when_toggle_on(): void
+    {
+        $c = $this->makeCompany(['pos_waiter_takeaway_enabled' => true]);
+        $this->makeUser($c, 'pos_waiter');
+        $id = $this->seedHeldOrder($c, 'takeaway');
+
+        $res = $this->append($id);
+
+        $this->assertSame(200, $res->getStatusCode());
+        $this->assertSame(1, DB::table('restaurant_order_items')->where('order_id', $id)->count());
+    }
+
+    public function test_waiter_append_to_dine_in_allowed_even_when_toggle_off(): void
+    {
+        $c = $this->makeCompany(['pos_waiter_takeaway_enabled' => false]);
+        $this->makeUser($c, 'pos_waiter');
+        $id = $this->seedHeldOrder($c, 'dine_in');
+
+        $res = $this->append($id);
+
+        $this->assertSame(200, $res->getStatusCode());
+        $this->assertSame(1, DB::table('restaurant_order_items')->where('order_id', $id)->count());
+    }
+
+    public function test_admin_append_to_takeaway_allowed_even_when_toggle_off(): void
+    {
+        $c = $this->makeCompany(['pos_waiter_takeaway_enabled' => false]);
+        $this->makeUser($c, 'pos_admin');
+        $id = $this->seedHeldOrder($c, 'takeaway');
+
+        $res = $this->append($id);
+
+        $this->assertSame(200, $res->getStatusCode());
+        $this->assertSame(1, DB::table('restaurant_order_items')->where('order_id', $id)->count());
+    }
 }

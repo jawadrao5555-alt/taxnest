@@ -142,8 +142,12 @@
                 {{-- Parcel button — amber, badge = my open takeaway/delivery orders.
                      Task #342 (Aug 2026): tap = inline sub-list of open parcel orders
                      (tap to append, tables jaisa flow) + "+ Naya Parcel Order". --}}
-                {{-- Task 527: takeaway band ho to Parcel button sirf tab dikhe jab
-                     PEHLE se khule parcel orders hon (append allowed, naya nahi). --}}
+                {{-- Task 626 (owner, 13 Aug 2026): takeaway OFF = waiter app par
+                     takeaway ka KOI UI element nahi — Parcel button + sub-list
+                     poori tarah chhupe, chahe purane khule parcel orders hon
+                     (Task 527 ka append-allow rasta owner ke faisle par band).
+                     Purane orders ka settle path cashier/counter side barqarar. --}}
+                @if($waiterCanTakeaway ?? true)
                 <button @click="selectButtonParcel()"
                         x-show="canTakeaway || parcelOrders().length > 0"
                         class="w-full flex items-center justify-between rounded-2xl bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-400 dark:border-amber-600 px-5 py-4 transition active:scale-[.98]">
@@ -174,13 +178,12 @@
                                   x-text="'Rs ' + Math.round(o.total_amount).toLocaleString()"></span>
                         </button>
                     </template>
-                    @if($waiterCanTakeaway ?? true)
                     <button @click="startNewParcel()"
                             class="w-full rounded-2xl bg-amber-500 hover:bg-amber-600 text-white px-4 py-3 text-sm font-black transition active:scale-[.98]">
                         {{ __('pos.waiter_buttons_new_parcel') }}
                     </button>
-                    @endif
                 </div>
+                @endif
             </div>
 
             {{-- Back button (buttons mode — shown when grid is active, not in append) --}}
@@ -501,7 +504,10 @@
                             <template x-for="(it, ix) in o.items" :key="ix"><span><span x-text="it.quantity + '× ' + it.name"></span><span x-show="ix < o.items.length - 1"> · </span></span></template>
                         </div>
                         <div class="mt-2.5 flex items-center gap-2">
-                            <button @click="startAppend(o)" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition">{{ __('pos.add_items') }}</button>
+                            {{-- Task 626: takeaway OFF = parcel (non-dine-in) orders par
+                                 waiter ka Add Items rasta bhi band — order dikh jata hai
+                                 (status/settle cashier side), append nahi hota. --}}
+                            <button @click="startAppend(o)" x-show="canTakeaway || o.order_type === 'dine_in'" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition">{{ __('pos.add_items') }}</button>
                             {{-- Table Shift (owner batch, 26 Jul 2026): sirf dine-in
                                  orders (table wale); khali table par hi jayega. --}}
                             <button x-show="o.table_id" @click="startShift(o)" class="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 border border-teal-300 dark:border-teal-700 text-teal-700 dark:text-teal-300 hover:bg-teal-50 text-xs font-bold transition">⇄ {{ __('pos.change_table') }}</button>
@@ -1004,6 +1010,12 @@ function waiterApp() {
         },
 
         startAppend(o) {
+            // Task 626: takeaway OFF → parcel orders mein append ka client rasta
+            // bhi band (koi shortcut isay na khole); server bhi 403 karta hai.
+            if (!this.canTakeaway && o.order_type && o.order_type !== 'dine_in') {
+                this.showToast(@js(__('pos.waiter_takeaway_not_allowed')), 'error');
+                return;
+            }
             if (this.cart.length && !confirm(@js(__('pos.discard_unsent_items_q')))) return;
             this.cart = [];
             this.appendOrderId = o.id;
@@ -1218,6 +1230,7 @@ function waiterApp() {
         // inline sub-list toggle karo (tap = append, tables jaisa flow); warna
         // seedha naya parcel order shuru.
         selectButtonParcel() {
+            if (!this.canTakeaway) return; // Task 626: takeaway OFF = parcel flows band
             if (this.parcelOrders().length > 0) {
                 this.parcelListOpen = !this.parcelListOpen;
                 return;

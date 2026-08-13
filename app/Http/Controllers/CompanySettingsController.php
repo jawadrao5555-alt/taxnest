@@ -26,7 +26,9 @@ class CompanySettingsController extends Controller
             'name' => 'required|string|max:255',
             'owner_name' => 'nullable|string|max:255',
             'ntn' => 'nullable|string|max:50',
-            'cnic' => 'nullable|string|max:20',
+            // Shared CNIC truth (Task 580): 13 digits, dash-tolerant, GLOBAL
+            // uniqueness (own row exempt) — same rules as POS/FBR profiles.
+            'cnic' => \App\Services\LoginIdentifierResolver::cnicRules($company->id),
             'registration_no' => 'nullable|string|max:100',
             'email' => 'nullable|email|max:255',
             'phone' => 'nullable|string|max:50',
@@ -35,9 +37,15 @@ class CompanySettingsController extends Controller
             'address' => 'nullable|string|max:500',
             'city' => 'nullable|string|max:100',
             'website' => 'nullable|string|max:255',
-        ]);
+        ], \App\Services\LoginIdentifierResolver::cnicMessages());
 
-        $company->update($request->only(['name', 'owner_name', 'ntn', 'cnic', 'registration_no', 'email', 'phone', 'mobile', 'business_activity', 'address', 'city', 'website']));
+        $data = $request->only(['name', 'owner_name', 'ntn', 'cnic', 'registration_no', 'email', 'phone', 'mobile', 'business_activity', 'address', 'city', 'website']);
+        if (array_key_exists('cnic', $data)) {
+            // Always store plain digits (empty clears to NULL).
+            $data['cnic'] = \App\Services\LoginIdentifierResolver::normalizeCnic($data['cnic']);
+        }
+
+        $company->update($data);
 
         SecurityLogService::log('company_profile_updated', auth()->id(), [
             'company_id' => $company->id,

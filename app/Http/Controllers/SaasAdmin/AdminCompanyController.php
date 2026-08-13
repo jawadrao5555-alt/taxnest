@@ -44,7 +44,9 @@ class AdminCompanyController extends Controller
             'product_type' => 'required|in:di,pos,fbrpos',
             'email' => 'required|email|max:255',
             'ntn' => 'nullable|string|max:50',
-            'cnic' => 'nullable|string|max:20',
+            // Shared CNIC truth (Task 580): 13 digits, dash-tolerant, GLOBAL
+            // uniqueness — admin screens must not bypass the owner-facing rules.
+            'cnic' => \App\Services\LoginIdentifierResolver::cnicRules(),
             'phone' => 'nullable|string|max:20',
             'mobile' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:500',
@@ -58,7 +60,11 @@ class AdminCompanyController extends Controller
             'admin_email' => 'required|email|unique:users,email',
             'admin_password' => 'required|string|min:6',
             'admin_name' => 'required|string|max:255',
-        ]);
+        ], \App\Services\LoginIdentifierResolver::cnicMessages());
+
+        // Store plain digits — the login lookup digit-compares, and plain
+        // storage keeps every panel's CNIC matching trivially exact.
+        $normalizedCnic = \App\Services\LoginIdentifierResolver::normalizeCnic($request->cnic);
 
         $companyData = [
             'name' => $request->name,
@@ -66,7 +72,7 @@ class AdminCompanyController extends Controller
             'product_type' => $request->product_type,
             'email' => $request->email,
             'ntn' => $request->ntn,
-            'cnic' => $request->cnic,
+            'cnic' => $normalizedCnic,
             'phone' => $request->phone,
             'mobile' => $request->mobile,
             'address' => $request->address,
@@ -118,7 +124,7 @@ class AdminCompanyController extends Controller
             'email' => $request->admin_email,
             'phone' => $request->phone ?: $request->mobile,
             'ntn' => $request->ntn,
-            'cnic' => $request->cnic,
+            'cnic' => $normalizedCnic,
         ], $company->id, $request->product_type);
 
         AdminAuditLog::log(auth('admin')->id(), 'Company created', 'Company', $company->id, [
@@ -147,7 +153,8 @@ class AdminCompanyController extends Controller
             'owner_name' => 'nullable|string|max:255',
             'email' => 'nullable|email|max:255',
             'ntn' => 'nullable|string|max:50',
-            'cnic' => 'nullable|string|max:20',
+            // Shared CNIC truth (Task 580); own row exempt from the dupe check.
+            'cnic' => \App\Services\LoginIdentifierResolver::cnicRules($company->id),
             'phone' => 'nullable|string|max:20',
             'mobile' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:500',
@@ -169,7 +176,7 @@ class AdminCompanyController extends Controller
             'fbr_pos_id' => 'nullable|string|max:100',
             'admin_password' => 'nullable|string|min:6|max:100',
             'admin_email' => 'nullable|email|max:255',
-        ]);
+        ], \App\Services\LoginIdentifierResolver::cnicMessages());
 
         if ($request->filled('admin_password') || $request->filled('admin_email')) {
             $companyAdmin = User::where('company_id', $id)->where('role', 'company_admin')->first();
@@ -211,7 +218,13 @@ class AdminCompanyController extends Controller
             $fields[] = 'agent_id';
         }
 
-        $company->update($request->only($fields));
+        $data = $request->only($fields);
+        if (array_key_exists('cnic', $data)) {
+            // Always store plain digits (empty clears to NULL).
+            $data['cnic'] = \App\Services\LoginIdentifierResolver::normalizeCnic($data['cnic']);
+        }
+
+        $company->update($data);
 
         AdminAuditLog::log(auth('admin')->id(), 'Company profile updated', 'Company', $id, ['name' => $company->name]);
         return redirect()->route('saas.admin.companies.show', $id)->with('success', "Company '{$company->name}' updated successfully.");

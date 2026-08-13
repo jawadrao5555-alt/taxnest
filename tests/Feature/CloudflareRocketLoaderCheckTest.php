@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 /**
- * Locks the Rocket Loader nightly guard (cloudflare:check-rocket-loader):
+ * Locks the Rocket Loader every-30-min guard (cloudflare:check-rocket-loader):
  *  - clean homepage => success, no mail
  *  - rocket-loader injection detected => failure exit + urgent admin email
  *  - fetch failure / non-2xx => failure exit, NO alert (transient blip ≠ incident)
@@ -169,6 +169,65 @@ class CloudflareRocketLoaderCheckTest extends TestCase
         $this->artisan('cloudflare:check-rocket-loader')->assertExitCode(0);
 
         $this->assertCount(0, $this->sentMessages());
+    }
+
+    public function test_repeat_detection_within_throttle_window_sends_one_email(): void
+    {
+        // 30-min schedule + lingering Cloudflare edge cache: the SAME incident
+        // must not email once per run. Second run still fails + re-attempts
+        // auto-fix, but sends no second email.
+        $this->makeAdmin();
+        Http::fake([self::URL => Http::response(
+            '<html><head><script src="/cdn-cgi/scripts/7d0fa10a/cloudflare-static/rocket-loader.min.js"></script></head></html>',
+            200
+        )]);
+
+        $this->artisan('cloudflare:check-rocket-loader')->assertExitCode(1);
+        $this->artisan('cloudflare:check-rocket-loader')->assertExitCode(1);
+
+        $this->assertCount(1, $this->sentMessages(), 'Repeat detection must be throttled to one email');
+    }
+
+    public function test_clean_run_resets_throttle_so_new_incident_alerts_again(): void
+    {
+        $this->makeAdmin();
+        $dirty = '<html><head><script src="/cdn-cgi/scripts/7d0fa10a/cloudflare-static/rocket-loader.min.js"></script></head></html>';
+
+        Http::fake([self::URL => Http::sequence()
+            ->push($dirty, 200)
+            ->push('<html><body>ok</body></html>', 200)
+            ->push($dirty, 200)]);
+
+        $this->artisan('cloudflare:check-rocket-loader')->assertExitCode(1);
+
+        // Site recovers — clean run resets the throttle.
+        $this->artisan('cloudflare:check-rocket-loader')->assertExitCode(0);
+
+        // A NEW incident must alert immediately, not wait out the 6h window.
+        $this->artisan('cloudflare:check-rocket-loader')->assertExitCode(1);
+
+        $this->assertCount(2, $this->sentMessages(), 'New incident after recovery must alert again');
+    }
+
+    public function test_alert_sent_again_after_throttle_window_expires(): void
+    {
+        $this->makeAdmin();
+        Http::fake([self::URL => Http::response(
+            '<html><head><script src="/cdn-cgi/scripts/7d0fa10a/cloudflare-static/rocket-loader.min.js"></script></head></html>',
+            200
+        )]);
+
+        $this->artisan('cloudflare:check-rocket-loader')->assertExitCode(1);
+        $this->assertCount(1, $this->sentMessages());
+
+        // Backdate the throttle marker past the 6h window.
+        \App\Models\SystemSetting::set(
+            'rocket_loader_last_alert_at',
+            now()->subHours(7)->toDateTimeString()
+        );
+
+        $this->artisan('cloudflare:check-rocket-loader')->assertExitCode(1);
+        $this->assertCount(2, $this->sentMessages(), 'Persisting incident should re-alert after the window');
     }
 
     public function test_non_2xx_response_fails_without_alert(): void

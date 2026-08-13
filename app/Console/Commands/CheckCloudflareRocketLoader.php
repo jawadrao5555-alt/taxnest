@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 /**
- * Nightly guard: Cloudflare Rocket Loader must stay OFF.
+ * Every-30-minutes guard: Cloudflare Rocket Loader must stay OFF.
  *
  * Rocket Loader rewrites/delays inline <script> tags, which kills the POS
  * universal sale screen's Alpine x-data boot (items stop registering). Any
@@ -19,7 +19,15 @@ use Illuminate\Support\Facades\Mail;
  *
  * Runs SYNCHRONOUSLY from the scheduler (no queue worker required on
  * cPanel). Fetch failures are logged but do NOT alert — a transient network
- * blip is not a Rocket Loader incident; the next nightly run re-checks.
+ * blip is not a Rocket Loader incident; the next run re-checks.
+ *
+ * Repeat-alert throttle: the auto-fix turns Rocket Loader OFF at the zone,
+ * but Cloudflare's edge cache can keep serving HTML with the injection
+ * marker for a while, so back-to-back 30-minute runs would re-detect the
+ * SAME incident. The auto-fix PATCH is idempotent and always re-attempted,
+ * but the admin email is throttled to once per ALERT_THROTTLE_HOURS via a
+ * SystemSetting timestamp. The throttle resets on the first clean run, so a
+ * genuinely NEW incident after recovery alerts immediately.
  */
 class CheckCloudflareRocketLoader extends Command
 {
@@ -29,6 +37,12 @@ class CheckCloudflareRocketLoader extends Command
     protected $description = 'Alert admins if Cloudflare Rocket Loader is detected ON for the live site.';
 
     private const DEFAULT_URL = 'https://taxnest.com.pk/';
+
+    /** SystemSetting key holding the last admin-alert timestamp. */
+    private const ALERT_AT_KEY = 'rocket_loader_last_alert_at';
+
+    /** Suppress repeat admin emails for the same incident window. */
+    private const ALERT_THROTTLE_HOURS = 6;
 
     public function handle(): int
     {
@@ -70,6 +84,9 @@ class CheckCloudflareRocketLoader extends Command
 
         if (! $found) {
             $this->info('OK — Rocket Loader not detected.');
+            // Incident over (edge cache serves clean HTML again): reset the
+            // alert throttle so the NEXT incident emails immediately.
+            $this->resetAlertThrottle();
 
             return self::SUCCESS;
         }
@@ -77,10 +94,62 @@ class CheckCloudflareRocketLoader extends Command
         Log::error('Rocket Loader DETECTED on live site', ['url' => $url]);
         $this->error('Rocket Loader DETECTED — attempting auto-fix via Cloudflare API.');
 
+        // Always re-attempt the (idempotent) auto-fix, but throttle the email
+        // so a lingering edge-cached marker doesn't spam one alert per run.
         $autoFixed = $this->turnOffViaApi();
-        $this->alertAdmins($url, $autoFixed);
+
+        if ($this->shouldAlert()) {
+            $this->alertAdmins($url, $autoFixed);
+            $this->markAlerted();
+        } else {
+            Log::info('Rocket Loader alert suppressed (throttled — same incident window)');
+            $this->warn('Alert email suppressed — admins were already emailed for this incident window.');
+        }
 
         return self::FAILURE;
+    }
+
+    /** True when no alert was sent within the throttle window. */
+    private function shouldAlert(): bool
+    {
+        try {
+            $last = (string) \App\Models\SystemSetting::get(self::ALERT_AT_KEY, '');
+            if ($last === '') {
+                return true;
+            }
+
+            return \Illuminate\Support\Carbon::parse($last)
+                ->lt(now()->subHours(self::ALERT_THROTTLE_HOURS));
+        } catch (\Throwable $e) {
+            // Fail open: better a duplicate email than a silent incident.
+            Log::warning('Rocket Loader alert-throttle read failed', ['error' => $e->getMessage()]);
+
+            return true;
+        }
+    }
+
+    private function markAlerted(): void
+    {
+        try {
+            \App\Models\SystemSetting::set(
+                self::ALERT_AT_KEY,
+                now()->toDateTimeString(),
+                'Last time admins were emailed about a Rocket Loader detection (repeat-alert throttle).'
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Rocket Loader alert-throttle write failed', ['error' => $e->getMessage()]);
+        }
+    }
+
+    private function resetAlertThrottle(): void
+    {
+        try {
+            if ((string) \App\Models\SystemSetting::get(self::ALERT_AT_KEY, '') !== '') {
+                \App\Models\SystemSetting::set(self::ALERT_AT_KEY, '', 'Cleared — site clean again.');
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Rocket Loader alert-throttle reset failed', ['error' => $e->getMessage()]);
+        }
     }
 
     /**

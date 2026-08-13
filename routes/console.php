@@ -152,6 +152,8 @@ Schedule::command('import-batches:prune')->dailyAt('04:45');
 // morning if nobody closed it manually; before 6 AM yesterday stays open).
 Schedule::command('pos:auto-dayclose')->hourly()->withoutOverlapping();
 // Cloudflare guard: Rocket Loader rewrites inline scripts and kills the POS
-// sale screen's Alpine boot. Nightly curl of the live homepage; if the
-// rocket-loader injection marker is found, every admin is emailed at once.
-Schedule::command('cloudflare:check-rocket-loader')->dailyAt('05:15');
+// sale screen's Alpine boot. Every 30 min: GET the live homepage; if the
+// rocket-loader injection marker is found the command auto-turns it OFF via
+// the Cloudflare API and emails admins (throttled inside the command so a
+// lingering edge-cached marker can't spam one email per run).
+Schedule::command('cloudflare:check-rocket-loader')->everyThirtyMinutes();

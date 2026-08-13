@@ -195,12 +195,14 @@ class PraIntegrationService
         $totalTaxCharged = round($totalTaxCharged, 2);
         $totalBillAmount = round($totalBillAmount, 2);
 
-        // ── Return / credit-note (Task 570, Aug 2026) ─────────────────────────
-        // Return rows store POSITIVE amounts (FBR Phase-2 convention); the PRA
-        // payload flips the sign AFTER all rounding/reconciler math so the
-        // whole-rupee logic above stays untouched. IMS credit-note model
-        // (SRO 1279-style, same as FBR IMS): InvoiceType=3, RefUSIN = the
-        // ORIGINAL bill's merchant USIN, negative quantities/values.
+        // ── Return / credit-note (Task 570, Aug 2026; corrected Aug 2026) ────────
+        // Return rows store POSITIVE amounts (FBR Phase-2 convention).
+        // PRA IMS credit-note model: InvoiceType=3, RefUSIN = original bill's
+        // merchant USIN, and ALL amounts stay POSITIVE — PRA signals the reversal
+        // via InvoiceType=3 alone (Code 102 "Invalid Total Bill Amount…" is what
+        // PRA returns when you send negative amounts on a credit note; confirmed
+        // live Aug 2026 on MALIK CHICKEN BROAST, POS ID 191963).
+        // FBR IMS also uses InvoiceType=3 with positive amounts for its credit notes.
         $isReturn = ($transaction->transaction_type ?? 'sale') === 'return';
         $refUsin = null;
         $invoiceType = 1;
@@ -212,17 +214,12 @@ class PraIntegrationService
                     ->find($transaction->parent_transaction_id)
                 : null;
             $refUsin = $parent?->invoice_number;
+            // Amounts remain positive; only InvoiceType and RefUSIN are set per line.
             foreach ($items as $i => $ln) {
-                $items[$i]['Quantity'] = -$ln['Quantity'];
-                $items[$i]['SaleValue'] = round(-$ln['SaleValue'], 2);
-                $items[$i]['TaxCharged'] = round(-$ln['TaxCharged'], 2);
-                $items[$i]['TotalAmount'] = round(-$ln['TotalAmount'], 2);
                 $items[$i]['InvoiceType'] = 3;
                 $items[$i]['RefUSIN'] = $refUsin;
             }
-            $totalSaleValue = round(-$totalSaleValue, 2);
-            $totalTaxCharged = round(-$totalTaxCharged, 2);
-            $totalBillAmount = round(-$totalBillAmount, 2);
+            // Header totals stay positive — no sign flip.
         }
 
         return [

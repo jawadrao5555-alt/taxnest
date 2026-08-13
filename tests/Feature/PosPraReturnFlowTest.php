@@ -409,11 +409,14 @@ class PosPraReturnFlowTest extends TestCase
 
         $this->assertSame(3, $payload['InvoiceType']);
         $this->assertSame($parent->invoice_number, $payload['RefUSIN'], 'RefUSIN = parent merchant USIN');
-        $this->assertLessThan(0, $payload['TotalSaleValue']);
-        $this->assertLessThan(0, $payload['TotalTaxCharged']);
-        $this->assertLessThan(0, $payload['TotalBillAmount']);
+        // PRA IMS credit note (InvoiceType=3): ALL amounts stay POSITIVE.
+        // PRA signals the reversal via InvoiceType=3; negative amounts cause Code 102
+        // "Invalid Total Bill Amount/Quantity/SaleValue/TaxCharged" (confirmed live Aug 2026).
+        $this->assertGreaterThan(0, $payload['TotalSaleValue']);
+        $this->assertGreaterThan(0, $payload['TotalTaxCharged']);
+        $this->assertGreaterThan(0, $payload['TotalBillAmount']);
         foreach ($payload['Items'] as $line) {
-            $this->assertLessThan(0, $line['Quantity']);
+            $this->assertGreaterThan(0, $line['Quantity']);
             $this->assertSame(3, $line['InvoiceType']);
             $this->assertSame($parent->invoice_number, $line['RefUSIN']);
         }

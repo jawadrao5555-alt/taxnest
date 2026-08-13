@@ -2819,6 +2819,7 @@ return [
     'fbr_receipt_style_card_desc' => 'بولڈ پرنٹ، لوگو پوزیشن',
     'receipt_printer_size' => 'رسید پرنٹر سائز',
     'receipt_provisional_bill' => 'عارضی بل',
+    'receipt_pending_pra_note' => 'یہ بل PRA کو رپورٹ ہو رہا ہے — فسکل نمبر تھوڑی دیر میں آ جائے گا',
     'receipt_provisional_note' => 'یہ صرف آپ کی معلومات کے لیے ایک عارضی بل ہے',
     'receipt_qty' => 'تعداد',
     'receipt_rate' => 'ریٹ',

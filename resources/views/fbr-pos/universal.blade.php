@@ -2560,7 +2560,7 @@ window.addEventListener('popstate', function() {
     {{-- the cashier doesn't dismiss the popup by accident while reading totals or printing.        --}}
     {{-- Esc on this popup belongs to the browser print dialog (closes that, not our popup).        --}}
     {{-- Popup closes ONLY via: X (top-right cross), Close button, or "New Sale" button.            --}}
-    <div x-show="showReceipt" x-cloak x-transition.opacity x-effect="if (!showReceipt) cancelPendingPrints()" class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div x-show="showReceipt" x-cloak x-transition.opacity x-effect="if (!showReceipt) { cancelPendingPrints(); stopFbrPoll(); }" class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="receipt-modal-enter relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col" style="max-height:92vh;" x-transition.scale.90>
             {{-- Top-right cross (primary close action) --}}
             <button @click="showReceipt = false" class="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/80 dark:bg-gray-800/80 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white flex items-center justify-center transition shadow-sm" title="{{ __('pos.ti_close_popup') }}">
@@ -5991,6 +5991,7 @@ function restaurantPos() {
                 window.dispatchEvent(new CustomEvent('fbr-bills-refresh'));
                 this.showReceipt = true;
                 this.scheduleReceiptAutoClose();
+                this.startFbrPoll(); // Task 655: fiscal_device 'pending' → badge + receipt auto-flip
                 this.$nextTick(() => { setTimeout(() => this.triggerConfetti(), 300); });
                 // Auto-print receipt + KOT for FBR bills.
                 // Held row is deleted on recall, so post-pay KOT uses the TRANSACTION
@@ -6115,8 +6116,12 @@ function restaurantPos() {
             frame.src = cacheBustedUrl;
         },
 
-        printReceipt(onAfterPrint) {
+        async printReceipt(onAfterPrint) {
             if (!this.lastTransactionId) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
+            // Task 655: fiscal_device grace — bill abhi 'pending' hai to chand
+            // seconds ka bounded intezar (submit aa jaye to PEHLI slip par hi FBR
+            // fiscal number chapta hai), warna jo bhi haalat hai usi par print.
+            await this.fbrPrintGrace();
             const url = '/fbr-pos/transaction/' + this.lastTransactionId + '/receipt?auto_print=1';
             console.log('[printReceipt] URL=', url, 'isRestaurantMode=', this.isRestaurantMode);
             this._printViaIframe('print-receipt-frame', url, 'width=400,height=700', onAfterPrint);
@@ -6641,6 +6646,7 @@ function restaurantPos() {
                     }
                     this.showReceipt = true;
                     this.scheduleReceiptAutoClose();
+                    this.startFbrPoll(); // Task 655: fiscal_device 'pending' → badge + receipt auto-flip
                     this.$nextTick(() => { setTimeout(() => this.triggerConfetti(), 300); });
                     // Print order: INVOICE FIRST → KOT AFTER. Cashier-requested sequence.
                     // Uses postMessage-chained engine — KOT never fires before the receipt
@@ -6671,6 +6677,80 @@ function restaurantPos() {
 
         cancelReceiptAutoClose() {
             if (this.receiptAutoCloseTimer) { clearTimeout(this.receiptAutoCloseTimer); this.receiptAutoCloseTimer = null; }
+        },
+
+        // ── Task 655: FISCAL-DEVICE FBR STATUS POLL (twin of the PRA poll) ──
+        // fiscal_device companies save the bill as fbr_status='pending'; the
+        // Desktop Agent submits it from the shop PC within seconds. Poll the
+        // tiny status endpoint (~2.5s, bounded 30s) so the popup badge flips
+        // to FBR VERIFIED + fiscal number and the receipt iframe reloads.
+        fbrPollTimer: null,
+        startFbrPoll() {
+            this.stopFbrPoll();
+            if (this.lastFbrStatus !== 'pending' || !this.lastTransactionId || this.lastIsOffline) return;
+            const txnId = this.lastTransactionId;
+            const deadline = Date.now() + 30000;
+            let inflight = false;
+            this.fbrPollTimer = setInterval(async () => {
+                if (this.lastTransactionId !== txnId || Date.now() > deadline) { this.stopFbrPoll(); return; }
+                if (inflight) return; // slow response must not stack requests
+                inflight = true;
+                const st = await this._fetchFbrStatus(txnId);
+                inflight = false;
+                if (!st || this.lastTransactionId !== txnId) return;
+                if (st.fbr_status && st.fbr_status !== 'pending') {
+                    this._applyFbrStatus(txnId, st);
+                    // submitted = terminal. failed/offline: badge update ho chuka,
+                    // lekin agent retry kar sakta hai — deadline tak poll jaari.
+                    if (st.fbr_status === 'submitted') this.stopFbrPoll();
+                }
+            }, 2500);
+        },
+        stopFbrPoll() {
+            if (this.fbrPollTimer) { clearInterval(this.fbrPollTimer); this.fbrPollTimer = null; }
+        },
+        async _fetchFbrStatus(txnId) {
+            try {
+                const res = await fetch('/fbr-pos/transaction/' + txnId + '/fbr-status', { headers: { 'Accept': 'application/json' } });
+                if (!res.ok) return null;
+                return await res.json();
+            } catch (e) { return null; } // network blip — next tick retries
+        },
+        _applyFbrStatus(txnId, st) {
+            if (this.lastTransactionId !== txnId) return; // a new sale took over
+            const prev = this.lastFbrStatus;
+            this.lastFbrStatus = st.fbr_status || '';
+            if (st.fbr_invoice_number) this.lastFbrNumber = st.fbr_invoice_number;
+            if (prev !== this.lastFbrStatus) {
+                this.refreshReceiptIframe();
+                if (this.lastFbrStatus === 'failed' || this.lastFbrStatus === 'offline') this.loadFailedBills();
+            }
+        },
+        // Receipt iframe reload (cache-bust) — pending→submitted flip ke baad
+        // popup ke andar receipt FBR fiscal box + QR ke saath taaza dikhe.
+        refreshReceiptIframe() {
+            if (!this.showReceipt || this.lastIsOffline || !this.lastTransactionId) return;
+            try {
+                const el = this.$refs.receiptIframe;
+                if (!el) return;
+                el.src = '/fbr-pos/transaction/' + this.lastTransactionId + '/receipt?_fbr=' + Date.now();
+            } catch (e) { /* best-effort — popup badge is already correct */ }
+        },
+        // Bounded pehla-print grace (max ~4.8s): bill abhi 'pending' ho to print
+        // se pehle submit ka mauqa do; timeout par pending slip hi chal padti hai.
+        async fbrPrintGrace() {
+            if (this.lastFbrStatus !== 'pending' || !this.lastTransactionId || this.lastIsOffline) return;
+            const txnId = this.lastTransactionId;
+            for (let i = 0; i < 4; i++) {
+                await new Promise(r => setTimeout(r, 1200));
+                if (this.lastTransactionId !== txnId) return; // new sale took over
+                if (this.lastFbrStatus !== 'pending') return; // badge poll flipped it already
+                const st = await this._fetchFbrStatus(txnId);
+                if (st && st.fbr_status && st.fbr_status !== 'pending') {
+                    this._applyFbrStatus(txnId, st);
+                    return;
+                }
+            }
         },
 
         async recallOrder(order) {

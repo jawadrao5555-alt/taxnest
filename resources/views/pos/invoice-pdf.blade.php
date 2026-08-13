@@ -322,6 +322,9 @@
         <div class="local-box" style="border: 1.5px solid #374151; color: #111827;">
             <strong style="font-size: 12px;">{{ __('pos.receipt_sale_receipt') }}</strong><br>
             {{ $transaction->invoice_number }}
+            {{-- Task 655: agent-mode bill rendered while still 'pending' — chhoti
+                 wazahat ke yeh bill PRA ko report ho raha hai. --}}
+            @if(($transaction->pra_status ?? null) === 'pending')<br><span style="font-size: 9px;">{{ __('pos.receipt_pending_pra_note') }}</span>@endif
         </div>
         @endif
         @if($qrUrl)

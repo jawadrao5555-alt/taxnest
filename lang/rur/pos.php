@@ -2819,6 +2819,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'fbr_receipt_style_card_desc' => 'Bold print, logo position',
     'receipt_printer_size' => 'Receipt printer ka size',
     'receipt_provisional_bill' => 'PROVISIONAL BILL',
+    'receipt_pending_pra_note' => 'Yeh bill PRA ko report ho raha hai — fiscal number thori dair mein aa jayega',
     'receipt_provisional_note' => 'Yeh provisional bill sirf aap ke record ke liye hai',
     'receipt_qty' => 'Qty',
     'receipt_rate' => 'Rate',

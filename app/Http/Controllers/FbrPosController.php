@@ -1986,6 +1986,28 @@ class FbrPosController extends Controller
         return view('fbr-pos.show', compact('transaction'));
     }
 
+    /**
+     * Task 655 — lightweight FBR status probe (twin of PosController::apiPraStatus).
+     * fiscal_device companies save bills as fbr_status='pending' (Desktop Agent
+     * submits within seconds); the sale screen polls this to flip the popup badge
+     * + refresh the receipt iframe once the fiscal number lands.
+     */
+    public function apiFbrStatus($id)
+    {
+        $companyId = app('currentCompanyId');
+        $tx = FbrPosTransaction::where('company_id', $companyId)
+            ->select(['id', 'fbr_status', 'fbr_invoice_number'])
+            ->find($id);
+        if (!$tx) {
+            return response()->json(['success' => false], 404);
+        }
+        return response()->json([
+            'success' => true,
+            'fbr_status' => $tx->fbr_status,
+            'fbr_invoice_number' => $tx->fbr_invoice_number,
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    }
+
     public function retryFbr($id)
     {
         $companyId = app('currentCompanyId');

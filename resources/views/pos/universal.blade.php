@@ -4520,6 +4520,11 @@ function restaurantPos() {
             this.syncOfflineBills();
             this._autoSyncTick();
             this._syncTimer = setInterval(() => this._autoSyncTick(), 30000);
+            // Coming back to the tab = instant badge reconcile (background cron /
+            // Desktop Agent may have synced bills while the tab slept).
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden && navigator.onLine) this.loadFailedBills();
+            });
 
             // PWA auto-update guard: hold the auto-reload while a sale is mid-flight
             // (items in cart, pay modal open, submitting, or the persistent receipt
@@ -4541,7 +4546,9 @@ function restaurantPos() {
                 if (!this.praEnabled) { this.syncStatus = 'online'; this._autoSyncBusy = false; return; }
                 if (this.failedBills.length === 0) { this.syncStatus = 'online'; this._autoSyncBusy = false; return; }
                 // Pick OLDEST not-currently-retrying bill and submit silently.
-                const candidate = [...this.failedBills].reverse().find(b => !b._retrying);
+                // _queued bills already sit with the Desktop Agent — re-queueing
+                // them every 30 sec adds nothing and made the badge flicker.
+                const candidate = [...this.failedBills].reverse().find(b => !b._retrying && !b._queued);
                 if (!candidate) { this.syncStatus = 'online'; this._autoSyncBusy = false; return; }
                 this.syncStatus = 'syncing';
                 candidate._retrying = true;
@@ -4550,10 +4557,20 @@ function restaurantPos() {
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                 });
                 const data = await res.json().catch(() => ({}));
-                if (data && data.success) {
+                if (data && data.success && data.queued) {
+                    // Desktop-Agent mode: the bill is only RE-QUEUED for the local
+                    // agent — it is NOT synced yet. Keep it in the list (badge stays
+                    // honest) and mark it so this tick loop doesn't hammer it again.
+                    // When the agent actually submits, the next refresh drops it.
+                    candidate._retrying = false;
+                    candidate._queued = true;
+                } else if (data && data.success) {
                     this.failedBills = this.failedBills.filter(b => b.id !== candidate.id);
                     // Mini toast — non-intrusive (existing showToast auto-dismisses).
                     this.showToast(window.TXT.auto_synced_prefix + (candidate.invoice_number || '#' + candidate.id) + ' to PRA', 'success');
+                    // Reconcile with server truth right away (background cron/agent
+                    // may have synced other bills too) — badge updates without reload.
+                    await this.loadFailedBills();
                 } else {
                     candidate._retrying = false;
                 }
@@ -8870,14 +8887,26 @@ function restaurantPos() {
         // ─── FAILED BILLS API helpers (F11 modal) ───────────────────────────
         async loadFailedBills() {
             this.failedBillsLoading = true;
+            // Sequence guard: overlapping fetches (auto-sync tick + post-sale refresh
+            // + manual modal refresh) must never let an OLDER response overwrite a
+            // NEWER list — that's how the badge "jumped back" to a stale count.
+            const seq = (this._failedBillsSeq = (this._failedBillsSeq || 0) + 1);
             try {
                 const res = await fetch('{{ route('pos.api.failed-bills') }}', {
                     headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                 });
                 if (!res.ok) { this.failedBillsLoading = false; return; }
                 const data = await res.json();
-                if (data && data.success) {
-                    this.failedBills = data.bills || [];
+                if (data && data.success && seq === this._failedBillsSeq) {
+                    // Carry over in-flight flags so a refresh mid-retry can't make
+                    // the tick loop pick the same bill twice.
+                    const prev = {};
+                    (this.failedBills || []).forEach(b => { if (b._retrying || b._queued) prev[b.id] = b; });
+                    this.failedBills = (data.bills || []).map(b => {
+                        const p = prev[b.id];
+                        if (p) { b._retrying = p._retrying; b._queued = p._queued; }
+                        return b;
+                    });
                     if (this.activeFailedIndex >= this.failedBills.length) {
                         this.activeFailedIndex = Math.max(0, this.failedBills.length - 1);
                     }
@@ -8901,11 +8930,18 @@ function restaurantPos() {
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                 });
                 const data = await res.json();
-                if (data && data.success) {
+                if (data && data.success && data.queued) {
+                    // Desktop-Agent mode: only RE-QUEUED, not synced — keep the bill
+                    // in the list (badge stays honest) and mark it queued.
+                    bill._retrying = false;
+                    bill._queued = true;
+                    this.showToast(data.message || window.TXT.submitted_to_pra, 'success');
+                } else if (data && data.success) {
                     this.failedBills = this.failedBills.filter(b => b.id !== bill.id);
                     if (this.activeFailedIndex >= this.failedBills.length) this.activeFailedIndex = Math.max(0, this.failedBills.length - 1);
                     if (this.failedBills.length === 0) { this.showFailedBills = false; this.activeFailedIndex = 0; }
                     this.showToast(data.message || window.TXT.submitted_to_pra, 'success');
+                    this.loadFailedBills();
                 } else {
                     bill._retrying = false;
                     this.showToast((data && data.message) || window.TXT.retry_failed, 'error');

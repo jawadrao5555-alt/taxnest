@@ -2111,6 +2111,12 @@ class RestaurantPosController extends Controller
                 ->count(),
         ];
 
+        // Task 666 parity (14 Aug 2026, Malik Chicken Broast): restaurant-mode
+        // dashboard is a SEPARATE page — the "Aaj ka Khaata" card was only on
+        // the retail dashboard, so restaurant owners never saw it. Same shared
+        // builder + partial as PosController::dashboard.
+        $todayKhata = \App\Services\PosTodayKhata::build($companyId, $bizDate, $user);
+
         return view('pos.restaurant.dashboard', compact(
             'company', 'todaySales', 'yesterdaySales', 'todayOrders',
             'heldCount', 'completedCount', 'totalTables', 'occupiedTables',
@@ -2120,7 +2126,7 @@ class RestaurantPosController extends Controller
             'todayCost', 'todayProfit', 'kitchenStats',
             'dashboardStyle', 'isRestaurant', 'isAdmin', 'praStatus', 'isCashier',
             'pendingProvisional', 'openOrdersCount', 'cancelledTodayCount',
-            'counterOrdersCount'
+            'counterOrdersCount', 'todayKhata'
         ));
     }
 

@@ -150,6 +150,11 @@ if [ "$LIVE_HEAD_BEFORE" = "$LOCAL_HEAD" ]; then
   # compiled views (mtime newer than blade => Laravel never recompiles), and its
   # migrate step is '|| true' (silent failure). So: refresh everything anyway.
   echo "Live is already at workspace HEAD (cPanel auto-deploy likely ran on push)."
+  # NOTE (Task 710): NO CACHE_VERSION bump on this refresh-only path — by design.
+  # No commit gap means live already serves exactly this code, including whatever
+  # CACHE_VERSION shipped with it (auto-bumped when it was originally deployed).
+  # Bumping here would mint a new commit + trigger another deploy cycle for a
+  # zero-code change. The auto-bump applies only to deploys with a live→local gap.
   echo "Refreshing migrate + caches + OPcache anyway — racing auto-deploys can leave stale/poisoned state."
 
   step "Live (refresh): php artisan migrate --force (idempotent)"
@@ -180,6 +185,37 @@ if ! git merge-base --is-ancestor "$LIVE_HEAD_BEFORE" "$LOCAL_HEAD" 2>/dev/null;
   echo "Live HEAD is not an ancestor of workspace HEAD." >&2
   echo "Either the workspace is behind origin, or live has drifted." >&2
   fail "refusing to deploy over divergence — investigate (git fetch; compare $LIVE_HEAD_BEFORE vs $LOCAL_HEAD)"
+fi
+
+# ---------------------------------------------- 0.5 SW cache-version auto-bump (Task 710)
+# Every deploy must change public/sw.js CACHE_VERSION so devices purge old
+# RUNTIME/STATIC caches and get the SW update badge. Idempotent: if the gap
+# (live..workspace) already changes the CACHE_VERSION line (manual bump or a
+# re-run after a previous auto-bump), do NOT bump again.
+step "SW cache auto-bump: ensure CACHE_VERSION changes in this deploy"
+if git diff "$LIVE_HEAD_BEFORE".."$LOCAL_HEAD" -- public/sw.js | grep -q '^+const CACHE_VERSION'; then
+  echo "CACHE_VERSION already bumped in this deploy gap — skipping (idempotent)."
+else
+  # Unique per deploy even for back-to-back runs in the same minute:
+  # seconds-precision timestamp + the short hash of the commit being deployed.
+  NEW_SW_VERSION="taxnest-$(date +%Y%m%d-%H%M%S)-$(git rev-parse --short "$LOCAL_HEAD")"
+  sed -i "s|^const CACHE_VERSION = '[^']*';.*$|const CACHE_VERSION = '$NEW_SW_VERSION'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)|" public/sw.js
+  grep -q "const CACHE_VERSION = '$NEW_SW_VERSION'" public/sw.js \
+    || fail "sw.js CACHE_VERSION auto-bump failed (CACHE_VERSION line pattern not matched — did sw.js header change?)"
+  node scripts/sw-smoke-check.mjs \
+    || fail "sw smoke check FAILED after CACHE_VERSION auto-bump — sw.js broken, not deploying"
+  git add public/sw.js
+  # sed must have actually changed the file — an empty commit would silently
+  # ship the OLD cache version (or abort the deploy). Verify a staged diff.
+  git diff --cached --quiet -- public/sw.js \
+    && fail "sw.js CACHE_VERSION bump produced no staged change (version collision?) — refusing to deploy without a fresh SW version"
+  # Pathspec-scoped commit: ONLY public/sw.js is committed, even if other files
+  # happen to be staged (they stay staged, uncommitted — the preflight warning
+  # about undeployed tracked changes still applies to them).
+  git commit -m "sw: auto-bump CACHE_VERSION to $NEW_SW_VERSION (deploy-live.sh)" -- public/sw.js >/dev/null 2>&1 \
+    || fail "could not commit sw.js CACHE_VERSION bump"
+  LOCAL_HEAD=$(git rev-parse HEAD)
+  echo "CACHE_VERSION bumped to $NEW_SW_VERSION (workspace HEAD now $LOCAL_HEAD)"
 fi
 
 # Live worktree must be clean for a fast-forward pull (untracked junk is fine).

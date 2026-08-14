@@ -5406,6 +5406,19 @@ class PosController extends Controller
         if ($r = $this->planGate('reports_enabled')) {
             return $r;
         }
+        [$data, $filename] = $this->buildTaxReportPdfData($request);
+
+        return $this->renderReportPdf('pos.tax-report-pdf', $data, $filename, 'landscape');
+    }
+
+    /**
+     * Builds the FULL view-data array + filename for the printed tax report PDF.
+     * Split out of exportTaxReportPdf (Task 700) so tests can lock the PDF
+     * summary figures against the screen's without rendering DomPDF — the
+     * owner files taxes from the printed copy, so these MUST never drift.
+     */
+    protected function buildTaxReportPdfData(Request $request): array
+    {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         // Local export is ADMIN-ONLY — cashiers always export PRA data.
@@ -5477,12 +5490,9 @@ class PosController extends Controller
             : 'All_Taxes';
         $filename = 'NestPOS_Tax_Report_' . $filenamePart . '_' . now()->format('Ymd_His') . '.pdf';
 
-        return $this->renderReportPdf(
-            'pos.tax-report-pdf',
-            compact('company', 'transactions', 'summary', 'dateLabel', 'taxRateLabel', 'taxRateFilter', 'itemValues', 'billTypeFilter') + ['billTypeReady' => $typeReady],
-            $filename,
-            'landscape'
-        );
+        $data = compact('company', 'transactions', 'summary', 'dateLabel', 'taxRateLabel', 'taxRateFilter', 'itemValues', 'billTypeFilter') + ['billTypeReady' => $typeReady];
+
+        return [$data, $filename];
     }
 
     public function services()

@@ -382,6 +382,104 @@ class PosTaxReportCreditNoteNettingTest extends TestCase
         $this->assertStringContainsString('Credit Notes Only', $csv);
     }
 
+    // ── 4b. Printed PDF: view data must ALWAYS match the screen (Task 700) ──
+    //
+    // exportTaxReportPdf duplicates the summary aggregation; the owner files
+    // taxes from the printed copy. Lock every summary figure the PDF renders
+    // against the screen's for the same filters — without rendering DomPDF —
+    // via buildTaxReportPdfData() (the exact array handed to renderReportPdf).
+
+    private function pdfViewData(array $query = []): array
+    {
+        $controller = new PosController();
+        $method = new \ReflectionMethod($controller, 'buildTaxReportPdfData');
+        $method->setAccessible(true);
+        [$data, $filename] = $method->invoke(
+            $controller,
+            Request::create('/pos/tax-reports/pdf', 'GET', $query)
+        );
+        $this->assertStringEndsWith('.pdf', $filename);
+
+        return $data;
+    }
+
+    private function assertPdfSummaryMatchesScreen(array $query, array $fields): void
+    {
+        $pdf = $this->pdfViewData($query)['summary'];
+        $screen = $this->praTaxReport($query)['summary'];
+
+        foreach ($fields as $field) {
+            $this->assertEqualsWithDelta(
+                (float) ($screen->{$field} ?? 0),
+                (float) ($pdf->{$field} ?? 0),
+                0.001,
+                "PDF summary '{$field}' drifted from the screen for filters " . json_encode($query)
+            );
+        }
+    }
+
+    private const PDF_SUMMARY_FIELDS = [
+        'total_invoices', 'total_sales', 'total_tax', 'total_taxable',
+        'total_discount', 'return_count', 'return_amount', 'return_tax',
+    ];
+
+    public function test_pdf_all_bills_summary_matches_screen_and_is_netted(): void
+    {
+        $this->assertPdfSummaryMatchesScreen([], self::PDF_SUMMARY_FIELDS);
+
+        // Absolute lock too — parity alone would pass if BOTH paths broke.
+        $data = $this->pdfViewData();
+        $summary = $data['summary'];
+        $this->assertSame(2, (int) $summary->total_invoices);
+        $this->assertSame(1441.0, (float) $summary->total_sales, '1070 + 585 − 214 refund');
+        $this->assertSame(221.0, (float) $summary->total_tax);
+        $this->assertSame(1220.0, (float) $summary->total_taxable);
+        $this->assertSame(1, (int) $summary->return_count);
+        $this->assertSame(214.0, (float) $summary->return_amount);
+        $this->assertCount(3, $data['transactions'], 'PDF lists every bill incl. the credit note');
+        $this->assertTrue($data['billTypeReady']);
+        $this->assertSame('', $data['billTypeFilter']);
+    }
+
+    public function test_pdf_sales_only_summary_matches_screen(): void
+    {
+        $this->assertPdfSummaryMatchesScreen(['bill_type' => 'sales'], self::PDF_SUMMARY_FIELDS);
+
+        $data = $this->pdfViewData(['bill_type' => 'sales']);
+        $this->assertSame(1655.0, (float) $data['summary']->total_sales, '1070 + 585, no netting');
+        $this->assertSame(0, (int) $data['summary']->return_count);
+        $this->assertCount(2, $data['transactions']);
+        $this->assertSame('sales', $data['billTypeFilter']);
+    }
+
+    public function test_pdf_returns_only_summary_matches_screen_and_stays_positive(): void
+    {
+        $this->assertPdfSummaryMatchesScreen(['bill_type' => 'returns'], self::PDF_SUMMARY_FIELDS);
+
+        $data = $this->pdfViewData(['bill_type' => 'returns']);
+        $this->assertSame(214.0, (float) $data['summary']->total_sales, 'refund figures stay POSITIVE');
+        $this->assertSame(34.0, (float) $data['summary']->total_tax);
+        $this->assertCount(1, $data['transactions']);
+        $this->assertSame('RET-0001', $data['transactions']->first()->invoice_number);
+    }
+
+    public function test_pdf_tax_rate_filter_summary_matches_screen_item_level_path(): void
+    {
+        // Item-level path builds total_discount differently (PDF pins it to 0),
+        // so compare every OTHER figure the printed copy shows.
+        $fields = ['total_invoices', 'total_sales', 'total_tax', 'return_count', 'return_amount'];
+        $this->assertPdfSummaryMatchesScreen(['tax_rate' => '17'], $fields);
+
+        $data = $this->pdfViewData(['tax_rate' => '17']);
+        $this->assertSame(1300.0, (float) $data['summary']->total_sales, '1000 + 500 − 200 return items');
+        $this->assertSame(221.0, (float) $data['summary']->total_tax);
+        $this->assertSame('17', $data['taxRateFilter']);
+        $this->assertNotEmpty($data['itemValues'], 'item-level values must ride along for per-bill rows');
+
+        // Item-level + returns-only combo stays positive, matching the screen.
+        $this->assertPdfSummaryMatchesScreen(['tax_rate' => '17', 'bill_type' => 'returns'], ['total_invoices', 'total_sales', 'total_tax']);
+    }
+
     // ── 5. FBR POS tax report parity ─────────────────────────────────────────
 
     private function fbrTaxReport(array $query = []): array

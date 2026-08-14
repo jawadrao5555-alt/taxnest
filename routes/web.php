@@ -727,6 +727,11 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     // Task 516: bulk-close every stranded prior business day in one click.
     Route::post('/day-close/close-all-prior', [PosController::class, 'closeAllPriorDays'])->name('pos.close-all-days');
     Route::post('/day-opening', [PosController::class, 'saveDayOpening'])->name('pos.day-opening.save');
+    // Task 660: X-Report — read-only "abhi tak ki report" WITHOUT closing the
+    // day (no wash, no hash, no report row). Literal paths registered BEFORE
+    // the /day-close/{id}/... routes so {id} never swallows 'x-report'.
+    Route::get('/day-close/x-report/pdf', [PosController::class, 'dayCloseXReportPdf'])->name('pos.day-close-x-pdf');
+    Route::get('/day-close/x-report/thermal', [PosController::class, 'dayCloseXReportThermal'])->name('pos.day-close-x-thermal');
     Route::get('/day-close/{id}/pdf', [PosController::class, 'dayCloseReportPdf'])->name('pos.day-close-pdf');
     Route::get('/day-close/{id}/thermal', [PosController::class, 'dayCloseThermal'])->name('pos.day-close-thermal');
     Route::get('/api/tax-rate', [PosController::class, 'getTaxRate'])->name('pos.api.tax-rate');

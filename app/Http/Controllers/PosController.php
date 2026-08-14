@@ -9017,6 +9017,14 @@ class PosController extends Controller
 
         $analytics = $this->buildDayCloseAnalytics($companyId, $date, $transactions, $company);
 
+        // Per-stream split (Task 660): PRA vs Local vs Exempt boxes. For a
+        // CLOSED day prefer the figures frozen on the report (the wash may
+        // have deleted reporting-OFF finals — live recompute would undercount);
+        // otherwise compute live from today's set.
+        $streamSplit = ($existingReport && is_array($existingReport->stream_summary ?? null))
+            ? $existingReport->stream_summary
+            : $this->buildDayCloseStreamSplit($transactions);
+
         // Delivery Riders (Jul 2026): live rider cash figures for the recon preview
         // (unsettled rider cash is OUT of the drawer; earlier-day settlements are IN).
         $riderFigures = $this->buildRiderDayFigures($companyId, $date);
@@ -9041,7 +9049,7 @@ class PosController extends Controller
         // rows included, closed = a PosDayCloseReport row exists for that date.
         $unclosedPriorDays = $this->unclosedPriorBusinessDays($companyId, $date);
 
-        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays'));
+        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit'));
     }
 
     /**
@@ -10123,51 +10131,24 @@ class PosController extends Controller
             ? $transactions->reject(fn ($t) => ($t->transaction_type ?? 'sale') === 'return')->values()
             : $transactions;
 
-        // Cash/card/other via the ONE shared alias set (PosPaymentBuckets) —
-        // 'card' is stored as 'debit_card'; ='card' matching reported Rs 0 card
-        // sales on the Z-report (live incident, Jul 2026). Refunds net their
-        // bucket (cash refund reduces expected drawer cash).
-        $payBuckets = PosPaymentBuckets::split($saleRows);
-        $refundBuckets = PosPaymentBuckets::split($returnRows);
-
-        $data = [
+        // Shared figure builder (Task 660): the SAME code path the X-Report
+        // uses, so Z-Report and X-Report numbers can never diverge.
+        $data = array_merge($this->buildDayCloseFigureData($saleRows, $returnRows), [
             'company_id' => $companyId,
             'report_date' => $date,
             'report_number' => $reportNumber,
-            'total_invoices' => $saleRows->count(),
-            'pra_invoices' => $saleRows->where('pra_status', 'submitted')->count(),
-            'local_invoices' => $saleRows->whereIn('pra_status', ['local', null])->count(),
-            'offline_invoices' => $saleRows->where('pra_status', 'offline')->count(),
-            'gross_sales' => $saleRows->sum('subtotal') - $returnRows->sum('subtotal'),
-            'total_discount' => $saleRows->sum('discount_amount') - $returnRows->sum('discount_amount'),
-            'net_sales' => ($saleRows->sum('subtotal') - $returnRows->sum('subtotal'))
-                - ($saleRows->sum('discount_amount') - $returnRows->sum('discount_amount')),
-            'total_tax' => $saleRows->sum('tax_amount') - $returnRows->sum('tax_amount'),
-            'total_amount' => $saleRows->sum('total_amount') - $returnRows->sum('total_amount'),
-            'cash_amount' => round($payBuckets['cash'] - $refundBuckets['cash'], 2),
-            'card_amount' => round($payBuckets['card'] - $refundBuckets['card'], 2),
-            'other_amount' => round($payBuckets['other'] - $refundBuckets['other'], 2),
-            'first_invoice_number' => $saleRows->first()->invoice_number ?? null,
-            'last_invoice_number' => $saleRows->last()->invoice_number ?? null,
-            'first_invoice_time' => $saleRows->first()->created_at ?? null,
-            'last_invoice_time' => $saleRows->last()->created_at ?? null,
             'closed_by' => $closedBy,
             'notes' => $notes,
-        ];
+        ]);
 
-        // Returns detail on the Z-report (schema-guarded, drift self-heal).
-        if (\Schema::hasColumn('pos_day_close_reports', 'returns_count')) {
-            $data['returns_count'] = $returnRows->count();
-            $data['returns_amount'] = round((float) $returnRows->sum('total_amount'), 2);
-        }
-
-        // Wastage detail (Task 596): spoiled-goods returns — same is_wastage
-        // filter the day-close SCREEN preview uses, so print matches screen.
-        if (\Schema::hasColumn('pos_day_close_reports', 'wastage_count')
-            && \Schema::hasColumn('pos_transactions', 'is_wastage')) {
-            $wastageRows = $returnRows->filter(fn ($t) => (bool) ($t->is_wastage ?? false));
-            $data['wastage_count'] = $wastageRows->count();
-            $data['wastage_amount'] = round((float) $wastageRows->sum('total_amount'), 2);
+        // Per-stream split (Task 660, ZFC): PRA vs Local vs Exempt figures with
+        // payment buckets + exempt item detail — STORED on the report because
+        // the wash below may permanently DELETE reporting-OFF finals (a later
+        // recompute from surviving rows would undercount the Local stream —
+        // this is also why the old Invoice Summary "Amount" column printed
+        // "-"). Schema-guarded (prod drift self-heal).
+        if (\Schema::hasColumn('pos_day_close_reports', 'stream_summary')) {
+            $data['stream_summary'] = $this->buildDayCloseStreamSplit($transactions);
         }
 
         // Delivery Riders (Jul 2026): rider cash figures for this day — computed
@@ -10506,9 +10487,16 @@ class PosController extends Controller
         // transaction set (works for OLD closed days too; no schema change).
         $taxSplit = $this->dayCloseTaxSplit($transactions);
 
+        // Per-stream split (Task 660): prefer the figures FROZEN at close time
+        // (wash may have deleted reporting-OFF finals); graceful fallback for
+        // OLD reports = best-effort recompute from surviving historical rows.
+        $streamSplit = is_array($report->stream_summary ?? null)
+            ? $report->stream_summary
+            : $this->buildDayCloseStreamSplit($transactions);
+
         return $this->renderReportPdf(
             'pos.day-close-pdf',
-            compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit'),
+            compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit'),
             "Day-Close-{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf"
         );
     }
@@ -10562,7 +10550,12 @@ class PosController extends Controller
         // PRA segregation (owner 9 Aug 2026) — same historical computation as the PDF.
         $taxSplit = $this->dayCloseTaxSplit($transactions);
 
-        return view('pos.day-close-thermal', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit'));
+        // Per-stream split (Task 660) — same frozen-first logic as the PDF.
+        $streamSplit = is_array($report->stream_summary ?? null)
+            ? $report->stream_summary
+            : $this->buildDayCloseStreamSplit($transactions);
+
+        return view('pos.day-close-thermal', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit'));
     }
 
     /**
@@ -10577,6 +10570,300 @@ class PosController extends Controller
             'taxable' => $transactions->sum(fn ($t) => max(0, (float) $t->subtotal - (float) $t->discount_amount - (float) ($t->exempt_amount ?? 0))),
             'exempt' => $transactions->sum(fn ($t) => (float) ($t->exempt_amount ?? 0)),
         ];
+    }
+
+    /**
+     * Core Z-report figure fields from an already-partitioned sale/return set
+     * (Task 660): extracted from performDayClose so the X-Report renders the
+     * EXACT same numbers a close would store — one code path, never diverges.
+     * Counts stay SALES-only; money figures are netted (returns subtract);
+     * cash/card/other via the ONE shared alias set (PosPaymentBuckets — 'card'
+     * is stored as 'debit_card'; ='card' matching reported Rs 0 card sales on
+     * the Z-report, live incident Jul 2026).
+     */
+    private function buildDayCloseFigureData($saleRows, $returnRows): array
+    {
+        $payBuckets = PosPaymentBuckets::split($saleRows);
+        $refundBuckets = PosPaymentBuckets::split($returnRows);
+
+        $data = [
+            'total_invoices' => $saleRows->count(),
+            'pra_invoices' => $saleRows->where('pra_status', 'submitted')->count(),
+            'local_invoices' => $saleRows->whereIn('pra_status', ['local', null])->count(),
+            'offline_invoices' => $saleRows->where('pra_status', 'offline')->count(),
+            'gross_sales' => $saleRows->sum('subtotal') - $returnRows->sum('subtotal'),
+            'total_discount' => $saleRows->sum('discount_amount') - $returnRows->sum('discount_amount'),
+            'net_sales' => ($saleRows->sum('subtotal') - $returnRows->sum('subtotal'))
+                - ($saleRows->sum('discount_amount') - $returnRows->sum('discount_amount')),
+            'total_tax' => $saleRows->sum('tax_amount') - $returnRows->sum('tax_amount'),
+            'total_amount' => $saleRows->sum('total_amount') - $returnRows->sum('total_amount'),
+            'cash_amount' => round($payBuckets['cash'] - $refundBuckets['cash'], 2),
+            'card_amount' => round($payBuckets['card'] - $refundBuckets['card'], 2),
+            'other_amount' => round($payBuckets['other'] - $refundBuckets['other'], 2),
+            'first_invoice_number' => $saleRows->first()->invoice_number ?? null,
+            'last_invoice_number' => $saleRows->last()->invoice_number ?? null,
+            'first_invoice_time' => $saleRows->first()->created_at ?? null,
+            'last_invoice_time' => $saleRows->last()->created_at ?? null,
+        ];
+
+        // Returns detail on the Z-report (schema-guarded, drift self-heal).
+        if (\Schema::hasColumn('pos_day_close_reports', 'returns_count')) {
+            $data['returns_count'] = $returnRows->count();
+            $data['returns_amount'] = round((float) $returnRows->sum('total_amount'), 2);
+        }
+
+        // Wastage detail (Task 596): spoiled-goods returns — same is_wastage
+        // filter the day-close SCREEN preview uses, so print matches screen.
+        if (\Schema::hasColumn('pos_day_close_reports', 'wastage_count')
+            && \Schema::hasColumn('pos_transactions', 'is_wastage')) {
+            $wastageRows = $returnRows->filter(fn ($t) => (bool) ($t->is_wastage ?? false));
+            $data['wastage_count'] = $wastageRows->count();
+            $data['wastage_amount'] = round((float) $wastageRows->sum('total_amount'), 2);
+        }
+
+        return $data;
+    }
+
+    /**
+     * ═══ Per-stream day-close split (Task 660, ZFC owner feedback) ═══
+     * PRA vs Local vs Exempt boxes — each stream's bill count, sale, tax and
+     * cash/card/other payment buckets (returns NET their own stream), plus
+     * the exempt detail: exempt value (incl. exempt shares on MIXED bills)
+     * and which exempt items sold (qty + amount).
+     *
+     * Stream classifier mirrors PosTransaction::applyStreamTab within the
+     * day-close PRA-mode set:
+     *   exempt = pra_status 'exempt_internal' (all-exempt bills, Task 647)
+     *   pra    = bill entered the PRA pipeline: any other non-'local'
+     *            pra_status, OR a PRA fiscal number exists
+     *   local  = the rest (pra_status NULL/'local' — reporting-OFF finals)
+     *
+     * 'summary' amounts use the SAME predicates as the stored count columns
+     * (pra_invoices = submitted only, local_invoices = local/NULL, offline)
+     * so the Invoice Summary table rows finally carry matching amounts.
+     *
+     * SHARED by the day-close page, performDayClose (frozen on the report),
+     * the PDF/thermal fallback for OLD reports, and the X-Report — one code
+     * path so the numbers can never diverge.
+     */
+    private function buildDayCloseStreamSplit($transactions): array
+    {
+        $typeReady = \Schema::hasColumn('pos_transactions', 'transaction_type');
+        $returnRows = $typeReady
+            ? $transactions->filter(fn ($t) => ($t->transaction_type ?? 'sale') === 'return')->values()
+            : collect();
+        $saleRows = $typeReady
+            ? $transactions->reject(fn ($t) => ($t->transaction_type ?? 'sale') === 'return')->values()
+            : $transactions;
+
+        $streamOf = function ($t) {
+            if (($t->pra_status ?? null) === PosTransaction::EXEMPT_INTERNAL) {
+                return 'exempt';
+            }
+            if (!empty($t->pra_invoice_number)) {
+                return 'pra';
+            }
+            $s = $t->pra_status ?? null;
+
+            return ($s !== null && $s !== 'local') ? 'pra' : 'local';
+        };
+
+        $box = function ($sales, $returns) {
+            $pb = PosPaymentBuckets::split($sales);
+            $rb = PosPaymentBuckets::split($returns);
+
+            return [
+                'count' => $sales->count(),
+                'sales' => round((float) $sales->sum('total_amount') - (float) $returns->sum('total_amount'), 2),
+                'tax' => round((float) $sales->sum('tax_amount') - (float) $returns->sum('tax_amount'), 2),
+                'cash' => round($pb['cash'] - $rb['cash'], 2),
+                'card' => round($pb['card'] - $rb['card'], 2),
+                'other' => round($pb['other'] - $rb['other'], 2),
+            ];
+        };
+
+        $split = [];
+        foreach (['pra', 'local', 'exempt'] as $stream) {
+            $split[$stream] = $box(
+                $saleRows->filter(fn ($t) => $streamOf($t) === $stream)->values(),
+                $returnRows->filter(fn ($t) => $streamOf($t) === $stream)->values()
+            );
+        }
+
+        // Exempt detail: value = stored exempt_amount (post-discount, PosTaxMath
+        // — the same figure the tax report uses, covers exempt shares on mixed
+        // bills too); items = which exempt items sold today (sales-only,
+        // informational). Schema-guarded for older prod boxes.
+        $exemptValue = round(
+            (float) $saleRows->sum(fn ($t) => (float) ($t->exempt_amount ?? 0))
+            - (float) $returnRows->sum(fn ($t) => (float) ($t->exempt_amount ?? 0)),
+            2
+        );
+        $exemptItems = [];
+        $saleIds = $saleRows->pluck('id')->filter()->all();
+        if (!empty($saleIds) && \Schema::hasColumn('pos_transaction_items', 'is_tax_exempt')) {
+            $exemptItems = \App\Models\PosTransactionItem::whereIn('transaction_id', $saleIds)
+                ->where('is_tax_exempt', true)
+                ->get(['item_name', 'quantity', 'subtotal'])
+                ->groupBy('item_name')
+                ->map(fn ($g, $name) => [
+                    'name' => (string) $name,
+                    'qty' => (float) $g->sum('quantity'),
+                    'amount' => round((float) $g->sum('subtotal'), 2),
+                ])
+                ->sortByDesc('amount')
+                ->take(20)
+                ->values()
+                ->all();
+        }
+        $split['exempt_detail'] = ['value' => $exemptValue, 'items' => $exemptItems];
+
+        // Invoice Summary amounts — predicates MIRROR the stored count columns.
+        $split['summary'] = [
+            'pra_submitted' => round((float) $saleRows->where('pra_status', 'submitted')->sum('total_amount'), 2),
+            'local' => round((float) $saleRows->whereIn('pra_status', ['local', null])->sum('total_amount'), 2),
+            'offline' => round((float) $saleRows->where('pra_status', 'offline')->sum('total_amount'), 2),
+        ];
+
+        return $split;
+    }
+
+    /**
+     * ═══ X-Report (Task 660, ZFC owner request) ═══
+     * "Abhi tak ki report" — the SAME report family as the Z-Report but for a
+     * day that is NOT closed yet. READ-ONLY by design: no wash/archive, no
+     * integrity hash, no PosDayCloseReport row — live business-day figures
+     * rendered through the SAME builders (buildDayCloseFigureData /
+     * buildDayCloseStreamSplit / buildDayCloseAnalytics) so X and Z numbers
+     * can never diverge. Access = dayCloseAllowed (admin/manager; cashier only
+     * via company switch / Custom Access tick — same rule as day close).
+     * Views receive $isXReport=true → PROVISIONAL watermark, hash hidden.
+     */
+    private function buildXReportContext(Request $request)
+    {
+        $user = \Illuminate\Support\Facades\Auth::guard('pos')->user();
+        if ($user && !\App\Services\PosAccessService::dayCloseAllowed($user)) {
+            return redirect()->route('pos.dashboard')->with('error', __('pos.custom_access_denied'));
+        }
+        $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
+        $date = $request->get('date');
+        try {
+            $date = $date ? \Carbon\Carbon::parse($date)->toDateString() : \App\Services\PosBusinessDay::current($companyId);
+        } catch (\Throwable $e) {
+            $date = \App\Services\PosBusinessDay::current($companyId);
+        }
+
+        // Core precondition: X-Report exists ONLY for a still-open day. Once
+        // the day is closed the Z-Report (frozen figures + hash) is the truth —
+        // a direct URL hit here would print "PROVISIONAL — day not closed"
+        // over a day that IS closed, from a live set the wash already thinned
+        // (hide_archived hides archived bills). Hard-block, don't trust the UI.
+        // whereDate, not where: the model's date cast writes 'Y-m-d H:i:s'
+        // on drivers without a true DATE type (sqlite tests) — a strict
+        // string match would silently let the guard through.
+        $alreadyClosed = PosDayCloseReport::where('company_id', $companyId)
+            ->whereDate('report_date', $date)
+            ->exists();
+        if ($alreadyClosed) {
+            return redirect()->route('pos.day-close', ['date' => $date])
+                ->with('error', __('pos.dayclose_report_exists'));
+        }
+
+        // Live PRA-mode set — hide_archived stays ACTIVE (X-Report is for the
+        // still-open day; nothing has been washed yet). Local (non-PRA) bills
+        // excluded exactly like the Z-report figure set.
+        $transactions = PosTransaction::where('company_id', $companyId)
+            ->where('business_date', $date)
+            ->where(function ($q) {
+                $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
+            })
+            ->with('creator')
+            ->orderBy('created_at')
+            ->get();
+
+        if ($transactions->isEmpty()) {
+            return redirect()->route('pos.day-close', ['date' => $date])
+                ->with('error', __('pos.no_transactions_for_date', ['date' => \Carbon\Carbon::parse($date)->format('d M Y')]));
+        }
+
+        $typeReady = \Schema::hasColumn('pos_transactions', 'transaction_type');
+        $returnRows = $typeReady
+            ? $transactions->filter(fn ($t) => ($t->transaction_type ?? 'sale') === 'return')->values()
+            : collect();
+        $saleRows = $typeReady
+            ? $transactions->reject(fn ($t) => ($t->transaction_type ?? 'sale') === 'return')->values()
+            : $transactions;
+
+        // TRANSIENT report object — NEVER saved. Same field shapes the Z views
+        // read, so both PDF/thermal templates work unchanged.
+        $report = new PosDayCloseReport(array_merge(
+            $this->buildDayCloseFigureData($saleRows, $returnRows),
+            [
+                'company_id' => $companyId,
+                'report_date' => $date,
+                'report_number' => 'X-' . \Carbon\Carbon::parse($date)->format('Ymd'),
+            ]
+        ));
+        $report->created_at = now();
+
+        // Live rider figures (informational — same shape the views read).
+        $riderFigures = $this->buildRiderDayFigures($companyId, $date);
+        if (!empty($riderFigures['active'])) {
+            $report->rider_summary = $riderFigures;
+        }
+
+        $streamSplit = $this->buildDayCloseStreamSplit($transactions);
+
+        // Cashier figures are SIGNED (Task 570): refunds net revenue/tax;
+        // counts stay sales-only.
+        $cashierBreakdown = $transactions->groupBy(fn ($t) => $t->creator ? $t->creator->name : 'Unknown')->map(function ($group) {
+            $sign = fn ($t) => ($t->transaction_type ?? 'sale') === 'return' ? -1 : 1;
+
+            return (object) [
+                'count' => $group->filter(fn ($t) => ($t->transaction_type ?? 'sale') !== 'return')->count(),
+                'revenue' => $group->sum(fn ($t) => $sign($t) * (float) $t->total_amount),
+                'tax' => $group->sum(fn ($t) => $sign($t) * (float) $t->tax_amount),
+            ];
+        });
+
+        $analytics = $this->buildDayCloseAnalytics($companyId, $date, $transactions, $company);
+        $hazri = PosFeatureService::planAllows($company, 'hazri_enabled')
+            ? $this->buildHazriRows($companyId, $date)
+            : [];
+        $bioPunches = PosFeatureService::planAllows($company, 'hazri_enabled')
+            ? $this->buildBiometricRows($companyId, $date)
+            : [];
+        $taxSplit = $this->dayCloseTaxSplit($transactions);
+        $isXReport = true;
+
+        return compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit', 'isXReport');
+    }
+
+    /** X-Report as A4 PDF (Task 660) — read-only, PROVISIONAL watermark. */
+    public function dayCloseXReportPdf(Request $request)
+    {
+        $ctx = $this->buildXReportContext($request);
+        if (!is_array($ctx)) {
+            return $ctx;
+        }
+
+        return $this->renderReportPdf(
+            'pos.day-close-pdf',
+            $ctx,
+            "X-Report-{$ctx['report']->report_date->format('Y-m-d')}.pdf"
+        );
+    }
+
+    /** X-Report on 80mm thermal (Task 660) — read-only, PROVISIONAL watermark. */
+    public function dayCloseXReportThermal(Request $request)
+    {
+        $ctx = $this->buildXReportContext($request);
+        if (!is_array($ctx)) {
+            return $ctx;
+        }
+
+        return view('pos.day-close-thermal', $ctx);
     }
 
     /**

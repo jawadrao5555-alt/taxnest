@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Z-Report {{ $report->report_number }}</title>
+<title>{{ ($isXReport ?? false) ? 'X-Report' : 'Z-Report' }} {{ $report->report_number }}</title>
 <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { background: #f3f4f6; font-family: 'Courier New', Courier, monospace; color: #000; }
@@ -44,10 +44,16 @@
     @if($company->address)<div class="c sm">{{ $company->address }}</div>@endif
     @if($company->ntn)<div class="c sm">NTN: {{ $company->ntn }}</div>@endif
     <div class="hr2"></div>
-    <div class="c b xl">{{ __('pos.dc_zreport') }}</div>
+    <div class="c b xl">{{ ($isXReport ?? false) ? __('pos.dc_xreport') : __('pos.dc_zreport') }}</div>
     <div class="c">{{ $report->report_number }}</div>
     <div class="c">{{ $report->report_date->format('l, d M Y') }}</div>
+    @if($isXReport ?? false)
+    {{-- X-Report (Task 660): PROVISIONAL watermark — din abhi close nahi hua --}}
+    <div class="c sm">{{ __('pos.dc_generated') }}: {{ $report->created_at->format('d/m/Y h:i A') }}</div>
+    <div style="border:2px solid #000; padding:3px 4px; margin:5px 0; text-align:center; font-weight:bold; font-size:11px;">{{ __('pos.dc_provisional_watermark') }}</div>
+    @else
     <div class="c sm">{{ __('pos.dc_closed') }}: {{ $report->created_at->format('d/m/Y h:i A') }}@if($report->closedByUser) {{ __('pos.dcp_by_word') }} {{ $report->closedByUser->name }}@endif</div>
+    @endif
     <div class="hr2"></div>
 
     <div class="sec">{{ __('pos.dc_sales_summary') }}</div>
@@ -80,6 +86,49 @@
         <tr><td class="b lg">{{ __('pos.dc_total_revenue') }}</td><td class="r b lg">{{ number_format($report->total_amount, 2) }}</td></tr>
     </table>
     <div class="hr"></div>
+
+    {{-- ═══ PRA / Local / Exempt stream sections (Task 660, ZFC owner):
+         80mm par side-by-side mumkin nahi — sequential boxes, same figures.
+         $streamSplit = stored stream_summary ya OLD reports par recompute;
+         section gracefully skips when unavailable. --}}
+    @php
+        $ssPra = is_array($streamSplit ?? null) ? ($streamSplit['pra'] ?? null) : null;
+        $ssLocal = is_array($streamSplit ?? null) ? ($streamSplit['local'] ?? null) : null;
+        $ssExempt = is_array($streamSplit ?? null) ? ($streamSplit['exempt'] ?? null) : null;
+        $ssExDetail = is_array($streamSplit ?? null) ? ($streamSplit['exempt_detail'] ?? ['value' => 0, 'items' => []]) : ['value' => 0, 'items' => []];
+        $ssHasExempt = ($ssExempt['count'] ?? 0) > 0 || ($ssExDetail['value'] ?? 0) > 0 || !empty($ssExDetail['items']);
+    @endphp
+    @if(is_array($ssPra) && is_array($ssLocal))
+    @foreach([[__('pos.dc_stream_pra'), $ssPra], [__('pos.dc_stream_local'), $ssLocal]] as $sbRow)
+    @php $sbTitle = $sbRow[0]; $sb = $sbRow[1]; @endphp
+    <div class="sec">{{ $sbTitle }} ({{ $sb['count'] ?? 0 }} {{ __('pos.dcp_bills_word') }})</div>
+    <table>
+        <tr><td class="b">{{ __('pos.dc_stream_sale') }}</td><td class="r b">{{ number_format($sb['sales'] ?? 0, 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_sales_tax') }}</td><td class="r">{{ number_format($sb['tax'] ?? 0, 2) }}</td></tr>
+        <tr><td>&nbsp;&nbsp;{{ __('pos.dc_cash') }}</td><td class="r">{{ number_format($sb['cash'] ?? 0, 2) }}</td></tr>
+        <tr><td>&nbsp;&nbsp;{{ __('pos.dc_card') }}</td><td class="r">{{ number_format($sb['card'] ?? 0, 2) }}</td></tr>
+        <tr><td>&nbsp;&nbsp;{{ __('pos.dc_other') }}</td><td class="r">{{ number_format($sb['other'] ?? 0, 2) }}</td></tr>
+    </table>
+    <div class="hr"></div>
+    @endforeach
+
+    @if($ssHasExempt)
+    <div class="sec">{{ __('pos.dc_stream_exempt') }} ({{ $ssExempt['count'] ?? 0 }} {{ __('pos.dcp_bills_word') }})</div>
+    <table>
+        <tr><td>{{ __('pos.dc_exempt_value') }}</td><td class="r b">{{ number_format($ssExDetail['value'] ?? 0, 2) }}</td></tr>
+        <tr><td>{{ __('pos.dc_exempt_bills_sale') }}</td><td class="r">{{ number_format($ssExempt['sales'] ?? 0, 2) }}</td></tr>
+    </table>
+    @if(!empty($ssExDetail['items']))
+    <div class="sm b" style="margin-top:2px;">{{ __('pos.dc_exempt_items_sold') }}</div>
+    <table>
+        @foreach($ssExDetail['items'] as $exItem)
+        <tr><td>{{ \Illuminate\Support\Str::limit($exItem['name'] ?? '-', 18) }}</td><td class="ct">{{ rtrim(rtrim(number_format((float) ($exItem['qty'] ?? 0), 2), '0'), '.') }}</td><td class="r">{{ number_format($exItem['amount'] ?? 0, 2) }}</td></tr>
+        @endforeach
+    </table>
+    @endif
+    <div class="hr"></div>
+    @endif
+    @endif
 
     <div class="sec">{{ __('pos.dc_payments') }}</div>
     <table>
@@ -222,8 +271,13 @@
         <tr><td>{{ __('pos.dc_last_inv') }}</td><td class="r">{{ $report->last_invoice_number ?? '-' }}</td></tr>
     </table>
     <div class="hr2"></div>
+    @if($isXReport ?? false)
+    {{-- X-Report: NO integrity hash — nothing was stored (Task 660). --}}
+    <div style="border:2px solid #000; padding:3px 4px; margin:5px 0; text-align:center; font-weight:bold; font-size:11px;">{{ __('pos.dc_provisional_watermark') }}</div>
+    @else
     <div class="c sm">{{ __('pos.dcp_sha256_hash') }}</div>
     <div class="c sm wrap">{{ $report->hash }}</div>
+    @endif
     <div class="hr"></div>
     <div class="c sm">{{ __('pos.dcp_sys_zreport_pra') }}</div>
     <div class="c sm b">{{ __('pos.dcp_powered_nestpos') }}</div>

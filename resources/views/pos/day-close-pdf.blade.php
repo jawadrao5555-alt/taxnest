@@ -68,10 +68,19 @@
     </div>
 
     <div class="report-title">
-        <h2>{{ __('pos.dcp_report_title') }}</h2>
+        <h2>{{ ($isXReport ?? false) ? __('pos.dcp_xreport_title') : __('pos.dcp_report_title') }}</h2>
         <p>{{ __('pos.dcp_pra_eod_summary') }}</p>
         <p style="font-weight:bold; margin-top:4px;">{{ $report->report_date->format('l, d F Y') }}</p>
     </div>
+
+    {{-- X-Report PROVISIONAL watermark banner (Task 660): loud on BOTH ends of
+         the document — this print is NOT a fiscal day-close record. --}}
+    @if($isXReport ?? false)
+    <div style="border:3px solid #dc2626; background-color:#fef2f2; padding:8px 12px; margin-bottom:14px; text-align:center;">
+        <p style="font-size:13px; font-weight:bold; color:#dc2626; letter-spacing:1px;">{{ __('pos.dc_provisional_watermark') }}</p>
+        <p style="font-size:9px; color:#991b1b; margin-top:2px;">{{ __('pos.dc_xreport_hint') }}</p>
+    </div>
+    @endif
 
     <div class="info-box">
         <div class="info-row">
@@ -88,122 +97,10 @@
         </div>
     </div>
 
-    <div class="section-title">{{ __('pos.dcp_invoice_summary') }}</div>
-    <table class="data">
-        <thead>
-            <tr>
-                <th>{{ __('pos.dc_th_category') }}</th>
-                <th class="c">{{ __('pos.dc_th_count') }}</th>
-                <th class="r">{{ __('pos.dc_th_amount_pkr') }}</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>{{ __('pos.dcp_pra_submitted_invoices') }}</td>
-                <td class="c">{{ $report->pra_invoices }}</td>
-                <td class="r">-</td>
-            </tr>
-            <tr>
-                <td>{{ __('pos.dcp_local_invoices') }}</td>
-                <td class="c">{{ $report->local_invoices }}</td>
-                <td class="r">-</td>
-            </tr>
-            @if($report->offline_invoices > 0)
-            <tr>
-                <td>{{ __('pos.dcp_offline_invoices') }}</td>
-                <td class="c">{{ $report->offline_invoices }}</td>
-                <td class="r">-</td>
-            </tr>
-            @endif
-            @if(($report->deleted_final_count ?? 0) > 0)
-            <tr>
-                <td>{{ __('pos.dcp_local_final_deleted') }}</td>
-                <td class="c">{{ $report->deleted_final_count }}</td>
-                <td class="r">-</td>
-            </tr>
-            @endif
-            @if(($report->deleted_provisional_count ?? 0) > 0)
-            <tr>
-                <td>{{ __('pos.dcp_provisional_deleted') }}</td>
-                <td class="c">{{ $report->deleted_provisional_count }}</td>
-                <td class="r">-</td>
-            </tr>
-            @endif
-        </tbody>
-        <tfoot>
-            <tr>
-                <td>{{ __('pos.dc_total_invoices') }}</td>
-                <td class="c" style="font-weight:bold;">{{ $report->total_invoices }}</td>
-                <td class="r">-</td>
-            </tr>
-        </tfoot>
-    </table>
-
-    {{-- Local-bill wash detail (comprehensive Z-report, Jul 2026): what the close
-         did with non-PRA local bills, incl. backlog swept from earlier dates. --}}
-    @if(is_array($report->local_summary) && (collect($report->local_summary)->sum('count') > 0 || collect($report->local_summary)->sum('finalized') > 0))
-    <div class="section-title">{{ __('pos.dcp_local_bills_closed') }}</div>
-    <table class="data">
-        <thead>
-            <tr>
-                <th>{{ __('pos.dcp_bill_kind') }}</th>
-                <th class="c">{{ __('pos.dcp_action') }}</th>
-                <th class="c">{{ __('pos.dc_th_count') }}</th>
-                <th class="c">{{ __('pos.dcp_from_earlier_dates') }}</th>
-                <th class="r">{{ __('pos.dc_th_amount_pkr') }}</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach(['provisional' => __('pos.dcp_provisional_lseries'), 'final_local' => __('pos.dcp_final_reporting_off')] as $kind => $label)
-                @php $ls = $report->local_summary[$kind] ?? null; @endphp
-                @if($ls && (($ls['count'] ?? 0) > 0 || ($ls['finalized'] ?? 0) > 0))
-                <tr>
-                    <td>{{ $label }}</td>
-                    <td class="c">{{ ($ls['action'] ?? 'save') === 'delete' ? __('pos.dcp_deleted_per_policy') : (($ls['action'] ?? 'save') === 'carry' ? __('pos.dcp_carried') : (($ls['action'] ?? 'save') === 'finalize' ? __('pos.dcp_finalized') : __('pos.dcp_archived'))) }}</td>
-                    <td class="c">{{ $ls['count'] }}</td>
-                    <td class="c">{{ $ls['backlog'] ?? 0 }}</td>
-                    <td class="r">{{ number_format($ls['amount'] ?? 0, 2) }}</td>
-                </tr>
-                @if(($ls['action'] ?? 'save') === 'finalize')
-                {{-- Auto-finalize sweep detail (Aug 2026) --}}
-                <tr>
-                    <td colspan="5" style="font-size:9px;">{{ __('pos.wash_finalized_detail', ['count' => $ls['finalized'] ?? 0, 'amount' => number_format($ls['finalized_amount'] ?? 0), 'submitted' => $ls['submitted'] ?? 0, 'queued' => $ls['queued'] ?? 0, 'offline' => $ls['offline'] ?? 0, 'left' => $ls['count'] ?? 0]) }}</td>
-                </tr>
-                @endif
-                @endif
-            @endforeach
-        </tbody>
-    </table>
-    @endif
-
-    {{-- Delivery Riders (Jul 2026): rider day detail stored on the report --}}
-    @if(is_array($report->rider_summary) && !empty($report->rider_summary['riders']))
-    <div class="section-title">{{ __('pos.dc_delivery_riders') }}</div>
-    <table class="data">
-        <thead>
-            <tr>
-                <th>{{ __('pos.dcp_rider') }}</th>
-                <th class="c">{{ __('pos.dcp_deliveries') }}</th>
-                <th class="c">{{ __('pos.dcp_delivered') }}</th>
-                <th class="c">{{ __('pos.dcp_returned') }}</th>
-                <th class="r">{{ __('pos.dcp_cash_bills_pkr') }}</th>
-                <th class="r">{{ __('pos.dcp_unsettled_at_close_pkr') }}</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach($report->rider_summary['riders'] as $rr)
-            <tr>
-                <td>{{ $rr['name'] ?? '-' }}</td>
-                <td class="c">{{ $rr['deliveries'] ?? 0 }}</td>
-                <td class="c">{{ $rr['delivered'] ?? 0 }}</td>
-                <td class="c">{{ $rr['returned'] ?? 0 }}</td>
-                <td class="r">{{ number_format($rr['cash_total'] ?? 0, 2) }}</td>
-                <td class="r" style="{{ ($rr['cash_pending'] ?? 0) > 0 ? 'color:#dc2626; font-weight:bold;' : '' }}">{{ ($rr['cash_pending'] ?? 0) > 0 ? number_format($rr['cash_pending'], 2) : __('pos.dcp_clear') }}</td>
-            </tr>
-            @endforeach
-        </tbody>
-    </table>
-    @endif
+    <div class="summary-box">
+        <div class="lbl">{{ __('pos.dc_total_revenue') }}</div>
+        <div class="val">PKR {{ number_format($report->total_amount, 2) }}</div>
+    </div>
 
     <div class="section-title">{{ __('pos.dcp_financial_summary') }}</div>
     <table class="data">
@@ -261,10 +158,149 @@
         </tbody>
     </table>
 
-    <div class="summary-box">
-        <div class="lbl">{{ __('pos.dc_total_revenue') }}</div>
-        <div class="val">PKR {{ number_format($report->total_amount, 2) }}</div>
-    </div>
+    {{-- ═══ PRA vs Local side-by-side + Exempt detail (Task 660, ZFC owner:
+         har stream ki sale, tax aur payment breakdown alag-alag boxes mein).
+         $streamSplit = stored stream_summary, ya OLD reports par live
+         recompute fallback (graceful — section skip if unavailable). --}}
+    @php
+        $ssPra = is_array($streamSplit ?? null) ? ($streamSplit['pra'] ?? null) : null;
+        $ssLocal = is_array($streamSplit ?? null) ? ($streamSplit['local'] ?? null) : null;
+        $ssExempt = is_array($streamSplit ?? null) ? ($streamSplit['exempt'] ?? null) : null;
+        $ssExDetail = is_array($streamSplit ?? null) ? ($streamSplit['exempt_detail'] ?? ['value' => 0, 'items' => []]) : ['value' => 0, 'items' => []];
+        $ssHasExempt = ($ssExempt['count'] ?? 0) > 0 || ($ssExDetail['value'] ?? 0) > 0 || !empty($ssExDetail['items']);
+    @endphp
+    @if(is_array($ssPra) && is_array($ssLocal))
+    <div class="section-title">{{ __('pos.dc_stream_split_title') }}</div>
+    <table style="width:100%; border-collapse:separate; border-spacing:6px 0; margin-bottom:12px;">
+        <tr>
+            @foreach([[__('pos.dc_stream_pra'), $ssPra, '#6d28d9'], [__('pos.dc_stream_local'), $ssLocal, '#0f766e']] as $sbRow)
+            @php [$sbTitle, $sb, $sbColor] = $sbRow; @endphp
+            <td style="width:50%; border:2px solid {{ $sbColor }}; padding:8px 10px; vertical-align:top;">
+                <div style="font-size:11px; font-weight:bold; color:{{ $sbColor }}; margin-bottom:5px; border-bottom:1px solid {{ $sbColor }}; padding-bottom:3px;">{{ $sbTitle }} — {{ $sb['count'] ?? 0 }} {{ __('pos.dcp_bills_word') }}</div>
+                <table style="width:100%; border-collapse:collapse;">
+                    <tr>
+                        <td style="font-size:10px; padding:2px 0; font-weight:bold;">{{ __('pos.dc_stream_sale') }}</td>
+                        <td style="font-size:11px; padding:2px 0; text-align:right; font-weight:bold;">{{ number_format($sb['sales'] ?? 0, 2) }}</td>
+                    </tr>
+                    <tr>
+                        <td style="font-size:10px; padding:2px 0;">{{ __('pos.dcp_sales_tax_collected') }}</td>
+                        <td style="font-size:10px; padding:2px 0; text-align:right; font-weight:bold;">{{ number_format($sb['tax'] ?? 0, 2) }}</td>
+                    </tr>
+                    <tr>
+                        <td style="font-size:10px; padding:2px 0; border-top:1px solid #d1d5db;">{{ __('pos.dc_cash') }}</td>
+                        <td style="font-size:10px; padding:2px 0; text-align:right; border-top:1px solid #d1d5db;">{{ number_format($sb['cash'] ?? 0, 2) }}</td>
+                    </tr>
+                    <tr>
+                        <td style="font-size:10px; padding:2px 0;">{{ __('pos.dc_card') }}</td>
+                        <td style="font-size:10px; padding:2px 0; text-align:right;">{{ number_format($sb['card'] ?? 0, 2) }}</td>
+                    </tr>
+                    <tr>
+                        <td style="font-size:10px; padding:2px 0;">{{ __('pos.dc_other') }}</td>
+                        <td style="font-size:10px; padding:2px 0; text-align:right;">{{ number_format($sb['other'] ?? 0, 2) }}</td>
+                    </tr>
+                </table>
+            </td>
+            @endforeach
+        </tr>
+    </table>
+
+    @if($ssHasExempt)
+    <div class="section-title">{{ __('pos.dc_stream_exempt') }}</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>{{ __('pos.dcp_description') }}</th>
+                <th class="r">{{ __('pos.dc_th_amount_pkr') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>{{ __('pos.dc_exempt_value') }}</td>
+                <td class="r">{{ number_format($ssExDetail['value'] ?? 0, 2) }}</td>
+            </tr>
+            <tr>
+                <td>{{ __('pos.dc_exempt_bills_sale') }} ({{ $ssExempt['count'] ?? 0 }} {{ __('pos.dcp_bills_word') }})</td>
+                <td class="r">{{ number_format($ssExempt['sales'] ?? 0, 2) }}</td>
+            </tr>
+        </tbody>
+    </table>
+    @if(!empty($ssExDetail['items']))
+    <table class="data">
+        <thead>
+            <tr>
+                <th>{{ __('pos.dc_exempt_items_sold') }}</th>
+                <th class="c">{{ __('pos.receipt_qty') }}</th>
+                <th class="r">{{ __('pos.dc_th_amount_pkr') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($ssExDetail['items'] as $exItem)
+            <tr>
+                <td>{{ $exItem['name'] ?? '-' }}</td>
+                <td class="c">{{ rtrim(rtrim(number_format((float) ($exItem['qty'] ?? 0), 2), '0'), '.') }}</td>
+                <td class="r">{{ number_format($exItem['amount'] ?? 0, 2) }}</td>
+            </tr>
+            @endforeach
+        </tbody>
+    </table>
+    @endif
+    @endif
+    @endif
+
+    <div class="section-title">{{ __('pos.dcp_invoice_summary') }}</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>{{ __('pos.dc_th_category') }}</th>
+                <th class="c">{{ __('pos.dc_th_count') }}</th>
+                <th class="r">{{ __('pos.dc_th_amount_pkr') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{-- Amounts populated from streamSplit (Task 660): predicates MIRROR
+                 the stored count columns — the old hardcoded "-" cells were the
+                 ZFC "khaali Amount" bug. Graceful "-" if split unavailable. --}}
+            @php $ssSum = is_array($streamSplit ?? null) ? ($streamSplit['summary'] ?? null) : null; @endphp
+            <tr>
+                <td>{{ __('pos.dcp_pra_submitted_invoices') }}</td>
+                <td class="c">{{ $report->pra_invoices }}</td>
+                <td class="r">{{ is_array($ssSum) ? number_format($ssSum['pra_submitted'] ?? 0, 2) : '-' }}</td>
+            </tr>
+            <tr>
+                <td>{{ __('pos.dcp_local_invoices') }}</td>
+                <td class="c">{{ $report->local_invoices }}</td>
+                <td class="r">{{ is_array($ssSum) ? number_format($ssSum['local'] ?? 0, 2) : '-' }}</td>
+            </tr>
+            @if($report->offline_invoices > 0)
+            <tr>
+                <td>{{ __('pos.dcp_offline_invoices') }}</td>
+                <td class="c">{{ $report->offline_invoices }}</td>
+                <td class="r">{{ is_array($ssSum) ? number_format($ssSum['offline'] ?? 0, 2) : '-' }}</td>
+            </tr>
+            @endif
+            @if(($report->deleted_final_count ?? 0) > 0)
+            <tr>
+                <td>{{ __('pos.dcp_local_final_deleted') }}</td>
+                <td class="c">{{ $report->deleted_final_count }}</td>
+                <td class="r">-</td>
+            </tr>
+            @endif
+            @if(($report->deleted_provisional_count ?? 0) > 0)
+            <tr>
+                <td>{{ __('pos.dcp_provisional_deleted') }}</td>
+                <td class="c">{{ $report->deleted_provisional_count }}</td>
+                <td class="r">-</td>
+            </tr>
+            @endif
+        </tbody>
+        <tfoot>
+            <tr>
+                <td>{{ __('pos.dc_total_invoices') }}</td>
+                <td class="c" style="font-weight:bold;">{{ $report->total_invoices }}</td>
+                <td class="r">{{ number_format($report->total_amount, 2) }}</td>
+            </tr>
+        </tfoot>
+    </table>
 
     <div class="section-title">{{ __('pos.dcp_payment_method_breakdown') }}</div>
     <table class="data">
@@ -336,6 +372,72 @@
                 <td class="r" style="font-weight:bold; {{ abs((float) $report->cash_variance) < 0.01 ? '' : 'color:#dc2626;' }}">{{ (float) $report->cash_variance > 0 ? '+' : '' }}{{ number_format($report->cash_variance, 2) }}</td>
             </tr>
             @endif
+        </tbody>
+    </table>
+    @endif
+
+    {{-- Local-bill wash detail (comprehensive Z-report, Jul 2026): what the close
+         did with non-PRA local bills, incl. backlog swept from earlier dates. --}}
+    @if(is_array($report->local_summary) && (collect($report->local_summary)->sum('count') > 0 || collect($report->local_summary)->sum('finalized') > 0))
+    <div class="section-title">{{ __('pos.dcp_local_bills_closed') }}</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>{{ __('pos.dcp_bill_kind') }}</th>
+                <th class="c">{{ __('pos.dcp_action') }}</th>
+                <th class="c">{{ __('pos.dc_th_count') }}</th>
+                <th class="c">{{ __('pos.dcp_from_earlier_dates') }}</th>
+                <th class="r">{{ __('pos.dc_th_amount_pkr') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach(['provisional' => __('pos.dcp_provisional_lseries'), 'final_local' => __('pos.dcp_final_reporting_off')] as $kind => $label)
+                @php $ls = $report->local_summary[$kind] ?? null; @endphp
+                @if($ls && (($ls['count'] ?? 0) > 0 || ($ls['finalized'] ?? 0) > 0))
+                <tr>
+                    <td>{{ $label }}</td>
+                    <td class="c">{{ ($ls['action'] ?? 'save') === 'delete' ? __('pos.dcp_deleted_per_policy') : (($ls['action'] ?? 'save') === 'carry' ? __('pos.dcp_carried') : (($ls['action'] ?? 'save') === 'finalize' ? __('pos.dcp_finalized') : __('pos.dcp_archived'))) }}</td>
+                    <td class="c">{{ $ls['count'] }}</td>
+                    <td class="c">{{ $ls['backlog'] ?? 0 }}</td>
+                    <td class="r">{{ number_format($ls['amount'] ?? 0, 2) }}</td>
+                </tr>
+                @if(($ls['action'] ?? 'save') === 'finalize')
+                {{-- Auto-finalize sweep detail (Aug 2026) --}}
+                <tr>
+                    <td colspan="5" style="font-size:9px;">{{ __('pos.wash_finalized_detail', ['count' => $ls['finalized'] ?? 0, 'amount' => number_format($ls['finalized_amount'] ?? 0), 'submitted' => $ls['submitted'] ?? 0, 'queued' => $ls['queued'] ?? 0, 'offline' => $ls['offline'] ?? 0, 'left' => $ls['count'] ?? 0]) }}</td>
+                </tr>
+                @endif
+                @endif
+            @endforeach
+        </tbody>
+    </table>
+    @endif
+
+    {{-- Delivery Riders (Jul 2026): rider day detail stored on the report --}}
+    @if(is_array($report->rider_summary) && !empty($report->rider_summary['riders']))
+    <div class="section-title">{{ __('pos.dc_delivery_riders') }}</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>{{ __('pos.dcp_rider') }}</th>
+                <th class="c">{{ __('pos.dcp_deliveries') }}</th>
+                <th class="c">{{ __('pos.dcp_delivered') }}</th>
+                <th class="c">{{ __('pos.dcp_returned') }}</th>
+                <th class="r">{{ __('pos.dcp_cash_bills_pkr') }}</th>
+                <th class="r">{{ __('pos.dcp_unsettled_at_close_pkr') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($report->rider_summary['riders'] as $rr)
+            <tr>
+                <td>{{ $rr['name'] ?? '-' }}</td>
+                <td class="c">{{ $rr['deliveries'] ?? 0 }}</td>
+                <td class="c">{{ $rr['delivered'] ?? 0 }}</td>
+                <td class="c">{{ $rr['returned'] ?? 0 }}</td>
+                <td class="r">{{ number_format($rr['cash_total'] ?? 0, 2) }}</td>
+                <td class="r" style="{{ ($rr['cash_pending'] ?? 0) > 0 ? 'color:#dc2626; font-weight:bold;' : '' }}">{{ ($rr['cash_pending'] ?? 0) > 0 ? number_format($rr['cash_pending'], 2) : __('pos.dcp_clear') }}</td>
+            </tr>
+            @endforeach
         </tbody>
     </table>
     @endif
@@ -612,10 +714,17 @@
     <p style="font-size:10px; color:#374151; padding:4px 0;">{{ $report->notes }}</p>
     @endif
 
+    {{-- X-Report has NO integrity hash — nothing was stored (Task 660). --}}
+    @if($isXReport ?? false)
+    <div style="border:2px solid #dc2626; background-color:#fef2f2; padding:6px 12px; margin-top:10px; text-align:center;">
+        <p style="font-size:11px; font-weight:bold; color:#dc2626;">{{ __('pos.dc_provisional_watermark') }}</p>
+    </div>
+    @else
     <div class="hash-box">
         <div class="label">{{ __('pos.dcp_integrity_hash') }}</div>
         <p>{{ $report->hash }}</p>
     </div>
+    @endif
 
     <div class="footer">
         <p>{{ __('pos.dcp_sys_report_pra') }}</p>

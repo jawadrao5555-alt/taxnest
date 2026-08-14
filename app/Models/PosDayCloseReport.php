@@ -15,6 +15,9 @@ class PosDayCloseReport extends Model
         'first_invoice_time', 'last_invoice_time',
         'closed_by', 'notes', 'hash',
         'deleted_final_count', 'deleted_provisional_count', 'local_summary',
+        // Per-stream figures (Task 660): PRA vs Local vs Exempt split with
+        // payment buckets + exempt item detail, frozen at close time.
+        'stream_summary',
         'opening_float', 'counted_cash', 'expected_cash', 'cash_variance',
         'rider_summary',
         // Return / credit-note netting (Task 570).
@@ -28,6 +31,7 @@ class PosDayCloseReport extends Model
         'first_invoice_time' => 'datetime',
         'last_invoice_time' => 'datetime',
         'local_summary' => 'array',
+        'stream_summary' => 'array',
         'rider_summary' => 'array',
     ];
 

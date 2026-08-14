@@ -116,6 +116,10 @@ class AppServiceProvider extends ServiceProvider
                 if (in_array($event->guard ?? null, ['pos', 'fbrpos'], true)
                     && $event->user instanceof \App\Models\User
                     && $event->user->company_id
+                    // Task 705: khufia station identity-switch re-login is NOT a
+                    // fresh staff arrival — no hazri row (double-count guard;
+                    // attribute set by PosController::identitySwitchLogin).
+                    && !request()->attributes->get('pos_identity_switch')
                     && !\Illuminate\Support\Facades\Auth::guard('admin')->check()) {
                     DB::table('pos_user_sessions')->insert([
                         'company_id' => $event->user->company_id,

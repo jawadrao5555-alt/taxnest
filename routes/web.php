@@ -728,6 +728,12 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::get('/tax-reports/csv', [PosController::class, 'exportTaxReportCsv'])->name('pos.tax-reports.csv');
     Route::get('/tax-reports/pdf', [PosController::class, 'exportTaxReportPdf'])->name('pos.tax-reports.pdf');
     Route::get('/reports/analytics-pdf', [PosController::class, 'reportsAnalyticsPdf'])->name('pos.reports.analytics-pdf');
+    // Task 705: khufia key (Ctrl+Alt+Shift+L) — no visible UI by design.
+    // Manager/owner: session-only "local check mode" toggle (cashier = 403).
+    // LOCAL-scoped cashier: station identity switch to the owner-linked PRA
+    // counterpart cashier and back (unlinked/ineligible = silent no-op).
+    Route::post('/api/local-check-toggle', [PosController::class, 'toggleLocalCheck'])->name('pos.api.local-check-toggle');
+    Route::post('/api/identity-switch', [PosController::class, 'identitySwitch'])->name('pos.api.identity-switch');
     Route::get('/day-close', [PosController::class, 'dayCloseReport'])->name('pos.day-close');
     Route::post('/day-close', [PosController::class, 'closeDayReport'])->name('pos.close-day');
     // Task 516: bulk-close every stranded prior business day in one click.

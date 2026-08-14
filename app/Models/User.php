@@ -128,6 +128,34 @@ class User extends Authenticatable
         return (bool) ($company->billing_scope_admin_enabled ?? false);
     }
 
+    /**
+     * Task 705 — khufia "local check mode" session flag (Ctrl+Alt+Shift+L).
+     * Raw flag only; toggled by PosController::toggleLocalCheck (manager/
+     * owner-only endpoint). Session-based — logout/fresh login clears it.
+     * VISIBILITY ONLY: PRA-reporting logic never reads this flag.
+     */
+    public function posLocalCheckOn(): bool
+    {
+        try {
+            return (bool) session('pos_local_check');
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Task 705 — manager default PRA-only view: a pos_manager sees ONLY the
+     * PRA stream (Local tab/figures hidden everywhere) until the khufia
+     * local-check mode is ON. LOCAL-scoped managers keep their local world
+     * (billing-scope forcing wins); owner/admin visibility is unchanged.
+     */
+    public function posHidesLocalStream(): bool
+    {
+        return $this->isPosManager()
+            && $this->posBillingScope() !== 'local'
+            && !$this->posLocalCheckOn();
+    }
+
     public function isSuperAdmin()
     {
         return $this->role === 'super_admin';

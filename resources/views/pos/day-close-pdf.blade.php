@@ -170,10 +170,18 @@
         $ssHasExempt = ($ssExempt['count'] ?? 0) > 0 || ($ssExDetail['value'] ?? 0) > 0 || !empty($ssExDetail['items']);
     @endphp
     @if(is_array($ssPra) && is_array($ssLocal))
+    @php
+        // Task 705: Z/X mode-gating — Local stream box renders ONLY in khufia
+        // local-check mode (or for LOCAL-scoped viewers). Default = PRA only.
+        $sbRows = [[__('pos.dc_stream_pra'), $ssPra, '#6d28d9']];
+        if ($showLocalStream ?? false) {
+            $sbRows[] = [__('pos.dc_stream_local'), $ssLocal, '#0f766e'];
+        }
+    @endphp
     <div class="section-title">{{ __('pos.dc_stream_split_title') }}</div>
     <table style="width:100%; border-collapse:separate; border-spacing:6px 0; margin-bottom:12px;">
         <tr>
-            @foreach([[__('pos.dc_stream_pra'), $ssPra, '#6d28d9'], [__('pos.dc_stream_local'), $ssLocal, '#0f766e']] as $sbRow)
+            @foreach($sbRows as $sbRow)
             @php [$sbTitle, $sb, $sbColor] = $sbRow; @endphp
             <td style="width:50%; border:2px solid {{ $sbColor }}; padding:8px 10px; vertical-align:top;">
                 <div style="font-size:11px; font-weight:bold; color:{{ $sbColor }}; margin-bottom:5px; border-bottom:1px solid {{ $sbColor }}; padding-bottom:3px;">{{ $sbTitle }} — {{ $sb['count'] ?? 0 }} {{ __('pos.dcp_bills_word') }}</div>
@@ -266,11 +274,14 @@
                 <td class="c">{{ $report->pra_invoices }}</td>
                 <td class="r">{{ is_array($ssSum) ? number_format($ssSum['pra_submitted'] ?? 0, 2) : '-' }}</td>
             </tr>
+            {{-- Task 705: Local row only in khufia local-check mode (or LOCAL-scoped viewer) --}}
+            @if($showLocalStream ?? false)
             <tr>
                 <td>{{ __('pos.dcp_local_invoices') }}</td>
                 <td class="c">{{ $report->local_invoices }}</td>
                 <td class="r">{{ is_array($ssSum) ? number_format($ssSum['local'] ?? 0, 2) : '-' }}</td>
             </tr>
+            @endif
             @if($report->offline_invoices > 0)
             <tr>
                 <td>{{ __('pos.dcp_offline_invoices') }}</td>

@@ -9,6 +9,9 @@
     // ko dikhta hai; owner neeche wale switch se admins ko bhi ijazat de sakta hai.
     $scopeManageAllowed = $tnTeamUser?->canManageBillingScope($tnTeamCompany) ?? false;
     $scopeAdminEnabled = (bool) ($tnTeamCompany->billing_scope_admin_enabled ?? false);
+    // Task 705: PRA counterpart link (khufia station identity switch) — same
+    // owner-only visibility as billing scope. PROD schema-drift guard.
+    $counterpartColReady = \Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_counterpart_user_id');
 @endphp
 <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     <a href="{{ route('pos.customize') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition mb-3">
@@ -258,6 +261,19 @@
                                             <option value="both" {{ $member->posBillingScope() === 'both' ? 'selected' : '' }}>{{ __('pos.billing_scope_both') }}</option>
                                             <option value="local" {{ $member->posBillingScope() === 'local' ? 'selected' : '' }}>{{ __('pos.billing_scope_local') }}</option>
                                             <option value="pra" {{ $member->posBillingScope() === 'pra' ? 'selected' : '' }}>{{ __('pos.billing_scope_pra') }}</option>
+                                        </select>
+                                        @endif
+                                        {{-- Task 705: PRA counterpart (khufia identity switch target) —
+                                             LOCAL-scoped cashier only; owner-only visibility (scope rule).
+                                             Options = same-company ACTIVE cashiers that can bill PRA. --}}
+                                        @if($counterpartColReady && $scopeManageAllowed && $member->pos_role === 'pos_cashier' && $member->posBillingScope() === 'local')
+                                        <select form="edit-{{ $member->id }}" name="pos_counterpart_user_id" title="{{ __('pos.pra_counterpart_label') }}" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-xs px-2 py-1.5 focus:ring-purple-500 focus:border-purple-500">
+                                            <option value="">{{ __('pos.pra_counterpart_none') }}</option>
+                                            @foreach($team as $cpOption)
+                                                @if($cpOption->pos_role === 'pos_cashier' && $cpOption->id !== $member->id && $cpOption->is_active && $cpOption->posBillingScope() !== 'local')
+                                                <option value="{{ $cpOption->id }}" {{ (int) ($member->pos_counterpart_user_id ?? 0) === $cpOption->id ? 'selected' : '' }}>{{ __('pos.pra_counterpart_label') }}: {{ $cpOption->name }}</option>
+                                                @endif
+                                            @endforeach
                                         </select>
                                         @endif
                                         <button form="edit-{{ $member->id }}" type="submit" class="text-emerald-600 hover:text-emerald-700 text-xs font-medium">{{ __('pos.save_btn') }}</button>

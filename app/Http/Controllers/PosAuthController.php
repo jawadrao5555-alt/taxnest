@@ -122,6 +122,10 @@ class PosAuthController extends Controller
                 Auth::guard('pos')->login($user, $remember);
                 $request->session()->regenerate();
                 $request->session()->forget('url.intended');
+                // Task 705: khufia-mode flags NEVER carry into a fresh login —
+                // local-check mode and the identity-switch memory reset here
+                // (regenerate() keeps session data, so clear explicitly).
+                $request->session()->forget(['pos_local_check', 'pos_identity_original_id']);
 
                 // Archive Viewer → isolated Archive Portal only. Same /pos/login URL,
                 // auto-detected by pos_role. POS admin/cashier never sees this account.
@@ -298,8 +302,13 @@ class PosAuthController extends Controller
         try {
             $u = Auth::guard('pos')->user();
             if ($u) {
+                // Task 705: agar station khufia identity-switch mein hai to
+                // asal (original) local cashier hi ja raha hai — USI ki rows
+                // band karo. Current PRA counterpart ki rows ko haath na lagao:
+                // woh doosre PC par apne asli login se kaam kar raha ho sakta hai.
+                $hazriUserId = (int) (session('pos_identity_original_id') ?: $u->id);
                 \Illuminate\Support\Facades\DB::table('pos_user_sessions')
-                    ->where('user_id', $u->id)
+                    ->where('user_id', $hazriUserId)
                     ->whereNull('logout_at')
                     ->update(['logout_at' => now(), 'last_activity_at' => now(), 'updated_at' => now()]);
             }

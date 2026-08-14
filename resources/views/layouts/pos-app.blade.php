@@ -1076,6 +1076,64 @@
                 });
             });
         </script>
+        {{-- Task 705: khufia key Ctrl+Alt+Shift+L — deliberately NO visible UI.
+             Manager/owner: toggles the session-only "local check mode" flag.
+             Cashier: station identity switch (owner-linked PRA counterpart).
+             Relative URLs (route(...,false)) — absolute https breaks http dev
+             fetches. pos/* is CSRF-exempt but the token rides anyway. --}}
+        @php
+            $khufiaUser = $posUserLayout ?? auth('pos')->user();
+            $khufiaUrl = null;
+            if ($khufiaUser?->isPosAdmin()) {
+                $khufiaUrl = route('pos.api.local-check-toggle', [], false);
+            } elseif ($khufiaUser?->isPosCashier()) {
+                $khufiaUrl = route('pos.api.identity-switch', [], false);
+            }
+        @endphp
+        @if($khufiaUrl)
+        <script>
+        (function () {
+            var busy = false;
+            document.addEventListener('keydown', function (e) {
+                if (!e.ctrlKey || !e.altKey || !e.shiftKey) return;
+                var isL = (e.code === 'KeyL') || (String(e.key || '').toLowerCase() === 'l');
+                if (!isL || busy) return;
+                e.preventDefault();
+                e.stopPropagation();
+                busy = true;
+                var meta = document.querySelector('meta[name="csrf-token"]');
+                fetch('{{ $khufiaUrl }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': meta ? meta.content : ''
+                    }
+                }).then(function (r) { return r.ok ? r.json() : null; })
+                  .then(function (d) {
+                      // Reload only when something actually changed — the
+                      // silent no-op (unlinked cashier) must stay invisible.
+                      if (d && (typeof d.on !== 'undefined' || d.switched === true)) {
+                          // Identity switched: drop the offline-first sale-screen
+                          // cache (SALE_CACHE) or the reload would serve the OLD
+                          // cashier's baked page. SW purges only on login/logout
+                          // URLs, so tell it explicitly (message already supported).
+                          if (d.switched === true && navigator.serviceWorker && navigator.serviceWorker.controller) {
+                              try { navigator.serviceWorker.controller.postMessage({ type: 'TN_DROP_SALE_CACHE' }); } catch (err) {}
+                          }
+                          window.location.reload();
+                      } else { busy = false; }
+                  })
+                  .catch(function () { busy = false; });
+            }, true);
+        })();
+        </script>
+        @endif
+        {{-- Task 705: tiny neutral dot = local-check mode ON / station switched.
+             Inline styles on purpose (no new arbitrary Tailwind classes). --}}
+        @if(session('pos_local_check') || session('pos_identity_original_id'))
+        <div title="" style="position:fixed;bottom:8px;left:8px;z-index:95;width:8px;height:8px;border-radius:9999px;background:{{ session('pos_local_check') ? '#14b8a6' : '#9ca3af' }};opacity:.65;pointer-events:none;"></div>
+        @endif
         @stack('scripts')
         <script>
         // Smart prefetch of POS sale screen (offline-ready) — skip on slow/save-data connections

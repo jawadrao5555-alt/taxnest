@@ -191,11 +191,16 @@ class PosAuth
         // block nahi karta. Browser band / bijli gayi = logout_at NULL rehta
         // hai aur report last_activity_at ko hi aakhri waqt dikhati hai.
         try {
-            $beatKey = 'pos_hazri_beat_' . $user->id;
+            // Task 705: khufia identity-switch ke dauran physically-present
+            // staff = ASAL local cashier (session mein yaad). Heartbeat USI ki
+            // open row par jaye — kabhi PRA counterpart ki row par nahi (woh
+            // doosre PC par apni asli hazri row rakhta hai).
+            $hazriUserId = (int) (session('pos_identity_original_id') ?: $user->id);
+            $beatKey = 'pos_hazri_beat_' . $hazriUserId;
             if (!cache()->has($beatKey)) {
                 cache()->put($beatKey, 1, 300);
                 \Illuminate\Support\Facades\DB::table('pos_user_sessions')
-                    ->where('user_id', $user->id)
+                    ->where('user_id', $hazriUserId)
                     ->whereNull('logout_at')
                     ->orderByDesc('id')
                     ->limit(1)

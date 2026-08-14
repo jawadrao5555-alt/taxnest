@@ -1667,6 +1667,9 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'billing_scope_local' => 'Sirf Local billing',
     'billing_scope_pra' => 'Sirf PRA billing',
     'billing_scope_hint_role' => 'Sirf cashier aur manager accounts par lagta hai.',
+    // Task 705: PRA counterpart link (owner-only, Team page)
+    'pra_counterpart_label' => 'PRA Counterpart',
+    'pra_counterpart_none' => 'Koi PRA counterpart nahi',
     'billing_scope_badge_local' => 'Sirf Local',
     'billing_scope_badge_pra' => 'Sirf PRA',
     'billing_scope_pra_only' => 'Yeh account sirf PRA billing ke liye muqarrar hai — local/provisional bill ki ijazat nahi.',

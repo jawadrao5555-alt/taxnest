@@ -20,6 +20,9 @@ class PosDayCloseReport extends Model
         'stream_summary',
         'opening_float', 'counted_cash', 'expected_cash', 'cash_variance',
         'rider_summary',
+        // Returns audit snapshot (Task 682): per-return detail frozen at close
+        // time — the wash may archive/delete local return rows afterwards.
+        'returns_detail',
         // Return / credit-note netting (Task 570).
         'returns_count', 'returns_amount',
         // Wastage (Task 596): spoiled-goods return figures on the stored Z-report.
@@ -33,6 +36,7 @@ class PosDayCloseReport extends Model
         'local_summary' => 'array',
         'stream_summary' => 'array',
         'rider_summary' => 'array',
+        'returns_detail' => 'array',
     ];
 
     public function company()

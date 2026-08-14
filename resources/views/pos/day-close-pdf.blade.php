@@ -442,6 +442,34 @@
     </table>
     @endif
 
+    {{-- Returns audit detail (Task 682): snapshot frozen at close time —
+         each return with parent bill and WHO processed it. --}}
+    @if(is_array($report->returns_detail ?? null) && count($report->returns_detail) > 0)
+    <div class="section-title">{{ __('pos.dc_returns_detail_title') }}</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>{{ __('pos.th_invoice') }}</th>
+                <th>{{ __('pos.return_original_bill') }}</th>
+                <th class="c">{{ __('pos.th_time') }}</th>
+                <th class="r">{{ __('pos.dc_th_amount_pkr') }}</th>
+                <th>{{ __('pos.return_processed_by') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($report->returns_detail as $rd)
+            <tr>
+                <td>{{ $rd['invoice_number'] ?? '-' }}@if(!empty($rd['is_wastage'])) ({{ __('pos.return_wastage_chip') }})@endif</td>
+                <td>{{ $rd['parent_invoice'] ?? '—' }}</td>
+                <td class="c">{{ !empty($rd['created_at']) ? \Carbon\Carbon::parse($rd['created_at'])->format('h:i A') : '-' }}</td>
+                <td class="r" style="color:#dc2626;">-{{ number_format($rd['amount'] ?? 0, 2) }}</td>
+                <td>{{ $rd['processed_by'] ?? '—' }}</td>
+            </tr>
+            @endforeach
+        </tbody>
+    </table>
+    @endif
+
     @if($cashierBreakdown->isNotEmpty())
     <div class="section-title">{{ __('pos.dcp_cashier_performance') }}</div>
     <table class="data">

@@ -170,7 +170,12 @@
                     @foreach($dcReturnDetail as $rt)
                     <tr>
                         <td class="px-3 py-2 font-medium text-rose-600 dark:text-rose-400">
-                            <a href="{{ route('pos.transaction.show', $rt->id) }}" class="hover:underline">{{ $rt->invoice_number }}</a>
+                            {{-- Snapshot rows (Task 682): underlying row may be archived/deleted — plain text, no link --}}
+                            @if(empty($rt->snapshot) && $rt->id)
+                                <a href="{{ route('pos.transaction.show', $rt->id) }}" class="hover:underline">{{ $rt->invoice_number }}</a>
+                            @else
+                                {{ $rt->invoice_number }}
+                            @endif
                             @if(!empty($rt->is_wastage))
                                 <span class="inline-flex items-center ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 uppercase">{{ __('pos.return_wastage_chip') }}</span>
                             @endif

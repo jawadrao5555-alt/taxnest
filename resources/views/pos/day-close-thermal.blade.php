@@ -176,6 +176,21 @@
     <div class="hr"></div>
     @endif
 
+    {{-- Returns audit detail (Task 682): compact — invoice + processed-by + amount --}}
+    @if(is_array($report->returns_detail ?? null) && count($report->returns_detail) > 0)
+    <div class="sec">{{ __('pos.dc_returns_detail_title') }}</div>
+    <table>
+        @foreach($report->returns_detail as $rd)
+        <tr>
+            <td>{{ \Illuminate\Support\Str::limit($rd['invoice_number'] ?? '-', 14) }}@if(!empty($rd['is_wastage']))*@endif<br>
+                <span class="sm">{{ __('pos.return_processed_by') }}: {{ \Illuminate\Support\Str::limit($rd['processed_by'] ?? '—', 16) }}@if(!empty($rd['parent_invoice'])) &middot; {{ $rd['parent_invoice'] }}@endif</span></td>
+            <td class="r">-{{ number_format($rd['amount'] ?? 0, 2) }}</td>
+        </tr>
+        @endforeach
+    </table>
+    <div class="hr"></div>
+    @endif
+
     <div class="sec">{{ __('pos.dc_pra_status') }}</div>
     <table>
         <tr><td>{{ __('pos.dc_submitted') }}</td><td class="r">{{ $analytics->pra_health->submitted }}</td></tr>

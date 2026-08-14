@@ -146,6 +146,8 @@ class PosDayCloseReturnNettingTest extends TestCase
             $table->integer('deleted_provisional_count')->default(0);
             $table->text('local_summary')->nullable();
             $table->text('rider_summary')->nullable();
+            // Returns audit snapshot (Task 682).
+            $table->text('returns_detail')->nullable();
             $table->integer('total_invoices')->default(0);
             $table->integer('pra_invoices')->default(0);
             $table->integer('local_invoices')->default(0);
@@ -454,6 +456,53 @@ class PosDayCloseReturnNettingTest extends TestCase
         $this->assertSame(2, (int) $row->count);
         $this->assertSame(1441.0, (float) $row->revenue);
         $this->assertSame(221.0, (float) $row->tax);
+    }
+
+    // ── 3b. Returns audit snapshot on the stored Z-report (Task 682) ─────────
+
+    public function test_perform_day_close_snapshots_returns_detail_on_report(): void
+    {
+        $companyId = $this->makeCompany();
+        $user = $this->makePosUser($companyId);
+        $this->seedNettingDay($companyId, $user->id);
+
+        (new PosController())->performDayClose($companyId, now()->toDateString(), null);
+
+        $report = \App\Models\PosDayCloseReport::where('company_id', $companyId)->first();
+        $this->assertIsArray($report->returns_detail);
+        $this->assertCount(1, $report->returns_detail);
+        $row = $report->returns_detail[0];
+        $this->assertSame('RET-0001', $row['invoice_number']);
+        $this->assertSame('P-0001', $row['parent_invoice']);
+        $this->assertSame(214.0, (float) $row['amount']);
+        $this->assertSame('POS Admin', $row['processed_by']);
+        $this->assertSame('pra', $row['stream'], 'pending pra_status = PRA pipeline, not local');
+    }
+
+    public function test_closed_day_page_shows_returns_from_snapshot_even_after_row_deleted(): void
+    {
+        $companyId = $this->makeCompany();
+        $user = $this->makePosUser($companyId);
+        [, , $returnId] = $this->seedNettingDay($companyId, $user->id);
+
+        (new PosController())->performDayClose($companyId, now()->toDateString(), null);
+
+        // Simulate the worst case: the return row is GONE after the wash.
+        DB::table('pos_transactions')->where('id', $returnId)->delete();
+
+        Auth::guard('pos')->setUser($user);
+        app()->instance('currentCompanyId', $companyId);
+        $request = Request::create('/pos/day-close', 'GET', ['date' => now()->toDateString()]);
+        $data = (new PosController())->dayCloseReport($request)->getData();
+
+        $detail = $data['dcReturnDetail'];
+        $this->assertCount(1, $detail, 'audit list must come from the stored snapshot');
+        $rt = $detail->first();
+        $this->assertSame('RET-0001', $rt->invoice_number);
+        $this->assertSame(214.0, (float) $rt->total_amount);
+        $this->assertSame('POS Admin', $rt->creator->name);
+        $this->assertTrue((bool) $rt->snapshot);
+        $this->assertSame('P-0001', $data['dcReturnParents']->get($rt->parent_transaction_id));
     }
 
     // ── 4. reports(): signed headline queries + gross topItems ───────────────

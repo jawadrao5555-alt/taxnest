@@ -8922,7 +8922,7 @@ class PosController extends Controller
         $date = $request->get('date', \App\Services\PosBusinessDay::current($companyId));
 
         $existingReport = PosDayCloseReport::where('company_id', $companyId)
-            ->where('report_date', $date)
+            ->whereDate('report_date', $date)
             ->first();
 
         // Local (non-PRA) bills are excluded from the day-close view & figures —
@@ -8968,24 +8968,49 @@ class PosController extends Controller
         // 'both' viewers), but the audit list must show every return the
         // viewer's scope may see (streamSplit already shows both streams).
         // Netting figures above stay untouched.
-        $dcReturnDetail = $dcTypeReady
-            ? PosTransaction::where('company_id', $companyId)
-                ->where('business_date', $date)
-                ->where('transaction_type', 'return')
-                ->with('creator')
-                ->orderBy('created_at')
-                ->get()
-                ->filter(fn ($t) => $t->allowedForBillingScope($dayCloseScope))
-                ->values()
-            : collect();
-        // Parent invoice numbers resolved in one query — parents can be from
-        // earlier days (and may already be archived).
-        $dcReturnParents = $dcReturnDetail->isNotEmpty()
-            ? PosTransaction::withoutGlobalScope('hide_archived')
-                ->where('company_id', $companyId)
-                ->whereIn('id', $dcReturnDetail->pluck('parent_transaction_id')->filter()->unique())
-                ->pluck('invoice_number', 'id')
-            : collect();
+        // For a CLOSED day prefer the snapshot frozen on the Z-report (Task 682):
+        // the wash may have archived/deleted local return rows — the live query
+        // below would silently lose them on past days' pages.
+        if ($existingReport && is_array($existingReport->returns_detail ?? null)) {
+            $dcSnapRows = collect($existingReport->returns_detail)
+                ->filter(fn ($r) => $dayCloseScope === 'both'
+                    || in_array($r['stream'] ?? 'pra', ['exempt', $dayCloseScope], true))
+                ->values();
+            $dcReturnDetail = $dcSnapRows->map(fn ($r) => (object) [
+                'id' => $r['id'] ?? null,
+                'invoice_number' => $r['invoice_number'] ?? '-',
+                'parent_transaction_id' => $r['parent_transaction_id'] ?? null,
+                'created_at' => !empty($r['created_at']) ? \Carbon\Carbon::parse($r['created_at']) : null,
+                'total_amount' => (float) ($r['amount'] ?? 0),
+                'is_wastage' => (bool) ($r['is_wastage'] ?? false),
+                'creator' => (object) ['name' => $r['processed_by'] ?? null],
+                // The underlying row may be deleted — the page renders the
+                // invoice number as plain text instead of a link.
+                'snapshot' => true,
+            ]);
+            $dcReturnParents = $dcSnapRows
+                ->filter(fn ($r) => !empty($r['parent_transaction_id']) && !empty($r['parent_invoice']))
+                ->pluck('parent_invoice', 'parent_transaction_id');
+        } else {
+            $dcReturnDetail = $dcTypeReady
+                ? PosTransaction::where('company_id', $companyId)
+                    ->where('business_date', $date)
+                    ->where('transaction_type', 'return')
+                    ->with('creator')
+                    ->orderBy('created_at')
+                    ->get()
+                    ->filter(fn ($t) => $t->allowedForBillingScope($dayCloseScope))
+                    ->values()
+                : collect();
+            // Parent invoice numbers resolved in one query — parents can be from
+            // earlier days (and may already be archived).
+            $dcReturnParents = $dcReturnDetail->isNotEmpty()
+                ? PosTransaction::withoutGlobalScope('hide_archived')
+                    ->where('company_id', $companyId)
+                    ->whereIn('id', $dcReturnDetail->pluck('parent_transaction_id')->filter()->unique())
+                    ->pluck('invoice_number', 'id')
+                : collect();
+        }
 
         $stats = (object) [
             'total_invoices' => $dcSaleRows->count(),
@@ -10239,6 +10264,43 @@ class PosController extends Controller
         return redirect()->route('pos.day-close')->with('success', $msg);
     }
 
+    /**
+     * Returns audit detail for one business day (Task 682): every return
+     * (both streams) with parent invoice + who processed it. Used to SNAPSHOT
+     * the list on the stored Z-report at close time — after the wash, local
+     * return rows may be archived/deleted and a live query would lose them.
+     */
+    private function buildDayCloseReturnsDetail(int $companyId, string $date): array
+    {
+        $rows = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->where('business_date', $date)
+            ->where('transaction_type', 'return')
+            ->with('creator')
+            ->orderBy('created_at')
+            ->get();
+        $parents = $rows->isNotEmpty()
+            ? PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->whereIn('id', $rows->pluck('parent_transaction_id')->filter()->unique())
+                ->pluck('invoice_number', 'id')
+            : collect();
+
+        return $rows->map(fn ($t) => [
+            'id' => $t->id,
+            'invoice_number' => $t->invoice_number,
+            'parent_transaction_id' => $t->parent_transaction_id,
+            'parent_invoice' => $t->parent_transaction_id ? $parents->get($t->parent_transaction_id) : null,
+            'created_at' => $t->created_at?->toIso8601String(),
+            'amount' => round((float) $t->total_amount, 2),
+            'is_wastage' => (bool) ($t->is_wastage ?? false),
+            'processed_by' => $t->creator->name ?? null,
+            // Billing-scope stream (mirrors allowedForBillingScope): exempt is
+            // visible to every scope; local/pra only to their own scope viewers.
+            'stream' => $t->isExemptStream() ? 'exempt' : ($t->isLocalBill() ? 'local' : 'pra'),
+        ])->values()->all();
+    }
+
     public function performDayClose(int $companyId, string $date, ?int $closedBy, ?string $notes = null, ?array $cashRecon = null, bool $allowEmpty = false, ?array $actionOverride = null): array
     {
         $existing = PosDayCloseReport::where('company_id', $companyId)
@@ -10370,6 +10432,16 @@ class PosController extends Controller
         // "-"). Schema-guarded (prod drift self-heal).
         if (\Schema::hasColumn('pos_day_close_reports', 'stream_summary')) {
             $data['stream_summary'] = $this->buildDayCloseStreamSplit($transactions);
+        }
+
+        // Returns audit snapshot (Task 682): freeze the per-return detail
+        // (invoice, parent, amount, processed-by) on the Z-report — the wash
+        // below may archive or permanently DELETE local return rows, so the
+        // live query behind the page's audit list can lose them afterwards.
+        // Company-wide (BOTH streams) like the live Task-678 list; the page
+        // filters by the viewer's billing scope via the stored 'stream' key.
+        if ($typeReady && \Schema::hasColumn('pos_day_close_reports', 'returns_detail')) {
+            $data['returns_detail'] = $this->buildDayCloseReturnsDetail($companyId, $date);
         }
 
         // Delivery Riders (Jul 2026): rider cash figures for this day — computed

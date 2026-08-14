@@ -1302,6 +1302,9 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::put('/branches/{id}', [\App\Http\Controllers\FbrPosBranchController::class, 'update'])->name('fbrpos.branches.update');
     Route::post('/branches/{id}/toggle', [\App\Http\Controllers\FbrPosBranchController::class, 'toggle'])->name('fbrpos.branches.toggle');
     Route::get('/tax-reports', [FbrPosController::class, 'taxReports'])->name('fbrpos.tax-reports');
+    // Task 698: CSV/PDF export of the monthly FBR tax report (PRA parity).
+    Route::get('/tax-reports/csv', [FbrPosController::class, 'exportTaxReportCsv'])->name('fbrpos.tax-reports.csv');
+    Route::get('/tax-reports/pdf', [FbrPosController::class, 'exportTaxReportPdf'])->name('fbrpos.tax-reports.pdf');
     Route::match(['get', 'post'], '/business-profile', [FbrPosController::class, 'businessProfile'])->name('fbrpos.business-profile');
     Route::match(['get', 'post'], '/my-profile', [FbrPosController::class, 'myProfile'])->name('fbrpos.my-profile');
     Route::get('/transaction/{id}/receipt', [FbrPosController::class, 'receipt'])->name('fbrpos.receipt');

@@ -6,6 +6,16 @@
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.tax_reports') }}</h1>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.month_fbr_tax_summary', ['month' => now()->format('F Y')]) }}</p>
         </div>
+        <div class="flex flex-wrap items-center gap-2">
+        {{-- CSV/PDF export (Task 698 — PRA parity): carries the bill_type filter. --}}
+        <a href="{{ route('fbrpos.tax-reports.csv', request()->all()) }}" class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition shadow-sm">
+            <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            {{ __('pos.download_csv') }}
+        </a>
+        <a href="{{ route('fbrpos.tax-reports.pdf', request()->all()) }}" class="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition shadow-sm">
+            <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+            {{ __('pos.download_pdf') }}
+        </a>
         {{-- Bill-type filter (Task 695): all / sales-only / credit-notes-only --}}
         @if($billTypeReady ?? false)
         <form method="GET" action="{{ route('fbrpos.tax-reports') }}" class="flex items-center gap-2">
@@ -17,6 +27,7 @@
             </select>
         </form>
         @endif
+        </div>
     </div>
 
     {{-- Credit-note summary line (Task 695): refunds are never hidden — the

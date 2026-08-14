@@ -3873,6 +3873,22 @@ class FbrPosController extends Controller
 
     public function taxReports(Request $request)
     {
+        [$company, $monthlyTax, $fbrStats, $taxByRate, $billTypeFilter, $billTypeReady] =
+            $this->fbrTaxReportData($request);
+
+        return view('fbr-pos.tax-reports', compact('company', 'monthlyTax', 'fbrStats', 'taxByRate', 'billTypeFilter', 'billTypeReady'));
+    }
+
+    /**
+     * Shared data source for the FBR tax-report screen AND its CSV/PDF exports
+     * (Task 698 — PRA parity): ONE query set so downloads always match the
+     * on-screen netted figures exactly (monthly totals, rate-wise table,
+     * credit-note count/refunded line), honoring the bill_type filter.
+     *
+     * @return array{0:?Company,1:object,2:object,3:\Illuminate\Support\Collection,4:string,5:bool}
+     */
+    private function fbrTaxReportData(Request $request): array
+    {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
@@ -3942,9 +3958,100 @@ class FbrPosController extends Controller
             ->orderBy('tax_rate')
             ->get();
 
-        $billTypeReady = $typeReady;
+        return [$company, $monthlyTax, $fbrStats, $taxByRate, $billTypeFilter, $typeReady];
+    }
 
-        return view('fbr-pos.tax-reports', compact('company', 'monthlyTax', 'fbrStats', 'taxByRate', 'billTypeFilter', 'billTypeReady'));
+    /**
+     * CSV export of the FBR monthly tax report (Task 698 — PRA parity).
+     * Same shared data source as the screen, so figures always match exactly.
+     */
+    public function exportTaxReportCsv(Request $request)
+    {
+        if ($resp = $this->fbrPlanGate('reports_enabled')) {
+            return $resp;
+        }
+        [, $monthlyTax, $fbrStats, $taxByRate, $billTypeFilter, $billTypeReady] =
+            $this->fbrTaxReportData($request);
+        $returnsOnly = $billTypeFilter === 'returns';
+
+        $filename = 'NestPOS_FBR_Tax_Report_' . now()->format('Ymd_His') . '.csv';
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ];
+
+        $callback = function () use ($monthlyTax, $fbrStats, $taxByRate, $billTypeFilter, $billTypeReady, $returnsOnly) {
+            $file = fopen('php://output', 'w');
+            fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+            $billTypeLabel = match ($billTypeFilter) {
+                'sales' => 'Sales Only',
+                'returns' => 'Credit Notes Only — refunded amounts',
+                default => 'All Bills',
+            };
+
+            fputcsv($file, ['FBR POS Tax Report — ' . now()->format('F Y')]);
+            fputcsv($file, ['Generated', now()->format('d/m/Y H:i')]);
+            if ($billTypeReady) {
+                fputcsv($file, ['Bill Type', $billTypeLabel]);
+            }
+            fputcsv($file, []);
+
+            fputcsv($file, ['MONTHLY SUMMARY' . ($returnsOnly ? ' (Credit Notes Only — refunded amounts)' : '')]);
+            fputcsv($file, ['Total Sales excl. Tax (PKR)', number_format($monthlyTax->total_sales ?? 0, 2, '.', '')]);
+            fputcsv($file, ['Total Tax Collected (PKR)', number_format($monthlyTax->total_tax ?? 0, 2, '.', '')]);
+            fputcsv($file, ['FBR POS Fee Collected (PKR)', number_format($monthlyTax->total_pos_fee ?? 0, 2, '.', '')]);
+            fputcsv($file, ['Total Invoices', (int) ($monthlyTax->invoice_count ?? 0)]);
+            if ($billTypeReady) {
+                fputcsv($file, ['Credit Notes (count)', (int) ($monthlyTax->return_count ?? 0)]);
+                fputcsv($file, ['Credit Notes Refunded (PKR)', number_format($monthlyTax->return_amount ?? 0, 2, '.', '')]);
+                fputcsv($file, ['Credit Notes Tax Reversed (PKR)', number_format($monthlyTax->return_tax ?? 0, 2, '.', '')]);
+            }
+            fputcsv($file, []);
+
+            fputcsv($file, ['FBR SUBMISSION STATUS']);
+            fputcsv($file, ['Submitted', (int) ($fbrStats->submitted ?? 0)]);
+            fputcsv($file, ['Pending', (int) ($fbrStats->pending ?? 0)]);
+            fputcsv($file, ['Failed', (int) ($fbrStats->failed ?? 0)]);
+            fputcsv($file, ['Local (Offline)', (int) ($fbrStats->local_count ?? 0)]);
+            fputcsv($file, []);
+
+            fputcsv($file, ['TAX BREAKDOWN BY RATE']);
+            fputcsv($file, ['Tax Rate (%)', 'Invoices', 'Sales (PKR)', 'Tax (PKR)']);
+            foreach ($taxByRate as $rate) {
+                fputcsv($file, [
+                    number_format($rate->tax_rate, 2, '.', ''),
+                    (int) $rate->count,
+                    number_format($rate->sales_total, 2, '.', ''),
+                    number_format($rate->tax_total, 2, '.', ''),
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * PDF export of the FBR monthly tax report (Task 698 — PRA parity).
+     * Same shared data source as the screen, so figures always match exactly.
+     */
+    public function exportTaxReportPdf(Request $request)
+    {
+        if ($resp = $this->fbrPlanGate('reports_enabled')) {
+            return $resp;
+        }
+        [$company, $monthlyTax, $fbrStats, $taxByRate, $billTypeFilter, $billTypeReady] =
+            $this->fbrTaxReportData($request);
+
+        $filename = 'NestPOS_FBR_Tax_Report_' . now()->format('Ymd_His') . '.pdf';
+
+        return $this->renderReportPdf(
+            'fbr-pos.tax-report-pdf',
+            compact('company', 'monthlyTax', 'fbrStats', 'taxByRate', 'billTypeFilter', 'billTypeReady'),
+            $filename
+        );
     }
 
     public function businessProfile(Request $request)

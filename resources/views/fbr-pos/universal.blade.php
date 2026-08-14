@@ -383,6 +383,13 @@ window.addEventListener('popstate', function() {
                 </div>
             </div>
 
+            {{-- Quick Return (Task 685) — bill number likho, seedha return form.
+                 FBR convention: return routes par koi per-staff gate nahi — sab ko dikhta hai. Rose family. --}}
+            <button @click="openQuickReturn()" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-rose-600/85 hover:bg-rose-600 ring-1 ring-rose-300/40 transition flex-shrink-0" title="{{ __('pos.quick_return_hint') }}">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z"/></svg>
+                <span class="hidden lg:inline">{{ __('pos.quick_return') }}</span>
+            </button>
+
             {{-- Keys F1 (moved from toolbar Row 2, owner 6 Aug 2026) --}}
             <button @click="showShortcuts = true" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-white/10 hover:bg-white/20 ring-1 ring-white/15 transition flex-shrink-0" title="{{ __('pos.ti_keyboard_shortcuts_f1') }}">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3C6.5 3 2 6.58 2 11c0 2.24 1.12 4.27 2.94 5.72L4 21l4.28-2.55c1.15.35 2.4.55 3.72.55 5.5 0 10-3.58 10-8s-4.5-8-10-8z"/></svg>
@@ -843,6 +850,12 @@ window.addEventListener('popstate', function() {
             <span class="hidden sm:inline">{{ __('pos.deliveries') }}</span>
         </button>
         @endif
+
+        {{-- Quick Return (Task 685) — mobile copy of the nav-strip button --}}
+        <button @click="openQuickReturn()" class="flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 hover:bg-rose-100 transition" title="{{ __('pos.quick_return_hint') }}">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z"/></svg>
+            <span class="hidden sm:inline">{{ __('pos.quick_return') }}</span>
+        </button>
 
         {{-- ── FAILED BILLS — header shortcut. F11. Red theme = needs attention. ── --}}
         {{-- Click → modal with Retry / Edit / Delete actions inline. --}}
@@ -2235,6 +2248,42 @@ window.addEventListener('popstate', function() {
         </div>
     </div>
 
+    {{-- ─────────────────────────────────────────────────────────────────────── --}}
+    {{-- QUICK RETURN MODAL (Task 685) — bill number → existing FBR return form. --}}
+    {{-- Lookup + return rules all server-side (fbrpos.phase2.return.lookup).    --}}
+    {{-- ─────────────────────────────────────────────────────────────────────── --}}
+    <div x-show="quickReturnOpen" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="quickReturnOpen = false">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden" x-transition.scale.90>
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 bg-rose-50 dark:bg-rose-900/20 flex-shrink-0">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <svg class="w-5 h-5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z"/></svg>
+                            {{ __('pos.quick_return_title') }}
+                        </h3>
+                        <p class="text-[10px] text-gray-500 mt-0.5">{{ __('pos.quick_return_hint') }}</p>
+                    </div>
+                    <button @click="quickReturnOpen = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                </div>
+            </div>
+            <div class="p-4 space-y-3">
+                {{-- nofill guards (memory: pos-sale-screen-autofill-guards) --}}
+                <input type="text" id="tn-quick-return-input" x-model="quickReturnQ"
+                       @keydown.enter.prevent="submitQuickReturn()"
+                       @keydown.escape.prevent="quickReturnOpen = false"
+                       autocomplete="off" name="quick_return_q_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                       placeholder="{{ __('pos.quick_return_placeholder_fbr') }}"
+                       class="w-full px-4 py-3 text-base font-bold rounded-xl border-2 border-rose-200 dark:border-rose-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:border-rose-500 focus:outline-none tn-num">
+                <p x-show="quickReturnErr" x-cloak class="text-xs font-bold text-red-600 dark:text-red-400" x-text="quickReturnErr"></p>
+                <button @click="submitQuickReturn()" :disabled="quickReturnBusy || !(quickReturnQ || '').trim()"
+                        class="w-full py-3 rounded-xl font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition">
+                    <span x-show="!quickReturnBusy">{{ __('pos.quick_return_open_btn') }}</span>
+                    <span x-show="quickReturnBusy" x-cloak>{{ __('pos.searching_word') }}</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div x-show="showShortcuts" x-cloak x-transition.opacity @click.self="showShortcuts = false" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" style="display:none;">
         <div x-show="showShortcuts" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" @click.stop style="max-width:520px; width:100%; max-height:85vh; overflow-y:auto; background:white; border-radius:20px; box-shadow:0 25px 60px rgba(0,0,0,0.3);" class="dark:bg-gray-900">
             <div style="background:linear-gradient(135deg,#2563eb,#6d28d9); padding:20px 24px; border-radius:20px 20px 0 0; display:flex; align-items:center; justify-content:space-between;">
@@ -2911,6 +2960,11 @@ function restaurantPos() {
         hasManagerPin: {{ $hasManagerPin ? 'true' : 'false' }},
         managerOverrideActive: false,
         showManagerPinModal: false,
+        // ── QUICK RETURN (Task 685) — bill number → return form ─────────────
+        quickReturnOpen: false,
+        quickReturnQ: '',
+        quickReturnBusy: false,
+        quickReturnErr: '',
         managerPin: '',
         managerPinError: '',
         ingredientCosts: {!! $jsEnc($ingredientCosts ?? [], '{}') !!},
@@ -4854,6 +4908,13 @@ function restaurantPos() {
             // reload the browser). preventDefault on document-level handler
             // also cancels the browser's native F-key behaviors.
             // ═══════════════════════════════════════════════════════════════
+            // Quick Return modal open (Task 685): apna chhota input hai — Esc
+            // band karta hai, Enter input ke apne handler par chalta hai; baqi
+            // saare global shortcuts (F-keys / Alt chords) is par fire na hon.
+            if (this.quickReturnOpen) {
+                if (e.key === 'Escape') { e.preventDefault(); this.quickReturnOpen = false; }
+                return;
+            }
             if (e.key === 'F1') { e.preventDefault(); this.showShortcuts = !this.showShortcuts; return; }
             if (e.key === 'F2') { e.preventDefault(); this.cartMode = false; this.activeCartIndex = -1; this.enterSearchMode(); return; }
             if (e.key === 'F3') { e.preventDefault(); this.activeHeldIndex = 0; this.showHeldOrders = true; return; }
@@ -6313,6 +6374,39 @@ function restaurantPos() {
                 }
             } catch (e) { this.localPinError = 'Network error — try again.'; }
             this.localPinVerifying = false;
+        },
+        // ── QUICK RETURN (Task 685) — FBR twin of PRA universal ─────────────
+        // Bill/serial number (FPOS-2026-00012, bare digits, ya FBR fiscal
+        // number) → server lookup → existing FBR return form. Sab rules
+        // SERVER par (FbrPosPhase2Controller) — yeh sirf navigate karta hai.
+        openQuickReturn() {
+            if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.tableSwitchPrompt) return;
+            this.quickReturnQ = '';
+            this.quickReturnErr = '';
+            this.quickReturnBusy = false;
+            this.quickReturnOpen = true;
+            this.$nextTick(() => { document.getElementById('tn-quick-return-input')?.focus(); });
+        },
+        submitQuickReturn() {
+            const q = (this.quickReturnQ || '').trim();
+            if (!q || this.quickReturnBusy) return;
+            this.quickReturnBusy = true;
+            this.quickReturnErr = '';
+            // Relative URL (memory: route absolute-https trap on plain-http dev).
+            fetch('{{ route('fbrpos.phase2.return.lookup', [], false) }}?q=' + encodeURIComponent(q), {
+                headers: { 'Accept': 'application/json' }
+            }).then(r => r.json().then(d => ({ ok: r.ok, d })))
+              .then(({ ok, d }) => {
+                if (ok && d && d.url) {
+                    window.location.href = d.url;
+                    return; // busy stays true — page is navigating
+                }
+                this.quickReturnBusy = false;
+                this.quickReturnErr = (d && d.error) ? d.error : window.TXT.network_error;
+            }).catch(() => {
+                this.quickReturnBusy = false;
+                this.quickReturnErr = window.TXT.network_error;
+            });
         },
         openLocalBills() {
             this.activeLocalIndex = 0;

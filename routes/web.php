@@ -1394,6 +1394,9 @@ Route::prefix('fbr-pos')->middleware(['fbrpos.auth', 'company.approval'])->group
     Route::post('/shifts/cash-movement', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'cashMovement'])->name('fbrpos.phase2.shift.cash');
 
     // Returns / Refunds
+    // Quick Return lookup (Task 685) — sale screen se bill number → return form.
+    // /api/ prefix keeps it inside sw.js skipPatterns (never SW-cached).
+    Route::get('/api/return-lookup', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'quickReturnLookup'])->name('fbrpos.phase2.return.lookup');
     Route::get('/transactions/{id}/return', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'returnForm'])->name('fbrpos.phase2.return.form');
     Route::post('/transactions/{id}/return', [\App\Http\Controllers\FbrPosPhase2Controller::class, 'processReturn'])->name('fbrpos.phase2.return.process');
 

@@ -2754,6 +2754,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'quick_return_not_found' => 'Is number ka koi bill nahi mila.',
     'quick_return_open_btn' => 'Return Form Kholein',
     'quick_return_placeholder' => 'Maslan POS-2026-00012, L-012 ya 12',
+    'quick_return_placeholder_fbr' => 'Maslan FPOS-2026-00012 ya 12',
     'quick_return_title' => 'Quick Return',
     'quick_save_tick_pfx' => 'Tick karne se yeh item permanently',
     'quick_save_tick_sfx' => 'category mein /pos/products mein save ho jaaye ga — agli baar search mein bhi mile ga.',

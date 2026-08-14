@@ -2754,6 +2754,7 @@ return [
     'quick_return_not_found' => 'اس نمبر کا کوئی بل نہیں ملا۔',
     'quick_return_open_btn' => 'ریٹرن فارم کھولیں',
     'quick_return_placeholder' => 'مثلاً POS-2026-00012، L-012 یا 12',
+    'quick_return_placeholder_fbr' => 'مثلاً FPOS-2026-00012 یا 12',
     'quick_return_title' => 'کوئک ریٹرن',
     'quick_save_tick_pfx' => 'ٹک کرنے سے یہ آئٹم مستقل طور پر سیو ہو جائے گا',
     'quick_save_tick_sfx' => 'کیٹیگری میں /pos/products — یہ اگلی بار سرچ میں بھی ظاہر ہوگا۔',

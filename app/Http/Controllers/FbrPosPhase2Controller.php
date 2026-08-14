@@ -482,6 +482,66 @@ class FbrPosPhase2Controller extends Controller
 
     // ========================= RETURNS / REFUNDS =========================
 
+    /**
+     * Quick Return lookup (Task 685) — FBR twin of PRA's
+     * PosReturnController::quickLookup: sale screen se bill number likh kar
+     * seedha return form kholna. JSON: { url } ya { error }.
+     *
+     * Accepts (case-insensitive):
+     *  - full serial: FPOS-2026-00012 (padding optional: fpos-2026-12)
+     *  - bare digits: 12 → FPOS-{thisYear/lastYear}-00012 (newest match wins)
+     *  - FBR fiscal invoice number (exact)
+     *
+     * FBR gating convention: the return routes themselves carry no per-staff
+     * gate (fbrpos.auth + company.approval only) — this endpoint mirrors that.
+     * The redirect target (returnForm/processReturn) re-enforces everything;
+     * this endpoint only navigates.
+     */
+    public function quickReturnLookup(Request $r)
+    {
+        $q = strtoupper(trim((string) $r->query('q', '')));
+        if ($q === '' || strlen($q) > 40) {
+            return response()->json(['error' => __('pos.quick_return_enter_number')], 422);
+        }
+
+        // Candidate invoice_number strings the input could mean.
+        $candidates = [$q];
+        if (preg_match('/^FPOS-?(\d{4})-?(\d+)$/', $q, $m)) {
+            $candidates[] = 'FPOS-' . $m[1] . '-' . str_pad($m[2], 5, '0', STR_PAD_LEFT);
+        } elseif (ctype_digit($q)) {
+            // Bare serial digits — this year's + last year's FPOS series
+            // (generateInvoiceNumber format: FPOS-YYYY-NNNNN).
+            $n = ltrim($q, '0');
+            $n = $n === '' ? '0' : $n;
+            foreach ([now()->format('Y'), now()->subYear()->format('Y')] as $yr) {
+                $candidates[] = 'FPOS-' . $yr . '-' . str_pad($n, 5, '0', STR_PAD_LEFT);
+            }
+        }
+        $candidates = array_values(array_unique($candidates));
+
+        $txn = FbrPosTransaction::where('company_id', $this->companyId())
+            ->where(function ($w) use ($candidates, $q) {
+                $w->whereIn('invoice_number', $candidates)
+                    ->orWhere('fbr_invoice_number', $q);
+            })
+            ->orderByDesc('created_at')
+            ->first();
+
+        if (!$txn) {
+            return response()->json(['error' => __('pos.quick_return_not_found')], 404);
+        }
+
+        // Same rule returnForm enforces: a return can never be returned.
+        if ($txn->transaction_type === 'return') {
+            return response()->json(['error' => __('pos.quick_return_not_found')], 422);
+        }
+
+        return response()->json([
+            'url' => route('fbrpos.phase2.return.form', $txn->id, false),
+            'invoice_number' => $txn->invoice_number,
+        ]);
+    }
+
     public function returnForm($id)
     {
         $original = FbrPosTransaction::with('items')->where('company_id', $this->companyId())->findOrFail($id);

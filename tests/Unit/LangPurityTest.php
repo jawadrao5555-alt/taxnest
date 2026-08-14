@@ -20,7 +20,7 @@ use PHPUnit\Framework\TestCase;
 class LangPurityTest extends TestCase
 {
     private const WHITELIST = [
-        'PRA','FBR','POS','NestPOS','TaxNest','taxnest','PKR','KOT','KOTs','PDF','CSV','WhatsApp','APK','NTN','CNIC','PIN','SMS','UoM','API','URL','IMS','B2B','KDS','PWA','Raast','Excel','Android','Enter','Esc','Del','Alt','Ctrl','Tab','Shift','Space','localhost','exe','com','PNG','JPG','iOS','Chrome','Safari','JazzCash','EasyPaisa','Easypaisa','Windows','Bluetooth','USB','WiFi','GST','SRO','STRN','CST','XLSX','xlsx','LAN','HTTPS','http','https',
+        'PRA','FBR','POS','FPOS','NestPOS','TaxNest','taxnest','PKR','KOT','KOTs','PDF','CSV','WhatsApp','APK','NTN','CNIC','PIN','SMS','UoM','API','URL','IMS','B2B','KDS','PWA','Raast','Excel','Android','Enter','Esc','Del','Alt','Ctrl','Tab','Shift','Space','localhost','exe','com','PNG','JPG','iOS','Chrome','Safari','JazzCash','EasyPaisa','Easypaisa','Windows','Bluetooth','USB','WiFi','GST','SRO','STRN','CST','XLSX','xlsx','LAN','HTTPS','http','https',
         // Biometric attendance device brands + protocol acronyms (4 Aug 2026)
         'ZKTeco','eSSL','FingerTec','Hikvision','Dahua','VIRDI','ADMS','ICLOCK','Out','TXT','XLS',
         'Nest','ABC','SHA','IDs','Unlimited','Business','Premium','Plus','Basic','Standard','Lite',

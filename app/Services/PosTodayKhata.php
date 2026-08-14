@@ -38,10 +38,23 @@ class PosTodayKhata
 
         $hasExempt = Schema::hasColumn('pos_transactions', 'exempt_amount');
         $exemptExpr = $hasExempt ? 'COALESCE(exempt_amount,0)' : '0';
+        // tax_amount gets the same drift guard (Task 718 review): minimal/legacy
+        // schemas without the column must still render the dashboard — tax rows
+        // simply aggregate to 0 instead of throwing "no such column".
+        $taxExpr = Schema::hasColumn('pos_transactions', 'tax_amount') ? 'COALESCE(tax_amount,0)' : '0';
+        $hasPayMethod = Schema::hasColumn('pos_transactions', 'payment_method');
         $cardIn = "'" . implode("','", PosPaymentBuckets::CARD_ALIASES) . "'";
         $cash = PosPaymentBuckets::CASH;
+        // Same drift guard for payment_method: without it the cash/card tax
+        // split is unknowable — report 0 for both instead of throwing.
+        $cashTaxExpr = $hasPayMethod
+            ? "COALESCE(SUM(CASE WHEN payment_method = '{$cash}' THEN ({$signExpr}) * {$taxExpr} ELSE 0 END),0)"
+            : '0';
+        $cardTaxExpr = $hasPayMethod
+            ? "COALESCE(SUM(CASE WHEN payment_method IN ({$cardIn}) THEN ({$signExpr}) * {$taxExpr} ELSE 0 END),0)"
+            : '0';
 
-        $agg = function (string $tab) use ($companyId, $bizToday, $signExpr, $saleRowExpr, $exemptExpr, $cardIn, $cash) {
+        $agg = function (string $tab) use ($companyId, $bizToday, $signExpr, $saleRowExpr, $exemptExpr, $taxExpr, $cashTaxExpr, $cardTaxExpr) {
             $row = PosTransaction::where('company_id', $companyId)
                 ->where('status', 'completed')
                 ->where('business_date', $bizToday)
@@ -49,9 +62,9 @@ class PosTodayKhata
                 ->selectRaw("
                     COALESCE(SUM({$saleRowExpr}),0) as bills,
                     COALESCE(SUM(({$signExpr}) * total_amount),0) as sale,
-                    COALESCE(SUM(({$signExpr}) * COALESCE(tax_amount,0)),0) as tax,
-                    COALESCE(SUM(CASE WHEN payment_method = '{$cash}' THEN ({$signExpr}) * COALESCE(tax_amount,0) ELSE 0 END),0) as cash_tax,
-                    COALESCE(SUM(CASE WHEN payment_method IN ({$cardIn}) THEN ({$signExpr}) * COALESCE(tax_amount,0) ELSE 0 END),0) as card_tax,
+                    COALESCE(SUM(({$signExpr}) * {$taxExpr}),0) as tax,
+                    {$cashTaxExpr} as cash_tax,
+                    {$cardTaxExpr} as card_tax,
                     COALESCE(SUM(({$signExpr}) * {$exemptExpr}),0) as exempt_items,
                     COALESCE(SUM(CASE WHEN pra_status = 'submitted' THEN ({$signExpr}) * total_amount ELSE 0 END),0) as reported
                 ")->first();

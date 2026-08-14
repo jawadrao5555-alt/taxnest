@@ -117,6 +117,9 @@
              existing centered behavior untouched. `html body` outranks the
              base `body` print rules above (incl. the A4 branch). --}}
         @php
+            // Task 718: keep `?? false` — for fbrpos companies kot_align_center is
+            // the RECEIPT print position (receipt-kot-margin-split); NULL (the new
+            // Pizza Master KOT default) must stay LEFT here. Never `?? true`.
             $pmAlign = (bool) ($company->kot_align_center ?? false);
             $pmMm    = max(0, min(30, (int) ($company->kot_left_margin_mm ?? 0)));
         @endphp

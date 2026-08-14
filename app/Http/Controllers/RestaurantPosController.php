@@ -1581,6 +1581,17 @@ class RestaurantPosController extends Controller
                 $updates[$kotFlag] = (bool) $request->input($kotFlag);
             }
         }
+        // Receipt fallback guard (Task 718): receipt_80mm/58mm + proof-bill fall
+        // back to kot_align_center while receipt_align_center is NULL. This save
+        // writes kot_align_center EXPLICITLY (center is pre-selected for the new
+        // Pizza Master default), so freeze the receipt position at its CURRENT
+        // effective value first — a kitchen-settings save must only move the KOT,
+        // never the customer receipt.
+        if (array_key_exists('kot_align_center', $updates)
+            && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'receipt_align_center')
+            && $company->receipt_align_center === null) {
+            $updates['receipt_align_center'] = (bool) ($company->kot_align_center ?? false);
+        }
         if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_left_margin_mm')) {
             $updates['kot_left_margin_mm'] = max(0, min(30, (int) $request->input('kot_left_margin_mm', 0)));
         }

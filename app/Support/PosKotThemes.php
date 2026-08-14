@@ -14,12 +14,25 @@ namespace App\Support;
  * automatically appears on the receipt-settings KOT card, passes validation,
  * and resolves to the right pre-selected card.
  *
- *   khula   — left edge, open spacing (today's default)
- *   center  — ticket centered on the paper, open spacing
+ *   khula   — left edge, open spacing (deliberate opt-out)
+ *   center  — ticket centered on the paper, open spacing (Pizza Master look —
+ *             UNIVERSAL DEFAULT since Task 718, owner-approved Aug 2026)
  *   compact — left edge, tight paper-saving layout
+ *
+ * DEFAULT semantics (Task 718): companies.kot_align_center is NULLABLE.
+ * NULL = "shop never made an explicit choice" → resolves to 'center' so an
+ * untouched company's KOT prints Pizza Master style (center-bold). An
+ * EXPLICIT false (khula/compact card, kitchen-settings save, or a pre-718
+ * deliberate compact/margin setup kept by the migration) stays left — the
+ * opt-out path the preset cards provide. FBR receipts/day-close read the
+ * same column with `?? false` ON PURPOSE (for fbrpos it is the RECEIPT
+ * print position, not a KOT look) — never "harmonize" them to this default.
  */
 class PosKotThemes
 {
+    /** Preset an untouched (NULL kot_align_center) company resolves to. */
+    public const DEFAULT = 'center';
+
     public const THEMES = [
         'khula' => [
             'compact' => false,
@@ -58,6 +71,10 @@ class PosKotThemes
      * Rule: compact ON = 'compact' regardless of alignment (a shop that
      * centered its compact ticket is still the Compact preset — same
      * "dominant flag wins" rule as PosReceiptThemes' saada).
+     *
+     * Task 718: callers must pass the RAW nullable column value for 'align'
+     * (never `?? false` it away) — NULL/missing = no explicit choice = the
+     * Pizza Master center default. Explicit false = deliberate left (khula).
      */
     public static function resolve(array $pair): string
     {
@@ -66,7 +83,16 @@ class PosKotThemes
             return 'compact';
         }
 
-        return filter_var($pair['align'] ?? false, FILTER_VALIDATE_BOOLEAN) ? 'center' : 'khula';
+        return self::alignBool($pair['align'] ?? null) ? 'center' : 'khula';
+    }
+
+    /**
+     * NULL-aware align reader: NULL (unset / schema drift) = center default
+     * (Pizza Master, Task 718); everything else keeps boolean semantics.
+     */
+    public static function alignBool(mixed $align): bool
+    {
+        return $align === null ? true : filter_var($align, FILTER_VALIDATE_BOOLEAN);
     }
 
     /**
@@ -85,7 +111,10 @@ class PosKotThemes
     {
         $current = [
             'compact' => filter_var($currentPair['compact'] ?? false, FILTER_VALIDATE_BOOLEAN),
-            'align'   => filter_var($currentPair['align'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            // NULL align = the center default (Task 718): a no-op re-save of the
+            // pre-selected Center card writes explicit true — same render, and
+            // receipts stay frozen (their own receipt_align_center column).
+            'align'   => self::alignBool($currentPair['align'] ?? null),
         ];
 
         if (!isset(self::THEMES[$theme]) || self::resolve($currentPair) === $theme) {

@@ -38,6 +38,9 @@
          (max-width capped) inside a full-width body, so position it there;
          default (all OFF) keeps the left-pinned behavior untouched. --}}
     @php
+        // Task 718: keep `?? false` — for fbrpos companies kot_align_center is the
+        // RECEIPT/Z-report print position, NOT a KOT look; NULL (the new Pizza
+        // Master KOT default) must stay LEFT here. Never `?? true`.
         $pmAlign = (bool) ($company->kot_align_center ?? false);
         $pmMm    = max(0, min(30, (int) ($company->kot_left_margin_mm ?? 0)));
     @endphp

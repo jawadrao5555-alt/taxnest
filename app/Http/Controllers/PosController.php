@@ -348,7 +348,10 @@ class PosController extends Controller
             if (\App\Support\PosKotThemes::isValid($kotTheme)) {
                 $kotPair = \App\Support\PosKotThemes::apply($kotTheme, [
                     'compact' => (bool) ($company->kot_compact ?? false),
-                    'align'   => (bool) ($company->kot_align_center ?? false),
+                    // Task 718: RAW nullable align — NULL = center default, so
+                    // re-saving the pre-selected Center card is a no-op and picking
+                    // Khula counts as an ACTIVE switch (writes explicit false).
+                    'align'   => $company->kot_align_center,
                 ]);
                 if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_compact')) {
                     $companyUpdates['kot_compact'] = $kotPair['compact'];
@@ -359,6 +362,18 @@ class PosController extends Controller
             } elseif (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_align_center')
                 && $request->filled('rp_kot_align_center')) {
                 $companyUpdates['kot_align_center'] = (bool) ((int) $request->input('rp_kot_align_center'));
+            }
+            // Receipt fallback guard (Task 718): receipt_80mm/58mm + proof-bill fall
+            // back to kot_align_center while receipt_align_center is NULL. If this
+            // save writes kot_align_center WITHOUT also writing the receipt column
+            // (partial/cached form — the full page always submits rp_align_center),
+            // freeze the receipt position at its current effective value first:
+            // a KOT preset switch must only move the KOT, never the customer receipt.
+            if (array_key_exists('kot_align_center', $companyUpdates)
+                && !array_key_exists('receipt_align_center', $companyUpdates)
+                && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'receipt_align_center')
+                && $company->receipt_align_center === null) {
+                $companyUpdates['receipt_align_center'] = (bool) ($company->kot_align_center ?? false);
             }
             if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_left_margin_mm')
                 && $request->filled('rp_kot_left_margin_mm')) {

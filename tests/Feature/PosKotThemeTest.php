@@ -13,6 +13,10 @@ use Tests\TestCase;
 
 /**
  * Task 716 — KOT theme presets (named bundles over kot_compact + kot_align_center).
+ * Task 718 — Pizza Master default: kot_align_center is NULLABLE; NULL = no
+ * explicit choice = the CENTER preset (center-bold KOT). Explicit false =
+ * deliberate left (khula/compact). Receipts must never move when the KOT
+ * default or a KOT write changes (receipt_align_center freeze guards).
  *
  * Locks:
  *   • resolve(): every stored compact/align pair maps to the RIGHT card —
@@ -72,7 +76,15 @@ class PosKotThemeTest extends TestCase
             $t->string('receipt_footer_note')->nullable();
             $t->string('order_match_style')->default('off');
             $t->boolean('kot_compact')->default(false);
-            $t->boolean('kot_align_center')->default(false);
+            // Task 718: mirrors the post-migration prod schema — NULLABLE, NULL default.
+            $t->boolean('kot_align_center')->nullable()->default(null);
+            $t->boolean('receipt_align_center')->nullable()->default(null);
+            $t->integer('receipt_left_margin_mm')->nullable()->default(null);
+            // Columns updateKitchenSettings writes unguarded (freeze-guard test).
+            $t->boolean('kds_enabled')->default(false);
+            $t->boolean('kitchen_printer_enabled')->default(false);
+            $t->boolean('print_on_hold')->default(false);
+            $t->boolean('print_on_pay')->default(false);
             $t->integer('kot_left_margin_mm')->default(0);
             $t->boolean('agent_enabled')->default(false);
             $t->timestamp('agent_last_seen')->nullable();
@@ -125,7 +137,7 @@ class PosKotThemeTest extends TestCase
         ]);
     }
 
-    private function seedPair(bool $compact, bool $align): void
+    private function seedPair(bool $compact, ?bool $align): void
     {
         Company::where('id', $this->posCompanyId)->update([
             'kot_compact' => $compact,
@@ -143,17 +155,44 @@ class PosKotThemeTest extends TestCase
         ];
     }
 
+    /** Raw nullable align — NULL means "no explicit choice" (Task 718). */
+    private function rawAlign(?int $companyId = null): ?bool
+    {
+        $v = DB::table('companies')->where('id', $companyId ?? $this->posCompanyId)->value('kot_align_center');
+
+        return $v === null ? null : (bool) $v;
+    }
+
+    private function rawReceiptAlign(): ?bool
+    {
+        $v = DB::table('companies')->where('id', $this->posCompanyId)->value('receipt_align_center');
+
+        return $v === null ? null : (bool) $v;
+    }
+
     // ── 1. resolve(): saved pair → pre-selected card ──────────────────────
 
     public function test_resolve_maps_every_pair_to_the_right_preset(): void
     {
+        // Explicit false = deliberate left (khula) — the Task 718 opt-out.
         $this->assertSame('khula', PosKotThemes::resolve(['compact' => false, 'align' => false]));
         $this->assertSame('center', PosKotThemes::resolve(['compact' => false, 'align' => true]));
         $this->assertSame('compact', PosKotThemes::resolve(['compact' => true, 'align' => false]));
         // Centered compact ticket is still the Compact preset (dominant flag).
         $this->assertSame('compact', PosKotThemes::resolve(['compact' => true, 'align' => true]));
-        // Untouched company = today's default.
-        $this->assertSame('khula', PosKotThemes::resolve([]));
+        // Task 718: NULL / untouched company = Pizza Master CENTER default.
+        $this->assertSame('center', PosKotThemes::resolve(['compact' => false, 'align' => null]));
+        $this->assertSame('center', PosKotThemes::resolve([]));
+        $this->assertSame(PosKotThemes::DEFAULT, PosKotThemes::resolve([]));
+    }
+
+    public function test_align_bool_null_means_center_default(): void
+    {
+        $this->assertTrue(PosKotThemes::alignBool(null));
+        $this->assertTrue(PosKotThemes::alignBool(true));
+        $this->assertFalse(PosKotThemes::alignBool(false));
+        $this->assertFalse(PosKotThemes::alignBool(0));
+        $this->assertTrue(PosKotThemes::alignBool('1'));
     }
 
     public function test_preset_catalogue_shape(): void
@@ -174,6 +213,21 @@ class PosKotThemeTest extends TestCase
         $this->assertSame(
             ['compact' => true, 'align' => true],
             PosKotThemes::apply('compact', $current)
+        );
+    }
+
+    public function test_apply_on_untouched_company_null_align(): void
+    {
+        // NULL align resolves to 'center' — re-saving the pre-selected Center
+        // card is a NO-OP (explicit true = same render), while picking Khula is
+        // an ACTIVE switch that writes the deliberate-left opt-out.
+        $this->assertSame(
+            ['compact' => false, 'align' => true],
+            PosKotThemes::apply('center', ['compact' => false, 'align' => null])
+        );
+        $this->assertSame(
+            ['compact' => false, 'align' => false],
+            PosKotThemes::apply('khula', ['compact' => false, 'align' => null])
         );
     }
 
@@ -265,6 +319,121 @@ class PosKotThemeTest extends TestCase
             ->assertSessionHasErrors('rp_kot_theme');
     }
 
+    // ── 3b. Task 718: default flip + receipt freeze guards ────────────────
+
+    public function test_post_khula_on_untouched_company_writes_explicit_left_optout(): void
+    {
+        // Untouched company (NULL align) renders center by default; picking the
+        // Khula card must be an ACTIVE switch that STICKS (explicit false).
+        $this->seedPair(false, null);
+
+        $this->actingAs(User::find($this->posAdminId), 'pos')
+            ->from('/pos/receipt-settings')
+            ->post('/pos/receipt-settings', ['rp_kot_theme' => 'khula'])
+            ->assertRedirect();
+
+        $this->assertFalse($this->rawAlign());
+    }
+
+    public function test_post_kot_theme_freezes_null_receipt_align(): void
+    {
+        // Theme-only POST (no rp_align_center — partial/cached form): writing
+        // kot_align_center while receipt_align_center is NULL must freeze the
+        // receipt at its CURRENT effective position (NULL kot → left) so the
+        // 80/58mm + proof-bill fallback never starts centering receipts.
+        $this->seedPair(false, null);
+
+        $this->actingAs(User::find($this->posAdminId), 'pos')
+            ->from('/pos/receipt-settings')
+            ->post('/pos/receipt-settings', ['rp_kot_theme' => 'center'])
+            ->assertRedirect();
+
+        $this->assertTrue($this->rawAlign());           // KOT explicitly centered
+        $this->assertFalse($this->rawReceiptAlign());   // receipts frozen LEFT
+    }
+
+    public function test_post_kot_theme_respects_existing_receipt_align(): void
+    {
+        // A shop that already centered its RECEIPTS keeps that choice untouched.
+        $this->seedPair(false, null);
+        DB::table('companies')->where('id', $this->posCompanyId)->update(['receipt_align_center' => true]);
+
+        $this->actingAs(User::find($this->posAdminId), 'pos')
+            ->from('/pos/receipt-settings')
+            ->post('/pos/receipt-settings', ['rp_kot_theme' => 'center'])
+            ->assertRedirect();
+
+        $this->assertTrue($this->rawReceiptAlign());
+    }
+
+    public function test_kitchen_settings_save_freezes_null_receipt_align(): void
+    {
+        // Kitchen-settings always writes kot_align_center explicitly (center is
+        // now pre-selected) — the receipt fallback must be frozen first.
+        $this->seedPair(false, null);
+        app()->instance('currentCompanyId', $this->posCompanyId);
+
+        $request = \Illuminate\Http\Request::create('/pos/restaurant/kitchen-settings', 'POST', [
+            'kot_align_center' => '1',
+            'kot_compact' => '0',
+            'kot_show_customer' => '1',
+            'kot_show_orderby' => '1',
+            'kot_show_barcode' => '1',
+            'kot_show_footer' => '1',
+        ]);
+        app(\App\Http\Controllers\RestaurantPosController::class)->updateKitchenSettings($request);
+
+        $this->assertTrue($this->rawAlign());
+        $this->assertFalse($this->rawReceiptAlign());   // receipts stay LEFT
+    }
+
+    public function test_migration_backfills_receipts_and_nulls_untouched_left(): void
+    {
+        // Rebuild companies as the PRE-718 prod shape: NOT NULL default(false).
+        Schema::drop('companies');
+        Schema::create('companies', function (Blueprint $t) {
+            $t->id();
+            $t->string('name');
+            $t->boolean('kot_compact')->default(false);
+            $t->boolean('kot_align_center')->default(false);
+            $t->integer('kot_left_margin_mm')->default(0);
+            $t->boolean('receipt_align_center')->nullable()->default(null);
+            $t->timestamps();
+        });
+        $now = now();
+        $mk = fn (array $a) => DB::table('companies')->insertGetId($a + [
+            'name' => 'M', 'created_at' => $now, 'updated_at' => $now,
+        ]);
+        $untouched = $mk(['kot_align_center' => 0]);
+        $compactShop = $mk(['kot_align_center' => 0, 'kot_compact' => 1]);
+        $marginShop = $mk(['kot_align_center' => 0, 'kot_left_margin_mm' => 5]);
+        $centerShop = $mk(['kot_align_center' => 1]);
+        $receiptSet = $mk(['kot_align_center' => 0, 'receipt_align_center' => 1]);
+
+        $migration = require database_path('migrations/2026_08_14_150000_kot_align_default_center_pizza_master.php');
+        $migration->up();
+
+        $align = fn (int $id) => DB::table('companies')->where('id', $id)->value('kot_align_center');
+        $rcpt = fn (int $id) => DB::table('companies')->where('id', $id)->value('receipt_align_center');
+
+        // Untouched shop: KOT flips to the center default (NULL), receipt frozen LEFT.
+        $this->assertNull($align($untouched));
+        $this->assertEquals(0, $rcpt($untouched));
+        // Deliberate left layouts (compact / margin) keep their explicit left.
+        $this->assertEquals(0, $align($compactShop));
+        $this->assertEquals(0, $align($marginShop));
+        // Centered shop unchanged; its receipt fallback frozen as CENTER.
+        $this->assertEquals(1, $align($centerShop));
+        $this->assertEquals(1, $rcpt($centerShop));
+        // An explicit receipt choice is never overwritten by the backfill.
+        $this->assertEquals(1, $rcpt($receiptSet));
+
+        // Idempotency: a deliberate post-718 LEFT save survives a re-run.
+        DB::table('companies')->where('id', $untouched)->update(['kot_align_center' => 0]);
+        $migration->up();
+        $this->assertEquals(0, $align($untouched));
+    }
+
     // ── 4. Blade renders the preset cards ─────────────────────────────────
 
     public function test_receipt_settings_blade_renders_kot_preset_cards(): void
@@ -275,5 +444,36 @@ class PosKotThemeTest extends TestCase
         // The old raw controls the cards replace must be GONE from this page.
         $this->assertStringNotContainsString('rp_kot_compact', $blade);
         $this->assertStringNotContainsString("name=\"rp_kot_align_center\"", $blade);
+        // Task 718: resolve() must get the RAW nullable align (NULL → center
+        // card pre-selected) — a `?? false` here would pre-select Khula while
+        // the ticket actually prints centered.
+        $this->assertStringContainsString("'align' => \$company->kot_align_center])", $blade);
+    }
+
+    // ── 5. Task 718: read-path defaults stay split (KOT center, receipts left) ──
+
+    public function test_kot_and_receipt_blades_keep_their_own_null_defaults(): void
+    {
+        // PRA kitchen ticket: NULL → CENTER (Pizza Master default).
+        $kot = file_get_contents(resource_path('views/pos/restaurant/kitchen-ticket.blade.php'));
+        $this->assertStringContainsString('$company->kot_align_center ?? true', $kot);
+
+        // PRA receipts + proof bill: explicit receipt column first, then the
+        // kot fallback with a LEFT tail — NULL kot must never center receipts.
+        foreach (['pos/receipts/receipt_80mm', 'pos/receipts/receipt_58mm', 'pos/restaurant/proof-bill'] as $view) {
+            $src = file_get_contents(resource_path("views/{$view}.blade.php"));
+            $this->assertStringContainsString(
+                '$company->receipt_align_center ?? $company->kot_align_center ?? false',
+                $src,
+                "{$view} lost its receipt-first fallback chain"
+            );
+        }
+
+        // FBR receipt + Z-report: kot_align_center IS the receipt position for
+        // fbrpos (receipt-kot-margin-split) — NULL must stay LEFT (`?? false`).
+        foreach (['fbr-pos/receipt', 'fbr-pos/day-close-thermal'] as $view) {
+            $src = file_get_contents(resource_path("views/{$view}.blade.php"));
+            $this->assertStringContainsString('$company->kot_align_center ?? false', $src, "{$view} must keep the left default");
+        }
     }
 }

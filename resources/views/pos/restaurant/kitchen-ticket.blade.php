@@ -16,7 +16,12 @@
         $kotShowBarcode       = (bool) ($company->kot_show_barcode ?? true);
         $kotShowFooter        = (bool) ($company->kot_show_footer ?? true);
         $kotShowKitchenNotes  = (bool) ($company->kot_show_kitchen_notes ?? false);
-        $kotAlignCenter       = (bool) ($company->kot_align_center ?? false);
+        // Task 718 (Pizza Master default): kot_align_center is now NULLABLE —
+        // NULL = shop never chose, so the KOT prints CENTERED (Pizza Master
+        // style) by default. Explicit false (Khula/Compact preset or a
+        // kitchen-settings save) keeps the left edge. Drift-missing column
+        // also lands on the new center default.
+        $kotAlignCenter       = (bool) ($company->kot_align_center ?? true);
         $kotMarginMm          = max(0, min(30, (int) ($company->kot_left_margin_mm ?? 0)));
     @endphp
     <style>

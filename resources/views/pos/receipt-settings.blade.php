@@ -262,7 +262,10 @@
              fork; kitchen-settings keeps writing the raw columns — last save
              wins, and resolve() pre-selects the right card either way). --}}
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md"
-             x-data='{ kotTheme: @json(\App\Support\PosKotThemes::resolve(['compact' => $company->kot_compact ?? false, 'align' => $company->kot_align_center ?? false])) }'>
+             {{-- Task 718: pass the RAW nullable align — NULL resolves to 'center'
+                  (Pizza Master default) so untouched companies see that card
+                  pre-selected. Never `?? false` it here. --}}
+             x-data='{ kotTheme: @json(\App\Support\PosKotThemes::resolve(['compact' => $company->kot_compact ?? false, 'align' => $company->kot_align_center])) }'>
             <div class="p-5 border-b border-gray-200 dark:border-gray-700">
                 <h3 class="text-sm font-bold text-gray-900 dark:text-white">🎫 {{ __('pos.kot_print_style') }}</h3>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.kot_print_style_hint') }}</p>

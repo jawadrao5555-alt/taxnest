@@ -171,9 +171,12 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.print_position') }}</label>
+                            {{-- Task 718: NULL = Pizza Master center default → pre-select
+                                 CENTER so an untouched save writes the same look the
+                                 kitchen ticket already prints (no silent flip to left). --}}
                             <select name="kot_align_center" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm">
-                                <option value="0" {{ !($company->kot_align_center ?? false) ? 'selected' : '' }}>{{ __('pos.print_pos_left_edge') }}</option>
-                                <option value="1" {{ ($company->kot_align_center ?? false) ? 'selected' : '' }}>{{ __('pos.print_pos_center') }}</option>
+                                <option value="0" {{ !($company->kot_align_center ?? true) ? 'selected' : '' }}>{{ __('pos.print_pos_left_edge') }}</option>
+                                <option value="1" {{ ($company->kot_align_center ?? true) ? 'selected' : '' }}>{{ __('pos.print_pos_center') }}</option>
                             </select>
                             <p class="text-[11px] text-amber-600 dark:text-amber-400 mt-1">{{ __('pos.print_pos_center_warn') }}</p>
                         </div>

@@ -56,20 +56,28 @@ Variants: dark (white-on-dark, default) | light (slate-on-light, for white heade
     const TITLE_APPLY = @json(__('pos.pwa_apply_now'));
     const TITLE_CHECK = @json(__('pos.pwa_check_updates'));
     const MSG_DOWNLOADING = @json(__('pos.pwa_downloading'));
+    const MSG_STILL_DOWNLOADING = @json(__('pos.pwa_still_downloading'));
     const MSG_ON_LATEST = @json(__('pos.pwa_on_latest'));
     const MSG_OFFLINE = @json(__('pos.pwa_offline_no_check'));
     const LATEST_FLAG = 'tnPwaLatestToast';
 
     btn.style.display = 'inline-flex';
 
-    // Small self-contained toast (green = ok, red = error) — used for the
-    // post-reload "you're on the latest version" confirmation and the offline
-    // error. Kept independent from the x-pwa-update bar (Task 706).
-    const showToast = (msg, isError) => {
+    // Small self-contained toast (ok = green, err = red, info = amber) — used
+    // for the post-reload "you're on the latest version" confirmation, the
+    // offline error and the still-downloading notice. Kept independent from
+    // the x-pwa-update bar (Task 706).
+    const TOAST_BG = {
+        ok:   'linear-gradient(135deg,#10b981,#047857)',
+        err:  'linear-gradient(135deg,#ef4444,#b91c1c)',
+        info: 'linear-gradient(135deg,#f59e0b,#b45309)'
+    };
+    const showToast = (msg, kind) => {
         const t = document.createElement('div');
         t.textContent = msg;
+        t.setAttribute('data-tn-pwa-toast', kind || 'ok');
         t.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-8px);z-index:99999;padding:10px 18px;border-radius:12px;font-size:13px;font-weight:700;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,0.28);opacity:0;transition:opacity .25s ease,transform .25s ease;max-width:90vw;text-align:center;background:'
-            + (isError ? 'linear-gradient(135deg,#ef4444,#b91c1c)' : 'linear-gradient(135deg,#10b981,#047857)');
+            + (TOAST_BG[kind] || TOAST_BG.ok);
         document.body.appendChild(t);
         requestAnimationFrame(() => { t.style.opacity = '1'; t.style.transform = 'translateX(-50%) translateY(0)'; });
         setTimeout(() => {
@@ -82,7 +90,7 @@ Variants: dark (white-on-dark, default) | light (slate-on-light, for white heade
     try {
         if (sessionStorage.getItem(LATEST_FLAG) === '1') {
             sessionStorage.removeItem(LATEST_FLAG);
-            showToast(MSG_ON_LATEST, false);
+            showToast(MSG_ON_LATEST, 'ok');
         }
     } catch(_) {}
 
@@ -145,7 +153,7 @@ Variants: dark (white-on-dark, default) | light (slate-on-light, for white heade
         // Offline: no reload (would land on the offline splash), no fake green —
         // clear feedback instead (Task 706).
         if (!navigator.onLine) {
-            showToast(MSG_OFFLINE, true);
+            showToast(MSG_OFFLINE, 'err');
             return;
         }
 
@@ -206,11 +214,24 @@ Variants: dark (white-on-dark, default) | light (slate-on-light, for white heade
             return;
         }
 
-        if (outcome === 'activated' || outcome === 'redundant' || outcome === 'timeout') {
+        if (outcome === 'timeout') {
+            // Still downloading after 20s (very slow shop internet). Do NOT
+            // reload — under the old worker the user could land back on the old
+            // version, the exact failure this button must eliminate. Explicit
+            // non-reloading state instead: the download keeps going in the
+            // background, the statechange watcher above fires the "!" badge the
+            // moment it's ready, and the user taps once more to apply.
+            btn.classList.remove('tn-spinning');
+            btn.title = TITLE_CHECK;
+            showToast(MSG_STILL_DOWNLOADING, 'info');
+            busy = false;
+            return;
+        }
+
+        if (outcome === 'activated' || outcome === 'redundant') {
             // activated: new SW took over silently → reload to be controlled by it.
-            // redundant: install failed → still reload once for fresh server content.
-            // timeout: still downloading after 20s → reload now; the install keeps
-            // going in the background and the "!" badge will appear when ready.
+            // redundant: install failed → still reload once for fresh server content
+            // (panel HTML is network-first, so the reload fetches fresh markup).
             reloadFresh(false);
             return;
         }
@@ -221,7 +242,7 @@ Variants: dark (white-on-dark, default) | light (slate-on-light, for white heade
             clearUpdate();
             btn.classList.remove('tn-spinning');
             btn.title = TITLE_CHECK;
-            showToast(MSG_OFFLINE, true);
+            showToast(MSG_OFFLINE, 'err');
             busy = false;
             return;
         }

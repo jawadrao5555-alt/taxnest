@@ -30,17 +30,24 @@ use Illuminate\Support\Str;
  *  - Only parents with a PRA fiscal number queue a credit note ('pending');
  *    everything else stays a local return (pra_status NULL).
  *
- * Task 586 additions (rider auto-return path only — manual form unchanged):
- *  - allow_provisional: a provisional/local parent produces a LOCAL-stream
- *    return (invoice_mode 'local' + pra_status 'local', never reported).
+ * Task 586 additions (rider auto-return path):
  *  - wastage: returned goods were spoiled — stock restore is SKIPPED and the
  *    return row carries is_wastage=1 for future reporting.
+ *
+ * Task 678 (counter-sale returns, both streams): local parents are returnable
+ * on EVERY path now — the return mirrors the parent's stream exactly (local
+ * triple ↔ local triple; reporting-OFF final ↔ mode 'pra' + NULL status) and
+ * non-PRA parents never attempt a PRA submission. The old allow_provisional
+ * opt is inert (kept for caller compatibility).
  */
 class PosReturnService
 {
     /**
-     * Which parent bills can be returned: completed finals in the PRA stream.
-     * Provisionals keep their existing delete flow; returns of returns never.
+     * Which parent bills can be returned: ANY completed final — PRA stream OR
+     * local stream (Task 678: counter-sale returns work for both; a local
+     * parent simply produces a local-stream return that is never reported).
+     * Returns of returns never; non-completed (held/provisional-in-progress)
+     * bills keep their existing delete flow.
      * (Single source of truth — PosReturnController::returnableReason delegates here.)
      */
     public static function returnableReason(PosTransaction $txn): ?string
@@ -50,9 +57,6 @@ class PosReturnService
         }
         if ($txn->status !== 'completed') {
             return 'not_completed';
-        }
-        if ($txn->invoice_mode === 'local' || $txn->pra_status === 'local') {
-            return 'provisional';
         }
         return null;
     }
@@ -75,8 +79,9 @@ class PosReturnService
      *                           quantity (computed under the same lock).
      * @param string $refundMethod 'cash' | 'card'
      * @param array $opts  wastage: bool (skip stock restore + flag row),
-     *                     allow_provisional: bool (rider path — local parent
-     *                     produces a local-stream return).
+     *                     allow_provisional: bool (LEGACY, Task 586 rider path
+     *                     — inert since Task 678 made local parents returnable
+     *                     everywhere; kept so existing callers don't break).
      *
      * @return array ['error' => msg] | ['return' => PosTransaction,
      *               'praEligible' => bool, 'company' => Company]
@@ -84,9 +89,8 @@ class PosReturnService
     public static function createReturn(int $companyId, int $originalId, ?array $items, string $refundMethod, ?int $userId, array $opts = []): array
     {
         $wastage = (bool) ($opts['wastage'] ?? false);
-        $allowProvisional = (bool) ($opts['allow_provisional'] ?? false);
 
-        return DB::transaction(function () use ($companyId, $originalId, $items, $refundMethod, $userId, $wastage, $allowProvisional) {
+        return DB::transaction(function () use ($companyId, $originalId, $items, $refundMethod, $userId, $wastage) {
             // Re-fetch UNDER LOCK — concurrent returns of the same bill must
             // serialize here or both see the same remaining quantities and
             // double-refund/double-restock.
@@ -96,10 +100,14 @@ class PosReturnService
             $original->load('items');
 
             $reason = self::returnableReason($original);
-            $provisionalParent = ($reason === 'provisional');
-            if ($reason !== null && !($provisionalParent && $allowProvisional)) {
+            if ($reason !== null) {
                 return ['error' => __('pos.return_not_allowed_' . $reason)];
             }
+            // Stream mirroring (Task 678): a 'local' parent (L-series triple)
+            // produces a local-triple return; a reporting-OFF final (mode
+            // pra/NULL + NULL status) produces the SAME category (pra_status
+            // NULL — never stamped 'local'). Only real PRA parents may report.
+            $localParent = ($original->invoice_mode === 'local' || $original->pra_status === 'local');
 
             // NULL items = full return: every line's remaining quantity,
             // computed under this same lock (race-free).
@@ -211,11 +219,13 @@ class PosReturnService
                 'company_id' => $companyId,
                 'terminal_id' => $original->terminal_id,
                 'invoice_number' => $invNum,
-                // Returns live in the PRA stream (never 'local') — EXCEPT a
-                // provisional parent's auto return (Task 586), which mirrors
-                // the parent's local triple so the local stream/day-close
-                // treats parent and return consistently.
-                'invoice_mode' => $provisionalParent ? 'local' : 'pra',
+                // Stream mirroring: a PRA-stream parent's return lives in the
+                // PRA stream; a LOCAL parent (L-series triple) mirrors the
+                // local triple so the local stream/day-close treats parent
+                // and return consistently (Task 586 rider path, Task 678
+                // manual path). Reporting-OFF finals get mode 'pra' + NULL
+                // status — the reporting-OFF category, never 'local'.
+                'invoice_mode' => $localParent ? 'local' : 'pra',
                 'transaction_type' => 'return',
                 'parent_transaction_id' => $original->id,
                 'customer_id' => $original->customer_id,
@@ -231,9 +241,9 @@ class PosReturnService
                 'payment_method' => $refundMethod === 'card' ? 'debit_card' : 'cash',
                 'status' => 'completed',
                 // NULL pra_status = local return (reporting-OFF-final category);
-                // provisional parents mirror the 'local' triple; eligible
+                // local parents mirror the 'local' triple; eligible
                 // returns flip to 'pending' below.
-                'pra_status' => $provisionalParent ? 'local' : null,
+                'pra_status' => $localParent ? 'local' : null,
                 'created_by' => $userId,
             ];
             // Tax-inclusive snapshot rides the return so payload math branches
@@ -299,9 +309,9 @@ class PosReturnService
             // ── PRA CREDIT NOTE ELIGIBILITY ──────────────────────────────────
             // Only a parent PRA has actually numbered gives a valid RefUSIN.
             // 'pending' queues it for cloud submit (post-commit) or the desktop
-            // agent in fiscal-device mode — same pipeline as sales. Provisional
+            // agent in fiscal-device mode — same pipeline as sales. Local
             // parents NEVER report (their return is a local-stream record).
-            $praEligible = !$provisionalParent
+            $praEligible = !$localParent
                 && !empty($original->pra_invoice_number)
                 && $company && $company->praReportingActive();
             if ($praEligible) {

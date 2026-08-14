@@ -1377,6 +1377,7 @@ return [
     'feat_orders' => 'آرڈرز / بلز',
     'feat_products' => 'پروڈکٹس',
     'feat_reports' => 'سیلز رپورٹس',
+    'feat_returns' => 'واپسی / کریڈٹ نوٹ',
     'feat_riders' => 'رائیڈرز',
     'feat_tables' => 'ٹیبلز',
     'feat_tax_reports' => 'ٹیکس رپورٹس',
@@ -4448,7 +4449,7 @@ return [
     'stock_pur_void_not_received' => 'صرف وصول شدہ خریداری منسوخ ہو سکتی ہے۔',
 
     // ── Return / credit-note flow for PRA bills (Task 570) ──
-    'return_manager_only' => 'واپسی بل صرف مالک یا منیجر بنا سکتا ہے۔',
+    'return_manager_only' => 'واپسی بل صرف مالک/منیجر — یا وہ عملہ جسے «واپسی / کریڈٹ نوٹ» کا اختیار ملا ہو — بنا سکتا ہے۔',
     'return_not_allowed_return_of_return' => 'یہ خود واپسی بل ہے — واپسی کی واپسی نہیں ہو سکتی۔',
     'return_not_allowed_not_completed' => 'صرف مکمل بل واپس ہو سکتا ہے۔',
     'return_not_allowed_provisional' => 'عارضی / لوکل بل واپس نہیں ہو سکتا۔ پہلے بل فائنل کریں۔',
@@ -4457,6 +4458,13 @@ return [
     'return_processed' => 'واپسی بل بن گیا — :amount روپے واپس۔',
     'return_will_report_pra' => 'یہ واپسی PRA کو کریڈٹ نوٹ کے طور پر رپورٹ ہوگی (اصل فسکل انوائس کے خلاف)۔',
     'return_stays_local' => 'اصل بل پر PRA فسکل نمبر نہیں ہے، اس لیے یہ واپسی لوکل رہے گی (PRA کو کچھ نہیں جائے گا)۔',
+    // Counter-sale returns for both streams (Task 678)
+    'return_stays_local_bill' => 'یہ لوکل بل ہے — اس کی واپسی بھی لوکل سلسلے میں رہے گی، PRA کو رپورٹ نہیں ہوگی۔',
+    'return_action' => 'واپسی',
+    'return_processed_by' => 'کس نے پروسیس کیا',
+    'return_original_bill' => 'اصل بل',
+    'dc_returns_detail_title' => 'واپسیاں / کریڈٹ نوٹس',
+    'dc_returns_detail_hint' => 'اس دن کی تمام واپسیاں، ساتھ میں کس عملے نے پروسیس کیں۔ اوپر کے ٹوٹلز میں یہ پہلے سے منہا ہیں۔',
     'return_rider_partial_notice' => 'رائیڈر اس بل کا :amount روپے جزوی کیش پہلے دے چکا ہے — آج کی کیش ملاپ میں اسے گنیں۔',
     'return_bill_banner' => 'واپسی / کریڈٹ نوٹ',
     'bill_has_returns' => 'اس بل کے خلاف واپسیاں',

@@ -11,8 +11,12 @@ use Illuminate\Support\Facades\Schema;
  * PRA POS Return / Credit-Note flow (Task 570, Aug 2026).
  *
  * Modeled on FbrPosPhase2Controller::returnForm/processReturn with PRA rules:
- *  - Manager/owner-only (posCashierBlocked → 403); local-scoped staff blocked
- *    (returns live in the PRA stream).
+ *  - Permission (Task 678): PosAccessService::returnsAllowed — owner/manager
+ *    always; cashiers only via the per-staff "Return / Credit Note" Custom
+ *    Access tick (default OFF). Stream-locked staff may only return bills in
+ *    their own stream (allowedForBillingScope).
+ *  - BOTH streams returnable (Task 678): local parents produce local-triple
+ *    returns that are NEVER reported; only PRA-numbered parents credit-note.
  *  - Refund methods are cash/card ONLY — PRA POS has no khata/credit bills.
  *  - Return rows store POSITIVE amounts (FBR convention); PraIntegrationService
  *    flips the sign and emits InvoiceType=3 + RefUSIN when submitting.
@@ -31,12 +35,13 @@ class PosReturnController extends Controller
     private function gate()
     {
         $user = auth('pos')->user();
-        if (!$user || $user->posCashierBlocked()) {
-            abort(403, __('pos.return_manager_only'));
-        }
-        // Billing Scope: local-scoped staff run the offline stream only —
-        // returns/credit notes belong to the PRA stream.
-        if (($user->posBillingScope() ?? 'both') === 'local') {
+        // Task 678: per-staff "Return / Credit Note" grant — single verdict
+        // (PosAccessService::returnsAllowed) shared with the Return buttons on
+        // the bill detail + transactions list. Owner/manager allowed by
+        // default; cashiers need the Team-page Custom Access tick (default
+        // OFF). The PATH_MAP 'returns' entry keeps posCashierBlocked()/PosAuth
+        // consistent with this same verdict on the return routes.
+        if (!$user || !\App\Services\PosAccessService::returnsAllowed($user)) {
             abort(403, __('pos.return_manager_only'));
         }
         if (!Schema::hasColumn('pos_transactions', 'transaction_type')) {
@@ -45,6 +50,19 @@ class PosReturnController extends Controller
             abort(503, 'Return flow unavailable: database migration pending.');
         }
         return null;
+    }
+
+    /**
+     * Billing Scope stream lock (Task 678): stream-locked staff may only
+     * return bills inside their own visible stream — same per-row predicate
+     * the reports/lists use (allowedForBillingScope mirrors applyStreamTab).
+     */
+    private function assertScopeAllows(PosTransaction $txn): void
+    {
+        $scope = auth('pos')->user()?->posBillingScope() ?? 'both';
+        if (!$txn->allowedForBillingScope($scope)) {
+            abort(403, __('pos.return_manager_only'));
+        }
     }
 
     /**
@@ -66,12 +84,23 @@ class PosReturnController extends Controller
         $original = PosTransaction::withoutGlobalScope('hide_archived')
             ->with('items')->where('company_id', $companyId)->findOrFail($id);
 
+        $this->assertScopeAllows($original);
+
         if ($reason = self::returnableReason($original)) {
             return redirect()->route('pos.transaction.show', $original->id)
                 ->with('error', __('pos.return_not_allowed_' . $reason));
         }
 
-        return view('pos.return-form', compact('original'));
+        // Notice branch (Task 678): SAME predicate the service uses — only a
+        // non-local parent with an actual PRA fiscal number + reporting ON
+        // produces a credit note; everything else stays a local return.
+        $company = \App\Models\Company::find($companyId);
+        $localParent = ($original->invoice_mode === 'local' || $original->pra_status === 'local');
+        $praEligible = !$localParent
+            && !empty($original->pra_invoice_number)
+            && $company && $company->praReportingActive();
+
+        return view('pos.return-form', compact('original', 'praEligible', 'localParent'));
     }
 
     public function processReturn(Request $r, $id)
@@ -91,8 +120,9 @@ class PosReturnController extends Controller
 
         // Existence check (404) before the service runs — behaviour parity
         // with the pre-refactor findOrFail inside the transaction.
-        PosTransaction::withoutGlobalScope('hide_archived')
+        $parent = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)->findOrFail($id);
+        $this->assertScopeAllows($parent);
 
         $result = PosReturnService::createReturn(
             (int) $companyId,

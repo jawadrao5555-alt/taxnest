@@ -22,10 +22,14 @@
     {{-- Return / credit-note flow (Task 570) --}}
     @php
         $isReturnBill = ($transaction->transaction_type ?? 'sale') === 'return';
-        $canReturnHere = auth('pos')->user() && !auth('pos')->user()->posCashierBlocked()
-            && (auth('pos')->user()->posBillingScope() ?? 'both') !== 'local'
+        // Task 678: single permission verdict (returnsAllowed) + per-bill
+        // stream lock + remaining returnable quantity — BOTH streams.
+        $__remainingQty = $transaction->items->sum(fn ($it) => max(0, (float) $it->quantity - (float) ($it->returned_quantity ?? 0)));
+        $canReturnHere = \App\Services\PosAccessService::returnsAllowed(auth('pos')->user())
+            && $transaction->allowedForBillingScope(auth('pos')->user()?->posBillingScope() ?? 'both')
             && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type')
-            && \App\Http\Controllers\PosReturnController::returnableReason($transaction) === null;
+            && \App\Http\Controllers\PosReturnController::returnableReason($transaction) === null
+            && $__remainingQty > 0;
         $returnRows = $isReturnBill || !\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type')
             ? collect() : $transaction->returns()->withoutGlobalScope('hide_archived')->get();
         // Explicit parent lookup — live has strict lazy loading, so never
@@ -283,8 +287,10 @@
                     </div>
                     @endif
                     <div class="flex justify-between">
-                        <span class="text-gray-500">{{ __('pos.created_by') }}</span>
-                        <span class="text-gray-900 dark:text-white">{{ $transaction->creator->name ?? 'N/A' }}</span>
+                        {{-- Return bills (Task 678): explicit "Processed by" label so the
+                             owner can audit WHO made each refund. --}}
+                        <span class="text-gray-500">{{ $isReturnBill ? __('pos.return_processed_by') : __('pos.created_by') }}</span>
+                        <span class="{{ $isReturnBill ? 'font-semibold text-rose-600 dark:text-rose-400' : 'text-gray-900 dark:text-white' }}">{{ $transaction->creator->name ?? 'N/A' }}</span>
                     </div>
                     <div class="flex justify-between items-center">
                         <span class="text-gray-500">{{ __('pos.pra_status') }}</span>

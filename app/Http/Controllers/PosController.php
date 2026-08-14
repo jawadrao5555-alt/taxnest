@@ -4256,6 +4256,14 @@ class PosController extends Controller
 
         $query = PosTransaction::where('company_id', $companyId)->where('status', 'completed')->with('creator');
 
+        // Return-button eligibility (Task 678): remaining returnable quantity
+        // per row, aggregated in the SAME page query (no N+1) — a fully
+        // returned bill hides its Return action.
+        if (\Schema::hasColumn('pos_transaction_items', 'returned_quantity')) {
+            $query->withSum('items as items_qty_total', 'quantity')
+                ->withSum('items as items_returned_total', 'returned_quantity');
+        }
+
         $this->applyReportFilters($query, $tab);
 
         if ($request->filled('search')) {
@@ -8954,6 +8962,31 @@ class PosController extends Controller
         $payBuckets = PosPaymentBuckets::split($dcSaleRows);
         $refundBuckets = PosPaymentBuckets::split($dcReturnRows);
 
+        // Returns detail (Task 678): the day-close page lists each return with
+        // WHO processed it (owner audits cashier-made returns). Own query —
+        // $transactions is stream-filtered for the STATS (local excluded for
+        // 'both' viewers), but the audit list must show every return the
+        // viewer's scope may see (streamSplit already shows both streams).
+        // Netting figures above stay untouched.
+        $dcReturnDetail = $dcTypeReady
+            ? PosTransaction::where('company_id', $companyId)
+                ->where('business_date', $date)
+                ->where('transaction_type', 'return')
+                ->with('creator')
+                ->orderBy('created_at')
+                ->get()
+                ->filter(fn ($t) => $t->allowedForBillingScope($dayCloseScope))
+                ->values()
+            : collect();
+        // Parent invoice numbers resolved in one query — parents can be from
+        // earlier days (and may already be archived).
+        $dcReturnParents = $dcReturnDetail->isNotEmpty()
+            ? PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->whereIn('id', $dcReturnDetail->pluck('parent_transaction_id')->filter()->unique())
+                ->pluck('invoice_number', 'id')
+            : collect();
+
         $stats = (object) [
             'total_invoices' => $dcSaleRows->count(),
             'pra_invoices' => $dcSaleRows->where('pra_status', 'submitted')->count(),
@@ -9077,7 +9110,7 @@ class PosController extends Controller
         // rider unsettled cash is a WARNING only (khata legitimately carries).
         $pendingDeliveries = $this->undispatchedDeliverySummary($companyId, $company, $date);
 
-        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'pendingDeliveries'));
+        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'pendingDeliveries', 'dcReturnDetail', 'dcReturnParents'));
     }
 
     /**

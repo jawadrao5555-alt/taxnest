@@ -19,10 +19,15 @@ use Tests\TestCase;
  * PRA Return / Credit-Note flow (Task 570).
  *
  * Locks the core invariants of the PRA return bill:
- *   1. Manager/owner-only — cashiers get 403 (posCashierBlocked), local-scoped
- *      staff get 403 (returns live in the PRA stream).
- *   2. Only completed PRA-stream finals are returnable — provisionals and
- *      returns-of-returns are refused, and nothing is written.
+ *   1. Permission (Task 678): owner/manager always; cashiers only via the
+ *      per-staff 'returns' Custom Access tick (default OFF → 403). Stream-
+ *      locked staff may only return bills inside their own visible stream
+ *      (allowedForBillingScope) — a local-scoped manager is refused on a
+ *      PRA-numbered parent but allowed on a local one.
+ *   2. BOTH streams returnable (Task 678): completed finals only — returns-
+ *      of-returns and non-completed bills are refused, and nothing is
+ *      written. A LOCAL parent's return mirrors the local triple
+ *      (invoice_mode 'local' + pra_status 'local') and never reports.
  *   3. Return math: per-item proration, bill-level discount share (capped
  *      across partials), PRA whole-rupee refund total, returned_quantity
  *      updated on the parent lines, over-return refused.
@@ -71,6 +76,7 @@ class PosPraReturnFlowTest extends TestCase
             $table->string('role')->nullable();
             $table->string('pos_role')->nullable();
             $table->string('pos_billing_scope')->nullable();
+            $table->text('pos_custom_access')->nullable();
             $table->boolean('pra_reporting_enabled')->nullable();
             $table->unsignedBigInteger('default_branch_id')->nullable();
             $table->timestamps();
@@ -181,6 +187,11 @@ class PosPraReturnFlowTest extends TestCase
             'created_at' => now(), 'updated_at' => now(),
         ]);
         app()->bind('currentCompanyId', fn () => $this->companyId);
+
+        // Static plan-gate cache leaks across test classes in one phpunit
+        // process — a stale custom_access_enabled=false verdict for company
+        // id 1 would silently kill the Custom Access tick tests below.
+        \App\Services\PosFeatureService::flushGateCaches();
     }
 
     protected function tearDown(): void
@@ -288,15 +299,80 @@ class PosPraReturnFlowTest extends TestCase
         $this->assertCount(0, $this->returnRows($parent));
     }
 
-    public function test_local_scoped_staff_gets_403(): void
+    public function test_local_scoped_staff_gets_403_on_pra_parent(): void
     {
+        // Task 678: the block is per-BILL now (allowedForBillingScope) — a
+        // local-scoped manager may not touch a PRA-numbered parent.
         $this->actAs('pos_manager', ['pos_billing_scope' => 'local']);
+        $parent = $this->seedParent(['pra_status' => 'submitted', 'pra_invoice_number' => 'PRA-FISCAL-42']);
+
+        try {
+            [$ids] = [$this->itemIds($parent)];
+            $this->postReturn($parent, [['item_id' => $ids[0], 'return_qty' => 1]]);
+            $this->fail('local-scoped staff must not return PRA-stream bills');
+        } catch (HttpException $e) {
+            $this->assertSame(403, $e->getStatusCode());
+        }
+        $this->assertCount(0, $this->returnRows($parent));
+    }
+
+    public function test_local_scoped_staff_can_return_local_parent(): void
+    {
+        // Task 678: bills inside the staff member's own visible stream ARE
+        // returnable — the local-scoped manager's stream includes L-series.
+        $this->actAs('pos_manager', ['pos_billing_scope' => 'local']);
+        $parent = $this->seedParent(['invoice_mode' => 'local', 'pra_status' => 'local']);
+        $ids = $this->itemIds($parent);
+
+        $this->postReturn($parent, [['item_id' => $ids[0], 'return_qty' => 1]]);
+
+        $ret = $this->returnRows($parent)->first();
+        $this->assertNotNull($ret, 'local-scoped staff must be able to return a local bill');
+        $this->assertSame('local', $ret->invoice_mode);
+        $this->assertSame('local', $ret->pra_status);
+    }
+
+    public function test_pra_scoped_staff_gets_403_on_local_parent(): void
+    {
+        $this->actAs('pos_manager', ['pos_billing_scope' => 'pra']);
+        $parent = $this->seedParent(['invoice_mode' => 'local', 'pra_status' => 'local']);
+
+        try {
+            [$ids] = [$this->itemIds($parent)];
+            $this->postReturn($parent, [['item_id' => $ids[0], 'return_qty' => 1]]);
+            $this->fail('pra-scoped staff must not return local-stream bills');
+        } catch (HttpException $e) {
+            $this->assertSame(403, $e->getStatusCode());
+        }
+        $this->assertCount(0, $this->returnRows($parent));
+    }
+
+    public function test_cashier_with_returns_tick_can_return(): void
+    {
+        // Task 678: per-staff "Return / Credit Note" grant via Custom Access.
+        $this->actAs('pos_cashier', ['pos_custom_access' => json_encode(['returns'])]);
+        $parent = $this->seedParent();
+        $ids = $this->itemIds($parent);
+
+        $this->postReturn($parent, [['item_id' => $ids[0], 'return_qty' => 1]]);
+
+        $ret = $this->returnRows($parent)->first();
+        $this->assertNotNull($ret, 'granted cashier must be able to process a return');
+        $this->assertNotNull($ret->created_by, 'processed-by attribution must be recorded');
+        $this->assertSame(auth('pos')->id(), (int) $ret->created_by);
+    }
+
+    public function test_cashier_with_set_but_no_returns_tick_gets_403(): void
+    {
+        // An 'orders' tick alone must NOT unlock refunds (PATH_MAP: the
+        // return route maps to 'returns', not the generic 'orders').
+        $this->actAs('pos_cashier', ['pos_custom_access' => json_encode(['orders', 'dashboard'])]);
         $parent = $this->seedParent();
 
         try {
             [$ids] = [$this->itemIds($parent)];
             $this->postReturn($parent, [['item_id' => $ids[0], 'return_qty' => 1]]);
-            $this->fail('local-scoped staff must not create returns');
+            $this->fail('cashier without the returns tick must not process returns');
         } catch (HttpException $e) {
             $this->assertSame(403, $e->getStatusCode());
         }
@@ -305,10 +381,29 @@ class PosPraReturnFlowTest extends TestCase
 
     // ── 2. parent eligibility ────────────────────────────────────────────────
 
-    public function test_provisional_parent_refused(): void
+    public function test_local_parent_return_mirrors_local_triple(): void
     {
+        // Task 678: local parents are returnable — the return mirrors the
+        // parent's local triple and NEVER reports to PRA (even reporting ON).
+        DB::table('companies')->where('id', $this->companyId)->update(['pra_reporting_enabled' => 1]);
         $this->actAs('pos_admin');
         $parent = $this->seedParent(['invoice_mode' => 'local', 'pra_status' => 'local']);
+        $ids = $this->itemIds($parent);
+
+        $this->postReturn($parent, [['item_id' => $ids[0], 'return_qty' => 2]]);
+
+        $ret = $this->returnRows($parent)->first();
+        $this->assertNotNull($ret, 'local parent must be returnable (Task 678)');
+        $this->assertSame('local', $ret->fresh()->invoice_mode, 'return mirrors the parent local triple');
+        $this->assertSame('local', $ret->fresh()->pra_status, 'local return must never queue for PRA');
+        $this->assertSame(560.0, (float) $ret->total_amount, 'whole-rupee refund math applies to local returns too');
+    }
+
+    public function test_held_parent_refused(): void
+    {
+        // Non-completed bills (held / in-progress) keep their existing flow.
+        $this->actAs('pos_admin');
+        $parent = $this->seedParent(['status' => 'held']);
         $ids = $this->itemIds($parent);
 
         $resp = $this->postReturn($parent, [['item_id' => $ids[0], 'return_qty' => 1]]);

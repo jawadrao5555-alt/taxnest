@@ -1377,6 +1377,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'feat_orders' => 'Orders / Bills',
     'feat_products' => 'Products',
     'feat_reports' => 'Sales reports',
+    'feat_returns' => 'Return / Credit Note',
     'feat_riders' => 'Riders',
     'feat_tables' => 'Tables',
     'feat_tax_reports' => 'Tax reports',
@@ -4449,7 +4450,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'stock_pur_void_not_received' => 'Sirf receive shuda purchase void ho sakti hai.',
 
     // ── Return / credit-note flow for PRA bills (Task 570) ──
-    'return_manager_only' => 'Return bill sirf owner ya manager bana sakta hai.',
+    'return_manager_only' => 'Return bill sirf owner/manager — ya woh staff jise "Return / Credit Note" ka ikhtiyar mila ho — bana sakta hai.',
     'return_not_allowed_return_of_return' => 'Yeh khud return bill hai — return ka return nahi ho sakta.',
     'return_not_allowed_not_completed' => 'Sirf mukammal (completed) bill return ho sakta hai.',
     'return_not_allowed_provisional' => 'Provisional / local bill return nahi ho sakta. Pehle bill final karein.',
@@ -4458,6 +4459,13 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'return_processed' => 'Return bill ban gaya — Rs :amount wapis.',
     'return_will_report_pra' => 'Yeh return PRA ko credit note ke taur par report hoga (asal fiscal invoice ke against).',
     'return_stays_local' => 'Asal bill par PRA fiscal number nahi hai, is liye yeh return local rahega (PRA ko kuch nahi jayega).',
+    // Counter-sale returns for both streams (Task 678)
+    'return_stays_local_bill' => 'Yeh local bill hai — iska return bhi local stream mein rahega, PRA ko report nahi hoga.',
+    'return_action' => 'Return',
+    'return_processed_by' => 'Kis ne process kiya',
+    'return_original_bill' => 'Asal bill',
+    'dc_returns_detail_title' => 'Returns / Credit Notes',
+    'dc_returns_detail_hint' => 'Is din ke sab returns, saath mein kis staff ne process kiya. Uper ke totals mein yeh pehle se minus hain.',
     'return_rider_partial_notice' => 'Rider is bill ka Rs :amount partial cash pehle de chuka hai — aaj ki cash reconciliation mein isay ginein.',
     'return_bill_banner' => 'RETURN / CREDIT NOTE',
     'bill_has_returns' => 'Is bill ke against returns',

@@ -41,6 +41,7 @@ class PosAccessService
         'tax_reports',
         'day_close',
         'order_cancel',
+        'returns',
         'inventory',
         'customize',
         'team',
@@ -61,6 +62,10 @@ class PosAccessService
         '#^pos/dashboard#' => 'dashboard',
         '#^pos/restaurant/dashboard#' => 'dashboard',
         '#^pos/transactions#' => 'orders',
+        // Return / credit-note flow (Task 678): its own per-staff grant —
+        // MUST precede the generic transaction/ prefix or it falls into
+        // 'orders' and every orders-ticked cashier could refund.
+        '#^pos/transaction/\d+/return$#' => 'returns',
         // Order detail / edit / receipt / retry live under the SINGULAR prefix.
         '#^pos/transaction/#' => 'orders',
         '#^pos/archive#' => 'orders',
@@ -268,6 +273,29 @@ class PosAccessService
         } catch (\Throwable $e) {
             return false; // fail closed — admin/manager path unaffected
         }
+    }
+
+    /**
+     * Return / Credit-Note verdict (Task 678, owner voice note: "phir ikhtiyar
+     * deta hoon") — SINGLE source of truth for the Return buttons (bill detail
+     * + transactions list) AND the PosReturnController gate:
+     * - Custom Access set (Unlimited/trial) → its explicit 'returns' tick wins,
+     *   both ways (a manager with a set but no tick is blocked too).
+     * - No set + admin/manager → allowed (pre-678 behavior unchanged).
+     * - No set + cashier → BLOCKED (default OFF — the owner grants per staff
+     *   member via the Team page Custom Access tick, never company-wide).
+     */
+    public static function returnsAllowed(?User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        $custom = self::customAllows($user, 'returns');
+        if ($custom !== null) {
+            return $custom;
+        }
+
+        return !$user->isPosCashier();
     }
 
     /** Whether the users.pos_custom_access column exists (PROD drift guard). */

@@ -4,8 +4,13 @@
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.return_refund') }}</h1>
             <p class="text-sm text-gray-500 mt-1">{{ __('pos.original_invoice_colon') }} <strong>{{ $original->invoice_number }}</strong> ({{ $original->created_at->format('d M Y H:i') }})</p>
-            @if($original->pra_invoice_number)
+            {{-- Task 678: notice uses the SAME eligibility predicate as the
+                 service — PRA credit note vs local return ("PRA ko report
+                 nahi hoga"), so the cashier always knows before processing. --}}
+            @if($praEligible ?? $original->pra_invoice_number)
                 <p class="text-xs text-emerald-600 dark:text-emerald-400 mt-1">{{ __('pos.return_will_report_pra') }}</p>
+            @elseif($localParent ?? false)
+                <p class="text-xs text-gray-500 mt-1">{{ __('pos.return_stays_local_bill') }}</p>
             @else
                 <p class="text-xs text-gray-500 mt-1">{{ __('pos.return_stays_local') }}</p>
             @endif

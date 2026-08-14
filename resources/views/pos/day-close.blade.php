@@ -148,6 +148,44 @@
             @endif
         </div>
     </div>
+
+    {{-- Returns detail (Task 678): each return with WHO processed it, so
+         cashier-made returns are always auditable at day close. --}}
+    @if(isset($dcReturnDetail) && $dcReturnDetail->isNotEmpty())
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-rose-200 dark:border-rose-800 shadow-md p-5 mb-6">
+        <h3 class="font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.dc_returns_detail_title') }}</h3>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">{{ __('pos.dc_returns_detail_hint') }}</p>
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead>
+                    <tr class="text-left text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        <th class="px-3 py-2">{{ __('pos.th_invoice') }}</th>
+                        <th class="px-3 py-2">{{ __('pos.return_original_bill') }}</th>
+                        <th class="px-3 py-2">{{ __('pos.th_time') }}</th>
+                        <th class="px-3 py-2 text-right">{{ __('pos.th_amount') }}</th>
+                        <th class="px-3 py-2">{{ __('pos.return_processed_by') }}</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    @foreach($dcReturnDetail as $rt)
+                    <tr>
+                        <td class="px-3 py-2 font-medium text-rose-600 dark:text-rose-400">
+                            <a href="{{ route('pos.transaction.show', $rt->id) }}" class="hover:underline">{{ $rt->invoice_number }}</a>
+                            @if(!empty($rt->is_wastage))
+                                <span class="inline-flex items-center ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 uppercase">{{ __('pos.return_wastage_chip') }}</span>
+                            @endif
+                        </td>
+                        <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ ($dcReturnParents ?? collect())->get($rt->parent_transaction_id) ?? '—' }}</td>
+                        <td class="px-3 py-2 text-gray-500 dark:text-gray-400">{{ $rt->created_at?->format('h:i A') }}</td>
+                        <td class="px-3 py-2 text-right font-semibold text-rose-600 dark:text-rose-400">− PKR {{ number_format($rt->total_amount, 2) }}</td>
+                        <td class="px-3 py-2 text-gray-900 dark:text-white font-medium">{{ $rt->creator->name ?? '—' }}</td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </div>
+    @endif
     {{-- ═══ PRA vs Local side-by-side + Exempt detail (Task 660, ZFC owner:
          total sab se oopar, phir PRA/Local alag-alag boxes har aik mein
          tax + payment breakdown, exempt items ki details bhi) ═══ --}}

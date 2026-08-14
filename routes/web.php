@@ -684,8 +684,10 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/transaction/{id}/retry-pra', [PosController::class, 'retryPra'])->name('pos.transaction.retry-pra');
     // Task 655: payment-complete popup polls this on agent-mode 'pending' bills.
     Route::get('/transaction/{id}/pra-status', [PosController::class, 'apiPraStatus'])->name('pos.transaction.pra-status');
-    // Return / credit-note flow (Task 570) — manager/owner-only (403 in
-    // controller via posCashierBlocked; cashiers must never refund).
+    // Return / credit-note flow (Task 570; Task 678: BOTH streams — local
+    // parents produce local returns, never reported). Permission = owner/
+    // manager always, staff via the per-user "Return / Credit Note" Custom
+    // Access tick (PosAccessService::returnsAllowed → 403 in controller).
     Route::get('/transaction/{id}/return', [\App\Http\Controllers\PosReturnController::class, 'returnForm'])->name('pos.transaction.return-form');
     Route::post('/transaction/{id}/return', [\App\Http\Controllers\PosReturnController::class, 'processReturn'])->name('pos.transaction.return');
     Route::post('/transactions/bulk-retry-pra', [PosController::class, 'bulkRetryPra'])->name('pos.transactions.bulk-retry-pra');

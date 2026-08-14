@@ -74,6 +74,14 @@
 
     @include('pos.partials.mode-tabs', ['baseUrl' => route('pos.transactions'), 'showExempt' => true])
 
+    @php
+        // Task 678: Return action on eligible rows — single permission verdict
+        // (owner/manager always; cashier only via the Custom Access tick) +
+        // schema guard. Rows shown are already inside the viewer's stream/tab.
+        $__canReturn = \App\Services\PosAccessService::returnsAllowed(auth('pos')->user())
+            && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type');
+    @endphp
+
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <form method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <input type="hidden" name="tab" value="{{ $tab ?? 'pra' }}">
@@ -125,6 +133,10 @@
                                 <span class="inline-flex items-center ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 uppercase">{{ __('pos.return_badge') }}</span>
                                 @if(!empty($txn->is_wastage))
                                     <span class="inline-flex items-center ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 uppercase">{{ __('pos.return_wastage_chip') }}</span>
+                                @endif
+                                {{-- Attribution (Task 678): owner audits WHO processed each return --}}
+                                @if($txn->creator)
+                                    <span class="block mt-0.5 text-[10px] text-rose-500 dark:text-rose-400">{{ __('pos.return_processed_by') }}: {{ $txn->creator->name }}</span>
                                 @endif
                             @endif
                         </td>
@@ -211,6 +223,21 @@
                                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                                     </button>
                                 </form>
+                                @endif
+                                {{-- Return action (Task 678): eligible = completed sale row
+                                     (list shows completed only), not itself a return, with
+                                     remaining returnable quantity — BOTH streams. Links to
+                                     the existing return form. --}}
+                                @php
+                                    $__rowRemaining = ($txn->items_qty_total !== null)
+                                        ? round((float) $txn->items_qty_total - (float) ($txn->items_returned_total ?? 0), 3)
+                                        : 1; // aggregate unavailable (schema drift) → let the form decide
+                                @endphp
+                                @if($__canReturn && !$rowIsReturn && $__rowRemaining > 0)
+                                <a href="{{ route('pos.transaction.return-form', $txn->id) }}" class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 dark:bg-rose-900/20 dark:text-rose-300 dark:border-rose-800 dark:hover:bg-rose-900/40 transition whitespace-nowrap" title="{{ __('pos.return_refund') }}">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3"/></svg>
+                                    {{ __('pos.return_action') }}
+                                </a>
                                 @endif
                                 {{-- LOCAL tab (owner rule Jul 2026 update): every local bill
                                      (provisional L-series OR reporting-OFF final) gets a per-bill

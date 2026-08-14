@@ -974,10 +974,7 @@ class FbrPosController extends Controller
         return [
             'u' => (int) $user->id,
             'c' => (int) $companyId,
-            // Task 658: baked i18n = used-keys subset — lang-file-only edits
-            // must refresh cached copies (see PRA twin note).
-            's' => (is_file($screenPath) ? (string) @filemtime($screenPath) : '0')
-                . '-' . \App\Support\PosI18n::langRev(),
+            's' => is_file($screenPath) ? (string) @filemtime($screenPath) : '0',
             'cat' => $catalogRev,
             'set' => $settingsRev,
         ];
@@ -1987,6 +1984,28 @@ class FbrPosController extends Controller
         }
 
         return view('fbr-pos.show', compact('transaction'));
+    }
+
+    /**
+     * Task 655 — lightweight FBR status probe (twin of PosController::apiPraStatus).
+     * fiscal_device companies save bills as fbr_status='pending' (Desktop Agent
+     * submits within seconds); the sale screen polls this to flip the popup badge
+     * + refresh the receipt iframe once the fiscal number lands.
+     */
+    public function apiFbrStatus($id)
+    {
+        $companyId = app('currentCompanyId');
+        $tx = FbrPosTransaction::where('company_id', $companyId)
+            ->select(['id', 'fbr_status', 'fbr_invoice_number'])
+            ->find($id);
+        if (!$tx) {
+            return response()->json(['success' => false], 404);
+        }
+        return response()->json([
+            'success' => true,
+            'fbr_status' => $tx->fbr_status,
+            'fbr_invoice_number' => $tx->fbr_invoice_number,
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 
     public function retryFbr($id)

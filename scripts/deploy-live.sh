@@ -113,6 +113,14 @@ else
   fi
 fi
 
+step "Preflight: service-worker smoke check (sw.js fetch/message handlers)"
+node scripts/sw-smoke-check.mjs \
+  || fail "sw smoke check FAILED — public/sw.js handler broken (offline-first + logout cache hygiene would silently die on every client); fix before deploying"
+
+step "Preflight: silent print-order check (receipt enqueues before KOT, incl. pending-PRA grace)"
+node scripts/print-order-check.mjs \
+  || fail "print-order check FAILED — silent fast path enqueues KOT before the receipt (invoice-first invariant); fix before deploying"
+
 step "Preflight: POS plan-gate matrix check (Starter/Business/Pro/Pro Max/Unlimited)"
 if [ "${SKIP_PLAN_GATE_CHECK:-0}" = "1" ]; then
   echo "SKIPPED (SKIP_PLAN_GATE_CHECK=1) — only skip for emergency hotfixes." >&2

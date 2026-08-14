@@ -4036,6 +4036,29 @@ class PosController extends Controller
     }
 
     /**
+     * Task 655 — lightweight PRA status probe for the payment-complete popup.
+     * Agent-mode companies save bills as pra_status='pending' (Desktop Agent
+     * submits within seconds); the sale screen polls this to flip the popup
+     * badge to PRA VERIFIED + refresh the receipt iframe once the fiscal
+     * number lands. Read-only, cashiers allowed, no-store (never SW-cached).
+     */
+    public function apiPraStatus($id)
+    {
+        $companyId = app('currentCompanyId');
+        $tx = PosTransaction::where('company_id', $companyId)
+            ->select(['id', 'pra_status', 'pra_invoice_number'])
+            ->find($id);
+        if (!$tx) {
+            return response()->json(['success' => false], 404);
+        }
+        return response()->json([
+            'success' => true,
+            'pra_status' => $tx->pra_status,
+            'pra_invoice_number' => $tx->pra_invoice_number,
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    }
+
+    /**
      * List failed/offline PRA bills for the F11 header shortcut modal.
      * Returns bills with pra_status IN ('failed','offline','pending') that
      * have NOT yet received a pra_invoice_number (i.e. need cashier attention).

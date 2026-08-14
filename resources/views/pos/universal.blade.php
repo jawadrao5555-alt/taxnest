@@ -3389,7 +3389,7 @@ window.addEventListener('popstate', function() {
     {{-- Closes via: X, Close button, "New Sale", OR the auto-close countdown (owner, 23 Jul 2026:  --}}
     {{-- per-company pos_receipt_autoclose_seconds, default 10s, 0 = persistent old behavior).      --}}
     {{-- Hover pauses the countdown; any click/keypress inside cancels it.                          --}}
-    <div x-show="showReceipt" x-cloak x-transition.opacity x-effect="if (!showReceipt) { cancelPendingPrints(); cancelReceiptAutoClose(); }" class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div x-show="showReceipt" x-cloak x-transition.opacity x-effect="if (!showReceipt) { cancelPendingPrints(); cancelReceiptAutoClose(); stopPraPoll(); }" class="fixed inset-0 bg-gradient-to-br from-green-900/80 via-black/70 to-emerald-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
         <div class="receipt-modal-enter relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col" style="max-height:92vh;" x-transition.scale.90
              @mouseenter="receiptClosePaused = true" @mouseleave="receiptClosePaused = false" @click="cancelReceiptAutoClose()">
             {{-- Auto-close countdown pill (visible only while the timer runs) --}}
@@ -8027,6 +8027,7 @@ function restaurantPos() {
                 this.lastSaleAt = Date.now();
                 this.showReceipt = true;
                 this.scheduleReceiptAutoClose();
+                this.startPraPoll(); // Task 655: agent-mode 'pending' → badge + receipt auto-flip
                 this.$nextTick(() => { setTimeout(() => this.triggerConfetti(), 300); });
                 // Auto-print receipt for manual-cart bills too (parity with held-order pay).
                 // DELIVERY bills saved here (provisional rider khata + manual-cart finals)
@@ -8291,8 +8292,14 @@ function restaurantPos() {
             });
         },
 
-        printReceipt(onAfterPrint) {
+        async printReceipt(onAfterPrint) {
             if (!this.lastTransactionId) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
+            // Task 655: agent-mode fiscal grace — bill abhi 'pending' hai to chand
+            // seconds ka bounded intezar (submit aa jaye to PEHLI slip par hi PRA
+            // fiscal number chapta hai), warna jo bhi haalat hai usi par print.
+            // Kabhi block nahi hota; manual, auto-chain aur silent print teeno
+            // isi raste se guzarte hain.
+            await this.praPrintGrace();
             const url = (this.isRestaurantMode ? '/pos/restaurant/receipt/' : '/pos/transaction/') + this.lastTransactionId + (this.isRestaurantMode ? '?auto_print=1' : '/receipt?auto_print=1');
             console.log('[printReceipt] URL=', url, 'isRestaurantMode=', this.isRestaurantMode);
             const txnId = this.lastTransactionId;
@@ -8303,15 +8310,20 @@ function restaurantPos() {
                 this._printViaIframe('print-receipt-frame', url, 'width=400,height=700', onAfterPrint);
             };
             if (this.silentBillPrint) {
-                this.trySilentPrint({ type: 'bill', transaction_id: this.lastTransactionId }).then(ok => {
-                    if (ok) {
-                        // deduped = this bill is ALREADY on its way to the printer
-                        // (double-press guard) — tell the cashier to wait, no 2nd copy.
-                        if (ok.deduped) this.showToast(window.TXT.receipt_already_printing, 'info');
-                        else this.showToast(window.TXT.receipt_sent_to_printer, 'success');
-                        if (typeof onAfterPrint === 'function') onAfterPrint();
-                    } else { fallback(); }
-                });
+                // Task 655 review fix: AWAIT the enqueue attempt (trySilentPrint never
+                // rejects — it retries internally and resolves false on failure) so
+                // printReceipt()'s promise settles only after the receipt job has
+                // actually reached the queue (or fallen back). runAutoPrintChain's
+                // silent fast path awaits this before creating the KOT job —
+                // receipt-first → KOT-after holds even under network/agent latency.
+                const ok = await this.trySilentPrint({ type: 'bill', transaction_id: this.lastTransactionId });
+                if (ok) {
+                    // deduped = this bill is ALREADY on its way to the printer
+                    // (double-press guard) — tell the cashier to wait, no 2nd copy.
+                    if (ok.deduped) this.showToast(window.TXT.receipt_already_printing, 'info');
+                    else this.showToast(window.TXT.receipt_sent_to_printer, 'success');
+                    if (typeof onAfterPrint === 'function') onAfterPrint();
+                } else { fallback(); }
                 return;
             }
             fallback();
@@ -8622,7 +8634,13 @@ function restaurantPos() {
                     // IMMEDIATELY (agent prints them in order anyway) instead of
                     // waiting for the receipt roundtrip before creating the KOT job.
                     if (this.silentBillPrint && this.silentKotPrint) {
-                        this.queuePrintTimer(() => { this.printReceipt(); fireKot(); }, 150);
+                        // Task 655 review fix: printReceipt() is async now (bounded
+                        // fiscal grace while pra_status='pending') — enqueue order
+                        // must stay RECEIPT-FIRST → KOT-AFTER, so await the receipt
+                        // enqueue before creating the KOT job. Grace is bounded
+                        // (~5s worst case, agent normally submits in 2-5s) so the
+                        // kitchen is never meaningfully delayed.
+                        this.queuePrintTimer(async () => { await this.printReceipt(); fireKot(); }, 150);
                         return;
                     }
                     this.queuePrintTimer(() => {
@@ -8995,11 +9013,15 @@ function restaurantPos() {
                     this.lastTotal = Math.round(parseFloat(data.total_amount ?? bill.total_amount) || 0);
                     this.lastPaymentMethod = method || bill.payment_method || 'cash';
                     this.lastPraNumber = data.pra_number || '';
-                    this.lastPraStatus = data.submitted ? 'completed' : (data.queued ? 'pending' : '');
+                    // Task 655: 'submitted' (not 'completed') — the popup badge only
+                    // understands submitted/pending/offline/failed; 'completed' fell
+                    // through to the grey LOCAL BILL label on a real fiscal submit.
+                    this.lastPraStatus = data.submitted ? 'submitted' : (data.queued ? 'pending' : '');
                     this.lastItemsCount = parseFloat(bill.items_count) || 0;
                     this.lastSaleAt = Date.now();
                     this.showReceipt = true;
                     this.scheduleReceiptAutoClose();
+                    this.startPraPoll(); // Task 655: agent-queued promote → badge + receipt auto-flip
                     // "Payment pehle, KOT baad" (1 Aug 2026): held KOT ab release —
                     // promote = payment confirm, isi waqt kitchen ticket (txn se) fire hoti hai.
                     // DIRECT fire (review catch): auto-print/auto-KOT master switches se
@@ -9201,6 +9223,7 @@ function restaurantPos() {
                     this.lastSaleAt = Date.now();
                     this.showReceipt = true;
                     this.scheduleReceiptAutoClose();
+                    this.startPraPoll(); // Task 655: agent-mode 'pending' → badge + receipt auto-flip
                     this.$nextTick(() => { setTimeout(() => this.triggerConfetti(), 300); });
                     // Print order: INVOICE FIRST → KOT AFTER. Cashier-requested sequence.
                     // Uses postMessage-chained engine — KOT never fires before the receipt
@@ -9245,6 +9268,86 @@ function restaurantPos() {
                 this.cancelReceiptAutoClose();
                 this.showReceipt = false;
             }, 1000);
+        },
+
+        // ── Task 655: AGENT-MODE PRA STATUS POLL ────────────────────────────
+        // Agent-handled companies (Company::agentHandlesPra) save the bill as
+        // pra_status='pending'; the Desktop Agent submits it from the shop PC
+        // within seconds. The popup used to sit on "REPORTING TO PRA…" forever.
+        // Poll the tiny status endpoint (~2.5s interval, bounded 30s) so the
+        // badge flips to PRA VERIFIED + fiscal number and the receipt iframe
+        // reloads with the fiscal box + QR. Popup band → stopPraPoll (x-effect).
+        praPollTimer: null,
+        startPraPoll() {
+            this.stopPraPoll();
+            if (this.lastPraStatus !== 'pending' || !this.lastTransactionId || this.lastIsOffline) return;
+            const txnId = this.lastTransactionId;
+            const deadline = Date.now() + 30000;
+            let inflight = false;
+            this.praPollTimer = setInterval(async () => {
+                if (this.lastTransactionId !== txnId || Date.now() > deadline) { this.stopPraPoll(); return; }
+                if (inflight) return; // slow response must not stack requests
+                inflight = true;
+                const st = await this._fetchPraStatus(txnId);
+                inflight = false;
+                if (!st || this.lastTransactionId !== txnId) return;
+                if (st.pra_status && st.pra_status !== 'pending') {
+                    this._applyPraStatus(txnId, st);
+                    // submitted = terminal. failed/offline: badge update ho chuka,
+                    // lekin agent retry kar sakta hai — deadline tak poll jaari.
+                    if (st.pra_status === 'submitted') this.stopPraPoll();
+                }
+            }, 2500);
+        },
+        stopPraPoll() {
+            if (this.praPollTimer) { clearInterval(this.praPollTimer); this.praPollTimer = null; }
+        },
+        async _fetchPraStatus(txnId) {
+            try {
+                const res = await fetch('/pos/transaction/' + txnId + '/pra-status', { headers: { 'Accept': 'application/json' } });
+                if (!res.ok) return null;
+                return await res.json();
+            } catch (e) { return null; } // network blip — next tick retries
+        },
+        // Apply a status flip to the popup's shared state: badge + PRA number +
+        // fresh receipt iframe; failed/offline flips refresh the F11 badge too.
+        _applyPraStatus(txnId, st) {
+            if (this.lastTransactionId !== txnId) return; // a new sale took over
+            const prev = this.lastPraStatus;
+            this.lastPraStatus = st.pra_status || '';
+            if (st.pra_invoice_number) this.lastPraNumber = st.pra_invoice_number;
+            if (prev !== this.lastPraStatus) {
+                this.refreshReceiptIframe();
+                if (this.lastPraStatus === 'failed' || this.lastPraStatus === 'offline') this.loadFailedBills();
+            }
+        },
+        // Receipt iframe reload (cache-bust) — pending→submitted flip ke baad
+        // popup ke andar receipt PRA fiscal box + QR ke saath taaza dikhe.
+        refreshReceiptIframe() {
+            if (!this.showReceipt || this.lastIsOffline || !this.lastTransactionId) return;
+            try {
+                const el = this.$refs.receiptIframe;
+                if (!el) return;
+                el.src = (this.isRestaurantMode ? '/pos/restaurant/receipt/' : '/pos/transaction/') + this.lastTransactionId + (this.isRestaurantMode ? '' : '/receipt') + '?_pra=' + Date.now();
+            } catch (e) { /* best-effort — popup badge is already correct */ }
+        },
+        // Bounded pehla-print grace (max ~4.8s): bill abhi 'pending' ho to print
+        // se pehle submit ka mauqa do. Status flip milte hi state update ho kar
+        // foran wapas; warna timeout par pending slip hi chal padti hai —
+        // counter ki raftar kabhi block nahi hoti. Errors silent.
+        async praPrintGrace() {
+            if (this.lastPraStatus !== 'pending' || !this.lastTransactionId || this.lastIsOffline) return;
+            const txnId = this.lastTransactionId;
+            for (let i = 0; i < 4; i++) {
+                await new Promise(r => setTimeout(r, 1200));
+                if (this.lastTransactionId !== txnId) return; // new sale took over
+                if (this.lastPraStatus !== 'pending') return; // badge poll flipped it already
+                const st = await this._fetchPraStatus(txnId);
+                if (st && st.pra_status && st.pra_status !== 'pending') {
+                    this._applyPraStatus(txnId, st);
+                    return;
+                }
+            }
         },
 
         cancelReceiptAutoClose() {

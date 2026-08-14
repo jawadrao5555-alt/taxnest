@@ -394,6 +394,9 @@
         <span style="font-size:13px; font-weight:bold; color:#000;">{{ $transaction->invoice_number }}</span>
         @endif
         @if($rcptTopProvisional)<br><span style="font-size:9px; color:#000;">{{ __('pos.receipt_provisional_note') }}</span>@endif
+        {{-- Task 655: agent-mode bill printed while still 'pending' — chhoti wazahat
+             ke yeh bill PRA ko report ho raha hai (taake "local bill" na samjha jaye). --}}
+        @if(($transaction->pra_status ?? null) === 'pending')<br><span style="font-size:9px; color:#000;">{{ __('pos.receipt_pending_pra_note') }}</span>@endif
     </div>
     @else
     <div class="invoice-numbers">

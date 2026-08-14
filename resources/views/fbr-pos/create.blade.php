@@ -279,6 +279,10 @@ kbd {
             pending: @js($pendingDayCloses),
             closedReports: [],
             errorMsg: '',
+            // Task 689: date => undispatched-count for days the rush-recovery
+            // auto-close SKIPPED (Task 684 guard) — cashier ko wajah dikhani hai.
+            skipped: {},
+            skipReason(n) { return @js(__('pos.dc_skip_reason_undispatched')).replace(':count', n); },
             totalBills() { return this.pending.reduce((s,p) => s + p.count, 0); },
             totalAmount() { return this.pending.reduce((s,p) => s + parseFloat(p.total || 0), 0); },
             fmt(n) { return 'Rs ' + Number(n||0).toLocaleString('en-PK', {minimumFractionDigits: 0, maximumFractionDigits: 0}); },
@@ -294,7 +298,17 @@ kbd {
                     const data = await r.json();
                     if (data.ok) {
                         this.closedReports = data.closed || [];
-                        setTimeout(() => { this.open = false; window.location.reload(); }, 1800);
+                        // Task 689: SKIPPED days (undispatched deliveries) must
+                        // stay visible with the reason — never silently vanish.
+                        this.skipped = {};
+                        (data.skipped || []).forEach(s => { this.skipped[s.date] = s.undispatched; });
+                        const closedDates = (data.closed || []).map(c => c.date);
+                        this.pending = this.pending.filter(p => !closedDates.includes(p.date));
+                        if (Object.keys(this.skipped).length === 0) {
+                            setTimeout(() => { this.open = false; window.location.reload(); }, 1800);
+                        } else {
+                            this.busy = false;
+                        }
                     } else {
                         this.errorMsg = data.error || 'Auto-close failed';
                         this.busy = false;
@@ -316,11 +330,15 @@ kbd {
                     const data = await r.json();
                     if (data.ok) {
                         this.pending = this.pending.filter(p => p.date !== date);
+                        delete this.skipped[date];
                         if (this.pending.length === 0) {
                             setTimeout(() => { this.open = false; window.location.reload(); }, 1000);
                         }
                     } else {
+                        // Task 689: single-date 409 (undispatched deliveries) —
+                        // show the server's message AND pin the reason on the row.
                         this.errorMsg = data.error || 'Close failed';
+                        if (data.undispatched) { this.skipped[date] = data.undispatched; }
                     }
                 } catch (e) {
                     this.errorMsg = 'Network error: ' + e.message;
@@ -386,6 +404,11 @@ kbd {
                                     <p class="text-[11px] text-slate-500 dark:text-slate-400">
                                         <span x-text="p.count"></span> bills ·
                                         <span x-text="fmt(p.total)"></span>
+                                    </p>
+                                    {{-- Task 689: rush-recovery ne yeh din SKIP kiya — wajah dikhao --}}
+                                    <p x-show="skipped[p.date]" x-cloak class="text-[11px] font-semibold text-red-600 dark:text-red-400 mt-0.5">
+                                        ⚠️ <span x-text="skipReason(skipped[p.date])"></span>
+                                        <a href="{{ route('fbrpos.deliveries') }}" class="underline hover:text-red-700 dark:hover:text-red-300">{{ __('pos.deliveries') }}</a>
                                     </p>
                                 </div>
                             </div>

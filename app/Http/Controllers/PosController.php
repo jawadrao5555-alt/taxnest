@@ -9072,7 +9072,12 @@ class PosController extends Controller
         // rows included, closed = a PosDayCloseReport row exists for that date.
         $unclosedPriorDays = $this->unclosedPriorBusinessDays($companyId, $date);
 
-        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit'));
+        // Pending checklist (Task 661, ZFC): undispatched delivery bills HARD-BLOCK
+        // the close (ZFC closed a day while delivery orders never left the shop);
+        // rider unsettled cash is a WARNING only (khata legitimately carries).
+        $pendingDeliveries = $this->undispatchedDeliverySummary($companyId, $company, $date);
+
+        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'pendingDeliveries'));
     }
 
     /**
@@ -9126,6 +9131,108 @@ class PosController extends Controller
         ];
     }
 
+    /**
+     * Undispatched delivery bills for the day-close pending checklist (Task 661,
+     * ZFC waqia): completed delivery bills that never reached a rider's hands —
+     * either ASSIGNED to a rider but not yet dispatched, or UNASSIGNED fresh
+     * delivery bills (same 7-day window as the Deliveries board / sale-screen
+     * popup, Task 512/513 — old pre-feature bills must not brick the close
+     * forever). These HARD-BLOCK the manual close and make the 6 AM auto-close
+     * SKIP the day (same policy as open restaurant orders). 'dispatched' does
+     * NOT block — the rider has the order; its cash is covered by the khata
+     * figures. Rider unsettled cash NEVER blocks (khata legitimately carries to
+     * the next day) — it rides along here as warning-only context.
+     * Feature-gated (riders plan gate + Delivery toggle, mirrors
+     * PosRiderController::deliveryGate) and schema-guarded: non-rider shops get
+     * a zeroed summary and are never blocked by this check.
+     * PUBLIC: AutoCloseDayPos calls it for the skip decision.
+     */
+    public function undispatchedDeliverySummary(int $companyId, ?Company $company, string $date): object
+    {
+        $empty = (object) ['active' => false, 'count' => 0, 'amount' => 0.0, 'assigned' => 0, 'unassigned' => 0, 'khata_count' => 0, 'khata_amount' => 0.0];
+        try {
+            if (! \Schema::hasColumn('pos_transactions', 'rider_id')
+                || ! \Schema::hasColumn('pos_transactions', 'delivery_status')) {
+                return $empty;
+            }
+            $company = $company ?: Company::find($companyId);
+            if (! $company
+                || ! \App\Services\PosFeatureService::planAllows($company, 'riders_enabled')
+                || empty(\App\Services\PosFeatureService::forCompany($company)->delivery)) {
+                return $empty;
+            }
+
+            $hasBizDate = \Schema::hasColumn('pos_transactions', 'business_date');
+            $hasType = \Schema::hasColumn('pos_transactions', 'transaction_type');
+            // Default scope (hide_archived) applies: an archived bill is out of
+            // the operational stream and must not block a close.
+            $rows = PosTransaction::where('company_id', $companyId)
+                ->where('status', 'completed')
+                ->when($hasBizDate,
+                    fn ($q) => $q->where('business_date', '<=', $date),
+                    fn ($q) => $q->whereDate('created_at', '<=', $date))
+                ->when($hasType, fn ($q) => $q->where(function ($w) {
+                    $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
+                }))
+                ->where(function ($q) {
+                    // Assigned to a rider but never handed over (dispatch pending).
+                    $q->where(function ($qa) {
+                        $qa->whereNotNull('rider_id')
+                            ->where('delivery_status', 'assigned')
+                            ->whereNull('rider_settlement_id');
+                    })
+                    // Unassigned fresh delivery bill — nobody is taking it anywhere.
+                    ->orWhere(function ($qu) {
+                        $qu->whereNull('rider_id')
+                            ->whereNull('delivery_status')
+                            ->whereNull('rider_settlement_id')
+                            ->where('order_type', 'delivery')
+                            ->where('created_at', '>=', now()->subDays(7));
+                    });
+                })
+                ->get(['id', 'rider_id', 'total_amount']);
+
+            // Rider unsettled cash khata — warning-only context (whole open
+            // khata, archived included: same scope as the rider settle path).
+            // Own try/catch: a khata-side failure must never zero the BLOCKER
+            // count above (warning data is expendable, the block is not).
+            $khataCount = 0;
+            $khataAmount = 0.0;
+            try {
+                if (\Schema::hasTable('pos_riders')) {
+                $khata = PosTransaction::withoutGlobalScope('hide_archived')
+                    ->where('company_id', $companyId)
+                    ->whereNotNull('rider_id')
+                    ->where('payment_method', 'cash')
+                    ->whereNull('rider_settlement_id')
+                    ->where(function ($q) {
+                        $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
+                    })
+                    ->selectRaw('COUNT(*) as c, COALESCE(SUM(' . \App\Models\PosRider::remainingExpr('pos_transactions') . '),0) as amt')
+                    ->first();
+                    $khataCount = (int) ($khata->c ?? 0);
+                    $khataAmount = round((float) ($khata->amt ?? 0), 2);
+                }
+            } catch (\Throwable $e) {
+                // warning-only figures stay zero
+            }
+
+            return (object) [
+                'active' => true, // delivery feature live — checklist rows render
+                'count' => $rows->count(),
+                'amount' => round((float) $rows->sum('total_amount'), 2),
+                'assigned' => $rows->filter(fn ($t) => $t->rider_id)->count(),
+                'unassigned' => $rows->filter(fn ($t) => ! $t->rider_id)->count(),
+                'khata_count' => $khataCount,
+                'khata_amount' => $khataAmount,
+            ];
+        } catch (\Throwable $e) {
+            // Checklist must never brick day-close on prod schema drift — fail
+            // open (empty summary) exactly like the rider figures helper.
+            return $empty;
+        }
+    }
+
     public function closeDayReport(Request $request)
     {
         // Owner rule (5 Aug 2026): cashier day-close only via company switch / Custom Access tick.
@@ -9155,6 +9262,16 @@ class PosController extends Controller
             ]));
         }
 
+        // HARD BLOCK #2 (Task 661, ZFC waqia): undispatched delivery bills —
+        // assigned-but-not-dispatched or fresh unassigned delivery bills — also
+        // refuse the close. The day is not settled while delivery orders never
+        // left the shop. Rider unsettled cash (khata) deliberately does NOT
+        // block — it carries to the next day (warning on the page only).
+        $pendingDel = $this->undispatchedDeliverySummary($companyId, $company, $date);
+        if ($pendingDel->count > 0) {
+            return back()->with('error', __('pos.dayclose_blocked_undispatched', ['count' => $pendingDel->count]));
+        }
+
         // Local-bill wash at day-close now follows the STANDING company policy set by
         // an admin in Customize POS → Local Billing (save=archive | delete, per bill
         // kind). Cashiers closing the day merely trigger that admin decision — no
@@ -9163,7 +9280,33 @@ class PosController extends Controller
         $request->validate([
             'opening_float' => 'nullable|numeric|min:0|max:99999999',
             'counted_cash' => 'nullable|numeric|min:0|max:99999999',
+            // Per-close wash override (Task 661): same vocabulary as the
+            // standing policy; 'standing' = no override.
+            'wash_override' => 'nullable|in:standing,finalize,save,delete',
         ]);
+        // Per-close action override (Task 661, owner's 3-option choice): an
+        // admin/manager may, for THIS close only, force pending local bills to
+        // PRA-finalize / stay Local (archive) / delete — the standing Customize
+        // policy stays untouched. Cashiers never see the dropdown, and a crafted
+        // value from a cashier is refused outright (settings authority stays
+        // admin-only — same rule as every /pos/settings POST).
+        $washOverride = $request->input('wash_override');
+        $actionOverride = null;
+        if ($washOverride && $washOverride !== 'standing') {
+            // isPosCashier (role), NOT posCashierBlocked (path access): a
+            // cashier granted day-close custom access may CLOSE the day but
+            // still must not override the owner's standing wash policy.
+            if ($user && $user->isPosCashier()) {
+                return back()->with('error', __('pos.only_admin_change_setting'));
+            }
+            $actionOverride = [
+                'provisional' => $washOverride,
+                // Reporting-OFF finals cannot be "finalized" (they already are
+                // final); they follow the override only for save/delete and
+                // keep the standing policy otherwise.
+                'final_local' => in_array($washOverride, ['save', 'delete'], true) ? $washOverride : null,
+            ];
+        }
         $cashRecon = null;
         if ($request->filled('opening_float') || $request->filled('counted_cash')) {
             $cashRecon = [
@@ -9191,7 +9334,7 @@ class PosController extends Controller
         // mint a fabricated zero Z-report. Today's close stays strict too.
         $allowEmpty = $date < \App\Services\PosBusinessDay::current($companyId)
             && $this->unclosedPriorBusinessDays($companyId)->contains($date);
-        $result = $this->performDayClose($companyId, $date, $user?->id, $request->input('notes'), $cashRecon, $allowEmpty);
+        $result = $this->performDayClose($companyId, $date, $user?->id, $request->input('notes'), $cashRecon, $allowEmpty, $actionOverride);
 
         if ($result['status'] === 'exists') {
             return back()->with('error', __('pos.dayclose_report_exists'));
@@ -9996,6 +10139,13 @@ class PosController extends Controller
             ]));
         }
 
+        // Undispatched delivery bills block the bulk close too (Task 661) —
+        // same authority as the single close.
+        $pendingDel = $this->undispatchedDeliverySummary($companyId, $company, \App\Services\PosBusinessDay::current($companyId));
+        if ($pendingDel->count > 0) {
+            return back()->with('error', __('pos.dayclose_blocked_undispatched', ['count' => $pendingDel->count]));
+        }
+
         if ($this->unclosedPriorBusinessDays($companyId)->isEmpty()) {
             return back()->with('success', __('pos.dc_bulk_none_pending'));
         }
@@ -10056,7 +10206,7 @@ class PosController extends Controller
         return redirect()->route('pos.day-close')->with('success', $msg);
     }
 
-    public function performDayClose(int $companyId, string $date, ?int $closedBy, ?string $notes = null, ?array $cashRecon = null, bool $allowEmpty = false): array
+    public function performDayClose(int $companyId, string $date, ?int $closedBy, ?string $notes = null, ?array $cashRecon = null, bool $allowEmpty = false, ?array $actionOverride = null): array
     {
         $existing = PosDayCloseReport::where('company_id', $companyId)
             ->whereDate('report_date', $date)
@@ -10075,6 +10225,21 @@ class PosController extends Controller
         $finalAction = in_array($company->pos_dayclose_final_local_action ?? 'save', ['save', 'delete'], true)
             ? ($company->pos_dayclose_final_local_action ?? 'save') : 'save';
         $spendPersist = (bool) ($company->pos_customer_spend_persist ?? true);
+
+        // Per-close override (Task 661): applies to THIS close only — the
+        // standing policy on the company row stays untouched, and the auto-close
+        // command never passes one (it always runs the standing policy).
+        // Resolved BEFORE the finalize sweep so an override to 'finalize' runs it.
+        // All downstream guards (rider delete-guard, deleted-count quota
+        // counters, draft/backlog rules, return exclusion) apply unchanged.
+        if (is_array($actionOverride)) {
+            if (in_array($actionOverride['provisional'] ?? null, ['save', 'delete', 'carry', 'finalize'], true)) {
+                $provAction = $actionOverride['provisional'];
+            }
+            if (in_array($actionOverride['final_local'] ?? null, ['save', 'delete'], true)) {
+                $finalAction = $actionOverride['final_local'];
+            }
+        }
 
         // ── AUTO-FINALIZE SWEEP (owner option, Aug 2026): promote every pending
         // provisional through the SAME core path F10 Make Final uses (quota gate,

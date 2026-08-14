@@ -417,6 +417,95 @@
     @endif
 
     @if(!$existingReport)
+    {{-- ═══ Pending checklist (Task 661, ZFC): everything that must be settled
+         BEFORE the day can close, in one glance. Blockers (open orders,
+         undispatched deliveries) hard-stop the close; pending local bills are
+         handled by the wash policy; rider khata is a warning only. ═══ --}}
+    @php
+        $pd = $pendingDeliveries ?? (object) ['active' => false, 'count' => 0, 'amount' => 0, 'assigned' => 0, 'unassigned' => 0, 'khata_count' => 0, 'khata_amount' => 0];
+        $clProv = in_array($company->pos_dayclose_provisional_action ?? 'save', ['save','delete','carry','finalize'], true) ? ($company->pos_dayclose_provisional_action ?? 'save') : 'save';
+        $clPendingLocal = ($localWash->prov_count ?? 0) + ($localWash->final_count ?? 0);
+        $clRows = [
+            ['count' => $openOrders ?? 0, 'block' => true],
+            ['count' => $pd->count, 'block' => true],
+            ['count' => $clPendingLocal, 'block' => false],
+            ['count' => $pd->khata_count, 'block' => false],
+        ];
+        $clBlocked = ($openOrders ?? 0) > 0 || $pd->count > 0;
+    @endphp
+    <div class="bg-white dark:bg-gray-900 rounded-xl border {{ $clBlocked ? 'border-red-300 dark:border-red-800' : 'border-gray-200 dark:border-gray-700' }} shadow-md p-5 mb-6">
+        <h3 class="font-semibold text-gray-900 dark:text-white mb-1">{{ __('pos.dc_checklist_title') }}</h3>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ __('pos.dc_checklist_hint') }}</p>
+        <ul class="space-y-2">
+            {{-- 1. Open restaurant orders — BLOCKER (restaurant-mode shops only) --}}
+            @if(($company->restaurant_mode ?? false) || ($openOrders ?? 0) > 0)
+            <li class="flex flex-wrap items-center gap-2 text-sm p-2.5 rounded-lg {{ ($openOrders ?? 0) > 0 ? 'bg-red-50 dark:bg-red-900/20' : 'bg-emerald-50/60 dark:bg-emerald-900/10' }}">
+                <span class="font-bold {{ ($openOrders ?? 0) > 0 ? 'text-red-600' : 'text-emerald-600' }}">{{ ($openOrders ?? 0) > 0 ? '✗' : '✓' }}</span>
+                <span class="font-semibold text-gray-900 dark:text-white">{{ __('pos.dc_check_open_orders') }}</span>
+                @if(($openOrders ?? 0) > 0)
+                <span class="text-red-700 dark:text-red-300 font-bold">{{ $openOrders }}</span>
+                @if(!empty($openHeld->tableNumbers ?? ''))<span class="text-xs text-red-700 dark:text-red-300">{{ __('pos.dc_open_tables_list', ['tables' => $openHeld->tableNumbers]) }}</span>@endif
+                <span class="ml-auto flex items-center gap-2">
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">{{ __('pos.dc_check_blocks') }}</span>
+                    <a href="{{ route('pos.invoice.create') }}" class="text-xs underline font-semibold text-red-700 dark:text-red-300">{{ __('pos.dc_open_table_board') }}</a>
+                </span>
+                @else
+                <span class="ml-auto text-xs font-semibold text-emerald-600 dark:text-emerald-400">{{ __('pos.dc_check_clear') }}</span>
+                @endif
+            </li>
+            @endif
+            {{-- 2. Undispatched delivery bills — BLOCKER (ZFC waqia; delivery-feature shops only) --}}
+            @if($pd->active)
+            <li class="flex flex-wrap items-center gap-2 text-sm p-2.5 rounded-lg {{ $pd->count > 0 ? 'bg-red-50 dark:bg-red-900/20' : 'bg-emerald-50/60 dark:bg-emerald-900/10' }}">
+                <span class="font-bold {{ $pd->count > 0 ? 'text-red-600' : 'text-emerald-600' }}">{{ $pd->count > 0 ? '✗' : '✓' }}</span>
+                <span class="font-semibold text-gray-900 dark:text-white">{{ __('pos.dc_check_undispatched') }}</span>
+                @if($pd->count > 0)
+                <span class="text-xs text-red-700 dark:text-red-300 font-semibold">{{ __('pos.dc_undispatched_detail', ['count' => $pd->count, 'amount' => number_format($pd->amount)]) }}</span>
+                <span class="ml-auto flex items-center gap-2">
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">{{ __('pos.dc_check_blocks') }}</span>
+                    <a href="{{ route('pos.deliveries') }}" class="text-xs underline font-semibold text-red-700 dark:text-red-300">{{ __('pos.dc_open_deliveries_board') }}</a>
+                </span>
+                @else
+                <span class="ml-auto text-xs font-semibold text-emerald-600 dark:text-emerald-400">{{ __('pos.dc_check_clear') }}</span>
+                @endif
+            </li>
+            @endif
+            {{-- 3. Pending local / provisional bills — handled by policy/override --}}
+            <li class="flex flex-wrap items-center gap-2 text-sm p-2.5 rounded-lg {{ $clPendingLocal > 0 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-emerald-50/60 dark:bg-emerald-900/10' }}">
+                <span class="font-bold {{ $clPendingLocal > 0 ? 'text-amber-600' : 'text-emerald-600' }}">{{ $clPendingLocal > 0 ? '!' : '✓' }}</span>
+                <span class="font-semibold text-gray-900 dark:text-white">{{ __('pos.dc_check_pending_local') }}</span>
+                @if($clPendingLocal > 0)
+                <span class="text-xs text-amber-700 dark:text-amber-300 font-semibold">{{ $clPendingLocal }} {{ __('pos.bills_word') }} — PKR {{ number_format(($localWash->prov_amount ?? 0) + ($localWash->final_amount ?? 0)) }}</span>
+                <span class="ml-auto flex items-center gap-2">
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ $clProv === 'delete' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' : ($clProv === 'carry' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' : ($clProv === 'finalize' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300')) }}">{{ $clProv === 'delete' ? __('pos.badge_delete') : ($clProv === 'carry' ? __('pos.badge_carry') : ($clProv === 'finalize' ? __('pos.badge_finalize') : __('pos.badge_archive'))) }}</span>
+                    <a href="{{ route('pos.local.index') }}" class="text-xs underline font-semibold text-amber-700 dark:text-amber-300">{{ __('pos.view_btn') }}</a>
+                </span>
+                @if($clProv === 'carry')
+                <span class="basis-full text-[11px] text-indigo-700 dark:text-indigo-300 font-semibold">{{ __('pos.dc_carry_pending_note') }}</span>
+                @endif
+                @else
+                <span class="ml-auto text-xs font-semibold text-emerald-600 dark:text-emerald-400">{{ __('pos.dc_check_clear') }}</span>
+                @endif
+            </li>
+            {{-- 4. Rider unsettled cash khata — WARNING ONLY, never blocks --}}
+            @if($pd->active)
+            <li class="flex flex-wrap items-center gap-2 text-sm p-2.5 rounded-lg {{ $pd->khata_count > 0 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-emerald-50/60 dark:bg-emerald-900/10' }}">
+                <span class="font-bold {{ $pd->khata_count > 0 ? 'text-amber-600' : 'text-emerald-600' }}">{{ $pd->khata_count > 0 ? '!' : '✓' }}</span>
+                <span class="font-semibold text-gray-900 dark:text-white">{{ __('pos.dc_check_rider_khata') }}</span>
+                @if($pd->khata_count > 0)
+                <span class="text-xs text-amber-700 dark:text-amber-300 font-semibold">{{ __('pos.dc_rider_khata_note', ['amount' => number_format($pd->khata_amount), 'count' => $pd->khata_count]) }}</span>
+                <span class="ml-auto flex items-center gap-2">
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">{{ __('pos.dc_check_warn_only') }}</span>
+                    <a href="{{ route('pos.deliveries') }}" class="text-xs underline font-semibold text-amber-700 dark:text-amber-300">{{ __('pos.dc_open_deliveries_board') }}</a>
+                </span>
+                @else
+                <span class="ml-auto text-xs font-semibold text-emerald-600 dark:text-emerald-400">{{ __('pos.dc_check_clear') }}</span>
+                @endif
+            </li>
+            @endif
+        </ul>
+    </div>
+
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
         <h3 class="font-semibold text-gray-900 dark:text-white mb-3">{{ __('pos.close_day') }}</h3>
         <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">{{ __('pos.close_day_hint', ['date' => \Carbon\Carbon::parse($date)->format('d M Y')]) }}</p>
@@ -484,6 +573,21 @@
                     </p>
                 </div>
             </div>
+            {{-- Per-close action override (Task 661, owner's 3-option choice):
+                 admin/manager only; applies to THIS close only — the standing
+                 Customize policy stays untouched. Auto-close never uses it. --}}
+            @if(auth('pos')->user() && !auth('pos')->user()->isPosCashier() && (($localWash->prov_count ?? 0) + ($localWash->final_count ?? 0)) > 0)
+            <div class="mb-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.wash_override_label') }}</label>
+                <select name="wash_override" class="w-full sm:w-auto rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm focus:ring-purple-500 focus:border-purple-500">
+                    <option value="standing" selected>{{ __('pos.wash_override_standing') }}</option>
+                    <option value="finalize">{{ __('pos.wash_override_finalize') }}</option>
+                    <option value="save">{{ __('pos.wash_override_save') }}</option>
+                    <option value="delete">{{ __('pos.wash_override_delete') }}</option>
+                </select>
+                <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.wash_override_hint') }}</p>
+            </div>
+            @endif
             @if(($localWash->prov_count ?? 0) > 0 && $lbProv !== 'carry' && $lbProv !== 'finalize')
             {{-- Aug 2026: pending provisionals warning at the CLOSE button too. --}}
             <div class="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border-2 border-red-400 dark:border-red-700">
@@ -512,6 +616,22 @@
                     </p>
                 </div>
             </div>
+            @endif
+            @if(($pendingDeliveries->count ?? 0) > 0)
+            {{-- Task 661 (ZFC): undispatched delivery bills HARD-BLOCK too — the
+                 day is not settled while delivery orders never left the shop.
+                 Server (closeDayReport) enforces this as the authority. --}}
+            <div class="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border-2 border-red-400 dark:border-red-700">
+                <div class="text-sm">
+                    <span class="font-bold text-red-800 dark:text-red-300">{{ __('pos.dayclose_blocked_undispatched', ['count' => $pendingDeliveries->count]) }}</span>
+                    <p class="text-xs font-semibold text-red-800 dark:text-red-300 mt-1">{{ __('pos.dc_undispatched_detail', ['count' => $pendingDeliveries->count, 'amount' => number_format($pendingDeliveries->amount)]) }}</p>
+                    <p class="text-xs font-bold text-red-700 dark:text-red-400 mt-0.5">
+                        <a href="{{ route('pos.deliveries') }}" class="underline font-semibold">{{ __('pos.dc_open_deliveries_board') }}</a>
+                    </p>
+                </div>
+            </div>
+            @endif
+            @if(($openOrders ?? 0) > 0 || ($pendingDeliveries->count ?? 0) > 0)
             <button type="button" disabled
                 class="px-6 py-2.5 bg-gray-400 dark:bg-gray-600 text-white font-semibold rounded-lg cursor-not-allowed text-sm flex items-center gap-2" title="{{ __('pos.dayclose_blocked_hint') }}">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
@@ -858,6 +978,7 @@
     @endphp
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6"
          x-data="{ cutoff: '{{ $currentCutoff }}', saving: false, msg: '', ok: true,
+            autoOn: {{ ($company->pos_auto_dayclose_24h ?? false) ? 'true' : 'false' }}, autoMsg: '', autoOk: true,
             save() {
                 this.saving = true; this.msg = '';
                 fetch('{{ route('pos.settings.dayclose-cutoff') }}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ cutoff: this.cutoff }) })
@@ -865,6 +986,13 @@
                     .then(d => { this.ok = !!(d && d.success); this.msg = (d && d.message) || (this.ok ? @js(__('pos.saved_dot')) : @js(__('pos.setting_save_failed'))); })
                     .catch(() => { this.ok = false; this.msg = @js(__('pos.setting_save_failed')); })
                     .finally(() => { this.saving = false; });
+            },
+            toggleAuto() {
+                this.autoMsg = '';
+                fetch('{{ route('pos.settings.auto-dayclose-toggle') }}', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ enabled: this.autoOn }) })
+                    .then(r => r.json())
+                    .then(d => { this.autoOk = !!(d && d.success); this.autoMsg = (d && d.message) || (this.autoOk ? @js(__('pos.saved_dot')) : @js(__('pos.setting_save_failed'))); if (!this.autoOk) { this.autoOn = !this.autoOn; } })
+                    .catch(() => { this.autoOk = false; this.autoMsg = @js(__('pos.setting_save_failed')); this.autoOn = !this.autoOn; });
             } }">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
@@ -886,6 +1014,19 @@
             </div>
         </div>
         <p x-show="msg" x-cloak class="text-xs mt-2" :class="ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'" x-text="msg"></p>
+        {{-- Auto day-close on/off RIGHT NEXT to the cutoff selector (Task 661,
+             owner tajweez): same flag as the Customize → Local Billing toggle
+             (pos_auto_dayclose_24h) via the same cashier-gated endpoint —
+             both places read/write ONE setting. --}}
+        <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 flex flex-wrap items-start gap-3">
+            <input type="checkbox" id="dc-auto-close-chk" x-model="autoOn" @change="toggleAuto()"
+                class="mt-0.5 w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-purple-600 focus:ring-purple-500">
+            <label for="dc-auto-close-chk" class="cursor-pointer flex-1 min-w-0">
+                <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.auto_dayclose_6am') }}</span>
+                <span class="block text-[11px] text-gray-500 dark:text-gray-400">{{ __('pos.auto_dayclose_6am_sub') }}</span>
+            </label>
+            <span x-show="autoMsg" x-cloak class="text-xs font-semibold shrink-0" :class="autoOk ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'" x-text="autoMsg"></span>
+        </div>
     </div>
     @endif
 

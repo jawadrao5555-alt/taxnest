@@ -81,26 +81,42 @@ class AutoCloseDayPos extends Command
                 // while a table is still occupied — staff or the owner must close
                 // manually once the orders are settled. The command runs hourly,
                 // so the day will auto-close on the NEXT run if no orders remain.
+                $openCount = 0;
                 if ($company->restaurant_mode && \Schema::hasTable('restaurant_orders')) {
                     $openCount = \App\Models\RestaurantOrder::where('company_id', $company->id)
                         ->whereIn('status', ['held', 'preparing', 'ready'])
                         ->whereHas('items')
                         ->count();
-                    if ($openCount > 0) {
-                        $msg = "Company {$company->id}: auto-close SKIPPED — {$openCount} open order(s) still active. Staff must settle and close manually.";
-                        $this->warn($msg);
-                        Log::warning('pos:auto-dayclose skipped — open orders', [
-                            'company_id' => $company->id,
-                            'open_orders' => $openCount,
-                            'dates_pending' => $dates->values(),
-                        ]);
-                        // Task 454: alert the owner by email — the log line alone
-                        // reaches nobody. Throttled to ONE email per company per
-                        // calendar day (the command runs hourly); if the day is
-                        // still stranded tomorrow, tomorrow's run alerts again.
-                        $this->sendSkipAlert($company, $openCount, $dates);
-                        continue; // skip to next company
-                    }
+                }
+
+                // Task 661 (ZFC): undispatched delivery bills ALSO make the sweep
+                // skip — the ZFC owner's day auto-closed while delivery orders
+                // never left the shop. Checked against the LATEST pending date so
+                // a fresh today-only delivery never blocks closing older days.
+                // Feature/schema-gated inside the helper (zero for non-rider
+                // shops); pass null so the helper loads the full Company row.
+                $undispatched = 0;
+                try {
+                    $undispatched = $pos->undispatchedDeliverySummary((int) $company->id, null, (string) $dates->max())->count;
+                } catch (\Throwable $e) {
+                    $undispatched = 0; // never let the checklist break the sweep
+                }
+
+                if ($openCount > 0 || $undispatched > 0) {
+                    $msg = "Company {$company->id}: auto-close SKIPPED — {$openCount} open order(s), {$undispatched} undispatched delivery bill(s). Staff must settle and close manually.";
+                    $this->warn($msg);
+                    Log::warning('pos:auto-dayclose skipped — open orders / undispatched deliveries', [
+                        'company_id' => $company->id,
+                        'open_orders' => $openCount,
+                        'undispatched_deliveries' => $undispatched,
+                        'dates_pending' => $dates->values(),
+                    ]);
+                    // Task 454: alert the owner by email — the log line alone
+                    // reaches nobody. Throttled to ONE email per company per
+                    // calendar day (the command runs hourly); if the day is
+                    // still stranded tomorrow, tomorrow's run alerts again.
+                    $this->sendSkipAlert($company, $openCount, $dates, $undispatched);
+                    continue; // skip to next company
                 }
 
                 // A system-run close still records a closer — use the company admin.
@@ -159,7 +175,7 @@ class AutoCloseDayPos extends Command
      * still stranded on the NEXT morning's run triggers a fresh alert. Mail
      * failure never breaks the close loop — the log warning already exists.
      */
-    private function sendSkipAlert(Company $company, int $openCount, $pendingDates): void
+    private function sendSkipAlert(Company $company, int $openCount, $pendingDates, int $undispatchedCount = 0): void
     {
         $cacheKey = 'pos_autoclose_skip_alert:' . $company->id . ':' . today()->toDateString();
         try {
@@ -188,28 +204,40 @@ class AutoCloseDayPos extends Command
             }
 
             // Which tables are still occupied (dine-in orders with a table).
-            $tables = \App\Models\RestaurantOrder::where('company_id', $company->id)
-                ->whereIn('status', ['held', 'preparing', 'ready'])
-                ->whereHas('items')
-                ->with('table:id,table_number')
-                ->get(['id', 'table_id'])
-                ->pluck('table.table_number')
-                ->filter()
-                ->unique()
-                ->values();
+            $tables = $openCount > 0
+                ? \App\Models\RestaurantOrder::where('company_id', $company->id)
+                    ->whereIn('status', ['held', 'preparing', 'ready'])
+                    ->whereHas('items')
+                    ->with('table:id,table_number')
+                    ->get(['id', 'table_id'])
+                    ->pluck('table.table_number')
+                    ->filter()
+                    ->unique()
+                    ->values()
+                : collect();
 
             $pendingList = collect($pendingDates)->implode(', ');
 
+            // Task 661: the alert states EVERY skip reason — open orders and/or
+            // undispatched delivery bills (either alone can strand the day).
+            $reasons = [];
+            if ($openCount > 0) {
+                $reasons[] = "{$openCount} order(s) abhi bhi open hain"
+                    . ($tables->isNotEmpty() ? ' (tables: ' . $tables->implode(', ') . ')' : '');
+            }
+            if ($undispatchedCount > 0) {
+                $reasons[] = "{$undispatchedCount} delivery bill(s) abhi tak kisi rider ko dispatch nahi hui";
+            }
+
             $paragraphs = [
-                "Aaj ka auto day-close skip ho gaya kyunke {$openCount} order(s) abhi bhi open hain"
-                    . ($tables->isNotEmpty() ? ' (tables: ' . $tables->implode(', ') . ')' : '') . '.',
+                'Aaj ka auto day-close skip ho gaya kyunke ' . implode(' aur ', $reasons) . '.',
                 "Pending day(s): {$pendingList}.",
-                'Kya karna hai: pehle sab open orders settle karein (payment le kar band karein), phir POS ke Day Close page se din khud close karein.',
-                'Agar orders settle ho jayen to agla auto-close run (har ghantay) din khud band kar dega — lekin intezaar na karein, manually close karna behtar hai.',
+                'Kya karna hai: pehle sab open orders settle karein (payment le kar band karein) aur delivery bills riders ko dispatch/settle karein, phir POS ke Day Close page se din khud close karein.',
+                'Agar sab kuch settle ho jaye to agla auto-close run (har ghantay) din khud band kar dega — lekin intezaar na karein, manually close karna behtar hai.',
             ];
 
             \Illuminate\Support\Facades\Mail::to($email)->send(new \App\Mail\TrialReminderMail(
-                subjectLine: 'Day Close skip ho gaya — orders abhi open hain',
+                subjectLine: 'Day Close skip ho gaya — kaam abhi pending hai',
                 companyName: $company->name ?? 'your company',
                 headline: 'Auto Day-Close skip ho gaya',
                 paragraphs: $paragraphs,

@@ -151,6 +151,9 @@ Schedule::command('import-batches:prune')->dailyAt('04:45');
 // (6 AM next-morning rule, owner 23 Jul 2026 — a day closes at 6:00 AM the next
 // morning if nobody closed it manually; before 6 AM yesterday stays open).
 Schedule::command('pos:auto-dayclose')->hourly()->withoutOverlapping();
+// Task 676 — FBR twin: auto-close FBR POS trading days (same checkbox flag,
+// product_type='fbrpos'), with the ZFC undispatched-deliveries skip.
+Schedule::command('fbrpos:auto-dayclose')->hourly()->withoutOverlapping();
 // Owner-facing agent-offline alert (Task 630, Frost & Brew): silent-print POS
 // shops whose Desktop Agent has been offline >2h get ONE email per outage
 // ("PC/agent chalu karein") — dedup via agent_offline_notified_at, cleared on

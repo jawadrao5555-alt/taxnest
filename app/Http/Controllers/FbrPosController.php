@@ -331,6 +331,61 @@ class FbrPosController extends Controller
         return response()->json(['success' => true, 'redirect' => route('fbrpos.failQueue')]);
     }
 
+    /**
+     * Day-close page → persist "auto day-close next morning" (Task 676 — FBR
+     * mirror of PosController::toggleAutoDayclose). Same company flag
+     * (pos_auto_dayclose_24h); the hourly fbrpos:auto-dayclose command reads it.
+     */
+    public function toggleAutoDayclose(Request $request)
+    {
+        $user = Auth::guard('fbrpos')->user();
+        if (!$user || $user->posCashierBlocked()) {
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
+        }
+        $company = Company::find(app('currentCompanyId'));
+        $company->pos_auto_dayclose_24h = $request->boolean('enabled');
+        $company->save();
+
+        return response()->json([
+            'success' => true,
+            'enabled' => (bool) $company->pos_auto_dayclose_24h,
+            'message' => $company->pos_auto_dayclose_24h ? __('pos.auto_dayclose_enabled') : __('pos.auto_dayclose_disabled'),
+        ]);
+    }
+
+    /**
+     * Day-close page → persist the trading-day cutoff (Task 676 — FBR mirror of
+     * PosController::updateDaycloseCutoff). Same shared company column
+     * (pos_business_day_cutoff) that PosBusinessDay::cutoffFor reads.
+     */
+    public function updateDaycloseCutoff(Request $request)
+    {
+        $user = Auth::guard('fbrpos')->user();
+        if (!$user || $user->posCashierBlocked()) {
+            return response()->json(['success' => false, 'message' => __('pos.only_admin_change_setting')], 403);
+        }
+
+        $cutoff = (string) $request->input('cutoff', '');
+        if (!preg_match('/^([01]\d):(00|30)$/', $cutoff) || $cutoff >= '12:00') {
+            return response()->json(['success' => false, 'message' => __('pos.dayclose_time_range')], 422);
+        }
+
+        $company = Company::find(app('currentCompanyId'));
+        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'pos_business_day_cutoff')) {
+            $company->pos_business_day_cutoff = $cutoff;
+            $company->save();
+            \App\Services\PosBusinessDay::forgetCutoff($company->id);
+        } else {
+            return response()->json(['success' => false, 'message' => __('pos.setting_not_available_try_later')], 503);
+        }
+
+        return response()->json([
+            'success' => true,
+            'cutoff' => $cutoff,
+            'message' => __('pos.dayclose_time_saved', ['time' => \Carbon\Carbon::createFromFormat('H:i', $cutoff)->format('g:i A')]),
+        ]);
+    }
+
     public function updateTheme(Request $request)
     {
         $theme = $request->input('theme', 'blue');
@@ -538,6 +593,12 @@ class FbrPosController extends Controller
     private ?array $lastFinalizeSweep = null;
 
     /**
+     * Provisionals permanently deleted by the per-close 'delete' override in
+     * performDayClose (this request only) — closeDayReport reads it for the flash.
+     */
+    private int $lastWashDeleted = 0;
+
+    /**
      * AUTO-FINALIZE SWEEP ('finalize' pending-bill policy — FBR mirror of the PRA
      * 'Khud Final' option, Aug 2026). Promotes every pending provisional bill
      * (invoice_mode='local' + fbr_status='local', created on or before the close
@@ -643,7 +704,7 @@ class FbrPosController extends Controller
      *   - Idempotent: returns existing report when already closed (never throws on duplicate intent)
      *   - Returns null only when no transactions exist for that date
      */
-    private function performDayClose(int $companyId, string $date, ?int $userId, ?string $notes = null, ?array $cashRecon = null, bool $allowEmpty = false): ?FbrDayCloseReport
+    public function performDayClose(int $companyId, string $date, ?int $userId, ?string $notes = null, ?array $cashRecon = null, bool $allowEmpty = false, ?array $actionOverride = null): ?FbrDayCloseReport
     {
         // Fast-path: already closed → return without locking
         $existing = FbrDayCloseReport::where('company_id', $companyId)
@@ -658,10 +719,41 @@ class FbrPosController extends Controller
         // figures are queried so freshly-finalized bills count in this very Z-report.
         // NO receipt print (customer not present; printing is client-side anyway).
         // Bills that cannot be finalized are CARRIED — never deleted.
+        // Per-close override (Task 676 — FBR mirror of Task 661): an admin may
+        // force finalize / keep-local / delete for THIS close only; the standing
+        // Customize policy stays untouched. Auto-close never passes an override.
         $company = Company::find($companyId);
-        if (($company?->pos_dayclose_provisional_action ?? null) === 'finalize') {
-            $this->lastFinalizeSweep = $this->finalizeFbrProvisionalsAtDayClose($companyId, $company, $date);
+        $provAction = $company?->pos_dayclose_provisional_action ?? null;
+        if (is_array($actionOverride)
+            && in_array($actionOverride['provisional'] ?? null, ['save', 'delete', 'carry', 'finalize'], true)) {
+            $provAction = $actionOverride['provisional'];
         }
+        if ($provAction === 'finalize') {
+            $this->lastFinalizeSweep = $this->finalizeFbrProvisionalsAtDayClose($companyId, $company, $date);
+        } elseif ($provAction === 'delete') {
+            // Permanent delete of the day's pending provisionals (local+local
+            // triple, biz-date ≤ close date) — same definition and item cleanup
+            // as apiDeleteProvisional, batched. Month gate does not apply: a
+            // deliberate delete removes the backlog too (PRA parity).
+            $this->lastWashDeleted = 0;
+            $ids = FbrPosTransaction::where('company_id', $companyId)
+                ->tap(fn ($q) => $this->whereBizDate($q, $date, '<='))
+                ->where('invoice_mode', 'local')
+                ->where('fbr_status', 'local')
+                ->pluck('id');
+            if ($ids->isNotEmpty()) {
+                \DB::transaction(function () use ($ids, $companyId) {
+                    FbrPosTransactionItem::whereIn('transaction_id', $ids)->delete();
+                    $this->lastWashDeleted = FbrPosTransaction::where('company_id', $companyId)
+                        ->whereIn('id', $ids)
+                        ->where('invoice_mode', 'local')
+                        ->where('fbr_status', 'local')
+                        ->delete();
+                });
+            }
+        }
+        // 'save' / 'carry' / null: bills simply stay Local (FBR has no archive
+        // concept — provisionals carry forward untouched).
 
         // Task 492: the persisted Z-report keys on business_date — same bucket
         // as the preview/PDF/thermal paths, so a 1 AM sale closes with its
@@ -3942,7 +4034,25 @@ class FbrPosController extends Controller
         // is OUT of the drawer; earlier-day settlements are IN).
         $riderFigures = $this->buildFbrRiderDayFigures($companyId, $date);
 
-        return view('fbr-pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'analytics', 'pendingAutoFinal', 'unclosedPriorDays', 'riderFigures'));
+        // Pending checklist (Task 676 — FBR mirror of PRA Task 661, ZFC):
+        // undispatched delivery bills HARD-BLOCK the close; rider unsettled
+        // cash is a WARNING only (khata legitimately carries).
+        $pendingDeliveries = $this->undispatchedDeliverySummary($companyId, $company, $date);
+
+        // Pending local (provisional) bills of the day — checklist row +
+        // per-close override visibility. Triple filter = FBR provisional
+        // definition (completed + local + local).
+        $pendingLocal = FbrPosTransaction::where('company_id', $companyId)
+            ->tap(fn ($q) => $this->whereBizDate($q, $date, '<='))
+            ->where('status', 'completed')
+            ->where('invoice_mode', 'local')
+            ->where('fbr_status', 'local')
+            ->selectRaw('COUNT(*) as c, COALESCE(SUM(total_amount),0) as amt')
+            ->first();
+        $pendingLocalCount = (int) ($pendingLocal->c ?? 0);
+        $pendingLocalAmount = (float) ($pendingLocal->amt ?? 0);
+
+        return view('fbr-pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'analytics', 'pendingAutoFinal', 'unclosedPriorDays', 'riderFigures', 'pendingDeliveries', 'pendingLocalCount', 'pendingLocalAmount'));
     }
 
     /**
@@ -4387,6 +4497,104 @@ class FbrPosController extends Controller
      * performDayClose routine per day — no parallel close path. Empty stranded
      * days get a zero-figure Z-report ($allowEmpty) so they leave the banner.
      */
+    /**
+     * Undispatched delivery bills for the FBR day-close pending checklist
+     * (Task 676 — FBR mirror of PRA Task 661, ZFC waqia): completed delivery
+     * bills that never reached a rider's hands — either ASSIGNED to a rider
+     * but not yet dispatched, or UNASSIGNED fresh delivery bills (same 7-day
+     * window as the Deliveries board / sale-screen popup — old pre-feature
+     * bills must not brick the close forever). These HARD-BLOCK the manual
+     * close and make the hourly auto-close SKIP the day (skip_alert policy).
+     * 'dispatched' does NOT block — the rider has the order; its cash is
+     * covered by the khata figures. Rider unsettled cash NEVER blocks (khata
+     * legitimately carries to the next day) — warning-only context here.
+     * Feature-gated (riders plan gate + Delivery toggle, mirrors
+     * FbrPosRiderController::deliveryGate) and schema-guarded: non-rider shops
+     * get a zeroed summary and are never blocked by this check.
+     * PUBLIC: AutoCloseDayFbrPos calls it for the skip decision.
+     */
+    public function undispatchedDeliverySummary(int $companyId, ?Company $company, string $date): object
+    {
+        $empty = (object) ['active' => false, 'count' => 0, 'amount' => 0.0, 'assigned' => 0, 'unassigned' => 0, 'khata_count' => 0, 'khata_amount' => 0.0];
+        try {
+            if (! \Schema::hasColumn('fbr_pos_transactions', 'rider_id')
+                || ! \Schema::hasColumn('fbr_pos_transactions', 'delivery_status')) {
+                return $empty;
+            }
+            $company = $company ?: Company::find($companyId);
+            if (! $company
+                || ! \App\Services\PosFeatureService::planAllows($company, 'riders_enabled')
+                || empty(\App\Services\PosFeatureService::forCompany($company)->delivery)) {
+                return $empty;
+            }
+
+            $hasBizDate = $this->hasBizDate();
+            $hasType = \Schema::hasColumn('fbr_pos_transactions', 'transaction_type');
+            $rows = FbrPosTransaction::where('company_id', $companyId)
+                ->where('status', 'completed')
+                ->when($hasBizDate,
+                    fn ($q) => $q->where('business_date', '<=', $date),
+                    fn ($q) => $q->whereDate('created_at', '<=', $date))
+                ->when($hasType, fn ($q) => $q->where(function ($w) {
+                    $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
+                }))
+                ->where(function ($q) {
+                    // Assigned to a rider but never handed over (dispatch pending).
+                    $q->where(function ($qa) {
+                        $qa->whereNotNull('rider_id')
+                            ->where('delivery_status', 'assigned')
+                            ->whereNull('rider_settlement_id');
+                    })
+                    // Unassigned fresh delivery bill — nobody is taking it anywhere.
+                    ->orWhere(function ($qu) {
+                        $qu->whereNull('rider_id')
+                            ->whereNull('delivery_status')
+                            ->whereNull('rider_settlement_id')
+                            ->where('order_type', 'delivery')
+                            ->where('created_at', '>=', now()->subDays(7));
+                    });
+                })
+                ->get(['id', 'rider_id', 'total_amount']);
+
+            // Rider unsettled cash khata — warning-only context (whole open
+            // khata, same scope as the rider settle path). Own try/catch: a
+            // khata-side failure must never zero the BLOCKER count above.
+            $khataCount = 0;
+            $khataAmount = 0.0;
+            try {
+                if (\Schema::hasTable('pos_riders')) {
+                    $khata = FbrPosTransaction::where('company_id', $companyId)
+                        ->whereNotNull('rider_id')
+                        ->where('payment_method', 'cash')
+                        ->whereNull('rider_settlement_id')
+                        ->where(function ($q) {
+                            $q->whereNull('delivery_status')->orWhere('delivery_status', '!=', 'returned');
+                        })
+                        ->selectRaw('COUNT(*) as c, COALESCE(SUM(' . \App\Models\PosRider::remainingExpr('fbr_pos_transactions') . '),0) as amt')
+                        ->first();
+                    $khataCount = (int) ($khata->c ?? 0);
+                    $khataAmount = round((float) ($khata->amt ?? 0), 2);
+                }
+            } catch (\Throwable $e) {
+                // warning-only figures stay zero
+            }
+
+            return (object) [
+                'active' => true, // delivery feature live — checklist rows render
+                'count' => $rows->count(),
+                'amount' => round((float) $rows->sum('total_amount'), 2),
+                'assigned' => $rows->filter(fn ($t) => $t->rider_id)->count(),
+                'unassigned' => $rows->filter(fn ($t) => ! $t->rider_id)->count(),
+                'khata_count' => $khataCount,
+                'khata_amount' => $khataAmount,
+            ];
+        } catch (\Throwable $e) {
+            // Checklist must never brick day-close on prod schema drift — fail
+            // open (empty summary) exactly like the rider figures helper.
+            return $empty;
+        }
+    }
+
     public function closeAllPriorDays(Request $request)
     {
         // Same authority gate as the single close (owner rule 5 Aug 2026).
@@ -4466,11 +4674,39 @@ class FbrPosController extends Controller
             return back()->with('error', __('pos.dayclose_report_exists'));
         }
 
+        // HARD BLOCK (Task 676 — FBR mirror of PRA Task 661, ZFC waqia):
+        // undispatched delivery bills — assigned-but-not-dispatched or fresh
+        // unassigned delivery bills — refuse the close. The day is not settled
+        // while delivery orders never left the shop. Rider unsettled cash
+        // (khata) deliberately does NOT block — it carries to the next day
+        // (warning on the page only). The page hides the close button too,
+        // but the endpoint is the authority.
+        $company = Company::find($companyId);
+        $pendingDel = $this->undispatchedDeliverySummary($companyId, $company, $date);
+        if ($pendingDel->count > 0) {
+            return back()->with('error', __('pos.dayclose_blocked_undispatched', ['count' => $pendingDel->count]));
+        }
+
         // Cash reconciliation (optional): opening float + physically-counted cash.
         $request->validate([
             'opening_float' => 'nullable|numeric|min:0|max:99999999',
             'counted_cash' => 'nullable|numeric|min:0|max:99999999',
+            // Per-close action override (Task 676 — FBR mirror of Task 661):
+            // same vocabulary as PRA; 'standing' = no override. FBR has no
+            // archive concept — 'save' simply keeps bills Local (carried).
+            'wash_override' => 'nullable|in:standing,finalize,save,delete',
         ]);
+        // Admin/manager only (isPosCashier ROLE check, NOT posCashierBlocked —
+        // a cashier granted day-close custom access may CLOSE the day but must
+        // not override the owner's standing pending-bill policy).
+        $washOverride = $request->input('wash_override');
+        $actionOverride = null;
+        if ($washOverride && $washOverride !== 'standing') {
+            if ($user && $user->isPosCashier()) {
+                return back()->with('error', __('pos.only_admin_change_setting'));
+            }
+            $actionOverride = ['provisional' => $washOverride];
+        }
         $cashRecon = null;
         if ($request->filled('opening_float') || $request->filled('counted_cash')) {
             $cashRecon = [
@@ -4483,7 +4719,7 @@ class FbrPosController extends Controller
         // Task 519 (mirror of PRA Task 516): a PRIOR trading day may close with
         // zero figures (stranded empty day) — today's empty close still refuses.
         $allowEmpty = $date < $this->fbrBizToday($companyId);
-        $report = $this->performDayClose($companyId, $date, $user->id, $request->input('notes'), $cashRecon, $allowEmpty);
+        $report = $this->performDayClose($companyId, $date, $user->id, $request->input('notes'), $cashRecon, $allowEmpty, $actionOverride);
 
         if (!$report) {
             return back()->with('error', __('pos.dayclose_no_transactions'));
@@ -4506,6 +4742,9 @@ class FbrPosController extends Controller
             if (($sweep['failed'] ?? 0) > 0) {
                 $msg .= __('pos.dayclose_bills_failed', ['count' => $sweep['failed']]);
             }
+        }
+        if ($this->lastWashDeleted > 0) {
+            $msg .= __('pos.dayclose_bills_deleted', ['count' => $this->lastWashDeleted]);
         }
         return back()->with('success', $msg);
     }

@@ -9464,6 +9464,13 @@ class PosController extends Controller
         if (($result['deleted'] ?? 0) > 0) {
             $msg .= __('pos.dayclose_bills_deleted', ['count' => $result['deleted']]);
         }
+        // Task 690 (parity with FBR): rider-khata delete-guard count — bills
+        // picked for delete but spared because rider cash is still unsettled
+        // (they were archived instead). Sourced from the Z-report local_summary.
+        $riderGuardedTotal = array_sum(array_column($result['summary'] ?? [], 'rider_guarded'));
+        if ($riderGuardedTotal > 0) {
+            $msg .= __('pos.dayclose_bills_rider_guarded', ['count' => $riderGuardedTotal]);
+        }
         $backlogSwept = array_sum(array_column($result['summary'] ?? [], 'backlog'));
         if ($backlogSwept > 0) {
             $msg .= __('pos.dayclose_backlog_included', ['count' => $backlogSwept]);

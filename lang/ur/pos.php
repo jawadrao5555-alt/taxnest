@@ -850,6 +850,7 @@ return [
     'dayclose_backlog_included' => ' پچھلی تاریخوں کے :count لوکل بل شامل ہیں۔',
     'dayclose_bills_archived' => ' — :count لوکل بل آرکائیو میں منتقل کر دیے گئے۔',
     'dayclose_bills_deleted' => ' — کمپنی پالیسی کے مطابق :count لوکل بل ڈیلیٹ کر دیے گئے۔',
+    'dayclose_bills_rider_guarded' => ' — :count بل رائڈر کھاتہ کی وجہ سے ڈیلیٹ نہیں ہوئے (رائڈر کا کیش ابھی انسیٹلڈ ہے) — لوکل ریکارڈز میں محفوظ ہیں۔',
     'dayclose_bills_failed' => ' :count بل فیل ہوئے (فیل قطار میں ہیں — وہیں سے دوبارہ کوشش کریں)۔',
     'dayclose_bills_finalized' => ' — :count کچے بل خودبخود فائنل ہو گئے۔',
     'dayclose_bills_offline_pra' => ':count بل آف لائن محفوظ ہوئے (PRA تک رسائی نہیں ہو سکی — ٹرانزیکشنز سے دوبارہ کوشش کریں)۔',

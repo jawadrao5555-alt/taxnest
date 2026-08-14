@@ -850,6 +850,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'dayclose_backlog_included' => ' Is mein :count purane local bill shamil hain.',
     'dayclose_bills_archived' => ' — :count local bill(s) Archive mein move kar diye gaye.',
     'dayclose_bills_deleted' => ' — :count local bill(s) company policy ke mutabiq delete kar diye gaye.',
+    'dayclose_bills_rider_guarded' => ' — :count bill rider khata ki wajah se delete nahi hue (rider ka cash abhi unsettled hai) — Local records mein mehfooz hain.',
     'dayclose_bills_failed' => ' :count bill fail ho gaye (fail queue mein hain — wahin se dobara try karein).',
     'dayclose_bills_finalized' => ' — :count kachay bill khud-ba-khud finalize ho gaye.',
     'dayclose_bills_offline_pra' => ' :count bill offline save ho gaye (PRA tak rasai nahi ho saki — Transactions se dobara try karein).',

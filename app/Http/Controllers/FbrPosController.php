@@ -599,6 +599,13 @@ class FbrPosController extends Controller
     private int $lastWashDeleted = 0;
 
     /**
+     * Provisionals SPARED from the per-close 'delete' by the rider-khata guard
+     * (unsettled rider-cash bills stay Local — Task 690). closeDayReport reads
+     * it for the flash so the cashier knows WHY the deleted count looks short.
+     */
+    private int $lastWashGuarded = 0;
+
+    /**
      * AUTO-FINALIZE SWEEP ('finalize' pending-bill policy — FBR mirror of the PRA
      * 'Khud Final' option, Aug 2026). Promotes every pending provisional bill
      * (invoice_mode='local' + fbr_status='local', created on or before the close
@@ -766,20 +773,24 @@ class FbrPosController extends Controller
             // be deleted — FBR has no archive, so it simply STAYS Local and the
             // khata trail survives. Schema-guarded for pre-rider prod boxes.
             $this->lastWashDeleted = 0;
+            $this->lastWashGuarded = 0;
             $riderReady = \Schema::hasColumn('fbr_pos_transactions', 'rider_id');
             $rows = FbrPosTransaction::where('company_id', $companyId)
                 ->tap(fn ($q) => $this->whereBizDate($q, $date, '<='))
                 ->where('invoice_mode', 'local')
                 ->where('fbr_status', 'local')
                 ->get();
-            $ids = $rows
-                ->filter(fn ($t) => ($billActions[(int) $t->id] ?? $provAction) === 'delete')
-                ->reject(fn ($t) => $riderReady
-                    && $t->rider_id
-                    && ($t->payment_method ?? null) === 'cash'
-                    && !$t->rider_settlement_id
-                    && ($t->delivery_status ?? null) !== 'returned')
-                ->pluck('id');
+            $guard = fn ($t) => $riderReady
+                && $t->rider_id
+                && ($t->payment_method ?? null) === 'cash'
+                && !$t->rider_settlement_id
+                && ($t->delivery_status ?? null) !== 'returned';
+            $pickedForDelete = $rows
+                ->filter(fn ($t) => ($billActions[(int) $t->id] ?? $provAction) === 'delete');
+            // Task 690: count the guarded rows so the success flash can tell
+            // the cashier why they were NOT deleted (khata trail survives).
+            $this->lastWashGuarded = $pickedForDelete->filter($guard)->count();
+            $ids = $pickedForDelete->reject($guard)->pluck('id');
             if ($ids->isNotEmpty()) {
                 \DB::transaction(function () use ($ids, $companyId) {
                     FbrPosTransactionItem::whereIn('transaction_id', $ids)->delete();
@@ -4890,6 +4901,11 @@ class FbrPosController extends Controller
         }
         if ($this->lastWashDeleted > 0) {
             $msg .= __('pos.dayclose_bills_deleted', ['count' => $this->lastWashDeleted]);
+        }
+        // Task 690: rider-khata delete-guard — tell the cashier how many bills
+        // were spared (cash still with the rider) so the deleted count adds up.
+        if ($this->lastWashGuarded > 0) {
+            $msg .= __('pos.dayclose_bills_rider_guarded', ['count' => $this->lastWashGuarded]);
         }
         return back()->with('success', $msg);
     }

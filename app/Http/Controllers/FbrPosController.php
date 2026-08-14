@@ -903,9 +903,23 @@ class FbrPosController extends Controller
             $userId = Auth::guard('fbrpos')->id();
             $today = today()->format('Y-m-d');
 
+            // Task 684 (ZFC waqia follow-up): the rush-recovery auto-close must
+            // never sweep past undispatched delivery bills — the same guard the
+            // manual close / hourly auto-close applies. Blocker days are SKIPPED
+            // (reported back), other days still close.
+            $company = Company::find($companyId);
             $closed = [];
+            $skipped = [];
             if ($request->boolean('all')) {
                 foreach ($this->getPendingDayCloses($companyId, 30) as $p) {
+                    $pendingDel = $this->undispatchedDeliverySummary($companyId, $company, (string) $p['date']);
+                    if ($pendingDel->count > 0) {
+                        $skipped[] = ['date' => $p['date'], 'undispatched' => (int) $pendingDel->count];
+                        \Log::warning('fbrpos apiAutoCloseDay skipped day — undispatched deliveries', [
+                            'company_id' => $companyId, 'date' => $p['date'], 'undispatched' => (int) $pendingDel->count,
+                        ]);
+                        continue;
+                    }
                     $r = $this->performDayClose($companyId, $p['date'], $userId, 'Auto-closed on next open (rush recovery)');
                     if ($r) $closed[] = ['number' => $r->report_number, 'date' => $p['date']];
                 }
@@ -917,11 +931,22 @@ class FbrPosController extends Controller
                 if ($date >= $today) {
                     return response()->json(['ok' => false, 'error' => 'Cannot auto-close today or future dates'], 422);
                 }
+                $pendingDel = $this->undispatchedDeliverySummary($companyId, $company, (string) $date);
+                if ($pendingDel->count > 0) {
+                    \Log::warning('fbrpos apiAutoCloseDay refused — undispatched deliveries', [
+                        'company_id' => $companyId, 'date' => $date, 'undispatched' => (int) $pendingDel->count,
+                    ]);
+                    return response()->json([
+                        'ok' => false,
+                        'error' => __('pos.dayclose_blocked_undispatched', ['count' => (int) $pendingDel->count]),
+                        'undispatched' => (int) $pendingDel->count,
+                    ], 409);
+                }
                 $r = $this->performDayClose($companyId, $date, $userId, 'Auto-closed on next open (rush recovery)');
                 if ($r) $closed[] = ['number' => $r->report_number, 'date' => $date];
             }
 
-            return response()->json(['ok' => true, 'closed' => $closed, 'count' => count($closed)]);
+            return response()->json(['ok' => true, 'closed' => $closed, 'count' => count($closed), 'skipped' => $skipped]);
         } catch (\Throwable $e) {
             \Log::error('apiAutoCloseDay failed: ' . $e->getMessage());
             return response()->json(['ok' => false, 'error' => 'Server error: ' . $e->getMessage()], 500);
@@ -4603,6 +4628,7 @@ class FbrPosController extends Controller
             return redirect()->route('fbrpos.dashboard')->with('error', __('pos.custom_access_denied'));
         }
         $companyId = app('currentCompanyId');
+        $company = Company::find($companyId);
 
         if ($this->unclosedPriorBusinessDays($companyId)->isEmpty()) {
             return back()->with('success', __('pos.dc_bulk_none_pending'));
@@ -4610,6 +4636,12 @@ class FbrPosController extends Controller
 
         $closed = 0;
         $zeroDays = 0;
+        // Task 684 (FBR mirror of the PRA bulk-close guard, ZFC waqia follow-up):
+        // undispatched delivery bills block PER-DAY — the blocker day (and,
+        // cumulatively, every later day: the summary is ≤date) is SKIPPED while
+        // earlier days still close. Skipped dates remembered so re-passes don't
+        // double-count and the flash can say WHY they remain.
+        $skippedDel = [];
         // The detector returns at most 30 dates per query — RE-QUERY until the
         // backlog is exhausted so 31+ open days still finish in ONE click.
         // oldestFirst: pages come CHRONOLOGICALLY (oldest day first) so reports
@@ -4622,6 +4654,22 @@ class FbrPosController extends Controller
             }
             $closedThisPass = 0;
             foreach ($pending as $day) {
+                // Task 684: undispatched delivery bills freeze THIS day — skip
+                // it, keep closing the rest, log the reason (same authority as
+                // the single close / hourly auto-close skip).
+                if (isset($skippedDel[$day])) {
+                    continue;
+                }
+                $pendingDel = $this->undispatchedDeliverySummary($companyId, $company, $day);
+                if ($pendingDel->count > 0) {
+                    $skippedDel[$day] = (int) $pendingDel->count;
+                    Log::warning('fbrpos bulk day-close skipped day — undispatched deliveries', [
+                        'company_id' => $companyId,
+                        'date' => $day,
+                        'undispatched' => (int) $pendingDel->count,
+                    ]);
+                    continue;
+                }
                 $report = $this->performDayClose($companyId, $day, $user?->id, null, null, true);
                 if ($report) {
                     $closed++;
@@ -4642,6 +4690,13 @@ class FbrPosController extends Controller
         $sweep = $this->lastFinalizeSweep;
         if (($sweep['finalized'] ?? 0) > 0) {
             $msg .= __('pos.dayclose_bills_finalized', ['count' => $sweep['finalized']]);
+        }
+        // Task 684: say WHY skipped days remain — undispatched delivery bills.
+        if (!empty($skippedDel)) {
+            $msg .= ' ' . __('pos.dc_bulk_skipped_undispatched', [
+                'days' => count($skippedDel),
+                'count' => array_sum($skippedDel),
+            ]);
         }
 
         // Honest "all": if anything is somehow still pending after the capped

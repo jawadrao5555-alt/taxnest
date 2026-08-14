@@ -933,6 +933,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'dc_bulk_done' => ':closed din band ho gaye (:zero bina transaction ke).',
     'dc_bulk_none_pending' => 'Koi purana din pending nahi — sab pehle se band hain.',
     'dc_bulk_partial' => ':remaining din abhi bhi pending hain — jari rakhne ke liye button dobara dabayen.',
+    'dc_bulk_skipped_undispatched' => ':days din skip hue: :count delivery bill abhi tak kisi rider ko dispatch nahi hui. Pehle Deliveries board se rider assign/dispatch ya settle karein, phir woh din band karein.',
     'dash_unclosed_days_title' => '{1} Pichla din band nahi hua!|[2,*] :count pichlay din band nahi huay!',
     'dash_unclosed_days_info_only' => 'Meharbani kar ke apne admin ya manager ko batayen ke Day Close page se din band karein.',
     'dash_unclosed_days_action' => 'Abhi band karein',

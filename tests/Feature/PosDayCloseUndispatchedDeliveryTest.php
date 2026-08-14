@@ -478,4 +478,58 @@ class PosDayCloseUndispatchedDeliveryTest extends TestCase
         $this->assertSame(1, DB::table('pos_day_close_reports')->count(),
             'After dispatch the sweep must close the pending day.');
     }
+
+    // ── 6. bulk close-all skips blocker days only (Task 684) ─────────────────
+
+    public function test_bulk_close_all_skips_undispatched_day_but_closes_earlier_days(): void
+    {
+        $cid = $this->makeCompany();
+        $rid = $this->makeRider($cid);
+        // Day -2: clean stranded day — must close.
+        $this->makeBill($cid, [
+            'business_date' => now()->subDays(2)->toDateString(),
+            'created_at' => now()->subDays(2),
+        ]);
+        // Day -1: assigned-but-undispatched delivery — must be SKIPPED.
+        $this->makeBill($cid, [
+            'rider_id' => $rid,
+            'delivery_status' => 'assigned',
+            'order_type' => 'delivery',
+            'business_date' => now()->subDay()->toDateString(),
+            'created_at' => now()->subDay(),
+        ]);
+
+        $res = $this->actingAs($this->makeUser($cid), 'pos')
+            ->from('/pos/day-close')
+            ->post('/pos/day-close/close-all-prior');
+        $res->assertRedirect('/pos/day-close');
+
+        $this->assertSame(1, DB::table('pos_day_close_reports')->count(),
+            'Only the clean earlier day may close; the blocker day must be skipped.');
+        $this->assertSame(
+            now()->subDays(2)->toDateString(),
+            (string) \Carbon\Carbon::parse(DB::table('pos_day_close_reports')->value('report_date'))->toDateString()
+        );
+        $err = (string) session('error');
+        $this->assertStringContainsString(
+            __('pos.dc_bulk_skipped_undispatched', ['days' => 1, 'count' => 1]),
+            $err,
+            'Flash must state WHY a day was skipped (undispatched deliveries).'
+        );
+        $this->assertStringContainsString(
+            __('pos.dc_bulk_partial', ['remaining' => 1]),
+            $err,
+            'Flash must report the skipped day as still pending.'
+        );
+
+        // Once dispatched, the next bulk run closes the remaining day.
+        DB::table('pos_transactions')->where('company_id', $cid)
+            ->where('delivery_status', 'assigned')->update(['delivery_status' => 'dispatched']);
+        $res2 = $this->actingAs($this->makeUser($cid), 'pos')
+            ->from('/pos/day-close')
+            ->post('/pos/day-close/close-all-prior');
+        $res2->assertSessionHas('success');
+        $this->assertSame(2, DB::table('pos_day_close_reports')->count(),
+            'After dispatch the bulk close must finish the skipped day.');
+    }
 }

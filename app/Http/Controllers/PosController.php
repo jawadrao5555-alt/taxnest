@@ -10258,13 +10258,6 @@ class PosController extends Controller
             ]));
         }
 
-        // Undispatched delivery bills block the bulk close too (Task 661) —
-        // same authority as the single close.
-        $pendingDel = $this->undispatchedDeliverySummary($companyId, $company, \App\Services\PosBusinessDay::current($companyId));
-        if ($pendingDel->count > 0) {
-            return back()->with('error', __('pos.dayclose_blocked_undispatched', ['count' => $pendingDel->count]));
-        }
-
         if ($this->unclosedPriorBusinessDays($companyId)->isEmpty()) {
             return back()->with('success', __('pos.dc_bulk_none_pending'));
         }
@@ -10273,6 +10266,12 @@ class PosController extends Controller
         $zeroDays = 0;
         $archived = 0;
         $deleted = 0;
+        // Task 684 (ZFC waqia follow-up): undispatched delivery bills now block
+        // PER-DAY, not the whole bulk run — days BEFORE the blocker still close
+        // (the summary is cumulative ≤date, so a blocker on day D skips D and
+        // every later day, never earlier ones). Skipped dates are remembered so
+        // re-passes don't double-count and the flash can say WHY they remain.
+        $skippedDel = [];
         // The detector returns at most 30 dates per query — RE-QUERY until the
         // backlog is exhausted so 31+ open days still finish in ONE click
         // ("all" must mean all). oldestFirst: pages must come CHRONOLOGICALLY
@@ -10286,6 +10285,22 @@ class PosController extends Controller
             }
             $closedThisPass = 0;
             foreach ($pending as $day) {
+                // Task 684: undispatched delivery bills freeze THIS day (and,
+                // cumulatively, every later one) — skip it, keep closing the
+                // rest, and log the reason (same authority as the single close).
+                if (isset($skippedDel[$day])) {
+                    continue;
+                }
+                $pendingDel = $this->undispatchedDeliverySummary($companyId, $company, $day);
+                if ($pendingDel->count > 0) {
+                    $skippedDel[$day] = (int) $pendingDel->count;
+                    \Illuminate\Support\Facades\Log::warning('pos bulk day-close skipped day — undispatched deliveries', [
+                        'company_id' => $companyId,
+                        'date' => $day,
+                        'undispatched' => (int) $pendingDel->count,
+                    ]);
+                    continue;
+                }
                 // allowEmpty: stranded days with only already-archived bills get
                 // a zero-figure Z-report so they finally leave the banner. Safe:
                 // every $day comes from the detector (has real bills).
@@ -10312,6 +10327,13 @@ class PosController extends Controller
         }
         if ($deleted > 0) {
             $msg .= __('pos.dayclose_bills_deleted', ['count' => $deleted]);
+        }
+        // Task 684: say WHY skipped days remain — undispatched delivery bills.
+        if (!empty($skippedDel)) {
+            $msg .= ' ' . __('pos.dc_bulk_skipped_undispatched', [
+                'days' => count($skippedDel),
+                'count' => array_sum($skippedDel),
+            ]);
         }
 
         // Honest "all": if anything is somehow still pending after the capped

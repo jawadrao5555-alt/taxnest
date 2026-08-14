@@ -1,12 +1,34 @@
 <x-fbr-pos-layout>
 <div class="max-w-7xl mx-auto">
     @include('fbr-pos.partials.back-link')
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-3">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.tax_reports') }}</h1>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.month_fbr_tax_summary', ['month' => now()->format('F Y')]) }}</p>
         </div>
+        {{-- Bill-type filter (Task 695): all / sales-only / credit-notes-only --}}
+        @if($billTypeReady ?? false)
+        <form method="GET" action="{{ route('fbrpos.tax-reports') }}" class="flex items-center gap-2">
+            <label class="text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">{{ __('pos.lbl_bill_type') }}</label>
+            <select name="bill_type" onchange="this.form.submit()" class="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                <option value="">{{ __('pos.opt_all_bills') }}</option>
+                <option value="sales" {{ ($billTypeFilter ?? '') === 'sales' ? 'selected' : '' }}>{{ __('pos.opt_sales_only') }}</option>
+                <option value="returns" {{ ($billTypeFilter ?? '') === 'returns' ? 'selected' : '' }}>{{ __('pos.opt_credit_notes_only') }}</option>
+            </select>
+        </form>
+        @endif
     </div>
+
+    {{-- Credit-note summary line (Task 695): refunds are never hidden — the
+         netted monthly figures below already subtract them. --}}
+    @if(($billTypeReady ?? false) && ((($billTypeFilter ?? '') === 'returns') || ($monthlyTax->return_count ?? 0) > 0))
+    <div class="mb-6 rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/20 px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+        <span class="font-semibold text-rose-700 dark:text-rose-300">{{ __('pos.tr_credit_notes') }}: {{ number_format($monthlyTax->return_count ?? 0) }}</span>
+        <span class="text-rose-700 dark:text-rose-300">{{ __('pos.tr_refunded_amount') }}: PKR {{ number_format($monthlyTax->return_amount ?? 0, 2) }}</span>
+        <span class="text-rose-700 dark:text-rose-300">{{ __('pos.tr_tax_reversed') }}: PKR {{ number_format($monthlyTax->return_tax ?? 0, 2) }}</span>
+        <span class="text-xs text-rose-600/80 dark:text-rose-400/80 basis-full sm:basis-auto">{{ ($billTypeFilter ?? '') === 'returns' ? __('pos.tr_cn_only_note') : __('pos.tr_cn_netted_note') }}</span>
+    </div>
+    @endif
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5">

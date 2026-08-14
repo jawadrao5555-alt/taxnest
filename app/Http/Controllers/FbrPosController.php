@@ -3871,20 +3871,55 @@ class FbrPosController extends Controller
         ];
     }
 
-    public function taxReports()
+    public function taxReports(Request $request)
     {
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
 
+        // Credit-note netting + bill-type filter (Task 695 — FBR mirror of the
+        // PRA tax report): money sums are SIGNED (returns subtract, amounts
+        // are stored POSITIVE on return rows), invoice counts stay sales-only,
+        // and the credit-note count/refunded amount ride alongside. In
+        // credit-notes-only mode figures stay POSITIVE (refunded amounts).
+        [$signExpr, $saleRowExpr] = $this->fbrReturnNettingExprs();
+        $typeReady = $signExpr !== '1';
+        $billTypeFilter = $typeReady && in_array($request->get('bill_type'), ['sales', 'returns'], true)
+            ? $request->get('bill_type') : '';
+        $returnsOnly = $billTypeFilter === 'returns';
+        if ($returnsOnly) {
+            $signExpr = '1';
+            $saleRowExpr = '1';
+        }
+        $isReturnExpr = $typeReady ? "CASE WHEN transaction_type = 'return' THEN 1 ELSE 0 END" : '0';
+        $applyBillType = function ($q) use ($billTypeFilter) {
+            if ($billTypeFilter === 'sales') {
+                $q->where(function ($w) {
+                    $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
+                });
+            } elseif ($billTypeFilter === 'returns') {
+                $q->where('transaction_type', 'return');
+            }
+        };
+
         $monthlyTax = FbrPosTransaction::where('company_id', $companyId)
             ->whereYear('created_at', now()->year)
             ->whereMonth('created_at', now()->month)
-            ->selectRaw('COALESCE(SUM(tax_amount), 0) as total_tax, COALESCE(SUM(subtotal), 0) as total_sales, COALESCE(SUM(fbr_service_charge), 0) as total_pos_fee, COUNT(*) as invoice_count')
+            ->tap($applyBillType)
+            ->selectRaw("
+                COALESCE(SUM(({$signExpr}) * tax_amount), 0) as total_tax,
+                COALESCE(SUM(({$signExpr}) * subtotal), 0) as total_sales,
+                COALESCE(SUM(({$signExpr}) * fbr_service_charge), 0) as total_pos_fee,
+                COALESCE(SUM({$saleRowExpr}), 0) as invoice_count,
+                COALESCE(SUM({$isReturnExpr}), 0) as return_count,
+                COALESCE(SUM(({$isReturnExpr}) * total_amount), 0) as return_amount,
+                COALESCE(SUM(({$isReturnExpr}) * tax_amount), 0) as return_tax
+            ")
             ->first();
 
         $fbrStats = FbrPosTransaction::where('company_id', $companyId)
             ->whereYear('created_at', now()->year)
             ->whereMonth('created_at', now()->month)
+            ->tap($applyBillType)
             ->selectRaw("
                 COUNT(CASE WHEN fbr_status = 'submitted' THEN 1 END) as submitted,
                 COUNT(CASE WHEN fbr_status = 'pending' THEN 1 END) as pending,
@@ -3895,12 +3930,21 @@ class FbrPosController extends Controller
         $taxByRate = FbrPosTransaction::where('company_id', $companyId)
             ->whereYear('created_at', now()->year)
             ->whereMonth('created_at', now()->month)
-            ->selectRaw('tax_rate, COUNT(*) as count, COALESCE(SUM(tax_amount), 0) as tax_total, COALESCE(SUM(subtotal), 0) as sales_total')
+            ->tap($applyBillType)
+            ->selectRaw("
+                tax_rate,
+                COALESCE(SUM({$saleRowExpr}), 0) as count,
+                COALESCE(SUM(({$signExpr}) * tax_amount), 0) as tax_total,
+                COALESCE(SUM(({$signExpr}) * subtotal), 0) as sales_total,
+                COALESCE(SUM({$isReturnExpr}), 0) as return_count
+            ")
             ->groupBy('tax_rate')
             ->orderBy('tax_rate')
             ->get();
 
-        return view('fbr-pos.tax-reports', compact('company', 'monthlyTax', 'fbrStats', 'taxByRate'));
+        $billTypeReady = $typeReady;
+
+        return view('fbr-pos.tax-reports', compact('company', 'monthlyTax', 'fbrStats', 'taxByRate', 'billTypeFilter', 'billTypeReady'));
     }
 
     public function businessProfile(Request $request)

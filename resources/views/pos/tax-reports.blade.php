@@ -63,7 +63,17 @@
                     <input type="text" name="customer" value="{{ request('customer') }}" placeholder="{{ __('pos.ph_search_customer_name') }}" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
                 </div>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-{{ ($billTypeReady ?? false) ? '4' : '3' }} gap-4">
+                @if($billTypeReady ?? false)
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.lbl_bill_type') }}</label>
+                    <select name="bill_type" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
+                        <option value="">{{ __('pos.opt_all_bills') }}</option>
+                        <option value="sales" {{ ($billTypeFilter ?? '') === 'sales' ? 'selected' : '' }}>{{ __('pos.opt_sales_only') }}</option>
+                        <option value="returns" {{ ($billTypeFilter ?? '') === 'returns' ? 'selected' : '' }}>{{ __('pos.opt_credit_notes_only') }}</option>
+                    </select>
+                </div>
+                @endif
                 <div>
                     <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ __('pos.lbl_date_from') }}</label>
                     <input type="date" name="date_from" id="dateFrom" value="{{ request('date_from') }}" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
@@ -168,6 +178,18 @@
     </div>
     @endif
 
+    {{-- Credit-note summary line (Task 695): shown whenever returns exist in the
+         filtered set (or the credit-notes-only view is active) so the netted
+         figures above never hide refunds. --}}
+    @if(($billTypeReady ?? false) && ((($billTypeFilter ?? '') === 'returns') || ($summary->return_count ?? 0) > 0))
+    <div class="mb-6 rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/20 px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+        <span class="font-semibold text-rose-700 dark:text-rose-300">{{ __('pos.tr_credit_notes') }}: {{ number_format($summary->return_count ?? 0) }}</span>
+        <span class="text-rose-700 dark:text-rose-300">{{ __('pos.tr_refunded_amount') }}: PKR {{ number_format($summary->return_amount ?? 0, 2) }}</span>
+        <span class="text-rose-700 dark:text-rose-300">{{ __('pos.tr_tax_reversed') }}: PKR {{ number_format($summary->return_tax ?? 0, 2) }}</span>
+        <span class="text-xs text-rose-600/80 dark:text-rose-400/80 basis-full sm:basis-auto">{{ ($billTypeFilter ?? '') === 'returns' ? __('pos.tr_cn_only_note') : __('pos.tr_cn_netted_note') }}</span>
+    </div>
+    @endif
+
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-sm table-cards">
@@ -199,6 +221,12 @@
                     @forelse($transactions as $t)
                     @php
                         $iv = ($taxRateFilter ?? false) ? ($itemValues[$t->id] ?? null) : null;
+                        // Credit-note row marking (Task 695): badge + signed red
+                        // amounts in netted views; the credit-notes-only view
+                        // keeps positive (refunded) figures.
+                        $rowIsReturn = ($billTypeReady ?? false) && ($t->transaction_type ?? 'sale') === 'return';
+                        $rowSign = ($rowIsReturn && ($billTypeFilter ?? '') !== 'returns') ? -1 : 1;
+                        $retCls = $rowIsReturn ? 'text-rose-600 dark:text-rose-400' : '';
                     @endphp
                     @if(($taxRateFilter ?? false) && !$iv)
                         @continue
@@ -206,6 +234,9 @@
                     <tr class="{{ $loop->even ? 'bg-gray-50/50 dark:bg-gray-800/20' : '' }} hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
                         <td class="px-4 py-3 font-medium text-gray-900 dark:text-white whitespace-nowrap">
                             <a href="{{ route('pos.transaction.show', $t->id) }}" class="text-purple-600 hover:text-purple-800 dark:text-purple-400 hover:underline">{{ $t->invoice_number }}</a>
+                            @if($rowIsReturn)
+                            <span class="inline-flex items-center ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 uppercase">{{ __('pos.credit_note_badge') }}</span>
+                            @endif
                         </td>
                         <td class="px-4 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">{{ $t->pra_invoice_number ?? '—' }}</td>
                         <td class="px-4 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">{{ $t->created_at->format('d M Y H:i') }}</td>
@@ -216,23 +247,23 @@
                             </span>
                         </td>
                         @if($taxRateFilter ?? false)
-                        <td class="px-4 py-3 text-right text-emerald-600 font-medium whitespace-nowrap">{{ number_format((float)($iv['item_subtotal'] ?? 0), 2) }}</td>
-                        <td class="px-4 py-3 text-right text-purple-600 font-medium whitespace-nowrap">{{ number_format((float)($iv['item_tax'] ?? 0), 2) }}</td>
-                        <td class="px-4 py-3 text-right font-bold text-gray-900 dark:text-white whitespace-nowrap">{{ number_format((float)($iv['item_subtotal'] ?? 0) + (float)($iv['item_tax'] ?? 0), 2) }}</td>
+                        <td class="px-4 py-3 text-right font-medium whitespace-nowrap {{ $retCls ?: 'text-emerald-600' }}">{{ number_format($rowSign * (float)($iv['item_subtotal'] ?? 0), 2) }}</td>
+                        <td class="px-4 py-3 text-right font-medium whitespace-nowrap {{ $retCls ?: 'text-purple-600' }}">{{ number_format($rowSign * (float)($iv['item_tax'] ?? 0), 2) }}</td>
+                        <td class="px-4 py-3 text-right font-bold whitespace-nowrap {{ $retCls ?: 'text-gray-900 dark:text-white' }}">{{ number_format($rowSign * ((float)($iv['item_subtotal'] ?? 0) + (float)($iv['item_tax'] ?? 0)), 2) }}</td>
                         @else
-                        <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300 whitespace-nowrap">{{ number_format($t->subtotal, 2) }}</td>
-                        <td class="px-4 py-3 text-right text-red-500 whitespace-nowrap">{{ number_format($t->discount_amount, 2) }}</td>
-                        <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300 whitespace-nowrap">{{ number_format($t->subtotal - $t->discount_amount - ($t->exempt_amount ?? 0), 2) }}</td>
+                        <td class="px-4 py-3 text-right whitespace-nowrap {{ $retCls ?: 'text-gray-700 dark:text-gray-300' }}">{{ number_format($rowSign * $t->subtotal, 2) }}</td>
+                        <td class="px-4 py-3 text-right text-red-500 whitespace-nowrap">{{ number_format($rowSign * $t->discount_amount, 2) }}</td>
+                        <td class="px-4 py-3 text-right whitespace-nowrap {{ $retCls ?: 'text-gray-700 dark:text-gray-300' }}">{{ number_format($rowSign * ($t->subtotal - $t->discount_amount - ($t->exempt_amount ?? 0)), 2) }}</td>
                         <td class="px-4 py-3 text-right whitespace-nowrap hidden lg:table-cell">
                             @if(($t->exempt_amount ?? 0) > 0)
-                            <span class="text-amber-600 dark:text-amber-400 font-medium">{{ number_format($t->exempt_amount, 2) }}</span>
+                            <span class="font-medium {{ $retCls ?: 'text-amber-600 dark:text-amber-400' }}">{{ number_format($rowSign * $t->exempt_amount, 2) }}</span>
                             @else
                             <span class="text-gray-400">—</span>
                             @endif
                         </td>
                         <td class="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white whitespace-nowrap">{{ number_format($t->tax_rate, 0) }}%</td>
-                        <td class="px-4 py-3 text-right text-purple-600 dark:text-purple-400 font-medium whitespace-nowrap">{{ number_format($t->tax_amount, 2) }}</td>
-                        <td class="px-4 py-3 text-right font-bold text-gray-900 dark:text-white whitespace-nowrap">{{ number_format($t->total_amount, 2) }}</td>
+                        <td class="px-4 py-3 text-right font-medium whitespace-nowrap {{ $retCls ?: 'text-purple-600 dark:text-purple-400' }}">{{ number_format($rowSign * $t->tax_amount, 2) }}</td>
+                        <td class="px-4 py-3 text-right font-bold whitespace-nowrap {{ $retCls ?: 'text-gray-900 dark:text-white' }}">{{ number_format($rowSign * $t->total_amount, 2) }}</td>
                         @endif
                         <td class="px-4 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">{{ $t->terminal?->terminal_name ?? '—' }}</td>
                         <td class="px-4 py-3 whitespace-nowrap">

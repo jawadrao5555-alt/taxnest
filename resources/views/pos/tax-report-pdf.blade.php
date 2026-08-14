@@ -26,6 +26,9 @@
         .badge-failed { background: #fee2e2; color: #991b1b; }
         .badge-offline { background: #ffedd5; color: #9a3412; }
         .badge-local { background: #f3f4f6; color: #4b5563; }
+        .badge-return { background: #ffe4e6; color: #be123c; }
+        .cn-line { border: 1px solid #fda4af; background: #fff1f2; border-radius: 5px; padding: 7px 10px; margin: 8px 0 4px; font-size: 8.5px; color: #9f1239; }
+        .cn-line b { margin-right: 12px; }
         .summary-box { border: 2px solid #7c3aed; border-radius: 6px; padding: 12px; margin-top: 10px; page-break-inside: avoid; }
         .summary-title { font-size: 11px; font-weight: bold; color: #7c3aed; margin-bottom: 8px; }
         .summary-grid { display: table; width: 100%; }
@@ -89,12 +92,19 @@
                 @foreach($transactions as $t)
                 @php
                     $iv = ($taxRateFilter ?? false) ? ($itemValues[$t->id] ?? null) : null;
+                    // Credit-note row marking (Task 695): badge + signed amounts
+                    // in netted views; credit-notes-only stays positive (refunded).
+                    $rowIsReturn = ($billTypeReady ?? false) && ($t->transaction_type ?? 'sale') === 'return';
+                    $rowSign = ($rowIsReturn && ($billTypeFilter ?? '') !== 'returns') ? -1 : 1;
+                    $retStyle = $rowIsReturn ? 'color:#dc2626;' : '';
                 @endphp
                 @if(($taxRateFilter ?? false) && !$iv)
                     @continue
                 @endif
                 <tr>
-                    <td style="font-weight:bold;">{{ $t->invoice_number }}</td>
+                    <td style="font-weight:bold;">{{ $t->invoice_number }}
+                        @if($rowIsReturn)<span class="badge badge-return">{{ __('pos.credit_note_badge') }}</span>@endif
+                    </td>
                     <td>{{ $t->pra_invoice_number ?? '—' }}</td>
                     <td>{{ $t->created_at->format('d/m/Y H:i') }}</td>
                     <td>{{ $t->customer_name ?? __('pos.tr_walk_in') }}</td>
@@ -104,17 +114,17 @@
                         </span>
                     </td>
                     @if($taxRateFilter ?? false)
-                    <td class="right" style="color:#059669;font-weight:bold;">{{ number_format((float)($iv['item_subtotal'] ?? 0), 2) }}</td>
-                    <td class="right" style="color:#7c3aed;font-weight:bold;">{{ number_format((float)($iv['item_tax'] ?? 0), 2) }}</td>
-                    <td class="right" style="font-weight:bold;">{{ number_format((float)($iv['item_subtotal'] ?? 0) + (float)($iv['item_tax'] ?? 0), 2) }}</td>
+                    <td class="right" style="{{ $retStyle ?: 'color:#059669;' }}font-weight:bold;">{{ number_format($rowSign * (float)($iv['item_subtotal'] ?? 0), 2) }}</td>
+                    <td class="right" style="{{ $retStyle ?: 'color:#7c3aed;' }}font-weight:bold;">{{ number_format($rowSign * (float)($iv['item_tax'] ?? 0), 2) }}</td>
+                    <td class="right" style="{{ $retStyle }}font-weight:bold;">{{ number_format($rowSign * ((float)($iv['item_subtotal'] ?? 0) + (float)($iv['item_tax'] ?? 0)), 2) }}</td>
                     @else
-                    <td class="right">{{ number_format($t->subtotal, 2) }}</td>
-                    <td class="right" style="color:#dc2626;">{{ number_format($t->discount_amount, 2) }}</td>
-                    <td class="right">{{ number_format($t->subtotal - $t->discount_amount - ($t->exempt_amount ?? 0), 2) }}</td>
-                    <td class="right" style="color:#d97706;">{{ ($t->exempt_amount ?? 0) > 0 ? number_format($t->exempt_amount, 2) : '—' }}</td>
+                    <td class="right" style="{{ $retStyle }}">{{ number_format($rowSign * $t->subtotal, 2) }}</td>
+                    <td class="right" style="color:#dc2626;">{{ number_format($rowSign * $t->discount_amount, 2) }}</td>
+                    <td class="right" style="{{ $retStyle }}">{{ number_format($rowSign * ($t->subtotal - $t->discount_amount - ($t->exempt_amount ?? 0)), 2) }}</td>
+                    <td class="right" style="{{ $retStyle ?: 'color:#d97706;' }}">{{ ($t->exempt_amount ?? 0) > 0 ? number_format($rowSign * $t->exempt_amount, 2) : '—' }}</td>
                     <td class="right" style="font-weight:bold;">{{ number_format($t->tax_rate, 0) }}%</td>
-                    <td class="right" style="color:#7c3aed;font-weight:bold;">{{ number_format($t->tax_amount, 2) }}</td>
-                    <td class="right" style="font-weight:bold;">{{ number_format($t->total_amount, 2) }}</td>
+                    <td class="right" style="{{ $retStyle ?: 'color:#7c3aed;' }}font-weight:bold;">{{ number_format($rowSign * $t->tax_amount, 2) }}</td>
+                    <td class="right" style="{{ $retStyle }}font-weight:bold;">{{ number_format($rowSign * $t->total_amount, 2) }}</td>
                     @endif
                     <td>{{ $t->terminal?->terminal_name ?? '—' }}</td>
                     <td>
@@ -153,8 +163,19 @@
             </tbody>
         </table>
 
+        {{-- Credit-note summary line (Task 695): refunds are never hidden — the
+             netted totals above already subtract them. --}}
+        @if(($billTypeReady ?? false) && ((($billTypeFilter ?? '') === 'returns') || ($summary->return_count ?? 0) > 0))
+        <div class="cn-line">
+            <b>{{ __('pos.tr_credit_notes') }}: {{ number_format($summary->return_count ?? 0) }}</b>
+            <b>{{ __('pos.tr_refunded_amount') }}: PKR {{ number_format($summary->return_amount ?? 0, 2) }}</b>
+            <b>{{ __('pos.tr_tax_reversed') }}: PKR {{ number_format($summary->return_tax ?? 0, 2) }}</b>
+            {{ ($billTypeFilter ?? '') === 'returns' ? __('pos.tr_cn_only_note') : __('pos.tr_cn_netted_note') }}
+        </div>
+        @endif
+
         <div class="summary-box">
-            <div class="summary-title">{{ __('pos.tr_summary_title') }} &mdash; {{ $taxRateLabel }}</div>
+            <div class="summary-title">{{ __('pos.tr_summary_title') }} &mdash; {{ $taxRateLabel }}{{ ($billTypeFilter ?? '') === 'returns' ? ' — ' . __('pos.opt_credit_notes_only') : '' }}</div>
             <div class="summary-grid">
                 <div class="summary-item">
                     <div class="summary-label">{{ __('pos.tr_sum_invoices') }}</div>

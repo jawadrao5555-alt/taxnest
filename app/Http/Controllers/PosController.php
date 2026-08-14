@@ -4885,6 +4885,20 @@ class PosController extends Controller
         // Isolated tab sets: PRA (default) vs Local (admin-only, callers gate).
         $this->applyReportFilters($query, $tab);
 
+        // Bill-type filter (Task 695): all / sales-only / credit-notes-only.
+        // Return rows are stored POSITIVE with transaction_type='return' —
+        // schema-guarded so pre-migration boxes silently ignore the filter.
+        if ($request->filled('bill_type')
+            && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type')) {
+            if ($request->bill_type === 'sales') {
+                $query->where(function ($w) {
+                    $w->whereNull('transaction_type')->orWhere('transaction_type', '!=', 'return');
+                });
+            } elseif ($request->bill_type === 'returns') {
+                $query->where('transaction_type', 'return');
+            }
+        }
+
         if (!$skipTaxRateFilter && $request->filled('tax_rate')) {
             if ($request->tax_rate === 'exempt') {
                 $query->where('exempt_amount', '>', 0);
@@ -5013,7 +5027,41 @@ class PosController extends Controller
             . ' ELSE pos_transaction_items.subtotal END';
     }
 
-    private function buildItemLevelSummary($transactionIds, $taxRateFilter)
+    /**
+     * Credit-note netting expressions for the tax report (Task 695 — same
+     * convention as the sales dashboard / Task 570): money sums multiply by
+     * the sign expression (returns subtract, amounts are stored POSITIVE on
+     * return rows); invoice counts count SALE rows only. In credit-notes-only
+     * mode ($returnsOnly) figures stay POSITIVE — the view labels them as
+     * refunded amounts. Schema-guarded for prod drift.
+     *
+     * @return array{0: bool, 1: bool, 2: string, 3: string, 4: string}
+     *         [$typeReady, $returnsOnly, $signExpr, $saleRowExpr, $isReturnExpr]
+     */
+    private function taxReportNettingExprs(Request $request): array
+    {
+        $typeReady = false;
+        try {
+            $typeReady = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type');
+        } catch (\Throwable $e) {
+            $typeReady = false;
+        }
+        $returnsOnly = $typeReady && $request->get('bill_type') === 'returns';
+
+        $sign = ($typeReady && !$returnsOnly)
+            ? "CASE WHEN pos_transactions.transaction_type = 'return' THEN -1 ELSE 1 END"
+            : '1';
+        $saleRow = ($typeReady && !$returnsOnly)
+            ? "CASE WHEN pos_transactions.transaction_type = 'return' THEN 0 ELSE 1 END"
+            : '1';
+        $isReturn = $typeReady
+            ? "CASE WHEN pos_transactions.transaction_type = 'return' THEN 1 ELSE 0 END"
+            : '0';
+
+        return [$typeReady, $returnsOnly, $sign, $saleRow, $isReturn];
+    }
+
+    private function buildItemLevelSummary($transactionIds, $taxRateFilter, bool $typeReady = false, bool $returnsOnly = false)
     {
         $base = $this->itemBaseSqlExpr();
         $itemQuery = \App\Models\PosTransactionItem::query()
@@ -5028,19 +5076,32 @@ class PosController extends Controller
                 ->where('pos_transaction_items.tax_rate', $rate);
         }
 
+        // Credit-note netting (Task 695): return items join through their
+        // return transaction — money sums are signed (returns subtract),
+        // invoice counts are sale bills only. Credit-notes-only mode keeps
+        // POSITIVE refunded figures.
+        $signed = $typeReady && !$returnsOnly;
+        $sign = $signed ? "CASE WHEN pos_transactions.transaction_type = 'return' THEN -1 ELSE 1 END" : '1';
+        $isReturn = $typeReady ? "CASE WHEN pos_transactions.transaction_type = 'return' THEN 1 ELSE 0 END" : '0';
+        $invoiceExpr = $signed
+            ? "COUNT(DISTINCT CASE WHEN COALESCE(pos_transactions.transaction_type, 'sale') != 'return' THEN pos_transaction_items.transaction_id END)"
+            : "COUNT(DISTINCT pos_transaction_items.transaction_id)";
+
         $hasThirdCol = \Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'is_third_schedule');
         $thirdExpr = $hasThirdCol
-            ? "COALESCE(SUM(CASE WHEN pos_transaction_items.is_third_schedule = 1 OR pos_transaction_items.is_third_schedule = true THEN {$base} ELSE 0 END), 0) as total_third_schedule,"
+            ? "COALESCE(SUM(CASE WHEN pos_transaction_items.is_third_schedule = 1 OR pos_transaction_items.is_third_schedule = true THEN ({$sign}) * ({$base}) ELSE 0 END), 0) as total_third_schedule,"
             : "0 as total_third_schedule,";
 
         return $itemQuery->selectRaw("
-            COUNT(DISTINCT pos_transaction_items.transaction_id) as total_invoices,
-            COALESCE(SUM({$base}), 0) as total_sales,
-            COALESCE(SUM(pos_transaction_items.tax_amount), 0) as total_tax,
-            COALESCE(SUM(CASE WHEN pos_transaction_items.is_tax_exempt = 1 OR pos_transaction_items.is_tax_exempt = true THEN {$base} ELSE 0 END), 0) as total_exempt,
-            COALESCE(SUM(CASE WHEN pos_transaction_items.is_tax_exempt = 0 OR pos_transaction_items.is_tax_exempt = false THEN {$base} ELSE 0 END), 0) as total_taxable,
+            {$invoiceExpr} as total_invoices,
+            COALESCE(SUM(({$sign}) * ({$base})), 0) as total_sales,
+            COALESCE(SUM(({$sign}) * pos_transaction_items.tax_amount), 0) as total_tax,
+            COALESCE(SUM(CASE WHEN pos_transaction_items.is_tax_exempt = 1 OR pos_transaction_items.is_tax_exempt = true THEN ({$sign}) * ({$base}) ELSE 0 END), 0) as total_exempt,
+            COALESCE(SUM(CASE WHEN pos_transaction_items.is_tax_exempt = 0 OR pos_transaction_items.is_tax_exempt = false THEN ({$sign}) * ({$base}) ELSE 0 END), 0) as total_taxable,
             {$thirdExpr}
-            0 as _dummy
+            COUNT(DISTINCT CASE WHEN ({$isReturn}) = 1 THEN pos_transaction_items.transaction_id END) as return_count,
+            COALESCE(SUM(({$isReturn}) * (({$base}) + pos_transaction_items.tax_amount)), 0) as return_amount,
+            COALESCE(SUM(({$isReturn}) * pos_transaction_items.tax_amount), 0) as return_tax
         ")->first();
     }
 
@@ -5081,6 +5142,9 @@ class PosController extends Controller
         $tab = ($request->get('tab') === 'local' && auth('pos')->user()?->isPosAdmin()) ? 'local' : 'pra';
 
         $taxRateFilter = $request->filled('tax_rate') ? $request->tax_rate : null;
+        [$typeReady, $returnsOnly, $signExpr, $saleRowExpr, $isReturnExpr] = $this->taxReportNettingExprs($request);
+        $billTypeFilter = $typeReady && in_array($request->get('bill_type'), ['sales', 'returns'], true)
+            ? $request->get('bill_type') : '';
 
         $baseQuery = $this->buildTaxReportQuery($request, $tab, true);
         $transactions = $baseQuery->paginate(50)->appends($request->all());
@@ -5090,21 +5154,28 @@ class PosController extends Controller
             $allIdsQuery = $this->buildTaxReportQuery($request, $tab, true);
             $allIds = $allIdsQuery->pluck('id')->toArray();
 
-            $summary = $this->buildItemLevelSummary($allIds, $taxRateFilter);
+            $summary = $this->buildItemLevelSummary($allIds, $taxRateFilter, $typeReady, $returnsOnly);
             $summary->total_discount = 0;
             $summary->total_third_schedule = $summary->total_third_schedule ?? 0;
 
             $itemValues = $this->getItemLevelValuesForTransactions($transactions, $taxRateFilter);
         } else {
             $summaryQuery = $this->buildTaxReportQuery($request, $tab, true);
-            $summary = $summaryQuery->reorder()->selectRaw('
-                COUNT(*) as total_invoices,
-                COALESCE(SUM(total_amount), 0) as total_sales,
-                COALESCE(SUM(discount_amount), 0) as total_discount,
-                COALESCE(SUM(subtotal - discount_amount - COALESCE(exempt_amount, 0)), 0) as total_taxable,
-                COALESCE(SUM(tax_amount), 0) as total_tax,
-                COALESCE(SUM(exempt_amount), 0) as total_exempt
-            ')->first();
+            // Credit-note netting (Task 695): money sums are SIGNED (returns
+            // subtract), invoice count = sale bills only; the credit-note
+            // count/amount ride alongside so nothing is hidden. In
+            // credit-notes-only mode figures stay POSITIVE (refunded).
+            $summary = $summaryQuery->reorder()->selectRaw("
+                COALESCE(SUM({$saleRowExpr}), 0) as total_invoices,
+                COALESCE(SUM(({$signExpr}) * total_amount), 0) as total_sales,
+                COALESCE(SUM(({$signExpr}) * discount_amount), 0) as total_discount,
+                COALESCE(SUM(({$signExpr}) * (subtotal - discount_amount - COALESCE(exempt_amount, 0))), 0) as total_taxable,
+                COALESCE(SUM(({$signExpr}) * tax_amount), 0) as total_tax,
+                COALESCE(SUM(({$signExpr}) * COALESCE(exempt_amount, 0)), 0) as total_exempt,
+                COALESCE(SUM({$isReturnExpr}), 0) as return_count,
+                COALESCE(SUM(({$isReturnExpr}) * total_amount), 0) as return_amount,
+                COALESCE(SUM(({$isReturnExpr}) * tax_amount), 0) as return_tax
+            ")->first();
 
             // Third Schedule breakdown (Aug 2026): item-level query so we can
             // split exempt into Third Schedule vs regular exempt for monthly return.
@@ -5117,7 +5188,7 @@ class PosController extends Controller
                         ->join('pos_transactions', 'pos_transactions.id', '=', 'pos_transaction_items.transaction_id')
                         ->whereIn('pos_transaction_items.transaction_id', $allIds)
                         ->where('pos_transaction_items.is_third_schedule', true)
-                        ->selectRaw("COALESCE(SUM({$base}), 0) as ts_total")
+                        ->selectRaw("COALESCE(SUM(({$signExpr}) * ({$base})), 0) as ts_total")
                         ->value('ts_total') ?? 0);
                 }
             }
@@ -5137,8 +5208,9 @@ class PosController extends Controller
         $localCount = 0;
         $user = auth('pos')->user();
         $availableRates = $this->availableTaxRates($companyId, $tab, $company);
+        $billTypeReady = $typeReady;
 
-        return view('pos.tax-reports', compact('company', 'transactions', 'summary', 'dateLabel', 'taxRateLabel', 'tab', 'hasPinSet', 'localCount', 'user', 'itemValues', 'taxRateFilter', 'availableRates'));
+        return view('pos.tax-reports', compact('company', 'transactions', 'summary', 'dateLabel', 'taxRateLabel', 'tab', 'hasPinSet', 'localCount', 'user', 'itemValues', 'taxRateFilter', 'availableRates', 'billTypeFilter', 'billTypeReady'));
     }
 
     public function exportTaxReportCsv(Request $request)
@@ -5152,6 +5224,12 @@ class PosController extends Controller
         $tab = ($request->get('tab') === 'local' && auth('pos')->user()?->isPosAdmin()) ? 'local' : 'pra';
 
         $taxRateFilter = $request->filled('tax_rate') ? $request->tax_rate : null;
+        // Credit-note netting (Task 695): CSV honors the bill-type filter and
+        // uses the same SIGNED math as the screen — returns subtract, unless
+        // the credit-notes-only view is active (positive refunded figures).
+        [$typeReady, $returnsOnly, $signExpr, $saleRowExpr, $isReturnExpr] = $this->taxReportNettingExprs($request);
+        $rowIsReturn = fn ($t) => $typeReady && ($t->transaction_type ?? 'sale') === 'return';
+        $rowSign = fn ($t) => ($rowIsReturn($t) && !$returnsOnly) ? -1 : 1;
 
         $query = $this->buildTaxReportQuery($request, $tab, (bool)$taxRateFilter);
         $transactions = $query->get();
@@ -5174,7 +5252,7 @@ class PosController extends Controller
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         ];
 
-        $callback = function () use ($transactions, $taxRateFilter, $itemValues, $taxRateLabel) {
+        $callback = function () use ($transactions, $taxRateFilter, $itemValues, $taxRateLabel, $typeReady, $returnsOnly, $signExpr, $rowIsReturn, $rowSign) {
             $file = fopen('php://output', 'w');
             fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
 
@@ -5184,6 +5262,7 @@ class PosController extends Controller
                     'PRA Fiscal Invoice Number',
                     'Invoice Date',
                     'Customer Name',
+                    'Bill Type',
                     'Payment Method',
                     $taxRateLabel . ' Value (PKR)',
                     $taxRateLabel . ' Tax Amount (PKR)',
@@ -5195,24 +5274,32 @@ class PosController extends Controller
                 $totalValue = 0;
                 $totalTax = 0;
                 $totalWithTax = 0;
+                $returnCount = 0;
+                $returnRefunded = 0;
 
                 foreach ($transactions as $t) {
                     $iv = $itemValues[$t->id] ?? null;
                     if (!$iv) continue;
 
-                    $itemSub = (float)($iv['item_subtotal'] ?? 0);
-                    $itemTax = (float)($iv['item_tax'] ?? 0);
+                    $sign = $rowSign($t);
+                    $itemSub = $sign * (float)($iv['item_subtotal'] ?? 0);
+                    $itemTax = $sign * (float)($iv['item_tax'] ?? 0);
                     $itemTotal = $itemSub + $itemTax;
 
                     $totalValue += $itemSub;
                     $totalTax += $itemTax;
                     $totalWithTax += $itemTotal;
+                    if ($rowIsReturn($t)) {
+                        $returnCount++;
+                        $returnRefunded += (float)($iv['item_subtotal'] ?? 0) + (float)($iv['item_tax'] ?? 0);
+                    }
 
                     fputcsv($file, [
                         $t->invoice_number,
                         $t->pra_invoice_number ?? 'N/A',
                         $t->created_at->format('d/m/Y H:i'),
                         $t->customer_name ?? 'Walk-in',
+                        $rowIsReturn($t) ? 'Credit Note' : 'Sale',
                         ucwords(str_replace('_', ' ', $t->payment_method)),
                         number_format($itemSub, 2, '.', ''),
                         number_format($itemTax, 2, '.', ''),
@@ -5223,17 +5310,22 @@ class PosController extends Controller
                 }
 
                 fputcsv($file, []);
-                fputcsv($file, ['SUMMARY — ' . $taxRateLabel]);
+                fputcsv($file, ['SUMMARY — ' . $taxRateLabel . ($returnsOnly ? ' (Credit Notes Only — refunded amounts)' : '')]);
                 fputcsv($file, ['Invoices with ' . $taxRateLabel . ' items', count(array_filter($itemValues, fn($v) => ($v['item_subtotal'] ?? 0) > 0))]);
                 fputcsv($file, [$taxRateLabel . ' Value (PKR)', number_format($totalValue, 2, '.', '')]);
                 fputcsv($file, [$taxRateLabel . ' Tax Amount (PKR)', number_format($totalTax, 2, '.', '')]);
                 fputcsv($file, [$taxRateLabel . ' Total (PKR)', number_format($totalWithTax, 2, '.', '')]);
+                if ($typeReady) {
+                    fputcsv($file, ['Credit Notes (count)', $returnCount]);
+                    fputcsv($file, ['Credit Notes Refunded (PKR)', number_format($returnRefunded, 2, '.', '')]);
+                }
             } else {
                 fputcsv($file, [
                     'POS Invoice Number',
                     'PRA Fiscal Invoice Number',
                     'Invoice Date',
                     'Customer Name',
+                    'Bill Type',
                     'Payment Method',
                     'Subtotal (PKR)',
                     'Discount Amount (PKR)',
@@ -5247,26 +5339,28 @@ class PosController extends Controller
                 ]);
 
                 foreach ($transactions as $t) {
+                    $sign = $rowSign($t);
                     fputcsv($file, [
                         $t->invoice_number,
                         $t->pra_invoice_number ?? 'N/A',
                         $t->created_at->format('d/m/Y H:i'),
                         $t->customer_name ?? 'Walk-in',
+                        $rowIsReturn($t) ? 'Credit Note' : 'Sale',
                         ucwords(str_replace('_', ' ', $t->payment_method)),
-                        number_format($t->subtotal, 2, '.', ''),
-                        number_format($t->discount_amount, 2, '.', ''),
-                        number_format($t->subtotal - $t->discount_amount - ($t->exempt_amount ?? 0), 2, '.', ''),
-                        number_format($t->exempt_amount ?? 0, 2, '.', ''),
+                        number_format($sign * $t->subtotal, 2, '.', ''),
+                        number_format($sign * $t->discount_amount, 2, '.', ''),
+                        number_format($sign * ($t->subtotal - $t->discount_amount - ($t->exempt_amount ?? 0)), 2, '.', ''),
+                        number_format($sign * ($t->exempt_amount ?? 0), 2, '.', ''),
                         number_format($t->tax_rate, 2, '.', ''),
-                        number_format($t->tax_amount, 2, '.', ''),
-                        number_format($t->total_amount, 2, '.', ''),
+                        number_format($sign * $t->tax_amount, 2, '.', ''),
+                        number_format($sign * $t->total_amount, 2, '.', ''),
                         $t->terminal?->terminal_name ?? 'N/A',
                         strtoupper($t->pra_status ?? 'N/A'),
                     ]);
                 }
 
                 fputcsv($file, []);
-                // Third Schedule breakdown for CSV summary
+                // Third Schedule breakdown for CSV summary — SIGNED (returns subtract)
                 $csvThirdTotal = 0;
                 if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'is_third_schedule')) {
                     $csvAllIds = $transactions->pluck('id')->toArray();
@@ -5276,22 +5370,29 @@ class PosController extends Controller
                             ->join('pos_transactions', 'pos_transactions.id', '=', 'pos_transaction_items.transaction_id')
                             ->whereIn('pos_transaction_items.transaction_id', $csvAllIds)
                             ->where('pos_transaction_items.is_third_schedule', true)
-                            ->selectRaw("COALESCE(SUM({$base2}), 0) as ts_total")
+                            ->selectRaw("COALESCE(SUM(({$signExpr}) * ({$base2})), 0) as ts_total")
                             ->value('ts_total') ?? 0);
                     }
                 }
-                $csvTotalExempt = $transactions->sum('exempt_amount');
+                $csvTotalExempt = $transactions->sum(fn ($t) => $rowSign($t) * ($t->exempt_amount ?? 0));
                 $csvExemptOther = max(0, $csvTotalExempt - $csvThirdTotal);
+                $csvSaleCount = $transactions->filter(fn ($t) => !$rowIsReturn($t))->count();
+                $csvReturns = $transactions->filter($rowIsReturn);
 
-                fputcsv($file, ['SUMMARY — Monthly Return Breakup']);
-                fputcsv($file, ['Total Invoices', $transactions->count()]);
-                fputcsv($file, ['Total Sales Amount (PKR)', number_format($transactions->sum('total_amount'), 2, '.', '')]);
-                fputcsv($file, ['Total Discount Amount (PKR)', number_format($transactions->sum('discount_amount'), 2, '.', '')]);
-                fputcsv($file, ['Taxable Sales (PKR)', number_format($transactions->sum(fn($t) => $t->subtotal - $t->discount_amount - ($t->exempt_amount ?? 0)), 2, '.', '')]);
+                fputcsv($file, ['SUMMARY — Monthly Return Breakup' . ($returnsOnly ? ' (Credit Notes Only — refunded amounts)' : '')]);
+                fputcsv($file, ['Total Invoices', $returnsOnly ? $transactions->count() : $csvSaleCount]);
+                fputcsv($file, ['Total Sales Amount (PKR)', number_format($transactions->sum(fn ($t) => $rowSign($t) * $t->total_amount), 2, '.', '')]);
+                fputcsv($file, ['Total Discount Amount (PKR)', number_format($transactions->sum(fn ($t) => $rowSign($t) * $t->discount_amount), 2, '.', '')]);
+                fputcsv($file, ['Taxable Sales (PKR)', number_format($transactions->sum(fn($t) => $rowSign($t) * ($t->subtotal - $t->discount_amount - ($t->exempt_amount ?? 0))), 2, '.', '')]);
                 fputcsv($file, ['Third Schedule Sales (PKR)', number_format($csvThirdTotal, 2, '.', '')]);
                 fputcsv($file, ['Exempt Sales — Other (PKR)', number_format($csvExemptOther, 2, '.', '')]);
                 fputcsv($file, ['Total Tax Exempt Amount (PKR)', number_format($csvTotalExempt, 2, '.', '')]);
-                fputcsv($file, ['Total Tax Amount (PKR)', number_format($transactions->sum('tax_amount'), 2, '.', '')]);
+                fputcsv($file, ['Total Tax Amount (PKR)', number_format($transactions->sum(fn ($t) => $rowSign($t) * $t->tax_amount), 2, '.', '')]);
+                if ($typeReady) {
+                    fputcsv($file, ['Credit Notes (count)', $csvReturns->count()]);
+                    fputcsv($file, ['Credit Notes Refunded (PKR)', number_format($csvReturns->sum('total_amount'), 2, '.', '')]);
+                    fputcsv($file, ['Credit Notes Tax Reversed (PKR)', number_format($csvReturns->sum('tax_amount'), 2, '.', '')]);
+                }
             }
 
             fclose($file);
@@ -5311,6 +5412,11 @@ class PosController extends Controller
         $tab = ($request->get('tab') === 'local' && auth('pos')->user()?->isPosAdmin()) ? 'local' : 'pra';
 
         $taxRateFilter = $request->filled('tax_rate') ? $request->tax_rate : null;
+        // Credit-note netting (Task 695): PDF honors the bill-type filter and
+        // mirrors the screen's SIGNED math exactly.
+        [$typeReady, $returnsOnly, $signExpr, $saleRowExpr, $isReturnExpr] = $this->taxReportNettingExprs($request);
+        $billTypeFilter = $typeReady && in_array($request->get('bill_type'), ['sales', 'returns'], true)
+            ? $request->get('bill_type') : '';
 
         $query = $this->buildTaxReportQuery($request, $tab, (bool)$taxRateFilter);
         $transactions = $query->get();
@@ -5318,21 +5424,24 @@ class PosController extends Controller
         $itemValues = [];
         if ($taxRateFilter) {
             $allIds = $transactions->pluck('id')->toArray();
-            $summary = $this->buildItemLevelSummary($allIds, $taxRateFilter);
+            $summary = $this->buildItemLevelSummary($allIds, $taxRateFilter, $typeReady, $returnsOnly);
             $summary->total_discount = 0;
             $itemValues = $this->getItemLevelValuesForTransactions($transactions, $taxRateFilter);
         } else {
             $summaryQuery = $this->buildTaxReportQuery($request, $tab, false);
-            $summary = $summaryQuery->reorder()->selectRaw('
-                COUNT(*) as total_invoices,
-                COALESCE(SUM(total_amount), 0) as total_sales,
-                COALESCE(SUM(discount_amount), 0) as total_discount,
-                COALESCE(SUM(subtotal - discount_amount - COALESCE(exempt_amount, 0)), 0) as total_taxable,
-                COALESCE(SUM(tax_amount), 0) as total_tax,
-                COALESCE(SUM(exempt_amount), 0) as total_exempt
-            ')->first();
+            $summary = $summaryQuery->reorder()->selectRaw("
+                COALESCE(SUM({$saleRowExpr}), 0) as total_invoices,
+                COALESCE(SUM(({$signExpr}) * total_amount), 0) as total_sales,
+                COALESCE(SUM(({$signExpr}) * discount_amount), 0) as total_discount,
+                COALESCE(SUM(({$signExpr}) * (subtotal - discount_amount - COALESCE(exempt_amount, 0))), 0) as total_taxable,
+                COALESCE(SUM(({$signExpr}) * tax_amount), 0) as total_tax,
+                COALESCE(SUM(({$signExpr}) * COALESCE(exempt_amount, 0)), 0) as total_exempt,
+                COALESCE(SUM({$isReturnExpr}), 0) as return_count,
+                COALESCE(SUM(({$isReturnExpr}) * total_amount), 0) as return_amount,
+                COALESCE(SUM(({$isReturnExpr}) * tax_amount), 0) as return_tax
+            ")->first();
 
-            // Third Schedule breakdown for PDF
+            // Third Schedule breakdown for PDF — SIGNED (returns subtract)
             $pdfThirdTotal = 0;
             if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transaction_items', 'is_third_schedule')) {
                 $pdfAllIds = $transactions->pluck('id')->toArray();
@@ -5342,7 +5451,7 @@ class PosController extends Controller
                         ->join('pos_transactions', 'pos_transactions.id', '=', 'pos_transaction_items.transaction_id')
                         ->whereIn('pos_transaction_items.transaction_id', $pdfAllIds)
                         ->where('pos_transaction_items.is_third_schedule', true)
-                        ->selectRaw("COALESCE(SUM({$base3}), 0) as ts_total")
+                        ->selectRaw("COALESCE(SUM(({$signExpr}) * ({$base3})), 0) as ts_total")
                         ->value('ts_total') ?? 0);
                 }
             }
@@ -5370,7 +5479,7 @@ class PosController extends Controller
 
         return $this->renderReportPdf(
             'pos.tax-report-pdf',
-            compact('company', 'transactions', 'summary', 'dateLabel', 'taxRateLabel', 'taxRateFilter', 'itemValues'),
+            compact('company', 'transactions', 'summary', 'dateLabel', 'taxRateLabel', 'taxRateFilter', 'itemValues', 'billTypeFilter') + ['billTypeReady' => $typeReady],
             $filename,
             'landscape'
         );

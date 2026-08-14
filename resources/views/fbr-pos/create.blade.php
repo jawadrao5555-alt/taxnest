@@ -280,7 +280,7 @@ kbd {
             closedReports: [],
             errorMsg: '',
             // Task 689: date => undispatched-count for days the rush-recovery
-            // auto-close SKIPPED (Task 684 guard) — cashier ko wajah dikhani hai.
+            // auto-close SKIPPED (Task 684 guard) — the cashier must see the reason.
             skipped: {},
             skipReason(n) { return @js(__('pos.dc_skip_reason_undispatched')).replace(':count', n); },
             totalBills() { return this.pending.reduce((s,p) => s + p.count, 0); },

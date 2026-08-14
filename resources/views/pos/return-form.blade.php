@@ -53,7 +53,9 @@
                         <td class="text-gray-700 dark:text-gray-300">Rs {{ number_format($it->unit_price, 2) }}</td>
                         <td>
                             <input type="hidden" name="items[{{ $loop->index }}][item_id]" value="{{ $it->id }}">
-                            <input type="number" name="items[{{ $loop->index }}][return_qty]" value="0" min="0" max="{{ $remaining }}" step="0.001" {{ $remaining <= 0 ? 'disabled' : '' }} class="w-24 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm dark:bg-gray-800 dark:text-white">
+                            {{-- Owner rule (14 Aug 2026): full remaining qty PREFILLED — most
+                                 returns are whole-bill; cashier only edits for partial returns. --}}
+                            <input type="number" name="items[{{ $loop->index }}][return_qty]" value="{{ $remaining > 0 ? rtrim(rtrim(number_format($remaining, 3, '.', ''), '0'), '.') : 0 }}" min="0" max="{{ $remaining }}" step="0.001" {{ $remaining <= 0 ? 'disabled' : '' }} class="w-24 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm dark:bg-gray-800 dark:text-white">
                         </td>
                     </tr>
                 @endforeach

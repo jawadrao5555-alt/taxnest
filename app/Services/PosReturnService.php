@@ -58,7 +58,39 @@ class PosReturnService
         if ($txn->status !== 'completed') {
             return 'not_completed';
         }
+        // Owner rule (14 Aug 2026): day close = hisaab settled. Once the
+        // bill's business day has a Z-report, no returns from ANY entry
+        // point (list/detail/form/quick-return/rider all funnel here).
+        if (self::dayClosed($txn)) {
+            return 'day_closed';
+        }
         return null;
+    }
+
+    /**
+     * Has this bill's business day already been closed (Z-report exists)?
+     * business_date is a raw 'Y-m-d' string (no cast — see PosBusinessDay);
+     * pre-migration rows fall back to the created_at calendar date.
+     */
+    public static function dayClosed(PosTransaction $txn): bool
+    {
+        $date = null;
+        if (Schema::hasColumn('pos_transactions', 'business_date')) {
+            $date = $txn->business_date;
+        }
+        $date = $date ?: optional($txn->created_at)->format('Y-m-d');
+        if (!$date) {
+            return false;
+        }
+        try {
+            // whereDate: pos_day_close_reports is tiny (one row/day/company)
+            // and the date-cast column may carry a time part on some drivers.
+            return \App\Models\PosDayCloseReport::where('company_id', $txn->company_id)
+                ->whereDate('report_date', $date)->exists();
+        } catch (\Throwable $e) {
+            // Prod schema drift — never block/500 the bills list over this.
+            return false;
+        }
     }
 
     /** Any return bill already created against this parent (partial or full). */

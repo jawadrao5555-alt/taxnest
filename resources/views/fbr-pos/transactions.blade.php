@@ -84,6 +84,11 @@
                         <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{{ __('pos.action_word') }}</th>
                     </tr>
                 </thead>
+                @php
+                    // Return button window (owner rule 14 Aug 2026) — same
+                    // constant the server enforces in returnForm/processReturn.
+                    $__fbrReturnCutoff = now()->subDays(\App\Http\Controllers\FbrPosPhase2Controller::RETURN_WINDOW_DAYS);
+                @endphp
                 <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                     @forelse($transactions as $txn)
                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
@@ -111,7 +116,20 @@
                         @endif
                         <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 hidden md:table-cell">{{ $txn->created_at->format('d M Y') }}</td>
                         <td class="px-4 py-3 text-center">
-                            <a href="{{ route('fbrpos.show', $txn->id) }}" class="text-blue-600 hover:text-blue-700 text-sm font-medium">{{ __('pos.view_word') }}</a>
+                            <div class="flex items-center justify-center gap-2 whitespace-nowrap">
+                                <a href="{{ route('fbrpos.show', $txn->id) }}" class="text-blue-600 hover:text-blue-700 text-sm font-medium">{{ __('pos.view_word') }}</a>
+                                {{-- Return button (owner request 14 Aug 2026): start a return
+                                     straight from the receipts list — completed sale rows only,
+                                     inside the 15-din window the server also enforces. --}}
+                                @if(($txn->transaction_type ?? 'sale') !== 'return'
+                                    && ($txn->status ?? 'completed') === 'completed'
+                                    && $txn->created_at->gte($__fbrReturnCutoff))
+                                <a href="{{ route('fbrpos.phase2.return.form', $txn->id) }}" class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 dark:bg-rose-900/20 dark:text-rose-300 dark:border-rose-800 dark:hover:bg-rose-900/40 transition" title="{{ __('pos.return_refund') }}">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3"/></svg>
+                                    {{ __('pos.return_action') }}
+                                </a>
+                                @endif
+                            </div>
                         </td>
                     </tr>
                     @empty

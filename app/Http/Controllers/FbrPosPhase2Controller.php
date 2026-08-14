@@ -483,6 +483,20 @@ class FbrPosPhase2Controller extends Controller
     // ========================= RETURNS / REFUNDS =========================
 
     /**
+     * Return window (owner rule 14 Aug 2026): FBR bills may only be returned
+     * within this many days of the sale. Legal ceiling is 180 days (Sales Tax
+     * Rules 2006 credit/debit-note limit); shop policy is set tighter at 15.
+     * PUBLIC — the transactions list / show blades gate their Return buttons
+     * on the same constant so UI and server never disagree.
+     */
+    public const RETURN_WINDOW_DAYS = 15;
+
+    private function returnWindowExpired(FbrPosTransaction $txn): bool
+    {
+        return $txn->created_at && $txn->created_at->lt(now()->subDays(self::RETURN_WINDOW_DAYS));
+    }
+
+    /**
      * Quick Return lookup (Task 685) — FBR twin of PRA's
      * PosReturnController::quickLookup: sale screen se bill number likh kar
      * seedha return form kholna. JSON: { url } ya { error }.
@@ -548,12 +562,18 @@ class FbrPosPhase2Controller extends Controller
         if ($original->transaction_type === 'return') {
             return back()->with('error', 'Cannot return a return');
         }
+        if ($this->returnWindowExpired($original)) {
+            return back()->with('error', __('pos.fbr_return_window_expired', ['days' => self::RETURN_WINDOW_DAYS]));
+        }
         return view('fbr-pos.phase2.return', compact('original'));
     }
 
     public function processReturn(Request $r, $id)
     {
         $original = FbrPosTransaction::with('items')->where('company_id', $this->companyId())->findOrFail($id);
+        if ($this->returnWindowExpired($original)) {
+            return back()->with('error', __('pos.fbr_return_window_expired', ['days' => self::RETURN_WINDOW_DAYS]));
+        }
         $r->validate([
             'items' => 'required|array|min:1',
             'items.*.item_id' => 'required|integer',

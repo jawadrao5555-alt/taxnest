@@ -210,6 +210,15 @@
                     {{ __('pos.download_pdf') }}
                 </button>
             </div>
+            {{-- Return entry (owner request 14 Aug 2026): completed sale bills
+                 only, inside the 15-din window the server also enforces. --}}
+            @if(($transaction->transaction_type ?? 'sale') !== 'return'
+                && ($transaction->status ?? 'completed') === 'completed'
+                && $transaction->created_at->gte(now()->subDays(\App\Http\Controllers\FbrPosPhase2Controller::RETURN_WINDOW_DAYS)))
+            <a href="{{ route('fbrpos.phase2.return.form', $transaction->id) }}" class="block w-full text-center py-2.5 bg-rose-600 text-white font-semibold rounded-lg hover:bg-rose-700 transition text-sm">
+                {{ __('pos.return_refund') }}
+            </a>
+            @endif
             <a href="{{ route('fbrpos.transactions') }}" class="block w-full text-center py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition text-sm">
                 {{ __('pos.back_to_transactions') }}
             </a>

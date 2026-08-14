@@ -4474,6 +4474,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'return_not_allowed_return_of_return' => 'Yeh khud return bill hai — return ka return nahi ho sakta.',
     'return_not_allowed_not_completed' => 'Sirf mukammal (completed) bill return ho sakta hai.',
     'return_not_allowed_provisional' => 'Provisional / local bill return nahi ho sakta. Pehle bill final karein.',
+    'return_not_allowed_day_closed' => 'Is bill ka din band ho chuka hai — hisaab settle ho gaya, ab yeh bill return nahi ho sakta.',
+    'fbr_return_window_expired' => 'Return ki muddat khatam — FBR bill sirf :days din ke andar return ho sakta hai.',
     'return_over_qty' => ':item ki return miqdaar baqi miqdaar (:qty) se zyada hai.',
     'return_no_items' => 'Return ke liye kam az kam aik item chunein.',
     'return_processed' => 'Return bill ban gaya — Rs :amount wapis.',

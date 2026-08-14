@@ -80,6 +80,26 @@
         // schema guard. Rows shown are already inside the viewer's stream/tab.
         $__canReturn = \App\Services\PosAccessService::returnsAllowed(auth('pos')->user())
             && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'transaction_type');
+        // Day-close return lock (owner rule 14 Aug 2026): a closed business
+        // day is settled — its bills lose the Return button. One query for
+        // the page's dates; per-row lookup below mirrors returnableReason.
+        $__closedDates = [];
+        if ($__canReturn) {
+            try {
+                $__pageDates = collect($transactions->items())
+                    ->map(fn ($t) => $t->business_date ?: optional($t->created_at)->format('Y-m-d'))
+                    ->filter()->unique()->values();
+                if ($__pageDates->isNotEmpty()) {
+                    $__closedDates = \App\Models\PosDayCloseReport::where('company_id', app('currentCompanyId'))
+                        ->whereIn('report_date', $__pageDates)
+                        ->pluck('report_date')
+                        ->map(fn ($d) => $d instanceof \Carbon\CarbonInterface ? $d->format('Y-m-d') : substr((string) $d, 0, 10))
+                        ->all();
+                }
+            } catch (\Throwable $__e) {
+                $__closedDates = [];
+            }
+        }
     @endphp
 
     <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
@@ -232,8 +252,10 @@
                                     $__rowRemaining = ($txn->items_qty_total !== null)
                                         ? round((float) $txn->items_qty_total - (float) ($txn->items_returned_total ?? 0), 3)
                                         : 1; // aggregate unavailable (schema drift) → let the form decide
+                                    // Day-close lock: settled day → no Return button.
+                                    $__rowDayClosed = in_array($txn->business_date ?: $txn->created_at->format('Y-m-d'), $__closedDates, true);
                                 @endphp
-                                @if($__canReturn && !$rowIsReturn && $__rowRemaining > 0)
+                                @if($__canReturn && !$rowIsReturn && $__rowRemaining > 0 && !$__rowDayClosed)
                                 <a href="{{ route('pos.transaction.return-form', $txn->id) }}" class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 dark:bg-rose-900/20 dark:text-rose-300 dark:border-rose-800 dark:hover:bg-rose-900/40 transition whitespace-nowrap" title="{{ __('pos.return_refund') }}">
                                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3"/></svg>
                                     {{ __('pos.return_action') }}

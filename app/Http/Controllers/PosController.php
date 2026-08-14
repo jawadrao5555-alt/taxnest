@@ -936,7 +936,10 @@ class PosController extends Controller
         // current BUSINESS day that are still not FINAL. Triple-filter per
         // pos-provisional rules (completed + invoice_mode='local' +
         // pra_status='local'); hide_archived global scope excludes archived.
-        $pendingProvisional = PosTransaction::where('company_id', $companyId)
+        // Task 705: manager default PRA-only — Pending (local) tile zeroed until
+        // the khufia local-check mode is ON.
+        $pendingProvisional = (auth('pos')->user()?->posHidesLocalStream() ?? false) ? 0
+            : PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
             ->where('invoice_mode', 'local')
             ->where('pra_status', 'local')
@@ -3359,7 +3362,9 @@ class PosController extends Controller
         // Billing Scope (07 Aug 2026): pra-scoped staff never see local/provisional
         // bills — the provisional half of this list is emptied for them. The FINAL
         // delivery-bill half below stays (delivery tracking is stream-agnostic).
-        $scopeHidesProvisionals = (auth('pos')->user()?->posBillingScope() ?? 'both') === 'pra';
+        $scopeHidesProvisionals = (auth('pos')->user()?->posBillingScope() ?? 'both') === 'pra'
+            // Task 705: manager default PRA-only — provisional list hidden too.
+            || (auth('pos')->user()?->posHidesLocalStream() ?? false);
         $bills = $scopeHidesProvisionals ? collect() : PosTransaction::where('company_id', $companyId)
             ->where('status', 'completed')
             ->where('invoice_mode', 'local')
@@ -3596,7 +3601,13 @@ class PosController extends Controller
             // stream in the Reprint list — mirrors applyReportFilters' split.
             ->where(function ($q) {
                 // Single predicate (Task 647): exempt bills visible to both scopes.
-                PosTransaction::applyBillingScopeFilter($q, auth('pos')->user()?->posBillingScope() ?? 'both');
+                // Task 705: manager default PRA-only = effective 'pra' scope here.
+                $tbUser = auth('pos')->user();
+                $tbScope = $tbUser?->posBillingScope() ?? 'both';
+                if ($tbScope === 'both' && ($tbUser?->posHidesLocalStream() ?? false)) {
+                    $tbScope = 'pra';
+                }
+                PosTransaction::applyBillingScopeFilter($q, $tbScope);
             })
             ->orderBy('id', 'desc')
             ->limit(300)
@@ -4230,6 +4241,108 @@ class PosController extends Controller
         return null;
     }
 
+    /**
+     * ─── Task 705: khufia key (Ctrl+Alt+Shift+L) — manager/owner side ───────
+     * Toggles the session-only "local check mode" flag: OFF (default) =
+     * managers see ONLY the PRA stream and Z/X reports render PRA-only
+     * figures; ON = local invoices + local-stream figures visible too.
+     * Session-based — logout / fresh login clears it. No visible UI beyond a
+     * tiny neutral dot (pos-app layout). VISIBILITY ONLY: what gets reported
+     * to PRA never changes here (compliance boundary, Task 705).
+     */
+    public function toggleLocalCheck(Request $request)
+    {
+        $user = auth('pos')->user();
+        // Manager/owner/admin only — cashiers & confined roles get a hard 403.
+        if (!$user || !$user->isPosAdmin()) {
+            abort(403);
+        }
+        $on = !session('pos_local_check');
+        session(['pos_local_check' => $on]);
+
+        return response()->json(['on' => $on]);
+    }
+
+    /**
+     * ─── Task 705: khufia key — LOCAL cashier station identity switch ───────
+     * Same key on a LOCAL-scoped cashier's station: the pos-guard session
+     * flips to the owner-linked PRA counterpart cashier (no password) — sale
+     * screen, today's bills, billing attribution sab us PRA ID par. Dobara
+     * key = wapas asal local ID (original remembered in the session; login()
+     * migrates the session but KEEPS data). Per-station only: doosre PCs ke
+     * sessions untouched; both stations may bill the same PRA ID concurrently.
+     * Unlinked/ineligible = silent no-op. Target can NEVER be a manager/
+     * owner/admin (cashier-role filter) or another company's user.
+     */
+    public function identitySwitch(Request $request)
+    {
+        $user = auth('pos')->user();
+        if (!$user) {
+            abort(403);
+        }
+        $companyId = app('currentCompanyId');
+        $noop = response()->json(['switched' => false]);
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_counterpart_user_id')) {
+                return $noop;
+            }
+        } catch (\Throwable $e) {
+            return $noop;
+        }
+
+        // ── Switch BACK: original local ID remembered in this session ──
+        $originalId = (int) session('pos_identity_original_id', 0);
+        if ($originalId > 0) {
+            $original = User::where('company_id', $companyId)
+                ->where('id', $originalId)
+                ->where('pos_role', 'pos_cashier')
+                ->where('is_active', true)
+                ->first();
+            // Sanity: the CURRENT user must be the original's linked counterpart —
+            // a stale/crafted session value must never become a free login.
+            if (!$original || (int) ($original->pos_counterpart_user_id ?? 0) !== (int) $user->id) {
+                session()->forget('pos_identity_original_id');
+
+                return $noop;
+            }
+            $this->identitySwitchLogin($original);
+            session()->forget('pos_identity_original_id');
+
+            return response()->json(['switched' => true, 'direction' => 'back']);
+        }
+
+        // ── Switch FORWARD: only a LOCAL-scoped cashier with an owner-set link ──
+        if (!$user->isPosCashier() || $user->posBillingScope() !== 'local'
+            || !(int) ($user->pos_counterpart_user_id ?? 0)) {
+            return $noop; // unlinked/ineligible = silent no-op (task rule)
+        }
+        $target = User::where('company_id', $companyId)
+            ->where('id', (int) $user->pos_counterpart_user_id)
+            ->where('pos_role', 'pos_cashier') // NEVER manager/owner/admin
+            ->where('is_active', true)
+            ->first();
+        if (!$target || $target->posBillingScope() === 'local') {
+            return $noop;
+        }
+        session(['pos_identity_original_id' => $user->id]);
+        $this->identitySwitchLogin($target);
+
+        return response()->json(['switched' => true, 'direction' => 'pra']);
+    }
+
+    /**
+     * Task 705: re-login the pos guard as $target WITHOUT a Staff Hazri row —
+     * an identity switch is not a fresh staff arrival. The AppServiceProvider
+     * Login listener skips its pos_user_sessions insert when this request
+     * attribute is set (hazri double-count guard). Session data (the
+     * original-id memory) survives login()'s session migrate.
+     */
+    private function identitySwitchLogin(User $target): void
+    {
+        request()->attributes->set('pos_identity_switch', true);
+        \Illuminate\Support\Facades\Auth::guard('pos')->login($target);
+    }
+
     public function transactions(Request $request)
     {
         $companyId = app('currentCompanyId');
@@ -4252,6 +4365,11 @@ class PosController extends Controller
         $scope = $user?->posBillingScope() ?? 'both';
         if ($scope !== 'both' && $tab !== 'exempt') {
             $tab = $scope === 'local' ? 'local' : 'pra';
+        }
+        // Task 705: manager default PRA-only — bina khufia local-check mode ke
+        // pos_manager ka Local tab server-side band (view mein tab chhupta bhi hai).
+        if ($tab === 'local' && ($user?->posHidesLocalStream() ?? false)) {
+            $tab = 'pra';
         }
 
         $query = PosTransaction::where('company_id', $companyId)->where('status', 'completed')->with('creator');
@@ -4648,6 +4766,10 @@ class PosController extends Controller
         if ($reportScope !== 'both' && $tab !== 'exempt') {
             $tab = $reportScope === 'local' ? 'local' : 'pra';
         }
+        // Task 705: manager default PRA-only (khufia local-check mode OFF).
+        if ($tab === 'local' && ($user?->posHidesLocalStream() ?? false)) {
+            $tab = 'pra';
+        }
         $cashierFilter = $request->get('cashier', 'all');
 
         // Owner rule (5 Aug 2026): a cashier ALWAYS sees only their own sales
@@ -4770,7 +4892,8 @@ class PosController extends Controller
 
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
-        $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin()) ? 'local' : 'pra';
+        // Task 705: manager PRA-only default — Local export needs local-check mode ON.
+        $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin() && !$user->posHidesLocalStream()) ? 'local' : 'pra';
         if ($request->get('tab') === 'exempt') {
             $tab = 'exempt'; // Task 647: exempt stream, open to every role/scope
         }
@@ -4801,7 +4924,8 @@ class PosController extends Controller
         $user = auth('pos')->user();
         $isCashier = ($user->pos_role ?? 'pos_admin') === 'pos_cashier';
         // Local export is ADMIN-ONLY — cashiers always export PRA data.
-        $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin()) ? 'local' : 'pra';
+        // Task 705: manager PRA-only default — Local export needs local-check mode ON.
+        $tab = ($request->get('tab') === 'local' && $user?->isPosAdmin() && !$user->posHidesLocalStream()) ? 'local' : 'pra';
         if ($request->get('tab') === 'exempt') {
             $tab = 'exempt'; // Task 647: exempt stream, open to every role/scope
         }
@@ -5139,7 +5263,9 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         // Local Invoices tab is ADMIN-ONLY — cashiers are always forced to PRA.
-        $tab = ($request->get('tab') === 'local' && auth('pos')->user()?->isPosAdmin()) ? 'local' : 'pra';
+        // Task 705: manager PRA-only default — Local tab needs local-check mode ON.
+        $tab = ($request->get('tab') === 'local' && auth('pos')->user()?->isPosAdmin()
+            && !(auth('pos')->user()?->posHidesLocalStream() ?? false)) ? 'local' : 'pra';
 
         $taxRateFilter = $request->filled('tax_rate') ? $request->tax_rate : null;
         [$typeReady, $returnsOnly, $signExpr, $saleRowExpr, $isReturnExpr] = $this->taxReportNettingExprs($request);
@@ -5221,7 +5347,9 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         // Local export is ADMIN-ONLY — cashiers always export PRA data.
-        $tab = ($request->get('tab') === 'local' && auth('pos')->user()?->isPosAdmin()) ? 'local' : 'pra';
+        // Task 705: manager PRA-only default — Local export needs local-check mode ON.
+        $tab = ($request->get('tab') === 'local' && auth('pos')->user()?->isPosAdmin()
+            && !(auth('pos')->user()?->posHidesLocalStream() ?? false)) ? 'local' : 'pra';
 
         $taxRateFilter = $request->filled('tax_rate') ? $request->tax_rate : null;
         // Credit-note netting (Task 695): CSV honors the bill-type filter and
@@ -5422,7 +5550,9 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         // Local export is ADMIN-ONLY — cashiers always export PRA data.
-        $tab = ($request->get('tab') === 'local' && auth('pos')->user()?->isPosAdmin()) ? 'local' : 'pra';
+        // Task 705: manager PRA-only default — Local export needs local-check mode ON.
+        $tab = ($request->get('tab') === 'local' && auth('pos')->user()?->isPosAdmin()
+            && !(auth('pos')->user()?->posHidesLocalStream() ?? false)) ? 'local' : 'pra';
 
         $taxRateFilter = $request->filled('tax_rate') ? $request->tax_rate : null;
         // Credit-note netting (Task 695): PDF honors the bill-type filter and
@@ -6622,6 +6752,44 @@ class PosController extends Controller
                     $cashier->id,
                     ['pos_billing_scope' => $oldScope, 'target_name' => $cashier->name],
                     ['pos_billing_scope' => $newScope, 'target_name' => $cashier->name],
+                    $companyId,
+                    auth('pos')->id()
+                );
+            }
+        }
+
+        // Task 705: PRA counterpart link — LOCAL cashier ↔ PRA cashier pair for
+        // the khufia station identity switch. Owner-only (billing-scope
+        // visibility rule); cashier-role-only, same-company; target must be
+        // able to bill the PRA stream. Empty = clear; invalid input silently
+        // ignored (keeps the old link). Direct assignment (non-$fillable).
+        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'pos_counterpart_user_id')
+            && (auth('pos')->user()?->canManageBillingScope() ?? false)
+            && $cashier->pos_role === 'pos_cashier'
+            && $request->exists('pos_counterpart_user_id')) {
+            $cpInput = $request->input('pos_counterpart_user_id');
+            $oldCp = $cashier->pos_counterpart_user_id ? (int) $cashier->pos_counterpart_user_id : null;
+            $newCp = $oldCp; // invalid target = keep the old link
+            if ($cpInput === null || $cpInput === '') {
+                $newCp = null;
+            } elseif ((int) $cpInput !== $cashier->id) {
+                $cpTarget = User::where('company_id', $companyId)
+                    ->where('id', (int) $cpInput)
+                    ->where('pos_role', 'pos_cashier') // NEVER manager/owner/admin
+                    ->first();
+                if ($cpTarget && $cpTarget->posBillingScope() !== 'local') {
+                    $newCp = (int) $cpTarget->id;
+                }
+            }
+            if ($oldCp !== $newCp) {
+                $cashier->pos_counterpart_user_id = $newCp;
+                $cashier->save();
+                AuditLogService::log(
+                    'pos_counterpart_link_changed',
+                    'User',
+                    $cashier->id,
+                    ['pos_counterpart_user_id' => $oldCp, 'target_name' => $cashier->name],
+                    ['pos_counterpart_user_id' => $newCp, 'target_name' => $cashier->name],
                     $companyId,
                     auth('pos')->id()
                 );
@@ -9260,7 +9428,12 @@ class PosController extends Controller
         // otherwise compute live from today's set.
         $streamSplit = ($existingReport && is_array($existingReport->stream_summary ?? null))
             ? $existingReport->stream_summary
-            : $this->buildDayCloseStreamSplit($transactions);
+            : $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, $companyId, $date));
+
+        // Task 705: Z/X display mode-gating — normal mode = PRA section only;
+        // khufia local-check mode ON = Local stream figures too. LOCAL-scoped
+        // viewers always see their own local world (scope forcing intact).
+        $showLocalStream = (bool) session('pos_local_check') || $dayCloseScope === 'local';
 
         // Delivery Riders (Jul 2026): live rider cash figures for the recon preview
         // (unsettled rider cash is OUT of the drawer; earlier-day settlements are IN).
@@ -9291,7 +9464,7 @@ class PosController extends Controller
         // rider unsettled cash is a WARNING only (khata legitimately carries).
         $pendingDeliveries = $this->undispatchedDeliverySummary($companyId, $company, $date);
 
-        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'washBills', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'pendingDeliveries', 'dcReturnDetail', 'dcReturnParents'));
+        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'washBills', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'showLocalStream', 'pendingDeliveries', 'dcReturnDetail', 'dcReturnParents'));
     }
 
     /**
@@ -10670,7 +10843,15 @@ class PosController extends Controller
         // this is also why the old Invoice Summary "Amount" column printed
         // "-"). Schema-guarded (prod drift self-heal).
         if (\Schema::hasColumn('pos_day_close_reports', 'stream_summary')) {
-            $data['stream_summary'] = $this->buildDayCloseStreamSplit($transactions);
+            // Task 705: the STORED split carries the COMPLETE local stream —
+            // L-series provisionals merged in (the PRA-mode figure set above
+            // deliberately excludes invoice_mode='local' rows, so the Local
+            // box was missing them). Split ONLY: every stored report figure
+            // stays computed from the PRA set, and PRA-reporting logic is
+            // untouched (compliance boundary).
+            $data['stream_summary'] = $this->buildDayCloseStreamSplit(
+                $this->withLocalStreamRows($transactions, $companyId, $date)
+            );
         }
 
         // Returns audit snapshot (Task 682): freeze the per-return detail
@@ -11040,11 +11221,16 @@ class PosController extends Controller
         // OLD reports = best-effort recompute from surviving historical rows.
         $streamSplit = is_array($report->stream_summary ?? null)
             ? $report->stream_summary
-            : $this->buildDayCloseStreamSplit($transactions);
+            : $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, (int) $report->company_id, $report->report_date->toDateString()));
+
+        // Task 705: Z display mode-gating — Local stream section renders only
+        // in khufia local-check mode (or for LOCAL-scoped viewers).
+        $showLocalStream = (bool) session('pos_local_check')
+            || ((\Illuminate\Support\Facades\Auth::guard('pos')->user()?->posBillingScope() ?? 'both') === 'local');
 
         return $this->renderReportPdf(
             'pos.day-close-pdf',
-            compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit'),
+            compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit', 'showLocalStream'),
             "Day-Close-{$report->report_number}-{$report->report_date->format('Y-m-d')}.pdf"
         );
     }
@@ -11101,9 +11287,13 @@ class PosController extends Controller
         // Per-stream split (Task 660) — same frozen-first logic as the PDF.
         $streamSplit = is_array($report->stream_summary ?? null)
             ? $report->stream_summary
-            : $this->buildDayCloseStreamSplit($transactions);
+            : $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, (int) $report->company_id, $report->report_date->toDateString()));
 
-        return view('pos.day-close-thermal', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit'));
+        // Task 705: Z display mode-gating (same rule as the PDF).
+        $showLocalStream = (bool) session('pos_local_check')
+            || ((\Illuminate\Support\Facades\Auth::guard('pos')->user()?->posBillingScope() ?? 'both') === 'local');
+
+        return view('pos.day-close-thermal', compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit', 'showLocalStream'));
     }
 
     /**
@@ -11194,6 +11384,38 @@ class PosController extends Controller
      * the PDF/thermal fallback for OLD reports, and the X-Report — one code
      * path so the numbers can never diverge.
      */
+    /**
+     * Task 705: merge the COMPLETE local stream into a day-close transaction
+     * set before building the per-stream split. The day-close figure sets
+     * deliberately exclude invoice_mode='local' rows (L-series provisionals
+     * and their returns), so the split's Local box was missing them. Merge is
+     * for the SPLIT/STORED breakdown ONLY — the Z-report's own figures stay
+     * computed from the PRA set, and PRA-reporting logic is untouched
+     * (compliance boundary). Archived rows included (historical recomputes
+     * after the wash); dedupe by id (LOCAL-scoped viewers' set already
+     * contains these rows).
+     */
+    private function withLocalStreamRows($transactions, int $companyId, string $date)
+    {
+        try {
+            $locals = PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->where('business_date', $date)
+                ->where('status', 'completed')
+                ->where('invoice_mode', 'local')
+                ->orderBy('created_at')
+                ->get();
+        } catch (\Throwable $e) {
+            return $transactions; // schema drift — split falls back to the old set
+        }
+        if ($locals->isEmpty()) {
+            return $transactions;
+        }
+        $seen = $transactions->pluck('id')->flip();
+
+        return $transactions->concat($locals->reject(fn ($t) => isset($seen[$t->id])))->values();
+    }
+
     private function buildDayCloseStreamSplit($transactions): array
     {
         $typeReady = \Schema::hasColumn('pos_transactions', 'transaction_type');
@@ -11361,7 +11583,11 @@ class PosController extends Controller
             $report->rider_summary = $riderFigures;
         }
 
-        $streamSplit = $this->buildDayCloseStreamSplit($transactions);
+        $streamSplit = $this->buildDayCloseStreamSplit($this->withLocalStreamRows($transactions, $companyId, $date));
+
+        // Task 705: X display mode-gating (same rule as the Z page/PDF).
+        $showLocalStream = (bool) session('pos_local_check')
+            || (($user?->posBillingScope() ?? 'both') === 'local');
 
         // Cashier figures are SIGNED (Task 570): refunds net revenue/tax;
         // counts stay sales-only.
@@ -11385,7 +11611,7 @@ class PosController extends Controller
         $taxSplit = $this->dayCloseTaxSplit($transactions);
         $isXReport = true;
 
-        return compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit', 'isXReport');
+        return compact('company', 'report', 'transactions', 'cashierBreakdown', 'analytics', 'hazri', 'bioPunches', 'taxSplit', 'streamSplit', 'showLocalStream', 'isXReport');
     }
 
     /** X-Report as A4 PDF (Task 660) — read-only, PROVISIONAL watermark. */

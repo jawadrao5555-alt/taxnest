@@ -113,7 +113,10 @@
             <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1">{{ $stats->total_invoices }}</p>
             <div class="flex flex-wrap gap-2 mt-2">
                 <span class="text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">{{ __('pos.badge_pra_count', ['count' => $stats->pra_invoices]) }}</span>
+                {{-- Task 705: Local badge only in khufia local-check mode (or LOCAL-scoped viewer) --}}
+                @if($showLocalStream ?? false)
                 <span class="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">{{ __('pos.badge_local_count', ['count' => $stats->local_invoices]) }}</span>
+                @endif
                 @if($stats->offline_invoices > 0)
                 <span class="text-xs px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">{{ __('pos.badge_offline_count', ['count' => $stats->offline_invoices]) }}</span>
                 @endif
@@ -202,8 +205,16 @@
         $ssHasExempt = ($ssExempt['count'] ?? 0) > 0 || ($ssExDetail['value'] ?? 0) > 0 || !empty($ssExDetail['items']);
     @endphp
     @if(is_array($ssPra) && is_array($ssLocal))
+    @php
+        // Task 705: Z/X mode-gating — Local stream box renders ONLY in khufia
+        // local-check mode (or for LOCAL-scoped viewers). Default = PRA only.
+        $ssBoxes = [['key' => 'pra', 'box' => $ssPra, 'title' => __('pos.dc_stream_pra'), 'accent' => 'purple']];
+        if ($showLocalStream ?? false) {
+            $ssBoxes[] = ['key' => 'local', 'box' => $ssLocal, 'title' => __('pos.dc_stream_local'), 'accent' => 'teal'];
+        }
+    @endphp
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        @foreach([['key' => 'pra', 'box' => $ssPra, 'title' => __('pos.dc_stream_pra'), 'accent' => 'purple'], ['key' => 'local', 'box' => $ssLocal, 'title' => __('pos.dc_stream_local'), 'accent' => 'teal']] as $sbox)
+        @foreach($ssBoxes as $sbox)
         <div class="bg-white dark:bg-gray-900 rounded-xl border-2 {{ $sbox['accent'] === 'purple' ? 'border-purple-200 dark:border-purple-800' : 'border-teal-200 dark:border-teal-800' }} shadow-md p-5">
             <div class="flex items-center justify-between mb-3">
                 <h3 class="font-bold {{ $sbox['accent'] === 'purple' ? 'text-purple-700 dark:text-purple-300' : 'text-teal-700 dark:text-teal-300' }}">{{ $sbox['title'] }}</h3>

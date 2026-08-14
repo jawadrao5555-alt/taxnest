@@ -52,7 +52,9 @@
          see this tab and the controllers force tab='pra' for them server-side.
          Billing Scope (07 Aug 2026): a local-scoped cashier/manager DOES get it
          (it is their whole world); a pra-scoped one never does. --}}
-    @if($tabScope === 'local' || ($tabScope !== 'pra' && auth('pos')->user()?->isPosAdmin()))
+    {{-- Task 705: manager default PRA-only — Local tab hidden until the khufia
+         local-check mode (Ctrl+Alt+Shift+L) is ON. Owner/admin unchanged. --}}
+    @if($tabScope === 'local' || ($tabScope !== 'pra' && auth('pos')->user()?->isPosAdmin() && !(auth('pos')->user()?->posHidesLocalStream() ?? false)))
     <a href="{{ $baseUrl }}?tab=local{{ $tabQuery }}"
         class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
         {{ $currentTab === 'local' ? 'bg-purple-600 text-white shadow-md' : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800' }}">

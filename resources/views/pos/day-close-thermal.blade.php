@@ -61,7 +61,10 @@
         <tr><td>{{ __('pos.dc_total_invoices') }}</td><td class="r b">{{ $report->total_invoices }}</td></tr>
         {{-- PRA vs Local split (owner video 12 Aug 2026): same values PDF shows --}}
         <tr><td>&nbsp;&nbsp;{{ __('pos.dcp_pra_submitted_invoices') }}</td><td class="r">{{ $report->pra_invoices }}</td></tr>
+        {{-- Task 705: Local row only in khufia local-check mode (or LOCAL-scoped viewer) --}}
+        @if($showLocalStream ?? false)
         <tr><td>&nbsp;&nbsp;{{ __('pos.dcp_local_invoices') }}</td><td class="r">{{ $report->local_invoices }}</td></tr>
+        @endif
         <tr><td>{{ __('pos.dc_gross_sales') }}</td><td class="r">{{ number_format($report->gross_sales, 2) }}</td></tr>
         @if($report->total_discount > 0)
         <tr><td>{{ __('pos.dc_discount') }}</td><td class="r">-{{ number_format($report->total_discount, 2) }}</td></tr>
@@ -99,7 +102,15 @@
         $ssHasExempt = ($ssExempt['count'] ?? 0) > 0 || ($ssExDetail['value'] ?? 0) > 0 || !empty($ssExDetail['items']);
     @endphp
     @if(is_array($ssPra) && is_array($ssLocal))
-    @foreach([[__('pos.dc_stream_pra'), $ssPra], [__('pos.dc_stream_local'), $ssLocal]] as $sbRow)
+    @php
+        // Task 705: Z/X mode-gating — Local stream section renders ONLY in
+        // khufia local-check mode (or for LOCAL-scoped viewers).
+        $sbStreamRows = [[__('pos.dc_stream_pra'), $ssPra]];
+        if ($showLocalStream ?? false) {
+            $sbStreamRows[] = [__('pos.dc_stream_local'), $ssLocal];
+        }
+    @endphp
+    @foreach($sbStreamRows as $sbRow)
     @php $sbTitle = $sbRow[0]; $sb = $sbRow[1]; @endphp
     <div class="sec">{{ $sbTitle }} ({{ $sb['count'] ?? 0 }} {{ __('pos.dcp_bills_word') }})</div>
     <table>

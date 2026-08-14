@@ -1667,6 +1667,9 @@ return [
     'billing_scope_local' => 'صرف مقامی بلنگ',
     'billing_scope_pra' => 'صرف پی آر اے بلنگ',
     'billing_scope_hint_role' => 'صرف کیشیئر اور منیجر اکاؤنٹس پر لاگو ہوتا ہے۔',
+    // Task 705: PRA counterpart link (owner-only, Team page)
+    'pra_counterpart_label' => 'پی آر اے ہم منصب',
+    'pra_counterpart_none' => 'کوئی پی آر اے ہم منصب نہیں',
     'billing_scope_badge_local' => 'صرف مقامی',
     'billing_scope_badge_pra' => 'صرف پی آر اے',
     'billing_scope_pra_only' => 'یہ اکاؤنٹ صرف پی آر اے بلنگ کے لیے مقرر ہے — مقامی/عبوری بل کی اجازت نہیں۔',

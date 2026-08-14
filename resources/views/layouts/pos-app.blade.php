@@ -76,7 +76,7 @@
     // "What's New" app updates (popup + bell). Admin-controlled via SystemSetting
     // pos_whats_new_enabled. NEVER break POS pages if the table is missing on prod
     // (schema-drift self-heal convention) — fail silent.
-    $whatsNewList = collect(); $whatsNewUnseenCount = 0; $whatsNewPopup = null; $whatsNewSeenIds = []; $whatsNewPopupList = collect();
+    $whatsNewList = collect(); $whatsNewUnseenCount = 0; $whatsNewPopup = null; $whatsNewSeenIds = []; $whatsNewPopupList = collect(); $whatsNewFeatured = null;
     try {
         // ADMIN/MANAGER ONLY (owner rule, Jul 2026): "What's New" popup + bell must
         // NEVER show on cashier screens — updates are the admin/manager's job to
@@ -106,6 +106,10 @@
                 // Owner (21 Jul 2026): popup shows ALL unseen updates stacked in one
                 // scrollable body (newest first) — not just the latest one.
                 $whatsNewPopupList = $whatsNewUnseen->values();
+                // Featured "bara elaan" (Task 722): if ANY unseen update is flagged,
+                // the popup renders in celebratory hero style with that update on top.
+                // ?? false: column may not exist yet mid-deploy (missing attr = null).
+                $whatsNewFeatured = $whatsNewPopupList->first(fn ($u) => (bool) ($u->is_featured ?? false));
             }
         }
     } catch (\Throwable $e) { /* keep POS pages alive */ }
@@ -1152,6 +1156,97 @@
         })();
         </script>
         @if($whatsNewPopup)
+        @if($whatsNewFeatured)
+        {{-- ⭐ FEATURED "bara elaan" popup (Task 722) — celebratory hero style for big
+             features. Same gating (admin/manager, not pending, not readonly-imp) and
+             same seen flow as the normal popup below. Inline <style> ON PURPOSE:
+             new arbitrary Tailwind classes are invisible without a Vite rebuild. --}}
+        <style>
+            @keyframes wnfPop { 0% { opacity: 0; transform: scale(0.85) translateY(16px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+            @keyframes wnfBadge { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+            @keyframes wnfSparkle { 0%, 100% { opacity: 0.35; transform: translateY(0) scale(1); } 50% { opacity: 1; transform: translateY(-6px) scale(1.3); } }
+            @keyframes wnfSheen { 0% { transform: translateX(-160%) skewX(-18deg); } 60%, 100% { transform: translateX(320%) skewX(-18deg); } }
+            .wnf-card { animation: wnfPop 0.3s cubic-bezier(0.34, 1.4, 0.64, 1); }
+            .wnf-badge { animation: wnfBadge 1.7s ease-in-out infinite; }
+            .wnf-sparkle { position: absolute; pointer-events: none; animation: wnfSparkle 2.2s ease-in-out infinite; }
+            .wnf-cta { position: relative; overflow: hidden; }
+            .wnf-cta::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 45%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent); animation: wnfSheen 2.6s ease-in-out infinite; }
+        </style>
+        <div x-data="{ wnOpen: true,
+                wnDismiss() {
+                    this.wnOpen = false;
+                    fetch('/pos/whats-new/seen', { method: 'POST', keepalive: true, headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' } }).catch(() => {});
+                },
+                wnTry(url) { this.wnDismiss(); window.location.href = url; } }"
+             x-show="wnOpen" x-cloak data-wn-featured="1"
+             class="fixed inset-0 flex items-center justify-center p-4"
+             style="z-index: 130; background: rgba(15, 10, 40, 0.62); backdrop-filter: blur(5px);">
+            <div class="wnf-card w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl overflow-hidden"
+                 style="box-shadow: 0 30px 80px -20px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.08);">
+                <div class="relative px-6 pt-6 pb-5 text-center overflow-hidden"
+                     style="background: linear-gradient(135deg, hsl(var(--accent-h), var(--accent-s), 18%) 0%, hsl(var(--accent-h), var(--accent-s), 40%) 55%, hsl(var(--accent-h), var(--accent-s), 28%) 100%);">
+                    <span class="wnf-sparkle text-lg" style="top: 12%; left: 7%;">✨</span>
+                    <span class="wnf-sparkle text-sm" style="top: 58%; left: 15%; animation-delay: 0.6s;">✨</span>
+                    <span class="wnf-sparkle text-base" style="top: 18%; right: 9%; animation-delay: 1.1s;">✨</span>
+                    <span class="wnf-sparkle text-sm" style="top: 62%; right: 17%; animation-delay: 1.6s;">⭐</span>
+                    <div class="wnf-badge inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12px] font-black uppercase tracking-wide"
+                         style="background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #451a03; box-shadow: 0 6px 18px -6px rgba(245,158,11,0.7);">
+                        🎉 {{ __('pos.wn_featured_badge') }}
+                    </div>
+                    <h2 class="mt-3 text-2xl font-extrabold text-white leading-snug" style="text-shadow: 0 2px 10px rgba(0,0,0,0.25);">{{ $whatsNewFeatured->title }}</h2>
+                    <p class="text-[12px] text-white/75 mt-1.5">{{ $whatsNewFeatured->created_at->format('d M Y') }}</p>
+                </div>
+                <div class="px-6 py-5 overflow-y-auto" style="max-height: 52vh;">
+                    @if($whatsNewFeatured->image_path ?? null)
+                        <img src="{{ asset('storage/' . $whatsNewFeatured->image_path) }}" alt="{{ __('pos.update_image_alt') }}" loading="lazy"
+                             class="w-full rounded-xl mb-4 cursor-zoom-in"
+                             style="box-shadow: 0 10px 30px -12px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.06);"
+                             onclick="window.open(this.src, '_blank')">
+                    @endif
+                    <ul class="space-y-2.5">
+                        @foreach(($whatsNewFeatured->points ?? []) as $wnpt)
+                            <li class="flex items-start gap-2.5 text-sm text-gray-700 dark:text-gray-200">
+                                <span class="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5" style="background: linear-gradient(135deg, #fef3c7, #fde68a);">
+                                    <svg class="w-3 h-3" style="color: #b45309;" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.958a1 1 0 00.95.69h4.162c.969 0 1.371 1.24.588 1.81l-3.368 2.447a1 1 0 00-.363 1.118l1.287 3.957c.3.922-.755 1.688-1.539 1.118l-3.367-2.446a1 1 0 00-1.175 0l-3.367 2.446c-.784.57-1.838-.196-1.539-1.118l1.287-3.957a1 1 0 00-.363-1.118L2.063 9.385c-.783-.57-.38-1.81.588-1.81h4.162a1 1 0 00.95-.69l1.286-3.958z"/></svg>
+                                </span>
+                                <span>{{ $wnpt }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                    @if($whatsNewPopupList->count() > 1)
+                        <div class="mt-5 pt-4 border-t border-gray-200 dark:border-gray-700">
+                            <p class="text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-3">{{ __('pos.wn_featured_more') }}</p>
+                            @foreach($whatsNewPopupList->reject(fn ($u) => $u->id === $whatsNewFeatured->id) as $wnp)
+                                <div class="{{ $loop->first ? '' : 'mt-4 pt-3 border-t border-gray-100 dark:border-gray-800' }}">
+                                    <p class="text-sm font-extrabold text-gray-900 dark:text-white mb-1.5">{{ $wnp->title }} <span class="font-normal text-[11px] text-gray-400">· {{ $wnp->created_at->format('d M Y') }}</span></p>
+                                    <ul class="space-y-1.5">
+                                        @foreach(($wnp->points ?? []) as $wnpt)
+                                            <li class="flex items-start gap-2 text-[13px] text-gray-600 dark:text-gray-300">
+                                                <svg class="flex-shrink-0 w-3.5 h-3.5 text-purple-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                                <span>{{ $wnpt }}</span>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+                <div class="px-6 pb-5 flex items-center gap-2.5">
+                    {{-- route(..., false) = RELATIVE path — absolute https:// URLs break on plain-http dev browsing (forceScheme trap) --}}
+                    <button @click="wnTry('{{ route('pos.transactions', [], false) }}')" x-ref="wnfCta" x-init="$nextTick(() => $refs.wnfCta.focus())"
+                            class="wnf-cta flex-1 py-3.5 rounded-xl text-white font-extrabold text-sm transition cursor-pointer"
+                            style="background: linear-gradient(135deg, hsl(var(--accent-h), var(--accent-s), 48%), hsl(var(--accent-h), var(--accent-s), 32%)); box-shadow: 0 10px 24px -8px hsla(var(--accent-h), var(--accent-s), 40%, 0.6);">
+                        {{ __('pos.wn_featured_try_now') }} →
+                    </button>
+                    <button @click="wnDismiss()"
+                            class="px-4 py-3.5 rounded-xl text-sm font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition cursor-pointer">
+                        {{ __('pos.whats_new_got_it') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+        @else
         {{-- One-time "What's New" popup — dismiss marks ALL current updates seen (per user) --}}
         <div x-data="{ wnOpen: true,
                 wnDismiss() {
@@ -1209,6 +1304,7 @@
                 </div>
             </div>
         </div>
+        @endif
         @endif
         <x-pwa-update color="purple" />
         <x-trial-lock-modal />

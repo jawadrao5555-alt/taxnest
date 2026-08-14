@@ -100,13 +100,16 @@
                                         <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-semibold text-center {{ $upd->audience === 'fbr_pos' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : ($upd->audience === 'all' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300') }}">
                                             {{ $upd->audience === 'fbr_pos' ? 'FBR POS' : ($upd->audience === 'all' ? 'PRA + FBR' : 'PRA POS') }}
                                         </span>
+                                        @if($upd->is_featured ?? false)
+                                            <span class="mt-1 block px-2 py-1 rounded-full text-[10px] font-bold text-center bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">⭐ Bara Elaan</span>
+                                        @endif
                                     </td>
                                     <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ number_format($upd->seens_count) }} users</td>
                                     <td class="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">{{ $upd->created_at->format('d M Y, h:i A') }}</td>
                                     <td class="px-4 py-3">
                                         <div class="flex items-center gap-1.5 flex-wrap">
                                             <button type="button"
-                                                onclick='openEditModal(@json($upd->id), @json($upd->title), @json(implode("\n", $upd->points ?? [])), @json($upd->image_path ? asset("storage/" . $upd->image_path) : null), @json($upd->audience))'
+                                                onclick='openEditModal(@json($upd->id), @json($upd->title), @json(implode("\n", $upd->points ?? [])), @json($upd->image_path ? asset("storage/" . $upd->image_path) : null), @json($upd->audience), @json((bool) ($upd->is_featured ?? false)))'
                                                 class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200">Edit</button>
                                             <form method="POST" action="/admin/app-updates/{{ $upd->id }}/toggle" class="inline">
                                                 @csrf
@@ -173,6 +176,10 @@
                         <option value="all">Both (PRA + FBR POS)</option>
                     </select>
                 </div>
+                <div class="flex items-start gap-2">
+                    <input type="checkbox" name="is_featured" value="1" id="featNew" class="rounded border-gray-300 text-amber-500 mt-0.5">
+                    <label for="featNew" class="text-sm text-gray-700 dark:text-gray-300">⭐ Bara elaan (featured) <span class="block text-xs text-gray-400 font-normal">Celebratory hero popup — bare features ke liye. "Abhi Try Karein" button bills/receipts page par le jata hai.</span></label>
+                </div>
                 <div class="flex items-center gap-2">
                     <input type="checkbox" name="is_published" value="1" checked id="pubNew" class="rounded border-gray-300 text-emerald-600">
                     <label for="pubNew" class="text-sm text-gray-700 dark:text-gray-300">Publish immediately (POS users will see popup + bell)</label>
@@ -221,6 +228,10 @@
                     <input type="file" name="image" accept="image/jpeg,image/png,image/webp" class="w-full text-sm text-gray-600 dark:text-gray-300 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-emerald-50 file:text-emerald-700 file:text-sm file:font-medium">
                     <p class="mt-1 text-[11px] text-gray-400">Nayi image upload karne se purani replace ho jayegi.</p>
                 </div>
+                <div class="flex items-start gap-2">
+                    <input type="checkbox" name="is_featured" value="1" id="featEdit" class="rounded border-gray-300 text-amber-500 mt-0.5">
+                    <label for="featEdit" class="text-sm text-gray-700 dark:text-gray-300">⭐ Bara elaan (featured) <span class="block text-xs text-gray-400 font-normal">Celebratory hero popup — bare features ke liye. "Abhi Try Karein" button bills/receipts page par le jata hai.</span></label>
+                </div>
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" onclick="document.getElementById('editUpdateModal').classList.add('hidden')" class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">Cancel</button>
                     <button type="submit" class="px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700">Save Changes</button>
@@ -230,11 +241,12 @@
     </div>
 
     <script>
-        function openEditModal(id, title, pointsText, imageUrl, audience) {
+        function openEditModal(id, title, pointsText, imageUrl, audience, isFeatured) {
             document.getElementById('editUpdateForm').action = '/admin/app-updates/' + id + '/update';
             document.getElementById('editTitle').value = title;
             document.getElementById('editPoints').value = pointsText;
             document.getElementById('editAudience').value = ['pos','fbr_pos','all'].includes(audience) ? audience : 'pos';
+            document.getElementById('featEdit').checked = !!isFeatured;
             var wrap = document.getElementById('editCurrentImageWrap');
             var img = document.getElementById('editCurrentImage');
             if (imageUrl) {

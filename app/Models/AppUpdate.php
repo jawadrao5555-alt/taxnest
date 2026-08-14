@@ -7,12 +7,14 @@ use Illuminate\Database\Eloquent\Model;
 class AppUpdate extends Model
 {
     protected $fillable = [
-        'title', 'points', 'image_path', 'audience', 'is_published', 'created_by',
+        'title', 'points', 'image_path', 'audience', 'is_published', 'is_featured', 'created_by',
     ];
 
     protected $casts = [
         'points' => 'array',
         'is_published' => 'boolean',
+        // Featured "bara elaan" (Task 722): renders as a celebratory hero popup.
+        'is_featured' => 'boolean',
     ];
 
     /**

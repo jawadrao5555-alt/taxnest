@@ -73,7 +73,10 @@ class AppUpdateController extends Controller
             'audience' => $request->input('audience') ?: 'pos',
             'is_published' => $request->boolean('is_published', true),
             'created_by' => auth()->id(),
-        ]);
+            // Featured "bara elaan" (Task 722) — hasColumn guard: prod schema
+            // drift convention (row could be "Ran" without the column).
+        ] + (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'is_featured')
+            ? ['is_featured' => $request->boolean('is_featured')] : []));
 
         return redirect('/admin/app-updates')->with('success', 'Update published. POS users will see it on their next page load.');
     }
@@ -100,6 +103,10 @@ class AppUpdateController extends Controller
         ];
         if ($request->filled('audience')) {
             $data['audience'] = $request->input('audience');
+        }
+        // Unchecked checkbox = false (edit form always sends the field's state).
+        if (\Illuminate\Support\Facades\Schema::hasColumn('app_updates', 'is_featured')) {
+            $data['is_featured'] = $request->boolean('is_featured');
         }
 
         if ($request->boolean('remove_image')) {

@@ -55,8 +55,44 @@ Variants: dark (white-on-dark, default) | light (slate-on-light, for white heade
 
     const TITLE_APPLY = @json(__('pos.pwa_apply_now'));
     const TITLE_CHECK = @json(__('pos.pwa_check_updates'));
+    const MSG_DOWNLOADING = @json(__('pos.pwa_downloading'));
+    const MSG_STILL_DOWNLOADING = @json(__('pos.pwa_still_downloading'));
+    const MSG_ON_LATEST = @json(__('pos.pwa_on_latest'));
+    const MSG_OFFLINE = @json(__('pos.pwa_offline_no_check'));
+    const LATEST_FLAG = 'tnPwaLatestToast';
 
     btn.style.display = 'inline-flex';
+
+    // Small self-contained toast (ok = green, err = red, info = amber) — used
+    // for the post-reload "you're on the latest version" confirmation, the
+    // offline error and the still-downloading notice. Kept independent from
+    // the x-pwa-update bar (Task 706).
+    const TOAST_BG = {
+        ok:   'linear-gradient(135deg,#10b981,#047857)',
+        err:  'linear-gradient(135deg,#ef4444,#b91c1c)',
+        info: 'linear-gradient(135deg,#f59e0b,#b45309)'
+    };
+    const showToast = (msg, kind) => {
+        const t = document.createElement('div');
+        t.textContent = msg;
+        t.setAttribute('data-tn-pwa-toast', kind || 'ok');
+        t.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-8px);z-index:99999;padding:10px 18px;border-radius:12px;font-size:13px;font-weight:700;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,0.28);opacity:0;transition:opacity .25s ease,transform .25s ease;max-width:90vw;text-align:center;background:'
+            + (TOAST_BG[kind] || TOAST_BG.ok);
+        document.body.appendChild(t);
+        requestAnimationFrame(() => { t.style.opacity = '1'; t.style.transform = 'translateX(-50%) translateY(0)'; });
+        setTimeout(() => {
+            t.style.opacity = '0'; t.style.transform = 'translateX(-50%) translateY(-8px)';
+            setTimeout(() => t.remove(), 300);
+        }, 3500);
+    };
+
+    // The pre-reload click set this flag → confirm "you're on the latest version"
+    try {
+        if (sessionStorage.getItem(LATEST_FLAG) === '1') {
+            sessionStorage.removeItem(LATEST_FLAG);
+            showToast(MSG_ON_LATEST, 'ok');
+        }
+    } catch(_) {}
 
     const markUpdate = () => {
         updateAvailable = true;
@@ -92,9 +128,35 @@ Variants: dark (white-on-dark, default) | light (slate-on-light, for white heade
         reg.addEventListener('updatefound', () => watchWorker(reg.installing));
     });
 
+    const applyWaiting = () => {
+        // Apply waiting SW via centralized helper (sets intent flag → posts SKIP_WAITING → reloads)
+        if (typeof window.tnPwaApplyWaitingUpdate === 'function') {
+            window.tnPwaApplyWaitingUpdate();
+        } else {
+            location.reload();
+        }
+    };
+
+    // Task 706: the icon's promise is "bring me the latest version" — so the
+    // no-SW-update path must STILL reload once (server-side Blade/features ship
+    // without sw.js changing on most deploys). This is a direct user action, so
+    // the owner's "no auto-reload" rule does not apply here.
+    const reloadFresh = (onLatest) => {
+        if (onLatest) { try { sessionStorage.setItem(LATEST_FLAG, '1'); } catch(_) {} }
+        location.reload();
+    };
+
     btn.addEventListener('click', async (e) => {
         e.preventDefault();
         if (busy) return;
+
+        // Offline: no reload (would land on the offline splash), no fake green —
+        // clear feedback instead (Task 706).
+        if (!navigator.onLine) {
+            showToast(MSG_OFFLINE, 'err');
+            return;
+        }
+
         busy = true;
         btn.classList.add('tn-spinning');
 
@@ -105,44 +167,98 @@ Variants: dark (white-on-dark, default) | light (slate-on-light, for white heade
         const reg = await navigator.serviceWorker.getRegistration().catch(()=>null);
 
         if (updateAvailable && reg && reg.waiting) {
-            // Apply waiting SW via centralized helper (sets intent flag → posts SKIP_WAITING → reloads)
-            if (typeof window.tnPwaApplyWaitingUpdate === 'function') {
-                window.tnPwaApplyWaitingUpdate();
-            } else {
-                location.reload();
-            }
+            applyWaiting();
             return;
         }
 
-        // No update was marked — but maybe another tab cleared it, or user wants to force-check
-        if (reg) {
-            try { await reg.update(); } catch(_) {}
-            setTimeout(() => {
-                if (reg.waiting) {
-                    if (typeof window.tnPwaApplyWaitingUpdate === 'function') {
-                        window.tnPwaApplyWaitingUpdate();
-                    } else {
-                        location.reload();
+        if (!reg) { reloadFresh(true); return; }
+
+        // Force-check. If the check itself fails (server unreachable even though
+        // navigator.onLine says true), do NOT reload — the user would lose the
+        // page to the offline splash.
+        let checkFailed = false;
+        try { await reg.update(); } catch(_) { checkFailed = true; }
+
+        // Fixed-1s race fix (Task 706): instead of peeking reg.waiting after
+        // 1000ms (slow shop internet → new SW still 'installing' → false green),
+        // watch the new worker until it is fully installed, bounded at 20s.
+        const outcome = await new Promise((resolve) => {
+            let settled = false;
+            const finish = (r) => { if (!settled) { settled = true; resolve(r); } };
+            if (reg.waiting) { finish('installed'); return; }
+            const hardTimer = setTimeout(() => finish('timeout'), 20000);
+            // Grace window: reg.update() resolves before updatefound on some
+            // browsers — give the new worker a moment to appear.
+            const graceTimer = setTimeout(() => finish('none'), 800);
+            const watch = (worker) => {
+                if (!worker) return;
+                clearTimeout(graceTimer);
+                btn.title = MSG_DOWNLOADING;
+                const onState = () => {
+                    if (worker.state === 'installed' || worker.state === 'activated' || worker.state === 'redundant') {
+                        clearTimeout(hardTimer);
+                        finish(worker.state);
                     }
-                } else if (hadBadge) {
-                    // Badge said "update available" but no waiting SW exists
-                    // (stale flag — e.g. another tab already applied it, or the
-                    // worker activated silently). The user clicked EXPECTING a
-                    // refresh; pressing again would do nothing forever (owner
-                    // hit this: pressed 2-3x, "refresh nahi hua"). Give a real
-                    // reload so the fresh version actually shows.
-                    location.reload();
-                } else {
-                    // No new version — sync stale state, show success flash
-                    clearUpdate();
-                    btn.classList.remove('tn-spinning');
-                    btn.classList.add('tn-flash-ok');
-                    setTimeout(() => { btn.classList.remove('tn-flash-ok'); busy = false; }, 1100);
-                }
-            }, 1000);
-        } else {
-            location.reload();
+                };
+                worker.addEventListener('statechange', onState);
+                onState();
+            };
+            reg.addEventListener('updatefound', () => watch(reg.installing));
+            watch(reg.installing);
+        });
+
+        if (outcome === 'installed') {
+            // New SW fully downloaded → apply + reload (helper falls back to a
+            // plain reload if there is no waiting worker, e.g. first install).
+            applyWaiting();
+            return;
         }
+
+        if (outcome === 'timeout') {
+            // Still downloading after 20s (very slow shop internet). Do NOT
+            // reload — under the old worker the user could land back on the old
+            // version, the exact failure this button must eliminate. Explicit
+            // non-reloading state instead: the download keeps going in the
+            // background, the statechange watcher above fires the "!" badge the
+            // moment it's ready, and the user taps once more to apply.
+            btn.classList.remove('tn-spinning');
+            btn.title = TITLE_CHECK;
+            showToast(MSG_STILL_DOWNLOADING, 'info');
+            busy = false;
+            return;
+        }
+
+        if (outcome === 'activated' || outcome === 'redundant') {
+            // activated: new SW took over silently → reload to be controlled by it.
+            // redundant: install failed → still reload once for fresh server content
+            // (panel HTML is network-first, so the reload fetches fresh markup).
+            reloadFresh(false);
+            return;
+        }
+
+        // outcome === 'none' — no new SW found.
+        if (checkFailed) {
+            // Network said online but the update check couldn't reach the server.
+            clearUpdate();
+            btn.classList.remove('tn-spinning');
+            btn.title = TITLE_CHECK;
+            showToast(MSG_OFFLINE, 'err');
+            busy = false;
+            return;
+        }
+
+        if (hadBadge) {
+            // Badge said "update available" but no waiting SW exists (stale flag —
+            // e.g. another tab already applied it). The user clicked EXPECTING a
+            // refresh (owner hit this: pressed 2-3x, "refresh nahi hua") — reload
+            // so the fresh version actually shows.
+            reloadFresh(false);
+            return;
+        }
+
+        // No SW change at all → still reload once so the server's fresh
+        // Blade/features arrive; the post-reload toast confirms "on latest".
+        reloadFresh(true);
     });
 })();
 </script>

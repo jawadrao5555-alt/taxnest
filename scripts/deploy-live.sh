@@ -121,6 +121,10 @@ step "Preflight: silent print-order check (receipt enqueues before KOT, incl. pe
 node scripts/print-order-check.mjs \
   || fail "print-order check FAILED — silent fast path enqueues KOT before the receipt (invoice-first invariant); fix before deploying"
 
+step "Preflight: PWA refresh-button check (slow-install wait, no-update reload+toast, offline, timeout)"
+node scripts/pwa-refresh-check.mjs \
+  || fail "pwa-refresh check FAILED — the header update icon click contract regressed (Task 706); fix before deploying"
+
 step "Preflight: POS plan-gate matrix check (Starter/Business/Pro/Pro Max/Unlimited)"
 if [ "${SKIP_PLAN_GATE_CHECK:-0}" = "1" ]; then
   echo "SKIPPED (SKIP_PLAN_GATE_CHECK=1) — only skip for emergency hotfixes." >&2

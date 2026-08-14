@@ -593,7 +593,12 @@
             {{-- Per-close action override (Task 676 — FBR mirror of Task 661):
                  admin/manager only; applies to THIS close only — the standing
                  Customize policy stays untouched. Auto-close never uses it. --}}
+            {{-- BILL-BY-BILL choice (Task 687 — FBR mirror of PRA Task 677): the
+                 all-box (wash_override) covers every bill left on "default"; a
+                 per-row pick beats the all-box for exactly that bill. FBR set =
+                 provisionals only (no final_local / draft kinds). --}}
             @if(auth('fbrpos')->user() && !auth('fbrpos')->user()->isPosCashier() && ($pendingLocalCount ?? 0) > 0)
+            @php $wbShow = $washBills ?? collect(); @endphp
             <div class="mb-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
                 <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">{{ __('pos.wash_override_label') }}</label>
                 <select name="wash_override" class="w-full sm:w-auto rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
@@ -603,6 +608,59 @@
                     <option value="delete">{{ __('pos.wash_override_delete') }}</option>
                 </select>
                 <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.wash_override_hint') }}</p>
+
+                @if($wbShow->isNotEmpty())
+                <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <p class="text-xs font-bold text-gray-700 dark:text-gray-300">{{ __('pos.dc_bill_actions_title') }}</p>
+                    <p class="text-[11px] text-gray-500 dark:text-gray-400 mb-2">{{ __('pos.dc_bill_actions_hint') }}</p>
+                    @if($wbShow->count() > 15)
+                    {{-- Big-backlog helper: client-side filter only — every row stays
+                         in the DOM/form, so hidden rows still submit their pick. --}}
+                    <input type="text" inputmode="search" autocomplete="off" name="wb_search_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                           placeholder="{{ __('pos.dc_bill_search_ph') }}"
+                           class="w-full sm:w-64 mb-2 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-xs focus:ring-blue-500 focus:border-blue-500"
+                           oninput="var q=this.value.toLowerCase().trim();document.querySelectorAll('#dc-bill-rows tr').forEach(function(r){r.style.display=(!q||(r.getAttribute('data-wb')||'').indexOf(q)!==-1)?'':'none';});">
+                    @endif
+                    <div class="overflow-x-auto max-h-80 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+                            <thead class="bg-gray-100 dark:bg-gray-900 sticky top-0">
+                                <tr>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ __('pos.th_invoice') }}</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">{{ __('pos.th_type') }}</th>
+                                    <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">{{ __('pos.receipt_amount') }}</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">{{ __('pos.dc_bill_action_col') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dc-bill-rows" class="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
+                                @foreach($wbShow as $wb)
+                                <tr data-wb="{{ Str::lower($wb->invoice_number . ' ' . ($wb->customer_name ?? '')) }}">
+                                    <td class="px-3 py-2">
+                                        <span class="font-semibold text-gray-900 dark:text-white">{{ $wb->invoice_number }}</span>
+                                        <span class="block text-[11px] text-gray-500">{{ \Carbon\Carbon::parse($wb->business_date)->format('d M') }}{{ $wb->customer_name ? ' — ' . $wb->customer_name : '' }}</span>
+                                    </td>
+                                    <td class="px-3 py-2 hidden sm:table-cell">
+                                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300">{{ __('pos.dc_bill_kind_prov') }}</span>
+                                        @if($wb->khata)
+                                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" title="{{ __('pos.dc_bill_khata_note') }}">{{ __('pos.dc_check_rider_khata') }}</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-3 py-2 text-right font-semibold text-gray-900 dark:text-white whitespace-nowrap">{{ number_format($wb->total_amount) }}</td>
+                                    <td class="px-3 py-2">
+                                        <select name="bill_actions[{{ $wb->id }}]" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white text-xs focus:ring-blue-500 focus:border-blue-500 py-1">
+                                            <option value="standing" selected>{{ __('pos.dc_bill_action_default') }}</option>
+                                            <option value="finalize">{{ __('pos.wash_override_finalize') }}</option>
+                                            <option value="save">{{ __('pos.wash_override_save') }}</option>
+                                            {{-- Khata bills: delete disabled — the wash keeps them Local regardless (rider guard). --}}
+                                            <option value="delete" @if($wb->khata) disabled @endif>{{ __('pos.wash_override_delete') }}@if($wb->khata) — {{ __('pos.dc_bill_khata_short') }}@endif</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                @endif
             </div>
             @endif
             @if(($pendingDeliveries->count ?? 0) > 0)

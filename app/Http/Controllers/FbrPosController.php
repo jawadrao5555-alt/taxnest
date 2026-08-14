@@ -618,7 +618,7 @@ class FbrPosController extends Controller
      * provisionals are closed — never submitted late; they are skipped/carried.
      * NO receipt print — the sweep runs server-side without a customer present.
      */
-    private function finalizeFbrProvisionalsAtDayClose(int $companyId, Company $company, string $date): array
+    private function finalizeFbrProvisionalsAtDayClose(int $companyId, Company $company, string $date, ?array $onlyIds = null, array $excludeIds = []): array
     {
         $sweep = ['finalized' => 0, 'queued' => 0, 'submitted' => 0, 'failed' => 0, 'skipped' => 0];
 
@@ -629,10 +629,16 @@ class FbrPosController extends Controller
         // Task 492: sweep keys on business_date so an after-midnight provisional
         // (created 00:30, business_date = the close date) is finalized with its
         // trading day. The MONTH GATE below stays on real created_at (FBR truth).
+        // Task 687 (bill-by-bill, FBR mirror of PRA Task 677): $onlyIds limits
+        // the sweep to explicitly-picked bills; $excludeIds keeps bills the
+        // admin marked save/delete OUT of a whole-set finalize (they must
+        // follow their own pick, not promote).
         $rows = FbrPosTransaction::where('company_id', $companyId)
             ->tap(fn ($q) => $this->whereBizDate($q, $date, '<='))
             ->where('invoice_mode', 'local')
             ->where('fbr_status', 'local')
+            ->when($onlyIds !== null, fn ($q) => $q->whereIn('id', $onlyIds))
+            ->when(!empty($excludeIds), fn ($q) => $q->whereNotIn('id', $excludeIds))
             ->orderBy('id')
             ->get();
 
@@ -728,18 +734,51 @@ class FbrPosController extends Controller
             && in_array($actionOverride['provisional'] ?? null, ['save', 'delete', 'carry', 'finalize'], true)) {
             $provAction = $actionOverride['provisional'];
         }
+        // Task 687 (bill-by-bill, FBR mirror of PRA Task 677): per-bill picks
+        // BEAT the standing policy / all-box action for their own bill. Only
+        // finalize/save/delete are honored; anything else falls back to the
+        // set action. Auto-close never passes bills — standing policy only.
+        $billActions = [];
+        foreach ((array) ($actionOverride['bills'] ?? []) as $bid => $act) {
+            if ((int) $bid > 0 && in_array($act, ['finalize', 'save', 'delete'], true)) {
+                $billActions[(int) $bid] = $act;
+            }
+        }
         if ($provAction === 'finalize') {
-            $this->lastFinalizeSweep = $this->finalizeFbrProvisionalsAtDayClose($companyId, $company, $date);
-        } elseif ($provAction === 'delete') {
-            // Permanent delete of the day's pending provisionals (local+local
-            // triple, biz-date ≤ close date) — same definition and item cleanup
-            // as apiDeleteProvisional, batched. Month gate does not apply: a
+            // Whole-set finalize, but bills the admin explicitly marked
+            // save/delete must NOT promote — they follow their own pick.
+            $skipIds = array_keys(array_filter($billActions, fn ($a) => $a !== 'finalize'));
+            $this->lastFinalizeSweep = $this->finalizeFbrProvisionalsAtDayClose($companyId, $company, $date, null, $skipIds);
+        } elseif (in_array('finalize', $billActions, true)) {
+            // Set action is save/delete/carry but specific bills were picked
+            // for finalize — promote ONLY those.
+            $onlyIds = array_keys(array_filter($billActions, fn ($a) => $a === 'finalize'));
+            $this->lastFinalizeSweep = $this->finalizeFbrProvisionalsAtDayClose($companyId, $company, $date, $onlyIds);
+        }
+        if ($provAction === 'delete' || in_array('delete', $billActions, true)) {
+            // Permanent delete of pending provisionals (local+local triple,
+            // biz-date ≤ close date) — same definition and item cleanup as
+            // apiDeleteProvisional, batched. Month gate does not apply: a
             // deliberate delete removes the backlog too (PRA parity).
+            // Effective action per bill = per-bill pick ?? set action.
+            // 🛵 RIDER KHATA DELETE-GUARD (PRA parity, Task 677): a bill whose
+            // cash is still WITH the rider (unsettled, not returned) must never
+            // be deleted — FBR has no archive, so it simply STAYS Local and the
+            // khata trail survives. Schema-guarded for pre-rider prod boxes.
             $this->lastWashDeleted = 0;
-            $ids = FbrPosTransaction::where('company_id', $companyId)
+            $riderReady = \Schema::hasColumn('fbr_pos_transactions', 'rider_id');
+            $rows = FbrPosTransaction::where('company_id', $companyId)
                 ->tap(fn ($q) => $this->whereBizDate($q, $date, '<='))
                 ->where('invoice_mode', 'local')
                 ->where('fbr_status', 'local')
+                ->get();
+            $ids = $rows
+                ->filter(fn ($t) => ($billActions[(int) $t->id] ?? $provAction) === 'delete')
+                ->reject(fn ($t) => $riderReady
+                    && $t->rider_id
+                    && ($t->payment_method ?? null) === 'cash'
+                    && !$t->rider_settlement_id
+                    && ($t->delivery_status ?? null) !== 'returned')
                 ->pluck('id');
             if ($ids->isNotEmpty()) {
                 \DB::transaction(function () use ($ids, $companyId) {
@@ -4077,7 +4116,39 @@ class FbrPosController extends Controller
         $pendingLocalCount = (int) ($pendingLocal->c ?? 0);
         $pendingLocalAmount = (float) ($pendingLocal->amt ?? 0);
 
-        return view('fbr-pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'analytics', 'pendingAutoFinal', 'unclosedPriorDays', 'riderFigures', 'pendingDeliveries', 'pendingLocalCount', 'pendingLocalAmount'));
+        // Bill-by-bill decision list (Task 687 — FBR mirror of PRA Task 677):
+        // every pending provisional the wash will touch, so the admin can pick
+        // finalize / keep-local / delete PER BILL. FBR set = provisionals only
+        // (no final_local kind — reporting-OFF finals are fbr+NULL, untouched).
+        // Khata flag (rider cash still out) disables delete in the UI; the
+        // server guard in performDayClose is the authority. Schema-guarded.
+        $washBills = collect();
+        if (!$existingReport && $pendingLocalCount > 0) {
+            $riderReady = \Schema::hasColumn('fbr_pos_transactions', 'rider_id');
+            $washBills = FbrPosTransaction::where('company_id', $companyId)
+                ->tap(fn ($q) => $this->whereBizDate($q, $date, '<='))
+                ->where('status', 'completed')
+                ->where('invoice_mode', 'local')
+                ->where('fbr_status', 'local')
+                ->orderBy($this->hasBizDate() ? 'business_date' : 'created_at')
+                ->orderBy('id')
+                ->get()
+                ->map(fn ($t) => (object) [
+                    'id' => (int) $t->id,
+                    'invoice_number' => $t->invoice_number,
+                    'customer_name' => $t->customer_name ?? null,
+                    'total_amount' => (float) $t->total_amount,
+                    'business_date' => $t->business_date ?? optional($t->created_at)->toDateString(),
+                    'khata' => $riderReady
+                        && $t->rider_id
+                        && ($t->payment_method ?? null) === 'cash'
+                        && !$t->rider_settlement_id
+                        && ($t->delivery_status ?? null) !== 'returned',
+                ])
+                ->values();
+        }
+
+        return view('fbr-pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'analytics', 'pendingAutoFinal', 'unclosedPriorDays', 'riderFigures', 'pendingDeliveries', 'pendingLocalCount', 'pendingLocalAmount', 'washBills'));
     }
 
     /**
@@ -4750,17 +4821,36 @@ class FbrPosController extends Controller
             // same vocabulary as PRA; 'standing' = no override. FBR has no
             // archive concept — 'save' simply keeps bills Local (carried).
             'wash_override' => 'nullable|in:standing,finalize,save,delete',
+            // Bill-by-bill decision (Task 687 — FBR mirror of PRA Task 677):
+            // per-bill pick beats the all-box / standing policy for its bill.
+            // 'standing' = follow the default (dropped in sanitize below).
+            'bill_actions' => 'nullable|array',
+            'bill_actions.*' => 'nullable|in:standing,finalize,save,delete',
         ]);
+        // Sanitize per-bill picks: int-id keyed map, 'standing' (= default)
+        // dropped. Company/local ownership is enforced inside performDayClose
+        // (the wash query is company- and status-scoped), so a crafted foreign
+        // id simply matches nothing.
+        $billActions = [];
+        foreach ((array) $request->input('bill_actions', []) as $bid => $act) {
+            if ((int) $bid > 0 && in_array($act, ['finalize', 'save', 'delete'], true)) {
+                $billActions[(int) $bid] = $act;
+            }
+        }
         // Admin/manager only (isPosCashier ROLE check, NOT posCashierBlocked —
         // a cashier granted day-close custom access may CLOSE the day but must
-        // not override the owner's standing pending-bill policy).
+        // not override the owner's standing pending-bill policy, nor pick
+        // per-bill actions).
         $washOverride = $request->input('wash_override');
         $actionOverride = null;
-        if ($washOverride && $washOverride !== 'standing') {
+        if (($washOverride && $washOverride !== 'standing') || !empty($billActions)) {
             if ($user && $user->isPosCashier()) {
                 return back()->with('error', __('pos.only_admin_change_setting'));
             }
-            $actionOverride = ['provisional' => $washOverride];
+            $actionOverride = [
+                'provisional' => ($washOverride && $washOverride !== 'standing') ? $washOverride : null,
+                'bills' => $billActions,
+            ];
         }
         $cashRecon = null;
         if ($request->filled('opening_float') || $request->filled('counted_cash')) {

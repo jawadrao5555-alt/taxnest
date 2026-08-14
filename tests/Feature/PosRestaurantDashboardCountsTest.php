@@ -122,6 +122,13 @@ class PosRestaurantDashboardCountsTest extends TestCase
             $table->string('pra_status')->nullable();
             $table->boolean('is_archived')->default(false);
             $table->decimal('total_amount', 12, 2)->default(0);
+            // Task 666 parity (14 Aug 2026): restaurant dashboard now builds
+            // the "Aaj ka Khaata" card via PosTodayKhata — its aggregate reads
+            // these columns too.
+            $table->decimal('tax_amount', 12, 2)->nullable();
+            $table->string('payment_method')->nullable();
+            $table->string('pra_invoice_number')->nullable();
+            $table->string('transaction_type')->nullable()->default('sale');
             $table->timestamps();
         });
 

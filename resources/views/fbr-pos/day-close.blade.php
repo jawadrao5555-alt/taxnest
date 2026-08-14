@@ -464,6 +464,43 @@
     </div>
     @endif
 
+    {{-- Pending-bill decision audit (Task 691 — FBR mirror of PRA's
+         local_summary card): a durable record of what happened to the day's
+         Local (pending) bills at close — finalize sweep outcome, per-bill
+         picks, deletes, and rider-khata guarded bills. Rendered from the
+         STORED snapshot, never recomputed (deleted bills leave no live rows). --}}
+    @php $fls = ($existingReport && is_array($existingReport->local_summary)) ? ($existingReport->local_summary['provisional'] ?? null) : null; @endphp
+    @if(is_array($fls) && (($fls['count'] ?? 0) > 0 || ($fls['finalized'] ?? 0) > 0 || ($fls['deleted'] ?? 0) > 0))
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-5 mb-6">
+        <h3 class="font-semibold text-gray-900 dark:text-white mb-4">{{ __('pos.local_bills_closed_with_day') }}</h3>
+        <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div class="flex items-center justify-between">
+                <p class="text-xs font-bold uppercase text-gray-600 dark:text-gray-300">{{ __('pos.provisional_bills_l_series') }}</p>
+                @php $flsAct = $fls['action'] ?? 'carry'; @endphp
+                {{-- FBR has no archive: save/carry both mean the bills simply stayed Local. --}}
+                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ $flsAct === 'delete' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : ($flsAct === 'finalize' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300') }}">{{ $flsAct === 'delete' ? __('pos.badge_deleted') : ($flsAct === 'finalize' ? __('pos.badge_finalized') : __('pos.badge_carried')) }}</span>
+            </div>
+            <p class="text-xl font-bold text-gray-900 dark:text-white mt-1">{{ $fls['count'] ?? 0 }} <span class="text-sm font-semibold text-gray-500">{{ __('pos.bills_word') }} — PKR {{ number_format($fls['amount'] ?? 0) }}</span></p>
+            @if(($fls['backlog'] ?? 0) > 0)
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.n_older_dates_included', ['count' => $fls['backlog']]) }}</p>
+            @endif
+            {{-- Finalize sweep detail — same wording set as the close-time flash. --}}
+            @if(($fls['finalized'] ?? 0) > 0)
+            <p class="text-xs text-emerald-700 dark:text-emerald-300 font-semibold mt-1">{{ ltrim(__('pos.dayclose_bills_finalized', ['count' => $fls['finalized']]), ' —') }}@if(($fls['submitted'] ?? 0) > 0){{ __('pos.dayclose_bills_submitted', ['count' => $fls['submitted']]) }}@endif @if(($fls['queued'] ?? 0) > 0){{ __('pos.dayclose_bills_queued', ['count' => $fls['queued']]) }}@endif @if(($fls['failed'] ?? 0) > 0){{ __('pos.dayclose_bills_failed', ['count' => $fls['failed']]) }}@endif</p>
+            @endif
+            @if(($fls['deleted'] ?? 0) > 0)
+            <p class="text-xs text-red-600 dark:text-red-400 font-semibold mt-1">{{ ltrim(__('pos.dayclose_bills_deleted', ['count' => $fls['deleted']]), ' —') }}</p>
+            @endif
+            @if(($fls['rider_guarded'] ?? 0) > 0)
+            <p class="text-xs text-amber-700 dark:text-amber-400 font-semibold mt-1">{{ __('pos.dc_rider_guarded_kept', ['count' => $fls['rider_guarded']]) }}</p>
+            @endif
+            @if(is_array($fls['per_bill'] ?? null))
+            <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">{{ __('pos.dc_per_bill_split', ['save' => $fls['per_bill']['save'] ?? 0, 'delete' => $fls['per_bill']['delete'] ?? 0, 'carry' => $fls['per_bill']['carry'] ?? 0]) }}</p>
+            @endif
+        </div>
+    </div>
+    @endif
+
     @if(!$existingReport)
     {{-- 'Khud Final' policy notice (Aug 2026, PRA UX mirror): when auto-finalize is
          ON and pending local bills exist, warn the cashier BEFORE the close so the

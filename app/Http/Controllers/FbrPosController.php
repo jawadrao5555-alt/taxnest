@@ -770,6 +770,45 @@ class FbrPosController extends Controller
             $onlyIds = array_keys(array_filter($billActions, fn ($a) => $a === 'finalize'));
             $this->lastFinalizeSweep = $this->finalizeFbrProvisionalsAtDayClose($companyId, $company, $date, $onlyIds);
         }
+        // Task 691 (PRA local_summary parity): durable audit of what happened
+        // to the day's pending bills at THIS close. Snapshot taken AFTER the
+        // finalize sweep (leftover set — PRA convention) and BEFORE the delete
+        // wash below, so rows about to be deleted still count. try/catch: the
+        // audit must never fail a close.
+        $localSummary = [];
+        try {
+            $auditRows = FbrPosTransaction::where('company_id', $companyId)
+                ->tap(fn ($q) => $this->whereBizDate($q, $date, '<='))
+                ->where('invoice_mode', 'local')
+                ->where('fbr_status', 'local')
+                ->get();
+            $hasBizCol = \Schema::hasColumn('fbr_pos_transactions', 'business_date');
+            $localSummary['provisional'] = [
+                // FBR has no archive: save/carry/null all mean "stays Local".
+                'action' => $provAction ?: 'carry',
+                'count' => $auditRows->count(),
+                'amount' => round((float) $auditRows->sum('total_amount'), 2),
+                'backlog' => $auditRows->filter(fn ($t) => ($d = ($hasBizCol ? $t->business_date : null) ?: $t->created_at?->toDateString()) && $d < $date)->count(),
+            ];
+            if ($this->lastFinalizeSweep !== null) {
+                $localSummary['provisional'] = array_merge($localSummary['provisional'], $this->lastFinalizeSweep);
+            }
+            // Per-bill picks (Task 687): how the admin's bill-by-bill decisions
+            // split the leftover set (finalized rows already left it).
+            if (!empty($billActions)) {
+                $eff = fn ($t) => $billActions[(int) $t->id] ?? $provAction;
+                $saveN = $auditRows->filter(fn ($t) => $eff($t) === 'save')->count();
+                $delN = $auditRows->filter(fn ($t) => $eff($t) === 'delete')->count();
+                $localSummary['provisional']['per_bill'] = [
+                    'save' => $saveN,
+                    'delete' => $delN,
+                    'carry' => $auditRows->count() - $saveN - $delN,
+                ];
+            }
+        } catch (\Throwable $e) {
+            $localSummary = [];
+        }
+
         if ($provAction === 'delete' || in_array('delete', $billActions, true)) {
             // Permanent delete of pending provisionals (local+local triple,
             // biz-date ≤ close date) — same definition and item cleanup as
@@ -802,6 +841,11 @@ class FbrPosController extends Controller
             $this->lastWashGuardedIds = $pickedForDelete->filter($guard)->pluck('id')->map(fn ($id) => (int) $id)->all();
             $this->lastWashGuarded = count($this->lastWashGuardedIds);
             $ids = $pickedForDelete->reject($guard)->pluck('id');
+            // Task 691 audit: bills the rider khata delete-guard kept alive
+            // (cash still with the rider — they simply STAY Local).
+            if ($this->lastWashGuarded > 0 && isset($localSummary['provisional'])) {
+                $localSummary['provisional']['rider_guarded'] = $this->lastWashGuarded;
+            }
             if ($ids->isNotEmpty()) {
                 \DB::transaction(function () use ($ids, $companyId) {
                     FbrPosTransactionItem::whereIn('transaction_id', $ids)->delete();
@@ -811,6 +855,10 @@ class FbrPosController extends Controller
                         ->where('fbr_status', 'local')
                         ->delete();
                 });
+            }
+            // Task 691 audit: how many were actually removed at this close.
+            if ($this->lastWashDeleted > 0 && isset($localSummary['provisional'])) {
+                $localSummary['provisional']['deleted'] = $this->lastWashDeleted;
             }
         }
         // 'save' / 'carry' / null: bills simply stay Local (FBR has no archive
@@ -898,7 +946,7 @@ class FbrPosController extends Controller
         // Retry loop — max 3 attempts to handle rare concurrent report_number collisions
         for ($attempt = 1; $attempt <= 3; $attempt++) {
             try {
-                return \DB::transaction(function () use ($companyId, $date, $baseData, $riderFigures) {
+                return \DB::transaction(function () use ($companyId, $date, $baseData, $riderFigures, $localSummary) {
                     // Race-safe re-check inside transaction
                     $locked = FbrDayCloseReport::where('company_id', $companyId)
                         ->where('report_date', $date)->lockForUpdate()->first();
@@ -920,6 +968,20 @@ class FbrPosController extends Controller
                     $data = array_merge($baseData, ['report_number' => $reportNumber]);
                     $data['hash'] = hash('sha256', json_encode($data));
                     $report = FbrDayCloseReport::create($data);
+
+                    // Task 691: pending-bill decision audit on the Z-report
+                    // (PRA local_summary parity). Stored only when something
+                    // was pending or handled. Schema-drift try/catch — the
+                    // column may not exist on a prod box mid-deploy; the close
+                    // must never fail over the informational summary.
+                    $ls = $localSummary['provisional'] ?? null;
+                    if ($ls && (($ls['count'] ?? 0) > 0 || ($ls['finalized'] ?? 0) > 0 || ($ls['deleted'] ?? 0) > 0)) {
+                        try {
+                            $report->forceFill(['local_summary' => $localSummary])->save();
+                        } catch (\Throwable $e) {
+                            // local_summary column missing pre-migration — skip detail
+                        }
+                    }
 
                     // Delivery Riders (Task 541): rider day detail on the
                     // Z-report. Same schema-drift try/catch pattern as PRA —

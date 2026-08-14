@@ -961,6 +961,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'dc_opening_float' => 'Subah ka Opening Cash',
     'dc_order_types' => 'Order ki Qismein',
     'dc_other' => 'Deegar',
+    'dc_per_bill_split' => 'Bill-ba-bill faisle: :save Local rahe, :delete delete hue, :carry agle din gaye.',
+    'dc_rider_guarded_kept' => ':count bill delete NAHIN hue — rider ka cash abhi settle nahin hua (khata ka record bachane ke liye Local rahe).',
     'dc_udhaar' => 'Udhaar / Khata',
     'dc_udhaar_not_in_drawer' => 'Cash mein nahi',
     'dc_over' => '(ZYADA)',

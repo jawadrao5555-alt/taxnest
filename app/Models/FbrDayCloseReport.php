@@ -16,12 +16,13 @@ class FbrDayCloseReport extends Model
         'returns_count', 'returns_amount',
         'closed_by', 'notes', 'hash',
         'opening_float', 'counted_cash', 'expected_cash', 'cash_variance',
-        'rider_summary',
+        'rider_summary', 'local_summary',
     ];
 
     protected $casts = [
         'report_date' => 'date',
         'rider_summary' => 'array',
+        'local_summary' => 'array',
         'first_invoice_time' => 'datetime',
         'last_invoice_time' => 'datetime',
     ];

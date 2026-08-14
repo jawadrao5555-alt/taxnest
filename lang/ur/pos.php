@@ -961,6 +961,8 @@ return [
     'dc_opening_float' => 'اوپننگ فلوٹ',
     'dc_order_types' => 'آرڈر ٹائپس',
     'dc_other' => 'دیگر',
+    'dc_per_bill_split' => 'بل بہ بل فیصلے: :save لوکل رہے، :delete ڈیلیٹ ہوئے، :carry اگلے دن منتقل ہوئے۔',
+    'dc_rider_guarded_kept' => ':count بل ڈیلیٹ نہیں ہوئے — رائیڈر کا کیش ابھی وصول نہیں ہوا (کھاتہ ریکارڈ بچانے کے لیے لوکل رہے)۔',
     'dc_udhaar' => 'ادھار / کھاتہ',
     'dc_udhaar_not_in_drawer' => 'نقد میں شامل نہیں',
     'dc_over' => '(اوور)',

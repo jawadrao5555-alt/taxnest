@@ -206,6 +206,8 @@ class FbrPosDayClosePerBillActionTest extends TestCase
             $table->decimal('counted_cash', 14, 2)->nullable();
             $table->decimal('expected_cash', 14, 2)->nullable();
             $table->decimal('cash_variance', 14, 2)->nullable();
+            // Task 691: pending-bill decision audit (PRA local_summary parity).
+            $table->text('local_summary')->nullable();
             $table->timestamps();
         });
 
@@ -470,6 +472,65 @@ class FbrPosDayClosePerBillActionTest extends TestCase
         $this->assertStringContainsString(
             __('pos.dayclose_bills_deleted', ['count' => 3]),
             (string) session('success')
+        );
+    }
+
+    // ── Task 691: pending-bill decision audit (local_summary) ───────────────
+
+    public function test_local_summary_audit_records_per_bill_decisions(): void
+    {
+        $cid = $this->makeCompany(['pos_dayclose_provisional_action' => null]);
+        $rid = $this->makeRider($cid);
+        $fin = $this->makeProvisional($cid);
+        $del = $this->makeProvisional($cid);
+        $keep = $this->makeProvisional($cid);
+        // Rider-khata bill picked for delete — the guard keeps it Local.
+        $khata = $this->makeProvisional($cid, [
+            'rider_id' => $rid, 'delivery_status' => 'dispatched', 'order_type' => 'delivery',
+        ]);
+
+        $res = $this->closeDay($this->makeUser($cid), [
+            'bill_actions' => [$fin => 'finalize', $del => 'delete', $khata => 'delete', $keep => 'save'],
+        ]);
+        $res->assertSessionHas('success');
+
+        $raw = DB::table('fbr_day_close_reports')->where('company_id', $cid)->value('local_summary');
+        $this->assertNotNull($raw, 'Z-report must carry the pending-bill audit.');
+        $ls = json_decode((string) $raw, true)['provisional'] ?? null;
+        $this->assertIsArray($ls);
+        // Snapshot is the post-sweep leftover set: 3 bills (finalized one left).
+        $this->assertSame(3, $ls['count']);
+        $this->assertEquals(1500, $ls['amount']);
+        $this->assertSame(1, $ls['finalized'], 'Sweep outcome merged into the audit.');
+        $this->assertSame(['save' => 1, 'delete' => 2, 'carry' => 0], $ls['per_bill']);
+        $this->assertSame(1, $ls['rider_guarded'], 'Khata delete-guard skip recorded.');
+        $this->assertSame(1, $ls['deleted'], 'Actual delete count recorded.');
+
+        // The Z-report page renders the stored audit block.
+        // (sqlite stores the DATE cast as 'Y-m-d 00:00:00' which breaks the
+        // page's string-equality report_date lookup; MySQL's DATE column has
+        // no such suffix. Normalize so the lookup behaves like production.)
+        DB::table('fbr_day_close_reports')->where('company_id', $cid)
+            ->update(['report_date' => now()->toDateString()]);
+        $page = $this->actingAs($this->makeUser($cid), 'fbrpos')
+            ->get('/fbr-pos/day-close?date=' . now()->toDateString());
+        $page->assertOk();
+        $page->assertSee(__('pos.local_bills_closed_with_day'));
+        $page->assertSee(__('pos.dc_rider_guarded_kept', ['count' => 1]));
+        $page->assertSee(__('pos.dc_per_bill_split', ['save' => 1, 'delete' => 2, 'carry' => 0]));
+    }
+
+    public function test_local_summary_absent_when_nothing_was_pending(): void
+    {
+        $cid = $this->makeCompany(['pos_dayclose_provisional_action' => null]);
+        // A FINAL bill only — no pending provisionals.
+        $this->makeProvisional($cid, ['invoice_mode' => 'fbr', 'fbr_status' => null]);
+
+        $this->closeDay($this->makeUser($cid))->assertSessionHas('success');
+
+        $this->assertNull(
+            DB::table('fbr_day_close_reports')->where('company_id', $cid)->value('local_summary'),
+            'No audit row when the day had no pending bills.'
         );
     }
 

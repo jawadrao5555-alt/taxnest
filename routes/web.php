@@ -688,6 +688,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     // parents produce local returns, never reported). Permission = owner/
     // manager always, staff via the per-user "Return / Credit Note" Custom
     // Access tick (PosAccessService::returnsAllowed → 403 in controller).
+    // Task 681: sale-screen Quick Return — bill number → return-form URL (JSON).
+    Route::get('/return-lookup', [\App\Http\Controllers\PosReturnController::class, 'quickLookup'])->name('pos.return.lookup');
     Route::get('/transaction/{id}/return', [\App\Http\Controllers\PosReturnController::class, 'returnForm'])->name('pos.transaction.return-form');
     Route::post('/transaction/{id}/return', [\App\Http\Controllers\PosReturnController::class, 'processReturn'])->name('pos.transaction.return');
     Route::post('/transactions/bulk-retry-pra', [PosController::class, 'bulkRetryPra'])->name('pos.transactions.bulk-retry-pra');

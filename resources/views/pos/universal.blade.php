@@ -91,6 +91,10 @@
     $showDeliveriesBoardBtn = !empty($features->delivery)
         && \App\Services\PosFeatureService::planAllows($company, 'riders_enabled')
         && (($__ppUser?->posCustomAllows('deliveries')) ?? true);
+    // Quick Return (Task 681): bill number likh kar seedha return form —
+    // button sirf tab dikhta hai jab returnsAllowed (Task 678 single verdict);
+    // server /pos/return-lookup + return routes sab kuch re-enforce karte hain.
+    $canQuickReturn = \App\Services\PosAccessService::returnsAllowed($__ppUser);
 @endphp
 @if($__ppShow)
 <div id="tn-silent-prompt" class="fixed bottom-4 left-4 z-40 max-w-sm rounded-xl bg-purple-800 text-white px-4 py-3 shadow-sm">
@@ -529,6 +533,15 @@ window.addEventListener('popstate', function() {
                 <span class="tn-key-chip text-[9px] bg-teal-400/30 px-1 rounded">Alt+R</span>
                 <span class="hidden lg:inline">{{ __('pos.reprint') }}</span>
             </button>
+
+            {{-- Quick Return (Task 681) — bill number likho, seedha return form.
+                 Sirf returnsAllowed staff (Task 678 verdict). Rose family. --}}
+            @if($canQuickReturn)
+            <button @click="openQuickReturn()" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 hover:bg-rose-100 transition flex-shrink-0" title="{{ __('pos.quick_return_hint') }}">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z"/></svg>
+                <span class="hidden lg:inline">{{ __('pos.quick_return') }}</span>
+            </button>
+            @endif
 
             {{-- Held orders — F3 RETIRED (owner, 26 Jul 2026). Table companies:
                  held orders ab TABLE board ke andar hain (tiles + "bina table"
@@ -1064,6 +1077,14 @@ window.addEventListener('popstate', function() {
             <span class="tn-key-chip text-[10px] bg-teal-400/30 px-1 rounded">Alt+R</span>
             <span class="hidden sm:inline">{{ __('pos.reprint') }}</span>
         </button>
+
+        {{-- Quick Return (Task 681) — mobile copy of the nav-strip button --}}
+        @if($canQuickReturn)
+        <button @click="openQuickReturn()" class="flex md:hidden items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 hover:bg-rose-100 transition" title="{{ __('pos.quick_return_hint') }}">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z"/></svg>
+            <span class="hidden sm:inline">{{ __('pos.quick_return') }}</span>
+        </button>
+        @endif
 
         {{-- Held pill — table companies: TABLE board hi single surface hai (F3 retired) --}}
         @unless($features->tables ?? false)
@@ -2623,6 +2644,44 @@ window.addEventListener('popstate', function() {
     </div>
 
     {{-- ─────────────────────────────────────────────────────────────────────── --}}
+    {{-- QUICK RETURN MODAL (Task 681) — bill number → return form.             --}}
+    {{-- Permission/stream/returnable rules all server-side (return-lookup).    --}}
+    {{-- ─────────────────────────────────────────────────────────────────────── --}}
+    @if($canQuickReturn)
+    <div x-show="quickReturnOpen" x-cloak x-transition.opacity class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click.self="quickReturnOpen = false">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden" x-transition.scale.90>
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 bg-rose-50 dark:bg-rose-900/20 flex-shrink-0">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <svg class="w-5 h-5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z"/></svg>
+                            {{ __('pos.quick_return_title') }}
+                        </h3>
+                        <p class="text-[10px] text-gray-500 mt-0.5">{{ __('pos.quick_return_hint') }}</p>
+                    </div>
+                    <button @click="quickReturnOpen = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                </div>
+            </div>
+            <div class="p-4 space-y-3">
+                {{-- nofill guards (memory: pos-sale-screen-autofill-guards) --}}
+                <input type="text" id="tn-quick-return-input" x-model="quickReturnQ"
+                       @keydown.enter.prevent="submitQuickReturn()"
+                       @keydown.escape.prevent="quickReturnOpen = false"
+                       autocomplete="off" name="quick_return_q_nofill" data-lpignore="true" data-form-type="other" data-1p-ignore
+                       placeholder="{{ __('pos.quick_return_placeholder') }}"
+                       class="w-full px-4 py-3 text-base font-bold rounded-xl border-2 border-rose-200 dark:border-rose-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:border-rose-500 focus:outline-none tn-num">
+                <p x-show="quickReturnErr" x-cloak class="text-xs font-bold text-red-600 dark:text-red-400" x-text="quickReturnErr"></p>
+                <button @click="submitQuickReturn()" :disabled="quickReturnBusy || !(quickReturnQ || '').trim()"
+                        class="w-full py-3 rounded-xl font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition">
+                    <span x-show="!quickReturnBusy">{{ __('pos.quick_return_open_btn') }}</span>
+                    <span x-show="quickReturnBusy" x-cloak>{{ __('pos.searching_word') }}</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- ─────────────────────────────────────────────────────────────────────── --}}
     {{-- REPRINT MODAL — opens from header "Reprint" button (Alt+R).            --}}
     {{-- ALL of today's completed bills (PRA / queue / failed / provisional /    --}}
     {{-- local) — click a row = instant print of the ORIGINAL receipt.          --}}
@@ -4147,6 +4206,11 @@ function restaurantPos() {
         reprintSearch: '',
         reprintBusyId: null,
         reprintPreviewBill: null,   // Preview modal (ZFC 30 Jul 2026): bill being previewed
+        // ── QUICK RETURN (Task 681) — bill number → return form ──────────
+        quickReturnOpen: false,
+        quickReturnQ: '',
+        quickReturnBusy: false,
+        quickReturnErr: '',
         // ── INCOMING WAITER ORDERS (P7, F6) ───────────────────────────────
         // Orders composed on waiter tablets (source='waiter', status 'held').
         // Cashier loads one into the cart, takes payment via the MANUAL path
@@ -5953,6 +6017,13 @@ function restaurantPos() {
             // reload the browser). preventDefault on document-level handler
             // also cancels the browser's native F-key behaviors.
             // ═══════════════════════════════════════════════════════════════
+            // Quick Return modal open (Task 681): apna chhota input hai — Esc
+            // band karta hai, Enter input ke apne handler par chalta hai; baqi
+            // saare global shortcuts (F-keys / Alt chords) is par fire na hon.
+            if (this.quickReturnOpen) {
+                if (e.key === 'Escape') { e.preventDefault(); this.quickReturnOpen = false; }
+                return;
+            }
             if (e.key === 'F1') { e.preventDefault(); this.showShortcuts = !this.showShortcuts; return; }
             if (e.key === 'F2') { e.preventDefault(); this.cartMode = false; this.activeCartIndex = -1; this.enterSearchMode(); return; }
             // F3 RETIRED (owner, 26 Jul 2026): held orders TABLE board mein merge
@@ -8875,6 +8946,40 @@ function restaurantPos() {
             );
         },
         // ─── REPRINT (Alt+R) — today's bills, read-only, click = print ─────────
+        // ── QUICK RETURN (Task 681) ───────────────────────────────────────
+        // Bill/serial number (POS-2026-00012, L-012, bare digits, PRA fiscal
+        // number, ya receipt order code) → server lookup → return form.
+        // Permission + stream lock + returnable rules sab SERVER par
+        // (PosReturnController::quickLookup) — yeh sirf navigate karta hai.
+        openQuickReturn() {
+            if (this.showPayModal || this.showReceipt || this.showHeldOrders || this.showQuickType || this.showManualItem || this.showCustomerPicker || this.showShortcuts || this.showManagerPinModal || this.showLocalBills || this.showFailedBills || this.showPendingDeliveries || this.showTablePicker || this.showReprint || this.boardMenuTable || this.boardConfirm || this.boardCancelAsk || this.boardShift || this.heldMenu || this.tableSwitchPrompt) return;
+            this.quickReturnQ = '';
+            this.quickReturnErr = '';
+            this.quickReturnBusy = false;
+            this.quickReturnOpen = true;
+            this.$nextTick(() => { document.getElementById('tn-quick-return-input')?.focus(); });
+        },
+        submitQuickReturn() {
+            const q = (this.quickReturnQ || '').trim();
+            if (!q || this.quickReturnBusy) return;
+            this.quickReturnBusy = true;
+            this.quickReturnErr = '';
+            // Relative URL (memory: route absolute-https trap on plain-http dev).
+            fetch('{{ route('pos.return.lookup', [], false) }}?q=' + encodeURIComponent(q), {
+                headers: { 'Accept': 'application/json' }
+            }).then(r => r.json().then(d => ({ ok: r.ok, d })))
+              .then(({ ok, d }) => {
+                if (ok && d && d.url) {
+                    window.location.href = d.url;
+                    return; // busy stays true — page is navigating
+                }
+                this.quickReturnBusy = false;
+                this.quickReturnErr = (d && d.error) ? d.error : window.TXT.network_error;
+            }).catch(() => {
+                this.quickReturnBusy = false;
+                this.quickReturnErr = window.TXT.network_error;
+            });
+        },
         openReprint() {
             this.activeReprintIndex = 0;
             this.reprintSearch = '';

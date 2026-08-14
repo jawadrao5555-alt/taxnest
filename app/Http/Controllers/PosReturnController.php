@@ -103,6 +103,97 @@ class PosReturnController extends Controller
         return view('pos.return-form', compact('original', 'praEligible', 'localParent'));
     }
 
+    /**
+     * Quick Return lookup (Task 681): sale screen se bill number likh kar
+     * seedha return form kholna. JSON: { url } ya { error }.
+     *
+     * Accepts (case-insensitive):
+     *  - full serial:  POS-2026-00012 / L-012 (padding optional: pos-2026-12, l-12)
+     *  - bare digits:  12 → POS-{thisYear/lastYear}-00012 or L-012 (newest match wins)
+     *  - PRA fiscal number (exact)
+     *  - receipt order code (last segment of ORD-yymmdd-XXXXX, 'code' style shops)
+     *
+     * Same gates as returnForm: returnsAllowed (gate) + stream lock
+     * (allowedForBillingScope) + returnableReason — the redirect target
+     * re-enforces everything server-side, this endpoint only navigates.
+     */
+    public function quickLookup(Request $r)
+    {
+        $this->gate();
+        $companyId = app('currentCompanyId');
+        $q = strtoupper(trim((string) $r->query('q', '')));
+        if ($q === '' || strlen($q) > 40) {
+            return response()->json(['error' => __('pos.quick_return_enter_number')], 422);
+        }
+
+        // Candidate invoice_number strings the input could mean.
+        $candidates = [$q];
+        if (preg_match('/^POS-?(\d{4})-?(\d+)$/', $q, $m)) {
+            $candidates[] = 'POS-' . $m[1] . '-' . str_pad($m[2], 5, '0', STR_PAD_LEFT);
+        } elseif (preg_match('/^L-?(\d+)$/', $q, $m)) {
+            $candidates[] = 'L-' . str_pad($m[1], 3, '0', STR_PAD_LEFT);
+            $candidates[] = 'L-' . $m[1];
+        } elseif (ctype_digit($q)) {
+            // Bare serial digits — this year's + last year's POS series and the
+            // L-series (padded + unpadded; L pad grows past 999 naturally).
+            $n = ltrim($q, '0');
+            $n = $n === '' ? '0' : $n;
+            foreach ([now()->format('Y'), now()->subYear()->format('Y')] as $yr) {
+                $candidates[] = 'POS-' . $yr . '-' . str_pad($n, 5, '0', STR_PAD_LEFT);
+            }
+            $candidates[] = 'L-' . str_pad($n, 3, '0', STR_PAD_LEFT);
+            $candidates[] = 'L-' . $n;
+        }
+        $candidates = array_values(array_unique($candidates));
+
+        // withoutGlobalScope: parity with returnForm — an archived reporting-OFF
+        // final is still a real sale whose goods can come back.
+        $txn = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->where(function ($w) use ($candidates, $q) {
+                $w->whereIn('invoice_number', $candidates)
+                    ->orWhere('pra_invoice_number', $q);
+            })
+            ->orderByDesc('created_at')
+            ->first();
+
+        // Receipt order code ('code' match style): last segment of the
+        // restaurant order_number (ORD-yymmdd-XXXXX). Only when no bill matched
+        // and the input looks like such a code (alnum, has a letter).
+        if (!$txn && preg_match('/^[A-Z0-9]{3,10}$/', $q) && preg_match('/[A-Z]/', $q)
+            && Schema::hasTable('restaurant_orders')) {
+            $order = \App\Models\RestaurantOrder::where('company_id', $companyId)
+                ->whereNotNull('pos_transaction_id')
+                ->where('order_number', 'like', '%-' . $q)
+                ->orderByDesc('id')
+                ->first();
+            if ($order) {
+                $txn = PosTransaction::withoutGlobalScope('hide_archived')
+                    ->where('company_id', $companyId)
+                    ->find($order->pos_transaction_id);
+            }
+        }
+
+        if (!$txn) {
+            return response()->json(['error' => __('pos.quick_return_not_found')], 404);
+        }
+
+        // Stream lock (Task 678): same per-row predicate as reports/lists.
+        $scope = auth('pos')->user()?->posBillingScope() ?? 'both';
+        if (!$txn->allowedForBillingScope($scope)) {
+            return response()->json(['error' => __('pos.return_manager_only')], 403);
+        }
+
+        if ($reason = self::returnableReason($txn)) {
+            return response()->json(['error' => __('pos.return_not_allowed_' . $reason)], 422);
+        }
+
+        return response()->json([
+            'url' => route('pos.transaction.return-form', $txn->id, false),
+            'invoice_number' => $txn->invoice_number,
+        ]);
+    }
+
     public function processReturn(Request $r, $id)
     {
         $this->gate();

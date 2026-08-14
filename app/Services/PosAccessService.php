@@ -66,6 +66,8 @@ class PosAccessService
         // MUST precede the generic transaction/ prefix or it falls into
         // 'orders' and every orders-ticked cashier could refund.
         '#^pos/transaction/\d+/return$#' => 'returns',
+        // Task 681: sale-screen quick-return lookup — same per-staff grant.
+        '#^pos/return-lookup$#' => 'returns',
         // Order detail / edit / receipt / retry live under the SINGULAR prefix.
         '#^pos/transaction/#' => 'orders',
         '#^pos/archive#' => 'orders',

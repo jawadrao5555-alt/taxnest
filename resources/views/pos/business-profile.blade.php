@@ -1,5 +1,51 @@
 <x-pos-layout>
-<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+@php
+    // Live sample-receipt preview (Task 717) — PRA's receipt toggles live on
+    // /pos/receipt-settings, so here the preview live-reads the IDENTITY fields
+    // (name/address/phone/NTN...) as the owner types; toggle keys are null'd out
+    // and render from the saved PRA set.
+    $ps = $company->posReceiptStyle();
+    $rp = $company->posReceiptPrefs('pra');
+    $rcptThemeCfg = json_encode([
+        'theme'  => \App\Support\PosReceiptThemes::resolve($ps),
+        'themes' => \App\Support\PosReceiptThemes::clientMap(),
+        'mode'   => 'pra',
+        'live'   => true,
+        'formId' => 'posBizProfileForm',
+        'paper'  => ($company->print_paper_size ?? 'thermal') === 'thermal58' ? '58mm' : '80mm',
+        'fieldMap' => [
+            'orderMatch' => null,
+            'address' => null, 'ntn' => null, 'email' => null, 'phone' => null,
+            'cashier' => null, 'bizname' => null, 'devby' => null, 'footer' => null,
+            'footerText' => null, 'tax' => null, 'logo' => null,
+            'logoFinalsOnly' => null, 'menuQr' => null, 'paper' => null,
+        ],
+        'textMap' => [
+            'name' => ['name'],
+            'address' => ['address', 'city'],
+            'phone' => ['phone', 'mobile'],
+            'ntn' => ['ntn'],
+            'email' => ['email'],
+        ],
+        'prefs'  => [
+            'address' => (bool) $rp['show_address'],
+            'ntn' => (bool) $rp['show_ntn'],
+            'email' => (bool) $rp['show_email'],
+            'phone' => (bool) $rp['show_mobile'],
+            'cashier' => (bool) $rp['show_cashier'],
+            'bizname' => (bool) $rp['show_business_name'],
+            'devby' => (bool) $rp['show_developed_by'],
+            'footer' => (bool) $rp['show_footer'],
+            'footerText' => (string) ($rp['footer_text'] ?? ''),
+            'tax' => (bool) $rp['show_tax'],
+            'logo' => (bool) ($ps['show_logo'] ?? true),
+            'logoFinalsOnly' => (bool) ($ps['logo_finals_only'] ?? false),
+            'menuQr' => (bool) ($ps['show_menu_qr'] ?? true),
+            'orderMatch' => in_array($company->order_match_style ?? 'off', ['off', 'token', 'code'], true) ? ($company->order_match_style ?? 'off') : 'off',
+        ],
+    ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}';
+@endphp
+<div class="max-w-4xl lg:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">{{ __('pos.business_profile') }}</h1>
     <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">{{ __('pos.business_profile_sub') }}</p>
 
@@ -17,8 +63,15 @@
     </div>
     @endif
 
-    <form method="POST" action="{{ route('pos.business-profile') }}" enctype="multipart/form-data" class="space-y-6">
+    {{-- x-data MUST be single-quoted (config JSON carries structural double quotes). --}}
+    <div class="lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start" x-data='rcptThemePicker({!! $rcptThemeCfg !!})'>
+    <form method="POST" action="{{ route('pos.business-profile') }}" enctype="multipart/form-data" class="space-y-6 lg:col-span-3" id="posBizProfileForm">
         @csrf
+
+        {{-- Live preview on small screens (the lg aside is hidden there) --}}
+        <div class="lg:hidden">
+            @include('pos.partials.receipt-theme-preview', ['company' => $company, 'mode' => 'pra'])
+        </div>
 
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-6">
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
@@ -157,6 +210,12 @@
             </button>
         </div>
     </form>
+
+    {{-- Sticky live preview (desktop) — identity fields react as you type (Task 717) --}}
+    <div class="hidden lg:block lg:col-span-2 lg:sticky lg:top-4">
+        @include('pos.partials.receipt-theme-preview', ['company' => $company, 'mode' => 'pra'])
+    </div>
+    </div>
 
     {{-- ============ F8: PUBLIC QR PROFILE + MENU (admin only) ============ --}}
     @if(isset($ppSettings) && auth('pos')->user() && !auth('pos')->user()->isPosCashier())

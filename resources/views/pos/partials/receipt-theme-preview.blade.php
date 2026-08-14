@@ -43,7 +43,7 @@
                 <table style="width:100%;border-collapse:collapse;margin-bottom:2px;">
                     <tr>
                         <td style="text-align:left;vertical-align:middle;width:64%;padding:0;">
-                            <span x-show="p.bizname" style="display:block;font-size:15px;font-weight:bold;text-align:left;">{{ $tnName }}</span>
+                            <span x-show="p.bizname" style="display:block;font-size:15px;font-weight:bold;text-align:left;" data-tn-prev="name">{{ $tnName }}</span>
                         </td>
                         <td style="text-align:right;vertical-align:middle;width:36%;padding:0;">
                             @if($tnLogoUri)
@@ -56,16 +56,16 @@
                 </table>
             </div>
             <div x-show="p.bizname && !(showLogoNow() && thLogo() === 'side')" style="text-align:center;">
-                <span style="font-size:15px;font-weight:bold;">{{ $tnName }}</span>
+                <span style="font-size:15px;font-weight:bold;" data-tn-prev="name">{{ $tnName }}</span>
             </div>
 
             <div style="text-align:center;font-size:10px;font-weight:600;line-height:1.4;">
-                <div x-show="p.address">{{ $tnAddress }}</div>
-                <div x-show="p.phone">Tel: {{ $tnPhone }}</div>
+                <div x-show="p.address"><span data-tn-prev="address">{{ $tnAddress }}</span></div>
+                <div x-show="p.phone">Tel: <span data-tn-prev="phone">{{ $tnPhone }}</span></div>
                 @if($tnMode === 'pra')
-                <div x-show="p.email">{{ $tnEmail }}</div>
+                <div x-show="p.email"><span data-tn-prev="email">{{ $tnEmail }}</span></div>
                 @endif
-                <div x-show="p.ntn"><strong>NTN:</strong> {{ $tnNtn }}</div>
+                <div x-show="p.ntn"><strong>NTN:</strong> <span data-tn-prev="ntn">{{ $tnNtn }}</span></div>
             </div>
 
             <div style="border-top:1px dashed #000;margin:4px 0;"></div>
@@ -181,7 +181,15 @@
 if (!window.rcptThemePicker) {
     // Alpine state factory for the theme cards + live preview (Task 712).
     // cfg: { theme, themes: {key:{bold,logo}}, mode: 'pra'|'fbr', live: bool,
-    //        formId, paper: '80mm'|'58mm', prefs: {...initial preview prefs} }
+    //        formId, paper: '80mm'|'58mm', prefs: {...initial preview prefs},
+    //        fieldMap: {previewKey: formFieldName|null}   (Task 717, optional) —
+    //          per-page override of the default rp_/lp_ receipt-settings field
+    //          names; explicit null = "this page has no such field, keep the
+    //          initial pref". Lets business-profile pages (rd_*, receipt_footer_note,
+    //          print_paper_size) reuse the same live preview.
+    //        textMap: {name|address|phone|ntn|email: [fieldNames...]} (optional) —
+    //          live header text from identity inputs; empty inputs fall back to
+    //          the server-rendered sample text. }
     window.rcptThemePicker = function (cfg) {
         return {
             tab: 'pra',
@@ -199,34 +207,67 @@ if (!window.rcptThemePicker) {
                 this.sync();
             },
             sync: function () {
+                var self = this;
                 var form = document.getElementById(cfg.formId);
                 if (!form) { return; }
-                var chk = function (name, dflt) {
-                    var el = form.querySelector('input[type="checkbox"][name="' + name + '"]');
-                    return el ? el.checked : dflt;
-                };
                 var val = function (name, dflt) {
                     var el = form.querySelector('[name="' + name + '"]');
                     return (el && el.value) ? el.value : dflt;
                 };
-                var om = form.querySelector('input[name="rp_order_match"]:checked');
-                this.p.orderMatch = om ? om.value : (this.p.orderMatch || 'off');
-                if (!cfg.live) { return; } // FBR: display prefs are static (business-profile owns them)
-                var pre = this.tab === 'local' ? 'lp_' : 'rp_';
-                this.p.address = chk(pre + 'show_address', true);
-                this.p.ntn = chk(pre + 'show_ntn', true);
-                this.p.email = chk(pre + 'show_email', true);
-                this.p.phone = chk(pre + 'show_mobile', true);
-                this.p.cashier = chk(pre + 'show_cashier', true);
-                this.p.bizname = chk(pre + 'show_business_name', true);
-                this.p.devby = chk(pre + 'show_developed_by', true);
-                this.p.footer = chk(pre + 'show_footer', true);
-                this.p.footerText = (val(pre + 'footer_text', '') || '').trim();
-                this.p.tax = chk(pre + 'show_tax', true);
-                this.p.logo = chk('rp_show_logo', true);
-                this.p.logoFinalsOnly = chk('rp_logo_finals_only', false);
-                this.p.menuQr = chk('rp_show_menu_qr', true);
-                this.paper = val('rp_printer_size', this.paper);
+                // Task 717: resolve a preview key to this page's form field name.
+                var fname = function (key, dflt) {
+                    if (cfg.fieldMap && Object.prototype.hasOwnProperty.call(cfg.fieldMap, key)) { return cfg.fieldMap[key]; }
+                    return dflt;
+                };
+                var omName = fname('orderMatch', 'rp_order_match');
+                if (omName) {
+                    var om = form.querySelector('input[name="' + omName + '"]:checked');
+                    this.p.orderMatch = om ? om.value : (this.p.orderMatch || 'off');
+                }
+                if (cfg.live) {
+                    var pre = this.tab === 'local' ? 'lp_' : 'rp_';
+                    // Missing checkbox = page doesn't expose that toggle — keep the
+                    // initial pref (was hardcoded defaults before Task 717).
+                    var setChk = function (key, dflt) {
+                        var n = fname(key, dflt);
+                        if (!n) { return; }
+                        var el = form.querySelector('input[type="checkbox"][name="' + n + '"]');
+                        if (el) { self.p[key] = el.checked; }
+                    };
+                    setChk('address', pre + 'show_address');
+                    setChk('ntn', pre + 'show_ntn');
+                    setChk('email', pre + 'show_email');
+                    setChk('phone', pre + 'show_mobile');
+                    setChk('cashier', pre + 'show_cashier');
+                    setChk('bizname', pre + 'show_business_name');
+                    setChk('devby', pre + 'show_developed_by');
+                    setChk('footer', pre + 'show_footer');
+                    setChk('tax', pre + 'show_tax');
+                    setChk('logo', 'rp_show_logo');
+                    setChk('logoFinalsOnly', 'rp_logo_finals_only');
+                    setChk('menuQr', 'rp_show_menu_qr');
+                    var ftName = fname('footerText', pre + 'footer_text');
+                    if (ftName) { this.p.footerText = (val(ftName, '') || '').trim(); }
+                    var paperName = fname('paper', 'rp_printer_size');
+                    if (paperName) {
+                        var pv = val(paperName, this.paper);
+                        // business-profile pages post print_paper_size (thermal/thermal58/a4)
+                        this.paper = pv === 'thermal58' ? '58mm' : ((pv === 'thermal' || pv === 'a4') ? '80mm' : pv);
+                    }
+                }
+                // Task 717: live header text from identity inputs (business-profile).
+                if (cfg.textMap) {
+                    var root = this.$root || document;
+                    Object.keys(cfg.textMap).forEach(function (key) {
+                        var parts = (cfg.textMap[key] || []).map(function (n) { return (val(n, '') || '').trim(); }).filter(Boolean);
+                        var sep = key === 'address' ? ', ' : (key === 'phone' ? ' / ' : ' ');
+                        var text = parts.join(sep);
+                        root.querySelectorAll('[data-tn-prev="' + key + '"]').forEach(function (el) {
+                            if (el.dataset.tnDflt === undefined) { el.dataset.tnDflt = el.textContent; }
+                            el.textContent = text || el.dataset.tnDflt;
+                        });
+                    });
+                }
             },
             thBold: function () {
                 var t = cfg.themes[this.theme];

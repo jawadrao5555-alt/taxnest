@@ -1,5 +1,52 @@
 <x-fbr-pos-layout>
-<div class="max-w-3xl mx-auto">
+@php
+    // Live sample-receipt preview (Task 717) — the FBR display toggles are edited
+    // HERE (rd_* + receipt_footer_note + print_paper_size), so this page's preview
+    // is live; fieldMap points the shared partial at this form's field names and
+    // null = "no such field here" (theme cards / rp_* live on receipt-settings).
+    $ps = $company->posReceiptStyle();
+    $rd = $company->displayPrefs('fbrpos');
+    $rcptThemeCfg = json_encode([
+        'theme'  => \App\Support\PosReceiptThemes::resolve($ps),
+        'themes' => \App\Support\PosReceiptThemes::clientMap(),
+        'mode'   => 'fbr',
+        'live'   => true,
+        'formId' => 'fbrBizProfileForm',
+        'paper'  => ($company->print_paper_size ?? 'thermal') === 'thermal58' ? '58mm' : '80mm',
+        'fieldMap' => [
+            'orderMatch' => null,
+            'address' => 'rd_show_address',
+            'phone' => 'rd_show_phone',
+            'ntn' => 'rd_show_ntn',
+            'cashier' => 'rd_show_cashier',
+            'footer' => 'rd_show_footer',
+            'footerText' => 'receipt_footer_note',
+            'paper' => 'print_paper_size',
+            'email' => null, 'bizname' => null, 'devby' => null, 'tax' => null,
+            'logo' => null, 'logoFinalsOnly' => null, 'menuQr' => null,
+        ],
+        'textMap' => [
+            'name' => ['name'],
+            'address' => ['address'],
+            'phone' => ['phone'],
+            'ntn' => ['ntn'],
+        ],
+        'prefs'  => [
+            'address' => (bool) $rd['show_address'],
+            'ntn' => (bool) $rd['show_ntn'],
+            'phone' => (bool) $rd['show_mobile'],
+            'cashier' => (bool) $rd['show_cashier'],
+            'bizname' => true,
+            'footer' => (bool) $rd['show_footer'],
+            'footerText' => (string) ($company->receipt_footer_note ?? ''),
+            'tax' => true,
+            'logo' => (bool) ($ps['show_logo'] ?? true),
+            'logoFinalsOnly' => false,
+            'orderMatch' => in_array($company->order_match_style ?? 'off', ['off', 'token', 'code'], true) ? ($company->order_match_style ?? 'off') : 'off',
+        ],
+    ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}';
+@endphp
+<div class="max-w-3xl lg:max-w-6xl mx-auto">
     @include('fbr-pos.partials.back-link')
     <div class="mb-6">
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.business_profile') }}</h1>
@@ -12,8 +59,15 @@
         </div>
     @endif
 
-    <form method="POST" action="{{ route('fbrpos.business-profile') }}" enctype="multipart/form-data">
+    {{-- x-data MUST be single-quoted (config JSON carries structural double quotes). --}}
+    <div class="lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start" x-data='rcptThemePicker({!! $rcptThemeCfg !!})'>
+    <form method="POST" action="{{ route('fbrpos.business-profile') }}" enctype="multipart/form-data" id="fbrBizProfileForm" class="lg:col-span-3">
         @csrf
+
+        {{-- Live preview on small screens (the lg aside is hidden there) --}}
+        <div class="lg:hidden mb-5">
+            @include('pos.partials.receipt-theme-preview', ['company' => $company, 'mode' => 'fbr'])
+        </div>
 
         {{-- Business details --}}
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-6 space-y-5 mb-5">
@@ -195,5 +249,11 @@
             </button>
         </div>
     </form>
+
+    {{-- Sticky live preview (desktop) — reads this form's toggles live (Task 717) --}}
+    <div class="hidden lg:block lg:col-span-2 lg:sticky lg:top-4">
+        @include('pos.partials.receipt-theme-preview', ['company' => $company, 'mode' => 'fbr'])
+    </div>
+    </div>
 </div>
 </x-fbr-pos-layout>

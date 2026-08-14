@@ -30,6 +30,98 @@ step() { echo ""; echo "==> $*"; }
 
 run_ssh() { timeout 120 ssh "${SSH_OPTS[@]}" "$HOST" "$@"; }
 
+# ALL live-mutating work (pull/composer/migrate/caches/OPcache) runs as ONE
+# remote payload under a single exclusive flock — the SAME lock the cPanel
+# auto-deploy (scripts/cpanel-autodeploy.sh) holds for its whole critical
+# section. Neither deploy can interleave between the other's stages.
+DEPLOY_LOCK="/home/taxnestc/.taxnest-deploy.lock"
+
+# remote_apply DO_PULL DO_COMPOSER DO_MIGRATE
+# Executes the full mutation sequence on live inside one held lock AND inside
+# the same pre-rendered HTTP-200 maintenance window the auto-deploy uses:
+# down(200) BEFORE any mutation, up ONLY after caches + confirmed OPcache
+# reset. On any failure the site STAYS on the 200 maintenance page (fail
+# closed — identical lifecycle semantics to scripts/cpanel-autodeploy.sh).
+# Exit codes: 90 cd, 91 pull, 92 composer, 93 migrate, 94 caches,
+# 95 opcache-probe-write, 96 down failed (live untouched), 97 up failed,
+# 98 opcache reset unconfirmed. Prints REMOTE_* markers.
+remote_apply() {
+  local DO_PULL=$1 DO_COMPOSER=$2 DO_MIGRATE=$3
+  local RPROBE="opr-$(date +%s%N)$RANDOM$RANDOM.php"   # unguessable one-time probe name
+  timeout 900 ssh "${SSH_OPTS[@]}" "$HOST" \
+    "flock -w 300 $DEPLOY_LOCK bash -s -- $DO_PULL $DO_COMPOSER $DO_MIGRATE $RPROBE" <<'REMOTE'
+set -u
+DO_PULL=$1; DO_COMPOSER=$2; DO_MIGRATE=$3; RPROBE=$4
+LIVE_DIR=/home/taxnestc/public_html
+PHP84=/usr/local/bin/ea-php84
+trap 'rm -f "$LIVE_DIR/public/$RPROBE"' EXIT INT TERM
+cd "$LIVE_DIR" || exit 90
+echo "REMOTE_LOCK_HELD"
+
+# Maintenance window FIRST — live must never serve mid-mutation state.
+# Bootstrap a minimal 200 page if the committed one isn't on live yet.
+if [ ! -f resources/views/errors/deploying.blade.php ]; then
+  mkdir -p resources/views/errors || exit 96
+  printf '%s' '<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="4"><title>Updating</title></head><body style="font-family:sans-serif;text-align:center;padding-top:20vh;background:#0A4D5C;color:#fff"><h1>System update in progress&hellip;</h1><p>This page refreshes automatically.</p></body></html>' \
+    > resources/views/errors/deploying.blade.php || exit 96
+fi
+echo "REMOTE_STEP: artisan down (200 maintenance window)"
+$PHP84 artisan down --render=errors::deploying --status=200 --refresh=4 2>&1 || exit 96
+# From here on, any failure exits WITHOUT artisan up — site stays on the
+# friendly 200 page; recover manually ('php artisan up' after fixing).
+
+if [ "$DO_PULL" = 1 ]; then
+  echo "REMOTE_STEP: git pull origin main"
+  git pull origin main 2>&1 || exit 91
+fi
+if [ "$DO_COMPOSER" = 1 ]; then
+  echo "REMOTE_STEP: composer install"
+  /usr/local/bin/php $(command -v composer || echo composer.phar) install --no-interaction --prefer-dist --no-dev 2>&1 || exit 92
+fi
+if [ "$DO_MIGRATE" = 1 ]; then
+  echo "REMOTE_STEP: migrate --force"
+  $PHP84 artisan migrate --force 2>&1 || exit 93
+fi
+echo "REMOTE_STEP: cache rebuild"
+{ $PHP84 artisan config:clear && $PHP84 artisan cache:clear && $PHP84 artisan route:clear \
+  && $PHP84 artisan view:clear && $PHP84 artisan config:cache && $PHP84 artisan route:cache \
+  && $PHP84 artisan view:cache; } 2>&1 || exit 94
+echo "REMOTE_STEP: web OPcache reset"
+echo '<?php opcache_reset(); echo "OPCACHE_RESET_OK ".__DIR__; ?>' > "public/$RPROBE" || exit 95
+OP_OK=0
+for TRY in 1 2 3; do
+  OP_OUT=$(curl -s --max-time 15 "https://taxnest.com.pk/$RPROBE" || true)
+  case "$OP_OUT" in *OPCACHE_RESET_OK*) OP_OK=1; break ;; esac
+  OP_OUT=$(curl -sk --max-time 15 -H "Host: taxnest.com.pk" "https://127.0.0.1/$RPROBE" || true)
+  case "$OP_OUT" in *OPCACHE_RESET_OK*) OP_OK=1; break ;; esac
+  sleep 3
+done
+rm -f "public/$RPROBE"
+[ "$OP_OK" = 1 ] || exit 98
+echo "$OP_OUT"
+echo "REMOTE_STEP: artisan up"
+$PHP84 artisan up 2>&1 || exit 97
+echo "REMOTE_DONE"
+exit 0
+REMOTE
+}
+
+apply_fail_reason() {
+  case "$1" in
+    90) echo "cd to live dir failed" ;;
+    91) echo "git pull failed on live — SITE LEFT IN MAINTENANCE (fix, then 'php artisan up' on live)" ;;
+    92) echo "composer install failed on live — SITE LEFT IN MAINTENANCE" ;;
+    93) echo "migrate --force failed on live — SITE LEFT IN MAINTENANCE" ;;
+    94) echo "cache rebuild failed on live — SITE LEFT IN MAINTENANCE" ;;
+    95) echo "could not write OPcache probe on live — SITE LEFT IN MAINTENANCE" ;;
+    96) echo "could not open 200 maintenance window — ABORTED, live untouched" ;;
+    97) echo "artisan up failed after successful release — run 'php artisan up' on live" ;;
+    98) echo "web OPcache reset NOT confirmed — SITE LEFT IN MAINTENANCE (old opcode risk)" ;;
+    124) echo "remote apply timed out (or lock held >300s by another deploy) — check live maintenance state" ;;
+    *)  echo "remote apply failed with exit $1" ;;
+  esac
+}
+
 # Live logging health: LOG_LEVEL must be 'warning' or lower (debug/info) so
 # scheduler/guard Log::warning lines actually land in laravel.log
 # (13 Aug 2026: LOG_LEVEL=error silently swallowed them all). Also flag a
@@ -157,18 +249,11 @@ if [ "$LIVE_HEAD_BEFORE" = "$LOCAL_HEAD" ]; then
   # zero-code change. The auto-bump applies only to deploys with a live→local gap.
   echo "Refreshing migrate + caches + OPcache anyway — racing auto-deploys can leave stale/poisoned state."
 
-  step "Live (refresh): php artisan migrate --force (idempotent)"
-  run_ssh "cd $LIVE_DIR && /usr/local/bin/ea-php84 artisan migrate --force 2>&1" \
-    || fail "migrate --force failed on live"
-
-  step "Live (refresh): rebuild caches (config/route/view)"
-  run_ssh "cd $LIVE_DIR && /usr/local/bin/ea-php84 artisan config:clear && /usr/local/bin/ea-php84 artisan cache:clear && /usr/local/bin/ea-php84 artisan route:clear && /usr/local/bin/ea-php84 artisan view:clear && /usr/local/bin/ea-php84 artisan config:cache && /usr/local/bin/ea-php84 artisan route:cache && /usr/local/bin/ea-php84 artisan view:cache 2>&1" \
-    || fail "cache rebuild failed on live"
-
-  step "Live (refresh): reset WEB OPcache"
-  OPCACHE_OUT=$(run_ssh "cd $LIVE_DIR && echo '<?php opcache_reset(); echo \"OPCACHE_RESET_OK \".__DIR__; ?>' > public/r.php && curl -s $LIVE_URL/r.php ; RC=\$? ; rm -f public/r.php ; exit \$RC")
-  echo "$OPCACHE_OUT"
-  echo "$OPCACHE_OUT" | grep -q "OPCACHE_RESET_OK" || fail "web OPcache reset did not confirm"
+  step "Live (refresh): migrate + caches + OPcache under ONE held deploy lock"
+  REFRESH_OUT=$(remote_apply 0 0 1); APPLY_RC=$?
+  echo "$REFRESH_OUT"
+  [ $APPLY_RC -eq 0 ] || fail "$(apply_fail_reason $APPLY_RC)"
+  echo "$REFRESH_OUT" | grep -q "OPCACHE_RESET_OK" || fail "web OPcache reset did not confirm"
 
   HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$LIVE_URL/")
   echo "GET $LIVE_URL/ -> $HTTP_CODE"
@@ -246,41 +331,20 @@ if ! git push origin HEAD:main 2>&1; then
 fi
 
 # ------------------------------------------------------------------ 2. Deploy over SSH
-step "Live: git pull origin main"
-PULL_OUT=$(run_ssh "cd $LIVE_DIR && git pull origin main 2>&1"); PULL_RC=$?
-echo "$PULL_OUT"
-[ $PULL_RC -eq 0 ] || fail "git pull failed on live (see output above; untracked-overwrite blockers? see runbook)"
+# Composer note: MUST run under /usr/local/bin/php (CloudLinux alt-php — the
+# SAME runtime as the lsphp web handler, has gd/iconv). ea-php84 CLI lacks
+# gd+iconv → mPDF/PhpSpreadsheet platform checks fail (discovered 4 Aug 2026).
+step "Live: pull + composer($NEED_COMPOSER) + migrate($NEED_MIGRATE) + caches + OPcache under ONE held deploy lock"
+APPLY_OUT=$(remote_apply 1 "$NEED_COMPOSER" "$NEED_MIGRATE"); APPLY_RC=$?
+echo "$APPLY_OUT"
+[ $APPLY_RC -eq 0 ] || fail "$(apply_fail_reason $APPLY_RC)"
+echo "$APPLY_OUT" | grep -q "OPCACHE_RESET_OK" \
+  || fail "web OPcache reset did not confirm (probe output above) — live may serve stale compiled code"
 
 LIVE_HEAD_AFTER=$(run_ssh "cd $LIVE_DIR && git rev-parse HEAD" 2>/dev/null)
 [ "$LIVE_HEAD_AFTER" = "$LOCAL_HEAD" ] \
-  || fail "pull ran but live HEAD ($LIVE_HEAD_AFTER) != workspace HEAD ($LOCAL_HEAD) — pull may have silently aborted"
+  || fail "apply ran but live HEAD ($LIVE_HEAD_AFTER) != workspace HEAD ($LOCAL_HEAD) — pull may have silently aborted"
 echo "live HEAD (after): $LIVE_HEAD_AFTER — matches workspace."
-
-if [ $NEED_COMPOSER -eq 1 ]; then
-  step "Live: composer install (composer.json/lock changed in gap)"
-  # Composer MUST run under /usr/local/bin/php (CloudLinux alt-php — the SAME
-  # runtime as the lsphp web handler, has gd/iconv). ea-php84 CLI lacks gd+iconv
-  # → mPDF/PhpSpreadsheet platform checks fail (discovered 4 Aug 2026).
-  run_ssh "cd $LIVE_DIR && /usr/local/bin/php \$(command -v composer || echo composer.phar) install --no-interaction --prefer-dist --no-dev 2>&1" \
-    || fail "composer install failed on live"
-fi
-
-if [ $NEED_MIGRATE -eq 1 ]; then
-  step "Live: php artisan migrate --force (gap includes migrations)"
-  run_ssh "cd $LIVE_DIR && /usr/local/bin/ea-php84 artisan migrate --force 2>&1" \
-    || fail "migrate --force failed on live"
-else
-  step "No new migrations in gap — skipping migrate (idempotent anyway; re-run manually if unsure)"
-fi
-
-step "Live: rebuild caches (config/route/view)"
-run_ssh "cd $LIVE_DIR && /usr/local/bin/ea-php84 artisan config:clear && /usr/local/bin/ea-php84 artisan cache:clear && /usr/local/bin/ea-php84 artisan route:clear && /usr/local/bin/ea-php84 artisan view:clear && /usr/local/bin/ea-php84 artisan config:cache && /usr/local/bin/ea-php84 artisan route:cache && /usr/local/bin/ea-php84 artisan view:cache 2>&1" \
-  || fail "cache rebuild failed on live"
-
-step "Live: reset WEB OPcache (temp public/r.php + web hit)"
-OPCACHE_OUT=$(run_ssh "cd $LIVE_DIR && echo '<?php opcache_reset(); echo \"OPCACHE_RESET_OK \".__DIR__; ?>' > public/r.php && curl -s $LIVE_URL/r.php ; RC=\$? ; rm -f public/r.php ; exit \$RC")
-echo "$OPCACHE_OUT"
-echo "$OPCACHE_OUT" | grep -q "OPCACHE_RESET_OK" || fail "web OPcache reset did not confirm (r.php output above) — live may serve stale compiled code"
 
 # ------------------------------------------------------------------ 3. Verify
 step "Verify: homepage returns 200"

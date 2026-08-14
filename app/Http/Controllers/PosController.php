@@ -9068,6 +9068,17 @@ class PosController extends Controller
         $pendingBase = fn () => PosTransaction::where('company_id', $companyId)
             ->where('business_date', '<=', $date)
             ->whereNull('pra_invoice_number');
+        // Bill-by-bill list (Task 677): the page shows each pending bill with
+        // its own action selector — fetch display columns too. Rider columns
+        // are schema-guarded (prod drift self-heal convention).
+        $washRiderReady = \Schema::hasColumn('pos_transactions', 'rider_id');
+        $washCols = ['id', 'invoice_number', 'status', 'created_at', 'business_date', 'total_amount', 'payment_method'];
+        if (\Schema::hasColumn('pos_transactions', 'customer_name')) {
+            $washCols[] = 'customer_name';
+        }
+        if ($washRiderReady) {
+            array_push($washCols, 'rider_id', 'rider_settlement_id', 'delivery_status');
+        }
         $pendingProv = $pendingBase()
             ->where('invoice_mode', 'local')
             ->where('pra_status', 'local')
@@ -9079,14 +9090,40 @@ class PosController extends Controller
                 $q->whereDate('created_at', $date)
                     ->orWhere('status', '!=', 'draft');
             })
-            ->get(['id', 'created_at', 'business_date', 'total_amount']);
+            ->get($washCols);
         $pendingFinal = $pendingBase()
             ->where('status', 'completed')
             ->where(function ($q) {
                 $q->where('invoice_mode', 'pra')->orWhereNull('invoice_mode');
             })
             ->whereNull('pra_status')
-            ->get(['id', 'created_at', 'business_date', 'total_amount']);
+            ->get($washCols);
+        // Combined per-bill rows for the close form (Task 677): kind decides the
+        // selector options; unsettled rider-cash bills can never be deleted
+        // (khata proof — the wash archives them regardless, so the UI says so).
+        $khata = fn ($t) => $washRiderReady && $t->rider_id && $t->payment_method === 'cash'
+            && !$t->rider_settlement_id && $t->delivery_status !== 'returned';
+        $washBills = $pendingProv->map(fn ($t) => (object) [
+            'id' => $t->id,
+            'kind' => 'provisional',
+            'invoice_number' => $t->invoice_number,
+            'customer_name' => $t->customer_name ?? null,
+            'total_amount' => (float) $t->total_amount,
+            'business_date' => $t->business_date,
+            'created_at' => $t->created_at,
+            'is_draft' => ($t->status ?? null) === 'draft',
+            'khata' => $khata($t),
+        ])->concat($pendingFinal->map(fn ($t) => (object) [
+            'id' => $t->id,
+            'kind' => 'final_local',
+            'invoice_number' => $t->invoice_number,
+            'customer_name' => $t->customer_name ?? null,
+            'total_amount' => (float) $t->total_amount,
+            'business_date' => $t->business_date,
+            'created_at' => $t->created_at,
+            'is_draft' => false,
+            'khata' => $khata($t),
+        ]))->sortBy([['business_date', 'asc'], ['id', 'asc']])->values();
         $localWash = (object) [
             'prov_count' => $pendingProv->count(),
             'prov_amount' => (float) $pendingProv->sum('total_amount'),
@@ -9135,7 +9172,7 @@ class PosController extends Controller
         // rider unsettled cash is a WARNING only (khata legitimately carries).
         $pendingDeliveries = $this->undispatchedDeliverySummary($companyId, $company, $date);
 
-        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'pendingDeliveries', 'dcReturnDetail', 'dcReturnParents'));
+        return view('pos.day-close', compact('company', 'date', 'stats', 'existingReport', 'cashierBreakdown', 'previousReports', 'transactions', 'localWash', 'washBills', 'analytics', 'riderFigures', 'dayOpening', 'openOrders', 'occupiedTables', 'openHeld', 'unclosedPriorDays', 'streamSplit', 'pendingDeliveries', 'dcReturnDetail', 'dcReturnParents'));
     }
 
     /**
@@ -9341,6 +9378,11 @@ class PosController extends Controller
             // Per-close wash override (Task 661): same vocabulary as the
             // standing policy; 'standing' = no override.
             'wash_override' => 'nullable|in:standing,finalize,save,delete',
+            // Bill-by-bill choice (Task 677, owner-approved 14 Aug 2026): each
+            // pending local/provisional bill may carry its OWN action for THIS
+            // close. 'standing' = follow the all-box / standing policy.
+            'bill_actions' => 'nullable|array',
+            'bill_actions.*' => 'nullable|in:standing,finalize,save,delete',
         ]);
         // Per-close action override (Task 661, owner's 3-option choice): an
         // admin/manager may, for THIS close only, force pending local bills to
@@ -9349,20 +9391,34 @@ class PosController extends Controller
         // value from a cashier is refused outright (settings authority stays
         // admin-only — same rule as every /pos/settings POST).
         $washOverride = $request->input('wash_override');
+        // Bill-by-bill map (Task 677): sanitize to int-id => action, dropping
+        // 'standing' (= no deviation). Ids never in the wash selectors are
+        // simply ignored downstream (queries stay company-scoped — a crafted
+        // foreign id can never touch another company's bills).
+        $billActions = [];
+        foreach ((array) $request->input('bill_actions', []) as $bid => $act) {
+            if (in_array($act, ['finalize', 'save', 'delete'], true) && (int) $bid > 0) {
+                $billActions[(int) $bid] = $act;
+            }
+        }
         $actionOverride = null;
-        if ($washOverride && $washOverride !== 'standing') {
+        if (($washOverride && $washOverride !== 'standing') || !empty($billActions)) {
             // isPosCashier (role), NOT posCashierBlocked (path access): a
             // cashier granted day-close custom access may CLOSE the day but
-            // still must not override the owner's standing wash policy.
+            // still must not override the owner's standing wash policy —
+            // neither via the all-box nor via crafted per-bill actions.
             if ($user && $user->isPosCashier()) {
                 return back()->with('error', __('pos.only_admin_change_setting'));
             }
             $actionOverride = [
-                'provisional' => $washOverride,
+                'provisional' => ($washOverride && $washOverride !== 'standing') ? $washOverride : null,
                 // Reporting-OFF finals cannot be "finalized" (they already are
                 // final); they follow the override only for save/delete and
                 // keep the standing policy otherwise.
                 'final_local' => in_array($washOverride, ['save', 'delete'], true) ? $washOverride : null,
+                // Per-bill deviations beat the all-box/standing action for
+                // exactly the bills named (Task 677).
+                'bills' => $billActions,
             ];
         }
         $cashRecon = null;
@@ -10091,7 +10147,7 @@ class PosController extends Controller
      *
      * @return array{finalized:int,finalized_amount:float,submitted:int,queued:int,offline:int,quota_blocked:int,skipped:int}
      */
-    private function finalizeProvisionalsAtDayClose(int $companyId, Company $company, string $date): array
+    private function finalizeProvisionalsAtDayClose(int $companyId, Company $company, string $date, ?array $onlyIds = null, array $excludeIds = []): array
     {
         $sweep = ['finalized' => 0, 'finalized_amount' => 0.0, 'submitted' => 0, 'queued' => 0, 'offline' => 0, 'quota_blocked' => 0, 'skipped' => 0];
 
@@ -10101,6 +10157,9 @@ class PosController extends Controller
 
         // Same selector as the provisional wash set, restricted to COMPLETED bills —
         // a draft is a live/abandoned cart, never something to send to the tax record.
+        // Task 677 (bill-by-bill): $onlyIds limits the sweep to explicitly-picked
+        // bills; $excludeIds keeps bills the admin marked save/delete OUT of a
+        // whole-set finalize (they must wash, not promote).
         $rows = PosTransaction::withoutGlobalScope('hide_archived')
             ->where('company_id', $companyId)
             ->where('business_date', '<=', $date)
@@ -10109,6 +10168,8 @@ class PosController extends Controller
             ->where('invoice_mode', 'local')
             ->where('pra_status', 'local')
             ->where('status', 'completed')
+            ->when($onlyIds !== null, fn ($q) => $q->whereIn('id', $onlyIds))
+            ->when(!empty($excludeIds), fn ($q) => $q->whereNotIn('id', $excludeIds))
             ->orderBy('id')
             ->get();
 
@@ -10335,6 +10396,15 @@ class PosController extends Controller
                 $finalAction = $actionOverride['final_local'];
             }
         }
+        // Bill-by-bill deviations (Task 677): id => finalize|save|delete for
+        // THIS close only. Sanitized here too (performDayClose is also called
+        // by closeAllPriorDays / the auto-close command, which never pass one).
+        $billActions = [];
+        foreach ((array) ($actionOverride['bills'] ?? []) as $bid => $act) {
+            if (in_array($act, ['finalize', 'save', 'delete'], true) && (int) $bid > 0) {
+                $billActions[(int) $bid] = $act;
+            }
+        }
 
         // ── AUTO-FINALIZE SWEEP (owner option, Aug 2026): promote every pending
         // provisional through the SAME core path F10 Make Final uses (quota gate,
@@ -10344,7 +10414,15 @@ class PosController extends Controller
         // CARRIED — never archived/deleted, they stay finalizable tomorrow.
         $finalizeSweep = null;
         if ($provAction === 'finalize') {
-            $finalizeSweep = $this->finalizeProvisionalsAtDayClose($companyId, $company, $date);
+            // Whole-set finalize — but bills the admin explicitly marked
+            // save/delete (Task 677) must NOT be promoted first.
+            $skipIds = array_keys(array_filter($billActions, fn ($a) => $a !== 'finalize'));
+            $finalizeSweep = $this->finalizeProvisionalsAtDayClose($companyId, $company, $date, null, $skipIds);
+        } elseif (in_array('finalize', $billActions, true)) {
+            // Per-bill finalize (Task 677): promote ONLY the named bills; the
+            // rest of the provisional set follows the standing/all-box action.
+            $onlyIds = array_keys(array_filter($billActions, fn ($a) => $a === 'finalize'));
+            $finalizeSweep = $this->finalizeProvisionalsAtDayClose($companyId, $company, $date, $onlyIds);
         }
 
         // Local (non-PRA) bills stay OUT of the stored day-close figures — they are
@@ -10506,7 +10584,7 @@ class PosController extends Controller
         $deletedCount = 0;
         $report = null;
         $localSummary = [];
-        \DB::transaction(function () use ($data, $companyId, $date, $provAction, $finalAction, $spendPersist, $riderGuardReady, $riderFigures, $finalizeSweep, &$archivedCount, &$deletedCount, &$report, &$localSummary) {
+        \DB::transaction(function () use ($data, $companyId, $date, $provAction, $finalAction, $spendPersist, $riderGuardReady, $riderFigures, $finalizeSweep, $billActions, &$archivedCount, &$deletedCount, &$report, &$localSummary) {
             $report = PosDayCloseReport::create($data);
 
             // BACKLOG SWEEP (owner rule Jul 2026): wash covers bills up to AND
@@ -10579,27 +10657,47 @@ class PosController extends Controller
                     'backlog' => $rows->filter(fn ($t) => $t->business_date && $t->business_date < $date)->count(),
                 ];
                 // AUTO-FINALIZE (Aug 2026): sweep already promoted what it could —
-                // merge its numbers into the Z-report detail. Remaining rows here
-                // are the leftovers (quota out / older month / drafts / races);
-                // they are CARRIED, never archived or deleted.
-                if ($billKind === 'provisional' && $set['action'] === 'finalize') {
-                    $localSummary[$billKind] = array_merge($localSummary[$billKind], $finalizeSweep ?? []);
-                    continue;
+                // merge its numbers into the Z-report detail (whole-set 'finalize'
+                // policy OR per-bill finalize picks, Task 677). Remaining rows are
+                // the leftovers (quota out / older month / drafts / races) — they
+                // resolve to 'carry' below: never archived or deleted.
+                if ($billKind === 'provisional' && $finalizeSweep !== null) {
+                    $localSummary[$billKind] = array_merge($localSummary[$billKind], $finalizeSweep);
                 }
                 if ($rows->isEmpty()) {
                     continue;
                 }
-                // CARRY FORWARD: bills survive the wash exactly as they are —
-                // still un-archived, still in F10, finalizable tomorrow. Summary
-                // above already recorded the pending count for the Z-report.
-                if ($set['action'] === 'carry') {
-                    continue;
+                // Bill-by-bill resolution (Task 677): each row follows its own
+                // picked action, falling back to the kind's set action. Kind
+                // constraints: reporting-OFF finals can only save/delete (they
+                // are already final — 'finalize' is meaningless and resolves to
+                // the set action). 'finalize' leftovers still present here (the
+                // sweep could not promote them) resolve to 'carry'.
+                $effective = function ($t) use ($billActions, $set, $billKind) {
+                    $act = $billActions[(int) $t->id] ?? $set['action'];
+                    if ($billKind === 'final_local' && !in_array($act, ['save', 'delete'], true)) {
+                        $act = in_array($set['action'], ['save', 'delete'], true) ? $set['action'] : 'save';
+                    }
+                    return $act === 'finalize' ? 'carry' : $act;
+                };
+                $deleteRows = $rows->filter(fn ($t) => $effective($t) === 'delete')->values();
+                $saveRows = $rows->filter(fn ($t) => $effective($t) === 'save')->values();
+                // CARRY FORWARD rows survive the wash exactly as they are —
+                // still un-archived, still in F10, finalizable tomorrow.
+                if (!empty($billActions)) {
+                    // Z-report detail: how the per-bill picks split this kind.
+                    $localSummary[$billKind]['per_bill'] = [
+                        'save' => $saveRows->count(),
+                        'delete' => $deleteRows->count(),
+                        'carry' => $rows->count() - $saveRows->count() - $deleteRows->count(),
+                    ];
                 }
                 // Rider DELETE-guard: unsettled cash delivery bills are ARCHIVED
-                // instead of deleted (khata proof survives). Settled / returned /
+                // instead of deleted (khata proof survives) — applies to per-bill
+                // picks exactly like the whole-set policy. Settled / returned /
                 // non-cash rider bills wash normally.
-                if ($set['action'] === 'delete' && $riderGuardReady) {
-                    $riderGuarded = $rows->filter(fn ($t) => $t->rider_id
+                if ($deleteRows->isNotEmpty() && $riderGuardReady) {
+                    $riderGuarded = $deleteRows->filter(fn ($t) => $t->rider_id
                         && $t->payment_method === 'cash'
                         && !$t->rider_settlement_id
                         && $t->delivery_status !== 'returned');
@@ -10612,19 +10710,14 @@ class PosController extends Controller
                                 'archived_by_report_id' => $report->id,
                             ]);
                         $localSummary[$billKind]['rider_guarded'] = $riderGuarded->count();
-                        $rows = $rows->reject(fn ($t) => $t->rider_id
-                            && $t->payment_method === 'cash'
-                            && !$t->rider_settlement_id
-                            && $t->delivery_status !== 'returned');
-                        if ($rows->isEmpty()) {
-                            continue;
-                        }
+                        $guardedIds = $riderGuarded->pluck('id')->all();
+                        $deleteRows = $deleteRows->reject(fn ($t) => in_array($t->id, $guardedIds, true))->values();
                     }
                 }
-                if ($set['action'] === 'delete') {
+                if ($deleteRows->isNotEmpty()) {
                     if ($spendPersist) {
                         $now = now();
-                        $snapshots = $rows
+                        $snapshots = $deleteRows
                             ->filter(fn ($t) => $t->customer_id || !empty($t->customer_phone))
                             ->map(fn ($t) => [
                                 'company_id' => $companyId,
@@ -10647,7 +10740,7 @@ class PosController extends Controller
                             \App\Models\PosCustomerSpendSnapshot::insert($snapshots);
                         }
                     }
-                    $ids = $rows->pluck('id')->all();
+                    $ids = $deleteRows->pluck('id')->all();
                     \App\Models\PosTransactionItem::whereIn('transaction_id', $ids)->delete();
                     \App\Models\PosPayment::whereIn('transaction_id', $ids)->delete();
                     $kindDeleted = PosTransaction::withoutGlobalScope('hide_archived')
@@ -10659,13 +10752,14 @@ class PosController extends Controller
                     // Aug 1 00:30, business_date Jul 31) deleted during Jul 31's
                     // close must still be credited to July's quota — created_at
                     // bounds would let it escape quota entirely.
-                    $deletedByKind[$billKind] += $rows
+                    $deletedByKind[$billKind] += $deleteRows
                         ->filter(fn ($t) => ($d = $t->business_date ?: $t->created_at?->toDateString())
                             && $d >= $monthStart->toDateString() && $d <= $monthEnd->toDateString())
                         ->count();
-                } else {
+                }
+                if ($saveRows->isNotEmpty()) {
                     $archivedCount += PosTransaction::withoutGlobalScope('hide_archived')
-                        ->whereIn('id', $rows->pluck('id')->all())
+                        ->whereIn('id', $saveRows->pluck('id')->all())
                         ->update([
                             'is_archived' => true,
                             'archived_at' => now(),

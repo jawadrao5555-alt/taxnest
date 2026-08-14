@@ -136,6 +136,57 @@ class FbrPosDayCloseBulkCloseTest extends TestCase
         $this->assertSame(0, DB::table('fbr_day_close_reports')->count());
     }
 
+    /**
+     * Task 694: rider-khata guarded bill counted ONCE across a multi-day bulk
+     * run. FBR guarded bills STAY Local (no archive), so every later day's
+     * ≤date delete wash re-selects the same bill — the flash must de-dupe.
+     */
+    public function test_bulk_close_counts_rider_guarded_bill_once(): void
+    {
+        // Company wash policy = delete pending provisionals at close.
+        DB::table('companies')->where('id', $this->company->id)
+            ->update(['pos_dayclose_provisional_action' => 'delete']);
+
+        // Three stranded days with normal final bills.
+        $this->strandDay(3, 'F-A');
+        $this->strandDay(2, 'F-B');
+        $this->strandDay(1, 'F-C');
+
+        // ONE unsettled cash rider bill (Local provisional) on the OLDEST day.
+        $at = now()->subDays(3)->setTime(15, 0);
+        $guardedId = DB::table('fbr_pos_transactions')->insertGetId([
+            'company_id' => $this->company->id,
+            'invoice_number' => 'F-RIDER',
+            'transaction_type' => 'sale',
+            'status' => 'completed',
+            'invoice_mode' => 'local',
+            'fbr_status' => 'local',
+            'subtotal' => 500,
+            'total_amount' => 500,
+            'payment_method' => 'cash',
+            'rider_id' => 7,
+            'rider_settlement_id' => null,
+            'delivery_status' => 'delivered',
+            'created_at' => $at,
+            'updated_at' => $at,
+        ]);
+
+        $response = $this->bulkClose();
+        $response->assertSessionHas('success');
+
+        // All three days closed…
+        $this->assertSame(3, DB::table('fbr_day_close_reports')->where('company_id', $this->company->id)->count());
+        // …the guarded bill survives, still Local (khata trail intact)…
+        $row = DB::table('fbr_pos_transactions')->where('id', $guardedId)->first();
+        $this->assertNotNull($row, 'guarded rider bill must never be deleted');
+        $this->assertSame('local', $row->invoice_mode);
+        $this->assertSame('local', $row->fbr_status);
+        // …and the flash reports it exactly ONCE (not once per closed day).
+        $flash = session('success');
+        $this->assertStringContainsString(__('pos.dayclose_bills_rider_guarded', ['count' => 1]), $flash);
+        $this->assertStringNotContainsString(__('pos.dayclose_bills_rider_guarded', ['count' => 3]), $flash);
+    }
+
     /** 6: cashier without day-close rights cannot bulk-close. */
     public function test_cashier_without_rights_cannot_bulk_close(): void
     {
@@ -281,6 +332,10 @@ class FbrPosDayCloseBulkCloseTest extends TestCase
             $t->decimal('total_amount', 12, 2)->default(0);
             $t->string('payment_method')->nullable();
             $t->unsignedBigInteger('created_by')->nullable();
+            // Rider-khata delete-guard columns (Tasks 690/694).
+            $t->unsignedBigInteger('rider_id')->nullable();
+            $t->unsignedBigInteger('rider_settlement_id')->nullable();
+            $t->string('delivery_status')->nullable();
             $t->timestamps();
         });
 

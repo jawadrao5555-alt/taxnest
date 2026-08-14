@@ -606,6 +606,14 @@ class FbrPosController extends Controller
     private int $lastWashGuarded = 0;
 
     /**
+     * IDs of the guarded rows above (this close only). Task 694: FBR guarded
+     * bills STAY Local (no archive), so a multi-day bulk run re-selects the
+     * SAME bill on every later day's ≤date wash — the bulk flash must union
+     * these IDs across days or it would count one spared bill many times.
+     */
+    private array $lastWashGuardedIds = [];
+
+    /**
      * AUTO-FINALIZE SWEEP ('finalize' pending-bill policy — FBR mirror of the PRA
      * 'Khud Final' option, Aug 2026). Promotes every pending provisional bill
      * (invoice_mode='local' + fbr_status='local', created on or before the close
@@ -789,7 +797,10 @@ class FbrPosController extends Controller
                 ->filter(fn ($t) => ($billActions[(int) $t->id] ?? $provAction) === 'delete');
             // Task 690: count the guarded rows so the success flash can tell
             // the cashier why they were NOT deleted (khata trail survives).
-            $this->lastWashGuarded = $pickedForDelete->filter($guard)->count();
+            // Task 694: keep their IDs too — guarded bills stay Local, so a
+            // bulk run's later days re-select them; the bulk flash de-dupes.
+            $this->lastWashGuardedIds = $pickedForDelete->filter($guard)->pluck('id')->map(fn ($id) => (int) $id)->all();
+            $this->lastWashGuarded = count($this->lastWashGuardedIds);
             $ids = $pickedForDelete->reject($guard)->pluck('id');
             if ($ids->isNotEmpty()) {
                 \DB::transaction(function () use ($ids, $companyId) {
@@ -4718,6 +4729,11 @@ class FbrPosController extends Controller
 
         $closed = 0;
         $zeroDays = 0;
+        // Task 694: rider-khata delete-guard accumulated din-ba-din as a
+        // UNIQUE ID set — guarded bills stay Local (no archive on FBR), so the
+        // ≤date wash of every LATER day re-selects the same spared bill; a
+        // plain sum would count it once per day. Union of IDs = honest count.
+        $riderGuardedIds = [];
         // Task 684 (FBR mirror of the PRA bulk-close guard, ZFC waqia follow-up):
         // undispatched delivery bills block PER-DAY — the blocker day (and,
         // cumulatively, every later day: the summary is ≤date) is SKIPPED while
@@ -4752,10 +4768,21 @@ class FbrPosController extends Controller
                     ]);
                     continue;
                 }
+                // Task 694: the wash resets the guarded props only when the
+                // delete branch actually runs — clear them here so a day that
+                // skips the wash can never re-count the previous day's figure.
+                $this->lastWashGuarded = 0;
+                $this->lastWashGuardedIds = [];
                 $report = $this->performDayClose($companyId, $day, $user?->id, null, null, true);
                 if ($report) {
                     $closed++;
                     $closedThisPass++;
+                    // Task 694: union this day's guarded IDs before the next
+                    // performDayClose resets the prop — set semantics so a
+                    // bill re-guarded on later days is still counted ONCE.
+                    foreach ($this->lastWashGuardedIds as $gid) {
+                        $riderGuardedIds[$gid] = true;
+                    }
                     if ((int) ($report->total_invoices ?? 0) === 0) {
                         $zeroDays++;
                     }
@@ -4772,6 +4799,12 @@ class FbrPosController extends Controller
         $sweep = $this->lastFinalizeSweep;
         if (($sweep['finalized'] ?? 0) > 0) {
             $msg .= __('pos.dayclose_bills_finalized', ['count' => $sweep['finalized']]);
+        }
+        // Task 694 (parity with the single close, Task 690): rider-khata
+        // delete-guard — UNIQUE bills picked for delete but spared (kept
+        // Local) because rider cash is still unsettled.
+        if (!empty($riderGuardedIds)) {
+            $msg .= __('pos.dayclose_bills_rider_guarded', ['count' => count($riderGuardedIds)]);
         }
         // Task 684: say WHY skipped days remain — undispatched delivery bills.
         if (!empty($skippedDel)) {

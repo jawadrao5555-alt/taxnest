@@ -10273,6 +10273,11 @@ class PosController extends Controller
         $zeroDays = 0;
         $archived = 0;
         $deleted = 0;
+        // Task 694: rider-khata delete-guard count accumulated across ALL
+        // closed days — same 'spared because rider cash unsettled' line the
+        // single close shows (Task 690), so the bulk flash explains why some
+        // local bills were archived instead of deleted.
+        $riderGuarded = 0;
         // Task 684 (ZFC waqia follow-up): undispatched delivery bills now block
         // PER-DAY, not the whole bulk run — days BEFORE the blocker still close
         // (the summary is cumulative ≤date, so a blocker on day D skips D and
@@ -10317,6 +10322,9 @@ class PosController extends Controller
                     $closedThisPass++;
                     $archived += $result['archived'];
                     $deleted += $result['deleted'] ?? 0;
+                    // Task 694: per-day rider-guarded count rides in the same
+                    // Z-report local_summary the single close reads (Task 690).
+                    $riderGuarded += array_sum(array_column($result['summary'] ?? [], 'rider_guarded'));
                     if ((int) ($result['report']->total_invoices ?? 0) === 0) {
                         $zeroDays++;
                     }
@@ -10334,6 +10342,11 @@ class PosController extends Controller
         }
         if ($deleted > 0) {
             $msg .= __('pos.dayclose_bills_deleted', ['count' => $deleted]);
+        }
+        // Task 694: rider-khata delete-guard — bills picked for delete but
+        // spared (archived instead) because rider cash is still unsettled.
+        if ($riderGuarded > 0) {
+            $msg .= __('pos.dayclose_bills_rider_guarded', ['count' => $riderGuarded]);
         }
         // Task 684: say WHY skipped days remain — undispatched delivery bills.
         if (!empty($skippedDel)) {

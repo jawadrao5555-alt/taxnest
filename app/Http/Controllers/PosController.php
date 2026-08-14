@@ -232,6 +232,7 @@ class PosController extends Controller
                 'rp_printer_size' => 'nullable|in:80mm,58mm',
                 'rp_logo_style' => 'nullable|in:side,center',
                 'rp_receipt_theme' => 'nullable|in:' . implode(',', \App\Support\PosReceiptThemes::keys()),
+                'rp_kot_theme' => 'nullable|in:' . implode(',', \App\Support\PosKotThemes::keys()),
                 'rp_pdf_paper' => 'nullable|in:thermal,a4',
                 'rp_order_match' => 'nullable|in:off,token,code',
                 'rp_pra_number_style' => 'nullable|in:serial,token',
@@ -335,10 +336,27 @@ class PosController extends Controller
                     $companyUpdates['kot_left_margin_mm'] = max(0, min(30, (int) $request->input('rp_left_margin_mm')));
                 }
             }
-            // KOT ka apna alag margin (Pizza Master, 11 Aug 2026): receipt-settings se
-            // bhi KOT position set ho sakti hai — kitchen-settings wale hi kot_* columns
-            // (us page ki save bhi inhi par likhti hai; aakhri save jeet-ti hai).
-            if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_align_center')
+            // KOT theme preset (Task 716): the form now submits a named preset
+            // (rp_kot_theme) that PosKotThemes maps onto the SAME kot_compact +
+            // kot_align_center columns. Re-saving the already-active preset is a
+            // no-op on the stored pair (a shop's exact combo — e.g. compact AND
+            // centered set from kitchen-settings — survives a settings re-save).
+            // Legacy fallback: an old cached form (or scripted POST) that still
+            // sends rp_kot_align_center / rp_kot_compact keeps working; a POST
+            // with none of these leaves the company's current pair untouched.
+            $kotTheme = $request->input('rp_kot_theme');
+            if (\App\Support\PosKotThemes::isValid($kotTheme)) {
+                $kotPair = \App\Support\PosKotThemes::apply($kotTheme, [
+                    'compact' => (bool) ($company->kot_compact ?? false),
+                    'align'   => (bool) ($company->kot_align_center ?? false),
+                ]);
+                if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_compact')) {
+                    $companyUpdates['kot_compact'] = $kotPair['compact'];
+                }
+                if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_align_center')) {
+                    $companyUpdates['kot_align_center'] = $kotPair['align'];
+                }
+            } elseif (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_align_center')
                 && $request->filled('rp_kot_align_center')) {
                 $companyUpdates['kot_align_center'] = (bool) ((int) $request->input('rp_kot_align_center'));
             }
@@ -357,7 +375,13 @@ class PosController extends Controller
             // KOT Print Style toggles (Aug 2026): also saveable from receipt-settings
             // so shops without the kitchen module can still control their KOT layout.
             // Uses rp_kot_* prefix + hidden=0/checkbox=1 pattern (same as kitchen-settings).
+            // Task 716: kot_compact ab theme preset se aata hai — legacy
+            // rp_kot_compact sirf tab mana jata hai jab koi valid theme na ho
+            // (warna purana cached form theme ka faisla ulat deta).
             foreach (['kot_compact', 'kot_show_customer', 'kot_show_orderby', 'kot_show_barcode', 'kot_show_footer', 'kot_show_kitchen_notes'] as $kotFlag) {
+                if ($kotFlag === 'kot_compact' && \App\Support\PosKotThemes::isValid($kotTheme)) {
+                    continue;
+                }
                 if (\Illuminate\Support\Facades\Schema::hasColumn('companies', $kotFlag)
                     && $request->has('rp_' . $kotFlag)) {
                     $companyUpdates[$kotFlag] = (bool) $request->input('rp_' . $kotFlag);

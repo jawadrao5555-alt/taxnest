@@ -256,14 +256,71 @@
         {{-- KOT Print Style (Aug 2026): same toggles as Kitchen Settings — exposed
              here too so shops without the kitchen module can control their KOT layout.
              Uses rp_kot_* prefix; PosController saves them to the same company columns. --}}
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md">
+        {{-- KOT theme cards (Task 716): the old Compact toggle + align select are
+             replaced by named preset cards mapping onto the SAME kot_compact /
+             kot_align_center columns via App\Support\PosKotThemes (no template
+             fork; kitchen-settings keeps writing the raw columns — last save
+             wins, and resolve() pre-selects the right card either way). --}}
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md"
+             x-data='{ kotTheme: @json(\App\Support\PosKotThemes::resolve(['compact' => $company->kot_compact ?? false, 'align' => $company->kot_align_center ?? false])) }'>
             <div class="p-5 border-b border-gray-200 dark:border-gray-700">
                 <h3 class="text-sm font-bold text-gray-900 dark:text-white">🎫 {{ __('pos.kot_print_style') }}</h3>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.kot_print_style_hint') }}</p>
             </div>
+            <div class="p-5 border-b border-gray-200 dark:border-gray-700">
+                <label class="block text-sm font-semibold text-gray-900 dark:text-white mb-0.5">{{ __('pos.kot_theme_pick') }}</label>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ __('pos.kot_theme_pick_hint') }}</p>
+                <input type="hidden" name="rp_kot_theme" :value="kotTheme">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    @foreach(\App\Support\PosKotThemes::THEMES as $ktKey => $ktDef)
+                    <button type="button" @click="kotTheme = '{{ $ktKey }}'"
+                            :class="kotTheme === '{{ $ktKey }}' ? 'border-purple-500 bg-purple-50/60 dark:bg-purple-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700'"
+                            class="relative w-full rounded-xl border-2 p-3 text-left transition">
+                        <span x-show="kotTheme === '{{ $ktKey }}'" x-cloak
+                              class="absolute top-2 right-2 w-5 h-5 rounded-full bg-purple-600 text-white flex items-center justify-center">
+                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                        </span>
+
+                        {{-- Mini KOT sample — pure inline styles (no build needed). The
+                             outer strip is the PAPER; the inner block is the ticket, so
+                             the left/center position is visible at a glance. --}}
+                        <span class="block" style="background:#f3f4f6;border:1px solid #d1d5db;border-radius:4px;padding:6px;width:96px;margin:0 auto;">
+                            @if($ktKey === 'center')
+                            <span style="display:block;width:72%;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:3px;padding:5px 6px;">
+                                <span style="display:block;height:5px;background:#111827;border-radius:2px;width:80%;margin:0 auto 3px;"></span>
+                                <span style="display:block;border-top:1px dashed #9ca3af;margin:3px 0;"></span>
+                                <span style="display:block;height:3px;background:#374151;border-radius:2px;width:100%;margin-bottom:3px;"></span>
+                                <span style="display:block;height:3px;background:#374151;border-radius:2px;width:100%;margin-bottom:3px;"></span>
+                                <span style="display:block;height:3px;background:#374151;border-radius:2px;width:85%;margin:0 auto;"></span>
+                            </span>
+                            @elseif($ktKey === 'compact')
+                            <span style="display:block;width:72%;margin-right:auto;background:#fff;border:1px solid #e5e7eb;border-radius:3px;padding:4px 5px;">
+                                <span style="display:block;height:4px;background:#111827;border-radius:2px;width:70%;margin-bottom:2px;"></span>
+                                <span style="display:block;border-top:1px dashed #9ca3af;margin:2px 0;"></span>
+                                <span style="display:block;height:2px;background:#374151;border-radius:2px;width:100%;margin-bottom:2px;"></span>
+                                <span style="display:block;height:2px;background:#374151;border-radius:2px;width:100%;margin-bottom:2px;"></span>
+                                <span style="display:block;height:2px;background:#374151;border-radius:2px;width:100%;margin-bottom:2px;"></span>
+                                <span style="display:block;height:2px;background:#374151;border-radius:2px;width:90%;"></span>
+                            </span>
+                            @else
+                            <span style="display:block;width:72%;margin-right:auto;background:#fff;border:1px solid #e5e7eb;border-radius:3px;padding:5px 6px;">
+                                <span style="display:block;height:5px;background:#111827;border-radius:2px;width:80%;margin-bottom:3px;"></span>
+                                <span style="display:block;border-top:1px dashed #9ca3af;margin:3px 0;"></span>
+                                <span style="display:block;height:3px;background:#374151;border-radius:2px;width:100%;margin-bottom:3px;"></span>
+                                <span style="display:block;height:3px;background:#374151;border-radius:2px;width:100%;margin-bottom:3px;"></span>
+                                <span style="display:block;height:3px;background:#374151;border-radius:2px;width:85%;"></span>
+                            </span>
+                            @endif
+                        </span>
+
+                        <span class="block text-sm font-bold text-gray-900 dark:text-white mt-2.5 text-center">{{ __($ktDef['label']) }}</span>
+                        <span class="block text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 text-center leading-snug">{{ __($ktDef['hint']) }}</span>
+                    </button>
+                    @endforeach
+                </div>
+            </div>
             <div class="divide-y divide-gray-200 dark:divide-gray-700">
                 @foreach([
-                    ['rp_kot_compact',             'pos.compact_kot',                  'pos.compact_kot_hint',                  $company->kot_compact ?? false],
                     ['rp_kot_show_customer',        'pos.show_customer_name',            'pos.show_customer_name_hint',           $company->kot_show_customer ?? true],
                     ['rp_kot_show_orderby',         'pos.show_order_by_item_count',      'pos.show_order_by_item_count_hint',     $company->kot_show_orderby ?? true],
                     ['rp_kot_show_barcode',         'pos.show_barcode',                  'pos.show_barcode_hint',                 $company->kot_show_barcode ?? true],
@@ -284,21 +341,17 @@
                 @endforeach
                 {{-- KOT ki APNI print position (Pizza Master, 11 Aug 2026): receipts
                      wale margin se bilkul alag — kitchen-settings wale hi kot_*
-                     columns likhta hai (aakhri save jeet-ti hai). --}}
+                     columns likhta hai (aakhri save jeet-ti hai). Task 716: left/center
+                     ab upar wale theme cards se aata hai; yahan sirf fine-tune margin. --}}
                 <div class="p-5">
                     <label class="block text-sm font-semibold text-gray-900 dark:text-white mb-0.5">📐 {{ __('pos.kot_print_position') }}</label>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ __('pos.kot_print_position_hint') }}</p>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <select name="rp_kot_align_center" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-purple-500 focus:ring-purple-500">
-                                <option value="0" {{ !($company->kot_align_center ?? false) ? 'selected' : '' }}>{{ __('pos.print_pos_left_edge') }}</option>
-                                <option value="1" {{ ($company->kot_align_center ?? false) ? 'selected' : '' }}>{{ __('pos.print_pos_center') }}</option>
-                            </select>
-                        </div>
-                        <div>
                             <label class="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">{{ __('pos.left_margin_mm') }}</label>
                             <input type="number" name="rp_kot_left_margin_mm" min="0" max="30" step="1" value="{{ (int) ($company->kot_left_margin_mm ?? 0) }}"
                                    class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-purple-500 focus:ring-purple-500">
+                            <p class="text-[11px] text-gray-400 mt-1">{{ __('pos.left_margin_mm_hint') }}</p>
                         </div>
                     </div>
                 </div>

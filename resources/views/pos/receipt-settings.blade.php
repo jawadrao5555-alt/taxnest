@@ -1,5 +1,5 @@
 <x-pos-layout>
-<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div class="max-w-3xl lg:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     <a href="{{ route('pos.customize') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition mb-3">
         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
         {{ __('pos.back_to_customize') }}
@@ -30,8 +30,41 @@
         $rp = $company->posReceiptPrefs('pra');
         $lp = $company->posReceiptPrefs('local');
         $ps = $company->posReceiptStyle();
+        // Receipt Themes + live preview (Task 712): Alpine state shared by the
+        // form (tab switcher + theme cards) AND the sticky preview aside — so
+        // x-data moves from the <form> to the wrapper div below. Config is
+        // UTF-8-safe encoded (footer text is user content; a bad byte must
+        // never kill the whole page's Alpine scope — see replit.md pitfalls).
+        $rcptThemeCfg = json_encode([
+            'theme'  => \App\Support\PosReceiptThemes::resolve($ps),
+            'themes' => \App\Support\PosReceiptThemes::clientMap(),
+            'mode'   => 'pra',
+            'live'   => true,
+            'formId' => 'rcptSettingsForm',
+            'paper'  => ($company->receipt_printer_size ?? '80mm') === '58mm' ? '58mm' : '80mm',
+            'prefs'  => [
+                'address' => (bool) $rp['show_address'],
+                'ntn' => (bool) $rp['show_ntn'],
+                'email' => (bool) $rp['show_email'],
+                'phone' => (bool) $rp['show_mobile'],
+                'cashier' => (bool) $rp['show_cashier'],
+                'bizname' => (bool) ($rp['show_business_name'] ?? true),
+                'devby' => (bool) ($rp['show_developed_by'] ?? true),
+                'footer' => (bool) $rp['show_footer'],
+                'footerText' => (string) ($rp['footer_text'] ?? ''),
+                'tax' => (bool) $rp['show_tax'],
+                'logo' => (bool) ($ps['show_logo'] ?? true),
+                'logoFinalsOnly' => (bool) ($ps['logo_finals_only'] ?? false),
+                'menuQr' => (bool) ($ps['show_menu_qr'] ?? true),
+                'orderMatch' => in_array($company->order_match_style ?? 'off', ['off', 'token', 'code'], true) ? ($company->order_match_style ?? 'off') : 'off',
+            ],
+        ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}';
     @endphp
-    <form method="POST" action="{{ route('pos.receipt-settings') }}" class="space-y-6" x-data="{ tab: 'pra' }">
+    {{-- NOTE: x-data attribute MUST be single-quoted — the config JSON's structural
+         double quotes would terminate a double-quoted attribute (JSON_HEX_APOS
+         escapes any apostrophes inside string values). --}}
+    <div class="lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start" x-data='rcptThemePicker({!! $rcptThemeCfg !!})'>
+    <form method="POST" action="{{ route('pos.receipt-settings') }}" class="space-y-6 lg:col-span-3" id="rcptSettingsForm">
         @csrf
 
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md overflow-hidden">
@@ -388,26 +421,17 @@
             </label>
         </div>
 
-        {{-- Print Style (customer feedback Jul 2026 — Pizza Master): GLOBAL like
-             paper size — it's the printer/brand look, not a bill-type setting.
-             Applies to both PRA and Local receipts. --}}
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-6 space-y-5">
-            <h3 class="text-sm font-bold text-gray-900 dark:text-white">🖋️ {{ __('pos.receipt_print_style') }} <span class="text-xs font-normal text-gray-500 dark:text-gray-400">{{ __('pos.applies_both_receipt_types') }}</span></h3>
-            <label class="flex items-start gap-2.5 cursor-pointer p-3 rounded-lg border {{ $ps['bold'] ? 'border-purple-400 bg-purple-50/40 dark:bg-purple-900/10' : 'border-gray-200 dark:border-gray-700' }} transition">
-                <input type="checkbox" name="rp_style_bold" value="1" {{ $ps['bold'] ? 'checked' : '' }} class="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4">
-                <span class="flex-1 min-w-0">
-                    <span class="block text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.bold_receipt_print') }}</span>
-                    <span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.bold_receipt_hint') }}</span>
-                </span>
-            </label>
-            <div>
-                <label class="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">{{ __('pos.logo_style_on_receipt') }}</label>
-                <select name="rp_logo_style" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-purple-500 focus:ring-purple-500">
-                    <option value="side" {{ $ps['logo'] === 'side' ? 'selected' : '' }}>{{ __('pos.logo_style_compact') }}</option>
-                    <option value="center" {{ $ps['logo'] === 'center' ? 'selected' : '' }}>{{ __('pos.logo_style_large') }}</option>
-                </select>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.logo_style_hint') }}</p>
-            </div>
+        {{-- Receipt Theme (Task 712): named bundles over the same pos_style
+             bold/logo keys the old bold-toggle + logo-select (rp_style_bold /
+             rp_logo_style) wrote — the save path still accepts those legacy
+             fields from old cached forms. GLOBAL like paper size — applies to
+             both PRA and Local receipts. Cards + live preview aside share the
+             wrapper's rcptThemePicker() Alpine scope. --}}
+        @include('pos.partials.receipt-theme-cards', ['accent' => 'purple'])
+
+        {{-- Live preview on small screens (the lg aside is hidden there) --}}
+        <div class="lg:hidden">
+            @include('pos.partials.receipt-theme-preview', ['company' => $company, 'mode' => 'pra'])
         </div>
 
         <div class="flex items-center justify-between gap-3">
@@ -420,6 +444,13 @@
             </button>
         </div>
     </form>
+
+    {{-- Sticky live preview (desktop) — updates instantly on theme select AND
+         on every print toggle above, before save (Task 712). --}}
+    <div class="hidden lg:block lg:col-span-2 lg:sticky lg:top-4">
+        @include('pos.partials.receipt-theme-preview', ['company' => $company, 'mode' => 'pra'])
+    </div>
+    </div>
 
     {{-- Direct Print guide (owner request Jul 2026): browsers ALWAYS show a print
          dialog from JavaScript — the ONLY reliable no-dialog path is the browser's

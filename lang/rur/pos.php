@@ -4561,4 +4561,16 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'khata_card_tax' => 'Card par tax',
     'khata_exempt_items' => 'Exempt items (bill ke andar)',
     'khata_exempt_bills' => 'Exempt bills',
+    // Task 712: Receipt Themes picker + live preview (PRA + FBR receipt-settings)
+    'rcpt_theme_section' => 'Receipt Theme',
+    'rcpt_theme_section_sub' => 'Apne chhape bill ka andaz chunein — live preview foran badalta hai; save se pehle kuch nahi badalta.',
+    'rcpt_theme_pizza_bold' => 'Pizza Master / Bold',
+    'rcpt_theme_pizza_bold_hint' => 'Poora bill bold + bada darmiyani logo (default)',
+    'rcpt_theme_bold_side' => 'Bold Side-Logo',
+    'rcpt_theme_bold_side_hint' => 'Poora bill bold + naam ke saath chhota logo',
+    'rcpt_theme_saada' => 'Saada (Plain)',
+    'rcpt_theme_saada_hint' => 'Halki chhapai — sirf headings aur total bold',
+    'rcpt_preview_title' => 'Live Preview',
+    'rcpt_preview_sub' => 'Namoona receipt — theme ya print toggle badalte hi foran badal jati hai.',
+    'rcpt_preview_sample_note' => 'Yeh namoona data hai — asal bill aap ki apni items aur raqam ke saath chapta hai.',
 ];

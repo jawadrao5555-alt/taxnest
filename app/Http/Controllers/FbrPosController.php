@@ -2759,7 +2759,8 @@ class FbrPosController extends Controller
         if ($request->isMethod('post')) {
             $request->validate([
                 'rp_style_bold'   => 'nullable|in:1',
-                'rp_logo_style'   => 'required|in:side,center',
+                'rp_logo_style'   => 'nullable|in:side,center',
+                'rp_receipt_theme' => 'nullable|in:' . implode(',', \App\Support\PosReceiptThemes::keys()),
                 'rp_order_match'  => 'nullable|in:off,token,code',
                 'rp_print_confirm' => 'nullable|in:1',
             ]);
@@ -2769,8 +2770,20 @@ class FbrPosController extends Controller
 
             // Preserve keys we don't touch on this page (show_logo, logo_finals_only,
             // show_menu_qr, pdf_paper) so saving here never clobbers PRA settings.
-            $style['bold'] = $request->has('rp_style_bold');
-            $style['logo'] = $request->input('rp_logo_style', 'center');
+            // Receipt Themes (Task 712): the form submits a named theme mapped by
+            // PosReceiptThemes (single truth, shared with PRA receipt-settings) onto
+            // the same bold/logo keys; re-saving the active theme never rewrites the
+            // stored pair. Legacy rp_style_bold/rp_logo_style POSTs keep working; a
+            // POST with neither leaves the company's current pair untouched.
+            $theme = $request->input('rp_receipt_theme');
+            if (\App\Support\PosReceiptThemes::isValid($theme)) {
+                $pair = \App\Support\PosReceiptThemes::apply($theme, $company->posReceiptStyle());
+                $style['bold'] = $pair['bold'];
+                $style['logo'] = $pair['logo'];
+            } elseif ($request->filled('rp_logo_style') || $request->has('rp_style_bold')) {
+                $style['bold'] = $request->has('rp_style_bold');
+                $style['logo'] = $request->input('rp_logo_style', 'center') === 'side' ? 'side' : 'center';
+            }
 
             $prefs['pos_style'] = $style;
             $company->invoice_display_prefs = $prefs;

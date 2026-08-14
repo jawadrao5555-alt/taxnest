@@ -4560,4 +4560,16 @@ return [
     'khata_card_tax' => 'کارڈ پر ٹیکس',
     'khata_exempt_items' => 'چھوٹ والی اشیا (بل کے اندر)',
     'khata_exempt_bills' => 'چھوٹ والے بل',
+    // Task 712: Receipt Themes picker + live preview (PRA + FBR receipt-settings)
+    'rcpt_theme_section' => 'رسید کی تھیم',
+    'rcpt_theme_section_sub' => 'اپنے چھپے بل کا انداز چنیں — جھلک فوراً بدلتی ہے؛ محفوظ کرنے سے پہلے کچھ نہیں بدلتا۔',
+    'rcpt_theme_pizza_bold' => 'پیزا ماسٹر / بولڈ',
+    'rcpt_theme_pizza_bold_hint' => 'پورا بل بولڈ + بڑا درمیانی لوگو (طے شدہ)',
+    'rcpt_theme_bold_side' => 'بولڈ سائیڈ لوگو',
+    'rcpt_theme_bold_side_hint' => 'پورا بل بولڈ + نام کے ساتھ چھوٹا لوگو',
+    'rcpt_theme_saada' => 'سادہ',
+    'rcpt_theme_saada_hint' => 'ہلکی چھپائی — صرف سرخیاں اور کل رقم بولڈ',
+    'rcpt_preview_title' => 'براہِ راست جھلک',
+    'rcpt_preview_sub' => 'نمونہ رسید — تھیم یا چھپائی کے بٹن بدلتے ہی فوراً بدل جاتی ہے۔',
+    'rcpt_preview_sample_note' => 'یہ نمونہ ڈیٹا ہے — اصل بل آپ کی اپنی اشیا اور رقم کے ساتھ چھپتا ہے۔',
 ];

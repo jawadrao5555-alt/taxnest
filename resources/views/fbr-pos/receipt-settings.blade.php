@@ -1,6 +1,35 @@
 <x-fbr-pos-layout>
-@php $ps = $company->posReceiptStyle(); @endphp
-<div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+@php
+    $ps = $company->posReceiptStyle();
+    // Receipt Themes + live preview (Task 712) — same definitions (single
+    // truth: PosReceiptThemes) and partials as PRA receipt-settings. FBR's
+    // display prefs live on the business-profile page, so the preview reads
+    // them STATICALLY from the saved fbrpos set; theme + order-match radios
+    // react live. UTF-8-safe encode (footer note is user content).
+    $rd = $company->displayPrefs('fbrpos');
+    $rcptThemeCfg = json_encode([
+        'theme'  => \App\Support\PosReceiptThemes::resolve($ps),
+        'themes' => \App\Support\PosReceiptThemes::clientMap(),
+        'mode'   => 'fbr',
+        'live'   => false,
+        'formId' => 'rcptSettingsForm',
+        'paper'  => ($company->print_paper_size ?? 'thermal') === 'thermal58' ? '58mm' : '80mm',
+        'prefs'  => [
+            'address' => (bool) $rd['show_address'],
+            'ntn' => (bool) $rd['show_ntn'],
+            'phone' => (bool) $rd['show_mobile'],
+            'cashier' => (bool) $rd['show_cashier'],
+            'bizname' => true,
+            'footer' => (bool) $rd['show_footer'],
+            'footerText' => '',
+            'tax' => true,
+            'logo' => (bool) ($ps['show_logo'] ?? true),
+            'logoFinalsOnly' => false,
+            'orderMatch' => in_array($company->order_match_style ?? 'off', ['off', 'token', 'code'], true) ? ($company->order_match_style ?? 'off') : 'off',
+        ],
+    ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}';
+@endphp
+<div class="max-w-2xl lg:max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     @include('fbr-pos.partials.back-link')
     <a href="{{ route('fbrpos.customize') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition mb-3">
         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
@@ -23,29 +52,21 @@
     </div>
     @endif
 
-    <form method="POST" action="{{ route('fbrpos.receipt-settings') }}" class="space-y-5">
+    {{-- NOTE: x-data attribute MUST be single-quoted — the config JSON's structural
+         double quotes would terminate a double-quoted attribute (JSON_HEX_APOS
+         escapes any apostrophes inside string values). --}}
+    <div class="lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start" x-data='rcptThemePicker({!! $rcptThemeCfg !!})'>
+    <form method="POST" action="{{ route('fbrpos.receipt-settings') }}" class="space-y-5 lg:col-span-3" id="rcptSettingsForm">
         @csrf
 
-        {{-- Bold toggle --}}
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
-            <label class="flex items-start gap-3 cursor-pointer p-3 rounded-lg border {{ $ps['bold'] ? 'border-blue-400 bg-blue-50/40 dark:bg-blue-900/10' : 'border-gray-200 dark:border-gray-700' }} transition">
-                <input type="checkbox" name="rp_style_bold" value="1" {{ $ps['bold'] ? 'checked' : '' }}
-                       class="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4">
-                <span class="flex-1 min-w-0">
-                    <span class="block text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.bold_receipt_print') }}</span>
-                    <span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.bold_receipt_hint') }}</span>
-                </span>
-            </label>
-        </div>
+        {{-- Receipt Theme cards (Task 712) — replaces the old bold toggle +
+             logo select; the save path still accepts legacy rp_style_bold /
+             rp_logo_style POSTs from old cached forms. --}}
+        @include('pos.partials.receipt-theme-cards', ['accent' => 'blue'])
 
-        {{-- Logo position --}}
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
-            <label class="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">{{ __('pos.logo_style_on_receipt') }}</label>
-            <select name="rp_logo_style" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 text-sm focus:border-blue-500 focus:ring-blue-500">
-                <option value="side"   {{ $ps['logo'] === 'side'   ? 'selected' : '' }}>{{ __('pos.logo_style_compact') }}</option>
-                <option value="center" {{ $ps['logo'] === 'center' ? 'selected' : '' }}>{{ __('pos.logo_style_large') }}</option>
-            </select>
-            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ __('pos.logo_style_hint') }}</p>
+        {{-- Live preview on small screens (the lg aside is hidden there) --}}
+        <div class="lg:hidden">
+            @include('pos.partials.receipt-theme-preview', ['company' => $company, 'mode' => 'fbr'])
         </div>
 
         {{-- Task 565: opt-in "Print se pehle poocho (Yes/No)" — shared flag with
@@ -99,5 +120,12 @@
             </button>
         </div>
     </form>
+
+    {{-- Sticky live preview (desktop) — theme + order-match react instantly;
+         FBR display prefs render from the saved fbrpos set (Task 712). --}}
+    <div class="hidden lg:block lg:col-span-2 lg:sticky lg:top-4">
+        @include('pos.partials.receipt-theme-preview', ['company' => $company, 'mode' => 'fbr'])
+    </div>
+    </div>
 </div>
 </x-fbr-pos-layout>

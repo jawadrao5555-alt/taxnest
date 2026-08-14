@@ -268,8 +268,18 @@ class PosReceiptStyleGuardTest extends TestCase
     {
         // The "absence = deliberate OFF" semantics of the PRA rebuild are only
         // safe because the form ALWAYS renders every style control.
-        $blade = file_get_contents(resource_path('views/pos/receipt-settings.blade.php'));
-        foreach (['rp_style_bold', 'rp_logo_style', 'rp_pdf_paper', 'rp_show_logo',
+        // Task 712: bold/logo are now submitted as a named theme (rp_receipt_theme);
+        // the legacy rp_style_bold/rp_logo_style fields left the blade but the
+        // controller still accepts them (old cached forms). The theme input is
+        // rendered by the shared cards partial included inside the form.
+        $blade = file_get_contents(resource_path('views/pos/receipt-settings.blade.php'))
+            . file_get_contents(resource_path('views/pos/partials/receipt-theme-cards.blade.php'));
+        $this->assertStringContainsString(
+            'pos.partials.receipt-theme-cards',
+            $blade,
+            'receipt-settings form must include the theme cards partial'
+        );
+        foreach (['rp_receipt_theme', 'rp_pdf_paper', 'rp_show_logo',
                   'rp_logo_finals_only', 'rp_show_menu_qr'] as $field) {
             $this->assertStringContainsString($field, $blade, "receipt-settings form must render {$field}");
         }

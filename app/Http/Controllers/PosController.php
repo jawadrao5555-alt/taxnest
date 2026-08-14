@@ -231,6 +231,7 @@ class PosController extends Controller
                 'lp_footer_text' => 'nullable|string|max:150',
                 'rp_printer_size' => 'nullable|in:80mm,58mm',
                 'rp_logo_style' => 'nullable|in:side,center',
+                'rp_receipt_theme' => 'nullable|in:' . implode(',', \App\Support\PosReceiptThemes::keys()),
                 'rp_pdf_paper' => 'nullable|in:thermal,a4',
                 'rp_order_match' => 'nullable|in:off,token,code',
                 'rp_pra_number_style' => 'nullable|in:serial,token',
@@ -265,9 +266,31 @@ class PosController extends Controller
             ];
             // Print Style (Pizza Master Jul 2026): GLOBAL like paper size — bold
             // whole-receipt font + logo size/placement. Applies to both bill types.
+            // Receipt Themes (Task 712): the form now submits a named theme
+            // (rp_receipt_theme) that PosReceiptThemes maps onto the SAME
+            // bold/logo keys. Re-saving the already-active theme is a no-op on
+            // the stored pair (plain opt-out shops keep their exact combo).
+            // Legacy fallback: an old cached form (or a scripted POST) that
+            // still sends rp_style_bold/rp_logo_style keeps working; a POST
+            // with NEITHER present leaves the company's current pair untouched.
+            $curStyle = $company->posReceiptStyle();
+            $theme = $request->input('rp_receipt_theme');
+            if (\App\Support\PosReceiptThemes::isValid($theme)) {
+                $styleBoldLogo = \App\Support\PosReceiptThemes::apply($theme, $curStyle);
+            } elseif ($request->filled('rp_logo_style') || $request->has('rp_style_bold')) {
+                $styleBoldLogo = [
+                    'bold' => $request->has('rp_style_bold'),
+                    'logo' => $request->input('rp_logo_style', 'side') === 'center' ? 'center' : 'side',
+                ];
+            } else {
+                $styleBoldLogo = [
+                    'bold' => (bool) ($curStyle['bold'] ?? true),
+                    'logo' => ($curStyle['logo'] ?? 'center') === 'side' ? 'side' : 'center',
+                ];
+            }
             $prefs['pos_style'] = [
-                'bold' => $request->has('rp_style_bold'),
-                'logo' => $request->input('rp_logo_style', 'side') === 'center' ? 'center' : 'side',
+                'bold' => $styleBoldLogo['bold'],
+                'logo' => $styleBoldLogo['logo'],
                 // PDF Download Paper (customer video Jul 2026): 'thermal' = exact
                 // roll-width PDF page (default); 'a4' = real A4 page, receipt strip
                 // top-left — fixes right-shifted/clipped prints on office printers.

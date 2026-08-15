@@ -437,12 +437,25 @@ HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$LIVE_URL/")
 echo "GET $LIVE_URL/ -> $HTTP_CODE"
 [ "$HTTP_CODE" = "200" ] || fail "homepage returned $HTTP_CODE after deploy — investigate immediately (live log: storage/logs/laravel.log)"
 
-step "Verify: no fresh production errors in live log"
-FRESH_ERRORS=$(run_ssh "cd $LIVE_DIR && grep 'production.ERROR' storage/logs/laravel.log 2>/dev/null | grep \"\$(date +%Y-%m-%d)\" | tail -5" 2>/dev/null || true)
-if [ -n "$FRESH_ERRORS" ]; then
-  echo "NOTE: today's production.ERROR lines (may be pre-existing noise, e.g. 02:00 Compliance cron):"
-  echo "$FRESH_ERRORS"
+step "Verify: no fresh production errors in live log (probe-aware triage)"
+# Task 734: classify errors WITH stack frames — /tmp/*.php or "Command line
+# code" frames = manual CLI probe, NOT app error / schema drift. Twice such
+# probes were mistaken for drift and spawned phantom fix-tasks (Task 729).
+# Fetch to a temp file FIRST and check the SSH exit status — never let a
+# failed fetch masquerade as a clean "APP ERRORS: 0" triage. First line of
+# the fetch = the LIVE server's date, so "today" matches the server TZ.
+TRIAGE_TMP=$(mktemp)
+if run_ssh "cd $LIVE_DIR && date +%Y-%m-%d && tail -c 2000000 storage/logs/laravel.log" \
+     > "$TRIAGE_TMP" 2>/dev/null && [ -s "$TRIAGE_TMP" ]; then
+  LIVE_DAY=$(head -1 "$TRIAGE_TMP")
+  TRIAGE=$(tail -n +2 "$TRIAGE_TMP" | bash scripts/live-error-triage.sh "$LIVE_DAY") || true
+  echo "NOTE: today's live error triage (APP ERRORS may still be pre-existing noise, e.g. 02:00 Compliance cron;"
+  echo "      CLI PROBE entries are someone's /tmp probe script — NOT drift, do NOT open fix-tasks for them):"
+  echo "$TRIAGE"
+else
+  echo "!!! WARNING: error triage could not run (SSH/log fetch failed or empty log) — check storage/logs/laravel.log manually. !!!" >&2
 fi
+rm -f "$TRIAGE_TMP"
 
 check_live_logging
 post_deploy_screen_smoke

@@ -90,6 +90,56 @@
         </tr>
     </table>
 
+    @php
+        // Payment breakdown — only shown when there are ≥2 rows (single-method
+        // bills don't need a breakdown) and the relation was loaded (schema-guarded
+        // in the controller). No PII: payment method label + amount only.
+        $billPayments = [];
+        try {
+            if ($transaction->relationLoaded('payments')) {
+                $rawPayments = $transaction->payments ?? collect();
+                if ($rawPayments->count() >= 2) {
+                    // Bucket aliases so the customer sees a friendly label.
+                    $cardAliases = ['card', 'debit_card', 'credit_card'];
+                    $methodLabel = function(string $m) use ($cardAliases): string {
+                        if ($m === 'cash')                      return __('pos.receipt_pay_cash');
+                        if (in_array($m, $cardAliases, true))  return __('pos.receipt_pay_card');
+                        return __('pos.receipt_pay_other');
+                    };
+                    // Group by bucket so debit_card + card collapse into one row.
+                    $grouped = [];
+                    foreach ($rawPayments as $p) {
+                        $bucket = $p->payment_method === 'cash' ? 'cash'
+                            : (in_array($p->payment_method, $cardAliases, true) ? 'card' : ('other:'.$p->payment_method));
+                        $grouped[$bucket] = ($grouped[$bucket] ?? 0) + (float) $p->amount;
+                    }
+                    foreach ($grouped as $bucket => $amount) {
+                        $rawMethod = $bucket === 'cash' ? 'cash'
+                            : (str_starts_with($bucket, 'other:') ? substr($bucket, 6) : 'debit_card');
+                        $billPayments[] = ['label' => $methodLabel($rawMethod), 'amount' => $amount];
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            $billPayments = [];
+        }
+    @endphp
+    @if(count($billPayments) >= 2)
+    <table class="totals" style="margin-top:6px; border-top:1px dashed #e5e7eb; padding-top:4px;">
+        <tr>
+            <td colspan="2" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;padding-bottom:2px;">
+                {{ __('pos.payment_breakdown') }}
+            </td>
+        </tr>
+        @foreach($billPayments as $pay)
+        <tr>
+            <td style="font-size:13px;">{{ $pay['label'] }}</td>
+            <td class="num" style="font-size:13px;">Rs {{ number_format($pay['amount'], 0) }}</td>
+        </tr>
+        @endforeach
+    </table>
+    @endif
+
     @if($menuUrl)
     <a class="menu-link" href="{{ $menuUrl }}">{{ __('pos.receipt_scan_menu') }} &rarr;</a>
     @endif

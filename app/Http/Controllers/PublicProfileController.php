@@ -134,9 +134,20 @@ class PublicProfileController extends Controller
             abort(404);
         }
 
+        // Schema-guarded payments load — pos_payments table may not exist on
+        // older installs; silently omit the breakdown rather than 500ing.
+        $withRelations = ['items'];
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('pos_payments')) {
+                $withRelations[] = 'payments';
+            }
+        } catch (\Throwable $e) {
+            // ignore — schema not yet applied
+        }
+
         $transaction = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
             ->where('share_token', $token)
-            ->with('items')
+            ->with($withRelations)
             ->first();
         if (!$transaction) {
             abort(404);

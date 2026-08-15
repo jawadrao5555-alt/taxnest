@@ -53,10 +53,34 @@ class AgentController extends Controller
             if (!$zip) {
                 return null;
             }
+            $zipUrl = $zip['url'];
+
+            // Transition shim (Aug 2026): releases moved to the public releases-only
+            // repo (nestpos-releases) so the main source repo can go private.
+            // Agents < 1.7.0 host-pin ONLY the old taxnest repo and silently reject
+            // any other zip_url, so for them we rewrite the download URL back to the
+            // OLD repo, where every transition release is published with identical assets.
+            //
+            // Remove this shim once every live agent (companies.agent_version where
+            // agent_last_seen is recent) is >= 1.7.0. While the shim is active, the
+            // old taxnest repo MUST remain public (or the transition releases republished
+            // elsewhere) — agents < 1.7.0 download directly from that URL.
+            // Shops to watch: ZFC PIZZA POINT (company 28, v1.6.2) and X-WAY SHOES
+            // (company 27, v1.6.1).
+            $legacy = true;
+            if ($agentVersion && preg_match('/^v?(\d+)\.(\d+)\.(\d+)/', trim($agentVersion), $av)) {
+                $legacy = version_compare("{$av[1]}.{$av[2]}.{$av[3]}", '1.7.0', '<');
+            }
+            $newPrefix = 'https://github.com/jawadrao5555-alt/nestpos-releases/releases/download/';
+            $oldPrefix = 'https://github.com/jawadrao5555-alt/taxnest/releases/download/';
+            if ($legacy && str_starts_with($zipUrl, $newPrefix)) {
+                $zipUrl = $oldPrefix . substr($zipUrl, strlen($newPrefix));
+            }
+
             return [
                 'version' => $m[1] . '.' . $m[2] . '.' . $m[3],
                 'tag' => $tag,
-                'zip_url' => $zip['url'],
+                'zip_url' => $zipUrl,
                 'zip_size' => $zip['size'] ?? 0,
             ];
         } catch (\Throwable $e) {

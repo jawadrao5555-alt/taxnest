@@ -4444,7 +4444,16 @@ class PosController extends Controller
         }
 
         if ($request->filled('payment_method')) {
-            $query->where('payment_method', $request->payment_method);
+            $method = $request->payment_method;
+            // Legacy rows carry 'card' (before the write-path was normalised to
+            // 'debit_card'). Both values mean the same thing to the shopkeeper,
+            // so selecting Debit Card must surface both. Use the canonical alias
+            // set from PosPaymentBuckets as the single source of truth.
+            if ($method === 'debit_card') {
+                $query->whereIn('payment_method', ['debit_card', 'card']);
+            } else {
+                $query->where('payment_method', $method);
+            }
         }
 
         // Wastage filter (Task 593): only wastage-flagged return bills —
@@ -5096,7 +5105,14 @@ class PosController extends Controller
         }
 
         if ($request->filled('payment_method')) {
-            $query->where('payment_method', $request->payment_method);
+            $method = $request->payment_method;
+            // Legacy rows carry 'card' (pre-normalisation alias for 'debit_card').
+            // Surface both when the user selects Debit Card.
+            if ($method === 'debit_card') {
+                $query->whereIn('payment_method', ['debit_card', 'card']);
+            } else {
+                $query->where('payment_method', $method);
+            }
         }
 
         if ($request->filled('customer')) {

@@ -541,7 +541,54 @@ class PosPaymentBucketsTest extends TestCase
         $this->assertSame(510.0, array_sum(array_column($breakdown, 'total')), 'PRA-set day total (no local bill)');
     }
 
-    // ── 6. rider/day-close cash reconciliation buckets ───────────────────────
+    // ── 6. transactions filter: debit_card matches legacy 'card' rows ────────
+
+    /**
+     * Regression: exact-match ='debit_card' silently missed pre-normalisation
+     * rows stored as 'card'. The fix uses whereIn(['debit_card','card']) when
+     * the user picks Debit Card; other choices remain exact-match.
+     */
+    public function test_transactions_filter_debit_card_includes_legacy_card_rows(): void
+    {
+        $companyId = $this->makeCompany();
+        $user      = $this->makePosUser($companyId);
+
+        $this->makeFinal($companyId, 'P-0001', 'cash',       100.00);
+        $this->makeFinal($companyId, 'P-0002', 'debit_card', 200.00); // modern
+        $this->makeFinal($companyId, 'P-0003', 'card',        25.00); // legacy
+        $this->makeFinal($companyId, 'P-0004', 'credit_card', 75.00);
+        $this->makeFinal($companyId, 'P-0005', 'qr_payment',  60.00);
+
+        $this->actingAs($user, 'pos');
+        app()->instance('currentCompanyId', $companyId);
+        $controller = app(\App\Http\Controllers\PosController::class);
+
+        // ── debit_card: must return both 'debit_card' AND legacy 'card' rows ──
+        $req = \Illuminate\Http\Request::create('/pos/transactions', 'GET', ['payment_method' => 'debit_card']);
+        $data = $controller->transactions($req)->getData();
+        $methods = collect($data['transactions']->items())->pluck('payment_method')->sort()->values()->all();
+        $this->assertSame(['card', 'debit_card'], $methods,
+            'debit_card filter must surface legacy card rows too');
+
+        // ── credit_card: exact — must NOT bleed into debit_card or card ────────
+        $req2 = \Illuminate\Http\Request::create('/pos/transactions', 'GET', ['payment_method' => 'credit_card']);
+        $data2 = $controller->transactions($req2)->getData();
+        $methods2 = collect($data2['transactions']->items())->pluck('payment_method')->unique()->values()->all();
+        $this->assertSame(['credit_card'], $methods2);
+
+        // ── cash: exact ────────────────────────────────────────────────────────
+        $req3 = \Illuminate\Http\Request::create('/pos/transactions', 'GET', ['payment_method' => 'cash']);
+        $data3 = $controller->transactions($req3)->getData();
+        $methods3 = collect($data3['transactions']->items())->pluck('payment_method')->unique()->values()->all();
+        $this->assertSame(['cash'], $methods3);
+
+        // ── no filter: all five rows ───────────────────────────────────────────
+        $req4 = \Illuminate\Http\Request::create('/pos/transactions', 'GET');
+        $data4 = $controller->transactions($req4)->getData();
+        $this->assertSame(5, $data4['transactions']->total());
+    }
+
+    // ── 7. rider/day-close cash reconciliation buckets ───────────────────────
 
     public function test_z_report_cash_reconciliation_counts_only_cash_bucket_rider_bills(): void
     {

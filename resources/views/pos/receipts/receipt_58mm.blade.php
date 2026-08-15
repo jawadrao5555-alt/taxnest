@@ -354,15 +354,29 @@
                 <td class="inv-value" style="font-weight:900;">{{ $omRcptFullNum }}</td>
             </tr>
             @endif
-            {{-- Single number row (10 Aug 2026, owner feedback): PRA Fiscal # when
-                 reported; Local Invoice # (own serial) for local-stream bills;
-                 POS serial fallback for PRA-stream bills still awaiting fiscal
-                 number — no bill ever prints number-less. --}}
+            {{-- Number rows: PRA Fiscal # when reported; Local Invoice # (own serial)
+                 for local-stream bills; POS serial fallback for PRA-stream bills
+                 still awaiting fiscal number — no bill ever prints number-less.
+                 Task 763 (15 Aug 2026): for submitted fiscal bills, ALSO print the
+                 shop's own serial so customers can reference it. Token style shows
+                 it as a small Ref row (token already dominant above); serial style
+                 prints it as a full POS Invoice row. --}}
             @if($transaction->pra_invoice_number)
             <tr>
                 <td class="inv-label">{{ __('pos.receipt_pra_fiscal') }}:</td>
                 <td class="inv-value">{{ $transaction->pra_invoice_number }}</td>
             </tr>
+            @if($rcptBillToken !== null)
+            <tr>
+                <td class="inv-label" style="font-size:8px; color:#000;">{{ __('pos.bill_ref_label') }}:</td>
+                <td class="inv-value" style="font-size:8px; color:#000;">{{ $transaction->invoice_number }}</td>
+            </tr>
+            @else
+            <tr>
+                <td class="inv-label">{{ __('pos.receipt_pos_invoice') }}:</td>
+                <td class="inv-value">{{ $transaction->invoice_number }}</td>
+            </tr>
+            @endif
             @elseif($rcptIsLocalStream)
             <tr>
                 <td class="inv-label">{{ __('pos.receipt_local_invoice') }}:</td>

@@ -15,23 +15,25 @@ namespace App\Support;
  * and resolves to the right pre-selected card.
  *
  *   khula   — left edge, open spacing (deliberate opt-out)
- *   center  — ticket centered on the paper, open spacing (Pizza Master look —
- *             UNIVERSAL DEFAULT since Task 718, owner-approved Aug 2026)
+ *   center  — ticket centered on the paper, open spacing (Pizza Master look;
+ *             was the NULL default in Task 718 — demoted to explicit opt-in
+ *             by Task 757 to match actual left-pinned print behaviour)
  *   compact — left edge, tight paper-saving layout
  *
  * DEFAULT semantics (Task 718, amended by Task 756):
  * companies.kot_align_center is NULLABLE.
  * NULL = "shop never made an explicit choice".
  *
- * Two contexts read this differently ON PURPOSE:
- *   • Settings UI / card pre-selection (alignBool / resolve): NULL → CENTER,
- *     so an untouched company sees the Center card highlighted and an
- *     untouched save writes explicit true (no surprise flip).
+ * Task 757 (Aug 2026): both the settings UI and the print CSS now treat
+ * NULL as LEFT — the two contexts are CONSISTENT:
  *   • Print CSS in kitchen-ticket.blade.php: NULL → LEFT (v6-safe, no
- *     margin:auto). This is the Task 756 regression fix — the old `?? true`
- *     let NULL emit margin:auto, which on A4-default Windows queues shifted
- *     the 72mm body off the thermal head → blank KOT. Only explicit true
- *     (owner opt-in, warned on the settings page) emits centering CSS.
+ *     margin:auto). Task 756 regression fix — the old `?? true` let NULL
+ *     emit margin:auto, which on A4-default Windows queues shifted the
+ *     72mm body off the thermal head → blank KOT.
+ *   • Settings UI / card pre-selection (alignBool / resolve): NULL → LEFT
+ *     (khula), so owners see the dropdown/card that matches what they are
+ *     actually getting. Opting in to centering is an explicit action, with
+ *     the A4-queue warning shown on save.
  *
  * EXPLICIT false (khula/compact card, kitchen-settings save, or a pre-718
  * deliberate compact/margin setup kept by the migration) stays left in BOTH
@@ -41,8 +43,12 @@ namespace App\Support;
  */
 class PosKotThemes
 {
-    /** Preset an untouched (NULL kot_align_center) company resolves to. */
-    public const DEFAULT = 'center';
+    /**
+     * Preset an untouched (NULL kot_align_center) company resolves to.
+     * Task 757: changed from 'center' to 'khula' — NULL prints LEFT, so the
+     * UI must pre-select LEFT (khula) to match actual print behaviour.
+     */
+    public const DEFAULT = 'khula';
 
     public const THEMES = [
         'khula' => [
@@ -83,9 +89,9 @@ class PosKotThemes
      * centered its compact ticket is still the Compact preset — same
      * "dominant flag wins" rule as PosReceiptThemes' saada).
      *
-     * Task 718: callers must pass the RAW nullable column value for 'align'
-     * (never `?? false` it away) — NULL/missing = no explicit choice = the
-     * Pizza Master center default. Explicit false = deliberate left (khula).
+     * Task 757: callers must pass the RAW nullable column value for 'align'
+     * (never `?? false` it away) — NULL/missing = no explicit choice = LEFT
+     * (khula). Explicit false = deliberate left; explicit true = opted-in center.
      */
     public static function resolve(array $pair): string
     {
@@ -98,12 +104,14 @@ class PosKotThemes
     }
 
     /**
-     * NULL-aware align reader: NULL (unset / schema drift) = center default
-     * (Pizza Master, Task 718); everything else keeps boolean semantics.
+     * NULL-aware align reader: NULL (unset / schema drift) = LEFT (Task 757).
+     * Print CSS already renders NULL as left-pinned (Task 756 fix); the UI
+     * now agrees — NULL resolves to 'khula' so owners see what they get.
+     * Explicit true = opted-in center; explicit false = deliberate left.
      */
     public static function alignBool(mixed $align): bool
     {
-        return $align === null ? true : filter_var($align, FILTER_VALIDATE_BOOLEAN);
+        return $align === null ? false : filter_var($align, FILTER_VALIDATE_BOOLEAN);
     }
 
     /**
@@ -122,8 +130,8 @@ class PosKotThemes
     {
         $current = [
             'compact' => filter_var($currentPair['compact'] ?? false, FILTER_VALIDATE_BOOLEAN),
-            // NULL align = the center default (Task 718): a no-op re-save of the
-            // pre-selected Center card writes explicit true — same render, and
+            // NULL align = left (Task 757): a no-op re-save of the pre-selected
+            // Khula card writes explicit false — same render as NULL, and
             // receipts stay frozen (their own receipt_align_center column).
             'align'   => self::alignBool($currentPair['align'] ?? null),
         ];

@@ -420,6 +420,48 @@
         </tbody>
     </table>
 
+    {{-- Task 697: pending-bill decision audit on the PDF Z-report too — same
+         STORED local_summary snapshot + wording set the day-close page uses
+         (Task 691). Never recomputed: deleted bills leave no live rows. --}}
+    @php $pdfFls = is_array($report->local_summary) ? ($report->local_summary['provisional'] ?? null) : null; @endphp
+    @if(is_array($pdfFls) && (($pdfFls['count'] ?? 0) > 0 || ($pdfFls['finalized'] ?? 0) > 0 || ($pdfFls['deleted'] ?? 0) > 0))
+    @php $pdfFlsAct = $pdfFls['action'] ?? 'carry'; @endphp
+    <div class="section-title">{{ __('pos.local_bills_closed_with_day') }}</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>{{ __('pos.provisional_bills_l_series') }}</th>
+                <th class="c">{{ __('pos.dc_th_count') }}</th>
+                <th class="r">{{ __('pos.dc_th_amount_pkr') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>{{ $pdfFlsAct === 'delete' ? __('pos.badge_deleted') : ($pdfFlsAct === 'finalize' ? __('pos.badge_finalized') : __('pos.badge_carried')) }}</td>
+                <td class="c">{{ $pdfFls['count'] ?? 0 }}</td>
+                <td class="r">{{ number_format($pdfFls['amount'] ?? 0, 2) }}</td>
+            </tr>
+        </tbody>
+    </table>
+    <div style="font-size:9px; color:#374151; margin:-8px 0 12px;">
+        @if(($pdfFls['backlog'] ?? 0) > 0)
+        <p>{{ __('pos.n_older_dates_included', ['count' => $pdfFls['backlog']]) }}</p>
+        @endif
+        @if(($pdfFls['finalized'] ?? 0) > 0)
+        <p style="font-weight:bold; color:#059669;">{{ ltrim(__('pos.dayclose_bills_finalized', ['count' => $pdfFls['finalized']]), ' —') }}@if(($pdfFls['submitted'] ?? 0) > 0){{ __('pos.dayclose_bills_submitted', ['count' => $pdfFls['submitted']]) }}@endif @if(($pdfFls['queued'] ?? 0) > 0){{ __('pos.dayclose_bills_queued', ['count' => $pdfFls['queued']]) }}@endif @if(($pdfFls['failed'] ?? 0) > 0){{ __('pos.dayclose_bills_failed', ['count' => $pdfFls['failed']]) }}@endif</p>
+        @endif
+        @if(($pdfFls['deleted'] ?? 0) > 0)
+        <p style="font-weight:bold; color:#dc2626;">{{ ltrim(__('pos.dayclose_bills_deleted', ['count' => $pdfFls['deleted']]), ' —') }}</p>
+        @endif
+        @if(($pdfFls['rider_guarded'] ?? 0) > 0)
+        <p style="font-weight:bold; color:#b45309;">{{ __('pos.dc_rider_guarded_kept', ['count' => $pdfFls['rider_guarded']]) }}</p>
+        @endif
+        @if(is_array($pdfFls['per_bill'] ?? null))
+        <p>{{ __('pos.dc_per_bill_split', ['save' => $pdfFls['per_bill']['save'] ?? 0, 'delete' => $pdfFls['per_bill']['delete'] ?? 0, 'carry' => $pdfFls['per_bill']['carry'] ?? 0]) }}</p>
+        @endif
+    </div>
+    @endif
+
     @if($analytics->discounts->total > 0)
     <div class="section-title">{{ __('pos.dcp_discount_summary') }}</div>
     <table class="data">

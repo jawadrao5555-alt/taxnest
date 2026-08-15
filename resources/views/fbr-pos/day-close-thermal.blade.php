@@ -155,6 +155,38 @@
     </table>
     <div class="hr"></div>
 
+    {{-- Task 697: pending-bill decision audit on the PRINTED Z-report too —
+         same STORED local_summary snapshot + wording set the day-close page
+         uses (Task 691). Never recomputed: deleted bills leave no live rows. --}}
+    @php $zFls = is_array($report->local_summary) ? ($report->local_summary['provisional'] ?? null) : null; @endphp
+    @if(is_array($zFls) && (($zFls['count'] ?? 0) > 0 || ($zFls['finalized'] ?? 0) > 0 || ($zFls['deleted'] ?? 0) > 0))
+    <div class="sec">{{ __('pos.local_bills_closed_with_day') }}</div>
+    @php $zFlsAct = $zFls['action'] ?? 'carry'; @endphp
+    <table>
+        <tr>
+            <td>{{ __('pos.provisional_bills_l_series') }}</td>
+            <td class="r b">{{ $zFlsAct === 'delete' ? __('pos.badge_deleted') : ($zFlsAct === 'finalize' ? __('pos.badge_finalized') : __('pos.badge_carried')) }}</td>
+        </tr>
+        <tr><td>{{ $zFls['count'] ?? 0 }} {{ __('pos.bills_word') }}</td><td class="r">{{ number_format($zFls['amount'] ?? 0, 2) }}</td></tr>
+    </table>
+    @if(($zFls['backlog'] ?? 0) > 0)
+    <div class="sm">{{ __('pos.n_older_dates_included', ['count' => $zFls['backlog']]) }}</div>
+    @endif
+    @if(($zFls['finalized'] ?? 0) > 0)
+    <div class="sm b">{{ ltrim(__('pos.dayclose_bills_finalized', ['count' => $zFls['finalized']]), ' —') }}@if(($zFls['submitted'] ?? 0) > 0){{ __('pos.dayclose_bills_submitted', ['count' => $zFls['submitted']]) }}@endif @if(($zFls['queued'] ?? 0) > 0){{ __('pos.dayclose_bills_queued', ['count' => $zFls['queued']]) }}@endif @if(($zFls['failed'] ?? 0) > 0){{ __('pos.dayclose_bills_failed', ['count' => $zFls['failed']]) }}@endif</div>
+    @endif
+    @if(($zFls['deleted'] ?? 0) > 0)
+    <div class="sm b">{{ ltrim(__('pos.dayclose_bills_deleted', ['count' => $zFls['deleted']]), ' —') }}</div>
+    @endif
+    @if(($zFls['rider_guarded'] ?? 0) > 0)
+    <div class="sm">{{ __('pos.dc_rider_guarded_kept', ['count' => $zFls['rider_guarded']]) }}</div>
+    @endif
+    @if(is_array($zFls['per_bill'] ?? null))
+    <div class="sm">{{ __('pos.dc_per_bill_split', ['save' => $zFls['per_bill']['save'] ?? 0, 'delete' => $zFls['per_bill']['delete'] ?? 0, 'carry' => $zFls['per_bill']['carry'] ?? 0]) }}</div>
+    @endif
+    <div class="hr"></div>
+    @endif
+
     @if($analytics->top_products->isNotEmpty())
     <div class="sec">{{ __('pos.dc_top_products') }}</div>
     <table>

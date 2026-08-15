@@ -1450,6 +1450,31 @@ class PosController extends Controller
         return back();
     }
 
+    /**
+     * Task 767: dismiss the one-time "KOT centering still ON — verify your
+     * printout" layout banner (stamped by the notify_kot_center_residual_shops
+     * migration for shops that KEPT explicit centering after the Task 761
+     * accidental-center reset). Admin/manager only — the banner itself is
+     * never rendered for cashiers/confined roles (isPosAdmin gate in layout),
+     * so a 403 here means someone is poking the route directly.
+     */
+    public function dismissKotCenterNotice()
+    {
+        $user = auth('pos')->user();
+        if (!$user || $user->posCashierBlocked()) {
+            abort(403, 'Only POS administrators can dismiss this notice.');
+        }
+
+        $companyId = app('currentCompanyId');
+        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_center_notice_at')) {
+            \Illuminate\Support\Facades\DB::table('companies')
+                ->where('id', $companyId)
+                ->update(['kot_center_notice_at' => null]);
+        }
+
+        return back();
+    }
+
     public function createInvoice(Request $request)
     {
         $companyId = app('currentCompanyId');

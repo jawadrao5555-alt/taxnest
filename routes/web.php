@@ -628,6 +628,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/notifications/{id}/dismiss', [PosController::class, 'dismissNotification'])->name('pos.notifications.dismiss');
     Route::post('/notifications/dismiss-all', [PosController::class, 'dismissAllNotifications'])->name('pos.notifications.dismiss-all');
     Route::post('/whats-new/seen', [\App\Http\Controllers\AppUpdateController::class, 'markSeen'])->name('pos.whats-new.seen');
+    // Task 767: one-time "KOT centering still ON — verify your printout" banner dismiss (admin/manager only, gated in controller).
+    Route::post('/kot-center-notice/dismiss', [PosController::class, 'dismissKotCenterNotice'])->name('pos.kot-center-notice.dismiss');
     // Feature Suggestion box (owner request 20 Jul 2026) — customers submit feature requests.
     Route::get('/suggestions', [\App\Http\Controllers\FeatureSuggestionController::class, 'index'])->name('pos.suggestions');
     Route::post('/suggestions', [\App\Http\Controllers\FeatureSuggestionController::class, 'store'])->name('pos.suggestions.store')->middleware('throttle:10,1');

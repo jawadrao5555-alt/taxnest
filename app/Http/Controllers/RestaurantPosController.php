@@ -1552,6 +1552,17 @@ class RestaurantPosController extends Controller
             ->distinct()->orderBy('category')->pluck('category');
         $printers = collect($company->printerSettings()['available_printers'])->pluck('name')->filter()->values();
 
+        // Task 767: opening this page counts as "notified" — the in-page
+        // Task 761 warning takes over from here (it persists while centering
+        // stays explicitly ON), so clear the one-time layout banner stamp.
+        if ($company
+            && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_center_notice_at')
+            && $company->kot_center_notice_at !== null) {
+            \Illuminate\Support\Facades\DB::table('companies')
+                ->where('id', $company->id)
+                ->update(['kot_center_notice_at' => null]);
+        }
+
         return view('pos.restaurant.kitchen-settings', compact('company', 'stations', 'categories', 'printers'));
     }
 
@@ -1713,6 +1724,12 @@ class RestaurantPosController extends Controller
         }
         if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_left_margin_mm')) {
             $updates['kot_left_margin_mm'] = max(0, min(30, (int) $request->input('kot_left_margin_mm', 0)));
+        }
+        // Task 767: a kitchen-settings save is an explicit verify — clear the
+        // one-time "centering still ON" layout banner stamp (belt & braces:
+        // the GET already clears it when the page is opened).
+        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_center_notice_at')) {
+            $updates['kot_center_notice_at'] = null;
         }
         $company->update($updates);
 

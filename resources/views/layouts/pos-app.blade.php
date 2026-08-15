@@ -157,6 +157,27 @@
                 ->get(['id', 'device_pin', 'first_seen_at']);
         }
     } catch (\Throwable $e) { /* never break POS pages */ }
+    // Task 767: one-time "KOT centering still ON — verify your printout" banner.
+    // Stamped (kot_center_notice_at) by the notify_kot_center_residual_shops
+    // migration for shops that KEPT explicit centering after the Task 761
+    // accidental-center reset. Admin/manager only — same gating as What's New
+    // (cashiers/confined roles can't open Kitchen Settings, pending companies
+    // and read-only impersonation can't POST the dismiss → dismiss loop).
+    // Kitchen feature gate: the linked page sits behind feature:kitchen.
+    $kotCenterNoticeShow = false;
+    try {
+        $kcnAllowed = $posUserLayout && $posUserLayout->isPosAdmin();
+        $kcnPending = ($companyLayout->status ?? null) === 'pending';
+        $kcnImp = session('impersonation');
+        $kcnReadonlyImp = is_array($kcnImp) && !empty($kcnImp['readonly']);
+        if ($kcnAllowed && !$kcnPending && !$kcnReadonlyImp && $companyLayout
+            && \Illuminate\Support\Facades\Schema::hasColumn('companies', 'kot_center_notice_at')
+            && $companyLayout->kot_center_notice_at !== null
+            && $companyLayout->kot_align_center === true
+            && !empty(\App\Services\PosFeatureService::forCompany($companyLayout)->kitchen)) {
+            $kotCenterNoticeShow = true;
+        }
+    } catch (\Throwable $e) { /* never break POS pages */ }
 @endphp
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="{{ $isDarkMode ? 'dark' : '' }}">
     <head>
@@ -940,6 +961,27 @@
                         class="flex-shrink-0 p-1 rounded hover:bg-white/20 transition" aria-label="{{ __('pos.dismiss') }}">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
+            </div>
+            @endif
+
+            {{-- Task 767: shops that KEPT explicit KOT centering after the Task 761
+                 accidental-center reset — one-tap link to Kitchen Settings to verify
+                 the printout. Outside <main> (top-banner clipping convention).
+                 Dismiss = POST (permanent, per company); the stamp also clears
+                 itself when Kitchen Settings is opened or saved. --}}
+            @if($kotCenterNoticeShow)
+            <div class="flex-shrink-0 bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 px-3 sm:px-5 py-2 flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2 min-w-0" @if(app()->getLocale() === 'ur') dir="rtl" @endif>
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                    <span class="text-[12px] sm:text-[13px] font-medium">{{ __('pos.kot_center_notice_banner') }}</span>
+                    <a href="{{ route('pos.restaurant.kitchen-settings') }}" class="text-[12px] sm:text-[13px] font-extrabold underline underline-offset-2 whitespace-nowrap">{{ __('pos.kot_center_notice_action') }}</a>
+                </div>
+                <form method="POST" action="{{ route('pos.kot-center-notice.dismiss') }}" class="flex-shrink-0">
+                    @csrf
+                    <button type="submit" class="p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-800/50 transition" aria-label="{{ __('pos.dismiss') }}">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </form>
             </div>
             @endif
 

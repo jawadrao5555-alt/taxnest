@@ -2599,6 +2599,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'print_pos_center' => 'Paper ke center mein',
     'print_pos_center_warn' => 'Center tabhi use karein agar printer ka paper size 80mm roll par set ho. A4/Letter queue par, Center print ko page se bahar dhakel deta hai aur slip khali aati hai.',
     'kot_center_accidental_warn' => 'Aapka KOT <strong>Center</strong> par set hai. Agar kitchen tickets khali aa rahi hain to Print Position ko <strong>Left Edge</strong> par switch karen aur save karen — Center tabhi kaam karta hai jab printer driver ka paper size 80mm roll ho.',
+    'kot_center_notice_banner' => 'Aapke KOT ki print position Center par set hai — ek test kitchen ticket print kar ke check karen ke parchi khali to nahi aa rahi.',
+    'kot_center_notice_action' => 'Kitchen Settings kholen',
     'print_pos_left_edge' => 'Left edge (default — sab se safe)',
     'print_position' => 'Print Position (sab slips)',
     'print_receipt' => 'Print Receipt',

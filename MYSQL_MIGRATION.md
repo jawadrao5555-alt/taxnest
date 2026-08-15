@@ -82,7 +82,7 @@ UNION ALL SELECT 'audit_logs', COUNT(*) FROM audit_logs;
 Match against same query on Postgres dump.
 
 ### Step 6 — Cutover (Production)
-1. `php artisan down --message="Scheduled maintenance — back in 30 min"`
+1. `php artisan down --render=errors::deploying --status=200 --refresh=4`  (NEVER plain `artisan down` — it serves a 503; the deploy scripts use exactly these flags)
 2. Final Postgres delta dump (incremental since Step 1)
 3. Apply delta to MySQL
 4. Update production `.env` → `DB_CONNECTION=mysql`
@@ -100,7 +100,7 @@ Match against same query on Postgres dump.
 ## 🔁 Rollback Plan
 
 If anything critical breaks within 24h:
-1. `php artisan down`
+1. `php artisan down --render=errors::deploying --status=200 --refresh=4`
 2. Switch `.env` back: `DB_CONNECTION=pgsql`
 3. Restore Postgres dump if data was modified after cutover
 4. `php artisan config:clear && php artisan up`

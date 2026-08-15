@@ -81,7 +81,33 @@ return Application::configure(basePath: dirname(__DIR__))
         // The db-down view is fully self-contained — NO auth()/session/DB calls
         // (the DB is down while it renders). 503 + Retry-After so clients and
         // crawlers treat it as temporary.
-        $dbDownResponse = function (\Throwable $e, $request) {
+        //
+        // Deploy-window exception (Task 736): the 15 Aug 2026 ~04:49 UTC "503
+        // burst" during a deploy was THIS renderable (content-negotiated
+        // 2037B HTML / 603B JSON bodies in the access log — a maintenance 503
+        // serves one uniform body), fired when a concurrent recovery briefly
+        // broke the DB config while the deploy lock was held. If a deploy is
+        // in progress (lock at ~/.taxnest-deploy.lock held by flock), browsers
+        // get the friendly 200 "Updating…" page instead of a 503. JSON/API
+        // clients keep the honest 503 (desktop agents must never mistake a
+        // down window for success).
+        $deployInProgress = function (): bool {
+            $lockFile = dirname(base_path()) . '/.taxnest-deploy.lock';
+            if (! is_file($lockFile)) {
+                return false;
+            }
+            $fh = @fopen($lockFile, 'r');
+            if (! $fh) {
+                return false;
+            }
+            $free = flock($fh, LOCK_SH | LOCK_NB); // deploy scripts hold LOCK_EX
+            if ($free) {
+                flock($fh, LOCK_UN);
+            }
+            fclose($fh);
+            return ! $free;
+        };
+        $dbDownResponse = function (\Throwable $e, $request) use ($deployInProgress) {
             if (! DatabaseDown::isConnectionFailure($e)) {
                 return null;
             }
@@ -90,6 +116,9 @@ return Application::configure(basePath: dirname(__DIR__))
                     'error' => __('pos.db_down_title') . ' — ' . __('pos.db_down_body'),
                     'db_down' => true,
                 ], 503, ['Retry-After' => '15']);
+            }
+            if ($deployInProgress()) {
+                return response()->view('errors.deploying', [], 200, ['Refresh' => '4']);
             }
             return response()->view('errors.db-down', [], 503, ['Retry-After' => '15']);
         };

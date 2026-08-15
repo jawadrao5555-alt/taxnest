@@ -44,7 +44,12 @@ code=$("${CURL[@]}" -o /dev/null -w '%{http_code}' -X POST \
   --data-urlencode "login=$LOGIN" \
   --data-urlencode "password=$PASSWORD" \
   "$BASE_URL/fbr-pos/login")
-[ "$code" = "302" ] || { echo "Login POST returned $code (expected 302) for $LOGIN" >&2; exit 2; }
+if [ "$code" != "302" ]; then
+  echo "Login POST returned $code (expected 302) for $LOGIN" >&2
+  echo "PASSWORD DRIFT? Run the CANONICAL reset: bash scripts/fbr-qa-reset-password.sh" >&2
+  echo "NEVER rotate this password to a new value (Task 735 — see live-pos-test-company.md)" >&2
+  exit 2
+fi
 echo "    Logged in as $LOGIN"
 
 # path | language-independent marker regex proving real content rendered

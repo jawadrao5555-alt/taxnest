@@ -49,7 +49,11 @@ code=$("${CURL[@]}" -o /dev/null -w '%{http_code}' -X POST \
   --data-urlencode "login=$LOGIN" \
   --data-urlencode "password=$PASSWORD" \
   "$BASE_URL/fbr-pos/login")
-[ "$code" = "302" ] || { echo "Login failed ($code) for $LOGIN — see live-pos-test-company.md password-drift note" >&2; exit 2; }
+if [ "$code" != "302" ]; then
+  echo "Login failed ($code) for $LOGIN — run the CANONICAL reset: bash scripts/fbr-qa-reset-password.sh" >&2
+  echo "NEVER rotate this password to a new value (Task 735 — see live-pos-test-company.md)" >&2
+  exit 2
+fi
 
 # ── FAIL-CLOSED PREFLIGHT ───────────────────────────────────────────────────
 dash="$TMPD/dash.html"

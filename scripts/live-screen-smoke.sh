@@ -81,14 +81,70 @@ fetch() {
   return 0
 }
 
+# ---------------------------------------------------- stale-cache sanitize
+# Task 740: a marker miss can be a FALSE alarm when live's compiled Blade
+# views / web OPcache are poisoned by racing cPanel auto-deploys (15 Aug 2026:
+# /pos/dashboard 'today-khata' FAILED while the blade md5 matched workspace;
+# view:clear+view:cache+opcache_reset made the marker appear instantly — see
+# .agents/memory/cpanel-deployment.md). So: on the FIRST marker miss, sanitize
+# live's caches ONCE over SSH and retry that page; only a second miss FAILs.
+# No SSH key (owner machine) => old behavior (fail on first miss) unchanged.
+SSH_KEY="${SMOKE_SSH_KEY:-/home/runner/workspace/.local/ssh/cpanel_deploy_key}"
+SSH_HOST="taxnestc@cpanel.taxnest.com.pk"   # DNS-only host; taxnest.com.pk is Cloudflare-proxied (port 22 dead)
+SANITIZE_DONE=0   # 0 = not attempted, 1 = succeeded, 2 = attempted & failed (don't retry again)
+
+# sanitize_live_caches -> 0 if the sanitize ran & OPcache reset confirmed
+sanitize_live_caches() {
+  if [ "$SANITIZE_DONE" = 1 ]; then return 0; fi
+  if [ "$SANITIZE_DONE" = 2 ]; then return 1; fi
+  if [ ! -f "$SSH_KEY" ]; then SANITIZE_DONE=2; return 1; fi
+  echo "    Marker miss — sanitizing live caches once (view:clear+view:cache + web OPcache reset) then retrying (Task 740, stale-compiled-view false alarm guard)..."
+  local RPROBE="opr-smoke-$(date +%s%N)$RANDOM.php" OUT
+  OUT=$(timeout 120 ssh -i "$SSH_KEY" -p 22 -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new \
+    "$SSH_HOST" bash -s -- "$RPROBE" <<'SANITIZE' 2>&1
+set -u
+RPROBE=$1
+LIVE_DIR=/home/taxnestc/public_html
+PHP84=/usr/local/bin/ea-php84
+trap 'rm -f "$LIVE_DIR/public/$RPROBE"' EXIT INT TERM
+cd "$LIVE_DIR" || exit 90
+$PHP84 artisan view:clear 2>&1 || exit 94
+$PHP84 artisan view:cache 2>&1 || exit 94
+echo '<?php opcache_reset(); echo "OPCACHE_RESET_OK"; ?>' > "public/$RPROBE" || exit 95
+for TRY in 1 2 3; do
+  OP_OUT=$(curl -s --max-time 15 "https://taxnest.com.pk/$RPROBE" || true)
+  case "$OP_OUT" in *OPCACHE_RESET_OK*) echo "SANITIZE_OK"; exit 0 ;; esac
+  sleep 3
+done
+exit 98
+SANITIZE
+  )
+  if echo "$OUT" | grep -q "SANITIZE_OK"; then
+    SANITIZE_DONE=1
+    echo "    Live cache sanitize done (view rebuilt + web OPcache reset confirmed)."
+    return 0
+  fi
+  SANITIZE_DONE=2
+  warn "live cache sanitize over SSH did not complete (output: $(echo "$OUT" | tail -c 200)) — falling back to plain marker verdicts"
+  return 1
+}
+
 # require <path> <feature-name> <regex>
+# On a miss: sanitize live caches ONCE (if SSH key available), refetch the
+# page, re-check. Fails only if the marker is still missing after the retry.
 require() {
   local path="$1" name="$2" regex="$3"
   if grep -qE "$regex" "$TMPD/page.html"; then
     echo "    OK: $name marker present on $path"
-  else
-    bad "$path MISSING marker for '$name' (regex: $regex) — feature not rendering (deploy gap or regression)"
+    return 0
   fi
+  if sanitize_live_caches && fetch "$path"; then
+    if grep -qE "$regex" "$TMPD/page.html"; then
+      echo "    OK: $name marker present on $path AFTER cache sanitize (was a stale-compiled-view false alarm — no regression)"
+      return 0
+    fi
+  fi
+  bad "$path MISSING marker for '$name' (regex: $regex) — feature not rendering (deploy gap or regression)"
 }
 
 # ------------------------------------------------------------------ pages

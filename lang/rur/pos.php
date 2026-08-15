@@ -1651,6 +1651,11 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'kot_reprint_banner' => '*** REPRINT #:n — PEHLA TICKET RADD KAREIN ***',
     'kot_reprint_btn' => 'Dobara Print',
     'kot_resend_btn' => '↻ KOT Dobara Bhejo',
+    // Task 753 (Pizza Master): missed-delta recovery — akhri add-on KOT batch ka reprint.
+    'kot_last_addon_btn' => '⎌ Akhri Add-on KOT',
+    'kot_last_addon_short' => '⎌ Add-on',
+    'ti_kot_last_addon' => 'Akhri add-on (delta) KOT dobara print karo — jab slip printer se nikli hi na ho.',
+    'products_grid_off_notice' => 'Products grid band hai — items wapas dikhane ke liye Products button dabayen.',
     'kot_rush' => '*** URGENT - JALDI ***',
     'order_match_token_label' => 'TOKEN',
     'order_match_token_caption' => 'Order queue number — bill number alag hai',

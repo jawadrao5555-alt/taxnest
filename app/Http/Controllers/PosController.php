@@ -9165,14 +9165,19 @@ class PosController extends Controller
             // Receipt display preferences (per-company, POS product scope)
             if ($request->has('receipt_prefs_submitted')) {
                 $prefs = $company->invoice_display_prefs ?? [];
-                $prefs['pos'] = [
+                // Task 769 / Task 800: merge-preserve keys owned by receipt-settings
+                // (show_verify_line, show_cashier, show_business_name, show_developed_by,
+                // show_tax …) — a wholesale rewrite here would silently erase them.
+                // Mirror of FbrPosController::businessProfile's array_merge pattern.
+                $posExisting = is_array($prefs['pos'] ?? null) ? $prefs['pos'] : [];
+                $prefs['pos'] = array_merge($posExisting, [
                     'show_address' => $request->has('rp_show_address'),
                     'show_ntn' => $request->has('rp_show_ntn'),
                     'show_email' => $request->has('rp_show_email'),
                     'show_mobile' => $request->has('rp_show_mobile'),
                     'show_footer' => $request->has('rp_show_footer'),
                     'footer_text' => trim((string) $request->input('rp_footer_text', '')) ?: null,
-                ];
+                ]);
                 $data['invoice_display_prefs'] = $prefs;
             }
 

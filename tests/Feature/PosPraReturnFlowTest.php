@@ -181,6 +181,16 @@ class PosPraReturnFlowTest extends TestCase
             $table->timestamps();
         });
 
+        // Task 792: transaction-show now accesses $transaction->restaurantOrder?->table
+        // for dine-in table display — must exist so the view renders without "no such table".
+        Schema::create('restaurant_orders', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id')->nullable();
+            $table->unsignedBigInteger('pos_transaction_id')->nullable();
+            $table->string('table')->nullable();
+            $table->timestamps();
+        });
+
         $this->companyId = DB::table('companies')->insertGetId([
             'name' => 'Return Shop',
             'pos_setup_completed' => true,

@@ -4422,7 +4422,7 @@ class PosController extends Controller
             $tab = 'pra';
         }
 
-        $query = PosTransaction::where('company_id', $companyId)->where('status', 'completed')->with('creator');
+        $query = PosTransaction::where('company_id', $companyId)->where('status', 'completed')->with(['creator', 'restaurantOrder.table.floor']);
 
         // Return-button eligibility (Task 678): remaining returnable quantity
         // per row, aggregated in the SAME page query (no N+1) — a fully
@@ -4506,7 +4506,7 @@ class PosController extends Controller
                       ->orWhere('invoice_mode', 'local');
                 }
             })
-            ->with(['items', 'payments', 'praLogs', 'creator', 'terminal'])
+            ->with(['items', 'payments', 'praLogs', 'creator', 'terminal', 'restaurantOrder.table.floor'])
             ->findOrFail($id);
 
         // Billing Scope: stream-locked staff cannot open the other stream's bills.

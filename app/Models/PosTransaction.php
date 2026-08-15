@@ -108,6 +108,12 @@ class PosTransaction extends Model
         return $this->hasMany(PosTransactionItem::class, 'transaction_id');
     }
 
+    /** Task 792: dine-in table link — RestaurantOrder carries pos_transaction_id. */
+    public function restaurantOrder()
+    {
+        return $this->hasOne(RestaurantOrder::class, 'pos_transaction_id');
+    }
+
     /** Return / credit-note flow (Task 570). */
     public function parentTransaction()
     {

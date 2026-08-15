@@ -161,8 +161,23 @@
                             @endif
                         </td>
                         <td class="px-4 py-3 text-gray-700 dark:text-gray-300 hidden md:table-cell">
-                            {{-- Task 791: dine-in bill with no customer → show "Dine-in", not "Walk-in" --}}
-                            {{ $txn->customer_name ?? ($txn->order_type === 'dine_in' ? __('pos.dine_in') : __('pos.walk_in')) }}
+                            {{-- Task 791/792: dine-in bill with no customer → show "Dine-in [· T-N]", not "Walk-in" --}}
+                            @php
+                                $__tbl = $txn->restaurantOrder?->table ?? null;
+                                $__tableLabel = $__tbl
+                                    ? (($__tbl->floor?->name ? $__tbl->floor->name . ' · ' : '') . 'T-' . $__tbl->table_number)
+                                    : null;
+                            @endphp
+                            @if($txn->customer_name)
+                                {{ $txn->customer_name }}
+                                @if($txn->order_type === 'dine_in' && $__tableLabel)
+                                    <span class="text-xs text-gray-400 dark:text-gray-500">· {{ $__tableLabel }}</span>
+                                @endif
+                            @elseif($txn->order_type === 'dine_in')
+                                {{ __('pos.dine_in') }}@if($__tableLabel) <span class="text-xs text-gray-400 dark:text-gray-500">· {{ $__tableLabel }}</span>@endif
+                            @else
+                                {{ __('pos.walk_in') }}
+                            @endif
                             {{-- Order type badge — readable pill, visible on small/blurry screens --}}
                             @if($txn->order_type && in_array($txn->order_type, ['dine_in', 'takeaway', 'delivery'], true))
                                 <span class="inline-flex mt-1 px-1.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wide

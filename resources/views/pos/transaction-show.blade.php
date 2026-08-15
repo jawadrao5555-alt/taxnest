@@ -270,10 +270,27 @@
                         <span class="text-gray-500">{{ __('pos.payment') }}</span>
                         <span class="text-gray-900 dark:text-white">{{ ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</span>
                     </div>
+                    @php
+                        $__showTbl = $transaction->restaurantOrder?->table ?? null;
+                        $__showTableLabel = $__showTbl
+                            ? (($__showTbl->floor?->name ? $__showTbl->floor->name . ' · ' : '') . 'T-' . $__showTbl->table_number)
+                            : null;
+                    @endphp
                     <div class="flex justify-between">
                         <span class="text-gray-500">{{ __('pos.customer_word') }}</span>
-                        {{-- Task 791: dine-in bill with no customer → "Dine-in", not "Walk-in" --}}
-                        <span class="text-gray-900 dark:text-white">{{ $transaction->customer_name ?? ($transaction->order_type === 'dine_in' ? __('pos.dine_in') : __('pos.walk_in')) }}</span>
+                        {{-- Task 791/792: dine-in bill with no customer → "Dine-in", not "Walk-in"; show table label when available --}}
+                        <span class="text-gray-900 dark:text-white">
+                            @if($transaction->customer_name)
+                                {{ $transaction->customer_name }}
+                                @if($transaction->order_type === 'dine_in' && $__showTableLabel)
+                                    <span class="text-xs text-gray-400 dark:text-gray-500">· {{ $__showTableLabel }}</span>
+                                @endif
+                            @elseif($transaction->order_type === 'dine_in')
+                                {{ __('pos.dine_in') }}@if($__showTableLabel) <span class="text-xs text-gray-400 dark:text-gray-500">· {{ $__showTableLabel }}</span>@endif
+                            @else
+                                {{ __('pos.walk_in') }}
+                            @endif
+                        </span>
                     </div>
                     @if($transaction->order_type && in_array($transaction->order_type, ['dine_in', 'takeaway', 'delivery'], true))
                     <div class="flex justify-between items-center">

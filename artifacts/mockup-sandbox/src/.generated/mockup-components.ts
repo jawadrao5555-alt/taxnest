@@ -20,6 +20,7 @@ export const modules: ModuleMap = {
   "./components/mockups/pos-cart/NayaDesign.tsx": () => import("../components/mockups/pos-cart/NayaDesign.tsx"),
   "./components/mockups/pos-cart/PooriSaleScreen.tsx": () => import("../components/mockups/pos-cart/PooriSaleScreen.tsx"),
   "./components/mockups/pos-cart/SaafSaleScreen.tsx": () => import("../components/mockups/pos-cart/SaafSaleScreen.tsx"),
+  "./components/mockups/kot/Current.tsx": () => import("../components/mockups/kot/Current.tsx"),
   "./components/mockups/receipt-cleanup/After.tsx": () => import("../components/mockups/receipt-cleanup/After.tsx"),
   "./components/mockups/receipt-cleanup/Before.tsx": () => import("../components/mockups/receipt-cleanup/Before.tsx"),
   "./components/mockups/receipt-order-code/Current.tsx": () => import("../components/mockups/receipt-order-code/Current.tsx"),

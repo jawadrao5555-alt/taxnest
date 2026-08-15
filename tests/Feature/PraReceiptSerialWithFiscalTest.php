@@ -334,7 +334,63 @@ class PraReceiptSerialWithFiscalTest extends TestCase
         }
     }
 
-    // ── 5. Reporting-OFF final — serial in top badge, no PRA Fiscal row ──
+    // ── 5. OFFLINE — .local-badge prints, serial in body, no PRA Fiscal row ─
+
+    /**
+     * Offline PRA bill (pra_status='offline') — the fiscal number has not been
+     * assigned yet (no internet at sale time).  The template renders a
+     * .local-badge block and the shop's own serial must still appear in the
+     * rendered body so the receipt is not number-less.  No PRA Fiscal row
+     * should be printed because there is no fiscal number to show.
+     *
+     * Invariants locked (both 80mm and 58mm):
+     *   • .local-badge block is present
+     *   • serial appears somewhere in the body (in the invoice box and/or badge)
+     *   • NO PRA Fiscal # label row (nothing to show yet)
+     *   • NO pra_invoice_number value in the output (offline = no fiscal yet)
+     */
+    public function test_offline_bill_prints_local_badge_with_serial_no_fiscal_row(): void
+    {
+        foreach (self::TEMPLATES as $template) {
+            $company = $this->makeCompany();
+            // pra_status='offline', no pra_invoice_number — fiscal not yet assigned.
+            $txn = $this->makeTransaction($company, 'offline', null);
+
+            $body = $this->renderBody($template, $company, $txn);
+
+            // .local-badge block must be present (the offline indicator).
+            $this->assertStringContainsString(
+                'local-badge',
+                $body,
+                ".local-badge block renders for offline bill ({$template})"
+            );
+
+            // Shop's own serial must appear somewhere in the body — the receipt
+            // must never be number-less even when the fiscal number is absent.
+            $this->assertStringContainsString(
+                self::SERIAL,
+                $body,
+                "serial appears in body for offline bill ({$template})"
+            );
+
+            // No PRA Fiscal # label row — there is no fiscal number to show.
+            $this->assertStringNotContainsString(
+                __('pos.receipt_pra_fiscal') . ':',
+                $body,
+                "no PRA Fiscal row on offline bill ({$template})"
+            );
+
+            // The FISCAL constant must not appear anywhere — offline bills
+            // carry no pra_invoice_number, so this value should be absent.
+            $this->assertStringNotContainsString(
+                self::FISCAL,
+                $body,
+                "fiscal number value absent on offline bill ({$template})"
+            );
+        }
+    }
+
+    // ── 6. Reporting-OFF final — serial in top badge, no PRA Fiscal row ──
 
     /**
      * Reporting-OFF final (pra_status=NULL + invoice_mode='pra') → SALE RECEIPT

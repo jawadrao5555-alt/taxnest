@@ -117,8 +117,28 @@ log "maintenance window OPEN (HTTP 200 'Updating…' page)"
 
 # ------- from here on, any failure leaves the site DOWN (maintenance) -------
 
-# 3. Copy new code in (same semantics as the old .cpanel.yml cp -R).
-/bin/cp -R "$REPO_DIR/." "$DEPLOYPATH/" || die_down "code copy (cp -R) failed"
+# 3. Copy new code in (same semantics as the old .cpanel.yml cp -R) —
+#    EXCLUDING .git: public_html is its own git repo and git object files are
+#    read-only, so cp -R over .git dies with "Permission denied" (verified
+#    15 Aug 2026, first real autodeploy run). Copy everything else item by item.
+for ITEM in "$REPO_DIR"/* "$REPO_DIR"/.[!.]* "$REPO_DIR"/..?*; do
+  [ -e "$ITEM" ] || continue
+  BN="${ITEM##*/}"
+  [ "$BN" = ".git" ] && continue
+  /bin/cp -R "$ITEM" "$DEPLOYPATH/" || die_down "code copy failed on $BN"
+done
+# 3b. Sync live git metadata from the LOCAL clone (no network/auth needed) so
+#     check-live-deploy / deploy-live.sh see the true deployed HEAD. Metadata
+#     only — never fatal for the release itself.
+NEW_SHA=$(git -C "$REPO_DIR" rev-parse HEAD 2>/dev/null || true)
+if [ -n "$NEW_SHA" ] && [ -d "$DEPLOYPATH/.git" ]; then
+  if git -C "$DEPLOYPATH" fetch -q "$REPO_DIR" HEAD 2>&1 \
+     && git -C "$DEPLOYPATH" reset -q "$NEW_SHA" 2>&1; then
+    log "live git metadata synced to $NEW_SHA"
+  else
+    log "WARNING: could not sync live git HEAD to $NEW_SHA (deploy itself unaffected)"
+  fi
+fi
 
 # 3.5 Server-side SW CACHE_VERSION bump (Task 713) — only when the push itself
 #     did not bump (decision made pre-copy above). Version-string-only sed;

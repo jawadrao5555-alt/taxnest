@@ -58,7 +58,16 @@
                         <td class="px-4 py-3 font-mono text-xs accent">{{ $b->invoice_number }}</td>
                         <td class="px-4 py-3 text-xs text-slate-300">{{ $b->created_at?->format('d M Y, h:i A') }}</td>
                         <td class="px-4 py-3 text-xs text-slate-300">{{ $b->creator->name ?? 'N/A' }}</td>
-                        <td class="px-4 py-3 text-xs text-slate-300">{{ $b->customer_name ?: 'Walk-in' }}</td>
+                        <td class="px-4 py-3 text-xs text-slate-300">
+                            {{-- Task 791: dine-in bill with no customer → "Dine-in", not "Walk-in" --}}
+                            {{ $b->customer_name ?: ($b->order_type === 'dine_in' ? __('pos.dine_in') : __('pos.walk_in')) }}
+                            @if($b->order_type && in_array($b->order_type, ['dine_in', 'takeaway', 'delivery'], true))
+                                <span class="inline-flex mt-0.5 px-1.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wide
+                                    {{ $b->order_type === 'dine_in' ? 'bg-teal-900/40 text-teal-300' : ($b->order_type === 'delivery' ? 'bg-orange-900/40 text-orange-300' : 'bg-blue-900/40 text-blue-300') }}">
+                                    {{ __('pos.ot_' . $b->order_type) }}
+                                </span>
+                            @endif
+                        </td>
                         <td class="px-4 py-3 text-center text-xs text-slate-400">{{ $b->items->count() }}</td>
                         <td class="px-4 py-3 text-right font-semibold text-white">Rs {{ number_format($b->total_amount, 2) }}</td>
                         <td class="px-4 py-3 text-center"><span class="text-[10px] uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300">{{ $b->payment_method }}</span></td>

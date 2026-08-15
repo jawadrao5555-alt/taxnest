@@ -161,11 +161,12 @@
                             @endif
                         </td>
                         <td class="px-4 py-3 text-gray-700 dark:text-gray-300 hidden md:table-cell">
-                            {{ $txn->customer_name ?? __("pos.walk_in") }}
-                            {{-- Order type badge (ZFC, 2 Aug 2026): Dine In / Takeaway / Delivery ka pata list se hi chale --}}
+                            {{-- Task 791: dine-in bill with no customer → show "Dine-in", not "Walk-in" --}}
+                            {{ $txn->customer_name ?? ($txn->order_type === 'dine_in' ? __('pos.dine_in') : __('pos.walk_in')) }}
+                            {{-- Order type badge — readable pill, visible on small/blurry screens --}}
                             @if($txn->order_type && in_array($txn->order_type, ['dine_in', 'takeaway', 'delivery'], true))
-                                <span class="block mt-0.5 text-[10px] font-bold uppercase tracking-wide
-                                    {{ $txn->order_type === 'dine_in' ? 'text-teal-600 dark:text-teal-400' : ($txn->order_type === 'delivery' ? 'text-orange-600 dark:text-orange-400' : 'text-blue-600 dark:text-blue-400') }}">
+                                <span class="inline-flex mt-1 px-1.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wide
+                                    {{ $txn->order_type === 'dine_in' ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' : ($txn->order_type === 'delivery' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300') }}">
                                     {{ __('pos.ot_' . $txn->order_type) }}
                                 </span>
                             @endif

@@ -272,8 +272,18 @@
                     </div>
                     <div class="flex justify-between">
                         <span class="text-gray-500">{{ __('pos.customer_word') }}</span>
-                        <span class="text-gray-900 dark:text-white">{{ $transaction->customer_name ?? __('pos.walk_in') }}</span>
+                        {{-- Task 791: dine-in bill with no customer → "Dine-in", not "Walk-in" --}}
+                        <span class="text-gray-900 dark:text-white">{{ $transaction->customer_name ?? ($transaction->order_type === 'dine_in' ? __('pos.dine_in') : __('pos.walk_in')) }}</span>
                     </div>
+                    @if($transaction->order_type && in_array($transaction->order_type, ['dine_in', 'takeaway', 'delivery'], true))
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-500">{{ __('pos.order_type') }}</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide
+                            {{ $transaction->order_type === 'dine_in' ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' : ($transaction->order_type === 'delivery' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300') }}">
+                            {{ __('pos.ot_' . $transaction->order_type) }}
+                        </span>
+                    </div>
+                    @endif
                     @if($transaction->customer_phone)
                     <div class="flex justify-between">
                         <span class="text-gray-500">{{ __('pos.phone_word') }}</span>

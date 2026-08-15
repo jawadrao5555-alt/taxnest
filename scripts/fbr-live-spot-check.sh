@@ -19,9 +19,11 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 BASE_URL="${BASE_URL:-https://taxnest.com.pk}"
+# Explicit env vars take precedence over the creds file (documented usage above).
+_ENV_LOGIN="${LIVE_FBR_QA_LOGIN:-}"; _ENV_PASS="${LIVE_FBR_QA_PASS:-}"
 if [ -f .local/qa-creds.env ]; then . .local/qa-creds.env; fi
-LOGIN="${LIVE_FBR_QA_LOGIN:-}"
-PASSWORD="${LIVE_FBR_QA_PASS:-}"
+LOGIN="${_ENV_LOGIN:-${LIVE_FBR_QA_LOGIN:-}}"
+PASSWORD="${_ENV_PASS:-${LIVE_FBR_QA_PASS:-}}"
 if [ -z "$LOGIN" ] || [ -z "$PASSWORD" ]; then
   echo "ERROR: set LIVE_FBR_QA_LOGIN / LIVE_FBR_QA_PASS (or .local/qa-creds.env)" >&2
   exit 2
@@ -36,18 +38,63 @@ JAR="$TMPD/jar"
 CURL=(curl -s --max-time 30 -H "X-Forwarded-Proto: https" -b "$JAR" -c "$JAR")
 
 echo "==> FBR POS live spot-check against $BASE_URL"
-page=$("${CURL[@]}" "$BASE_URL/fbr-pos/login") || { echo "Cannot reach $BASE_URL" >&2; exit 2; }
-token=$(echo "$page" | grep -oE 'name="_token" value="[^"]+"' | head -1 | sed 's/.*value="//; s/"$//')
-[ -n "$token" ] || { echo "Could not extract CSRF token from /fbr-pos/login" >&2; exit 2; }
-code=$("${CURL[@]}" -o /dev/null -w '%{http_code}' -X POST \
-  --data-urlencode "_token=$token" \
-  --data-urlencode "login=$LOGIN" \
-  --data-urlencode "password=$PASSWORD" \
-  "$BASE_URL/fbr-pos/login")
-if [ "$code" != "302" ]; then
-  echo "Login POST returned $code (expected 302) for $LOGIN" >&2
-  echo "PASSWORD DRIFT? Run the CANONICAL reset: bash scripts/fbr-qa-reset-password.sh" >&2
-  echo "NEVER rotate this password to a new value (Task 735 — see live-pos-test-company.md)" >&2
+
+# Attempt a full login (fresh cookie jar + CSRF token + POST).
+# Returns 0 on success (302), 1 on wrong-credentials-style failure,
+# 2 on cannot-run (unreachable / no token).
+attempt_login() {
+  : > "$JAR"
+  page=$("${CURL[@]}" "$BASE_URL/fbr-pos/login") || { echo "Cannot reach $BASE_URL" >&2; return 2; }
+  token=$(echo "$page" | grep -oE 'name="_token" value="[^"]+"' | head -1 | sed 's/.*value="//; s/"$//')
+  [ -n "$token" ] || { echo "Could not extract CSRF token from /fbr-pos/login" >&2; return 2; }
+  code=$("${CURL[@]}" -o /dev/null -w '%{http_code}' -X POST \
+    --data-urlencode "_token=$token" \
+    --data-urlencode "login=$LOGIN" \
+    --data-urlencode "password=$PASSWORD" \
+    "$BASE_URL/fbr-pos/login")
+  if [ "$code" != "302" ]; then
+    echo "Login POST returned $code (expected 302) for $LOGIN" >&2
+    return 1
+  fi
+  # A FAILED login is ALSO a 302 (redirect back to the login form) — prove the
+  # session is real by fetching the dashboard and checking it isn't the login page.
+  chk="$TMPD/login-check.html"
+  ccode=$("${CURL[@]}" -o "$chk" -w '%{http_code}' "$BASE_URL/fbr-pos/dashboard")
+  if [ "$ccode" != "200" ] || grep -qE 'name="password"' "$chk"; then
+    echo "Login POST for $LOGIN did not yield a session (dashboard=$ccode) — wrong password?" >&2
+    return 1
+  fi
+  return 0
+}
+
+attempt_login; rc=$?
+[ $rc -eq 2 ] && exit 2
+if [ $rc -ne 0 ]; then
+  # Task 739: password may have drifted (Task 735 class). Self-heal ONCE via
+  # the CANONICAL reset (re-asserts qa-creds.env value, never a new one),
+  # then retry the login a single time.
+  RESET_RAN=0
+  if [ -f scripts/fbr-qa-reset-password.sh ] && [ -f .local/qa-creds.env ] && [ -f .local/ssh/cpanel_deploy_key ]; then
+    echo "Login failed — running canonical reset (scripts/fbr-qa-reset-password.sh) and retrying ONCE..." >&2
+    if bash scripts/fbr-qa-reset-password.sh; then
+      RESET_RAN=1
+      attempt_login; rc=$?
+      [ $rc -eq 2 ] && exit 2
+    else
+      echo "Canonical reset script failed" >&2
+    fi
+  else
+    echo "Cannot self-heal: reset script, .local/qa-creds.env or SSH key missing" >&2
+  fi
+fi
+if [ $rc -ne 0 ]; then
+  if [ "${RESET_RAN:-0}" = "1" ]; then
+    echo "PASSWORD DRIFT? Login still failing AFTER the canonical reset." >&2
+    echo "Your qa-creds.env snapshot is STALE — STOP and report; do NOT rotate the password to something new (Task 735 — see live-pos-test-company.md)" >&2
+  else
+    echo "PASSWORD DRIFT? Run the CANONICAL reset: bash scripts/fbr-qa-reset-password.sh" >&2
+    echo "NEVER rotate this password to a new value (Task 735 — see live-pos-test-company.md)" >&2
+  fi
   exit 2
 fi
 echo "    Logged in as $LOGIN"

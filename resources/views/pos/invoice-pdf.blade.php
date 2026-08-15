@@ -283,7 +283,9 @@
         @if($praQr)
         <div class="qr-section">
             <img src="{{ $praQr }}" alt="PRA QR">
+            @if($rpPdf['show_verify_line'] ?? true)
             <p>{{ __('pos.receipt_scan_verify') }}</p>
+            @endif
         </div>
         @endif
         @elseif($transaction->pra_status === 'offline')

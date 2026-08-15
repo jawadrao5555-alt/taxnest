@@ -250,6 +250,9 @@ class PosController extends Controller
                 'show_business_name' => $request->has('rp_show_business_name'),
                 'show_developed_by' => $request->has('rp_show_developed_by'),
                 'footer_text' => trim((string) $request->input('rp_footer_text', '')) ?: null,
+                // show_verify_line (Aug 2026): "Scan with PRA Sahulat App" under the QR.
+                // Checkbox present = ON; absent = OFF. Default ON matches legacy behaviour.
+                'show_verify_line' => $request->has('rp_show_verify_line'),
             ];
             // Local (L-series) receipt set — owner request Jul 2026: PRA and Local
             // bills each get their OWN full display set (incl. its own show_tax).

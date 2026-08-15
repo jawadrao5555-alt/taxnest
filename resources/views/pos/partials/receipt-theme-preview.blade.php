@@ -150,7 +150,7 @@
                         linear-gradient(#000 25%,transparent 25%,transparent 50%,#000 50%,#000 75%,transparent 75%);
                         background-size:14px 14px;"></span>
                 </span>
-                <div style="font-size:10px;margin-top:2px;font-weight:600;" x-text="tab === 'local' ? 'Scan to view invoice' : 'Verify via PRA Sahulat app'"></div>
+                <div style="font-size:10px;margin-top:2px;font-weight:600;" x-show="tab === 'local' || p.verifyLine" x-text="tab === 'local' ? 'Scan to view invoice' : 'Verify via PRA Sahulat app'"></div>
             </div>
             @endif
 
@@ -246,6 +246,8 @@ if (!window.rcptThemePicker) {
                     setChk('logo', 'rp_show_logo');
                     setChk('logoFinalsOnly', 'rp_logo_finals_only');
                     setChk('menuQr', 'rp_show_menu_qr');
+                    // verifyLine is PRA-only — always use rp_show_verify_line regardless of tab.
+                    setChk('verifyLine', 'rp_show_verify_line');
                     var ftName = fname('footerText', pre + 'footer_text');
                     if (ftName) { this.p.footerText = (val(ftName, '') || '').trim(); }
                     var paperName = fname('paper', 'rp_printer_size');

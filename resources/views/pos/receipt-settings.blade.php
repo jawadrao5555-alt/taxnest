@@ -57,6 +57,8 @@
                 'logoFinalsOnly' => (bool) ($ps['logo_finals_only'] ?? false),
                 'menuQr' => (bool) ($ps['show_menu_qr'] ?? true),
                 'orderMatch' => in_array($company->order_match_style ?? 'off', ['off', 'token', 'code'], true) ? ($company->order_match_style ?? 'off') : 'off',
+                // show_verify_line (Aug 2026): drives the preview partial's QR caption.
+                'verifyLine' => (bool) ($rp['show_verify_line'] ?? true),
             ],
         ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}';
     @endphp
@@ -119,7 +121,16 @@
                         <span class="text-sm text-gray-800 dark:text-gray-200">{{ __('pos.show_developed_by_line') }}</span>
                     </label>
                 </div>
-                <div class="mt-4 p-3 rounded-lg border-2 {{ $rp['show_tax'] ? 'border-amber-400 bg-amber-50/40 dark:bg-amber-900/10' : 'border-gray-200 dark:border-gray-700' }}">
+                <div class="mt-3">
+                    <label class="flex items-start gap-2.5 cursor-pointer p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700 transition">
+                        <input type="checkbox" name="rp_show_verify_line" value="1" {{ ($rp['show_verify_line'] ?? true) ? 'checked' : '' }} class="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 w-4 h-4">
+                        <span class="flex-1 min-w-0">
+                            <span class="block text-sm text-gray-800 dark:text-gray-200">{{ __('pos.show_verify_line_pra') }}</span>
+                            <span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.show_verify_line_pra_hint') }}</span>
+                        </span>
+                    </label>
+                </div>
+                <div class="mt-3 p-3 rounded-lg border-2 {{ $rp['show_tax'] ? 'border-amber-400 bg-amber-50/40 dark:bg-amber-900/10' : 'border-gray-200 dark:border-gray-700' }}">
                     <label class="flex items-start gap-2.5 cursor-pointer">
                         <input type="checkbox" name="rp_show_tax" value="1" {{ $rp['show_tax'] ? 'checked' : '' }} class="mt-0.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500 w-4 h-4">
                         <span class="flex-1 min-w-0">

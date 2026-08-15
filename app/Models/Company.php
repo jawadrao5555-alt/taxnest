@@ -267,6 +267,13 @@ class Company extends Model
     {
         $pra = $this->displayPrefs('pos');
         $pra['show_tax'] = (bool) ($this->pos_receipt_show_tax ?? true);
+        // show_verify_line (Aug 2026): "Scan with PRA Sahulat App" text under the QR.
+        // Default ON (absent key = true) so existing shops are unchanged.
+        $all0 = $this->invoice_display_prefs;
+        $posPrefs = is_array($all0) ? ($all0['pos'] ?? []) : [];
+        $pra['show_verify_line'] = array_key_exists('show_verify_line', $posPrefs)
+            ? filter_var($posPrefs['show_verify_line'], FILTER_VALIDATE_BOOLEAN)
+            : true;
         if ($type !== 'local') {
             return $pra;
         }

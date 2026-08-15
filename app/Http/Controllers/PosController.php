@@ -3595,7 +3595,11 @@ class PosController extends Controller
         $assignCompany = Company::find($companyId);
         $canAssignRider = \App\Services\PosFeatureService::planAllows($assignCompany, 'riders_enabled')
             && !empty(\App\Services\PosFeatureService::forCompany($assignCompany)->delivery)
-            && \App\Services\PosAccessService::customAllows(auth('pos')->user(), 'deliveries') !== false;
+            && \App\Services\PosAccessService::customAllows(auth('pos')->user(), 'deliveries') !== false
+            // Task 797: local-scoped staff cannot assign riders to PRA finals —
+            // the assign POST already 403s them server-side; this removes the
+            // false UI affordance (dropdown appears but always errors).
+            && (auth('pos')->user()?->posBillingScope() ?? 'both') !== 'local';
         $assignRiders = [];
         if ($canAssignRider && $hasRiderCols && \Illuminate\Support\Facades\Schema::hasTable('pos_riders')) {
             $assignRiders = \DB::table('pos_riders')

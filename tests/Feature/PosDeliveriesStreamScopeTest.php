@@ -481,4 +481,35 @@ class PosDeliveriesStreamScopeTest extends TestCase
         $this->assertNotNull(DB::table('pos_transactions')->find($localId)->rider_settlement_id);
         $this->assertNotNull(DB::table('pos_transactions')->find($praId)->rider_settlement_id);
     }
+
+    /**
+     * Task 797 — Assign Rider dropdown must not appear for local-scoped staff.
+     *
+     * local-scoped cashier sees the popup but CANNOT assign riders to PRA finals
+     * (the assign POST would 403). The API must return can_assign_rider=false so
+     * the frontend never renders the dropdown on those bills.
+     * An admin (both-scope) must still get can_assign_rider=true.
+     */
+    public function test_local_scoped_staff_get_can_assign_rider_false(): void
+    {
+        $cid = $this->buildSchema();
+        $this->makeRider($cid);
+
+        $localCashier = $this->makeUser($cid, 'pos_cashier', 'local');
+        $admin        = $this->makeUser($cid, 'pos_admin');
+
+        // Local-scoped staff: can_assign_rider must be FALSE.
+        $res = $this->actingAs($localCashier, 'pos')
+            ->get('/pos/api/provisional-bills')
+            ->assertOk();
+        $this->assertFalse((bool) $res->json('can_assign_rider'),
+            'local-scoped staff should never get can_assign_rider=true');
+
+        // Admin (both-scope): can_assign_rider must be TRUE (delivery + plan gate satisfied).
+        $res = $this->actingAs($admin, 'pos')
+            ->get('/pos/api/provisional-bills')
+            ->assertOk();
+        $this->assertTrue((bool) $res->json('can_assign_rider'),
+            'admin should get can_assign_rider=true when delivery feature + plan gate satisfied');
+    }
 }

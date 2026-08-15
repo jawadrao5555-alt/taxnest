@@ -454,9 +454,16 @@ class PosKotThemeTest extends TestCase
 
     public function test_kot_and_receipt_blades_keep_their_own_null_defaults(): void
     {
-        // PRA kitchen ticket: NULL → CENTER (Pizza Master default).
+        // PRA kitchen ticket: NULL → LEFT (v6-safe, Task 756 regression fix).
+        // The old `?? true` emitted margin:auto for NULL companies, which on
+        // A4-default Windows queues shifted the 72mm body off the thermal head
+        // → blank KOT. Only explicit true (owner opt-in) may centre.
         $kot = file_get_contents(resource_path('views/pos/restaurant/kitchen-ticket.blade.php'));
-        $this->assertStringContainsString('$company->kot_align_center ?? true', $kot);
+        $this->assertStringContainsString('$company->kot_align_center ?? false', $kot);
+        // The dangerous margin:auto rule must be gated on the explicit-true
+        // flag, NEVER unconditionally or for the NULL/default path.
+        $this->assertStringNotContainsString('$company->kot_align_center ?? true', $kot,
+            'kitchen-ticket must not use ?? true — NULL must default to left (v6-safe), not centering CSS');
 
         // PRA receipts + proof bill: explicit receipt column first, then the
         // kot fallback with a LEFT tail — NULL kot must never center receipts.

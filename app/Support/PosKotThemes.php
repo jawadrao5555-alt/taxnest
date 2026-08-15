@@ -19,12 +19,23 @@ namespace App\Support;
  *             UNIVERSAL DEFAULT since Task 718, owner-approved Aug 2026)
  *   compact — left edge, tight paper-saving layout
  *
- * DEFAULT semantics (Task 718): companies.kot_align_center is NULLABLE.
- * NULL = "shop never made an explicit choice" → resolves to 'center' so an
- * untouched company's KOT prints Pizza Master style (center-bold). An
+ * DEFAULT semantics (Task 718, amended by Task 756):
+ * companies.kot_align_center is NULLABLE.
+ * NULL = "shop never made an explicit choice".
+ *
+ * Two contexts read this differently ON PURPOSE:
+ *   • Settings UI / card pre-selection (alignBool / resolve): NULL → CENTER,
+ *     so an untouched company sees the Center card highlighted and an
+ *     untouched save writes explicit true (no surprise flip).
+ *   • Print CSS in kitchen-ticket.blade.php: NULL → LEFT (v6-safe, no
+ *     margin:auto). This is the Task 756 regression fix — the old `?? true`
+ *     let NULL emit margin:auto, which on A4-default Windows queues shifted
+ *     the 72mm body off the thermal head → blank KOT. Only explicit true
+ *     (owner opt-in, warned on the settings page) emits centering CSS.
+ *
  * EXPLICIT false (khula/compact card, kitchen-settings save, or a pre-718
- * deliberate compact/margin setup kept by the migration) stays left — the
- * opt-out path the preset cards provide. FBR receipts/day-close read the
+ * deliberate compact/margin setup kept by the migration) stays left in BOTH
+ * contexts — the confirmed opt-out path. FBR receipts/day-close read the
  * same column with `?? false` ON PURPOSE (for fbrpos it is the RECEIPT
  * print position, not a KOT look) — never "harmonize" them to this default.
  */

@@ -17,11 +17,16 @@
         $kotShowFooter        = (bool) ($company->kot_show_footer ?? true);
         $kotShowKitchenNotes  = (bool) ($company->kot_show_kitchen_notes ?? false);
         // Task 718 (Pizza Master default): kot_align_center is now NULLABLE —
-        // NULL = shop never chose, so the KOT prints CENTERED (Pizza Master
-        // style) by default. Explicit false (Khula/Compact preset or a
-        // kitchen-settings save) keeps the left edge. Drift-missing column
-        // also lands on the new center default.
-        $kotAlignCenter       = (bool) ($company->kot_align_center ?? true);
+        // NULL = shop never chose explicitly. For PRINT CSS we default to LEFT
+        // (v6-safe, margin:0) regardless of the "center" UI default — this is
+        // the Task 756 regression fix: NULL was resolving to margin:auto via
+        // `?? true`, which on A4-default Windows queues shifts a 72mm body
+        // ~69mm right → the 72mm thermal head prints only the blank left margin.
+        // The settings UI still pre-selects Center for NULL companies (aligned
+        // with PosKotThemes::alignBool) so an untouched save writes explicit
+        // true. Only explicit true (owner opt-in, with the A4 warning on the
+        // settings page) now emits the margin:auto print rule.
+        $kotAlignCenter       = (bool) ($company->kot_align_center ?? false);
         $kotMarginMm          = max(0, min(30, (int) ($company->kot_left_margin_mm ?? 0)));
     @endphp
     <style>

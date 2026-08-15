@@ -71,6 +71,19 @@ $PHP84 artisan down --render=errors::deploying --status=200 --refresh=4 2>&1 || 
 # friendly 200 page; recover manually ('php artisan up' after fixing).
 
 if [ "$DO_PULL" = 1 ]; then
+  # Task 713: cPanel auto-deploys server-bump public/sw.js CACHE_VERSION when a
+  # plain push carried no bump, leaving the live worktree with a CACHE_VERSION-
+  # only local modification that would abort the pull. Restore it ONLY when the
+  # diff touches nothing but CACHE_VERSION lines — this deploy ships its own
+  # fresh CACHE_VERSION anyway. Any other local sw.js change still fails loudly.
+  if ! git diff --quiet -- public/sw.js 2>/dev/null; then
+    if git diff -- public/sw.js | grep '^[+-]' | grep -v '^+++' | grep -v '^---' | grep -qv 'CACHE_VERSION'; then
+      echo "REMOTE_STEP: public/sw.js locally modified beyond CACHE_VERSION — NOT auto-restoring"
+    else
+      echo "REMOTE_STEP: restoring server-bumped public/sw.js (CACHE_VERSION-only diff) before pull"
+      git checkout -- public/sw.js || exit 91
+    fi
+  fi
   echo "REMOTE_STEP: git pull origin main"
   git pull origin main 2>&1 || exit 91
 fi
@@ -304,7 +317,19 @@ else
 fi
 
 # Live worktree must be clean for a fast-forward pull (untracked junk is fine).
-DIRTY=$(run_ssh "cd $LIVE_DIR && git status --porcelain | grep -v '^??' | head -20" 2>/dev/null || true)
+# Exception (Task 713): a public/sw.js diff that touches ONLY the CACHE_VERSION
+# line is the cPanel auto-deploy's server-side bump — expected; remote_apply
+# restores it just before the pull. Anything else in sw.js still counts dirty.
+DIRTY=$(timeout 60 ssh "${SSH_OPTS[@]}" "$HOST" bash -s <<'DIRTYCHECK' 2>/dev/null || true
+cd /home/taxnestc/public_html || exit 0
+git status --porcelain | grep -v '^??' | grep -v ' public/sw\.js$' | head -20
+if ! git diff --quiet -- public/sw.js 2>/dev/null; then
+  if git diff -- public/sw.js | grep '^[+-]' | grep -v '^+++' | grep -v '^---' | grep -qv 'CACHE_VERSION'; then
+    echo ' M public/sw.js (changes beyond CACHE_VERSION auto-bump)'
+  fi
+fi
+DIRTYCHECK
+)
 if [ -n "$DIRTY" ]; then
   echo "Live worktree has MODIFIED tracked files:" >&2
   echo "$DIRTY" >&2

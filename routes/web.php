@@ -153,6 +153,7 @@ Route::get('/sitemap.xml', function () {
     $urls = [
         ['loc' => url('/'),                'priority' => '1.0', 'changefreq' => 'weekly'],
         ['loc' => url('/pos'),             'priority' => '0.9', 'changefreq' => 'monthly'],
+        ['loc' => url('/fbr-pos-landing'), 'priority' => '0.9', 'changefreq' => 'monthly'],
         ['loc' => url('/digital-invoice'), 'priority' => '0.9', 'changefreq' => 'monthly'],
         ['loc' => url('/tutorials'),       'priority' => '0.8', 'changefreq' => 'weekly'],
         ['loc' => url('/download'),        'priority' => '0.7', 'changefreq' => 'monthly'],

@@ -205,6 +205,7 @@
                 
                 <div class="hidden md:flex items-center space-x-8">
                     <a href="#architecture" class="text-sm font-semibold transition-colors" :class="scrolled ? 'text-[#052730] hover:text-[#0A4D5C]' : 'text-white/90 hover:text-white'">Architecture</a>
+                    <a href="#features" class="text-sm font-semibold transition-colors" :class="scrolled ? 'text-[#052730] hover:text-[#0A4D5C]' : 'text-white/90 hover:text-white'">Features</a>
                     <a href="#pricing" class="text-sm font-semibold transition-colors" :class="scrolled ? 'text-[#052730] hover:text-[#0A4D5C]' : 'text-white/90 hover:text-white'">Pricing</a>
                     
                     <div class="w-px h-5" :class="scrolled ? 'bg-gray-300' : 'bg-white/20'"></div>
@@ -225,6 +226,7 @@
         <div x-show="mobileOpen" x-cloak @click.away="mobileOpen = false" class="md:hidden border-t border-gray-200 bg-[#FDFBF7]">
             <div class="px-4 py-4 space-y-1">
                 <a href="#architecture" class="block px-3 py-2.5 rounded text-sm font-semibold text-gray-700 hover:bg-gray-100" @click="mobileOpen = false">Architecture</a>
+                <a href="#features" class="block px-3 py-2.5 rounded text-sm font-semibold text-gray-700 hover:bg-gray-100" @click="mobileOpen = false">Features</a>
                 <a href="#pricing" class="block px-3 py-2.5 rounded text-sm font-semibold text-gray-700 hover:bg-gray-100" @click="mobileOpen = false">Pricing</a>
                 <div class="border-t border-gray-200 my-2 pt-2"></div>
                 <button @click="showLoginModal = true; mobileOpen = false" class="w-full text-left block px-3 py-2.5 rounded text-sm font-semibold text-gray-700 hover:bg-gray-100">Sign In to POS</button>
@@ -410,6 +412,102 @@
                             Print a draft bill for customer review before committing it to FBR. A critical feature for restaurants or large hardware orders where adjustments happen before final payment.
                         </p>
                     </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Full Feature Grid -->
+    <section id="features" class="py-24 bg-[#FDFBF7] border-t border-gray-200">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="mb-16 max-w-3xl fade-in-up">
+                <span class="text-xs font-bold tracking-widest uppercase text-[#0A4D5C]">Everything at the counter</span>
+                <h2 class="text-4xl font-serif text-[#052730] mt-3 mb-6">A complete retail toolkit, <span class="text-[#B8951F]">not just a fiscal printer.</span></h2>
+                <p class="text-xl text-gray-600 leading-relaxed">
+                    Returns, loyalty, khata, promotions, shifts and day-close — the workflows a real Pakistani shop runs every day, built into the same terminal that talks to FBR.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Returns / Credit Notes -->
+                <div class="bg-white border border-gray-200 p-8 fade-in-up">
+                    <div class="w-10 h-10 rounded bg-[#0F6171]/10 flex items-center justify-center mb-5">
+                        <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z"/></svg>
+                    </div>
+                    <h4 class="text-lg font-bold text-[#052730] mb-2">Returns &amp; Credit Notes</h4>
+                    <p class="text-gray-600 text-sm leading-relaxed">Pull up any receipt and process a return within the 15-day window. Refunds, stock restore and the FBR credit note are handled in one flow — no manual adjustments.</p>
+                </div>
+
+                <!-- Loyalty -->
+                <div class="bg-white border border-gray-200 p-8 fade-in-up" style="transition-delay: 50ms;">
+                    <div class="w-10 h-10 rounded bg-[#0F6171]/10 flex items-center justify-center mb-5">
+                        <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+                    </div>
+                    <h4 class="text-lg font-bold text-[#052730] mb-2">Loyalty Points</h4>
+                    <p class="text-gray-600 text-sm leading-relaxed">Set your own earn and redeem rates. Regular customers collect points on every bill and cash them in at the counter — the full points ledger stays auditable per customer.</p>
+                </div>
+
+                <!-- Promotions -->
+                <div class="bg-white border border-gray-200 p-8 fade-in-up" style="transition-delay: 100ms;">
+                    <div class="w-10 h-10 rounded bg-[#0F6171]/10 flex items-center justify-center mb-5">
+                        <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+                    </div>
+                    <h4 class="text-lg font-bold text-[#052730] mb-2">Promotions &amp; Discount Codes</h4>
+                    <p class="text-gray-600 text-sm leading-relaxed">Run time-boxed promotions and discount codes that validate live at billing. Prices are enforced server-side, so cashiers can't hand out discounts you didn't approve.</p>
+                </div>
+
+                <!-- Khata -->
+                <div class="bg-white border border-gray-200 p-8 fade-in-up">
+                    <div class="w-10 h-10 rounded bg-[#0F6171]/10 flex items-center justify-center mb-5">
+                        <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                    </div>
+                    <h4 class="text-lg font-bold text-[#052730] mb-2">Customer Khata Ledger</h4>
+                    <p class="text-gray-600 text-sm leading-relaxed">Sell on credit the way the market actually works. Every udhaar bill and wasooli posts to a per-customer ledger with a running balance — no side registers.</p>
+                </div>
+
+                <!-- Day-close / shifts -->
+                <div class="bg-white border border-gray-200 p-8 fade-in-up" style="transition-delay: 50ms;">
+                    <div class="w-10 h-10 rounded bg-[#0F6171]/10 flex items-center justify-center mb-5">
+                        <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    </div>
+                    <h4 class="text-lg font-bold text-[#052730] mb-2">Z-Reports, Shifts &amp; Terminals</h4>
+                    <p class="text-gray-600 text-sm leading-relaxed">Open a shift with counted opening cash, run multiple terminals, and close the day with a Z-report — on screen, PDF or thermal — that reconciles cash, card and khata.</p>
+                </div>
+
+                <!-- Fiscal Device local mode -->
+                <div class="bg-white border border-gray-200 p-8 fade-in-up" style="transition-delay: 100ms;">
+                    <div class="w-10 h-10 rounded bg-[#0F6171]/10 flex items-center justify-center mb-5">
+                        <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    </div>
+                    <h4 class="text-lg font-bold text-[#052730] mb-2">Fiscal Device Local Mode</h4>
+                    <p class="text-gray-600 text-sm leading-relaxed">For POS IDs on FBR's fiscal-device regime, our Windows Desktop Agent fiscalizes bills through the local IMS service on your counter PC — the route FBR now requires for new registrations.</p>
+                </div>
+
+                <!-- Delivery riders -->
+                <div class="bg-white border border-gray-200 p-8 fade-in-up">
+                    <div class="w-10 h-10 rounded bg-[#0F6171]/10 flex items-center justify-center mb-5">
+                        <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0 2 2 0 00-4 0z"/></svg>
+                    </div>
+                    <h4 class="text-lg font-bold text-[#052730] mb-2">Delivery Riders</h4>
+                    <p class="text-gray-600 text-sm leading-relaxed">Assign home-delivery bills to riders, track what's out for delivery, and settle each rider's cash at day end so nothing goes missing between the shop and the doorstep.</p>
+                </div>
+
+                <!-- Receipt themes -->
+                <div class="bg-white border border-gray-200 p-8 fade-in-up" style="transition-delay: 50ms;">
+                    <div class="w-10 h-10 rounded bg-[#0F6171]/10 flex items-center justify-center mb-5">
+                        <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+                    </div>
+                    <h4 class="text-lg font-bold text-[#052730] mb-2">Receipt Themes</h4>
+                    <p class="text-gray-600 text-sm leading-relaxed">Pick the receipt style that fits your shop — layout, logo and formatting options for both 80mm and 58mm thermal printers, with the FBR fiscal block always intact.</p>
+                </div>
+
+                <!-- Urdu -->
+                <div class="bg-white border border-gray-200 p-8 fade-in-up" style="transition-delay: 100ms;">
+                    <div class="w-10 h-10 rounded bg-[#0F6171]/10 flex items-center justify-center mb-5">
+                        <svg class="w-5 h-5 text-[#0A4D5C]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/></svg>
+                    </div>
+                    <h4 class="text-lg font-bold text-[#052730] mb-2">Urdu &amp; Roman Urdu</h4>
+                    <p class="text-gray-600 text-sm leading-relaxed">Switch the whole panel to Urdu or Roman Urdu so every cashier is comfortable from day one — and print customer invoices with proper Urdu text where needed.</p>
                 </div>
             </div>
         </div>

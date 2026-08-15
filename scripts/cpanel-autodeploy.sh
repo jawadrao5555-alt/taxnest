@@ -91,7 +91,14 @@ $PHP artisan view:clear   2>&1 || die_down "view:clear failed"
 $PHP artisan cache:clear  2>&1 || die_down "cache:clear failed (app cache store unreachable?)"
 
 # 5. Dependencies + schema (inside the maintenance window, so slow is fine).
-$PHP /usr/local/bin/composer install --no-dev --optimize-autoloader --no-interaction 2>&1 \
+#    Composer location varies per host (this cPanel box has it at ~/bin/composer,
+#    NOT /usr/local/bin/composer — verified 15 Aug 2026). Resolve it, fail-closed.
+COMPOSER=""
+for C in "/home/$USER/bin/composer" /usr/local/bin/composer /opt/cpanel/composer/bin/composer "$(command -v composer 2>/dev/null)"; do
+  [ -n "$C" ] && [ -f "$C" ] && { COMPOSER="$C"; break; }
+done
+[ -n "$COMPOSER" ] || die_down "composer binary not found (looked in ~/bin, /usr/local/bin, /opt/cpanel/composer/bin, PATH)"
+$PHP "$COMPOSER" install --no-dev --optimize-autoloader --no-interaction 2>&1 \
   || die_down "composer install failed (vendor may be incomplete)"
 $PHP artisan migrate --force 2>&1 \
   || die_down "migrate --force failed (new code against old schema would 500)"

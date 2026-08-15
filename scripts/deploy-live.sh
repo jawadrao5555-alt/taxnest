@@ -103,6 +103,19 @@ if [ "$DO_PULL" = 1 ]; then
   fi
   echo "REMOTE_STEP: git pull origin main"
   git pull origin main 2>&1 || exit 91
+  # Task 728: record the repo sw.js CACHE_VERSION this deploy ships, in the SAME
+  # state file cpanel-autodeploy.sh uses. Without this, a deploy-live push (which
+  # does NOT trigger the cPanel webhook autodeploy) leaves the state stale, and
+  # the NEXT plain task-merge push would compare against the wrong version and
+  # wrongly skip its server-side bump (devices would keep old caches).
+  SHIPPED_SW=$(grep -m1 "^const CACHE_VERSION = '" public/sw.js | sed "s/^const CACHE_VERSION = '\([^']*\)'.*/\1/")
+  if [ -n "$SHIPPED_SW" ]; then
+    printf '%s\n' "$SHIPPED_SW" > /home/taxnestc/.taxnest-last-shipped-sw-version \
+      && echo "REMOTE_STEP: recorded shipped SW version $SHIPPED_SW" \
+      || echo "REMOTE_STEP: WARNING could not record shipped SW version (autodeploy falls back to live-file comparison)"
+  else
+    echo "REMOTE_STEP: WARNING could not read CACHE_VERSION from pulled public/sw.js — state file NOT updated"
+  fi
 fi
 if [ "$DO_COMPOSER" = 1 ]; then
   echo "REMOTE_STEP: composer install"

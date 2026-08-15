@@ -60,6 +60,13 @@ if ! flock -w 600 9; then
 fi
 log "deploy lock acquired"
 
+# 0.2 Ignore file-mode-only diffs in the live repo (Task 728): step 6's
+#     `chmod -R 775 storage bootstrap/cache` flips tracked .gitignore files to
+#     100755, which shows as ' M' in git status and falsely trips
+#     deploy-live.sh's "live tree dirty" abort. Content diffs still count.
+git -C "$DEPLOYPATH" config core.fileMode false 2>/dev/null \
+  || log "WARNING: could not set core.fileMode=false on live repo (mode-only diffs may trip deploy-live dirty check)"
+
 # 0.5 SW CACHE_VERSION freshness (Task 713): every deploy must ship a NEW
 #     public/sw.js CACHE_VERSION so devices purge old RUNTIME/STATIC caches and
 #     get the SW update badge. deploy-live.sh auto-bumps + commits before its

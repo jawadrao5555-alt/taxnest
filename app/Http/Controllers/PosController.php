@@ -3524,6 +3524,11 @@ class PosController extends Controller
         // Cash/Card) in par KABHI nahi chalta (bill pehle se final hai).
         $finalBills = collect();
         $hasDelStatus = \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'delivery_status');
+        // Task 807: stream-scope for final delivery bills — mirrors
+        // PosRiderController::applyStreamScope. local-scoped staff see ONLY
+        // local finals; pra-scoped staff see ONLY PRA finals; 'both'
+        // (owner/admin/pos_delivery) sees everything unchanged.
+        $finalBillScope = auth('pos')->user()?->posBillingScope() ?? 'both';
         if ($hasRiderCols && $hasDelStatus) {
             $finalBills = PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $companyId)
@@ -3562,6 +3567,25 @@ class PosController extends Controller
                             ->whereNull('rider_settlement_id')
                             ->where('order_type', 'delivery')
                             ->where('created_at', '>=', now()->subDays(7));
+                    });
+                })
+                // Task 807: apply billing-stream predicate — same logic as
+                // PosRiderController::applyStreamScope.
+                ->when($finalBillScope === 'local', function ($q) {
+                    $q->where(function ($s) {
+                        $s->where('invoice_mode', 'local')
+                          ->orWhere(function ($s2) {
+                              $s2->whereNull('pra_status')->whereNull('pra_invoice_number');
+                          });
+                    });
+                })
+                ->when($finalBillScope === 'pra', function ($q) {
+                    $q->where(function ($s) {
+                        $s->where(function ($s2) {
+                            $s2->where('invoice_mode', '!=', 'local')->orWhereNull('invoice_mode');
+                        })->where(function ($s2) {
+                            $s2->whereNotNull('pra_status')->orWhereNotNull('pra_invoice_number');
+                        });
                     });
                 })
                 ->orderBy('id', 'desc')

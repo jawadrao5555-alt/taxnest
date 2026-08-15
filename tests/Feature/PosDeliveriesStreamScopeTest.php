@@ -182,6 +182,16 @@ class PosDeliveriesStreamScopeTest extends TestCase
             $table->timestamps();
         });
 
+        // Needed by apiProvisionalBills finalData mapper (items_count).
+        Schema::create('pos_transaction_items', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('transaction_id');
+            $table->string('name')->nullable();
+            $table->decimal('price', 12, 2)->default(0);
+            $table->integer('quantity')->default(1);
+            $table->timestamps();
+        });
+
         \App\Services\PosFeatureService::flushGateCaches();
 
         $companyId = (int) DB::table('companies')->insertGetId([
@@ -511,5 +521,102 @@ class PosDeliveriesStreamScopeTest extends TestCase
             ->assertOk();
         $this->assertTrue((bool) $res->json('can_assign_rider'),
             'admin should get can_assign_rider=true when delivery feature + plan gate satisfied');
+    }
+
+    /**
+     * Task 807 — Pending Deliveries popup (apiProvisionalBills) must apply the
+     * same stream-scope predicate as the Deliveries board to final delivery bills.
+     *
+     * local-scoped staff: only local finals in final_deliveries JSON.
+     * pra-scoped staff:   only PRA finals in final_deliveries JSON.
+     * 'both' (admin):     both streams visible.
+     */
+    public function test_api_final_deliveries_hidden_for_cross_stream_staff(): void
+    {
+        $cid = $this->buildSchema();
+        $rid = $this->makeRider($cid);
+
+        // PRA final delivery bill — has pra_status + pra_invoice_number, not provisional.
+        $praInv = 'INV-FINAL-PRA-T807';
+        DB::table('pos_transactions')->insert([
+            'company_id'         => $cid,
+            'invoice_number'     => $praInv,
+            'business_date'      => now()->toDateString(),
+            'status'             => 'completed',
+            'invoice_mode'       => 'pra',
+            'pra_status'         => 'completed',
+            'pra_invoice_number' => 'PRAF-' . rand(10000, 99999),
+            'is_archived'        => false,
+            'order_type'         => 'delivery',
+            'rider_id'           => $rid,
+            'rider_assigned_at'  => now(),
+            'delivery_status'    => 'assigned',
+            'rider_settlement_id'=> null,
+            'payment_method'     => 'cash',
+            'total_amount'       => 700.00,
+            'subtotal'           => 700.00,
+            'created_at'         => now(),
+            'updated_at'         => now(),
+        ]);
+
+        // Local-stream final delivery bill — invoice_mode='pra' but NULL pra trail
+        // (reporting-OFF shop: bill was never submitted to PRA). This is the
+        // real-world shape for local-stream finals; the whereNot that excludes
+        // provisionals (invoice_mode='local' AND pra_status='local') safely passes
+        // because invoice_mode != 'local' here (SQL: NOT (FALSE AND NULL) = TRUE).
+        // Mirrors the "reporting_off_final_counts_as_local_stream" test pattern.
+        $localInv = 'INV-REPOFF-FINAL-T807';
+        DB::table('pos_transactions')->insert([
+            'company_id'         => $cid,
+            'invoice_number'     => $localInv,
+            'business_date'      => now()->toDateString(),
+            'status'             => 'completed',
+            'invoice_mode'       => 'pra',
+            'pra_status'         => null,
+            'pra_invoice_number' => null,
+            'is_archived'        => false,
+            'order_type'         => 'delivery',
+            'rider_id'           => $rid,
+            'rider_assigned_at'  => now(),
+            'delivery_status'    => 'assigned',
+            'rider_settlement_id'=> null,
+            'payment_method'     => 'cash',
+            'total_amount'       => 400.00,
+            'subtotal'           => 400.00,
+            'created_at'         => now(),
+            'updated_at'         => now(),
+        ]);
+
+        $localCashier = $this->makeUser($cid, 'pos_cashier', 'local');
+        $praCashier   = $this->makeUser($cid, 'pos_cashier', 'pra');
+        $admin        = $this->makeUser($cid, 'pos_admin');
+
+        // Local-scoped cashier: only local final visible; PRA final must be absent.
+        $res = $this->actingAs($localCashier, 'pos')
+            ->get('/pos/api/provisional-bills')
+            ->assertOk();
+        $invoiceNumbers = collect($res->json('final_deliveries'))->pluck('invoice_number');
+        $this->assertTrue($invoiceNumbers->contains($localInv),
+            'local-scoped staff should see local final delivery bill in popup');
+        $this->assertFalse($invoiceNumbers->contains($praInv),
+            'local-scoped staff must NOT see PRA final delivery bill in popup');
+
+        // PRA-scoped cashier: only PRA final visible; local final must be absent.
+        $res = $this->actingAs($praCashier, 'pos')
+            ->get('/pos/api/provisional-bills')
+            ->assertOk();
+        $invoiceNumbers = collect($res->json('final_deliveries'))->pluck('invoice_number');
+        $this->assertFalse($invoiceNumbers->contains($localInv),
+            'pra-scoped staff must NOT see local final delivery bill in popup');
+        $this->assertTrue($invoiceNumbers->contains($praInv),
+            'pra-scoped staff should see PRA final delivery bill in popup');
+
+        // Admin ('both'): sees all finals.
+        $res = $this->actingAs($admin, 'pos')
+            ->get('/pos/api/provisional-bills')
+            ->assertOk();
+        $invoiceNumbers = collect($res->json('final_deliveries'))->pluck('invoice_number');
+        $this->assertTrue($invoiceNumbers->contains($localInv), 'admin should see local final');
+        $this->assertTrue($invoiceNumbers->contains($praInv),   'admin should see PRA final');
     }
 }

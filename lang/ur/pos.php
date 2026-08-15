@@ -2900,6 +2900,7 @@ return [
     'receipt_rate' => 'ریٹ',
     'receipt_rider' => 'رائڈر',
     'receipt_waiter' => 'ویٹر',
+    'receipt_table' => 'میز',
     'receipt_sale_receipt' => 'سیل رسید',
     'receipt_scan_bill' => 'بل کی تفصیل کھولنے کے لیے اسکین کریں',
     'receipt_scan_details' => 'تفصیلات کے لیے اسکین کریں',

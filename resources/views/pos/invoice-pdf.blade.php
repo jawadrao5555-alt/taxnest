@@ -148,6 +148,31 @@
                 <div class="val">{{ $transaction->creator->name }}</div>
             </div>
             @endif
+            {{-- Table name (Aug 2026): dine-in PDF receipts show the table label.
+                 Schema guard = PROD drift convention. --}}
+            @php
+                $rcptPdfTableLabel = null;
+                if (($transaction->order_type ?? null) === 'dine_in'
+                    && \Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'table_id')) {
+                    $rcptPdfTableRO = \App\Models\RestaurantOrder::where('company_id', $transaction->company_id)
+                        ->where('pos_transaction_id', $transaction->id)
+                        ->with('table.floor')
+                        ->orderByDesc('id')
+                        ->first();
+                    if ($rcptPdfTableRO && $rcptPdfTableRO->table) {
+                        $rcptPdfTableLabel = 'T-' . $rcptPdfTableRO->table->table_number;
+                        if ($rcptPdfTableRO->table->floor && $rcptPdfTableRO->table->floor->name) {
+                            $rcptPdfTableLabel .= ' — ' . $rcptPdfTableRO->table->floor->name;
+                        }
+                    }
+                }
+            @endphp
+            @if($rcptPdfTableLabel)
+            <div class="info-row">
+                <div class="lbl">{{ __('pos.receipt_table') }}</div>
+                <div class="val">{{ $rcptPdfTableLabel }}</div>
+            </div>
+            @endif
         </div>
 
         @php

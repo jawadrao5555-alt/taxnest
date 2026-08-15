@@ -548,6 +548,29 @@
         @if($rcptWaiterName)
         <tr><td class="info-label">{{ __('pos.receipt_waiter') }}:</td><td class="info-value">{{ $rcptWaiterName }}</td></tr>
         @endif
+        {{-- Table name (Aug 2026): dine-in receipts show the table label so staff
+             can match a printout to the right table instantly. Floor name appended
+             when the company uses multiple floors. Schema guard = PROD drift convention. --}}
+        @php
+            $rcptTableLabel = null;
+            if (($transaction->order_type ?? null) === 'dine_in'
+                && \Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'table_id')) {
+                $rcptTableRO = \App\Models\RestaurantOrder::where('company_id', $transaction->company_id)
+                    ->where('pos_transaction_id', $transaction->id)
+                    ->with('table.floor')
+                    ->orderByDesc('id')
+                    ->first();
+                if ($rcptTableRO && $rcptTableRO->table) {
+                    $rcptTableLabel = 'T-' . $rcptTableRO->table->table_number;
+                    if ($rcptTableRO->table->floor && $rcptTableRO->table->floor->name) {
+                        $rcptTableLabel .= ' — ' . $rcptTableRO->table->floor->name;
+                    }
+                }
+            }
+        @endphp
+        @if($rcptTableLabel)
+        <tr><td class="info-label">{{ __('pos.receipt_table') }}:</td><td class="info-value">{{ $rcptTableLabel }}</td></tr>
+        @endif
     </table>
 
     <div class="separator"></div>

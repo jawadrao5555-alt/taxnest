@@ -98,6 +98,10 @@
         try {
             if ($transaction->relationLoaded('payments')) {
                 $rawPayments = $transaction->payments ?? collect();
+                // Show breakdown whenever there are ≥2 raw payment rows, even
+                // if all aliases collapse into a single display bucket (e.g.
+                // card + debit_card → one Card line). The customer paid in
+                // multiple transactions, so the section is still meaningful.
                 if ($rawPayments->count() >= 2) {
                     // Bucket aliases so the customer sees a friendly label.
                     $cardAliases = ['card', 'debit_card', 'credit_card'];
@@ -124,7 +128,7 @@
             $billPayments = [];
         }
     @endphp
-    @if(count($billPayments) >= 2)
+    @if(count($billPayments) >= 1)
     <table class="totals" style="margin-top:6px; border-top:1px dashed #e5e7eb; padding-top:4px;">
         <tr>
             <td colspan="2" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;padding-bottom:2px;">

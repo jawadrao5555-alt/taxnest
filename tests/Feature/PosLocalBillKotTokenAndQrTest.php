@@ -87,6 +87,16 @@ class PosLocalBillKotTokenAndQrTest extends TestCase
             $t->timestamps();
             $t->softDeletes();
         });
+
+        // Split-payment breakdown — Task 802/803.
+        Schema::create('pos_payments', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('transaction_id');
+            $t->string('payment_method');
+            $t->decimal('amount', 12, 2)->default(0);
+            $t->string('reference_number')->nullable();
+            $t->timestamps();
+        });
     }
 
     protected function tearDown(): void
@@ -492,5 +502,163 @@ class PosLocalBillKotTokenAndQrTest extends TestCase
         $this->get('/bill/' . self::TXN_ID)->assertRedirect('/');        // id guess
         $this->get('/bill/short')->assertRedirect('/');                  // malformed
         $this->getJson('/bill/' . str_repeat('b', 64))->assertNotFound();
+    }
+
+    // ── Split-payment breakdown (Task 802/803) ────────────────────────────
+
+    /**
+     * Seed payment rows alongside the bill so the split-payment section renders.
+     */
+    private function seedPayments(array $rows): void
+    {
+        foreach ($rows as $row) {
+            \DB::table('pos_payments')->insert(array_merge([
+                'transaction_id' => self::TXN_ID,
+                'created_at'     => now(),
+                'updated_at'     => now(),
+            ], $row));
+        }
+    }
+
+    /**
+     * A bill paid partly in cash and partly by card must show both payment
+     * lines and the correct grand total. The breakdown heading must also appear.
+     */
+    public function test_split_payment_bill_shows_breakdown_with_correct_amounts(): void
+    {
+        $token = $this->seedPublicBill([], ['total_amount' => 1000]);
+        $this->seedPayments([
+            ['payment_method' => 'cash',       'amount' => 600],
+            ['payment_method' => 'debit_card',  'amount' => 400],
+        ]);
+
+        $res = $this->get('/bill/' . $token);
+        $res->assertOk();
+
+        // Grand total must be present.
+        $res->assertSee('1,000');
+
+        // Payment breakdown heading.
+        $res->assertSee(__('pos.payment_breakdown'));
+
+        // Both payment method labels.
+        $res->assertSee(__('pos.receipt_pay_cash'));
+        $res->assertSee(__('pos.receipt_pay_card'));
+
+        // Each payment amount.
+        $res->assertSee('600');
+        $res->assertSee('400');
+    }
+
+    /**
+     * A bill paid with three split rows (cash + card + other) must show all
+     * three buckets. The 'card' alias (legacy) must merge with 'debit_card'
+     * into a single Card row.
+     */
+    public function test_split_payment_card_aliases_merge_into_one_row(): void
+    {
+        $token = $this->seedPublicBill([], ['total_amount' => 1500]);
+        $this->seedPayments([
+            ['payment_method' => 'cash',    'amount' => 500],
+            ['payment_method' => 'card',    'amount' => 300],  // legacy alias
+            ['payment_method' => 'debit_card', 'amount' => 200], // same bucket
+        ]);
+
+        $res = $this->get('/bill/' . $token);
+        $res->assertOk();
+
+        $html = $res->content();
+
+        // Both card aliases collapse into one label — ensure it appears exactly once.
+        $cardLabel = __('pos.receipt_pay_card');
+        $this->assertSame(1, substr_count($html, $cardLabel),
+            'card + debit_card aliases must collapse into a single Card row');
+
+        // Combined card amount (300 + 200 = 500).
+        $res->assertSee('500');
+    }
+
+    /**
+     * Single-payment bills must NOT show the payment breakdown section — the
+     * section is only useful when there are ≥2 rows.
+     */
+    public function test_single_payment_bill_hides_breakdown_section(): void
+    {
+        $token = $this->seedPublicBill([], ['total_amount' => 800]);
+        $this->seedPayments([
+            ['payment_method' => 'cash', 'amount' => 800],
+        ]);
+
+        $res = $this->get('/bill/' . $token);
+        $res->assertOk();
+        $res->assertDontSee(__('pos.payment_breakdown'));
+    }
+
+    /**
+     * The public bill page must NEVER expose PRA invoice numbers or any other
+     * internal fiscal identifier — not in the page title, body, or anywhere.
+     */
+    public function test_split_payment_bill_does_not_expose_pra_invoice_number(): void
+    {
+        $token = $this->seedPublicBill([], [
+            'total_amount'       => 700,
+            'invoice_mode'       => 'local',
+            'pra_invoice_number' => 'PRA-SECRET-9999',
+        ]);
+        $this->seedPayments([
+            ['payment_method' => 'cash',      'amount' => 400],
+            ['payment_method' => 'debit_card', 'amount' => 300],
+        ]);
+
+        $res = $this->get('/bill/' . $token);
+        $res->assertOk();
+        $res->assertDontSee('PRA-SECRET-9999');
+        $res->assertDontSee('pra_invoice_number');
+    }
+
+    /**
+     * Two card-alias rows (legacy 'card' + 'debit_card') collapse into ONE
+     * displayed Card row, but the breakdown section must still appear because
+     * there were ≥2 raw payment rows. The combined amount must be correct.
+     */
+    public function test_all_card_alias_rows_collapse_but_section_still_shows(): void
+    {
+        $token = $this->seedPublicBill([], ['total_amount' => 900]);
+        $this->seedPayments([
+            ['payment_method' => 'card',       'amount' => 400],  // legacy alias
+            ['payment_method' => 'debit_card',  'amount' => 500],  // same bucket
+        ]);
+
+        $res = $this->get('/bill/' . $token);
+        $res->assertOk();
+
+        // Section must appear even though both rows share the Card bucket.
+        $res->assertSee(__('pos.payment_breakdown'));
+
+        // One unified Card label.
+        $cardLabel = __('pos.receipt_pay_card');
+        $this->assertSame(1, substr_count($res->content(), $cardLabel),
+            'Both card-alias rows must collapse into exactly one Card label');
+
+        // Combined amount (400 + 500 = 900).
+        $res->assertSee('900');
+
+        // Cash label must NOT appear.
+        $res->assertDontSee(__('pos.receipt_pay_cash'));
+    }
+
+    /**
+     * Bills with no payment rows at all (older bills pre-split-payment feature)
+     * still render correctly — grand total visible, no breakdown section.
+     */
+    public function test_bill_without_payment_rows_renders_without_breakdown(): void
+    {
+        $token = $this->seedPublicBill([], ['total_amount' => 500]);
+        // No pos_payments rows inserted.
+
+        $res = $this->get('/bill/' . $token);
+        $res->assertOk();
+        $res->assertSee('500');
+        $res->assertDontSee(__('pos.payment_breakdown'));
     }
 }

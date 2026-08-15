@@ -357,7 +357,12 @@
                                  reassign stays open only while assigned/dispatched so a rider who
                                  suddenly leaves can be swapped (khata follows rider_id). --}}
                             @if($b->rider_settlement_id || in_array($b->delivery_status, ['delivered', 'returned']))
-                                <span class="text-xs text-gray-600 dark:text-gray-300">{{ $b->rider->name ?? '—' }}</span>
+                                @if($b->rider_id)
+                                    <span class="text-xs text-gray-600 dark:text-gray-300">{{ $b->rider->name ?? '—' }}</span>
+                                @else
+                                    {{-- Task 774: unassigned bill was marked delivered directly --}}
+                                    <span class="text-xs text-gray-400 dark:text-gray-500 italic">{{ __('pos.del_no_rider_direct') }}</span>
+                                @endif
                             @else
                             <form method="POST" action="{{ route('pos.deliveries.assign', $b->id) }}">
                                 @csrf
@@ -457,6 +462,14 @@
                                 <button type="button" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 transition"
                                         @click="retBill = {{ $b->id }}; retBulk = null">{{ __('pos.returned_word') }}</button>
                                 @endif
+                            @elseif($activeTab === 'pending' && !$b->rider_id && !$st)
+                                {{-- Task 774: unassigned pending delivery — Delivered button only
+                                     (no dispatch, no returned; rider cash/khata not involved). --}}
+                                <form method="POST" action="{{ route('pos.deliveries.status', $b->id) }}" class="inline"
+                                      onsubmit="return confirm({{ Js::from(__('pos.del_mark_delivered_confirm')) }});">
+                                    @csrf<input type="hidden" name="delivery_status" value="delivered">
+                                    <button type="submit" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition">{{ __('pos.delivered_word') }}</button>
+                                </form>
                             @endif
                             {{-- Task 773: settled bill still stuck at assigned/dispatched —
                                  forward move to Delivered only (Dispatch/Returned stay locked). --}}
@@ -535,6 +548,7 @@
                         <th class="px-4 py-3">{{ __('pos.payment_label') }}</th>
                         <th class="px-4 py-3">{{ __('pos.rider_label') }}</th>
                         <th class="px-4 py-3">{{ __('pos.status_label') }}</th>
+                        <th class="px-4 py-3 text-right">{{ __('pos.update_label') }}</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -578,9 +592,17 @@
                             {{-- Halka (gray) chip — purana bill koi demand nahi kar raha (Task 524). --}}
                             <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">{{ __('pos.del_status_unassigned') }}</span>
                         </td>
+                        {{-- Task 774: Delivered button for old unassigned bills too --}}
+                        <td class="px-4 py-3 text-right">
+                            <form method="POST" action="{{ route('pos.deliveries.status', $b->id) }}" class="inline"
+                                  onsubmit="return confirm({{ Js::from(__('pos.del_mark_delivered_confirm')) }});">
+                                @csrf<input type="hidden" name="delivery_status" value="delivered">
+                                <button type="submit" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition">{{ __('pos.delivered_word') }}</button>
+                            </form>
+                        </td>
                     </tr>
                     @endforeach
-                    <tr id="del-old-search-empty" style="display:none"><td colspan="6" class="px-4 py-6 text-center text-sm text-gray-400">{{ __('pos.del_no_match') }}</td></tr>
+                    <tr id="del-old-search-empty" style="display:none"><td colspan="7" class="px-4 py-6 text-center text-sm text-gray-400">{{ __('pos.del_no_match') }}</td></tr>
                 </tbody>
             </table>
         </div>

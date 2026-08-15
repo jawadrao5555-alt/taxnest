@@ -560,11 +560,37 @@ class PosRiderController extends Controller
         $request->validate(['delivery_status' => 'required|in:assigned,dispatched,delivered,returned']);
 
         $txn = PosTransaction::withoutGlobalScope('hide_archived')
-            ->where('company_id', $companyId)->whereNotNull('rider_id')->findOrFail($txnId);
+            ->where('company_id', $companyId)->findOrFail($txnId);
 
         // Task 353: stream-locked staff cannot touch the other stream's bills.
         if (!$this->streamScopeAllowsTxn($txn)) {
             abort(403);
+        }
+
+        // Task 774: unassigned delivery bill (rider_id NULL) — only 'delivered'
+        // allowed. No rider cash, no khata, no settlement involved; just closes
+        // the pending bill. All other transitions (dispatched, returned) stay
+        // gated behind rider_id NOT NULL.
+        // status=completed guard mirrors the board query — incomplete/held bills
+        // must not be closeable via a direct POST.
+        if (!$txn->rider_id) {
+            $newStatus = $request->input('delivery_status');
+            if ($newStatus !== 'delivered'
+                || $txn->delivery_status !== null
+                || $txn->order_type !== 'delivery'
+                || $txn->status !== 'completed'
+                || $txn->rider_settlement_id) {
+                return $this->statusError($request, 'Unassigned delivery bills can only be marked delivered (once).');
+            }
+            $upd = ['delivery_status' => 'delivered'];
+            if (Schema::hasColumn('pos_transactions', 'delivered_at')) {
+                $upd['delivered_at'] = now();
+            }
+            $txn->update($upd);
+            if ($request->expectsJson()) {
+                return response()->json(['success' => true, 'delivery_status' => 'delivered', 'return_url' => null, 'auto_return_id' => null, 'auto_return_invoice' => null]);
+            }
+            return back()->with('success', 'Delivery marked as delivered.');
         }
 
         if ($txn->rider_settlement_id) {

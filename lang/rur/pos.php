@@ -4090,7 +4090,10 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     // Task 524 (12 Aug 2026): purane unassigned delivery bills — alag collapsed
     // section, tab/badge counts se bahar.
     'old_del_section' => 'Purani deliveries',
-    'old_del_hint' => 'Pichhle dinon ke bina-rider delivery bills — rider ab bhi yahin se assign ho sakta hai.',
+    'old_del_hint' => 'Pichhle dinon ke bina-rider delivery bills — rider ab bhi yahin se assign ho sakta hai, ya seedha Delivered mark karo.',
+    // Task 774: unassigned delivered
+    'del_no_rider_direct' => 'Bina rider / seedha',
+    'del_mark_delivered_confirm' => 'Is delivery ko Delivered mark karen? Koi rider assign nahi tha — sirf bill band hoga.',
 
     // Deliveries board upgrades + Pending Deliveries popup finals (owner batch, 3 Aug 2026)
     'delivery_status_dispatched' => 'Rawana',

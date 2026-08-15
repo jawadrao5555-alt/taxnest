@@ -217,12 +217,39 @@ class FbrPosPopupDeliveredSettleTest extends TestCase
         $this->assertNotNull($bill->delivered_at);
     }
 
-    public function test_status_on_riderless_bill_404s(): void
+    /** Task 774: riderless unassigned delivery can now be marked delivered directly. */
+    public function test_status_on_riderless_bill_delivered_succeeds(): void
     {
-        $bill = $this->makeFinal(['rider_id' => null, 'delivery_status' => null]);
+        $bill = $this->makeFinal(['rider_id' => null, 'delivery_status' => null, 'order_type' => 'delivery']);
 
-        $this->expectException(ModelNotFoundException::class);
-        (new FbrPosRiderController())->updateStatus($this->jsonReq(['delivery_status' => 'delivered']), $bill->id);
+        $res = (new FbrPosRiderController())->updateStatus($this->jsonReq(['delivery_status' => 'delivered']), $bill->id);
+        $this->assertSame(200, $res->getStatusCode());
+        $this->assertTrue($res->getData(true)['success']);
+
+        $bill->refresh();
+        $this->assertSame('delivered', $bill->delivery_status);
+    }
+
+    /** Task 774: riderless bill — any transition other than 'delivered' must still be rejected. */
+    public function test_status_on_riderless_bill_non_delivered_422s(): void
+    {
+        $bill = $this->makeFinal(['rider_id' => null, 'delivery_status' => null, 'order_type' => 'delivery']);
+
+        $res = (new FbrPosRiderController())->updateStatus($this->jsonReq(['delivery_status' => 'dispatched']), $bill->id);
+        $this->assertSame(422, $res->getStatusCode());
+        $this->assertFalse($res->getData(true)['success']);
+    }
+
+    /** Task 774: incomplete (non-completed status) riderless delivery cannot be marked delivered. */
+    public function test_status_on_riderless_incomplete_bill_422s(): void
+    {
+        // Simulate a held/provisional bill that is NOT completed
+        $bill = $this->makeFinal(['rider_id' => null, 'delivery_status' => null, 'order_type' => 'delivery']);
+        FbrPosTransaction::where('id', $bill->id)->update(['status' => 'provisional']);
+
+        $res = (new FbrPosRiderController())->updateStatus($this->jsonReq(['delivery_status' => 'delivered']), $bill->id);
+        $this->assertSame(422, $res->getStatusCode());
+        $this->assertFalse($res->getData(true)['success']);
     }
 
     public function test_status_on_settled_bill_locked_422_json(): void

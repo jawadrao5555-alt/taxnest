@@ -4090,7 +4090,10 @@ return [
     'rider_assign_failed' => 'رائیڈر تفویض نہیں ہو سکا۔',
     // Task 524 (12 Aug 2026): پرانے بغیر رائیڈر ڈیلیوری بل — الگ سیکشن، گنتی سے باہر۔
     'old_del_section' => 'پرانی ڈیلیوریز',
-    'old_del_hint' => 'پچھلے دنوں کے بغیر رائیڈر ڈیلیوری بل — رائیڈر اب بھی یہیں سے تفویض ہو سکتا ہے۔',
+    'old_del_hint' => 'پچھلے دنوں کے بغیر رائیڈر ڈیلیوری بل — رائیڈر اب بھی یہیں سے تفویض ہو سکتا ہے، یا سیدھا ڈیلیورڈ مارک کریں۔',
+    // Task 774: unassigned delivered
+    'del_no_rider_direct' => 'بغیر رائیڈر / براہِ راست',
+    'del_mark_delivered_confirm' => 'اس ڈیلیوری کو ڈیلیورڈ مارک کریں؟ کوئی رائیڈر تفویض نہیں تھا — یہ صرف بل بند کرے گا۔',
 
     // Deliveries board upgrades + Pending Deliveries popup finals (owner batch, 3 Aug 2026)
     'delivery_status_dispatched' => 'روانہ',

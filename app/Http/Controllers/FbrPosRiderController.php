@@ -249,12 +249,23 @@ class FbrPosRiderController extends Controller
         $assignedTsExpr = Schema::hasColumn('fbr_pos_transactions', 'rider_assigned_at')
             ? 'COALESCE(rider_assigned_at, created_at)' : 'created_at';
 
+        // Task 774: include unassigned delivery bills (rider_id NULL, delivery_status NULL)
+        // in pending — same 7-day window as PRA so old pre-feature bills don't flood the board.
         $openBillsAll = FbrPosTransaction::where('company_id', $companyId)
             ->where(function ($q) {
                 $q->where('order_type', 'delivery')->orWhereNotNull('rider_id');
             })
             ->whereIn('status', ['completed'])
-            ->whereIn('delivery_status', ['assigned', 'dispatched'])
+            ->where(function ($q) {
+                $q->whereIn('delivery_status', ['assigned', 'dispatched'])
+                    ->orWhere(function ($q2) {
+                        $q2->whereNull('delivery_status')
+                            ->whereNull('rider_id')
+                            ->whereNull('rider_settlement_id')
+                            ->where('order_type', 'delivery')
+                            ->where('created_at', '>=', now()->subDays(7));
+                    });
+            })
             ->with('rider')
             ->orderBy(DB::raw($assignedTsExpr))
             ->get();
@@ -409,7 +420,31 @@ class FbrPosRiderController extends Controller
         $request->validate(['delivery_status' => 'required|in:assigned,dispatched,delivered,returned']);
 
         $txn = FbrPosTransaction::where('company_id', $companyId)
-            ->whereNotNull('rider_id')->findOrFail($txnId);
+            ->findOrFail($txnId);
+
+        // Task 774: unassigned delivery bill (rider_id NULL) — only 'delivered'
+        // allowed. No rider cash, no khata, no settlement involved.
+        // status=completed guard mirrors the board query — incomplete/held bills
+        // must not be closeable via a direct POST.
+        if (!$txn->rider_id) {
+            $newStatus = $request->input('delivery_status');
+            if ($newStatus !== 'delivered'
+                || $txn->delivery_status !== null
+                || $txn->order_type !== 'delivery'
+                || $txn->status !== 'completed'
+                || $txn->rider_settlement_id) {
+                return $this->statusError($request, 'Unassigned delivery bills can only be marked delivered (once).');
+            }
+            $upd = ['delivery_status' => 'delivered'];
+            if (Schema::hasColumn('fbr_pos_transactions', 'delivered_at')) {
+                $upd['delivered_at'] = now();
+            }
+            $txn->update($upd);
+            if ($request->expectsJson()) {
+                return response()->json(['success' => true, 'delivery_status' => 'delivered']);
+            }
+            return back()->with('success', 'Delivery marked as delivered.');
+        }
 
         if ($txn->rider_settlement_id) {
             // Task 773 safety net: settled bill stuck at assigned/dispatched may

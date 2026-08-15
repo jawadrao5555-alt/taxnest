@@ -106,6 +106,20 @@ class PraRequeueExemptInternal extends Command
             return 0;
         }
 
+        // ── Safety: --confirm requires explicit --company AND --ids ──────────
+        // Prevents accidental cross-tenant bulk mutation when scope flags are
+        // omitted. The operator MUST name both the company and the exact IDs.
+        if (!$companyId || empty($ids)) {
+            $this->error('--confirm requires both --company=<id> and --ids=<comma-list> to be specified.');
+            $this->line('This prevents accidentally re-queuing bills across all companies.');
+            $this->newLine();
+            $idList = $rows->pluck('id')->implode(',');
+            $co = $rows->first()->company_id;
+            $this->line('Example:');
+            $this->line("  php artisan pra:requeue-exempt-internal --company={$co} --ids={$idList} --confirm");
+            return 1;
+        }
+
         // ── Confirm ─────────────────────────────────────────────────────────
         if (!$this->confirm("Re-queue {$count} bill(s) as 'pending'? The Desktop Agent will submit them at TaxRate 0 (zero-rated, no tax charged). This cannot be undone automatically.")) {
             $this->line('Aborted — no changes made.');

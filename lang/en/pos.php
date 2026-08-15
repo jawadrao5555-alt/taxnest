@@ -4090,7 +4090,10 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     // Task 524 (12 Aug 2026): purane unassigned delivery bills — alag collapsed
     // section, tab/badge counts se bahar.
     'old_del_section' => 'Older deliveries',
-    'old_del_hint' => 'Unassigned delivery bills from previous days — a rider can still be assigned here.',
+    'old_del_hint' => 'Unassigned delivery bills from previous days — a rider can still be assigned here, or mark Delivered directly.',
+    // Task 774 (16 Aug 2026): unassigned delivery bill marked delivered — no rider cash involved.
+    'del_no_rider_direct' => 'No rider / direct',
+    'del_mark_delivered_confirm' => 'Mark this delivery as delivered? No rider was assigned — this just closes the bill.',
 
     // Deliveries board upgrades + Pending Deliveries popup finals (owner batch, 3 Aug 2026)
     'delivery_status_dispatched' => 'Dispatched',

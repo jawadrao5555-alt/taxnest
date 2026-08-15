@@ -302,7 +302,12 @@
                         </td>
                         <td class="px-4 py-3">
                             @if($b->rider_settlement_id || in_array($b->delivery_status, ['delivered', 'returned']))
-                                <span class="text-xs text-gray-600 dark:text-gray-300">{{ $b->rider->name ?? '—' }}</span>
+                                @if($b->rider_id)
+                                    <span class="text-xs text-gray-600 dark:text-gray-300">{{ $b->rider->name ?? '—' }}</span>
+                                @else
+                                    {{-- Task 774: unassigned bill was marked delivered directly --}}
+                                    <span class="text-xs text-gray-400 dark:text-gray-500 italic">{{ __('pos.del_no_rider_direct') }}</span>
+                                @endif
                             @else
                             <form method="POST" action="{{ route('fbrpos.deliveries.assign', $b->id) }}">
                                 @csrf
@@ -327,7 +332,13 @@
                                     'returned'   => 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400',
                                 ][$st] ?? 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400';
                             @endphp
-                            <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold {{ $stClass }}">{{ $st ? (Lang::has('pos.delivery_status_' . $st) ? __('pos.delivery_status_' . $st) : ucfirst($st)) : '—' }}</span>
+                            @if(!$st && $activeTab === 'pending')
+                                {{-- Task 774: unassigned delivery bill on FBR board — amber chip
+                                     matches PRA board treatment; nudges user to assign or deliver. --}}
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">{{ __('pos.del_status_unassigned') }}</span>
+                            @else
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold {{ $stClass }}">{{ $st ? (Lang::has('pos.delivery_status_' . $st) ? __('pos.delivery_status_' . $st) : ucfirst($st)) : '—' }}</span>
+                            @endif
                             @if($st === 'delivered' && $b->delivered_at && $b->rider_assigned_at)
                                 @php $delMins = (int) \Carbon\Carbon::parse($b->rider_assigned_at)->diffInMinutes(\Carbon\Carbon::parse($b->delivered_at)); @endphp
                                 <div class="text-[10px] text-gray-400 mt-0.5">{{ __('pos.delivery_took_mins', ['mins' => $delMins]) }}</div>
@@ -348,6 +359,13 @@
                                     <button type="submit" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition">{{ __('pos.delivered_word') }}</button>
                                 </form>
                                 @endif
+                            @elseif($activeTab === 'pending' && !$b->rider_id && !$st)
+                                {{-- Task 774: unassigned pending delivery on FBR board — Delivered only --}}
+                                <form method="POST" action="{{ route('fbrpos.deliveries.status', $b->id) }}" class="inline"
+                                      onsubmit="return confirm({{ Js::from(__('pos.del_mark_delivered_confirm')) }});">
+                                    @csrf<input type="hidden" name="delivery_status" value="delivered">
+                                    <button type="submit" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition">{{ __('pos.delivered_word') }}</button>
+                                </form>
                             @endif
                             {{-- Task 773: settled bill still stuck at assigned/dispatched —
                                  forward move to Delivered only (Dispatch/Returned stay locked). --}}

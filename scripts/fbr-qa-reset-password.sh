@@ -40,7 +40,7 @@ fi
 echo "==> Re-asserting canonical password for $EMAIL on live"
 # ssh joins its command args with spaces (no positional params) — feed the
 # script over stdin via `bash -s` so EMAIL/PASS arrive as REAL argv entries.
-OUT=$(timeout 60 ssh "${SSH_OPTS[@]}" "$HOST" "bash -s -- $(printf '%q %q' "$EMAIL" "$PASS")" 2>/dev/null <<REMOTE
+REMOTE_SCRIPT=$(cat <<REMOTE
 cd $LIVE_DIR && php -r '
 require "vendor/autoload.php";
 \$app = require "bootstrap/app.php";
@@ -54,6 +54,22 @@ echo Hash::check(\$argv[2], \$u->password) ? "RESET-OK\n" : "RESET-FAILED\n";
 ' "\$1" "\$2"
 REMOTE
 )
+
+run_reset() {
+  timeout 60 ssh "${SSH_OPTS[@]}" "$HOST" "bash -s -- $(printf '%q %q' "$EMAIL" "$PASS")" 2>/dev/null <<<"$REMOTE_SCRIPT"
+}
+
+OUT=$(run_reset)
+# Transient SSH flake (empty output / no verdict marker): back off briefly and
+# retry ONCE before giving up (Task 746).
+case "$OUT" in
+  *ALREADY-CANONICAL*|*RESET-OK*|*NOUSER*|*RESET-FAILED*) : ;;
+  *)
+    echo "    WARN: SSH attempt returned no verdict (output: '$OUT') — retrying once after 5s..." >&2
+    sleep 5
+    OUT=$(run_reset)
+    ;;
+esac
 echo "    $OUT"
 case "$OUT" in
   *ALREADY-CANONICAL*|*RESET-OK*) echo "Password matches canonical qa-creds.env value."; exit 0 ;;

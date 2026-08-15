@@ -174,10 +174,32 @@ if fetch "/pos/day-close"; then
   #     can never render the card). Re-assert the card, then hard-delete the
   #     seed via DELETE /pos/transaction/{id} so day-close/reports stay clean
   #     (manual delete = permanent; QA 35 admin is not a cashier).
-  if grep -qE 'day-close/x-report/' "$TMPD/page.html"; then
-    echo "    OK: X-Report card present on /pos/day-close"
+  # Task 744: like `require`, a bespoke miss here can be a stale-compiled-view
+  # false alarm — before concluding "day open with 0 bills" (and seeding), if
+  # NEITHER marker is present, sanitize live caches once (Task 740 helper,
+  # once-per-run) and refetch the page; only then take the seed/FAIL path.
+  # No SSH key => sanitize_live_caches returns 1 and behavior is unchanged.
+  DC_SANITIZED=""
+  DC_PAGE_OK=1   # empty => post-sanitize refetch FAILED; verdict cannot be made
+  if ! grep -qE 'day-close/x-report/' "$TMPD/page.html" \
+     && ! grep -qE 'pos/day-close/[0-9]+/(pdf|thermal)' "$TMPD/page.html"; then
+    if sanitize_live_caches; then
+      if fetch "/pos/day-close"; then
+        DC_SANITIZED=1
+      else
+        # fetch already recorded the failure (bad). Do NOT fall through to the
+        # marker/seed path on a failed page — that would seed a probe bill and
+        # emit a misleading regression verdict off an unusable response.
+        DC_PAGE_OK=""
+      fi
+    fi
+  fi
+  if [ -z "$DC_PAGE_OK" ]; then
+    warn "/pos/day-close refetch after cache sanitize failed — skipping X-Report card assertion (failure already recorded above)"
+  elif grep -qE 'day-close/x-report/' "$TMPD/page.html"; then
+    echo "    OK: X-Report card present on /pos/day-close${DC_SANITIZED:+ AFTER cache sanitize (was a stale-compiled-view false alarm — no regression)}"
   elif grep -qE 'pos/day-close/[0-9]+/(pdf|thermal)' "$TMPD/page.html"; then
-    echo "    OK: /pos/day-close shows closed-day report links (X-Report card correctly hidden — day already closed)"
+    echo "    OK: /pos/day-close shows closed-day report links (X-Report card correctly hidden — day already closed)${DC_SANITIZED:+ — confirmed after cache sanitize}"
   else
     echo "    Day open with 0 bills — seeding a temporary reporting-OFF final bill to assert the X-Report card deterministically..."
     SEED_JSON=$("${CURL[@]}" -X POST \

@@ -60,6 +60,44 @@ if ! flock -w 600 9; then
 fi
 log "deploy lock acquired"
 
+# 0.5 SW CACHE_VERSION freshness (Task 713): every deploy must ship a NEW
+#     public/sw.js CACHE_VERSION so devices purge old RUNTIME/STATIC caches and
+#     get the SW update badge. deploy-live.sh auto-bumps + commits before its
+#     push, but PLAIN pushes to origin main (e.g. platform task merges) reach
+#     this script WITHOUT a bump. Decide here (read-only) whether this push
+#     already carries a fresh version; the actual bump happens after the copy.
+#
+#     Idempotency = state file with the REPO version shipped by the LAST
+#     deploy. If the incoming repo version differs, the push bumped it itself
+#     (deploy-live.sh / manual) — never double-bump. If it is identical, the
+#     push had no bump — server-bump with a unique timestamped version.
+#     First run (no state file): fall back to comparing repo vs currently-live
+#     sw.js version.
+SW_STATE="/home/$USER/.taxnest-last-shipped-sw-version"
+SW_VER_RE="^const CACHE_VERSION = '"
+sw_ver() { grep -m1 "$SW_VER_RE" "$1" 2>/dev/null | sed "s/^const CACHE_VERSION = '\([^']*\)'.*/\1/"; }
+REPO_SW_VER=$(sw_ver "$REPO_DIR/public/sw.js")
+LIVE_SW_VER=$(sw_ver "public/sw.js")
+NEED_SW_BUMP=0
+if [ -z "$REPO_SW_VER" ]; then
+  log "WARNING: could not read CACHE_VERSION from repo public/sw.js — skipping SW bump decision"
+elif [ -f "$SW_STATE" ]; then
+  LAST_SHIPPED=$(cat "$SW_STATE" 2>/dev/null || true)
+  if [ "$REPO_SW_VER" = "$LAST_SHIPPED" ]; then
+    NEED_SW_BUMP=1
+    log "push did NOT change sw.js CACHE_VERSION ($REPO_SW_VER == last shipped) — will server-bump after copy"
+  else
+    log "push already carries a fresh sw.js CACHE_VERSION ($REPO_SW_VER) — no server bump"
+  fi
+else
+  if [ -n "$LIVE_SW_VER" ] && [ "$REPO_SW_VER" = "$LIVE_SW_VER" ]; then
+    NEED_SW_BUMP=1
+    log "no SW state file yet; repo CACHE_VERSION == live ($REPO_SW_VER) — will server-bump after copy"
+  else
+    log "no SW state file yet; repo CACHE_VERSION ($REPO_SW_VER) != live ($LIVE_SW_VER) — treating as already bumped"
+  fi
+fi
+
 # 1. Make sure the maintenance view exists BEFORE `down` pre-renders it
 #    (first deploy after this change: public_html doesn't have it yet).
 mkdir -p resources/views/errors \
@@ -81,6 +119,26 @@ log "maintenance window OPEN (HTTP 200 'Updating…' page)"
 
 # 3. Copy new code in (same semantics as the old .cpanel.yml cp -R).
 /bin/cp -R "$REPO_DIR/." "$DEPLOYPATH/" || die_down "code copy (cp -R) failed"
+
+# 3.5 Server-side SW CACHE_VERSION bump (Task 713) — only when the push itself
+#     did not bump (decision made pre-copy above). Version-string-only sed;
+#     no node smoke check here (the string swap cannot break handlers, and the
+#     cPanel box has no node). deploy-live.sh knows this file can be locally
+#     modified on live (CACHE_VERSION line only) and restores it before pull.
+if [ "$NEED_SW_BUMP" = 1 ]; then
+  NEW_SW_VERSION="taxnest-$(date +%Y%m%d-%H%M%S)-auto$(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || echo push)"
+  sed -i "s|^const CACHE_VERSION = '[^']*';.*$|const CACHE_VERSION = '$NEW_SW_VERSION'; // server-side auto-bump by cpanel-autodeploy.sh (Task 713) — push gap had no CACHE_VERSION change|" public/sw.js \
+    || die_down "server-side sw.js CACHE_VERSION bump failed (sed error)"
+  grep -q "const CACHE_VERSION = '$NEW_SW_VERSION'" public/sw.js \
+    || die_down "server-side sw.js CACHE_VERSION bump not applied (CACHE_VERSION line pattern not matched — did sw.js header change?)"
+  log "sw.js CACHE_VERSION server-bumped to $NEW_SW_VERSION"
+fi
+# Record what THIS push shipped (the repo's version, not the server-bumped
+# one) so the next auto-deploy can tell whether its push bumped or not.
+if [ -n "$REPO_SW_VER" ]; then
+  printf '%s\n' "$REPO_SW_VER" > "$SW_STATE" \
+    || log "WARNING: could not record shipped SW version to $SW_STATE (next deploy falls back to live-file comparison)"
+fi
 
 # 4. IMMEDIATELY kill every stale/poisoned cache. With caches cleared Laravel
 #    falls back to dynamic loading, so new code + no cache = consistent.

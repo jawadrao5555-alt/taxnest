@@ -4960,6 +4960,10 @@ class FbrPosController extends Controller
         // ≤date wash of every LATER day re-selects the same spared bill; a
         // plain sum would count it once per day. Union of IDs = honest count.
         $riderGuardedIds = [];
+        // Task 696: deleted-count accumulated din-ba-din. Deleted bills are
+        // GONE from the table, so a later day's ≤date wash can never re-select
+        // them — a plain sum is honest here (unlike guarded IDs above).
+        $bulkDeleted = 0;
         // Task 684 (FBR mirror of the PRA bulk-close guard, ZFC waqia follow-up):
         // undispatched delivery bills block PER-DAY — the blocker day (and,
         // cumulatively, every later day: the summary is ≤date) is SKIPPED while
@@ -4999,6 +5003,9 @@ class FbrPosController extends Controller
                 // skips the wash can never re-count the previous day's figure.
                 $this->lastWashGuarded = 0;
                 $this->lastWashGuardedIds = [];
+                // Task 696: same per-day reset for the deleted counter — a day
+                // that skips the wash must never re-count the previous day's.
+                $this->lastWashDeleted = 0;
                 $report = $this->performDayClose($companyId, $day, $user?->id, null, null, true);
                 if ($report) {
                     $closed++;
@@ -5009,6 +5016,9 @@ class FbrPosController extends Controller
                     foreach ($this->lastWashGuardedIds as $gid) {
                         $riderGuardedIds[$gid] = true;
                     }
+                    // Task 696: accumulate this day's deleted locals before the
+                    // next performDayClose resets the prop.
+                    $bulkDeleted += $this->lastWashDeleted;
                     if ((int) ($report->total_invoices ?? 0) === 0) {
                         $zeroDays++;
                     }
@@ -5025,6 +5035,11 @@ class FbrPosController extends Controller
         $sweep = $this->lastFinalizeSweep;
         if (($sweep['finalized'] ?? 0) > 0) {
             $msg .= __('pos.dayclose_bills_finalized', ['count' => $sweep['finalized']]);
+        }
+        // Task 696 (parity with the single close + PRA bulk path): local bills
+        // deleted by the day-close wash, totalled across the bulk run.
+        if ($bulkDeleted > 0) {
+            $msg .= __('pos.dayclose_bills_deleted', ['count' => $bulkDeleted]);
         }
         // Task 694 (parity with the single close, Task 690): rider-khata
         // delete-guard — UNIQUE bills picked for delete but spared (kept

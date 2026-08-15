@@ -3,7 +3,10 @@
 # Usage: bash scripts/check-live-deploy.sh
 # Exit 0 = live is up to date with workspace HEAD (or ahead/equal).
 # Exit 1 = DEPLOY GAP (live is behind) — run the deploy runbook.
-# Exit 2 = could not check (SSH/network problem) — verify manually.
+# Exit 2 = could not check (SSH/network problem) or REAL drift — verify manually.
+# Exit 3 = RECONCILABLE lineage divergence (Task 703): origin/main's tree is
+#          byte-identical to a workspace-lineage commit — deploy-live.sh will
+#          auto-reconcile (merge -s ours) and deploy; callers should run it.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -43,7 +46,34 @@ if git merge-base --is-ancestor "$LIVE_HEAD" "$LOCAL_HEAD" 2>/dev/null; then
   exit 1
 fi
 
-# Live commit unknown to workspace (workspace may be behind origin, or live drifted).
+# Live commit unknown to workspace. Common benign cause: platform task-merge
+# lineage divergence (content-identical, different SHAs — see
+# .agents/memory/cpanel-deployment.md). Classify it with the shared logic so
+# callers (post-merge.sh) can auto-run deploy-live.sh for the benign case.
+if [ -f scripts/lib/deploy-reconcile.sh ]; then
+  . scripts/lib/deploy-reconcile.sh
+  if reconcile_fetch_origin_main >/dev/null 2>&1; then
+    CLASS_LINE=$(reconcile_classify "$LOCAL_HEAD" "$LIVE_HEAD" 2>/dev/null || echo ERROR)
+    case "${CLASS_LINE%% *}" in
+      ANCESTOR)
+        # Fresh fetch shows live is actually behind/equal after all.
+        if [ "$LIVE_HEAD" = "$LOCAL_HEAD" ]; then
+          echo "check-live-deploy: OK — live HEAD matches workspace HEAD ($LOCAL_HEAD)."
+          exit 0
+        fi
+        echo "check-live-deploy: DEPLOY GAP — live is behind workspace (visible after fetch)." >&2
+        exit 1
+        ;;
+      RECONCILABLE)
+        echo "check-live-deploy: RECONCILABLE lineage divergence — origin/main's tree is" >&2
+        echo "  byte-identical to workspace commit ${CLASS_LINE#RECONCILABLE } (no unique content on origin)." >&2
+        echo "  deploy-live.sh will auto-reconcile (git merge -s ours) and deploy: bash scripts/deploy-live.sh" >&2
+        exit 3
+        ;;
+    esac
+  fi
+fi
 echo "check-live-deploy: live HEAD ($LIVE_HEAD) is not an ancestor of workspace HEAD ($LOCAL_HEAD)." >&2
-echo "  Either the workspace is behind, or live has drifted — investigate before deploying." >&2
+echo "  Origin carries unique content or live has REAL drift — investigate before deploying" >&2
+echo "  (see .agents/memory/cpanel-deployment.md). deploy-live.sh will also fail loudly on this." >&2
 exit 2

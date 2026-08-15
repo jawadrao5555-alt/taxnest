@@ -71,6 +71,19 @@ $PHP84 artisan down --render=errors::deploying --status=200 --refresh=4 2>&1 || 
 # friendly 200 page; recover manually ('php artisan up' after fixing).
 
 if [ "$DO_PULL" = 1 ]; then
+  # Task 713: cPanel auto-deploys server-bump public/sw.js CACHE_VERSION when a
+  # plain push carried no bump, leaving the live worktree with a CACHE_VERSION-
+  # only local modification that would abort the pull. Restore it ONLY when the
+  # diff touches nothing but CACHE_VERSION lines — this deploy ships its own
+  # fresh CACHE_VERSION anyway. Any other local sw.js change still fails loudly.
+  if ! git diff --quiet -- public/sw.js 2>/dev/null; then
+    if git diff -- public/sw.js | grep '^[+-]' | grep -v '^+++' | grep -v '^---' | grep -qv 'CACHE_VERSION'; then
+      echo "REMOTE_STEP: public/sw.js locally modified beyond CACHE_VERSION — NOT auto-restoring"
+    else
+      echo "REMOTE_STEP: restoring server-bumped public/sw.js (CACHE_VERSION-only diff) before pull"
+      git checkout -- public/sw.js || exit 91
+    fi
+  fi
   echo "REMOTE_STEP: git pull origin main"
   git pull origin main 2>&1 || exit 91
 fi
@@ -266,10 +279,52 @@ if [ "$LIVE_HEAD_BEFORE" = "$LOCAL_HEAD" ]; then
 fi
 
 if ! git merge-base --is-ancestor "$LIVE_HEAD_BEFORE" "$LOCAL_HEAD" 2>/dev/null; then
-  # Live commit unknown/diverged — do NOT blind-deploy over drift.
-  echo "Live HEAD is not an ancestor of workspace HEAD." >&2
-  echo "Either the workspace is behind origin, or live has drifted." >&2
-  fail "refusing to deploy over divergence — investigate (git fetch; compare $LIVE_HEAD_BEFORE vs $LOCAL_HEAD)"
+  # Live commit unknown/diverged. The COMMON benign cause (seen 3x, last
+  # 14 Aug 2026 / Task 702): platform task-merges commit to the workspace with
+  # NEW SHAs while content-identical commits already sit on origin/main (live
+  # auto-pulled them via .cpanel.yml) — lineage diverges, content does not.
+  # Task 703 automates the manual reconcile pattern from
+  # .agents/memory/cpanel-deployment.md via scripts/lib/deploy-reconcile.sh:
+  # tree-identical origin/main => `git merge -s ours`; anything else fails LOUD
+  # (origin unique content is NEVER auto-overwritten).
+  step "Divergence detected — attempting safe auto-reconcile (Task 703)"
+  . scripts/lib/deploy-reconcile.sh
+  reconcile_fetch_origin_main \
+    || fail "git fetch origin +main:refs/remotes/origin/main failed — cannot evaluate divergence"
+  echo "origin/main: $(git rev-parse refs/remotes/origin/main)"
+  echo "live HEAD:   $LIVE_HEAD_BEFORE"
+
+  CLASS_LINE=$(reconcile_classify "$LOCAL_HEAD" "$LIVE_HEAD_BEFORE") \
+    || fail "could not classify divergence (git error) — reconcile manually"
+  CLASS=${CLASS_LINE%% *}
+  case "$CLASS" in
+    ANCESTOR)
+      echo "After fetch, live HEAD is an ancestor of workspace HEAD — continuing normally."
+      ;;
+    RECONCILABLE)
+      MATCH_COMMIT=${CLASS_LINE#RECONCILABLE }
+      echo "origin/main tree is byte-identical to workspace commit $MATCH_COMMIT — origin has NO unique content."
+      step "Auto-reconcile: git merge -s ours origin/main"
+      reconcile_merge_ours "$MATCH_COMMIT" 2>&1 \
+        || fail "git merge -s ours origin/main failed — reconcile manually"
+      LOCAL_HEAD=$(git rev-parse HEAD)
+      echo "reconciled; workspace HEAD now $LOCAL_HEAD"
+      git merge-base --is-ancestor "$LIVE_HEAD_BEFORE" "$LOCAL_HEAD" 2>/dev/null \
+        || fail "live HEAD still not an ancestor after reconcile — investigate manually"
+      ;;
+    ORIGIN_UNIQUE)
+      echo "origin/main tree matches NO commit in workspace lineage —" >&2
+      echo "origin carries UNIQUE content. NEVER auto-overwriting it." >&2
+      fail "refusing to deploy over divergence — reconcile manually per .agents/memory/cpanel-deployment.md (inspect 'git diff HEAD origin/main' first)"
+      ;;
+    LIVE_DRIFT)
+      echo "Live HEAD is neither origin/main nor an ancestor of it — live has REAL drift." >&2
+      fail "refusing to deploy over divergence — investigate (compare live $LIVE_HEAD_BEFORE vs origin/main $(git rev-parse refs/remotes/origin/main) vs workspace $LOCAL_HEAD)"
+      ;;
+    *)
+      fail "unexpected divergence classification '$CLASS_LINE' — reconcile manually"
+      ;;
+  esac
 fi
 
 # ---------------------------------------------- 0.5 SW cache-version auto-bump (Task 710)
@@ -304,7 +359,19 @@ else
 fi
 
 # Live worktree must be clean for a fast-forward pull (untracked junk is fine).
-DIRTY=$(run_ssh "cd $LIVE_DIR && git status --porcelain | grep -v '^??' | head -20" 2>/dev/null || true)
+# Exception (Task 713): a public/sw.js diff that touches ONLY the CACHE_VERSION
+# line is the cPanel auto-deploy's server-side bump — expected; remote_apply
+# restores it just before the pull. Anything else in sw.js still counts dirty.
+DIRTY=$(timeout 60 ssh "${SSH_OPTS[@]}" "$HOST" bash -s <<'DIRTYCHECK' 2>/dev/null || true
+cd /home/taxnestc/public_html || exit 0
+git status --porcelain | grep -v '^??' | grep -v ' public/sw\.js$' | head -20
+if ! git diff --quiet -- public/sw.js 2>/dev/null; then
+  if git diff -- public/sw.js | grep '^[+-]' | grep -v '^+++' | grep -v '^---' | grep -qv 'CACHE_VERSION'; then
+    echo ' M public/sw.js (changes beyond CACHE_VERSION auto-bump)'
+  fi
+fi
+DIRTYCHECK
+)
 if [ -n "$DIRTY" ]; then
   echo "Live worktree has MODIFIED tracked files:" >&2
   echo "$DIRTY" >&2

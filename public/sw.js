@@ -1,6 +1,6 @@
 // TaxNest Suite Service Worker — Tax DI / Nest Pra Pos / Nest FBR Pos
 // Strategy: Stale-while-revalidate for static assets, network-first for HTML, offline fallback.
-const CACHE_VERSION = 'taxnest-20260815-194013-69415973'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
+const CACHE_VERSION = 'taxnest-20260815-194536-de872903'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 // OFFLINE-FIRST SALE SCREEN (Jul 2026): dedicated cache for /pos/invoice/create
@@ -48,7 +48,7 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
     const req = e.request;
-                const url = e.data.url === '/fbr-pos/create' ? '/fbr-pos/create' : '/pos/invoice/create';
+    const url = new URL(req.url);
     if (url.origin !== location.origin) return;
 
     // Session hygiene: ANY logout (DI /logout, /pos/logout, /fbr-pos/logout, admin, franchise —

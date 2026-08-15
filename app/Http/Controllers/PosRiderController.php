@@ -482,7 +482,24 @@ class PosRiderController extends Controller
         $currentRole = auth('pos')->user()->pos_role ?? null;
         $isAdminOrManager = in_array($currentRole, ['pos_admin', 'pos_manager'], true);
 
-        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'openDeliveryOldest', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager', 'oldUnassigned'));
+        // Task 786: load names for users who closed unassigned bills — keyed by user id.
+        // Only the Delivered tab bills matter (only they can have delivered_by set).
+        $deliveredByUsers = [];
+        if (Schema::hasColumn('pos_transactions', 'delivered_by')) {
+            $byIds = $allBills->where('delivery_status', 'delivered')
+                ->whereNull('rider_id')
+                ->pluck('delivered_by')
+                ->filter()
+                ->unique()
+                ->values();
+            if ($byIds->count()) {
+                $deliveredByUsers = \App\Models\User::whereIn('id', $byIds)
+                    ->pluck('name', 'id')
+                    ->toArray();
+            }
+        }
+
+        return view('pos.deliveries', compact('bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts', 'openDeliveryOldest', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager', 'oldUnassigned', 'deliveredByUsers'));
     }
 
     /** Assign / reassign / unassign a rider on a delivery bill. */
@@ -585,6 +602,10 @@ class PosRiderController extends Controller
             $upd = ['delivery_status' => 'delivered'];
             if (Schema::hasColumn('pos_transactions', 'delivered_at')) {
                 $upd['delivered_at'] = now();
+            }
+            // Task 786: stamp who closed the unassigned bill for audit trail.
+            if (Schema::hasColumn('pos_transactions', 'delivered_by')) {
+                $upd['delivered_by'] = auth('pos')->id();
             }
             $txn->update($upd);
             if ($request->expectsJson()) {

@@ -352,9 +352,26 @@ class FbrPosRiderController extends Controller
 
         $isAdminOrManager = $this->isAdmin();
 
+        // Task 786: load names for users who closed unassigned bills — keyed by user id.
+        $deliveredByUsers = [];
+        if (Schema::hasColumn('fbr_pos_transactions', 'delivered_by')) {
+            $byIds = $allBills->where('delivery_status', 'delivered')
+                ->whereNull('rider_id')
+                ->pluck('delivered_by')
+                ->filter()
+                ->unique()
+                ->values();
+            if ($byIds->count()) {
+                $deliveredByUsers = \App\Models\User::whereIn('id', $byIds)
+                    ->pluck('name', 'id')
+                    ->toArray();
+            }
+        }
+
         return view('fbr-pos.deliveries', compact(
             'bills', 'riders', 'khataBills', 'day', 'openDeliveryCounts',
-            'openDeliveryOldest', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager'
+            'openDeliveryOldest', 'tabCounts', 'activeTab', 'riderDaySummary', 'isAdminOrManager',
+            'deliveredByUsers'
         ));
     }
 
@@ -438,6 +455,10 @@ class FbrPosRiderController extends Controller
             $upd = ['delivery_status' => 'delivered'];
             if (Schema::hasColumn('fbr_pos_transactions', 'delivered_at')) {
                 $upd['delivered_at'] = now();
+            }
+            // Task 786: stamp who closed the unassigned bill for audit trail.
+            if (Schema::hasColumn('fbr_pos_transactions', 'delivered_by')) {
+                $upd['delivered_by'] = auth('fbrpos')->id();
             }
             $txn->update($upd);
             if ($request->expectsJson()) {

@@ -305,8 +305,15 @@
                                 @if($b->rider_id)
                                     <span class="text-xs text-gray-600 dark:text-gray-300">{{ $b->rider->name ?? '—' }}</span>
                                 @else
-                                    {{-- Task 774: unassigned bill was marked delivered directly --}}
+                                    {{-- Task 774/786: unassigned bill was marked delivered directly —
+                                         show who closed it and when for audit trail. --}}
                                     <span class="text-xs text-gray-400 dark:text-gray-500 italic">{{ __('pos.del_no_rider_direct') }}</span>
+                                    @if(!empty($b->delivered_at))
+                                        <div class="text-[10px] text-gray-400 mt-0.5">{{ \Carbon\Carbon::parse($b->delivered_at)->format('h:i A') }}</div>
+                                    @endif
+                                    @if(!empty($b->delivered_by) && !empty($deliveredByUsers[$b->delivered_by]))
+                                        <div class="text-[10px] text-gray-500 dark:text-gray-400">{{ __('pos.del_closed_by', ['name' => $deliveredByUsers[$b->delivered_by]]) }}</div>
+                                    @endif
                                 @endif
                             @else
                             <form method="POST" action="{{ route('fbrpos.deliveries.assign', $b->id) }}">

@@ -399,6 +399,10 @@
                                 <span class="accent-emerald mr-3 text-lg leading-none">•</span>
                                 <span class="text-gray-700 text-sm">One-click FBR Audit Pack — 6-year audit-ready archive</span>
                             </li>
+                            <li class="flex items-start">
+                                <span class="accent-emerald mr-3 text-lg leading-none">•</span>
+                                <span class="text-gray-700 text-sm">Bulk Excel invoice import &amp; AI-powered invoice parsing</span>
+                            </li>
                         </ul>
                         <div class="flex gap-4">
                             <a href="/digital-invoice" class="btn-solid btn-primary">Learn More</a>
@@ -431,11 +435,19 @@
                             </li>
                             <li class="flex items-start">
                                 <span class="accent-purple mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">Restaurant module with kitchen order tickets</span>
+                                <span class="text-gray-700 text-sm">Full restaurant suite — tables, kitchen display, waiter tablets &amp; QR menu</span>
                             </li>
                             <li class="flex items-start">
                                 <span class="accent-purple mr-3 text-lg leading-none">•</span>
-                                <span class="text-gray-700 text-sm">Barcode scanning, thermal receipt printing, offline auto-sync</span>
+                                <span class="text-gray-700 text-sm">Delivery riders with live map tracking, staff hazri &amp; deals</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="accent-purple mr-3 text-lg leading-none">•</span>
+                                <span class="text-gray-700 text-sm">Customer khata (credit ledger), receipt themes &amp; Urdu / Roman Urdu interface</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="accent-purple mr-3 text-lg leading-none">•</span>
+                                <span class="text-gray-700 text-sm">Desktop &amp; mobile apps, offline auto-sync, Madadgar AI support</span>
                             </li>
                         </ul>
                         <div class="flex gap-4">
@@ -506,6 +518,10 @@
                             <li class="flex items-start">
                                 <span class="accent-blue mr-3 text-lg leading-none">•</span>
                                 <span class="text-gray-700 text-sm">Keyboard-first interface with multi-branch management</span>
+                            </li>
+                            <li class="flex items-start">
+                                <span class="accent-blue mr-3 text-lg leading-none">•</span>
+                                <span class="text-gray-700 text-sm">Returns, customer loyalty, promotions &amp; day-close reports</span>
                             </li>
                         </ul>
                         <div class="flex gap-4">
@@ -602,19 +618,19 @@
                             <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Billing</td>
                             <td class="p-5">Monthly, Quarterly, Semi-Annual or Annual</td>
                             <td class="p-5">Annual or quarterly billing</td>
-                            <td class="p-5">Simple annual billing</td>
+                            <td class="p-5">Simple monthly billing</td>
                         </tr>
                         <tr class="border-b border-gray-100">
                             <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Starting at</td>
                             <td class="p-5 font-bold text-[#052730]">PKR 499 / month</td>
                             <td class="p-5 font-bold text-[#052730]">PKR 14,999 / year</td>
-                            <td class="p-5 font-bold text-[#052730]">PKR 11,269 / year</td>
+                            <td class="p-5 font-bold text-[#052730]">PKR 999 / month</td>
                         </tr>
                         <tr class="border-b border-gray-100">
                             <td class="p-5 font-semibold text-gray-500 text-xs uppercase tracking-wider">Standout features</td>
-                            <td class="p-5">HS code intelligence, sandbox validation, customer ledgers</td>
-                            <td class="p-5">Restaurant module, offline auto-sync, fiscal-device mode</td>
-                            <td class="p-5">Keyboard-first billing, installable PWA, retry queue</td>
+                            <td class="p-5">HS code intelligence, bulk Excel import, AI invoice parsing</td>
+                            <td class="p-5">Restaurant suite, delivery riders, khata, Urdu interface, desktop &amp; mobile apps</td>
+                            <td class="p-5">Returns &amp; loyalty, promotions, day-close reports, offline billing</td>
                         </tr>
                         <tr>
                             <td class="p-5"></td>

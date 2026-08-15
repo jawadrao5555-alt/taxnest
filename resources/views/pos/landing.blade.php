@@ -149,7 +149,15 @@
                 "name": "What do the NestPOS plans include?",
                 "acceptedAnswer": {
                     "@@type": "Answer",
-                    "text": "Starter covers your owner account plus 1 team account with up to 2,000 PRA bills per month. Business is the cafe & restaurant sweet spot — full kitchen module (KOT, kitchen display, tables), analytics dashboard, offline billing with the desktop app, 5 team accounts and 5,000 bills per month. Pro adds delivery riders & khata and a public QR menu, with 10 team accounts, 2 branches and 10,000 bills per month. Pro Max adds Staff Hazri (attendance) with 20 team accounts, 3 branches and unlimited bills. Unlimited is fully unrestricted — Rider Live Tracking on a map, unlimited team accounts, unlimited branches, unlimited billing, every feature unlocked, with priority support."
+                    "text": "Starter covers your owner account plus 1 team account with up to 2,000 PRA bills per month. Business is the cafe & restaurant sweet spot — full kitchen module (KOT, kitchen display, tables), analytics dashboard, offline billing with the desktop app, deals & combo pricing, product Excel import/export, 5 team accounts and 5,000 bills per month. Pro adds delivery riders & khata and a public QR menu, with 10 team accounts, 2 branches and 10,000 bills per month. Pro Max adds Staff Hazri (attendance) with 20 team accounts, 3 branches and unlimited bills. Unlimited is fully unrestricted — Rider Live Tracking on a map, unlimited team accounts, unlimited branches, unlimited billing, every feature unlocked, with priority support."
+                }
+            },
+            {
+                "@@type": "Question",
+                "name": "Is there a mobile app? Does it work in Urdu?",
+                "acceptedAnswer": {
+                    "@@type": "Answer",
+                    "text": "Yes to both. A lightweight Android app (~600 KB) gives your whole team — owner, manager, waiter, cashier — the full POS on their phones, and delivery riders get their own app. The entire panel runs in Urdu, Roman Urdu or English, and each staff member picks their own language."
                 }
             }
         ]
@@ -339,7 +347,7 @@
                 <!-- Feature 5 -->
                 <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">5</div>
-                    <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Delivery riders &amp; khata</h3>
+                    <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Delivery riders &amp; khata <span class="align-middle ml-2 inline-block px-2 py-0.5 bg-[#0F6171]/10 text-[#0A4D5C] font-mono text-[10px] font-bold uppercase tracking-widest">Pro +</span></h3>
                     <p class="text-gray-600 text-lg leading-relaxed relative z-10">Assign every delivery to a rider, track the cash each rider owes, settle bills the moment they return — and a live pending-bills tile on the dashboard so nothing is forgotten at closing time.</p>
                 </div>
 
@@ -348,6 +356,48 @@
                     <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">6</div>
                     <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">The manager's cockpit</h3>
                     <p class="text-gray-600 text-lg leading-relaxed relative z-10">Staff attendance (hazri), cancelled-orders and waste reports, analytics dashboards with PDF export, and a day-close that can auto-finalize leftover bills — the whole day reconciled in one screen.</p>
+                </div>
+
+                <!-- Feature 7 -->
+                <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
+                    <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">7</div>
+                    <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Deals &amp; combo pricing <span class="align-middle ml-2 inline-block px-2 py-0.5 bg-[#0F6171]/10 text-[#0A4D5C] font-mono text-[10px] font-bold uppercase tracking-widest">Business +</span></h3>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Build combo deals once and the price is enforced by the server on every bill — cashiers can't fat-finger a discount. Deal stock draws down from the real products behind it.</p>
+                </div>
+
+                <!-- Feature 8 -->
+                <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
+                    <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">8</div>
+                    <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Receipt &amp; KOT themes</h3>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Pick your own receipt and kitchen-ticket design with a live preview — logo placement, bold headers, 80mm or 58mm paper — so your bill looks like <em>your</em> shop, not a template.</p>
+                </div>
+
+                <!-- Feature 9 -->
+                <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
+                    <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">9</div>
+                    <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Urdu, Roman Urdu &amp; English</h3>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">The whole panel runs in اردو, Roman Urdu or English — each staff member picks their own language. Train a new cashier in the language they actually think in.</p>
+                </div>
+
+                <!-- Feature 10 -->
+                <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
+                    <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">10</div>
+                    <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Mobile apps</h3>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">A lightweight Android app (~600&nbsp;KB) puts the full POS in every team member's pocket — owner, manager, waiter or cashier. Riders get their own app, and on the Unlimited plan you watch them move on a live map.</p>
+                </div>
+
+                <!-- Feature 11 -->
+                <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
+                    <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">11</div>
+                    <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Madadgar — AI support</h3>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">An in-panel support assistant that answers in Urdu, any hour of the day. It knows every NestPOS screen — and when it can't solve something, it hands you straight to a human.</p>
+                </div>
+
+                <!-- Feature 12 -->
+                <div class="border-t-2 border-[#0A4D5C] pt-6 relative group">
+                    <div class="absolute right-0 top-6 text-[#E7BF3B] opacity-20 font-serif text-8xl leading-none transition-transform group-hover:-translate-y-2">12</div>
+                    <h3 class="text-2xl font-serif text-[#052730] mb-4 relative z-10">Counter essentials</h3>
+                    <p class="text-gray-600 text-lg leading-relaxed relative z-10">Order tokens printed on receipt and KOT so orders never get mixed up, product Excel import/export for bulk catalogs (Business plan onwards), tax-inclusive menu pricing, and an opening-cash record for a clean day-close.</p>
                 </div>
             </div>
         </div>
@@ -496,7 +546,14 @@
                         <span class="font-serif text-lg text-gray-900">What do the plans include?</span>
                         <span class="text-gray-400 font-mono text-xl" x-text="open === 4 ? '-' : '+'">+</span>
                     </button>
-                    <div x-show="open === 4" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Starter covers your owner account plus 1 team account with up to 2,000 PRA bills per month. Business is the cafe & restaurant sweet spot — full kitchen module (KOT, kitchen display, tables), analytics dashboard, offline billing with the desktop app, 5 team accounts and 5,000 bills per month. Pro adds delivery riders & khata and a public QR menu, with 10 team accounts, 2 branches and 10,000 bills per month. Pro Max adds Staff Hazri (attendance) with 20 team accounts, 3 branches and unlimited bills. Unlimited is fully unrestricted — Rider Live Tracking on a map, unlimited team accounts, unlimited branches, unlimited billing, every feature (including Team Custom Access) unlocked, with priority support.</div>
+                    <div x-show="open === 4" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Starter covers your owner account plus 1 team account with up to 2,000 PRA bills per month. Business is the cafe & restaurant sweet spot — full kitchen module (KOT, kitchen display, tables), analytics dashboard, offline billing with the desktop app, deals & combo pricing, product Excel import/export, 5 team accounts and 5,000 bills per month. Pro adds delivery riders & khata and a public QR menu, with 10 team accounts, 2 branches and 10,000 bills per month. Pro Max adds Staff Hazri (attendance) with 20 team accounts, 3 branches and unlimited bills. Unlimited is fully unrestricted — Rider Live Tracking on a map, unlimited team accounts, unlimited branches, unlimited billing, every feature (including Team Custom Access) unlocked, with priority support.</div>
+                </div>
+                <div class="border-b border-gray-200">
+                    <button @click="open = (open === 5 ? null : 5)" class="w-full flex items-center justify-between py-6 text-left">
+                        <span class="font-serif text-lg text-gray-900">Is there a mobile app? Does it work in Urdu?</span>
+                        <span class="text-gray-400 font-mono text-xl" x-text="open === 5 ? '-' : '+'">+</span>
+                    </button>
+                    <div x-show="open === 5" x-collapse class="pb-6 text-gray-600 leading-relaxed font-light">Yes to both. A lightweight Android app (~600&nbsp;KB) gives your whole team — owner, manager, waiter, cashier — the full POS on their phones, and delivery riders get their own app. The entire panel runs in Urdu, Roman Urdu or English, and each staff member picks their own language.</div>
                 </div>
             </div>
         </div>

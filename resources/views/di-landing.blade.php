@@ -223,6 +223,14 @@
             },
             {
                 "@@type": "Question",
+                "name": "Can I import invoices in bulk instead of typing them one by one?",
+                "acceptedAnswer": {
+                    "@@type": "Answer",
+                    "text": "Yes. Upload an Excel sheet and TaxNest converts the rows into draft invoices in one batch, each validated against FBR rules before submission. You can also paste rough invoice text and let the AI parser extract buyer, items, and amounts into a structured draft."
+                }
+            },
+            {
+                "@@type": "Question",
                 "name": "What happens if a submission fails?",
                 "acceptedAnswer": {
                     "@@type": "Answer",
@@ -515,6 +523,32 @@
                         <p class="text-gray-600 leading-relaxed mb-4">Train your accounting staff without risking formal FBR penalties. TaxNest provides a complete Sandbox mode where you can test workflows and verify PDF outputs, then switch to Production with a single click when ready.</p>
                     </div>
                 </div>
+
+                <div class="w-full h-px bg-gray-200"></div>
+
+                <!-- Point 04 -->
+                <div class="flex flex-col md:flex-row gap-8 reveal-on-scroll items-start">
+                    <div class="w-16 flex-shrink-0 pt-1">
+                        <span class="font-serif text-4xl text-[#0A4D5C] opacity-30 font-bold">04</span>
+                    </div>
+                    <div>
+                        <h4 class="text-2xl font-serif text-[#052730] mb-3">Bulk Excel Import</h4>
+                        <p class="text-gray-600 leading-relaxed mb-4">Already keeping your sales in spreadsheets? Upload an Excel file and TaxNest turns entire batches of rows into draft invoices in one go — each row mapped, validated against FBR rules, and queued for review. No more retyping hundreds of invoices by hand at month end.</p>
+                    </div>
+                </div>
+
+                <div class="w-full h-px bg-gray-200"></div>
+
+                <!-- Point 05 -->
+                <div class="flex flex-col md:flex-row gap-8 reveal-on-scroll items-start">
+                    <div class="w-16 flex-shrink-0 pt-1">
+                        <span class="font-serif text-4xl text-[#0A4D5C] opacity-30 font-bold">05</span>
+                    </div>
+                    <div>
+                        <h4 class="text-2xl font-serif text-[#052730] mb-3">AI Invoice Parsing</h4>
+                        <p class="text-gray-600 leading-relaxed mb-4">Paste rough invoice text — a WhatsApp order, a scanned bill, plain notes — and the AI reads it for you: buyer, items, quantities, rates and amounts land in a structured draft ready for your review. You confirm the fields; the system handles the data entry.</p>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
@@ -721,6 +755,13 @@
                         <svg class="w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 3 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <div x-show="open === 3" x-collapse class="px-2 pb-6 text-sm text-gray-600 leading-relaxed">Yes. As you type an item, the HS intelligence engine suggests matching codes and checks them against the correct tax schedule — so the right rate is applied before the invoice ever leaves your screen.</div>
+                </div>
+                <div class="bg-white">
+                    <button @click="open = (open === 5 ? null : 5)" class="w-full flex items-center justify-between py-6 text-left hover:bg-gray-50 px-2 transition-colors">
+                        <span class="font-bold text-gray-900 text-sm uppercase tracking-wide">Can I import invoices in bulk instead of typing them one by one?</span>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ml-4" :class="open === 5 ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open === 5" x-collapse class="px-2 pb-6 text-sm text-gray-600 leading-relaxed">Yes. Upload an Excel sheet and TaxNest converts the rows into draft invoices in one batch, each validated against FBR rules before submission. You can also paste rough invoice text and let the AI parser extract buyer, items, and amounts into a structured draft.</div>
                 </div>
                 <div class="bg-white">
                     <button @click="open = (open === 4 ? null : 4)" class="w-full flex items-center justify-between py-6 text-left hover:bg-gray-50 px-2 transition-colors">

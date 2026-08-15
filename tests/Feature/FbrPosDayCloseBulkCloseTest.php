@@ -187,6 +187,73 @@ class FbrPosDayCloseBulkCloseTest extends TestCase
         $this->assertStringNotContainsString(__('pos.dayclose_bills_rider_guarded', ['count' => 3]), $flash);
     }
 
+    /**
+     * Task 726: bulk-run flash counts stay honest across days. Deleted locals
+     * SUM across days (rows are gone, so no double-count risk — but a per-day
+     * reset regression would show only the LAST day's figure), while the
+     * rider-guarded bill (re-selected by every later day's ≤date wash) shows
+     * exactly ONCE.
+     */
+    public function test_bulk_close_flash_sums_deleted_across_days_and_counts_guarded_once(): void
+    {
+        // Company wash policy = delete pending provisionals at close.
+        DB::table('companies')->where('id', $this->company->id)
+            ->update(['pos_dayclose_provisional_action' => 'delete']);
+
+        // Three stranded days with normal final bills.
+        $this->strandDay(3, 'F-A');
+        $this->strandDay(2, 'F-B');
+        $this->strandDay(1, 'F-C');
+
+        // Local delete-policy bills: TWO on the oldest day, ONE on the middle
+        // day → the honest bulk flash must say 3 (a per-day reset bug says 1;
+        // a missing-reset bug on a wash-skipping day could double-count).
+        $localIds = [
+            $this->localBill(3, 'L-A1'),
+            $this->localBill(3, 'L-A2'),
+            $this->localBill(2, 'L-B1'),
+        ];
+
+        // ONE unsettled cash rider bill on the oldest day — every later day's
+        // ≤date wash re-selects it; the flash must de-dupe to 1.
+        $at = now()->subDays(3)->setTime(16, 0);
+        $guardedId = DB::table('fbr_pos_transactions')->insertGetId([
+            'company_id' => $this->company->id,
+            'invoice_number' => 'F-RIDER-726',
+            'transaction_type' => 'sale',
+            'status' => 'completed',
+            'invoice_mode' => 'local',
+            'fbr_status' => 'local',
+            'subtotal' => 500,
+            'total_amount' => 500,
+            'payment_method' => 'cash',
+            'rider_id' => 7,
+            'rider_settlement_id' => null,
+            'delivery_status' => 'delivered',
+            'created_at' => $at,
+            'updated_at' => $at,
+        ]);
+
+        $response = $this->bulkClose();
+        $response->assertSessionHas('success');
+
+        // All three days closed; the local bills are actually GONE…
+        $this->assertSame(3, DB::table('fbr_day_close_reports')->where('company_id', $this->company->id)->count());
+        $this->assertSame(0, DB::table('fbr_pos_transactions')->whereIn('id', $localIds)->count(),
+            'delete-policy local bills must be removed by the wash');
+        // …while the guarded rider bill survives, still Local.
+        $this->assertNotNull(DB::table('fbr_pos_transactions')->where('id', $guardedId)->first());
+
+        $flash = session('success');
+        // Deleted count = TOTAL across days (2 + 1), not just the last day's.
+        $this->assertStringContainsString(__('pos.dayclose_bills_deleted', ['count' => 3]), $flash);
+        $this->assertStringNotContainsString(__('pos.dayclose_bills_deleted', ['count' => 1]), $flash);
+        // Guarded bill exactly ONCE — not once per closed day.
+        $this->assertStringContainsString(__('pos.dayclose_bills_rider_guarded', ['count' => 1]), $flash);
+        $this->assertStringNotContainsString(__('pos.dayclose_bills_rider_guarded', ['count' => 2]), $flash);
+        $this->assertStringNotContainsString(__('pos.dayclose_bills_rider_guarded', ['count' => 3]), $flash);
+    }
+
     /** 6: cashier without day-close rights cannot bulk-close. */
     public function test_cashier_without_rights_cannot_bulk_close(): void
     {
@@ -213,6 +280,26 @@ class FbrPosDayCloseBulkCloseTest extends TestCase
     {
         return $this->actingAs($this->posAdmin, 'fbrpos')
             ->post('/fbr-pos/day-close/close-all-prior');
+    }
+
+    /** Insert a pending LOCAL provisional bill N days ago; returns its id. */
+    private function localBill(int $daysAgo, string $invoice): int
+    {
+        $at = now()->subDays($daysAgo)->setTime(15, 0);
+
+        return (int) DB::table('fbr_pos_transactions')->insertGetId([
+            'company_id' => $this->company->id,
+            'invoice_number' => $invoice,
+            'transaction_type' => 'sale',
+            'status' => 'completed',
+            'invoice_mode' => 'local',
+            'fbr_status' => 'local',
+            'subtotal' => 200,
+            'total_amount' => 200,
+            'payment_method' => 'cash',
+            'created_at' => $at,
+            'updated_at' => $at,
+        ]);
     }
 
     /** Insert a bill N days ago with no day-close report; returns Y-m-d. */

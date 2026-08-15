@@ -259,8 +259,18 @@
              "pyara nahi lagta" — poora ORD- number hi wapis (bold, complete). Matching
              phir bhi chalti hai: receipt ka code = isi number ka aakhri hissa. Sirf
              TOKEN style ka bada box rehta hai (woh alag number hai — bulane ke liye). --}}
+        @php
+            // Task 777 (ZFC, 16 Aug 2026): transaction-shim KOTs (order-less
+            // bills) print the BILL token big when the stream's number style
+            // is 'token' — matches the receipt's calling number. Passed only
+            // by renderTransactionKot; order-based KOTs stay unchanged.
+            $shimBillToken = $shimBillToken ?? null;
+        @endphp
         @if($omToken)
             <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:20px; font-weight:900; color:#000;">{{ __('pos.order_match_token_label') }} {{ $omToken }}</span>@if($kotBatchShown) <span class="text-sm bold">KOT #{{ $kotBatchNo }}</span>@endif</p>
+        @elseif($shimBillToken !== null)
+            <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:20px; font-weight:900; color:#000;">{{ __('pos.order_match_token_label') }} {{ $shimBillToken }}</span></p>
+            <p class="text-sm bold">{{ __('pos.bill_ref_label') }}: {{ $order->order_number }}</p>
         @else
             <p class="text-lg bold mt-1">{{ $order->order_number }}@if($kotBatchShown) <span class="text-sm bold">&mdash; KOT #{{ $kotBatchNo }}</span>@endif</p>
         @endif

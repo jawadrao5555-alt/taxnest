@@ -1747,6 +1747,24 @@ class RestaurantPosController extends Controller
         // one full ticket; multi-station splitting stays an order-KOT feature).
         $prep = \App\Models\PosStation::prepareTicket($companyId, $ticketItems, null);
 
+        // Task 777 (ZFC, 16 Aug 2026): when this bill's STREAM number style is
+        // 'token' (same predicate as receipts — local = isLocalBill/exempt),
+        // the shim KOT prints the bill token big with the serial as small ref,
+        // so the kitchen slip matches the receipt's calling number. Both the
+        // browser route and the Agent print path go through this render.
+        $shimBillToken = null;
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'bill_token') && $transaction->bill_token) {
+                $shimIsLocal = $transaction->isLocalBill() || $transaction->isExemptStream();
+                $shimStyle = $shimIsLocal ? ($company->local_number_style ?? 'serial') : ($company->pra_number_style ?? 'serial');
+                if ($shimStyle === 'token') {
+                    $shimBillToken = (int) $transaction->bill_token;
+                }
+            }
+        } catch (\Throwable $e) {
+            $shimBillToken = null;
+        }
+
         // "Payment First, Then KOT" v2 (Aug 2026): stamp the txn the first time its
         // kitchen ticket is rendered — the F10 "Send KOT" button and the promote-time
         // auto-KOT both check this so the kitchen never gets the same ticket twice.
@@ -1763,6 +1781,7 @@ class RestaurantPosController extends Controller
             'delta' => false,
             'kotBatchNo' => null,
             'newItemIds' => collect(),
+            'shimBillToken' => $shimBillToken,
         ])->render();
     }
 

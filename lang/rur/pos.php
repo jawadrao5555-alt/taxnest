@@ -2901,6 +2901,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'receipt_rider' => 'Rider',
     'receipt_waiter' => 'Waiter',
     'receipt_sale_receipt' => 'SALE RASEED',
+    'receipt_scan_bill' => 'Bill ki tafseel kholne ke liye scan karein',
     'receipt_scan_details' => 'Tafseel ke liye scan karein',
     'receipt_scan_invoice' => 'Invoice ki tafseel ke liye scan karein',
     'receipt_scan_menu' => 'Menu aur maloomat ke liye scan karein',

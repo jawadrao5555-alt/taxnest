@@ -158,6 +158,68 @@ class PosDayCloseBulkCloseTest extends TestCase
         $this->assertNull(DB::table('pos_day_close_reports')->whereDate('report_date', $neverTraded)->first());
     }
 
+    /**
+     * Task 732 (PRA mirror of FBR Task 726): bulk-run flash counts stay honest
+     * across days. Deleted locals SUM across days (a per-day reset regression
+     * would show only the LAST day's figure), while the rider-guarded bill is
+     * reported exactly ONCE. On PRA the guard ARCHIVES the bill (khata proof
+     * survives), so later days' ≤date washes must never re-count it.
+     */
+    public function test_bulk_close_flash_sums_deleted_across_days_and_counts_guarded_once(): void
+    {
+        // Company wash policy = delete pending provisionals at close.
+        DB::table('companies')->where('id', $this->companyId)
+            ->update(['pos_dayclose_provisional_action' => 'delete']);
+
+        // Three stranded days with normal PRA-mode bills (never washed).
+        $this->strandDay(3, 'INV-A');
+        $this->strandDay(2, 'INV-B');
+        $this->strandDay(1, 'INV-C');
+
+        // Local delete-policy provisionals: TWO on the oldest day, ONE on the
+        // middle day → the honest bulk flash must say 3 (a per-day reset bug
+        // says 1; a missing-reset bug could double-count).
+        $this->strandDay(3, 'L-A1', ['invoice_mode' => 'local', 'pra_status' => 'local']);
+        $this->strandDay(3, 'L-A2', ['invoice_mode' => 'local', 'pra_status' => 'local']);
+        $this->strandDay(2, 'L-B1', ['invoice_mode' => 'local', 'pra_status' => 'local']);
+        $localIds = DB::table('pos_transactions')
+            ->whereIn('invoice_number', ['L-A1', 'L-A2', 'L-B1'])->pluck('id');
+
+        // ONE unsettled cash rider bill (local provisional) on the OLDEST day —
+        // the delete wash must spare it (archive instead) and count it ONCE.
+        $this->strandDay(3, 'L-RIDER', [
+            'invoice_mode' => 'local',
+            'pra_status' => 'local',
+            'rider_id' => 7,
+            'rider_settlement_id' => null,
+            'delivery_status' => 'delivered',
+            'payment_method' => 'cash',
+        ]);
+        $guardedId = DB::table('pos_transactions')->where('invoice_number', 'L-RIDER')->value('id');
+
+        $response = $this->bulkClose();
+        $response->assertSessionHas('success');
+
+        // All three days closed; the delete-policy locals are actually GONE…
+        $this->assertSame(3, DB::table('pos_day_close_reports')->where('company_id', $this->companyId)->count());
+        $this->assertSame(0, DB::table('pos_transactions')->whereIn('id', $localIds)->count(),
+            'delete-policy local bills must be removed by the wash');
+        // …while the guarded rider bill survives — ARCHIVED, never deleted
+        // (khata trail intact; PRA guard archives, unlike FBR's stay-Local).
+        $guarded = DB::table('pos_transactions')->where('id', $guardedId)->first();
+        $this->assertNotNull($guarded, 'guarded rider bill must never be deleted');
+        $this->assertTrue((bool) $guarded->is_archived, 'guarded rider bill must be archived instead');
+
+        $flash = session('success');
+        // Deleted count = TOTAL across days (2 + 1), not just the last day's.
+        $this->assertStringContainsString(__('pos.dayclose_bills_deleted', ['count' => 3]), $flash);
+        $this->assertStringNotContainsString(__('pos.dayclose_bills_deleted', ['count' => 1]), $flash);
+        // Guarded bill exactly ONCE — not once per closed day.
+        $this->assertStringContainsString(__('pos.dayclose_bills_rider_guarded', ['count' => 1]), $flash);
+        $this->assertStringNotContainsString(__('pos.dayclose_bills_rider_guarded', ['count' => 2]), $flash);
+        $this->assertStringNotContainsString(__('pos.dayclose_bills_rider_guarded', ['count' => 3]), $flash);
+    }
+
     /** Today's close with zero bills stays strictly refused (allowEmpty is prior-days-only). */
     public function test_empty_today_close_is_still_refused(): void
     {
@@ -308,6 +370,10 @@ class PosDayCloseBulkCloseTest extends TestCase
             $t->decimal('total_amount', 12, 2)->default(0);
             $t->string('payment_method')->nullable();
             $t->boolean('tax_inclusive')->default(false);
+            // Rider delete-guard columns (Task 732 flash-count tests).
+            $t->unsignedBigInteger('rider_id')->nullable();
+            $t->unsignedBigInteger('rider_settlement_id')->nullable();
+            $t->string('delivery_status')->nullable();
             $t->timestamps();
             $t->unique(['company_id', 'invoice_number']);
         });

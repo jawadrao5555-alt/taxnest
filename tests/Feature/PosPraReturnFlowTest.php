@@ -606,6 +606,21 @@ class PosPraReturnFlowTest extends TestCase
             }
         }
 
+        // Task 792 added $transaction->restaurantOrder?->table to the dine-in
+        // header of transaction-show — the relation's table must exist for the
+        // render (stays empty here; retail rows have no restaurant order).
+        if (!Schema::hasTable('restaurant_orders')) {
+            Schema::create('restaurant_orders', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('company_id')->nullable();
+                $table->unsignedBigInteger('pos_transaction_id')->nullable();
+                $table->unsignedBigInteger('table_id')->nullable();
+                $table->string('order_type')->nullable();
+                $table->string('status')->nullable();
+                $table->timestamps();
+            });
+        }
+
         $this->actAs('pos_manager');
         $parent = $this->seedParent(['pra_invoice_number' => 'PRA-FISCAL-9']);
         $ids = $this->itemIds($parent);

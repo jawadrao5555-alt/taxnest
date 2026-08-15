@@ -865,6 +865,9 @@ class AgentController extends Controller
             }
             // Owner decision 1 Aug 2026: proof-bill follows chosen language.
             $this->setPrintLocale($order->creator?->language, $job, $company);
+            // Task 778: KOT-split rows (qty-aware carry) must merge back into
+            // one customer line per dish — same rule as the iframe proof route.
+            $order->setRelation('items', \App\Services\PosBillLineConsolidator::consolidate($order->items));
             return response(view('pos.restaurant.proof-bill', ['order' => $order, 'company' => $company])->render())
                 ->header('Content-Type', 'text/html; charset=UTF-8');
         }

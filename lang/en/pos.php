@@ -1649,6 +1649,10 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'kot_print_style_hint' => 'Shorten the kitchen ticket by hiding parts you don\'t need, and adjust where it prints on the paper',
     'kot_printer_hint' => 'Kitchen tickets (KOT) go straight to this printer in the kitchen.',
     'kot_reprint_banner' => '*** REPRINT #:n — IGNORE PRIOR TICKET ***',
+    // Task 778: delta slip rides "ADD-ON" beside KOT #N; full-mode update ticket gets a banner; new rows tagged.
+    'kot_addon_marker' => 'ADD-ON',
+    'kot_updated_banner' => '*** UPDATED ORDER — FULL TICKET ***',
+    'kot_new_tag' => 'NEW',
     'kot_reprint_btn' => 'Reprint',
     'kot_resend_btn' => '↻ Re-send KOT',
     // Task 753 (Pizza Master): missed-delta recovery — reprint the LAST add-on KOT batch.

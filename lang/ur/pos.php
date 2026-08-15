@@ -1649,6 +1649,10 @@ return [
     'kot_print_style_hint' => 'غیر ضروری حصے چھپا کر کچن ٹکٹ چھوٹا کریں، اور پیپر پر پرنٹنگ کی جگہ ایڈجسٹ کریں',
     'kot_printer_hint' => 'کچن ٹکٹ (KOT) براہِ راست کچن کے اس پرنٹر پر جائیں گے۔',
     'kot_reprint_banner' => '*** ری پرنٹ #:n — پرانا ٹکٹ نظر انداز کریں ***',
+    // Task 778: ڈیلٹا سلپ پر KOT #N کے ساتھ ایڈ آن مارکر؛ فل موڈ اپڈیٹ ٹکٹ پر بینر؛ نئی قطاروں پر ٹیگ۔
+    'kot_addon_marker' => 'ایڈ آن',
+    'kot_updated_banner' => '*** اپڈیٹ آرڈر — مکمل ٹکٹ ***',
+    'kot_new_tag' => 'نیا',
     'kot_reprint_btn' => 'دوبارہ پرنٹ کریں',
     'kot_resend_btn' => '↻ دوبارہ بھیجیں KOT',
     // Task 753 (Pizza Master): missed-delta recovery — آخری ایڈ آن KOT بیچ کا ری پرنٹ۔

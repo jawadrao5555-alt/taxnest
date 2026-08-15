@@ -128,6 +128,9 @@
         .btn-reprint { background: #f59e0b; color: #fff; }
         .btn-station { background: #3b82f6; color: #fff; font-size: 11px; }
         .btn-station:hover { background: #2563eb; }
+        /* Task 778: full-mode UPDATE tickets tag genuinely-new rows — solid black
+           on white (thermal-safe, same lesson as station headers). */
+        .kot-new-tag { font-weight: 900; font-size: 11px; border: 1px solid #000; padding: 0 3px; letter-spacing: 1px; color: #000; background: #fff; }
         .kot-barcode-box { text-align: center; margin: 8px 0 4px; }
         .kot-barcode-box svg { max-width: 95%; height: 50px; }
         .kot-barcode-hint { font-size: 9px; color: #000; font-weight: bold; letter-spacing: 1px; margin-top: 2px; }
@@ -233,6 +236,15 @@
                  Banner kept for manual full re-sends (non-delta) only. --}}
             <p class="text-sm bold" style="color:#000; font-weight:900;">{{ __('pos.kot_reprint_banner', ['n' => $order->kot_print_count]) }}</p>
         @endif
+        @php
+            // Task 778: full-mode UPDATE ticket = whole cart re-rendered because
+            // of new rows ($newItemIds only populated on the full-mode paths) —
+            // mark it clearly UPDATED so the kitchen doesn't re-fire everything.
+            $kotFullUpdate = !empty($delta) && ($newItemIds ?? collect())->isNotEmpty();
+        @endphp
+        @if($kotFullUpdate)
+            <p class="text-sm bold" style="color:#000; font-weight:900;">{{ __('pos.kot_updated_banner') }}</p>
+        @endif
         {{-- 10 Aug 2026 (Pizza Master photo): URGENT top se hata kar neeche footer
              lines ke saath chhota sa — paper aur kam lage; render site is below,
              beside the order-by line. --}}
@@ -254,7 +266,14 @@
         {{-- 10 Aug 2026 (Pizza Master follow-up video): "KOT #1" carries no info on the
              FIRST ticket — print the batch number only from #2 onward, where the kitchen
              genuinely needs it to spot a delta/repeat ticket for the same order. --}}
-        @php $kotBatchShown = !empty($kotBatchNo) && (int) $kotBatchNo > 1; @endphp
+        @php
+            $kotBatchShown = !empty($kotBatchNo) && (int) $kotBatchNo > 1;
+            // Task 778: delta slips (added-qty-only tickets) get a small ADD-ON
+            // marker riding the KOT #N line — same order number + token as the
+            // first slip, so the kitchen reads it as an update, not a new order.
+            // Full-mode update tickets show the UPDATED banner instead (above).
+            $kotAddon = !empty($delta) && $kotBatchShown && ($newItemIds ?? collect())->isEmpty();
+        @endphp
         {{-- 10 Aug 2026 (Pizza Master, via owner): CODE style par chhota boxed code
              "pyara nahi lagta" — poora ORD- number hi wapis (bold, complete). Matching
              phir bhi chalti hai: receipt ka code = isi number ka aakhri hissa. Sirf
@@ -267,12 +286,12 @@
             $shimBillToken = $shimBillToken ?? null;
         @endphp
         @if($omToken)
-            <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:20px; font-weight:900; color:#000;">{{ __('pos.order_match_token_label') }} {{ $omToken }}</span>@if($kotBatchShown) <span class="text-sm bold">KOT #{{ $kotBatchNo }}</span>@endif</p>
+            <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:20px; font-weight:900; color:#000;">{{ __('pos.order_match_token_label') }} {{ $omToken }}</span>@if($kotBatchShown) <span class="text-sm bold">KOT #{{ $kotBatchNo }}@if($kotAddon) &middot; {{ __('pos.kot_addon_marker') }}@endif</span>@endif</p>
         @elseif($shimBillToken !== null)
             <p style="margin-top:3px;"><span style="display:inline-block; border:2px solid #000; padding:2px 10px; font-size:20px; font-weight:900; color:#000;">{{ __('pos.order_match_token_label') }} {{ $shimBillToken }}</span></p>
             <p class="text-sm bold">{{ __('pos.bill_ref_label') }}: {{ $order->order_number }}</p>
         @else
-            <p class="text-lg bold mt-1">{{ $order->order_number }}@if($kotBatchShown) <span class="text-sm bold">&mdash; KOT #{{ $kotBatchNo }}</span>@endif</p>
+            <p class="text-lg bold mt-1">{{ $order->order_number }}@if($kotBatchShown) <span class="text-sm bold">&mdash; KOT #{{ $kotBatchNo }}@if($kotAddon) &middot; {{ __('pos.kot_addon_marker') }}@endif</span>@endif</p>
         @endif
     </div>
 
@@ -340,7 +359,7 @@
                 @foreach($items as $item)
                 <tr>
                     <td class="name">
-                        <span class="bold">{{ $item->item_name }}</span>
+                        <span class="bold">{{ $item->item_name }}</span>@if(($newItemIds ?? collect())->contains($item->id)) <span class="kot-new-tag">{{ __('pos.kot_new_tag') }}</span>@endif
                         @if($item->special_notes)
                             <br><span class="note"><span class="note-label">&raquo; {{ __('pos.kot_note') }}</span><span class="note-text">{{ $item->special_notes }}</span></span>
                         @endif

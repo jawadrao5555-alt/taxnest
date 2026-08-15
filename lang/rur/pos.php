@@ -1649,6 +1649,10 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'kot_print_style_hint' => 'Zaroorat ki cheezein chhupakar kitchen ticket chhota karein, aur print ki position adjust karein',
     'kot_printer_hint' => 'Kitchen tickets (KOT) seedha kitchen ke is printer par jayengi.',
     'kot_reprint_banner' => '*** REPRINT #:n — PEHLA TICKET RADD KAREIN ***',
+    // Task 778: delta slip par KOT #N ke saath "ADD-ON"; full-mode update ticket par banner; nayi rows par tag.
+    'kot_addon_marker' => 'ADD-ON',
+    'kot_updated_banner' => '*** UPDATE ORDER — MUKAMMAL TICKET ***',
+    'kot_new_tag' => 'NAYA',
     'kot_reprint_btn' => 'Dobara Print',
     'kot_resend_btn' => '↻ KOT Dobara Bhejo',
     // Task 753 (Pizza Master): missed-delta recovery — akhri add-on KOT batch ka reprint.

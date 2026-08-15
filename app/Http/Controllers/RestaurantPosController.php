@@ -372,13 +372,21 @@ class RestaurantPosController extends Controller
             $carriedKotCount = 0;
             // KOT delta on recall (owner, Jul 2026): recall+re-hold recreates the
             // order, which used to wipe kot_printed_at on EVERY line — the next
-            // ticket re-fired all dishes. Carry the print stamps forward for
-            // UNCHANGED lines (same type/id/name/qty/notes) so only genuinely
-            // new or changed rows stay unprinted; the delta ticket + KDS
-            // auto-print then cover just those.
+            // ticket re-fired all dishes. Task 778 (Pizza Master video, Aug 2026):
+            // the carry used to match lines QUANTITY-INCLUSIVE, so bumping a sent
+            // item's qty made the WHOLE line unprinted and the add-on slip printed
+            // the CUMULATIVE qty (kitchen fired 1+2=3 bottles for a 2-bottle
+            // order). Carry is now IDENTITY-based (type/id/name/notes) with
+            // per-identity printed-qty chunks: an increased line is SPLIT into
+            // stamped "already sent" row(s) + ONE unprinted delta row, so every
+            // delta path prints only the added qty. Decreases just consume fewer
+            // chunks — nothing new prints (no phantom KOT). Duplicate identical
+            // lines keep the shared-pool shift behaviour.
             $printedPool = [];
-            $kotCarryKey = function ($type, $id, $name, $qty, $notes) {
-                return implode('|', [$type, (string) $id, mb_strtolower(trim((string) $name)), (string) (int) $qty, trim((string) $notes)]);
+            $hadPrintedRows = false;
+            $oldOrder = null;
+            $kotCarryKey = function ($type, $id, $name, $notes) {
+                return implode('|', [$type, (string) $id, mb_strtolower(trim((string) $name)), trim((string) $notes)]);
             };
             if ($request->recalled_order_id) {
                 $oldOrder = RestaurantOrder::where('id', $request->recalled_order_id)
@@ -388,18 +396,30 @@ class RestaurantPosController extends Controller
                     ->first();
                 if ($oldOrder) {
                     $carriedKotCount = (int) ($oldOrder->kot_print_count ?? 0);
-                    foreach ($oldOrder->items()->whereNotNull('kot_printed_at')->get() as $oi) {
-                        $printedPool[$kotCarryKey($oi->item_type, $oi->item_id, $oi->item_name, $oi->quantity, $oi->special_notes)][] = [
+                    foreach ($oldOrder->items()->whereNotNull('kot_printed_at')->orderBy('kot_batch_no')->orderBy('id')->get() as $oi) {
+                        $printedPool[$kotCarryKey($oi->item_type, $oi->item_id, $oi->item_name, $oi->special_notes)][] = [
+                            'qty' => (float) $oi->quantity,
                             'kot_printed_at' => $oi->kot_printed_at,
                             'kot_batch_no' => $oi->kot_batch_no,
                         ];
+                        $hadPrintedRows = true;
                     }
                     $oldOrder->items()->delete();
+                    // Task 778 ORDER IDENTITY CARRY: the replacement order keeps the
+                    // ORIGINAL order_number (token carried below) so the kitchen
+                    // reads both slips as ONE order — the add-on slip used to get a
+                    // brand-new ORD number. order_number is UNIQUE — free it by
+                    // suffixing the superseded row ('~'+id stays unique + traceable;
+                    // superseded rows are excluded from every report/list).
+                    $orderNumber = $oldOrder->order_number;
                     // Task 506: yeh SYSTEM supersede hai (recall + re-hold), human
                     // cancel nahi — superseded_at stamp karo taake Cancelled Orders
                     // report / dashboard tile mein ghost row na bane. Status
                     // 'cancelled' hi rehta hai (blacklist queries leak-safe).
-                    $supersede = ['status' => 'cancelled'];
+                    $supersede = [
+                        'status' => 'cancelled',
+                        'order_number' => mb_substr($oldOrder->order_number, 0, 30 - strlen('~' . $oldOrder->id)) . '~' . $oldOrder->id,
+                    ];
                     if (Schema::hasColumn('restaurant_orders', 'superseded_at')) {
                         $supersede['superseded_at'] = now();
                     }
@@ -430,9 +450,13 @@ class RestaurantPosController extends Controller
 
             // Order Matching (Aug 2026): Daily Token allocated company-centrally
             // at ORDER birth — add-ons/KOT reprints/final bill all keep this token.
-            $tokenNo = ($company->order_match_style ?? 'off') === 'token'
-                ? \App\Services\OrderTokenService::nextToken($companyId)
-                : null;
+            // Task 778: a recalled order's replacement CARRIES the original token
+            // (the update slip must match the first slip) — never draws a fresh one.
+            $tokenNo = ($oldOrder && $oldOrder->token_no !== null)
+                ? (int) $oldOrder->token_no
+                : ((($company->order_match_style ?? 'off') === 'token')
+                    ? \App\Services\OrderTokenService::nextToken($companyId)
+                    : null);
 
             $order = RestaurantOrder::create([
                 'company_id' => $companyId,
@@ -472,15 +496,67 @@ class RestaurantPosController extends Controller
             ]);
 
             foreach ($resolvedItems as $item) {
-                // Re-apply carried KOT print stamps to unchanged lines (consume
-                // one pool entry per matching row — duplicates handled).
-                $ck = $kotCarryKey($item['item_type'], $item['item_id'], $item['item_name'], $item['quantity'], $item['special_notes'] ?? '');
-                if (!empty($printedPool[$ck])) {
-                    $stamp = array_shift($printedPool[$ck]);
-                    $item['kot_printed_at'] = $stamp['kot_printed_at'];
-                    $item['kot_batch_no'] = $stamp['kot_batch_no'];
+                // Task 778 QUANTITY-AWARE CARRY: consume this identity's printed
+                // chunks first; any qty beyond the already-sent total becomes ONE
+                // unprinted delta row — every delta path then prints just that.
+                $ck = $kotCarryKey($item['item_type'], $item['item_id'], $item['item_name'], $item['special_notes'] ?? '');
+                $lineQty = (float) $item['quantity'];
+                $chunks = [];
+                $remaining = $lineQty;
+                while ($remaining > 0.001 && !empty($printedPool[$ck])) {
+                    $chunk = array_shift($printedPool[$ck]);
+                    $use = min((float) $chunk['qty'], $remaining);
+                    $chunks[] = ['qty' => $use, 'kot_printed_at' => $chunk['kot_printed_at'], 'kot_batch_no' => $chunk['kot_batch_no']];
+                    if ((float) $chunk['qty'] - $use > 0.001) {
+                        // Qty DECREASED: return the leftover for a possible duplicate
+                        // line; unclaimed leftovers simply aren't re-created (and
+                        // nothing new prints — no phantom KOT on decrease/remove).
+                        $chunk['qty'] = (float) $chunk['qty'] - $use;
+                        array_unshift($printedPool[$ck], $chunk);
+                    }
+                    $remaining -= $use;
                 }
-                RestaurantOrderItem::create(array_merge($item, ['order_id' => $order->id]));
+                if ($remaining > 0.001 || empty($chunks)) {
+                    $chunks[] = ['qty' => max($remaining, 0), 'kot_printed_at' => null, 'kot_batch_no' => null];
+                }
+                // Chunks partition the line's quantity exactly. Split the money
+                // columns proportionally; the LAST chunk absorbs the rounding
+                // remainder so split rows always sum EXACTLY to the original line
+                // (bill/system totals unchanged). Single chunk = original figures.
+                $n = count($chunks);
+                $lineSubtotal = (float) $item['subtotal'];
+                $lineDiscAmt = (float) ($item['item_discount_amount'] ?? 0);
+                $lineDiscVal = (float) ($item['item_discount_value'] ?? 0);
+                $discType = $item['item_discount_type'] ?? null;
+                $accSub = 0.0; $accDisc = 0.0; $accVal = 0.0;
+                foreach ($chunks as $ci => $chunk) {
+                    $row = $item;
+                    $row['quantity'] = $chunk['qty'];
+                    // Only carried chunks write the stamp keys — fresh/delta rows
+                    // omit them entirely (prod schema-drift safe, matches the
+                    // pre-778 behaviour for plain holds).
+                    if ($chunk['kot_printed_at'] !== null) {
+                        $row['kot_printed_at'] = $chunk['kot_printed_at'];
+                        $row['kot_batch_no'] = $chunk['kot_batch_no'];
+                    }
+                    if ($ci === $n - 1) {
+                        $row['subtotal'] = round($lineSubtotal - $accSub, 2);
+                        $row['item_discount_amount'] = round($lineDiscAmt - $accDisc, 2);
+                        $row['item_discount_value'] = $discType === 'amount' ? round($lineDiscVal - $accVal, 2) : $lineDiscVal;
+                    } else {
+                        $ratio = $lineQty > 0 ? ($chunk['qty'] / $lineQty) : 0;
+                        $row['subtotal'] = round($lineSubtotal * $ratio, 2);
+                        $row['item_discount_amount'] = round($lineDiscAmt * $ratio, 2);
+                        // 'amount' discounts must split too — recall maps rows back
+                        // to cart lines 1:1, a full value on BOTH rows would double
+                        // the discount on the next re-hold. Percentage stays as-is.
+                        $row['item_discount_value'] = $discType === 'amount' ? round($lineDiscVal * $ratio, 2) : $lineDiscVal;
+                        $accSub += $row['subtotal'];
+                        $accDisc += $row['item_discount_amount'];
+                        $accVal += $discType === 'amount' ? $row['item_discount_value'] : 0;
+                    }
+                    RestaurantOrderItem::create(array_merge($row, ['order_id' => $order->id]));
+                }
             }
 
             if ($request->table_id) {
@@ -528,7 +604,7 @@ class RestaurantPosController extends Controller
             // flag=false dekh kar apna fallback (silent → iframe) chalata hai.
             $kotDeltaQueued = false;
             try {
-                if ($request->recalled_order_id && !empty($printedPool)
+                if ($request->recalled_order_id && $hadPrintedRows
                     && (bool) ($company->kds_enabled ?? true) && (bool) ($company->pos_kds_auto_print ?? false)) {
                     $enq = \App\Services\KotPrintService::enqueueForOrder($company, $order, $user->id, true);
                     $kotDeltaQueued = (bool) ($enq['printed'] ?? false) && !empty($enq['job_ids'] ?? []);
@@ -1027,7 +1103,11 @@ class RestaurantPosController extends Controller
             }
             $transaction = PosTransaction::create($transactionData);
 
-            foreach ($order->items as $item) {
+            // Task 778: KOT qty-carry may have SPLIT an increased line into
+            // stamped + delta rows (kitchen bookkeeping only). The customer bill
+            // must show ONE line per dish — consolidate identical rows before
+            // creating transaction items. Sums are exact by construction.
+            foreach ($this->consolidateBillLines($order->items) as $item) {
                 $lineAfterOrderDisc = $subtotal > 0 ? round($item->subtotal * max(0, $discountRatio), 2) : $item->subtotal;
                 $lineTax = $item->is_tax_exempt ? 0 : ($taxInclusive
                     ? \App\Services\PosTaxMath::inclusiveLineTax((float) $lineAfterOrderDisc, (float) $taxRate, $menuRate)
@@ -1442,7 +1522,20 @@ class RestaurantPosController extends Controller
             ->with(['items', 'table', 'creator'])
             ->findOrFail($orderId);
 
+        // Task 778: customer-facing pre-bill — merge KOT-split rows into one
+        // line per dish (display-only; DB rows keep their print stamps).
+        $order->setRelation('items', $this->consolidateBillLines($order->items));
+
         return view('pos.restaurant.proof-bill', compact('order', 'company'));
+    }
+
+    /**
+     * Task 778 — customer bill line consolidation; single truth lives in
+     * PosBillLineConsolidator (shared with AgentController's proof job path).
+     */
+    private function consolidateBillLines($items)
+    {
+        return \App\Services\PosBillLineConsolidator::consolidate($items);
     }
 
     public function kitchenSettings()

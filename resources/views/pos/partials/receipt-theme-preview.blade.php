@@ -248,7 +248,7 @@ if (!window.rcptThemePicker) {
                     setChk('logo', 'rp_show_logo');
                     setChk('logoFinalsOnly', 'rp_logo_finals_only');
                     setChk('menuQr', 'rp_show_menu_qr');
-                    // verifyLine is PRA-only — always use rp_show_verify_line regardless of tab.
+                    // verifyLine applies to both PRA and FBR — always use rp_show_verify_line regardless of tab.
                     setChk('verifyLine', 'rp_show_verify_line');
                     var ftName = fname('footerText', pre + 'footer_text');
                     if (ftName) { this.p.footerText = (val(ftName, '') || '').trim(); }

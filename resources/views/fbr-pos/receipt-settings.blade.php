@@ -11,7 +11,7 @@
         'theme'  => \App\Support\PosReceiptThemes::resolve($ps),
         'themes' => \App\Support\PosReceiptThemes::clientMap(),
         'mode'   => 'fbr',
-        'live'   => false,
+        'live'   => true,
         'formId' => 'rcptSettingsForm',
         'paper'  => ($company->print_paper_size ?? 'thermal') === 'thermal58' ? '58mm' : '80mm',
         'prefs'  => [

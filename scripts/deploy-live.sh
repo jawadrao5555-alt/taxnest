@@ -279,10 +279,52 @@ if [ "$LIVE_HEAD_BEFORE" = "$LOCAL_HEAD" ]; then
 fi
 
 if ! git merge-base --is-ancestor "$LIVE_HEAD_BEFORE" "$LOCAL_HEAD" 2>/dev/null; then
-  # Live commit unknown/diverged — do NOT blind-deploy over drift.
-  echo "Live HEAD is not an ancestor of workspace HEAD." >&2
-  echo "Either the workspace is behind origin, or live has drifted." >&2
-  fail "refusing to deploy over divergence — investigate (git fetch; compare $LIVE_HEAD_BEFORE vs $LOCAL_HEAD)"
+  # Live commit unknown/diverged. The COMMON benign cause (seen 3x, last
+  # 14 Aug 2026 / Task 702): platform task-merges commit to the workspace with
+  # NEW SHAs while content-identical commits already sit on origin/main (live
+  # auto-pulled them via .cpanel.yml) — lineage diverges, content does not.
+  # Task 703 automates the manual reconcile pattern from
+  # .agents/memory/cpanel-deployment.md via scripts/lib/deploy-reconcile.sh:
+  # tree-identical origin/main => `git merge -s ours`; anything else fails LOUD
+  # (origin unique content is NEVER auto-overwritten).
+  step "Divergence detected — attempting safe auto-reconcile (Task 703)"
+  . scripts/lib/deploy-reconcile.sh
+  reconcile_fetch_origin_main \
+    || fail "git fetch origin +main:refs/remotes/origin/main failed — cannot evaluate divergence"
+  echo "origin/main: $(git rev-parse refs/remotes/origin/main)"
+  echo "live HEAD:   $LIVE_HEAD_BEFORE"
+
+  CLASS_LINE=$(reconcile_classify "$LOCAL_HEAD" "$LIVE_HEAD_BEFORE") \
+    || fail "could not classify divergence (git error) — reconcile manually"
+  CLASS=${CLASS_LINE%% *}
+  case "$CLASS" in
+    ANCESTOR)
+      echo "After fetch, live HEAD is an ancestor of workspace HEAD — continuing normally."
+      ;;
+    RECONCILABLE)
+      MATCH_COMMIT=${CLASS_LINE#RECONCILABLE }
+      echo "origin/main tree is byte-identical to workspace commit $MATCH_COMMIT — origin has NO unique content."
+      step "Auto-reconcile: git merge -s ours origin/main"
+      reconcile_merge_ours "$MATCH_COMMIT" 2>&1 \
+        || fail "git merge -s ours origin/main failed — reconcile manually"
+      LOCAL_HEAD=$(git rev-parse HEAD)
+      echo "reconciled; workspace HEAD now $LOCAL_HEAD"
+      git merge-base --is-ancestor "$LIVE_HEAD_BEFORE" "$LOCAL_HEAD" 2>/dev/null \
+        || fail "live HEAD still not an ancestor after reconcile — investigate manually"
+      ;;
+    ORIGIN_UNIQUE)
+      echo "origin/main tree matches NO commit in workspace lineage —" >&2
+      echo "origin carries UNIQUE content. NEVER auto-overwriting it." >&2
+      fail "refusing to deploy over divergence — reconcile manually per .agents/memory/cpanel-deployment.md (inspect 'git diff HEAD origin/main' first)"
+      ;;
+    LIVE_DRIFT)
+      echo "Live HEAD is neither origin/main nor an ancestor of it — live has REAL drift." >&2
+      fail "refusing to deploy over divergence — investigate (compare live $LIVE_HEAD_BEFORE vs origin/main $(git rev-parse refs/remotes/origin/main) vs workspace $LOCAL_HEAD)"
+      ;;
+    *)
+      fail "unexpected divergence classification '$CLASS_LINE' — reconcile manually"
+      ;;
+  esac
 fi
 
 # ---------------------------------------------- 0.5 SW cache-version auto-bump (Task 710)

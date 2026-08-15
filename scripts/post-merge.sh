@@ -32,10 +32,12 @@ $ENVUNSET php artisan route:clear
 # the deploy could not complete, so the gap is never silent.
 if [ -f scripts/check-live-deploy.sh ] && [ -f scripts/deploy-live.sh ]; then
   # NOTE: set -e is active — capture the checker's exit code without letting a
-  # non-zero status (1 = live behind, 2 = SSH unreachable) abort the merge.
+  # non-zero status (1 = live behind, 2 = SSH unreachable/real drift,
+  # 3 = reconcilable lineage divergence) abort the merge.
   GAP_RC=0
   bash scripts/check-live-deploy.sh || GAP_RC=$?
-  if [ "$GAP_RC" -eq 1 ]; then
+  if [ "$GAP_RC" -eq 1 ] || [ "$GAP_RC" -eq 3 ]; then
+    [ "$GAP_RC" -eq 3 ] && echo "Reconcilable lineage divergence (Task 703) — deploy-live.sh will merge -s ours and deploy..."
     echo "Live is behind — running one-command deploy (scripts/deploy-live.sh)..."
     bash scripts/deploy-live.sh || {
       echo "==============================================================="

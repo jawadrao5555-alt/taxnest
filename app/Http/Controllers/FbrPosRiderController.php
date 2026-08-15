@@ -412,6 +412,17 @@ class FbrPosRiderController extends Controller
             ->whereNotNull('rider_id')->findOrFail($txnId);
 
         if ($txn->rider_settlement_id) {
+            // Task 773 safety net: settled bill stuck at assigned/dispatched may
+            // move FORWARD to delivered only (no delivered_at stamp). Returned
+            // and reassign stay locked — they would reverse settled cash.
+            if ($request->input('delivery_status') === 'delivered'
+                && in_array($txn->delivery_status, ['assigned', 'dispatched'], true)) {
+                $txn->update(['delivery_status' => 'delivered']);
+                if ($request->expectsJson()) {
+                    return response()->json(['success' => true, 'delivery_status' => 'delivered']);
+                }
+                return back()->with('success', 'Delivery status updated.');
+            }
             return $this->statusError($request, 'This bill is already settled — status is locked.');
         }
 
@@ -586,6 +597,13 @@ class FbrPosRiderController extends Controller
                         'rider_settlement_id' => $settlement->id,
                         'rider_settled_at'    => now(),
                     ]);
+                // Task 773: cash settle = delivery done. Fully settled bills still
+                // at assigned/dispatched auto-advance to delivered so they leave
+                // the Pending tab. delivered_at deliberately NOT stamped (settle
+                // time ≠ actual delivery time — duration chip skips NULL).
+                FbrPosTransaction::whereIn('id', $settledIds)
+                    ->whereIn('delivery_status', ['assigned', 'dispatched'])
+                    ->update(['delivery_status' => 'delivered']);
             }
             if ($partialBill) {
                 FbrPosTransaction::where('id', $partialBill[0])

@@ -458,6 +458,14 @@
                                         @click="retBill = {{ $b->id }}; retBulk = null">{{ __('pos.returned_word') }}</button>
                                 @endif
                             @endif
+                            {{-- Task 773: settled bill still stuck at assigned/dispatched —
+                                 forward move to Delivered only (Dispatch/Returned stay locked). --}}
+                            @if($activeTab === 'pending' && $b->rider_id && $b->rider_settlement_id && in_array($st, ['assigned', 'dispatched']))
+                            <form method="POST" action="{{ route('pos.deliveries.status', $b->id) }}" class="inline">
+                                @csrf<input type="hidden" name="delivery_status" value="delivered">
+                                <button type="submit" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition">{{ __('pos.delivered_word') }}</button>
+                            </form>
+                            @endif
                             {{-- Prepaid conversion button (Task 285, Aug 2026): admin/manager only,
                                  cash + unsettled + not returned — any tab (pending OR delivered).
                                  PRA-submitted bills get a different confirm dialog noting the PRA record is unchanged. --}}

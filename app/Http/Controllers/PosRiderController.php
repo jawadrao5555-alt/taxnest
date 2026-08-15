@@ -568,6 +568,18 @@ class PosRiderController extends Controller
         }
 
         if ($txn->rider_settlement_id) {
+            // Task 773 safety net: a settled bill stuck at assigned/dispatched may
+            // move FORWARD to delivered only (clears Pending zombies). No
+            // delivered_at stamp (settle time ≠ delivery time). Returned and
+            // reassign stay locked — they would reverse settled cash.
+            if ($request->input('delivery_status') === 'delivered'
+                && in_array($txn->delivery_status, ['assigned', 'dispatched'], true)) {
+                $txn->update(['delivery_status' => 'delivered']);
+                if ($request->expectsJson()) {
+                    return response()->json(['success' => true, 'delivery_status' => 'delivered', 'return_url' => null, 'auto_return_id' => null, 'auto_return_invoice' => null]);
+                }
+                return back()->with('success', 'Delivery status updated.');
+            }
             return $this->statusError($request, 'This bill is already settled — status is locked.');
         }
 
@@ -894,6 +906,15 @@ class PosRiderController extends Controller
                         'rider_settlement_id' => $settlement->id,
                         'rider_settled_at' => now(),
                     ]);
+                // Task 773: cash settle = delivery ka kaam khatam. Fully settled
+                // bills still sitting at assigned/dispatched auto-advance to
+                // delivered so they leave the Pending tab (no more zombies).
+                // delivered_at is deliberately NOT stamped — settle time ≠ actual
+                // delivery time ("Delivered in X min" chip skips NULL delivered_at).
+                PosTransaction::withoutGlobalScope('hide_archived')
+                    ->whereIn('id', $settledIds)
+                    ->whereIn('delivery_status', ['assigned', 'dispatched'])
+                    ->update(['delivery_status' => 'delivered']);
             }
             if ($partialBill) {
                 PosTransaction::withoutGlobalScope('hide_archived')

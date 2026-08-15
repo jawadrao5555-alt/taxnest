@@ -349,6 +349,14 @@
                                 </form>
                                 @endif
                             @endif
+                            {{-- Task 773: settled bill still stuck at assigned/dispatched —
+                                 forward move to Delivered only (Dispatch/Returned stay locked). --}}
+                            @if($activeTab === 'pending' && $b->rider_id && $b->rider_settlement_id && in_array($st, ['assigned', 'dispatched']))
+                            <form method="POST" action="{{ route('fbrpos.deliveries.status', $b->id) }}" class="inline">
+                                @csrf<input type="hidden" name="delivery_status" value="delivered">
+                                <button type="submit" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition">{{ __('pos.delivered_word') }}</button>
+                            </form>
+                            @endif
                             @if(($activeTab === 'pending' && $b->rider_id && !$b->rider_settlement_id) || ($activeTab === 'delivered' && $isAdminOrManager && $b->rider_id && !$b->rider_settlement_id))
                                 @if($st !== 'returned')
                                 <form method="POST" action="{{ route('fbrpos.deliveries.status', $b->id) }}" class="inline" onsubmit="return confirm({{ Js::from(__('pos.confirm_mark_returned')) }});">

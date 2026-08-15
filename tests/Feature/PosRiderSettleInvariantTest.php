@@ -191,7 +191,12 @@ class PosRiderSettleInvariantTest extends TestCase
             $this->assertSame($old->status, $tx->status);
             $this->assertSame((float) $old->total_amount, (float) $tx->total_amount);
             $this->assertSame((bool) $old->is_archived, (bool) $tx->is_archived);
-            $this->assertSame($old->delivery_status, $tx->delivery_status);
+            // Task 773: cash settle = delivery done — fully settled bills still
+            // at assigned/dispatched auto-advance to delivered (no more Pending
+            // zombies). delivered_at stays NULL (settle time ≠ delivery time).
+            $expectedStatus = in_array($old->delivery_status, ['assigned', 'dispatched'], true)
+                ? 'delivered' : $old->delivery_status;
+            $this->assertSame($expectedStatus, $tx->delivery_status);
             // ONLY the settlement columns move.
             $this->assertSame($settlementId, (int) $tx->rider_settlement_id);
             $this->assertNotNull($tx->rider_settled_at);

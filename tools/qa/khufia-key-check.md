@@ -109,6 +109,12 @@ Login page: `/pos/login` (fields: `login`, `password`). Dev base:
   (`/pos/transactions?_qa=<nanoid>`). If the browser leg stays unusable, fall
   back to the curl verification below (it proves everything except the
   keydown listener, which Flow B exercises identically).
+- **Proxy bypass that made Flow A green in-browser (Aug 2026):** drive the
+  browser at `http://127.0.0.1:5000` directly and restart the Laravel Server
+  workflow with a one-off `APP_URL=http://127.0.0.1:5000` override so
+  redirects stay on http. Whole Flow A round-trip (tab + teal dot ON→OFF)
+  passed this way with zero flakes. Restore the workflow (drop the override)
+  afterwards.
 
 ## Flow A curl fallback (no browser)
 

@@ -3335,6 +3335,70 @@ class PosController extends Controller
         }
     }
 
+    /**
+     * Re-queue a single historical exempt_internal bill as 'pending' so the
+     * Desktop Agent (or direct server) can submit it to PRA at TaxRate 0.
+     *
+     * Safety mirrors the artisan pra:requeue-exempt-internal command:
+     *   • company-scoped (never cross-tenant)
+     *   • WHERE pra_status='exempt_internal' only (never touches other statuses)
+     *   • WHERE pra_invoice_number IS NULL (never overwrites a submitted row)
+     *
+     * Owner/admin only — cashiers and managers cannot trigger this.
+     */
+    public function requeueExemptInternal($id)
+    {
+        $companyId = app('currentCompanyId');
+        $company   = Company::find($companyId);
+
+        if (!auth('pos')->user()?->isPosAdmin()) {
+            return back()->with('error', __('pos.only_owner_requeue_exempt'));
+        }
+
+        $transaction = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->findOrFail($id);
+
+        // Safety double-check: must still be exempt_internal with no fiscal number.
+        if ($transaction->pra_status !== PosTransaction::EXEMPT_INTERNAL
+            || !empty($transaction->pra_invoice_number)) {
+            return back()->with('error', __('pos.requeue_exempt_not_eligible'));
+        }
+
+        // Flip to 'pending' — sendInvoice blocks exempt_internal but NOT pending,
+        // so setting the status first then calling submit is safe.
+        $transaction->update([
+            'pra_status'       => 'pending',
+            'pra_response_code' => null,
+        ]);
+
+        // Agent-mode companies: the Desktop Agent picks it up on its next poll.
+        if ($company->agentHandlesPra()) {
+            return back()->with('success', __('pos.requeue_exempt_success_agent', [
+                'invoice' => $transaction->invoice_number,
+            ]));
+        }
+
+        // Direct-server mode: attempt an immediate PRA submission.
+        try {
+            $praService = new PraIntegrationService($company);
+            $result = $praService->sendInvoice($transaction);
+            $transaction->refresh();
+
+            if (!empty($result['success'])) {
+                return back()->with('success', __('pos.pra_submission_successful_num', [
+                    'number' => $transaction->pra_invoice_number ?? 'N/A',
+                ]));
+            }
+            return back()->with('error', __('pos.pra_submission_failed', [
+                'error' => $result['message'] ?? __('pos.unknown_error'),
+            ]));
+        } catch (\Exception $e) {
+            $transaction->update(['pra_status' => 'offline']);
+            return back()->with('error', __('pos.pra_connection_failed_sync'));
+        }
+    }
+
     public function bulkRetryPra()
     {
         $companyId = app('currentCompanyId');

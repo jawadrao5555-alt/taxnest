@@ -3425,6 +3425,12 @@ return [
     'submit_failed_prefix' => 'سبمٹ ناکام: ',
     'submit_to_fbr' => 'FBR کو سبمٹ کریں',
     'submit_to_pra' => 'PRA کو سبمٹ کریں',
+    // Task 808
+    'requeue_exempt_btn'            => 'PRA کے لیے دوبارہ قطار میں لگائیں',
+    'confirm_requeue_exempt'        => ':invoice کو PRA کے لیے دوبارہ قطار میں لگائیں؟ یہ بل صفر ٹیکس (TaxRate 0) پر سبمٹ کیا جائے گا۔',
+    'requeue_exempt_success_agent'  => '🟡 :invoice ڈیسک ٹاپ ایجنٹ کے لیے دوبارہ قطار میں لگ گیا — اگلے پول پر TaxRate 0 پر سبمٹ ہو جائے گا۔',
+    'requeue_exempt_not_eligible'   => 'یہ بل دوبارہ قطار میں لگانے کے لیے اہل نہیں رہا (شاید پہلے ہی سبمٹ یا قطار میں لگ چکا ہے)۔',
+    'only_owner_requeue_exempt'     => 'صرف شاپ کا مالک exempt بلوں کو PRA کے لیے دوبارہ قطار میں لگا سکتا ہے۔',
     'submit_to_pra_make_final' => 'PRA کو سبمٹ کریں — حتمی بنائیں',
     'submitted_to_fbr' => 'FBR کو سبمٹ ہو گیا',
     'submitted_to_pra' => 'PRA کو سبمٹ ہو گیا',

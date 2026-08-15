@@ -685,6 +685,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::put('/transaction/{id}', [PosController::class, 'updateTransaction'])->name('pos.transaction.update');
     Route::delete('/transaction/{id}', [PosController::class, 'deleteTransaction'])->name('pos.transaction.delete');
     Route::post('/transaction/{id}/retry-pra', [PosController::class, 'retryPra'])->name('pos.transaction.retry-pra');
+    // Task 808: owner self-serve re-queue of historical exempt_internal bills.
+    Route::post('/transaction/{id}/requeue-exempt', [PosController::class, 'requeueExemptInternal'])->name('pos.transaction.requeue-exempt');
     // Task 655: payment-complete popup polls this on agent-mode 'pending' bills.
     Route::get('/transaction/{id}/pra-status', [PosController::class, 'apiPraStatus'])->name('pos.transaction.pra-status');
     // Return / credit-note flow (Task 570; Task 678: BOTH streams — local

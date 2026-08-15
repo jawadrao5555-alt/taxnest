@@ -260,6 +260,19 @@
                                     </button>
                                 </form>
                                 @endif
+                                {{-- Task 808: Re-queue historical exempt_internal bill for PRA.
+                                     Owner/admin only — mirrors artisan pra:requeue-exempt-internal.
+                                     Shown on the exempt tab when the bill has no fiscal number yet. --}}
+                                @if($txn->isExemptStream() && !$txn->pra_invoice_number && !$rowIsReturn && auth('pos')->user()?->isPosAdmin())
+                                <form method="POST" action="{{ route('pos.transaction.requeue-exempt', $txn->id) }}" class="inline"
+                                      onsubmit="return confirm(@js(__('pos.confirm_requeue_exempt', ['invoice' => $txn->invoice_number])))">
+                                    @csrf
+                                    <button type="submit" class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-300 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-700 dark:hover:bg-amber-900/40 transition whitespace-nowrap" title="{{ __('pos.requeue_exempt_btn') }}">
+                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                        {{ __('pos.requeue_exempt_btn') }}
+                                    </button>
+                                </form>
+                                @endif
                                 {{-- Return action (Task 678): eligible = completed sale row
                                      (list shows completed only), not itself a return, with
                                      remaining returnable quantity — BOTH streams. Links to

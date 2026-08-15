@@ -8,6 +8,7 @@ use App\Models\PosTransaction;
 use App\Models\PosTransactionItem;
 use App\Models\RestaurantOrder;
 use App\Models\RestaurantOrderItem;
+use App\Support\QrImage;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
@@ -86,6 +87,12 @@ class PosLocalBillKotTokenAndQrTest extends TestCase
             $t->timestamps();
             $t->softDeletes();
         });
+    }
+
+    protected function tearDown(): void
+    {
+        QrImage::resetFake(); // never leave the fake active between tests
+        parent::tearDown();
     }
 
     // ── Fixtures ──────────────────────────────────────────────────────────
@@ -265,13 +272,21 @@ class PosLocalBillKotTokenAndQrTest extends TestCase
         $company = $this->makeCompany();
         $company->invoice_display_prefs = ['pos_style' => ['show_menu_qr' => true, 'bold' => false]];
 
+        QrImage::fake();
         foreach (self::TEMPLATES as $tpl) {
             $txn = $this->makeTxn($company);
-            $html = view($tpl, ['transaction' => $txn, 'company' => $company])->render();
-            $this->assertStringContainsString(__('pos.receipt_scan_bill'), $html, $tpl);
-            $tok = PosTransaction::withoutGlobalScope('hide_archived')->find(self::TXN_ID)->share_token;
-            $this->assertNotEmpty($tok, $tpl . ': share token minted lazily');
+            view($tpl, ['transaction' => $txn, 'company' => $company])->render();
         }
+        $tok = PosTransaction::withoutGlobalScope('hide_archived')->find(self::TXN_ID)->share_token;
+        $this->assertNotEmpty($tok, 'share_token must be lazily minted on first render');
+
+        $expectedUrl = url('/bill/' . $tok);
+        foreach (QrImage::recorded() as $i => $payload) {
+            $this->assertSame($expectedUrl, $payload,
+                'QR payload #' . $i . ' must be the /bill/{token} URL, not text or menu URL');
+        }
+        $this->assertCount(count(self::TEMPLATES), QrImage::recorded(),
+            'One QrImage::dataUri() call expected per template');
     }
 
     /**
@@ -286,13 +301,20 @@ class PosLocalBillKotTokenAndQrTest extends TestCase
         $company = $this->makeCompany(['public_profile_slug' => 'token-qr-co']);
         $company->invoice_display_prefs = ['pos_style' => ['show_menu_qr' => true, 'bold' => false]];
 
+        QrImage::fake();
         foreach (self::TEMPLATES as $tpl) {
-            $txn = $this->makeTxn($company);
+            $txn  = $this->makeTxn($company);
             $html = view($tpl, ['transaction' => $txn, 'company' => $company])->render();
-            $this->assertStringContainsString(__('pos.receipt_scan_bill'), $html, $tpl);
             $this->assertStringNotContainsString(__('pos.receipt_scan_menu'), $html, $tpl);
         }
-        $this->assertNotEmpty(PosTransaction::withoutGlobalScope('hide_archived')->find(self::TXN_ID)->share_token);
+        $tok = PosTransaction::withoutGlobalScope('hide_archived')->find(self::TXN_ID)->share_token;
+        $this->assertNotEmpty($tok);
+
+        $expectedUrl = url('/bill/' . $tok);
+        foreach (QrImage::recorded() as $i => $payload) {
+            $this->assertSame($expectedUrl, $payload,
+                'Bill URL must beat menu QR — QR payload #' . $i . ' must be /bill/{token}');
+        }
     }
 
     public function test_show_menu_qr_off_suppresses_qr_and_mints_nothing(): void
@@ -301,12 +323,15 @@ class PosLocalBillKotTokenAndQrTest extends TestCase
         $company = $this->makeCompany();
         $company->invoice_display_prefs = ['pos_style' => ['show_menu_qr' => false, 'bold' => false]];
 
+        QrImage::fake();
         foreach (self::TEMPLATES as $tpl) {
-            $txn = $this->makeTxn($company);
+            $txn  = $this->makeTxn($company);
             $html = view($tpl, ['transaction' => $txn, 'company' => $company])->render();
             $this->assertStringNotContainsString(__('pos.receipt_scan_bill'), $html, $tpl);
         }
-        $this->assertNull(PosTransaction::withoutGlobalScope('hide_archived')->find(self::TXN_ID)->share_token);
+        $this->assertNull(PosTransaction::withoutGlobalScope('hide_archived')->find(self::TXN_ID)->share_token,
+            'show_menu_qr=false must not mint a share_token');
+        $this->assertEmpty(QrImage::recorded(), 'QrImage::dataUri must not be called when QR is suppressed');
     }
 
     public function test_fiscal_receipt_untouched_no_bill_url(): void
@@ -315,12 +340,92 @@ class PosLocalBillKotTokenAndQrTest extends TestCase
         $company = $this->makeCompany();
         $company->invoice_display_prefs = ['pos_style' => ['show_menu_qr' => true, 'bold' => false]];
 
+        QrImage::fake();
         foreach (self::TEMPLATES as $tpl) {
-            $txn = $this->makeTxn($company, ['invoice_mode' => 'pra', 'pra_status' => 'submitted', 'pra_invoice_number' => 'PRA-1']);
+            $txn  = $this->makeTxn($company, ['invoice_mode' => 'pra', 'pra_status' => 'submitted', 'pra_invoice_number' => 'PRA-1']);
             $html = view($tpl, ['transaction' => $txn, 'company' => $company])->render();
             $this->assertStringNotContainsString(__('pos.receipt_scan_bill'), $html, $tpl);
         }
-        $this->assertNull(PosTransaction::withoutGlobalScope('hide_archived')->find(self::TXN_ID)->share_token);
+        $this->assertNull(PosTransaction::withoutGlobalScope('hide_archived')->find(self::TXN_ID)->share_token,
+            'Fiscal receipt must never mint a share_token');
+        $billUrlCalls = array_filter(QrImage::recorded(), fn ($p) => str_contains($p, '/bill/'));
+        $this->assertEmpty($billUrlCalls, 'Fiscal receipt must never pass a /bill/ URL to the QR encoder');
+    }
+
+    /**
+     * PDF download path (DomPDF / MpdfRenderer): PosController passes pdfMode=true
+     * to the same blades.  pdfMode only affects paper-sizing CSS — it must NOT
+     * suppress the QR.  Token must still be lazily minted so the downloaded PDF
+     * also carries a scannable /bill/{token} URL.
+     *
+     * Agent silent-print path: AgentController renders the same receipt_80mm /
+     * receipt_58mm blades WITHOUT pdfMode (plain view render, no extra vars), so
+     * its QR payload is identical to the normal-reprint path and is covered by
+     * test_nonfiscal_receipt_qr_encodes_bill_url_on_both_templates above.
+     */
+    public function test_pdf_mode_receipt_qr_still_encodes_bill_url(): void
+    {
+        $this->insertTxnRow(); // share_token = NULL (pre-Task-777 old bill)
+        $company = $this->makeCompany();
+        $company->invoice_display_prefs = ['pos_style' => ['show_menu_qr' => true, 'bold' => false]];
+
+        QrImage::fake();
+        foreach (self::TEMPLATES as $tpl) {
+            $txn = $this->makeTxn($company);
+            view($tpl, [
+                'transaction' => $txn,
+                'company'     => $company,
+                'pdfMode'     => true,
+                'pdfPaper'    => 'thermal',
+            ])->render();
+        }
+        $tok = PosTransaction::withoutGlobalScope('hide_archived')->find(self::TXN_ID)->share_token;
+        $this->assertNotEmpty($tok, 'share_token must be minted even when rendering for PDF');
+
+        $expectedUrl = url('/bill/' . $tok);
+        foreach (QrImage::recorded() as $i => $payload) {
+            $this->assertSame($expectedUrl, $payload,
+                "pdfMode=true: QR payload #$i must still encode the /bill/{token} URL");
+        }
+        $this->assertCount(count(self::TEMPLATES), QrImage::recorded(),
+            'One QrImage::dataUri() call expected per template even in PDF mode');
+    }
+
+    /**
+     * Reprint of a pre-Task-777 bill (share_token was NULL in DB).
+     * First render — whether triggered by the cashier's reprint button, the
+     * transactions-list receipt popup, or the Desktop Agent silent-print —
+     * must lazily mint the token so every subsequent reprint scans to the
+     * same /bill/{token} URL.
+     */
+    public function test_old_bill_null_share_token_lazily_minted_on_reprint(): void
+    {
+        // Simulate a bill created before Task 777: no share_token in DB.
+        $this->insertTxnRow(['share_token' => null]);
+        $company = $this->makeCompany();
+        $company->invoice_display_prefs = ['pos_style' => ['show_menu_qr' => true, 'bold' => false]];
+
+        // First reprint render.
+        QrImage::fake();
+        $txn = $this->makeTxn($company);
+        view('pos.receipts.receipt_80mm', ['transaction' => $txn, 'company' => $company])->render();
+
+        $mintedToken = PosTransaction::withoutGlobalScope('hide_archived')->find(self::TXN_ID)->share_token;
+        $this->assertNotEmpty($mintedToken, 'First reprint must write share_token to DB');
+
+        $expectedUrl = url('/bill/' . $mintedToken);
+        $this->assertSame([$expectedUrl], QrImage::recorded(),
+            'First reprint: QR encoder must receive the exact /bill/{token} URL that was just minted');
+
+        // Second reprint: same token reused, not re-minted, same URL encoded.
+        QrImage::fake(); // reset recorder for the second render
+        $txn2 = $this->makeTxn($company);
+        view('pos.receipts.receipt_80mm', ['transaction' => $txn2, 'company' => $company])->render();
+
+        $tokenAfterSecond = PosTransaction::withoutGlobalScope('hide_archived')->find(self::TXN_ID)->share_token;
+        $this->assertSame($mintedToken, $tokenAfterSecond, 'Token must be identical across reprints (idempotent)');
+        $this->assertSame([$expectedUrl], QrImage::recorded(),
+            'Subsequent reprints must encode the SAME /bill/{token} URL');
     }
 
     // ── Public bill page ──────────────────────────────────────────────────

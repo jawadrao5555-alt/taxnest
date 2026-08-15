@@ -181,13 +181,15 @@ class PosPraReturnFlowTest extends TestCase
             $table->timestamps();
         });
 
-        // Task 792: transaction-show now accesses $transaction->restaurantOrder?->table
-        // for dine-in table display — must exist so the view renders without "no such table".
+        // transaction-show.blade.php lazily accesses restaurantOrder?->table
+        // (Task 792 dine-in label). The table must exist so the relation query
+        // doesn't throw; no rows needed — ?-> short-circuits to null.
         Schema::create('restaurant_orders', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('company_id')->nullable();
             $table->unsignedBigInteger('pos_transaction_id')->nullable();
-            $table->string('table')->nullable();
+            $table->unsignedBigInteger('table_id')->nullable();
+            $table->string('order_number')->nullable();
             $table->timestamps();
         });
 

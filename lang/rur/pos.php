@@ -2908,6 +2908,8 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'receipt_scan_verify' => 'PRA Sahulat App se scan kar ke verify karein',
     'show_verify_line_pra' => '"PRA Sahulat App se scan karein" line dikhayein',
     'show_verify_line_pra_hint' => 'PRA fiscal receipt par QR code ke neeche print hoti hai. Band karein agar aap chahte hain ke customers ko yeh prompt na dikhe.',
+    'show_verify_line_fbr' => '"FBR Tax Asaan App se scan karein" line dikhayein',
+    'show_verify_line_fbr_hint' => 'FBR submitted receipt par QR code ke neeche print hoti hai. Band karein agar aap chahte hain ke customers ko yeh prompt na dikhe.',
     'receipt_scan_verify_fbr' => 'FBR Tax Asaan App se scan kar ke verify karein',
     'receipt_scan_verify_short' => 'PRA Sahulat App se scan karein',
     'receipt_sent_prefix' => 'Receipt printer ko bhej di — ',

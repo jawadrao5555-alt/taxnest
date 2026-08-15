@@ -234,6 +234,9 @@ class Company extends Model
             // per-receipt-type toggles (owner wanted them OFF on local bills).
             'show_business_name' => true,
             'show_developed_by' => true,
+            // Task 769: "Scan with ... App to verify" line under the QR (used by
+            // the FBR set; PRA resolves its copy via posReceiptPrefs). Default ON.
+            'show_verify_line' => true,
             'footer_text' => null,
         ];
     }
@@ -247,7 +250,7 @@ class Company extends Model
 
         $merged = array_merge($defaults, is_array($prefs) ? $prefs : []);
 
-        foreach (['show_address', 'show_ntn', 'show_email', 'show_mobile', 'show_cashier', 'show_footer', 'show_business_name', 'show_developed_by'] as $k) {
+        foreach (['show_address', 'show_ntn', 'show_email', 'show_mobile', 'show_cashier', 'show_footer', 'show_business_name', 'show_developed_by', 'show_verify_line'] as $k) {
             $merged[$k] = filter_var($merged[$k], FILTER_VALIDATE_BOOLEAN);
         }
 

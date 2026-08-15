@@ -390,7 +390,10 @@
             <img src="{{ $qrUrl }}" alt="FBR QR Code" style="width:{{ $is58 ? '60px' : '70px' }}; height:{{ $is58 ? '60px' : '70px' }}; margin:0 auto; display:block;">
         </div>
         <div class="fbr-number">FBR: {{ $transaction->fbr_invoice_number }}</div>
+        {{-- Task 769: verify-line toggle (Receipt Settings) — default ON when absent. --}}
+        @if($rd['show_verify_line'] ?? true)
         <div style="font-size:9px; margin-top:3px;">{{ __('pos.receipt_scan_verify_fbr') }}</div>
+        @endif
     </div>
     @elseif(!$fbrRcptTopBadge)
     <div class="fbr-badge" style="border-style: dashed;">

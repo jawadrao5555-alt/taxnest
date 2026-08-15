@@ -2763,6 +2763,8 @@ class FbrPosController extends Controller
                 'rp_receipt_theme' => 'nullable|in:' . implode(',', \App\Support\PosReceiptThemes::keys()),
                 'rp_order_match'  => 'nullable|in:off,token,code',
                 'rp_print_confirm' => 'nullable|in:1',
+                'rp_show_verify_line' => 'nullable|in:1',
+                'rp_verify_present'   => 'nullable|in:1',
             ]);
 
             $prefs = $company->invoice_display_prefs ?? [];
@@ -2786,6 +2788,17 @@ class FbrPosController extends Controller
             }
 
             $prefs['pos_style'] = $style;
+
+            // Task 769: "Scan with FBR Tax Asaan App" verify-line toggle — stored
+            // in the 'fbrpos' set (merge-preserve the business-profile keys).
+            // Gated on the rp_verify_present marker so a stale cached form that
+            // predates the checkbox can never silently flip the line OFF.
+            if ($request->has('rp_verify_present')) {
+                $fbrSet = is_array($prefs['fbrpos'] ?? null) ? $prefs['fbrpos'] : [];
+                $fbrSet['show_verify_line'] = $request->has('rp_show_verify_line');
+                $prefs['fbrpos'] = $fbrSet;
+            }
+
             $company->invoice_display_prefs = $prefs;
 
             // Order Matching style — stored directly on the companies row (shared with PRA).
@@ -4114,13 +4127,16 @@ class FbrPosController extends Controller
             // 'fbrpos' key of invoice_display_prefs — same generic set the PRA
             // receipt-settings page uses ('pos'/'pos_local' keys untouched).
             $prefs = $company->invoice_display_prefs ?? [];
-            $prefs['fbrpos'] = [
+            // Task 769: merge-preserve keys owned by other pages (show_verify_line
+            // lives on receipt-settings) — a wholesale rewrite here would erase them.
+            $fbrExisting = is_array($prefs['fbrpos'] ?? null) ? $prefs['fbrpos'] : [];
+            $prefs['fbrpos'] = array_merge($fbrExisting, [
                 'show_address' => $request->has('rd_show_address'),
                 'show_ntn' => $request->has('rd_show_ntn'),
                 'show_mobile' => $request->has('rd_show_phone'),
                 'show_cashier' => $request->has('rd_show_cashier'),
                 'show_footer' => $request->has('rd_show_footer'),
-            ];
+            ]);
 
             // Print position (31 Jul 2026 — mirrors PRA slips): opt-in center /
             // left-margin correction. hasColumn guards = prod self-heal parity.

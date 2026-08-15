@@ -25,6 +25,7 @@
             'tax' => true,
             'logo' => (bool) ($ps['show_logo'] ?? true),
             'logoFinalsOnly' => false,
+            'verifyLine' => (bool) ($rd['show_verify_line'] ?? true),
             'orderMatch' => in_array($company->order_match_style ?? 'off', ['off', 'token', 'code'], true) ? ($company->order_match_style ?? 'off') : 'off',
         ],
     ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE) ?: '{}';
@@ -67,6 +68,22 @@
         {{-- Live preview on small screens (the lg aside is hidden there) --}}
         <div class="lg:hidden">
             @include('pos.partials.receipt-theme-preview', ['company' => $company, 'mode' => 'fbr'])
+        </div>
+
+        {{-- Task 769: "Scan with FBR Tax Asaan App" verify-line toggle — mirrors
+             PRA's Task 765 control; stored in invoice_display_prefs['fbrpos'].
+             Hidden rp_verify_present marker: a stale cached form without this
+             card must never silently flip the line OFF on save. --}}
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
+            <input type="hidden" name="rp_verify_present" value="1">
+            <label class="flex items-start gap-3 cursor-pointer p-3 rounded-lg border {{ ($rd['show_verify_line'] ?? true) ? 'border-blue-400 bg-blue-50/40 dark:bg-blue-900/10' : 'border-gray-200 dark:border-gray-700' }} transition">
+                <input type="checkbox" name="rp_show_verify_line" value="1" {{ ($rd['show_verify_line'] ?? true) ? 'checked' : '' }}
+                       class="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4">
+                <span class="flex-1 min-w-0">
+                    <span class="block text-sm font-bold text-gray-900 dark:text-white">{{ __('pos.show_verify_line_fbr') }}</span>
+                    <span class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ __('pos.show_verify_line_fbr_hint') }}</span>
+                </span>
+            </label>
         </div>
 
         {{-- Task 565: opt-in "Print se pehle poocho (Yes/No)" — shared flag with

@@ -2908,6 +2908,8 @@ return [
     'receipt_scan_verify' => 'ویریفائی کرنے کے لیے PRA Sahulat App سے اسکین کریں',
     'show_verify_line_pra' => '"PRA Sahulat App سے اسکین کریں" لائن دکھائیں',
     'show_verify_line_pra_hint' => 'PRA فسکل رسید پر QR کوڈ کے نیچے پرنٹ ہوتی ہے۔ بند کریں اگر آپ چاہتے ہیں کہ صارفین کو یہ اشارہ نہ ملے۔',
+    'show_verify_line_fbr' => '"FBR Tax Asaan App سے اسکین کریں" لائن دکھائیں',
+    'show_verify_line_fbr_hint' => 'FBR جمع شدہ رسید پر QR کوڈ کے نیچے پرنٹ ہوتی ہے۔ بند کریں اگر آپ چاہتے ہیں کہ صارفین کو یہ اشارہ نہ ملے۔',
     'receipt_scan_verify_fbr' => 'ویریفائی کرنے کے لیے FBR Tax Asaan App سے اسکین کریں',
     'receipt_scan_verify_short' => 'PRA Sahulat App سے اسکین کریں',
     'receipt_sent_prefix' => 'رسید پرنٹر کو بھیج دی گئی — ',

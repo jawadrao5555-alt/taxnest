@@ -242,7 +242,10 @@
             <img src="{{ $fbrQr }}" alt="FBR QR" style="width: 80px; height: 80px; margin: 3px auto; display: block;">
             @endif
             <div class="num">FBR: {{ $transaction->fbr_invoice_number }}</div>
+            {{-- Task 769: verify-line toggle (Receipt Settings) — default ON when absent. --}}
+            @if($rd['show_verify_line'] ?? true)
             <div style="font-size:9px; margin-top:3px;">{{ __('pos.receipt_scan_verify_fbr') }}</div>
+            @endif
         </div>
         @elseif($transaction->fbr_status === null || $transaction->fbr_status === 'local')
         @php

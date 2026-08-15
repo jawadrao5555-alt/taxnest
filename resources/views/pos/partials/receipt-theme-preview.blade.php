@@ -140,7 +140,9 @@
                         linear-gradient(#000 25%,transparent 25%,transparent 50%,#000 50%,#000 75%,transparent 75%);
                         background-size:12px 12px;"></span>
                 </span>
-                <div style="font-size:9px;margin-top:2px;">Verify at FBR Tax Asaan</div>
+                {{-- Task 769: gated by the fbrpos verify-line pref; undefined (pages
+                     that don't pass it, e.g. business-profile) keeps it visible. --}}
+                <div style="font-size:9px;margin-top:2px;" x-show="p.verifyLine !== false">Verify at FBR Tax Asaan</div>
             </div>
             @else
             <div x-show="qrNow()" style="text-align:center;margin:6px 0 2px;">

@@ -11,8 +11,10 @@
 # State-gates respected (QA 35 is PRA-reporting OFF, Pro plan):
 #   - exempt stream: only the UI tab LINK is asserted (tab=exempt) — the
 #     stream itself needs PRA reporting ON (.agents/memory/pos-billing-scope.md).
-#   - X-Report card: only rendered when the day is OPEN and has >0 bills; if
-#     absent we WARN (state-gated), never fail — closed-day links count as pass.
+#   - X-Report card (Task 731, deterministic — never silently skipped): closed
+#     day = report links count as pass; open day with 0 bills = a tiny
+#     reporting-OFF final bill is seeded, the card asserted, then the seed is
+#     permanently deleted (details at the day-close section below).
 #
 # Usage:
 #   bash scripts/live-screen-smoke.sh
@@ -101,18 +103,67 @@ if fetch "/pos/invoice/create"; then
   require "/pos/invoice/create" "printConfirmAsk state" 'printConfirmAsk'
 fi
 
-say "/pos/day-close — auto-close toggle + X-Report card (state-gated)"
+say "/pos/day-close — auto-close toggle + X-Report card (deterministic, Task 731)"
 if fetch "/pos/day-close"; then
   require "/pos/day-close" "auto day-close toggle" 'dc-auto-close-chk'
-  # X-Report card renders only when day OPEN and >0 bills; closed-day report
-  # links are equally proof the day-close feature set rendered. Neither =
-  # state (0 bills, day open) — WARN only, never fail on state.
+  # X-Report card renders only when the day is OPEN and has >0 bills in the
+  # viewer's stream. Deterministic assertion (Task 731 — no silent skip):
+  #   - card present            -> PASS
+  #   - closed-day report links -> PASS (card correctly hidden, state proven)
+  #   - day open, 0 bills       -> SEED one tiny reporting-OFF FINAL bill
+  #     (pos/* is CSRF-exempt; QA 35 is PRA-reporting OFF, so the final gets
+  #     an L-series number + invoice_mode='pra' + pra_status NULL — the shape
+  #     the admin/'both' day-close stats actually COUNT; a save_as_provisional
+  #     bill is invoice_mode='local' and is EXCLUDED from those stats, so it
+  #     can never render the card). Re-assert the card, then hard-delete the
+  #     seed via DELETE /pos/transaction/{id} so day-close/reports stay clean
+  #     (manual delete = permanent; QA 35 admin is not a cashier).
   if grep -qE 'day-close/x-report/' "$TMPD/page.html"; then
     echo "    OK: X-Report card present on /pos/day-close"
-  elif grep -qE 'pos/day-close/(pdf|thermal)/' "$TMPD/page.html"; then
+  elif grep -qE 'pos/day-close/[0-9]+/(pdf|thermal)' "$TMPD/page.html"; then
     echo "    OK: /pos/day-close shows closed-day report links (X-Report card correctly hidden — day already closed)"
   else
-    warn "/pos/day-close: X-Report card not visible — likely state-gated (0 bills today, day open). Not failing; verify manually if a bill exists today."
+    echo "    Day open with 0 bills — seeding a temporary reporting-OFF final bill to assert the X-Report card deterministically..."
+    SEED_JSON=$("${CURL[@]}" -X POST \
+      -H 'Content-Type: application/json' -H 'Accept: application/json' \
+      --data '{"items":[{"name":"SMOKE X-REPORT PROBE","quantity":1,"unit_price":1,"_manual":true}],"payment_method":"cash","discount_type":"amount","discount_value":0,"cash_received":1}' \
+      "$LIVE_URL/pos/invoice/store")
+    SEED_ID=$(echo "$SEED_JSON" | grep -oE '"transaction_id"[[:space:]]*:[[:space:]]*[0-9]+' | grep -oE '[0-9]+$')
+    if [ -z "$SEED_ID" ]; then
+      bad "/pos/day-close: could not seed probe bill via /pos/invoice/store — X-Report check cannot be proven (response: $(echo "$SEED_JSON" | head -c 300))"
+    else
+      echo "    Seeded probe bill id=$SEED_ID"
+      if fetch "/pos/day-close"; then
+        if grep -qE 'day-close/x-report/' "$TMPD/page.html"; then
+          echo "    OK: X-Report card present on /pos/day-close (with seeded bill)"
+        else
+          bad "/pos/day-close MISSING X-Report card even with a bill today — regression or deploy gap"
+        fi
+      fi
+      # Cleanup ALWAYS (even after a failed assert): hard-delete the seed so
+      # it never pollutes day-close/reports or the quota. Delete = permanent
+      # by design (deleteTransaction refuses PRA-fiscal bills; ours has none).
+      # deleteTransaction answers with a REDIRECT either way (success and
+      # error both 302), so the redirect proves nothing. Deletion is proven
+      # POSITIVELY by BOTH of:
+      #   a) the transaction detail page answering exactly 302/404 (row gone;
+      #      live's 404 handling itself REDIRECTS — verified: DB row deleted
+      #      while GET gave 302). 200 = still exists; 000/5xx/anything else =
+      #      transport/server trouble — deletion NOT established, fail loudly.
+      #   b) /pos/day-close no longer showing the X-Report card (stats back to
+      #      0 bills) — also proves the session is still alive, so (a)'s 302
+      #      was not a login bounce.
+      "${CURL[@]}" -o /dev/null -X POST --data-urlencode "_method=DELETE" \
+        "$LIVE_URL/pos/transaction/$SEED_ID"
+      GONE=$("${CURL[@]}" -o /dev/null -w '%{http_code}' "$LIVE_URL/pos/transaction/$SEED_ID")
+      if [ "$GONE" != "302" ] && [ "$GONE" != "404" ]; then
+        bad "Cleanup NOT PROVEN: probe bill id=$SEED_ID — /pos/transaction/$SEED_ID returned $GONE (200 = still exists; other = transport/server issue). Verify/delete manually from /pos/transactions on QA 35."
+      elif fetch "/pos/day-close" && ! grep -qE 'day-close/x-report/' "$TMPD/page.html"; then
+        echo "    Cleanup: probe bill $SEED_ID permanently deleted (detail page $GONE, X-Report card gone again)."
+      else
+        bad "Cleanup NOT PROVEN: probe bill id=$SEED_ID — /pos/day-close still shows the X-Report card (or did not load) after delete. Verify/delete manually from /pos/transactions on QA 35."
+      fi
+    fi
   fi
 fi
 

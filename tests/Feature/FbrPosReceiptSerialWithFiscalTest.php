@@ -1,0 +1,230 @@
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+use App\Models\Company;
+use App\Models\FbrPosTransaction;
+use App\Models\FbrPosTransactionItem;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * FBR POS RECEIPT — SERIAL PRINTS ALONGSIDE FISCAL # — Task 766 (16 Aug 2026).
+ *
+ * Task 763 fixed the PRA receipts (80mm/58mm): a submitted fiscal bill used
+ * to print ONLY the long PRA Fiscal # and hide the shop's own serial. Task
+ * 766 asked for the same guarantee on the FBR POS receipt. Investigation
+ * showed the FBR template (fbr-pos/receipt.blade.php) does NOT have the
+ * single-number-row pattern anymore: the 6 Aug 2026 owner redesign removed
+ * the boxed invoice-numbers table and moved the POS serial into the details
+ * table UNCONDITIONALLY for every non-badge bill, while the FBR fiscal
+ * number rides the bottom QR box. So a submitted FBR bill already prints
+ * BOTH numbers — but nothing locked that behaviour. A future template edit
+ * could silently reintroduce the "fiscal only" pattern the owner complained
+ * about (ZFC Pizza Point video, 15 Aug 2026).
+ *
+ * Invariants under lock (single template, $is58 switches paper width):
+ *   • SUBMITTED (fbr_status='submitted' + fbr_invoice_number): the details
+ *     table prints the "POS Invoice #: <serial>" row AND the QR badge
+ *     prints "FBR: <fiscal>" — on BOTH papers. No bill hides the serial.
+ *   • SUBMITTED + Order-Match token style: the big TOKEN box prints AND the
+ *     serial row AND the FBR line all coexist (token never replaces the
+ *     serial the way the PRA number-style token does — FBR has no
+ *     bill-number token style).
+ *   • PENDING (fiscal not yet returned): serial prints in the details row
+ *     AND as the "POS:" line inside the dashed FBR-PENDING badge.
+ *   • LOCAL / PROVISIONAL (fbr_status 'local'/NULL): unchanged — big serial
+ *     in the top badge, NO "FBR:" line, no duplicate details serial row.
+ *
+ * Pattern follows FbrPosReceiptOrderMatchLayoutTest (rendered-view, sqlite
+ * :memory:): company/transaction/items are unsaved shims wired via
+ * setRelation — exactly the variable set FbrPosController::receipt()
+ * passes (compact('transaction','company')). The blade gates the om box on
+ * Schema::hasColumn('fbr_pos_transactions', ...) so a minimal table with
+ * those two columns is created.
+ *
+ * Run:
+ *   php vendor/bin/phpunit tests/Feature/FbrPosReceiptSerialWithFiscalTest.php --testdox
+ */
+class FbrPosReceiptSerialWithFiscalTest extends TestCase
+{
+    private const TEMPLATE   = 'fbr-pos.receipt';
+    private const COMPANY_ID = 703;
+    private const TXN_ID     = 9201;
+    private const SERIAL     = 'FPOS-2026-00777';
+    private const FISCAL     = '7000000009999127';
+
+    /** Both paper widths — every assertion runs against each. */
+    private const PAPERS = ['thermal', 'thermal58'];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Schema::dropAllTables();
+
+        // Minimal fbr_pos_transactions — the blade om block gates on
+        // hasColumn('fbr_pos_transactions','token_no'/'order_code').
+        Schema::create('fbr_pos_transactions', function (Blueprint $t) {
+            $t->id();
+            $t->unsignedBigInteger('company_id');
+            $t->string('invoice_number');
+            $t->unsignedSmallInteger('token_no')->nullable();
+            $t->string('order_code', 10)->nullable();
+        });
+    }
+
+    // ── Fixture builders (mirror FbrPosController::receipt() variable set) ──
+
+    private function makeCompany(string $paper, string $omStyle = 'off'): Company
+    {
+        $company = new Company();
+        $company->id = self::COMPANY_ID;
+        $company->name = 'FBR Serial Lock Co';
+        $company->order_match_style = $omStyle;
+        $company->print_paper_size = $paper;
+        $company->invoice_display_prefs = ['pos_style' => ['bold' => false]];
+        return $company;
+    }
+
+    private function makeTransaction(
+        Company $company,
+        ?string $fbrStatus,
+        ?string $fiscalNumber,
+        string $invoiceMode = 'fbr',
+        ?int $tokenNo = null
+    ): FbrPosTransaction {
+        $txn = new FbrPosTransaction([
+            'invoice_number' => self::SERIAL,
+            'invoice_mode' => $invoiceMode,
+            'fbr_status' => $fbrStatus,
+            'fbr_invoice_number' => $fiscalNumber,
+            'payment_method' => 'cash',
+            'subtotal' => 500,
+            'tax_rate' => 0,
+            'tax_amount' => 0,
+            'discount_amount' => 0,
+            'total_amount' => 500,
+        ]);
+        $txn->id = self::TXN_ID;
+        $txn->company_id = $company->id;
+        $txn->token_no = $tokenNo;
+        $txn->created_at = now();
+
+        $item = new FbrPosTransactionItem([
+            'item_name' => 'Zinger Burger',
+            'uom' => 'U',
+            'quantity' => 1,
+            'unit_price' => 500,
+            'subtotal' => 500,
+        ]);
+        $item->id = 1;
+
+        $txn->setRelation('items', collect([$item]));
+        $txn->setRelation('company', $company);
+        $txn->setRelation('creator', null);
+        return $txn;
+    }
+
+    private function renderBody(Company $company, FbrPosTransaction $txn): string
+    {
+        $html = view(self::TEMPLATE, ['transaction' => $txn, 'company' => $company])->render();
+        // Markup AFTER </head> — the <title> carries the serial and would
+        // make "serial prints" assertions pass vacuously.
+        $pos = strpos($html, '</head>');
+        $this->assertNotFalse($pos, 'rendered receipt has a </head>');
+        return substr($html, $pos);
+    }
+
+    /** The exact details-table serial row markup (label glued to value cell). */
+    private function serialRow(): string
+    {
+        return __('pos.receipt_pos_invoice') . ':</td><td class="info-value">' . self::SERIAL;
+    }
+
+    // ── 1. SUBMITTED — serial row + FBR fiscal line BOTH print ───────────
+
+    public function test_submitted_bill_prints_serial_row_and_fbr_fiscal_line(): void
+    {
+        foreach (self::PAPERS as $paper) {
+            $company = $this->makeCompany($paper);
+            $txn = $this->makeTransaction($company, 'submitted', self::FISCAL);
+
+            $body = $this->renderBody($company, $txn);
+
+            $this->assertStringContainsString($this->serialRow(), $body, "POS Invoice # serial row prints ({$paper})");
+            $this->assertStringContainsString('FBR: ' . self::FISCAL, $body, "FBR fiscal line prints ({$paper})");
+            // Exactly once each — no duplicate large numbers (Task 763 convention).
+            $this->assertSame(1, substr_count($body, self::SERIAL), "serial prints exactly once ({$paper})");
+            $this->assertSame(1, substr_count($body, 'FBR: ' . self::FISCAL), "fiscal line prints exactly once ({$paper})");
+            // Fiscalized QR carries ONLY the bare fiscal number (X-WAY, 6 Aug 2026).
+            $this->assertStringContainsString('data=' . self::FISCAL, $body, "QR encodes the bare fiscal number ({$paper})");
+        }
+    }
+
+    public function test_submitted_bill_with_om_token_keeps_serial_and_fiscal(): void
+    {
+        // FBR's only "token" is the Order-Matching queue number — it must
+        // print ALONGSIDE the serial row and fiscal line, never replace them.
+        foreach (self::PAPERS as $paper) {
+            $company = $this->makeCompany($paper, omStyle: 'token');
+            $txn = $this->makeTransaction($company, 'submitted', self::FISCAL, tokenNo: 42);
+
+            $body = $this->renderBody($company, $txn);
+
+            $this->assertStringContainsString(__('pos.order_match_token_label') . ' 42', $body, "TOKEN 42 prints ({$paper})");
+            $this->assertStringContainsString($this->serialRow(), $body, "serial row still prints under token style ({$paper})");
+            $this->assertStringContainsString('FBR: ' . self::FISCAL, $body, "fiscal line still prints under token style ({$paper})");
+        }
+    }
+
+    // ── 2. PENDING — serial never hidden while awaiting the fiscal # ─────
+
+    public function test_pending_bill_prints_serial_in_details_and_pending_badge(): void
+    {
+        foreach (self::PAPERS as $paper) {
+            $company = $this->makeCompany($paper);
+            $txn = $this->makeTransaction($company, 'pending', null);
+
+            $body = $this->renderBody($company, $txn);
+
+            $this->assertStringContainsString($this->serialRow(), $body, "details serial row prints while pending ({$paper})");
+            $this->assertStringContainsString('POS: ' . self::SERIAL, $body, "dashed FBR-PENDING badge carries the serial ({$paper})");
+            $this->assertStringContainsString(__('pos.rcpt_fbr_pending'), $body, "FBR PENDING badge prints ({$paper})");
+            $this->assertStringNotContainsString('FBR: ', $body, "no fiscal line without a fiscal number ({$paper})");
+        }
+    }
+
+    // ── 3. LOCAL / PROVISIONAL — unchanged (big serial badge, no FBR line) ──
+
+    public function test_local_provisional_bill_keeps_top_badge_serial_only(): void
+    {
+        foreach (self::PAPERS as $paper) {
+            $company = $this->makeCompany($paper);
+            $txn = $this->makeTransaction($company, 'local', null, invoiceMode: 'local');
+
+            $body = $this->renderBody($company, $txn);
+
+            $this->assertStringContainsString('tb-serial">' . self::SERIAL, $body, "top badge prints the serial ({$paper})");
+            $this->assertStringContainsString(__('pos.receipt_provisional_bill'), $body, "PROVISIONAL BILL badge prints ({$paper})");
+            $this->assertStringNotContainsString($this->serialRow(), $body, "no duplicate details serial row for badge bills ({$paper})");
+            $this->assertStringNotContainsString('FBR: ', $body, "no fiscal line on provisional bills ({$paper})");
+        }
+    }
+
+    public function test_reporting_off_final_keeps_sale_receipt_badge_serial_only(): void
+    {
+        // fbr_status NULL + invoice_mode 'fbr' = reporting-OFF final → SALE RECEIPT badge.
+        foreach (self::PAPERS as $paper) {
+            $company = $this->makeCompany($paper);
+            $txn = $this->makeTransaction($company, null, null);
+
+            $body = $this->renderBody($company, $txn);
+
+            $this->assertStringContainsString('tb-serial">' . self::SERIAL, $body, "top badge prints the serial ({$paper})");
+            $this->assertStringContainsString(__('pos.receipt_sale_receipt'), $body, "SALE RECEIPT badge prints ({$paper})");
+            $this->assertStringNotContainsString($this->serialRow(), $body, "no duplicate details serial row ({$paper})");
+            $this->assertStringNotContainsString('FBR: ', $body, "no fiscal line without submission ({$paper})");
+        }
+    }
+}

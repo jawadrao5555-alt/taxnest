@@ -30,6 +30,23 @@ step() { echo ""; echo "==> $*"; }
 
 run_ssh() { timeout 120 ssh "${SSH_OPTS[@]}" "$HOST" "$@"; }
 
+# Post-deploy live screen smoke (Task 714): login as QA company 35 and grep
+# feature markers on key pages. BEST-EFFORT — warning-only, never blocks or
+# fails the deploy (deploy already succeeded when this runs).
+post_deploy_screen_smoke() {
+  step "Post-deploy: live screen smoke test (QA 35 feature markers — warning-only)"
+  if bash scripts/live-screen-smoke.sh; then
+    echo "Live screen smoke: PASS."
+  else
+    echo "" >&2
+    echo "!!! WARNING: live screen smoke test FAILED or could not run (see above). !!!" >&2
+    echo "!!! Deploy itself succeeded — but a feature marker may be missing on live. !!!" >&2
+    echo "!!! Re-run manually: bash scripts/live-screen-smoke.sh                     !!!" >&2
+    echo "" >&2
+  fi
+  return 0
+}
+
 # ALL live-mutating work (pull/composer/migrate/caches/OPcache) runs as ONE
 # remote payload under a single exclusive flock — the SAME lock the cPanel
 # auto-deploy (scripts/cpanel-autodeploy.sh) holds for its whole critical
@@ -273,6 +290,7 @@ if [ "$LIVE_HEAD_BEFORE" = "$LOCAL_HEAD" ]; then
   [ "$HTTP_CODE" = "200" ] || fail "homepage returned $HTTP_CODE after refresh"
 
   check_live_logging
+  post_deploy_screen_smoke
 
   echo "DEPLOY OK (refresh-only): live already at workspace HEAD; migrate + caches + OPcache refreshed."
   exit 0
@@ -427,6 +445,7 @@ if [ -n "$FRESH_ERRORS" ]; then
 fi
 
 check_live_logging
+post_deploy_screen_smoke
 
 echo ""
 echo "---------------------------------------------------------------"

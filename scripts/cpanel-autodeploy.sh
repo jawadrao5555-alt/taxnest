@@ -203,4 +203,19 @@ fi
 # 8. Everything succeeded — reopen the site.
 $PHP artisan up 2>&1 || die_down "artisan up failed after successful release (run 'php artisan up' on live)"
 log "auto-deploy COMPLETE — site is UP"
+
+# 9. Post-deploy live screen smoke (Task 714): login as QA company 35 and grep
+#    feature markers on key pages. BEST-EFFORT and WARNING-ONLY — the deploy
+#    already succeeded; a smoke failure must never re-close the site or fail
+#    this script. Credentials: untracked ~/.qa_pass on this box (the smoke
+#    script falls back to it automatically).
+if [ -f "scripts/live-screen-smoke.sh" ]; then
+  if timeout 300 bash scripts/live-screen-smoke.sh; then
+    log "post-deploy screen smoke: PASS"
+  else
+    log "WARNING: post-deploy screen smoke FAILED or could not run (see output above) — deploy itself is fine; re-run: bash scripts/live-screen-smoke.sh"
+  fi
+else
+  log "NOTE: scripts/live-screen-smoke.sh not present in this release — skipping screen smoke"
+fi
 exit 0

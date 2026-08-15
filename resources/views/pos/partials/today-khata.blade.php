@@ -26,7 +26,8 @@
     $tkShowExempt = is_array($tkExempt) && ((($tkExempt['bills'] ?? 0) > 0) || abs((float) ($tkExempt['sale'] ?? 0)) > 0.009);
 @endphp
 @if(!empty($tkStreams))
-<div class="mb-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+{{-- id="today-khata" is a language-independent smoke-test marker (scripts/live-screen-smoke.sh) — keep it. --}}
+<div id="today-khata" class="mb-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div class="flex items-center gap-2">
             <div class="w-9 h-9 rounded-xl bg-teal-600 flex items-center justify-center flex-shrink-0">

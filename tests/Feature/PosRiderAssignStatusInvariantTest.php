@@ -386,4 +386,70 @@ class PosRiderAssignStatusInvariantTest extends TestCase
         $this->assertFiscalIdentityUnchanged($before, $delivered);
         $this->assertSame('delivered', $this->tx($delivered)->delivery_status);
     }
+
+    // ── 5. bulkStatus: riderless bills in the DB never crash or corrupt ──────
+
+    /**
+     * Edge case (Task 796): the DB may contain delivery bills whose rider_id is
+     * NULL — either because the rider was unassigned post-creation or because
+     * the bill was created before the rider-assignment feature existed.  The
+     * bulk-status query scopes strictly to rider_id = $rider->id, so these rows
+     * are never matched.  This test confirms:
+     *   a) no 500 / exception when riderless bills coexist with open rider bills;
+     *   b) fiscal identity of the riderless bill is byte-for-byte untouched;
+     *   c) the delivery_status of the riderless bill is NOT changed;
+     *   d) the rider's legitimate open bills ARE flipped as expected.
+     */
+    public function test_bulk_status_skips_riderless_bills_and_does_not_crash(): void
+    {
+        $rider = $this->makeRider();
+
+        // A riderless delivery bill that happens to be in 'assigned' / 'dispatched'
+        // state — edge-case data that should never be touched by bulkStatus.
+        $riderlessAssigned = $this->makeBill(null, [
+            'invoice_number'  => 'POS-2026-99001',
+            'invoice_mode'    => 'pra',
+            'pra_status'      => 'submitted',
+            'pra_invoice_number' => 'PRA-RIDERLESS-1',
+            'delivery_status' => 'assigned',   // unusual but possible in edge cases
+            'rider_settlement_id' => null,
+        ]);
+        // A completely fresh unassigned delivery bill (rider_id NULL, status NULL).
+        $riderlessNull = $this->makeBill(null, [
+            'invoice_number'  => 'POS-2026-99002',
+            'invoice_mode'    => 'local',
+            'pra_status'      => 'local',
+            'pra_invoice_number' => null,
+            'delivery_status' => null,
+            'rider_settlement_id' => null,
+        ]);
+
+        // The rider also has a legitimate open bill that SHOULD be flipped.
+        $riderOpen = $this->makeBill($rider, [
+            'delivery_status' => 'dispatched',
+            'invoice_number'  => 'POS-2026-99003',
+        ]);
+
+        $beforeRiderless1 = $this->tx($riderlessAssigned);
+        $beforeRiderless2 = $this->tx($riderlessNull);
+        $beforeRiderOpen  = $this->tx($riderOpen);
+
+        // Must not throw; must return a redirect (not a 500).
+        $response = $this->bulkStatus($rider, 'delivered');
+        $this->assertNull($this->flashError($response), 'bulkStatus should succeed without an error flash');
+
+        // Rider's open bill flipped to delivered.
+        $this->assertSame('delivered', $this->tx($riderOpen)->delivery_status);
+        $this->assertSame($rider, (int) $this->tx($riderOpen)->rider_id, 'rider_id must not change on bulk flip');
+        $this->assertFiscalIdentityUnchanged($beforeRiderOpen, $riderOpen);
+
+        // Riderless bills completely untouched — no status change, no fiscal mutation.
+        $this->assertSame('assigned', $this->tx($riderlessAssigned)->delivery_status, 'riderless bill must keep its delivery_status');
+        $this->assertNull($this->tx($riderlessAssigned)->rider_id, 'riderless bill must keep rider_id NULL');
+        $this->assertFiscalIdentityUnchanged($beforeRiderless1, $riderlessAssigned);
+
+        $this->assertNull($this->tx($riderlessNull)->delivery_status, 'riderless NULL-status bill must stay NULL');
+        $this->assertNull($this->tx($riderlessNull)->rider_id, 'riderless bill must keep rider_id NULL');
+        $this->assertFiscalIdentityUnchanged($beforeRiderless2, $riderlessNull);
+    }
 }

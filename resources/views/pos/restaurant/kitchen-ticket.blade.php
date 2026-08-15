@@ -188,7 +188,14 @@
         @endif
         @if($kotAlignCenter)
         @media print {
-            html body { margin-left: auto; margin-right: auto; }
+            /* Task 764 (ZFC, 15 Aug 2026): explicit centering used margin:auto,
+               which centers within the QUEUE's page — on an A4-default Windows
+               queue that shifted the 72mm body ~65mm right and the thermal head
+               printed a BLANK slip (same physics as the v6 NULL fix). v6-safe
+               centering: center within the 80mm PAPER instead — body is capped
+               at 72mm, so a fixed 4mm left margin = visually centered on the
+               roll regardless of what page size the queue believes it has. */
+            html body { margin-left: 4mm; margin-right: 0; }
         }
         @elseif($kotMarginMm > 0)
         @media print {

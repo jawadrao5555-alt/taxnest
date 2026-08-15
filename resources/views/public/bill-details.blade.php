@@ -27,6 +27,8 @@
         .totals .grand td { font-size: 16px; font-weight: 900; border-top: 2px solid #111827; padding-top: 6px; }
         .menu-link { display: block; text-align: center; margin-top: 14px; font-size: 13px; color: #0a4d5c; font-weight: 700; text-decoration: none; }
         .foot { text-align: center; font-size: 11px; color: #9ca3af; margin-top: 14px; }
+        .return-banner { text-align: center; font-size: 12px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #fff; background: #dc2626; border-radius: 6px; padding: 4px 10px; margin-bottom: 10px; }
+        .returns-note  { text-align: center; font-size: 12px; font-weight: 600; color: #b45309; background: #fef3c7; border-radius: 6px; padding: 4px 10px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -47,6 +49,11 @@
     <div class="biz">{{ $company->name }}</div>
     @endif
     <div class="badge">{{ $isProvisional ? __('pos.receipt_provisional_bill') : __('pos.receipt_sale_receipt') }}</div>
+    @if($isReturnBill)
+    <div class="return-banner">{{ __('pos.return_bill_banner') }}</div>
+    @elseif($hasReturns)
+    <div class="returns-note">{{ __('pos.bill_has_returns') }}</div>
+    @endif
     @if($pageBillToken !== null)
     <div class="token">{{ $pageBillToken }}</div>
     <div class="meta">{{ __('pos.bill_ref_label') }}: {{ $transaction->invoice_number }}</div>

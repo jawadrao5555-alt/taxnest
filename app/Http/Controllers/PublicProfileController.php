@@ -154,14 +154,34 @@ class PublicProfileController extends Controller
         // the receipt means name OFF here too (ZFC issue #9 lineage).
         $rp = $company->posReceiptPrefsFor($transaction);
 
+        // Return/refund status — schema-guarded (columns added Task 570).
+        $isReturnBill = false;
+        $hasReturns   = false;
+        try {
+            $schema = \Illuminate\Support\Facades\Schema::class;
+            if ($schema::hasColumn('pos_transactions', 'transaction_type')) {
+                $isReturnBill = ($transaction->transaction_type ?? 'sale') === 'return';
+            }
+            if (!$isReturnBill && $schema::hasColumn('pos_transactions', 'parent_transaction_id')) {
+                $hasReturns = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
+                    ->where('parent_transaction_id', $transaction->id)
+                    ->where('transaction_type', 'return')
+                    ->exists();
+            }
+        } catch (\Throwable $e) {
+            // Schema not yet applied — silently skip the badge.
+        }
+
         return response()
             ->view('public.bill-details', [
-                'transaction' => $transaction,
-                'company' => $company,
+                'transaction'      => $transaction,
+                'company'          => $company,
                 'showBusinessName' => (bool) ($rp['show_business_name'] ?? true),
+                'isReturnBill'     => $isReturnBill,
+                'hasReturns'       => $hasReturns,
                 // Menu/public-profile link when the company has one (merged
                 // behavior: bill page carries the menu link onward).
-                'menuUrl' => self::publicUrlFor($company),
+                'menuUrl'          => self::publicUrlFor($company),
             ])
             ->header('X-Robots-Tag', 'noindex');
     }

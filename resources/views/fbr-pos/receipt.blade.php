@@ -274,7 +274,7 @@
         <tr><td class="info-label">NTN:</td><td class="info-value">{{ $transaction->customer_ntn }}</td></tr>
         @endif
         <tr><td class="info-label">{{ __('pos.tax_period') }}:</td><td class="info-value">{{ $transaction->created_at->format('M Y') }}</td></tr>
-        <tr><td class="info-label">{{ __('pos.receipt_payment_mode') }}:</td><td class="info-value">{{ strtolower((string) $transaction->payment_method) === 'credit' ? 'UDHAAR (Khata)' : ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</td></tr>
+        <tr><td class="info-label">{{ __('pos.receipt_payment_mode') }}:</td><td class="info-value"><strong style="font-weight:bold; text-transform:uppercase;">{{ strtolower((string) $transaction->payment_method) === 'credit' ? 'UDHAAR (Khata)' : ucwords(str_replace('_', ' ', $transaction->payment_method)) }}</strong></td></tr>
         @if($rd['show_cashier'] && $transaction->creator)
         <tr><td class="info-label">{{ __('pos.receipt_cashier') }}:</td><td class="info-value">{{ $transaction->creator->name }}</td></tr>
         @endif

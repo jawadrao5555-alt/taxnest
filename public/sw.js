@@ -1,6 +1,6 @@
 // TaxNest Suite Service Worker — Tax DI / Nest Pra Pos / Nest FBR Pos
 // Strategy: Stale-while-revalidate for static assets, network-first for HTML, offline fallback.
-const CACHE_VERSION = 'taxnest-20260815-191308-0e5896a6'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
+const CACHE_VERSION = 'taxnest-20260815-194536-de872903'; // auto-bumped by deploy-live.sh — purges old caches + triggers SW update badge on every deploy (Task 710)
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 // OFFLINE-FIRST SALE SCREEN (Jul 2026): dedicated cache for /pos/invoice/create
@@ -76,7 +76,7 @@ self.addEventListener('fetch', e => {
     // Aug 2026: /fbr-pos/create joined (FBR offline billing — PRA port).
     if (req.mode === 'navigate' && (url.pathname === '/pos/invoice/create' || url.pathname === '/fbr-pos/create') && url.search === '') {
         e.respondWith((async () => {
-            const c = await caches.open(SALE_CACHE);
+                const c = await caches.open(SALE_CACHE);
             const cached = await c.match(req);
             const network = fetch(req).then(res => {
                 const ct = res.headers.get('content-type') || '';

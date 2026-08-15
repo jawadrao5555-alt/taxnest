@@ -245,9 +245,9 @@ if fetch "/pos/day-close"; then
   fi
 fi
 
-say "/pos/transactions — exempt stream tab LINK (QA 35 is PRA-OFF: link only)"
+say "/pos/transactions — PRA tab + transactions table render (Task 760: exempt tab now historical-only, hidden on QA 35 which has no exempt_internal bills)"
 if fetch "/pos/transactions"; then
-  require "/pos/transactions" "exempt tab link" 'tab=exempt'
+  require "/pos/transactions" "PRA tab link" 'tab=pra'
 fi
 
 say "/pos/team — username login field"

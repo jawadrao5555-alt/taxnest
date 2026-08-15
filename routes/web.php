@@ -1500,6 +1500,14 @@ Route::get('/menu/{slug}', [\App\Http\Controllers\PublicProfileController::class
     ->middleware('throttle:60,1')
     ->name('public.company-profile');
 
+// === Public bill page (Task 777) — the receipt QR on non-fiscal (local/
+// provisional) bills opens this. Token-only lookup (64-hex share_token),
+// throttled, 404 on unknown — no login, no expiry (customers scan late),
+// archived bills open too. ===
+Route::get('/bill/{token}', [\App\Http\Controllers\PublicProfileController::class, 'showBill'])
+    ->middleware('throttle:60,1')
+    ->name('public.bill');
+
 // === PWA Diagnostics page (public — no sensitive data, only client-side checks) ===
 Route::get('/pwa-status', function () {
     return response()->view('pwa-status')

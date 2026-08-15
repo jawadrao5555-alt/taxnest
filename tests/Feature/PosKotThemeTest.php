@@ -180,15 +180,16 @@ class PosKotThemeTest extends TestCase
         $this->assertSame('compact', PosKotThemes::resolve(['compact' => true, 'align' => false]));
         // Centered compact ticket is still the Compact preset (dominant flag).
         $this->assertSame('compact', PosKotThemes::resolve(['compact' => true, 'align' => true]));
-        // Task 718: NULL / untouched company = Pizza Master CENTER default.
-        $this->assertSame('center', PosKotThemes::resolve(['compact' => false, 'align' => null]));
-        $this->assertSame('center', PosKotThemes::resolve([]));
+        // Task 757: NULL / untouched company = LEFT EDGE (khula) — matches print CSS.
+        $this->assertSame('khula', PosKotThemes::resolve(['compact' => false, 'align' => null]));
+        $this->assertSame('khula', PosKotThemes::resolve([]));
         $this->assertSame(PosKotThemes::DEFAULT, PosKotThemes::resolve([]));
     }
 
-    public function test_align_bool_null_means_center_default(): void
+    public function test_align_bool_null_means_left_default(): void
     {
-        $this->assertTrue(PosKotThemes::alignBool(null));
+        // Task 757: NULL = no explicit choice = LEFT EDGE (false), not center.
+        $this->assertFalse(PosKotThemes::alignBool(null));
         $this->assertTrue(PosKotThemes::alignBool(true));
         $this->assertFalse(PosKotThemes::alignBool(false));
         $this->assertFalse(PosKotThemes::alignBool(0));

@@ -11,6 +11,18 @@
     </div>
     @endif
 
+    {{-- Task 761: warn shops that still have explicit centering set (possibly by
+         accident before the Task 757 UI fix). Shown only when kot_align_center
+         is explicitly true — NULL / false companies never see this. --}}
+    @if($company->kot_align_center === true)
+    <div class="mb-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-xl p-3 text-sm text-amber-800 dark:text-amber-300">
+        <div class="flex items-start gap-2">
+            <svg class="w-4 h-4 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+            <span>{!! __('pos.kot_center_accidental_warn') !!}</span>
+        </div>
+    </div>
+    @endif
+
     <form method="POST" action="{{ route('pos.restaurant.kitchen-settings.update') }}" class="space-y-6">
         @csrf
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">

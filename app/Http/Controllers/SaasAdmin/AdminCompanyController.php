@@ -333,7 +333,19 @@ class AdminCompanyController extends Controller
             ->orderByRaw('last_login_at IS NULL, last_login_at DESC')
             ->get(['id', 'name', 'email', 'role', 'pos_role', 'last_login_at', 'last_login_ip']);
 
-        return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers', 'localViewers', 'companyAdmin', 'teamUsers'));
+        // Exempt-internal PRA bills: historical bills stamped 'exempt_internal'
+        // that were never submitted to PRA (pre-Task-760). Super-admin can re-queue
+        // them from the UI instead of needing SSH/artisan access.
+        $exemptInternalBills = collect();
+        if ($company->product_type === 'pos' && auth('admin')->user()?->isSuperAdmin()) {
+            $exemptInternalBills = PosTransaction::where('company_id', $id)
+                ->where('pra_status', 'exempt_internal')
+                ->whereNull('pra_invoice_number')
+                ->orderBy('id')
+                ->get(['id', 'invoice_number', 'total_amount', 'created_at', 'pra_status']);
+        }
+
+        return view('saas-admin.companies.show', compact('company', 'usageStats', 'extraStats', 'archiveViewers', 'localViewers', 'companyAdmin', 'teamUsers', 'exemptInternalBills'));
     }
 
     /**
@@ -1060,5 +1072,57 @@ class AdminCompanyController extends Controller
             'company' => $company->name, 'previous_type' => $oldType,
         ]);
         return back()->with('success', "Override removed for '{$company->name}'. Normal subscription rules now apply.");
+    }
+
+    /**
+     * Re-queue one or more exempt_internal PRA bills as 'pending' so the
+     * Desktop Agent can submit them at TaxRate 0.
+     *
+     * POST /admin/companies/{id}/requeue-exempt-internal
+     * Body: ids[] (required — comma-separated or array of pos_transaction IDs)
+     *
+     * Safety invariants (same as the artisan command):
+     *   - Only touches rows that are STILL exempt_internal AND have no PRA invoice number.
+     *   - Only touches rows belonging to this company.
+     *   - Super-admin only.
+     */
+    public function requeueExemptInternal(\Illuminate\Http\Request $request, $id)
+    {
+        $this->assertSuperAdmin();
+
+        $company = Company::findOrFail($id);
+        if ($company->product_type !== 'pos') {
+            return back()->with('error', 'This action is only available for PRA POS companies.');
+        }
+
+        $request->validate([
+            'ids'   => 'required|array|min:1',
+            'ids.*' => 'integer|min:1',
+        ]);
+
+        $requestedIds = array_map('intval', $request->input('ids'));
+
+        $updated = \Illuminate\Support\Facades\DB::table('pos_transactions')
+            ->where('company_id', $company->id)          // scope to this company only
+            ->whereIn('id', $requestedIds)
+            ->where('pra_status', 'exempt_internal')       // safety: never touch other statuses
+            ->whereNull('pra_invoice_number')              // safety: never overwrite a submitted row
+            ->update([
+                'pra_status' => 'pending',
+                'updated_at' => now(),
+            ]);
+
+        AdminAuditLog::log(auth('admin')->id(), 'PRA exempt_internal re-queued', 'PosTransaction', null, [
+            'company'      => $company->name,
+            'company_id'   => $company->id,
+            'requested_ids' => $requestedIds,
+            'updated_count' => $updated,
+        ]);
+
+        if ($updated === 0) {
+            return back()->with('error', 'No eligible bills found — they may have already been re-queued or submitted.');
+        }
+
+        return back()->with('success', "{$updated} bill(s) set to pending. The Desktop Agent will submit them at TaxRate 0 on its next poll.");
     }
 }

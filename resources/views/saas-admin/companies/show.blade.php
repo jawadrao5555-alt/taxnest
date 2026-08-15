@@ -535,6 +535,117 @@
     </div>
     @endif
 
+    @if($company->product_type === 'pos' && auth('admin')->user()?->isSuperAdmin() && $exemptInternalBills->isNotEmpty())
+    <div class="bg-gradient-to-br from-amber-950/30 to-slate-900 border border-amber-800/40 rounded-xl p-5 mt-6">
+        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div>
+                <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                    <span class="text-amber-400">⚠️</span> Exempt-Internal Bills — Never Submitted to PRA
+                </h3>
+                <p class="text-xs text-gray-400 mt-0.5">
+                    Ye bills historical hain — Task 760 se pehle all-exempt (bottle) bills submit nahi hoti thin.
+                    Ab zero-rated bills PRA ke saath kaam karti hain (TaxRate 0). "Re-queue" karne par Desktop Agent
+                    inhe next poll mein submit karega.
+                </p>
+            </div>
+        </div>
+
+        @if(session('success'))
+            <div class="mb-3 px-3 py-2 bg-emerald-900/40 border border-emerald-700/40 rounded-lg text-xs text-emerald-300">{{ session('success') }}</div>
+        @endif
+        @if(session('error'))
+            <div class="mb-3 px-3 py-2 bg-red-900/40 border border-red-700/40 rounded-lg text-xs text-red-300">{{ session('error') }}</div>
+        @endif
+
+        <div class="overflow-x-auto rounded-lg border border-amber-900/30">
+            <table class="w-full text-xs text-left">
+                <thead class="bg-amber-950/40 text-amber-300 uppercase tracking-wider">
+                    <tr>
+                        <th class="px-3 py-2 w-8"><input type="checkbox" id="exempt-check-all" class="accent-amber-500 cursor-pointer"></th>
+                        <th class="px-3 py-2">ID</th>
+                        <th class="px-3 py-2">Invoice #</th>
+                        <th class="px-3 py-2">Total (Rs)</th>
+                        <th class="px-3 py-2">Date</th>
+                        <th class="px-3 py-2">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-amber-900/20">
+                    @foreach($exemptInternalBills as $bill)
+                    <tr class="bg-gray-900/40 hover:bg-amber-950/20 transition">
+                        <td class="px-3 py-2">
+                            <input type="checkbox" name="exempt_bill_ids[]" value="{{ $bill->id }}" class="exempt-bill-check accent-amber-500 cursor-pointer" checked>
+                        </td>
+                        <td class="px-3 py-2 text-gray-300 font-mono">{{ $bill->id }}</td>
+                        <td class="px-3 py-2 text-white">{{ $bill->invoice_number ?: '—' }}</td>
+                        <td class="px-3 py-2 text-white">{{ number_format((float) $bill->total_amount, 2) }}</td>
+                        <td class="px-3 py-2 text-gray-400">{{ \Carbon\Carbon::parse($bill->created_at)->format('d M Y, h:i A') }}</td>
+                        <td class="px-3 py-2"><span class="px-2 py-0.5 rounded bg-amber-900/40 text-amber-300 text-[10px] uppercase tracking-wider">{{ $bill->pra_status }}</span></td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+
+        <form method="POST" action="{{ route('saas.admin.companies.requeueExemptInternal', $company->id) }}" id="exempt-requeue-form" class="mt-3 flex items-center gap-3 flex-wrap">
+            @csrf
+            {{-- Hidden inputs populated by JS from checked checkboxes --}}
+            <div id="exempt-ids-container"></div>
+            <button type="button" id="exempt-requeue-btn"
+                class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed">
+                Re-queue Selected for PRA
+            </button>
+            <span class="text-xs text-gray-500" id="exempt-selected-count">{{ $exemptInternalBills->count() }} selected</span>
+        </form>
+    </div>
+
+    <script>
+    (function () {
+        var checkAll = document.getElementById('exempt-check-all');
+        var checks   = document.querySelectorAll('.exempt-bill-check');
+        var countEl  = document.getElementById('exempt-selected-count');
+        var btn      = document.getElementById('exempt-requeue-btn');
+        var form     = document.getElementById('exempt-requeue-form');
+        var container = document.getElementById('exempt-ids-container');
+
+        function updateCount() {
+            var selected = document.querySelectorAll('.exempt-bill-check:checked');
+            countEl.textContent = selected.length + ' selected';
+            btn.disabled = selected.length === 0;
+        }
+
+        checkAll.addEventListener('change', function () {
+            checks.forEach(function (c) { c.checked = checkAll.checked; });
+            updateCount();
+        });
+        checks.forEach(function (c) {
+            c.addEventListener('change', function () {
+                checkAll.checked = Array.from(checks).every(function (x) { return x.checked; });
+                updateCount();
+            });
+        });
+
+        form.addEventListener('submit', function (e) {
+            var selected = Array.from(document.querySelectorAll('.exempt-bill-check:checked'));
+            if (selected.length === 0) { e.preventDefault(); return; }
+            if (!confirm('Re-queue ' + selected.length + ' bill(s) as pending? The Desktop Agent will submit them to PRA at TaxRate 0 (zero tax charged). This cannot be undone automatically.')) {
+                e.preventDefault();
+                return;
+            }
+            container.innerHTML = '';
+            selected.forEach(function (c) {
+                var inp = document.createElement('input');
+                inp.type = 'hidden';
+                inp.name = 'ids[]';
+                inp.value = c.value;
+                container.appendChild(inp);
+            });
+        });
+
+        updateCount();
+    })();
+    </script>
+    @endif
+
     @if($company->product_type === 'pos' && auth('admin')->user()?->isSuperAdmin())
     <div class="bg-gradient-to-br from-violet-950/40 to-slate-900 border border-violet-800/40 rounded-xl p-5 mt-6" x-data="{ showCreateLv: false }">
         <div class="flex items-center justify-between mb-3">

@@ -1137,6 +1137,7 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::put('/companies/{id}/archive-viewer/{userId}', [AdminCompanyController::class, 'updateArchiveViewer'])->name('saas.admin.companies.archive-viewer.update');
     Route::post('/companies/{id}/archive-viewer/{userId}/toggle', [AdminCompanyController::class, 'toggleArchiveViewer'])->name('saas.admin.companies.archive-viewer.toggle');
     Route::delete('/companies/{id}/archive-viewer/{userId}', [AdminCompanyController::class, 'deleteArchiveViewer'])->name('saas.admin.companies.archive-viewer.delete');
+    Route::post('/companies/{id}/requeue-exempt-internal', [AdminCompanyController::class, 'requeueExemptInternal'])->name('saas.admin.companies.requeueExemptInternal');
     Route::post('/companies/{id}/local-viewer', [AdminCompanyController::class, 'storeLocalViewer'])->name('saas.admin.companies.local-viewer.store');
     Route::put('/companies/{id}/local-viewer/{userId}', [AdminCompanyController::class, 'updateLocalViewer'])->name('saas.admin.companies.local-viewer.update');
     Route::post('/companies/{id}/local-viewer/{userId}/toggle', [AdminCompanyController::class, 'toggleLocalViewer'])->name('saas.admin.companies.local-viewer.toggle');

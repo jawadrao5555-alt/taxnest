@@ -616,6 +616,10 @@ class PosController extends Controller
             // kot: restaurant_order_id OR transaction_id (order-less delivery bills)
             'restaurant_order_id' => 'required_if:type,proof|nullable|integer',
             'delta' => 'nullable|boolean',
+            // Task 753: 'last' = MISSED-DELTA RECOVERY reprint (akhri KOT batch
+            // + still-unprinted rows) — explicit rescue when the slip never
+            // physically came out of the printer.
+            'batch' => 'nullable|in:last',
             // Counter/Station routing: a station-pinned KDS device enqueues ONLY
             // its own counter's ticket (0 = main Kitchen bucket).
             'station_id' => 'nullable|integer',
@@ -748,6 +752,38 @@ class PosController extends Controller
             ->find((int) $validated['restaurant_order_id']);
         if (!$order) {
             return response()->json(['success' => false, 'reason' => 'not_found'], 404);
+        }
+
+        // Task 753 MISSED-DELTA RECOVERY: explicit "Akhri Add-on KOT" reprint —
+        // ONE job on the company KOT printer with render_query batch=last (agent
+        // renders the LAST printed batch + any still-unprinted rows as a clean
+        // delta-style ticket). Counter-side rescue by design: no station split,
+        // no counter copy. The 2-min in-flight dedupe absorbs double presses.
+        if ($request->input('batch') === 'last') {
+            if (!$settings['kot_printer']) {
+                return response()->json(['success' => false, 'reason' => 'no_printer'], 409);
+            }
+            $inFlight = \App\Models\PosPrintJob::where('company_id', $companyId)
+                ->where('type', 'kot')
+                ->where('restaurant_order_id', $order->id)
+                ->where('target_printer', $settings['kot_printer'])
+                ->where('render_query', 'batch=last')
+                ->whereIn('status', ['pending', 'printing'])
+                ->where('created_at', '>=', now()->subMinutes(2))
+                ->orderByDesc('id')->first();
+            if ($inFlight) {
+                return response()->json(['success' => true, 'job_id' => $inFlight->id, 'deduped' => true]);
+            }
+            $job = \App\Models\PosPrintJob::create([
+                'company_id' => $companyId,
+                'type' => 'kot',
+                'target_printer' => $settings['kot_printer'],
+                'restaurant_order_id' => $order->id,
+                'render_query' => 'batch=last',
+                'status' => 'pending',
+                'created_by' => $user->id,
+            ]);
+            return response()->json(['success' => true, 'job_id' => $job->id]);
         }
 
         $delta = $request->boolean('delta');

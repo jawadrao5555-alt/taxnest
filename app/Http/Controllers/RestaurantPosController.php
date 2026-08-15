@@ -516,6 +516,27 @@ class RestaurantPosController extends Controller
 
             DB::commit();
 
+            // Task 753 (Pizza Master, Aug 2026): APPEND-DELTA GUARANTEE.
+            // KDS-auto-print config (KDS Auto Print ON) mein Print-on-Hold aksar
+            // OFF hota hai — recall+append ki chhoti (delta) KOT ka wahid raasta
+            // KDS board tha; board band/idle ho to slip kahin se nahi nikalti
+            // thi. Ab jab recall par pehle-se-chhapi rows carry hui hon (yaani
+            // genuinely APPEND case), server khud delta job enqueue karta hai —
+            // KDS/cashier ke double-fire apiCreatePrintJob + KotPrintService ke
+            // 2-min in-flight dedupe mein jazb ho jate hain. Best-effort: fail
+            // par hold kabhi nahi rukta; client (universal.blade.php holdOrder)
+            // flag=false dekh kar apna fallback (silent → iframe) chalata hai.
+            $kotDeltaQueued = false;
+            try {
+                if ($request->recalled_order_id && !empty($printedPool)
+                    && (bool) ($company->kds_enabled ?? true) && (bool) ($company->pos_kds_auto_print ?? false)) {
+                    $enq = \App\Services\KotPrintService::enqueueForOrder($company, $order, $user->id, true);
+                    $kotDeltaQueued = (bool) ($enq['printed'] ?? false) && !empty($enq['job_ids'] ?? []);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Hold-time delta KOT enqueue failed: ' . $e->getMessage(), ['order_id' => $order->id]);
+            }
+
             try {
                 $auditMeta = ['order_number' => $orderNumber, 'total' => $totalAmount, 'items_count' => count($resolvedItems)];
                 if ($discountAmount > 0) {
@@ -536,6 +557,9 @@ class RestaurantPosController extends Controller
                 // renders "Table: T-N" via x-if="order.table"; items-only left fresh
                 // holds table-less in the list until a full page reload.
                 'order' => $order->load(['items', 'table']),
+                // Task 753: TRUE = server ne recall+append ki delta KOT queue kar
+                // di — client dobara fire na kare (sirf toast dikhaye).
+                'kot_delta_queued' => $kotDeltaQueued,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -1618,12 +1642,28 @@ class RestaurantPosController extends Controller
         $delta = $request->query('delta') == '1';
         $fullMode = (bool) ($company->pos_kot_full_mode ?? false);
         $unprinted = $order->items->whereNull('kot_printed_at');
-        if ($delta && $fullMode && $unprinted->isNotEmpty()) {
+        // Task 753 MISSED-DELTA RECOVERY: ?batch=last — akhri chhapi KOT batch
+        // ki rows (+ jo rows ab tak unprinted hain) ko delta-style CLEAN ticket
+        // ke tor par dobara render karo. Physical print fail par add-on slip
+        // wapas mil jati hai; neeche wala stamp whereNull-guarded hai is liye
+        // chhapi hui rows kabhi re-number/re-consume nahi hotin. Batch data hi
+        // na ho (legacy rows) to poora ticket render hota hai.
+        $batchLast = $request->query('batch') === 'last';
+        if ($batchLast) {
+            $delta = true;
+            $maxBatch = (int) $order->items->max('kot_batch_no');
+            $ticketItems = $order->items
+                ->filter(fn ($i) => $i->kot_printed_at === null || ($maxBatch > 0 && (int) $i->kot_batch_no === $maxBatch))
+                ->values();
+            if ($ticketItems->isEmpty()) {
+                $ticketItems = $order->items;
+            }
+        } elseif ($delta && $fullMode && $unprinted->isNotEmpty()) {
             $ticketItems = $order->items;
         } else {
             $ticketItems = $delta ? $unprinted->values() : $order->items;
         }
-        $newItemIds = $fullMode ? $unprinted->pluck('id') : collect();
+        $newItemIds = ($fullMode && !$batchLast) ? $unprinted->pluck('id') : collect();
 
         // Counter/Station routing (owner, Jul 2026): optional ?station= filter
         // (numeric id, 0 = main Kitchen). Zero configured stations => legacy

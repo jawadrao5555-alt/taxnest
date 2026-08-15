@@ -1651,6 +1651,11 @@ return [
     'kot_reprint_banner' => '*** ری پرنٹ #:n — پرانا ٹکٹ نظر انداز کریں ***',
     'kot_reprint_btn' => 'دوبارہ پرنٹ کریں',
     'kot_resend_btn' => '↻ دوبارہ بھیجیں KOT',
+    // Task 753 (Pizza Master): missed-delta recovery — آخری ایڈ آن KOT بیچ کا ری پرنٹ۔
+    'kot_last_addon_btn' => '⎌ آخری ایڈ آن KOT',
+    'kot_last_addon_short' => '⎌ ایڈ آن',
+    'ti_kot_last_addon' => 'آخری ایڈ آن (ڈیلٹا) KOT دوبارہ پرنٹ کریں — جب سلپ پرنٹر سے نہ نکلی ہو۔',
+    'products_grid_off_notice' => 'مصنوعات کی فہرست بند ہے — آئٹمز دوبارہ دکھانے کے لیے مصنوعات کا بٹن دبائیں۔',
     'kot_rush' => '*** انتہائی ضروری ***',
     'order_match_token_label' => 'ٹوکن',
     'order_match_token_caption' => 'آرڈر قطار نمبر — بل نمبر الگ ہے',

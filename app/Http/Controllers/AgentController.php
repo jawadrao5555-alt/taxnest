@@ -890,12 +890,29 @@ class AgentController extends Controller
             $unprinted = $baked !== null
                 ? $order->items->whereIn('id', $baked)->values()
                 : $order->items->whereNull('kot_printed_at');
-            if ($delta && $fullMode && $unprinted->isNotEmpty()) {
+            // Task 753 MISSED-DELTA RECOVERY: render_query batch=last — mirror
+            // of the kitchenTicket route. LAST printed batch's rows (+ any rows
+            // still unprinted) as one clean delta-style ticket. Result-time
+            // stamping below stays whereNull-guarded, so already-printed rows
+            // are never renumbered; only genuinely-unprinted rows get stamped.
+            $batchLast = ($q['batch'] ?? null) === 'last';
+            if ($batchLast) {
+                $delta = true;
+                $maxBatch = (int) $order->items->max('kot_batch_no');
+                $ticketItems = $order->items
+                    ->filter(fn ($i) => $i->kot_printed_at === null || ($maxBatch > 0 && (int) $i->kot_batch_no === $maxBatch))
+                    ->values();
+                if ($ticketItems->isEmpty()) {
+                    $ticketItems = $order->items;
+                }
+                $newItemIds = collect();
+            } elseif ($delta && $fullMode && $unprinted->isNotEmpty()) {
                 $ticketItems = $order->items;
+                $newItemIds = $unprinted->pluck('id');
             } else {
                 $ticketItems = $delta ? $unprinted->values() : $order->items;
+                $newItemIds = $fullMode ? $unprinted->pluck('id') : collect();
             }
-            $newItemIds = $fullMode ? $unprinted->pluck('id') : collect();
 
             // Counter/Station routing (Jul 2026): render_query may pin this job to
             // one station (station=ID, 0 = main Kitchen). Same shared resolver as

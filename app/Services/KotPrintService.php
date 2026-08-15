@@ -47,6 +47,29 @@ class KotPrintService
                 return ['printed' => true, 'job_ids' => []];
             }
             $makeJob = function (?string $printer, ?string $renderQuery) use ($company, $order, $userId, $delta, $deltaIds) {
+                // Task 753: in-flight dedupe + merge — mirrors apiCreatePrintJob's
+                // rule so the hold-time server enqueue, the KDS auto-print fire and
+                // the cashier fallback all collapse into ONE physical slip. A
+                // pending delta job absorbs newly-unprinted ids (rapid second
+                // append); an already-printing job keeps its rendered set.
+                $inFlight = PosPrintJob::where('company_id', $company->id)
+                    ->where('type', 'kot')
+                    ->where('restaurant_order_id', $order->id)
+                    ->where('target_printer', $printer)
+                    ->where(fn ($q) => $renderQuery === null ? $q->whereNull('render_query') : $q->where('render_query', $renderQuery))
+                    ->whereIn('status', ['pending', 'printing'])
+                    ->where('created_at', '>=', now()->subMinutes(2))
+                    ->orderByDesc('id')->first();
+                if ($inFlight) {
+                    if ($delta && $deltaIds && $inFlight->status === 'pending') {
+                        $merged = collect($inFlight->printed_item_ids ?? [])->map(fn ($i) => (int) $i)
+                            ->merge($deltaIds)->unique()->values()->all();
+                        if ($merged !== ($inFlight->printed_item_ids ?? [])) {
+                            $inFlight->update(['printed_item_ids' => $merged]);
+                        }
+                    }
+                    return $inFlight;
+                }
                 return PosPrintJob::create([
                     'company_id' => $company->id,
                     'type' => 'kot',

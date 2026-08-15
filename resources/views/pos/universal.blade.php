@@ -2008,6 +2008,9 @@ window.addEventListener('popstate', function() {
                             <button @click="boardAskFinal()" :disabled="boardBusy" class="w-full py-2.5 rounded-xl text-sm font-extrabold text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 transition" x-text="window.TXT.make_final_rs_prefix + Math.round(boardMenuTable.order.total_amount).toLocaleString()"></button>
                             @if(($features->kot ?? false) || ($features->kitchen ?? false))
                             <button x-show="boardMenuTable.order.kot_sent_at" @click="boardResendKot()" :disabled="boardBusy" class="w-full py-2 rounded-xl text-xs font-bold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 disabled:opacity-40 transition">{{ __('pos.kot_resend_btn') }}</button>
+                            {{-- Task 753 MISSED-DELTA RECOVERY: akhri add-on (delta) KOT ka reprint —
+                                 physical print fail par slip wapas nikalne ka rasta. --}}
+                            <button x-show="boardMenuTable.order.kot_sent_at" @click="boardLastKot()" :disabled="boardBusy" title="{{ __('pos.ti_kot_last_addon') }}" class="w-full py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-40 transition">{{ __('pos.kot_last_addon_btn') }}</button>
                             @endif
                             {{-- Table Shift (owner batch, 26 Jul 2026): har role, sirf
                                  KHALI table par, timer continue, KOT reprint NAHI. --}}
@@ -2229,6 +2232,7 @@ window.addEventListener('popstate', function() {
                         <a :href="'/pos/restaurant/orders/' + heldMenu.id + '/kitchen-ticket'" target="_blank" class="py-2 rounded-xl text-xs font-bold text-center text-orange-600 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 transition">{{ __('pos.kot_dekho') }}</a>
                         <button @click="heldMenuResend()" class="py-2 rounded-xl text-xs font-bold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-300 dark:border-orange-700 hover:bg-orange-100 transition">{{ __('pos.kot_resend_btn') }}</button>
                     </div>
+                    <button @click="heldMenuLastKot()" title="{{ __('pos.ti_kot_last_addon') }}" class="w-full py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 hover:bg-amber-100 transition">{{ __('pos.kot_last_addon_btn') }}</button>
                     @endif
                     <button @click="heldMenuDelete()" class="w-full py-2 rounded-xl text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 transition">{{ __('pos.order_delete_btn') }}</button>
                 </div>
@@ -2273,6 +2277,7 @@ window.addEventListener('popstate', function() {
                             @if($features->kot)
                             <a :href="'/pos/restaurant/orders/' + order.id + '/kitchen-ticket'" target="_blank" title="{{ __('pos.ti_view_print_kot') }}" class="py-2 px-2 text-xs font-bold text-center text-orange-600 border border-orange-300 rounded-xl hover:bg-orange-50 transition">KOT</a>
                             <button @click="resendKitchen(order)" title="Re-send full order ticket to kitchen (marked REPRINT)." class="py-2 px-2 text-xs font-bold text-orange-700 border border-orange-400 rounded-xl bg-orange-50 hover:bg-orange-100 transition">{{ __('pos.resend_short') }}</button>
+                            <button @click="reprintLastKot(order)" title="{{ __('pos.ti_kot_last_addon') }}" class="py-2 px-2 text-xs font-bold text-amber-700 border border-amber-400 rounded-xl bg-amber-50 hover:bg-amber-100 transition">{{ __('pos.kot_last_addon_short') }}</button>
                             @endif
                             <button @click="payHeldOrder(order.id)" class="flex-1 py-2 text-xs font-bold text-white bg-green-600 rounded-xl hover:bg-green-700 transition">{{ __('pos.pay') }}</button>
                             <button @click="deleteHeldOrder(order.id)" class="py-2 px-3 text-xs font-bold text-red-500 border border-red-300 rounded-xl hover:bg-red-50 transition">{{ __('pos.delete') }}</button>
@@ -4592,6 +4597,9 @@ function restaurantPos() {
             try { if (localStorage.getItem('pos_show_products') === '0') this.showProducts = false; } catch (e) {}
             this.syncAutoWidecart(); // all items hidden => auto split layout
             this.filterProducts();
+            // Task 753 (Pizza Master): "products ghayab" dead-end guards — baked
+            // catalog empty ya grid manually OFF ho to khud pakro/batao.
+            setTimeout(() => this.gridDeadEndCheck(), 1200);
             setTimeout(() => { this.loading = false; }, 300);
             this.$watch('activeCategory', () => { this.filterProducts(); this.gridFocusIndex = 0; if (this.searchQuery.trim().length > 0) this.onSearchInput(); });
             this.calcGridCols();
@@ -5376,6 +5384,58 @@ function restaurantPos() {
             // Search still works when the grid is hidden — keep suggestions live if a query is active.
             if (this.searchQuery && this.searchQuery.trim().length > 0) { this.onSearchInput(); }
             else { this.searchSuggestions = []; this.showSearchDropdown = false; }
+        },
+
+        // Task 753 (Pizza Master, Aug 2026): "products ghayab" DEAD-END GUARDS.
+        // (1) Baked catalog EMPTY jabke hum online hain → ghaliban stale offline
+        //     SALE_CACHE copy (ya boot payload ka masla). Telemetry beacon chhodo
+        //     (live par account-level tashkhees ho sake) aur EK dafa fresh copy
+        //     network se le kar sale cache mein daal kar reload karo (session
+        //     one-shot guard — kabhi loop nahi; fresh copy bhi empty ho to
+        //     reload ka koi faida nahi, isliye skip).
+        // (2) Grid manually OFF (localStorage pos_show_products='0') jabke
+        //     catalog maujood hai → cashier ko din mein AIK dafa info toast —
+        //     deliberate widecart/manual-billing shops roz sirf ek chhota sa
+        //     yaad-dahani dekhte hain, magar "products ghayab" wala account
+        //     khud ko theek karna seekh leta hai. Auto-off case (sab items
+        //     hidden) syncAutoWidecart pehle hi handle/restore karta hai.
+        gridDeadEndCheck() {
+            try {
+                const total = (this.allProducts || []).length + (this.allServices || []).length + (this.allDeals || []).length;
+                if (total === 0) {
+                    this.printBeacon('empty-catalog-boot', {});
+                    if (!navigator.onLine) return;
+                    (async () => {
+                        try {
+                            if (sessionStorage.getItem('tnEmptyCatalogReloaded') === '1') return;
+                            const resp = await fetch(window.location.pathname, { cache: 'reload', credentials: 'same-origin' });
+                            const ct = (resp && resp.headers.get('content-type')) || '';
+                            if (!resp || !resp.ok || resp.redirected || !ct.includes('text/html')) return;
+                            const html = await resp.clone().text();
+                            // Fresh copy bhi khali? (allProducts: [] baked) → reload bekar.
+                            if (/allProducts:\s*\[\s*\]/.test(html)) return;
+                            if (window.caches) {
+                                try {
+                                    const names = await caches.keys();
+                                    const saleName = names.find(n => n.endsWith('-sale'));
+                                    if (saleName) { const c = await caches.open(saleName); await c.put(new Request(window.location.pathname), resp); }
+                                } catch (e) {}
+                            }
+                            sessionStorage.setItem('tnEmptyCatalogReloaded', '1');
+                            window.location.reload();
+                        } catch (e) { /* offline/flaky — cached screen keeps working */ }
+                    })();
+                    return;
+                }
+                if (!this.showProducts && this.visibleGridCount() > 0) {
+                    let last = null; try { last = localStorage.getItem('tn_grid_off_notice_day'); } catch (e) {}
+                    const day = new Date().toDateString();
+                    if (last !== day) {
+                        try { localStorage.setItem('tn_grid_off_notice_day', day); } catch (e) {}
+                        this.showToast(window.TXT.products_grid_off_notice, 'info');
+                    }
+                }
+            } catch (e) {}
         },
 
         // Empty-state "Show All Products" rescue — ALSO turns the products grid back ON
@@ -7666,6 +7726,20 @@ function restaurantPos() {
                     // the KDS station fires the same ticket, cashier-side = duplicate.
                     if ((this.kitchenSettings.print_on_hold || opts.forcePrintKot) && !this.kdsHandlesKot()) {
                         this.kotPrintOrPopup(data.order.id, wasRecall);
+                    } else if (data.kot_delta_queued) {
+                        // Task 753 (Pizza Master): server ne recall+append ki chhoti
+                        // (delta) KOT khud queue kar di (KDS zinda ho ya band) —
+                        // yahan sirf cashier ko confirm karo, dobara fire nahi.
+                        this.showToast(window.TXT.kot_sent_to_printer, 'success');
+                    } else if (wasRecall && this.kitchenSettings.kds_enabled && this.kitchenSettings.kds_auto_print
+                        && (this.silentKotPrint || !this.kdsHandlesKot())) {
+                        // Task 753 APPEND-DELTA GUARANTEE: KDS-auto-print config mein
+                        // Print-on-Hold OFF + KDS band/idle = add-on delta kahin se
+                        // nahi nikalti thi. Silent-print shops: hamesha fire (server
+                        // enqueue + KDS fire 2-min dedupe mein jazb — printer routing
+                        // server karta hai); non-silent shops: sirf jab KDS board
+                        // band ho, warna KDS apne device par sahi printer se chapta hai.
+                        this.kotPrintOrPopup(data.order.id, true);
                     }
                     result = data;
                 } else { this.showToast(data.message || window.TXT.failed_word, 'error'); }
@@ -7701,6 +7775,28 @@ function restaurantPos() {
             } catch (e) {
                 this.showToast(window.TXT.network_error, 'error');
             }
+        },
+
+        // Task 753 MISSED-DELTA RECOVERY — "Akhri Add-on KOT": akhri chhapi KOT
+        // batch (+ still-unprinted rows) ka clean delta-style reprint. Physical
+        // print fail (spooler/printer) par stamp lag chuka hota tha aur delta
+        // hamesha ke liye gum ho jati thi — yeh button use wapas nikalta hai.
+        // Stamping server par whereNull-guarded hai: kabhi re-number nahi hota.
+        reprintLastKot(order) {
+            if (!order || !order.id) return;
+            const url = '/pos/restaurant/orders/' + order.id + '/kitchen-ticket?auto_print=1&batch=last';
+            const fallback = () => this._printViaIframe('print-kot-frame', url, 'width=380,height=620');
+            if (!this.silentKotPrint) { fallback(); return; }
+            this.trySilentPrint({ type: 'kot', restaurant_order_id: order.id, batch: 'last' }).then(ok => {
+                if (ok) this.showToast(window.TXT.kot_sent_to_printer, 'success'); else fallback();
+            });
+        },
+        heldMenuLastKot() { const o = this.heldMenu; this.heldMenu = null; if (o) this.reprintLastKot(o); },
+        boardLastKot() {
+            const t = this.boardMenuTable;
+            if (!t || !t.order) return;
+            this.reprintLastKot({ id: t.order.id });
+            this.boardMenuTable = null;
         },
 
         // ─── SAVE PROVISIONAL DIRECT — fully isolated from Pay modal ─────

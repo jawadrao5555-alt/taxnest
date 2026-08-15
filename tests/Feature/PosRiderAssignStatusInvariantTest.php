@@ -149,6 +149,15 @@ class PosRiderAssignStatusInvariantTest extends TestCase
         return $this->controller()->updateStatus($this->makeRequest('/pos/deliveries/' . $txnId . '/status', ['delivery_status' => $status]), $txnId);
     }
 
+    /** Same as updateStatus() but with Accept: application/json — mirrors the sale-screen fetch path. */
+    private function updateStatusJson(int $txnId, string $status)
+    {
+        $this->actAs();
+        $request = Request::create('/pos/deliveries/' . $txnId . '/status', 'POST', ['delivery_status' => $status], [], [], ['HTTP_ACCEPT' => 'application/json']);
+        $request->setLaravelSession(app('session.store'));
+        return $this->controller()->updateStatus($request, $txnId);
+    }
+
     private function bulkStatus(int $riderId, string $status)
     {
         $this->actAs();
@@ -451,5 +460,82 @@ class PosRiderAssignStatusInvariantTest extends TestCase
         $this->assertNull($this->tx($riderlessNull)->delivery_status, 'riderless NULL-status bill must stay NULL');
         $this->assertNull($this->tx($riderlessNull)->rider_id, 'riderless bill must keep rider_id NULL');
         $this->assertFiscalIdentityUnchanged($beforeRiderless2, $riderlessNull);
+    }
+
+    // ── 6. updateStatus JSON path: riderless bill via sale-screen fetch ───────
+
+    /**
+     * Task 806: the sale-screen Pending Deliveries popup sends the same POST
+     * with Accept: application/json (fetch, not a form submit).  updateStatus()
+     * takes a different code branch for JSON clients and returns a JSON body
+     * instead of back().  This test confirms:
+     *   a) no 500 / exception — the riderless path is reached safely;
+     *   b) HTTP 200 with success:true and delivery_status:'delivered';
+     *   c) fiscal identity (invoice_mode / pra_status / serials) byte-for-byte
+     *      unchanged after the update.
+     */
+    public function test_update_status_json_path_on_riderless_bill_returns_200_success(): void
+    {
+        // Riderless delivery bill — the exact shape the sale-screen popup creates
+        // when no rider is assigned (rider_id NULL, delivery_status NULL).
+        $bill = $this->makeBill(null, [
+            'invoice_number'     => 'POS-2026-80601',
+            'invoice_mode'       => 'pra',
+            'pra_status'         => 'submitted',
+            'pra_invoice_number' => 'PRA-806',
+            'order_type'         => 'delivery',
+            'status'             => 'completed',
+            'delivery_status'    => null,
+            'rider_id'           => null,
+            'rider_settlement_id' => null,
+        ]);
+        $before = $this->tx($bill);
+
+        // Act — JSON-flavoured request (sale-screen fetch path).
+        $response = $this->updateStatusJson($bill, 'delivered');
+
+        // Must be a JsonResponse, HTTP 200.
+        $this->assertInstanceOf(\Illuminate\Http\JsonResponse::class, $response);
+        $this->assertSame(200, $response->getStatusCode());
+
+        $body = $response->getData(true);
+        $this->assertTrue((bool) ($body['success'] ?? false), 'JSON body must contain success:true');
+        $this->assertSame('delivered', $body['delivery_status'] ?? null, 'JSON body must report delivery_status:delivered');
+
+        // Delivery status flipped; rider_id stays NULL.
+        $tx = $this->tx($bill);
+        $this->assertSame('delivered', $tx->delivery_status);
+        $this->assertNull($tx->rider_id, 'rider_id must stay NULL on a riderless bill');
+        $this->assertNull($tx->rider_settlement_id, 'settlement must be untouched');
+
+        // THE invariant: fiscal identity byte-for-byte unchanged.
+        $this->assertFiscalIdentityUnchanged($before, $bill);
+    }
+
+    /**
+     * Negative: a riderless bill that is already delivered must NOT be marked
+     * delivered again via the JSON path — guarded to prevent double-delivery.
+     */
+    public function test_update_status_json_path_rejects_already_delivered_riderless_bill(): void
+    {
+        $bill = $this->makeBill(null, [
+            'invoice_number'  => 'POS-2026-80602',
+            'order_type'      => 'delivery',
+            'status'          => 'completed',
+            'delivery_status' => 'delivered',   // already done
+            'rider_id'        => null,
+            'rider_settlement_id' => null,
+        ]);
+        $before = $this->tx($bill);
+
+        $response = $this->updateStatusJson($bill, 'delivered');
+
+        // Must return an error response (JSON 422 or a JSON error body), never 200 success.
+        $body = $response->getData(true);
+        $this->assertFalse((bool) ($body['success'] ?? true), 'already-delivered riderless bill must not return success:true');
+
+        // Delivery status and fiscal identity must be unchanged.
+        $this->assertSame('delivered', $this->tx($bill)->delivery_status);
+        $this->assertFiscalIdentityUnchanged($before, $bill);
     }
 }

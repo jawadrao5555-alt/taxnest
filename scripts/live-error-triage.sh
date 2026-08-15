@@ -6,7 +6,8 @@
 # classifies each entry:
 #
 #   CLI PROBE  — stack/message references /tmp/*.php, "Command line code",
-#                eval()'d code, artisan tinker, or php -r frames. These are
+#                "Standard input code" (php < file / piped stdin), eval()'d
+#                code, artisan tinker, or php -r frames. These are
 #                manual probe scripts, NOT app errors. Twice (Jul 2026
 #                pos_print_jobs.printer_name, Aug 2026
 #                pos_user_sessions.last_seen_at) such probes were mistaken for
@@ -30,6 +31,7 @@ function classify() {
     if (buf == "") return
     if (buf ~ /\/tmp\/[A-Za-z0-9._\/-]*\.php/ \
         || buf ~ /Command line code/ \
+        || buf ~ /Standard input code/ \
         || buf ~ /eval\(\)'"'"'d code/ \
         || buf ~ /artisan tinker/ \
         || buf ~ /Psy\\+Shell/) {

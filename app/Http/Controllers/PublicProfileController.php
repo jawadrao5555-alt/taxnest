@@ -117,6 +117,55 @@ class PublicProfileController extends Controller
             ->header('X-Robots-Tag', 'noindex');
     }
 
+    /**
+     * Task 777 — GET /bill/{token}: light public bill-details page opened by
+     * the QR on local/provisional receipts. Token-only lookup (unguessable
+     * 64-hex share_token), no login, no expiry (customers may scan much
+     * later), archived bills open too. Privacy: business name follows the
+     * bill-stream receipt pref (show_business_name); NEVER any customer/
+     * khata PII.
+     */
+    public function showBill(string $token)
+    {
+        if (strlen($token) !== 64 || !ctype_xdigit($token)) {
+            abort(404);
+        }
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'share_token')) {
+            abort(404);
+        }
+
+        $transaction = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('share_token', $token)
+            ->with('items')
+            ->first();
+        if (!$transaction) {
+            abort(404);
+        }
+
+        $company = Company::find($transaction->company_id);
+        if (!$company) {
+            abort(404);
+        }
+
+        // Customer-facing page (no login) — render in the company's default language.
+        app()->setLocale(\App\Support\PosLocale::normalize($company->default_language));
+
+        // Same per-stream receipt prefs the printed receipt used — name OFF on
+        // the receipt means name OFF here too (ZFC issue #9 lineage).
+        $rp = $company->posReceiptPrefsFor($transaction);
+
+        return response()
+            ->view('public.bill-details', [
+                'transaction' => $transaction,
+                'company' => $company,
+                'showBusinessName' => (bool) ($rp['show_business_name'] ?? true),
+                // Menu/public-profile link when the company has one (merged
+                // behavior: bill page carries the menu link onward).
+                'menuUrl' => self::publicUrlFor($company),
+            ])
+            ->header('X-Robots-Tag', 'noindex');
+    }
+
     // ============================== ADMIN ==============================
 
     private function adminGate(Request $request): array

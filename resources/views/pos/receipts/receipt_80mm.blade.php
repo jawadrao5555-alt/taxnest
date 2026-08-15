@@ -742,23 +742,30 @@
                 $qrUrl = \App\Support\QrImage::dataUri($publicUrl, 5, 4);
                 $qrCaption = __('pos.receipt_scan_menu');
             } else {
-                // ZFC issue #9 (28 Jul 2026): business name OFF => QR payload must
-                // not leak the name either (owner scanned QR, saw "business" field).
-                // Compact plain-text payload + shared minVersion 4 (ZFC 13 Aug 2026):
-                // the old JSON payload rendered a much denser QR than the PRA fiscal
-                // QR at the same size — customers read them as different QR types.
-                $qrLines = [
-                    $rcptIsProvisional ? 'Provisional Bill' : 'Sale Receipt',
-                    $transaction->invoice_number,
-                    $transaction->created_at->format('d/m/Y H:i'),
-                    'Total: ' . number_format($transaction->total_amount, 2),
-                ];
-                if ($rp['show_business_name'] ?? true) {
-                    $qrLines[] = $transaction->company->name ?? 'NestPOS';
+                // Task 777 (ZFC, 16 Aug 2026): plain-text QR payloads do NOTHING
+                // when scanned on iPhone/most Androids — encode a URL instead
+                // that opens the public bill-details page (/bill/{share_token},
+                // unguessable, name follows show_business_name there too).
+                $billPageTok = $transaction->publicBillToken();
+                if ($billPageTok) {
+                    $qrUrl = \App\Support\QrImage::dataUri(url('/bill/' . $billPageTok), 5, 4);
+                    $qrCaption = __('pos.receipt_scan_bill');
+                } else {
+                    // share_token column missing (PROD drift) — legacy text payload.
+                    // ZFC issue #9 (28 Jul 2026): business name OFF => QR payload
+                    // must not leak the name either.
+                    $qrLines = [
+                        $rcptIsProvisional ? 'Provisional Bill' : 'Sale Receipt',
+                        $transaction->invoice_number,
+                        $transaction->created_at->format('d/m/Y H:i'),
+                        'Total: ' . number_format($transaction->total_amount, 2),
+                    ];
+                    if ($rp['show_business_name'] ?? true) {
+                        $qrLines[] = $transaction->company->name ?? 'NestPOS';
+                    }
+                    $qrUrl = \App\Support\QrImage::dataUri(implode("\n", $qrLines), 5, 4);
+                    $qrCaption = __('pos.receipt_scan_invoice');
                 }
-                $qrData = implode("\n", $qrLines);
-                $qrUrl = \App\Support\QrImage::dataUri($qrData, 5, 4);
-                $qrCaption = __('pos.receipt_scan_invoice');
             }
         } else {
             $qrUrl = null;

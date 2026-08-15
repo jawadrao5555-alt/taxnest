@@ -2901,6 +2901,7 @@ return [
     'receipt_rider' => 'رائڈر',
     'receipt_waiter' => 'ویٹر',
     'receipt_sale_receipt' => 'سیل رسید',
+    'receipt_scan_bill' => 'بل کی تفصیل کھولنے کے لیے اسکین کریں',
     'receipt_scan_details' => 'تفصیلات کے لیے اسکین کریں',
     'receipt_scan_invoice' => 'انوائس کی تفصیلات کے لیے اسکین کریں',
     'receipt_scan_menu' => 'ہمارا مینو اور معلومات دیکھنے کے لیے اسکین کریں',

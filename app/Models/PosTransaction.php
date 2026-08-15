@@ -295,6 +295,37 @@ class PosTransaction extends Model
         return $out;
     }
 
+    /**
+     * Task 777 — unguessable public reference for the receipt QR's bill page.
+     * Reuses the existing share_token column (64-hex, already unguessable and
+     * live everywhere) instead of adding a new column; mints lazily for old
+     * bills. Schema-guarded per PROD drift convention — returns null when the
+     * column is missing so callers fall back to the plain-text QR payload.
+     */
+    public function publicBillToken(): ?string
+    {
+        try {
+            if (!\Schema::hasColumn('pos_transactions', 'share_token')) {
+                return null;
+            }
+            if (!$this->share_token) {
+                // Direct query update — never touches other dirty attributes
+                // and works on shim/read-only render paths too. whereNull =
+                // concurrent-mint safe; re-read the WINNING value afterwards.
+                self::withoutGlobalScope('hide_archived')
+                    ->where('id', $this->id)
+                    ->whereNull('share_token')
+                    ->update(['share_token' => bin2hex(random_bytes(32)), 'share_token_created_at' => now()]);
+                $this->share_token = self::withoutGlobalScope('hide_archived')
+                    ->where('id', $this->id)
+                    ->value('share_token');
+            }
+            return $this->share_token ?: null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     public function payments()
     {
         return $this->hasMany(PosPayment::class, 'transaction_id');

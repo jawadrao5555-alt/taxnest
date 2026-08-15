@@ -127,17 +127,21 @@ class PosTransaction extends Model
     }
 
     /**
-     * Exempt stream (Task 647): an all-exempt bill is stamped
-     * pra_status='exempt_internal' by PraIntegrationService/AgentController —
-     * there is nothing to report, PRA never sees it. These bills are their OWN
-     * stream: not PRA (no fiscal ever), not Local (deliberate provisional /
-     * reporting-OFF). SINGLE SOURCE OF TRUTH — report tabs, billing scope,
-     * reprint list and receipt number-style must all route through the
-     * helpers below (memory rule pos-billing-scope: never inline a ternary).
+     * Exempt stream (Task 647; HISTORICAL-ONLY since Task 760): before
+     * 15 Aug 2026 an all-exempt bill was stamped pra_status='exempt_internal'
+     * by PraIntegrationService/AgentController and never reported. Owner
+     * decision (Task 760): exempt items are now ZERO-RATED — reported to PRA
+     * at TaxRate 0 — so NEW all-exempt bills submit normally and live in the
+     * PRA stream. Nothing stamps exempt_internal anymore; these helpers keep
+     * the historical rows in their own stream: not PRA (no fiscal ever), not
+     * Local (deliberate provisional / reporting-OFF). SINGLE SOURCE OF TRUTH —
+     * report tabs, billing scope, reprint list and receipt number-style must
+     * all route through the helpers below (memory rule pos-billing-scope:
+     * never inline a ternary). Historical rows are never retro-submitted.
      */
     public const EXEMPT_INTERNAL = 'exempt_internal';
 
-    /** Is this bill in the Exempt stream (all items tax-exempt, never reported)? */
+    /** Is this bill in the (historical) Exempt stream — pre-zero-rating, never reported? */
     public function isExemptStream(): bool
     {
         return ($this->pra_status ?? null) === self::EXEMPT_INTERNAL;

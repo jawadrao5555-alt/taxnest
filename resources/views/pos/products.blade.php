@@ -193,7 +193,7 @@
                                    class="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
                             <span class="text-xs font-bold uppercase tracking-wider"
                                   :class="exempt ? 'text-amber-700 dark:text-amber-300' : 'text-gray-600 dark:text-gray-400'">
-                                {{ __('pos.tax_exempt_tax_free') }}
+                                {{ __('pos.tax_exempt_zero_rated') }}
                             </span>
                         </label>
                         <label class="flex items-center gap-2 mt-1.5 cursor-pointer select-none">

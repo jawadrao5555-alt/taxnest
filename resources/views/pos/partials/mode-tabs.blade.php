@@ -11,10 +11,12 @@
     // Billing Scope (07 Aug 2026): stream-locked staff see ONLY their own
     // stream's tab — controllers force the tab server-side too.
     $tabScope = auth('pos')->user()?->posBillingScope() ?? 'both';
-    // Exempt tab (Task 647): shown ONLY when this company actually deals in
-    // exempt bills/products (all-exempt bills = pra_status='exempt_internal',
-    // never reported to PRA) — everyone else's UI stays unchanged. Visible to
-    // EVERY role and BOTH billing scopes (exempt bills belong to no stream).
+    // Exempt tab (Task 647, HISTORICAL since Task 760): exempt items are now
+    // reported to PRA at 0%, so NEW all-exempt bills live in the PRA tab like
+    // any other reported bill. This tab only surfaces pre-zero-rating bills
+    // stamped pra_status='exempt_internal' — shown ONLY when such bills exist
+    // (the old "has exempt products" OR-clause is gone: it would show a
+    // forever-empty tab). Visible to EVERY role and BOTH billing scopes.
     // Cheap cached existence check; caller opts in via 'showExempt'.
     $showExemptTab = false;
     if (($showExempt ?? false)) {
@@ -27,9 +29,6 @@
                     return \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
                             ->where('company_id', $tabCompanyId)
                             ->where('pra_status', \App\Models\PosTransaction::EXEMPT_INTERNAL)
-                            ->exists()
-                        || \App\Models\PosProduct::where('company_id', $tabCompanyId)
-                            ->where('is_tax_exempt', true)
                             ->exists();
                 }
             );

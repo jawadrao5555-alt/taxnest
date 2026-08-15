@@ -1104,10 +1104,12 @@ class RestaurantPosController extends Controller
                     try {
                         $praService = new \App\Services\PraIntegrationService($company);
                         $praResult = $praService->sendInvoice($transaction);
-                        // exempt_only success = all-exempt bill the service already
-                        // stamped 'exempt_internal' (never reported to PRA) — do NOT
-                        // overwrite it to 'submitted' with an empty fiscal number
-                        // (live bug: ZFC bills 1787/1791, 13 Aug 2026).
+                        // Task 760: exempt items now report at 0%, so all-exempt
+                        // bills submit like any other — sendInvoice no longer
+                        // returns the old exempt_only flag (kept in the guard for
+                        // safety: success without a real submission must never be
+                        // stamped 'submitted' with an empty fiscal number — live
+                        // bug precedent: ZFC bills 1787/1791, 13 Aug 2026).
                         if ($praResult && !empty($praResult['success']) && empty($praResult['exempt_only'])) {
                             $transaction->update([
                                 'pra_status' => 'submitted',

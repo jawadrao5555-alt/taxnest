@@ -86,9 +86,15 @@ class PraIntegrationService
             : null;
         $shareBase = $taxInclusive ? (float) $transaction->items->sum('subtotal') : $itemsSubtotal;
 
+        // Task 760 (owner, 15 Aug 2026): exempt items are ZERO-RATED at PRA —
+        // included in the payload with TaxRate 0 / TaxCharged 0 (competitor
+        // parity: LinksXpert at ZFC reports the same items at 0% and the bill
+        // verifies in the Sahulat app with "Total Tax Charged: 0.00"). They
+        // are no longer filtered out, so the reported bill total finally
+        // matches the printed receipt on mixed bills too.
         $items = $transaction->items
             ->filter(function ($item) {
-                return (float) $item->unit_price > 0 && (float) $item->quantity > 0 && !$item->is_tax_exempt;
+                return (float) $item->unit_price > 0 && (float) $item->quantity > 0;
             })
             ->values()
             ->map(function ($item, $index) use ($shareBase, $totalDiscount, $taxRate, $taxInclusive, $menuRate) {
@@ -103,7 +109,12 @@ class PraIntegrationService
                 }
                 $lineSaleValue = round($saleValuePerUnit * $qty, 2);
                 $itemTaxRate = $item->is_tax_exempt ? 0 : ($item->tax_rate ?? $taxRate);
-                if ($taxInclusive && $menuRate !== null && $menuRate > 0 && abs($menuRate - (float) $itemTaxRate) >= 0.005) {
+                // Exempt lines NEVER take the card-save divide-out below: their
+                // menu price contains no embedded tax (frontend/receipt treat the
+                // exempt share as whole menu money), so SaleValue = the line
+                // itself with TaxCharged 0 — the classic-inclusive branch at
+                // rate 0 produces exactly that.
+                if (!$item->is_tax_exempt && $taxInclusive && $menuRate !== null && $menuRate > 0 && abs($menuRate - (float) $itemTaxRate) >= 0.005) {
                     // Card-save: base divided out at the MENU rate, own rate charged on
                     // top. TotalAmount MUST be SaleValue + TaxCharged (NOT menu money —
                     // the customer pays the cheaper card total, bill must sum to it).
@@ -154,24 +165,34 @@ class PraIntegrationService
         // even though the STORED total is whole-rupee (673). Absorb the paisa difference
         // into the largest line so Items still sum EXACTLY to TotalBillAmount.
         if (count($items) > 0) {
-            $hasExempt = $transaction->items->contains(fn ($item) => (bool) $item->is_tax_exempt);
-            // Exempt lines are not reported, so the PRA bill is the taxable-only subset —
-            // round that subset. A full (no-exempt) bill mirrors the stored whole-rupee total.
+            // Task 760: exempt lines are now zero-rated INSIDE the payload, so
+            // every reported bill covers the WHOLE receipt — always mirror the
+            // stored whole-rupee total (memory rule pos-rounding-convention).
             $target = round($totalBillAmount);
-            if (!$hasExempt) {
-                $storedTotal = round((float) $transaction->total_amount);
-                if (abs($storedTotal - $totalBillAmount) <= 1.00) {
-                    $target = $storedTotal;
-                }
+            $storedTotal = round((float) $transaction->total_amount);
+            if (abs($storedTotal - $totalBillAmount) <= 1.00) {
+                $target = $storedTotal;
             }
             $diff = round($target - $totalBillAmount, 2);
             if (abs($diff) >= 0.01) {
+                // Prefer the largest line that actually carries tax (absorb the
+                // paisa drift into TaxCharged); an all-exempt bill falls back to
+                // the largest line overall (drift absorbed into SaleValue at
+                // TaxRate 0 — still consistent, 0% of anything is 0).
                 $idx = 0;
                 $max = -INF;
                 foreach ($items as $i => $ln) {
-                    if ($ln['TotalAmount'] > $max) {
+                    if ($ln['TaxCharged'] > 0 && $ln['TotalAmount'] > $max) {
                         $max = $ln['TotalAmount'];
                         $idx = $i;
+                    }
+                }
+                if ($max === -INF) {
+                    foreach ($items as $i => $ln) {
+                        if ($ln['TotalAmount'] > $max) {
+                            $max = $ln['TotalAmount'];
+                            $idx = $i;
+                        }
                     }
                 }
                 if ($items[$idx]['TaxCharged'] > 0 && $items[$idx]['TaxCharged'] + $diff >= 0) {
@@ -258,12 +279,13 @@ class PraIntegrationService
             return ['success' => false, 'message' => 'Local invoice cannot be synced to PRA'];
         }
 
-        $allExempt = $transaction->items->every(fn($item) => $item->is_tax_exempt);
-        if ($allExempt) {
-            Log::info("PRA submission skipped: Transaction #{$transaction->id} — all items are tax-exempt. Internal only.");
-            $transaction->pra_status = 'exempt_internal';
-            $transaction->save();
-            return ['success' => true, 'message' => 'All items are tax-exempt — not reported to PRA. Locked internally.', 'exempt_only' => true];
+        // Task 760 (owner, 15 Aug 2026): exempt items report at 0%, so an
+        // all-exempt bill submits like any other (fiscal number + QR, verifies
+        // with tax 0.00) — the old 'exempt_internal' short-circuit is GONE for
+        // new bills. Historical bills already stamped 'exempt_internal' stay
+        // untouched: never retro-submitted.
+        if ($transaction->pra_status === PosTransaction::EXEMPT_INTERNAL) {
+            return ['success' => false, 'message' => 'Historical exempt bill (pre zero-rating) — kept internal, never reported to PRA.'];
         }
 
         if ($transaction->submission_hash) {

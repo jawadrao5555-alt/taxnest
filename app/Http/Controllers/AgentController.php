@@ -288,15 +288,11 @@ class AgentController extends Controller
                 // stuck 'pending' forever). Mirror the FBR loop's loadMissing pattern.
                 $txn->loadMissing(['items', 'company']);
 
-                // All-exempt bills are never reported to PRA (mirrors sendInvoice) —
-                // without this, the agent would receive an empty-Items payload.
-                if ($txn->items->isNotEmpty() && $txn->items->every(fn ($item) => (bool) $item->is_tax_exempt)) {
-                    $txn->pra_status = 'exempt_internal';
-                    $txn->save();
-                    Log::info("Agent: PRA submission skipped for transaction #{$txn->id} — all items tax-exempt. Internal only.");
-                    continue;
-                }
-
+                // Task 760 (owner, 15 Aug 2026): exempt items are zero-rated —
+                // generatePayload now includes them at TaxRate 0 / TaxCharged 0,
+                // so all-exempt bills go to the agent like any other bill (the
+                // old exempt_internal skip is gone; historical exempt_internal
+                // rows never match the pending-status query above anyway).
                 $payload = $praService->generatePayload($txn);
                 $invoices[] = [
                     'transaction_id' => $txn->id,

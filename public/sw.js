@@ -54,7 +54,7 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
     const req = e.request;
-    const url = new URL(req.url);
+                const url = e.data.url === '/fbr-pos/create' ? '/fbr-pos/create' : '/pos/invoice/create';
     if (url.origin !== location.origin) return;
 
     // Session hygiene: ANY logout (DI /logout, /pos/logout, /fbr-pos/logout, admin, franchise —
@@ -108,7 +108,7 @@ self.addEventListener('fetch', e => {
     // known snapshot and auto-reloads when connectivity returns (handled in tables.blade).
     if (req.mode === 'navigate' && url.pathname === '/pos/restaurant/tables' && url.search === '') {
         e.respondWith((async () => {
-            const c = await caches.open(TABLES_CACHE);
+                const c = await caches.open(SALE_CACHE);
             const cached = await c.match(req);
             const network = fetch(req).then(res => {
                 const ct = res.headers.get('content-type') || '';

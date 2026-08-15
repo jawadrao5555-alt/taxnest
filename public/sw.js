@@ -48,7 +48,7 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
     const req = e.request;
-                const url = e.data.url === '/fbr-pos/create' ? '/fbr-pos/create' : '/pos/invoice/create';
+    const url = new URL(req.url);
     if (url.origin !== location.origin) return;
 
     // Session hygiene: ANY logout (DI /logout, /pos/logout, /fbr-pos/logout, admin, franchise —

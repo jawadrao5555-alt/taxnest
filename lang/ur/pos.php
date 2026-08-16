@@ -4118,6 +4118,7 @@ return [
     // Task 774: unassigned delivered
     'del_no_rider_direct' => 'بغیر رائیڈر / براہِ راست',
     'del_closed_by' => ':name نے',
+    'del_closed_by_label' => 'بند کیا',
     'del_mark_delivered_confirm' => 'اس ڈیلیوری کو ڈیلیورڈ مارک کریں؟ کوئی رائیڈر تفویض نہیں تھا — یہ صرف بل بند کرے گا۔',
 
     // Deliveries board upgrades + Pending Deliveries popup finals (owner batch, 3 Aug 2026)

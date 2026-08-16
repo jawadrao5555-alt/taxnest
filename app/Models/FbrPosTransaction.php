@@ -101,6 +101,14 @@ class FbrPosTransaction extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    /**
+     * Task 799: who closed an unassigned delivery bill (no rider, direct mark-delivered).
+     */
+    public function deliveredBy()
+    {
+        return $this->belongsTo(User::class, 'delivered_by');
+    }
+
     public function fbrLogs()
     {
         return $this->hasMany(FbrPosLog::class, 'transaction_id');

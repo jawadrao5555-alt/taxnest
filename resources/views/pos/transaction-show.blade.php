@@ -319,6 +319,18 @@
                         <span class="text-gray-500">{{ $isReturnBill ? __('pos.return_processed_by') : __('pos.created_by') }}</span>
                         <span class="{{ $isReturnBill ? 'font-semibold text-rose-600 dark:text-rose-400' : 'text-gray-900 dark:text-white' }}">{{ $transaction->creator->name ?? 'N/A' }}</span>
                     </div>
+                    {{-- Task 799: no-rider delivery — show who closed the bill and when --}}
+                    @if($transaction->order_type === 'delivery' && !$transaction->rider_id && $transaction->delivered_by && $transaction->deliveredBy)
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">{{ __('pos.del_closed_by_label') }}</span>
+                        <span class="text-gray-900 dark:text-white">
+                            {{ $transaction->deliveredBy->name }}
+                            @if($transaction->delivered_at)
+                                <span class="text-xs text-gray-400 dark:text-gray-500">· {{ \Carbon\Carbon::parse($transaction->delivered_at)->format('d M H:i') }}</span>
+                            @endif
+                        </span>
+                    </div>
+                    @endif
                     <div class="flex justify-between items-center">
                         <span class="text-gray-500">{{ __('pos.pra_status') }}</span>
                         @if($transaction->pra_status === 'submitted')

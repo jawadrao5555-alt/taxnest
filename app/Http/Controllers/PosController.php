@@ -4623,7 +4623,7 @@ class PosController extends Controller
                       ->orWhere('invoice_mode', 'local');
                 }
             })
-            ->with(['items', 'payments', 'praLogs', 'creator', 'terminal', 'restaurantOrder.table.floor'])
+            ->with(['items', 'payments', 'praLogs', 'creator', 'terminal', 'restaurantOrder.table.floor', 'deliveredBy'])
             ->findOrFail($id);
 
         // Billing Scope: stream-locked staff cannot open the other stream's bills.

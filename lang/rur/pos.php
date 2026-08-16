@@ -4118,6 +4118,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     // Task 774: unassigned delivered
     'del_no_rider_direct' => 'Bina rider / seedha',
     'del_closed_by' => ':name ne',
+    'del_closed_by_label' => 'Band kiya',
     'del_mark_delivered_confirm' => 'Is delivery ko Delivered mark karen? Koi rider assign nahi tha — sirf bill band hoga.',
 
     // Deliveries board upgrades + Pending Deliveries popup finals (owner batch, 3 Aug 2026)

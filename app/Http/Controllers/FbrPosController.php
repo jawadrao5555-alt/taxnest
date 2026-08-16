@@ -2215,7 +2215,7 @@ class FbrPosController extends Controller
     {
         $companyId = app('currentCompanyId');
         $transaction = FbrPosTransaction::where('company_id', $companyId)
-            ->with(['items', 'creator', 'fbrLogs'])
+            ->with(['items', 'creator', 'fbrLogs', 'deliveredBy'])
             ->findOrFail($id);
 
         if ($transaction->invoice_mode === 'local') {

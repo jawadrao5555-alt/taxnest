@@ -349,6 +349,15 @@ class PosTransaction extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    /**
+     * Task 799: who closed an unassigned delivery bill (no rider, direct mark-delivered).
+     * delivered_by stores a pos_users.id (same User model as created_by).
+     */
+    public function deliveredBy()
+    {
+        return $this->belongsTo(User::class, 'delivered_by');
+    }
+
     public function lockedByTerminal()
     {
         return $this->belongsTo(PosTerminal::class, 'locked_by_terminal_id');

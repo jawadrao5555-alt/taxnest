@@ -551,6 +551,57 @@ class PosSplitPaymentPdfReceiptTest extends TestCase
         }
     }
 
+    /**
+     * A bill with a LEGACY 'card' payment row combined with a 'credit_card' row
+     * must produce exactly ONE "Card" row in the breakdown — not two.
+     *
+     * Older code paths wrote payment_method='card' (plain) before the debit_card /
+     * credit_card split was introduced.  The blade's $rcptPayAliases includes all
+     * three values, so both must collapse into the same bucket.  If 'card' were ever
+     * dropped from that alias list it would fall through to an 'other:card' bucket
+     * and render a second row — this test catches that regression.
+     */
+    public function test_legacy_card_and_credit_card_collapse_into_one_card_row(): void
+    {
+        $company = $this->makeCompany();
+
+        $legacy = new PosPayment(['payment_method' => 'card',        'amount' => 200]);
+        $legacy->id = 12; $legacy->transaction_id = self::TXN_ID;
+
+        $credit = new PosPayment(['payment_method' => 'credit_card', 'amount' => 400]);
+        $credit->id = 13; $credit->transaction_id = self::TXN_ID;
+
+        $txn = $this->makeTxn($company, collect([$legacy, $credit]));
+
+        $cardLabel   = __('pos.receipt_pay_card');
+        $combinedAmt = '600.00'; // 200 + 400
+
+        foreach (self::TEMPLATES as $tpl) {
+            $html = $this->renderPdfStyle($tpl, $txn, $company);
+
+            // Breakdown section must appear (≥2 payment rows).
+            $this->assertStringContainsString(
+                __('pos.payment_breakdown'),
+                $html,
+                "{$tpl}: payment breakdown heading must appear for a legacy-card + credit_card split"
+            );
+
+            // Exactly one Card label — substr_count must equal 1.
+            $this->assertSame(
+                1,
+                substr_count($html, $cardLabel),
+                "{$tpl}: legacy 'card' and 'credit_card' must collapse into exactly ONE Card row, not two"
+            );
+
+            // The combined amount must be displayed.
+            $this->assertStringContainsString(
+                $combinedAmt,
+                $html,
+                "{$tpl}: Card row amount must equal the sum of legacy card + credit_card (600.00)"
+            );
+        }
+    }
+
     /** Single-method bills (1 row) must NOT show the breakdown section. */
     public function test_single_method_bill_has_no_breakdown_on_pdf_templates(): void
     {

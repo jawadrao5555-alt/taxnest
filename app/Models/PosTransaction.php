@@ -24,7 +24,7 @@ class PosTransaction extends Model
         'is_archived', 'archived_at', 'archived_by_report_id',
         'rider_id', 'order_type', 'delivery_status', 'rider_settlement_id', 'rider_settled_at', 'rider_partial_paid',
         // Delivery duration stamps (3 Aug 2026) — fillable warna update() chupke se drop kar deta hai.
-        'rider_assigned_at', 'delivered_at',
+        'rider_assigned_at', 'delivered_at', 'returned_at',
         // Task 786: who closed an unassigned delivery bill (pos user id).
         'delivered_by',
         // Prepaid conversion audit (Task 285, Aug 2026) — cash→qr_payment correction on deliveries board.

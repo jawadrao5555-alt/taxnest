@@ -74,6 +74,7 @@ class PosRiderAssignStatusInvariantTest extends TestCase
             $table->unsignedBigInteger('rider_settlement_id')->nullable();
             $table->timestamp('rider_settled_at')->nullable();
             $table->timestamp('delivered_at')->nullable();
+            $table->timestamp('returned_at')->nullable();
             $table->timestamps();
         });
     }
@@ -740,6 +741,75 @@ class PosRiderAssignStatusInvariantTest extends TestCase
             'pra_status'         => 'submitted',
             'invoice_number'     => 'POS-2026-83101',
             'pra_invoice_number' => 'PRA-83101',
+            'status'             => 'completed',
+            'total_amount'       => 500.00,
+            'is_archived'        => 0,
+        ];
+        $this->assertSame($beforeRider->invoice_mode,       $updatedRiderBill->invoice_mode,       'rider bill invoice_mode must be unchanged');
+        $this->assertSame($beforeRider->pra_status,         $updatedRiderBill->pra_status,         'rider bill pra_status must be unchanged');
+        $this->assertSame($beforeRider->invoice_number,     $updatedRiderBill->invoice_number,     'rider bill serial must be unchanged');
+        $this->assertSame($beforeRider->pra_invoice_number, $updatedRiderBill->pra_invoice_number, 'rider bill fiscal number must be unchanged');
+    }
+
+    // ── 10. bulkStatus JSON path: returned stamps returned_at; riderless untouched ─
+
+    /**
+     * Task 839: bulkStatus() bulk-returned path stamps returned_at on each
+     * bill when the column exists (Schema::hasColumn guard, same pattern as
+     * delivered_at in Task 831).  Confirms:
+     *   a) rider's dispatched bills get returned_at stamped (non-null)
+     *   b) a riderless bill's returned_at stays NULL
+     *   c) fiscal identity of both bills is untouched
+     */
+    public function test_bulk_status_returned_stamps_returned_at(): void
+    {
+        $rider = $this->makeRider();
+
+        // Rider's own open bill (dispatched).
+        $riderBill = $this->makeBill($rider, [
+            'invoice_number'      => 'POS-2026-83901',
+            'invoice_mode'        => 'pra',
+            'pra_status'          => 'submitted',
+            'pra_invoice_number'  => 'PRA-83901',
+            'delivery_status'     => 'dispatched',
+            'rider_settlement_id' => null,
+        ]);
+
+        // Riderless bill that must NOT be touched.
+        $riderlessBill = $this->makeBill(null, [
+            'invoice_number'      => 'POS-2026-83902',
+            'invoice_mode'        => 'pra',
+            'pra_status'          => 'submitted',
+            'pra_invoice_number'  => 'PRA-83902',
+            'delivery_status'     => 'dispatched',
+            'rider_settlement_id' => null,
+        ]);
+        $beforeRiderless = $this->tx($riderlessBill);
+
+        // Act — JSON-flavoured bulkStatus for 'returned'.
+        $this->bulkStatusJson($rider, 'returned');
+
+        $updatedRiderBill = $this->tx($riderBill);
+
+        // a) Rider bill: delivery_status flipped to 'returned'.
+        $this->assertSame('returned', $updatedRiderBill->delivery_status, 'rider bill delivery_status must be returned');
+
+        // b) Rider bill: returned_at must be stamped (non-null).
+        $this->assertNotNull($updatedRiderBill->returned_at, 'rider bill returned_at must be stamped after bulk returned');
+
+        // c) Riderless bill: returned_at stays NULL.
+        $updatedRiderless = $this->tx($riderlessBill);
+        $this->assertNull($updatedRiderless->returned_at, 'riderless bill returned_at must remain NULL');
+
+        // d) Riderless bill: fiscal identity untouched.
+        $this->assertFiscalIdentityUnchanged($beforeRiderless, $riderlessBill);
+
+        // e) Rider bill: fiscal identity untouched.
+        $beforeRider = (object) [
+            'invoice_mode'       => 'pra',
+            'pra_status'         => 'submitted',
+            'invoice_number'     => 'POS-2026-83901',
+            'pra_invoice_number' => 'PRA-83901',
             'status'             => 'completed',
             'total_amount'       => 500.00,
             'is_archived'        => 0,

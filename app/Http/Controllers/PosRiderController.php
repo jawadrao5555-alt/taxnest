@@ -799,8 +799,12 @@ class PosRiderController extends Controller
             }
             $wastage = $request->boolean('wastage');
             $made = 0;
+            $stampReturnedAt = Schema::hasColumn('pos_transactions', 'returned_at');
             foreach ($bills as $b) {
-                $b->update(['delivery_status' => 'returned']);
+                $b->update(array_merge(
+                    ['delivery_status' => 'returned'],
+                    $stampReturnedAt ? ['returned_at' => now()] : []
+                ));
                 if ($this->attemptAutoReturn($b, $wastage)) {
                     $made++;
                 }

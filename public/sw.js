@@ -69,7 +69,10 @@ self.addEventListener('fetch', e => {
     // starting a session — drop the cached sale screen, it bakes per-user data
     // (PRA toggle, role gates, discount limit, grid prefs).
     if (req.method === 'POST' && url.pathname.includes('/login')) {
-        e.waitUntil(caches.delete(SALE_CACHE));
+        // Tables board is cache-first + bakes per-session data — must be purged
+        // alongside the sale screen on user-switch so a new login never sees the
+        // previous session's table snapshot (cross-user exposure on shared terminals).
+        e.waitUntil(Promise.all([caches.delete(SALE_CACHE), caches.delete(TABLES_CACHE)]));
         return;
     }
 

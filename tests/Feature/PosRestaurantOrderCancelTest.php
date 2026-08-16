@@ -81,6 +81,7 @@ class PosRestaurantOrderCancelTest extends TestCase
             $table->string('kitchen_notes')->nullable();
             $table->decimal('subtotal', 12, 2)->default(0);
             $table->decimal('total_amount', 12, 2)->default(0);
+            $table->timestamp('kot_sent_at')->nullable();
             $table->timestamp('cancelled_at')->nullable();
             $table->unsignedBigInteger('cancelled_by')->nullable();
             $table->timestamps();
@@ -317,6 +318,89 @@ class PosRestaurantOrderCancelTest extends TestCase
 
         $this->assertSame(200, $this->cancel($orderId)->getStatusCode());
         $this->assertNull(DB::table('restaurant_order_items')->find($itemId)->was_made);
+    }
+
+    // ── Task #933: '…' menu dine-in cancel stamps was_made in report ─────────
+
+    /**
+     * The '…' menu on the Table Board (heldMenuDelete) feeds the same rich
+     * cancel modal as the board "Free Table" button, then calls boardCancelConfirm
+     * which POSTs made_item_ids to deleteOrder.  This test locks the server-side
+     * half of that round-trip for a dine-in held order that already has a KOT
+     * (kot_sent_at set) — the only case where the cashier sees made/not-made
+     * toggles and the client sends made_item_ids.
+     *
+     * Confirms:
+     *   - checked item  → was_made = 1
+     *   - unchecked item → was_made = 0
+     *   - both items appear in the cancelled-orders report
+     *   - only the checked item's subtotal counts toward waste
+     *   - a second cancel call on a no-KOT dine-in order (body = {}) leaves
+     *     was_made NULL on all items (not asked = never recorded)
+     */
+    public function test_dine_in_dot_menu_cancel_with_made_item_ids_stamps_was_made_in_report(): void
+    {
+        $manager = $this->actAs($this->makeUser('pos_manager', 'Manager Mehboob'));
+        $tableId = $this->table('occupied');
+
+        // ── Order 1: KOT was sent; cashier marks Chapli as made, Raita as not ──
+        $orderId = $this->order([
+            'order_type' => 'dine_in',
+            'source'     => 'waiter',
+            'table_id'   => $tableId,
+            'total_amount' => 1100,
+            'kot_sent_at'  => now(),
+        ]);
+        $chapliId = DB::table('restaurant_order_items')->insertGetId([
+            'order_id' => $orderId, 'item_name' => 'Chapli Kabab', 'quantity' => 2,
+            'subtotal' => 800, 'kot_printed_at' => now(),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $raitaId = DB::table('restaurant_order_items')->insertGetId([
+            'order_id' => $orderId, 'item_name' => 'Raita', 'quantity' => 1,
+            'subtotal' => 300, 'kot_printed_at' => now(),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        // boardCancelConfirm sends made_item_ids = [chapliId] (Chapli was made)
+        $response = $this->cancel($orderId, ['made_item_ids' => [$chapliId]]);
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertTrue($response->getData()->success);
+
+        // was_made stamped correctly per-item.
+        $this->assertEquals(1, DB::table('restaurant_order_items')->find($chapliId)->was_made,
+            'Chapli (checked) must have was_made = 1');
+        $this->assertEquals(0, DB::table('restaurant_order_items')->find($raitaId)->was_made,
+            'Raita (unchecked) must have was_made = 0');
+
+        // Both items survive (soft cancel) and appear in the report.
+        $reportIds = $this->cancelledReportOrders()->pluck('id');
+        $this->assertContains($orderId, $reportIds->all(), 'Cancelled dine-in order must appear in report');
+        $this->assertSame(2, DB::table('restaurant_order_items')->where('order_id', $orderId)->count(),
+            'Items must survive soft-cancel for the report');
+
+        // Waste = only the made item's subtotal (Chapli 800, not Raita 300).
+        $waste = (float) \App\Models\RestaurantOrderItem::where('was_made', true)
+            ->whereIn('order_id', $reportIds)
+            ->sum('subtotal');
+        $this->assertSame(800.0, $waste, 'Waste must count only was_made = 1 items');
+
+        // ── Order 2: no KOT (fresh hold, never sent to kitchen) — client sends
+        //    empty body ({}) → was_made must stay NULL (never asked) ──────────
+        $noKotId = $this->order([
+            'order_type'  => 'dine_in',
+            'source'      => 'pos',
+            'table_id'    => null,
+            'total_amount' => 500,
+            // no kot_sent_at
+        ]);
+        $itemId = DB::table('restaurant_order_items')->insertGetId([
+            'order_id' => $noKotId, 'item_name' => 'Lassi', 'quantity' => 1,
+            'subtotal' => 500, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->assertSame(200, $this->cancel($noKotId)->getStatusCode());
+        $this->assertNull(DB::table('restaurant_order_items')->find($itemId)->was_made,
+            'No-KOT order: was_made must stay NULL when made_item_ids was never sent');
     }
 
     // ── completed orders are protected ───────────────────────────────────────

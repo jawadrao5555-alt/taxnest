@@ -27,6 +27,7 @@ function extractMethod(startPattern) {
 
 const srcChain = extractMethod(/runAutoPrintChain\(orderId, orderType = null/);
 const srcPrint = extractMethod(/async printReceipt\(onAfterPrint\)/);
+const srcInner = extractMethod(/async _printReceiptInner\(onAfterPrint\)/);
 const srcGrace = extractMethod(/async praPrintGrace\(\)/);
 
 // Build a component with the REAL extracted methods + minimal stubs.
@@ -35,7 +36,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 let methods;
 try {
-  methods = (0, eval)(`({ ${srcChain}, ${srcPrint}, ${srcGrace} })`);
+  methods = (0, eval)(`({ ${srcChain}, ${srcPrint}, ${srcInner}, ${srcGrace} })`);
 } catch (e) {
   fail('extracted sources do not evaluate: ' + e.message);
 }

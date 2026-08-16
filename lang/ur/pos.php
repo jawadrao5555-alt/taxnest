@@ -1614,6 +1614,8 @@ return [
     'kds_auto_print_kot_sub' => 'نیا آرڈر آتے ہی KDS ڈیوائس خود کار طریقے سے KOT پرنٹ کر دے گی (کچن پرنٹر کا KDS ڈیوائس سے جڑا ہونا ضروری ہے)',
     'kds_display' => 'KDS ڈسپلے',
     'kds_hint' => 'آرڈر ہولڈ ہونے پر KDS اسکرین پر دکھائیں',
+    'kds_cancelled_header' => 'منسوخ',
+    'kds_void_ack_btn' => 'ٹھیک ہے',
     'kds_new_colon' => 'نیا:',
     'kds_page_subtitle' => 'کچن اسٹاف کے لیے فعال آرڈرز',
     'kds_page_title' => 'کچن ڈسپلے سسٹم',

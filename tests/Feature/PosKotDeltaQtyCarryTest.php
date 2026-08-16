@@ -270,6 +270,8 @@ class PosKotDeltaQtyCarryTest extends TestCase
             $table->timestamp('cancelled_at')->nullable();
             $table->unsignedBigInteger('cancelled_by')->nullable();
             $table->timestamp('superseded_at')->nullable();
+            // Task 841: KDS void-items badge column.
+            $table->text('void_items')->nullable();
             $table->timestamps();
         });
 
@@ -1243,6 +1245,78 @@ class PosKotDeltaQtyCarryTest extends TestCase
         $this->assertCount(1, $voidItems, 'unchanged Bottle must NOT appear on the void slip');
         $this->assertSame('Fries', $voidItems[0]['item_name']);
         $this->assertEquals(2.0, (float) $voidItems[0]['qty'], 'full printed Fries qty must be voided');
+    }
+
+    // ── 12. Task 841: void_items persisted on order for KDS cancelled badge ─
+
+    public function test_void_items_persisted_on_replacement_order_for_kds(): void
+    {
+        // When printed qty is removed (decrease or full removal), the replacement
+        // order must carry void_items so the KDS board can show a CANCELLED badge.
+        $c = $this->makeCompany();
+        $this->makeCashier($c);
+        $tableId = $this->makeTable($c);
+
+        $res1 = $this->hold([
+            'items' => [
+                $this->bottle(2),
+                ['item_type' => 'manual', 'item_name' => 'Fries', 'unit_price' => 50, 'quantity' => 1],
+            ],
+            'order_type' => 'dine_in', 'table_id' => $tableId,
+        ]);
+        $oldId = json_decode($res1->getContent(), true)['order']['id'];
+        $this->stampPrinted($oldId, 1);
+
+        // Remove Fries entirely; keep 1 Bottle (decrease from 2).
+        $res2 = $this->hold([
+            'items' => [$this->bottle(1)],
+            'order_type' => 'dine_in',
+            'table_id' => $tableId,
+            'recalled_order_id' => $oldId,
+        ]);
+        $this->assertSame(200, $res2->getStatusCode(), $res2->getContent());
+        $newId = json_decode($res2->getContent(), true)['order']['id'];
+
+        $order = RestaurantOrder::find($newId);
+        $this->assertNotNull($order->void_items, 'void_items must be persisted when printed dishes are removed');
+        $vi = json_decode($order->void_items, true);
+        $this->assertIsArray($vi);
+        $this->assertCount(2, $vi, 'both the decreased Bottle qty and the removed Fries must appear');
+
+        $names = array_column($vi, 'item_name');
+        $this->assertContains('Bottle', $names);
+        $this->assertContains('Fries', $names);
+
+        $bottleEntry = collect($vi)->firstWhere('item_name', 'Bottle');
+        $this->assertEquals(1.0, (float) $bottleEntry['qty'], 'Bottle: 2 sent - 1 kept = 1 voided');
+        $friesEntry = collect($vi)->firstWhere('item_name', 'Fries');
+        $this->assertEquals(1.0, (float) $friesEntry['qty'], 'Fries: entirely removed = full qty voided');
+    }
+
+    public function test_void_items_null_on_fresh_hold_and_pure_increase(): void
+    {
+        // Fresh holds and pure increases must NOT set void_items — the KDS badge
+        // must stay hidden when nothing was cancelled.
+        $c = $this->makeCompany();
+        $this->makeCashier($c);
+        $tableId = $this->makeTable($c);
+
+        // Fresh hold (no prior printed rows).
+        $res1 = $this->hold(['items' => [$this->bottle(2)], 'order_type' => 'dine_in', 'table_id' => $tableId]);
+        $id1 = json_decode($res1->getContent(), true)['order']['id'];
+        $this->assertNull(RestaurantOrder::find($id1)->void_items, 'fresh hold must not set void_items');
+
+        $this->stampPrinted($id1, 1);
+
+        // Pure increase — every printed chunk re-claimed; nothing voided.
+        $res2 = $this->hold([
+            'items' => [$this->bottle(3)],
+            'order_type' => 'dine_in',
+            'table_id' => $tableId,
+            'recalled_order_id' => $id1,
+        ]);
+        $id2 = json_decode($res2->getContent(), true)['order']['id'];
+        $this->assertNull(RestaurantOrder::find($id2)->void_items, 'pure qty increase must not set void_items');
     }
 
     public function test_pay_with_distinct_lines_keeps_them_separate(): void

@@ -589,6 +589,15 @@ class RestaurantPosController extends Controller
                 }
             }
 
+            // Task 841: persist void_items on the replacement order so the KDS
+            // live-orders poll can surface a "CANCELLED" badge on the card.
+            // Empty list = fresh hold or pure increase → clear any stale value.
+            // hasColumn guard (prod schema-drift memory).
+            if (Schema::hasColumn('restaurant_orders', 'void_items')) {
+                $order->void_items = !empty($voidItems) ? json_encode($voidItems) : null;
+                $order->saveQuietly();
+            }
+
             if ($request->table_id) {
                 $table = RestaurantTable::where('company_id', $companyId)->where('id', $request->table_id)->first();
                 // Int-cast both sides: some MySQL/PDO setups (emulated prepares on

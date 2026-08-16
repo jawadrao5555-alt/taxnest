@@ -275,6 +275,8 @@ class RestaurantKdsController extends Controller
                     'unprinted_by_station' => (object) $o->items->whereNull('kot_printed_at')
                         ->groupBy(fn ($i) => (string) ($stationItemMap[$i->id] ?? 0))
                         ->map->count()->toArray(),
+                    // Task 841: cancelled items for KDS badge (null or []).
+                    'void_items' => $o->void_items ? json_decode($o->void_items, true) : [],
                     'source' => $o->source ?? 'pos',
                     'created_by' => $o->creator?->name ?? 'Unknown',
                     'elapsed_minutes' => $elapsed,

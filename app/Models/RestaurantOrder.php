@@ -17,6 +17,8 @@ class RestaurantOrder extends Model
         'assigned_cashier_id', 'source',
         'token_no',
         'superseded_at',
+        // Task 841: KDS cancelled-items badge — JSON list of voided dishes.
+        'void_items',
     ];
 
     protected $casts = [

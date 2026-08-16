@@ -118,6 +118,26 @@
                     <div x-show="order.kitchen_notes" class="mt-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded text-xs text-amber-700 dark:text-amber-400">
                         <strong>{{ __('pos.note_label') }}</strong> <span x-text="order.kitchen_notes"></span>
                     </div>
+
+                    {{-- Task 841: CANCELLED dishes badge — shown until cook acknowledges. --}}
+                    <div x-show="hasUnacknowledgedVoids(order)"
+                         class="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded">
+                        <div class="flex items-center gap-1 mb-1">
+                            <svg class="w-3.5 h-3.5 text-red-600 dark:text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                            <span class="text-xs font-bold text-red-700 dark:text-red-400 uppercase tracking-wide">{{ __('pos.kds_cancelled_header') }}</span>
+                        </div>
+                        <template x-for="vi in (order.void_items || [])" :key="vi.item_name + vi.qty">
+                            <div class="text-xs font-semibold text-red-600 dark:text-red-400 flex items-center gap-1 py-0.5">
+                                <span class="w-5 h-5 rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 flex items-center justify-center text-[10px] font-black flex-shrink-0" x-text="vi.qty"></span>
+                                <span x-text="vi.item_name"></span>
+                                <span x-show="vi.notes" class="text-red-400 dark:text-red-500 font-normal italic" x-text="'(' + vi.notes + ')'"></span>
+                            </div>
+                        </template>
+                        <button @click.stop="acknowledgeVoids(order.id, order.void_items)"
+                                class="mt-1.5 text-[10px] px-2 py-0.5 bg-red-600 hover:bg-red-700 text-white rounded font-semibold">
+                            {{ __('pos.kds_void_ack_btn') }}
+                        </button>
+                    </div>
                 </div>
 
                 <div class="px-4 py-3 bg-gray-50 dark:bg-gray-800 flex gap-2">
@@ -189,6 +209,8 @@ $kdsOrdersJson = $orders->map(function($o) use ($stationItemMap) {
         'unprinted_by_station' => (object) $o->items->whereNull('kot_printed_at')
             ->groupBy(fn($i) => (string)($stationItemMap[$i->id] ?? 0))
             ->map->count()->toArray(),
+        // Task 841: voided dishes for KDS cancelled badge.
+        'void_items' => $o->void_items ? json_decode($o->void_items, true) : [],
         'elapsed_minutes' => $elapsed,
         'is_urgent' => $elapsed > 15,
         'created_at' => $kdsStart->format('H:i'),
@@ -227,6 +249,9 @@ function kdsScreen() {
         // P7: throttle delta re-queues — stamping happens when the ticket renders,
         // but a poll can land mid-print; don't re-fire the same delta within 30s.
         _deltaFiredAt: {},
+        // Task 841: per-device acknowledgement of cancelled-items badges.
+        // Map of orderId → JSON-string of void_items last acknowledged by this device.
+        acknowledgedVoids: {},
 
         // Kitchen lifecycle state (never the billing status): new → preparing → ready.
         kstate(order) {
@@ -262,10 +287,42 @@ function kdsScreen() {
             return Array.from(map.values()).sort((a, b) => b.qty - a.qty);
         },
 
+        // Task 841: true when the order has void_items that have not yet been
+        // acknowledged on this device. A second re-hold that produces a DIFFERENT
+        // void list resets the badge even if the cook acknowledged the previous one.
+        hasUnacknowledgedVoids(order) {
+            const vi = order.void_items || [];
+            if (!vi.length) return false;
+            const sig = JSON.stringify(vi);
+            return (this.acknowledgedVoids[String(order.id)] || '') !== sig;
+        },
+
+        acknowledgeVoids(orderId, voidItems) {
+            const sig = JSON.stringify(voidItems || []);
+            this.acknowledgedVoids[String(orderId)] = sig;
+            try {
+                const stored = {};
+                try { Object.assign(stored, JSON.parse(localStorage.getItem('kds_acked_voids') || '{}')); } catch(e) {}
+                stored[String(orderId)] = sig;
+                // Prune stale entries (orders no longer on board).
+                const liveIds = new Set(this.orders.map(o => String(o.id)));
+                Object.keys(stored).forEach(k => { if (!liveIds.has(k)) delete stored[k]; });
+                localStorage.setItem('kds_acked_voids', JSON.stringify(stored));
+            } catch(e) {}
+        },
+
+        initAcknowledgedVoids() {
+            try {
+                const stored = JSON.parse(localStorage.getItem('kds_acked_voids') || '{}');
+                if (stored && typeof stored === 'object') this.acknowledgedVoids = stored;
+            } catch(e) {}
+        },
+
         startPolling() {
             this.$watch('viewMode', v => { try { localStorage.setItem('kds_view_mode', v); } catch(e){} });
             this.initStation();
             this.initAutoPrint();
+            this.initAcknowledgedVoids();
             this.polling = setInterval(() => this.refreshOrders(), 15000);
             this.timerInterval = setInterval(() => {
                 this.orders.forEach(o => { o.elapsed_minutes++; });

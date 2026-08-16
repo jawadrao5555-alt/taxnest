@@ -2537,8 +2537,11 @@ window.addEventListener('popstate', function() {
                         {{-- Rider-khata warning: bill is still on the rider's unsettled khata.
                              Final is ALLOWED (riders never touch invoice_mode/serials — the
                              khata follows rider_id + rider_settlement_id, not the bill mode);
-                             the warning tells the cashier the CASH is still with the rider. --}}
-                        <template x-if="bill.rider_unsettled">
+                             the warning tells the cashier the CASH is still with the rider.
+                             Task 990: gate to is_final — a provisional bill with a pre-assigned
+                             rider hasn't collected cash yet, so the settle warning is misleading
+                             (rider is just queued, not carrying money). Khata math untouched. --}}
+                        <template x-if="bill.rider_unsettled && bill.is_final">
                             <div class="mb-2 px-3 py-2 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 text-[11px] font-semibold text-orange-700 dark:text-orange-300 flex items-start gap-1.5">
                                 <svg class="w-3.5 h-3.5 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                                 <div class="flex-1 min-w-0">
@@ -2560,7 +2563,10 @@ window.addEventListener('popstate', function() {
                              (can_assign_rider from the API mirrors PosAccessService verdict).
                              Task 984: PROVISIONAL rows par bhi — assign endpoint sirf
                              settled/delivered/returned block karta hai, provisional allowed,
-                             so cashier Final se pehle hi rider chun sakta hai. --}}
+                             so cashier Final se pehle hi rider chun sakta hai.
+                             Task 990: rider_unsettled warning sirf is_final rows par — provisional
+                             pe rider pre-assign hota hai (cash abhi nahi mili), isliye settle
+                             button confusing hoga; markup gate hi kaafi (khata math untouched). --}}
                         <template x-if="!bill.rider_id && canAssignRider && deliveryRiders.length > 0">
                             <div class="mb-2 flex items-center gap-2">
                                 <svg class="w-4 h-4 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a2 2 0 104 0m-4 0a2 2 0 11-4 0m10 0a2 2 0 104 0"/></svg>

@@ -2044,8 +2044,10 @@ window.addEventListener('popstate', function() {
                         <p class="text-[11px] text-gray-500 mb-2" x-text="bill.items_count + window.TXT.sfx_item_s_dot + (bill.created_time || bill.created_human)"></p>
                         {{-- Task 521: rider-khata warning — bill is still on the rider's
                              unsettled khata (cash rider ke paas). Settle button covers the
-                             rider's WHOLE khata (FbrPosRiderController::settle settle_all). --}}
-                        <template x-if="bill.rider_unsettled">
+                             rider's WHOLE khata (FbrPosRiderController::settle settle_all).
+                             Task 990: gate to is_final — provisional rider is pre-assigned only
+                             (cash nahi aayi abhi), settle confusing hoga; khata math untouched. --}}
+                        <template x-if="bill.rider_unsettled && bill.is_final">
                             <div class="mb-2 px-3 py-2 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 text-[11px] font-semibold text-orange-700 dark:text-orange-300 flex items-start gap-1.5">
                                 <svg class="w-3.5 h-3.5 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                                 <div class="flex-1 min-w-0">

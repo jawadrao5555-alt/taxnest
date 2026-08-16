@@ -81,17 +81,23 @@ AUDIENCE_ESCAPED=$(printf '%s' "$AUDIENCE" | sed "s/'/\\\\'/g")
 # ---------------------------------------------------------- PHP bootstrap script
 # Runs identically on live (hardcoded LIVE_DIR paths) or dev (relative paths from CWD).
 # GOTCHA: on live the script runs from /tmp so __DIR__ is wrong — we hardcode the path.
+# In dev mode the workspace root is passed as $argv[1] so the script finds vendor/.
 read -r -d '' PHP_SCRIPT <<PHPEOF || true
 <?php
 // Elaan insert helper — Task 999
-// Hardcoded live path (script may run from /tmp via SSH pipe).
-\$base = is_dir('/home/taxnestc/public_html/vendor')
-    ? '/home/taxnestc/public_html'
-    : realpath(__DIR__);
+// Base path: argv[1] (dev, passed by shell) > hardcoded live path > __DIR__ fallback.
+\$base = (!empty(\$argv[1]) && is_dir(\$argv[1].'/vendor'))
+    ? \$argv[1]
+    : (is_dir('/home/taxnestc/public_html/vendor')
+        ? '/home/taxnestc/public_html'
+        : realpath(__DIR__));
 
 require \$base . '/vendor/autoload.php';
 \$app = require \$base . '/bootstrap/app.php';
-\$kernel = \$app->make(Illuminate\Contracts\Http\Kernel::class);
+// Use the console kernel for CLI bootstrapping — the HTTP kernel calls
+// URL::forceScheme() in AppServiceProvider which requires a bound HTTP
+// request and throws a TypeError in CLI context.
+\$kernel = \$app->make(Illuminate\Contracts\Console\Kernel::class);
 \$kernel->bootstrap();
 
 \$points = $PHP_POINTS_ARRAY;
@@ -117,16 +123,27 @@ PHPEOF
 # ---------------------------------------------------------- Run
 if [ "$DEV" = "1" ]; then
   # Dev: run directly with the dev PHP (strips PG env vars to hit MySQL Staging).
+  # Pass the workspace root as argv[1] so the PHP script finds vendor/autoload.php
+  # even though the temp file lives in /tmp (where __DIR__ would resolve to /tmp).
   echo "Running on dev DB (local artisan bootstrap)..."
   TMP_SCRIPT=$(mktemp /tmp/elaan_insert_XXXXXX.php)
   printf '%s' "$PHP_SCRIPT" > "$TMP_SCRIPT"
-  env -u DATABASE_URL -u DB_CONNECTION -u PGHOST -u PGPORT -u PGUSER -u PGPASSWORD -u PGDATABASE \
-    php "$TMP_SCRIPT"
+  WORKSPACE_ROOT=$(pwd)
+  DEV_OUT=$(env -u DATABASE_URL -u DB_CONNECTION -u PGHOST -u PGPORT -u PGUSER -u PGPASSWORD -u PGDATABASE \
+    php "$TMP_SCRIPT" "$WORKSPACE_ROOT" 2>&1)
   DEV_RC=$?
   rm -f "$TMP_SCRIPT"
+  echo "$DEV_OUT"
   [ $DEV_RC -eq 0 ] || fail "PHP bootstrap failed on dev (exit $DEV_RC)"
+  echo "$DEV_OUT" | grep -q "ELAAN_INSERTED" \
+    || fail "PHP ran but ELAAN_INSERTED marker missing — row was NOT created; check output above"
+  CREATED_ID=$(echo "$DEV_OUT" | grep -oE 'id=[0-9]+' | head -1 | cut -d= -f2)
   echo ""
-  echo "Done. Check /admin/app-updates on dev to verify."
+  echo "---------------------------------------------------------------"
+  echo "ELAAN OK (dev): AppUpdate row #${CREATED_ID} created in dev DB."
+  echo "                Audience: $AUDIENCE  |  Points: ${#POINTS[@]}"
+  echo "                Verify: /admin/app-updates on the dev server."
+  echo "---------------------------------------------------------------"
 else
   # Live: stream the PHP script to live via SSH and run with ea-php84.
   [ -f "$KEY" ] || fail "SSH key not found at $KEY — can only run on live from the workspace"

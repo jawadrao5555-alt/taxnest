@@ -4644,6 +4644,25 @@ function restaurantPos() {
             if (this._inited) return;
             this._inited = true;
             this.initFit();
+            // Task 976: Tables board Takeaway/Delivery quick-start handoff.
+            // The tables page sets sessionStorage 'tn_pos_boot_order_type' before
+            // navigating here. Consume it immediately (one-shot) so a refresh or
+            // back-navigation never re-applies the seed. Only apply when this is a
+            // fresh screen — no table_id / recall_order URL param, no editingBillId
+            // — so a recalled dine-in order is never silently switched.
+            // 'delivery' maps directly; 'takeaway' is already the default but we
+            // set it explicitly in case a previous session left a different type.
+            try {
+                var _bootType = sessionStorage.getItem('tn_pos_boot_order_type');
+                if (_bootType === 'takeaway' || _bootType === 'delivery') {
+                    sessionStorage.removeItem('tn_pos_boot_order_type');
+                    var _urlParams = new URLSearchParams(window.location.search);
+                    var _isFresh = !_urlParams.get('table_id') && !_urlParams.get('recall_order') && !this.editingBillId;
+                    if (_isFresh) {
+                        this.orderType = _bootType;
+                    }
+                }
+            } catch (e) {}
             setTimeout(() => this.bootFpCheck(), 1500);
             // NestPOS Desktop keep-alive (Jul 2026): the desktop shell hides the
             // window on close and calls this hook when it is shown again — so a

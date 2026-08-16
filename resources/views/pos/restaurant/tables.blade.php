@@ -191,8 +191,28 @@
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ __('pos.tables_overview') }}</h1>
             <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('pos.realtime_table_status') }}</p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
             @php $tvUser = auth('pos')->user(); @endphp
+            {{-- Task 976: Takeaway / Delivery quick-start buttons — visible to all
+                 roles (including cashiers). Set a sessionStorage flag so the sale
+                 screen boots with the right order type already selected. The flag
+                 is consumed once on init and cleared immediately, so a page refresh
+                 or back-navigation never re-applies it. SW caches /pos/invoice/create
+                 at the bare URL (no query string) so offline shops work fine too. --}}
+            <a href="{{ route('pos.invoice.create') }}"
+               onclick="try{sessionStorage.setItem('tn_pos_boot_order_type','takeaway')}catch(e){}"
+               class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg bg-green-600 text-white hover:bg-green-700 font-medium">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                {{ __('pos.takeaway') }}
+            </a>
+            @if($tvDeliveryEnabled ?? false)
+            <a href="{{ route('pos.invoice.create') }}"
+               onclick="try{sessionStorage.setItem('tn_pos_boot_order_type','delivery')}catch(e){}"
+               class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-medium">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+                {{ __('pos.delivery') }}
+            </a>
+            @endif
             @if($tvUser && !$tvUser->isPosCashier())
             <a href="{{ route('pos.restaurant.table-management') }}" class="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 font-medium">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>

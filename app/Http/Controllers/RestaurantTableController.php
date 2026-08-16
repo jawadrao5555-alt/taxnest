@@ -47,7 +47,17 @@ class RestaurantTableController extends Controller
             ->orderBy('created_at')
             ->get();
 
-        return view('pos.restaurant.tables', compact('floors', 'openOrders'));
+        // Task 976: Takeaway/Delivery quick-start buttons on the board.
+        // Pass a simple boolean so the blade doesn't need to call PosFeatureService itself.
+        $tvDeliveryEnabled = false;
+        try {
+            $tvCompany = \App\Models\Company::find($companyId);
+            if ($tvCompany) {
+                $tvDeliveryEnabled = (bool) (\App\Services\PosFeatureService::forCompany($tvCompany)->delivery ?? false);
+            }
+        } catch (\Throwable $e) { /* silently disable if service unavailable */ }
+
+        return view('pos.restaurant.tables', compact('floors', 'openOrders', 'tvDeliveryEnabled'));
     }
 
     public function manage()

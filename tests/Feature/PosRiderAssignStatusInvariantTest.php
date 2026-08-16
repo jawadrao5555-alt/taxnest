@@ -751,6 +751,58 @@ class PosRiderAssignStatusInvariantTest extends TestCase
         $this->assertSame($beforeRider->pra_invoice_number, $updatedRiderBill->pra_invoice_number, 'rider bill fiscal number must be unchanged');
     }
 
+    // ── 9a. bulkStatus form-submit path: no open bills → redirect with error flash ──────────
+
+    /**
+     * Task 929: bulkStatus() 'delivered' via the plain form-submit path (no
+     * Accept: application/json header) when the rider has zero open bills.
+     * The controller hits the $count === 0 branch and must return a redirect
+     * (back()->with('error', ...)) — never a 500, never a JsonResponse.
+     *
+     * This mirrors test_bulk_status_with_no_open_deliveries_writes_nothing
+     * (which covers 'returned') but targets the 'delivered' code path, which
+     * goes through the bulk UPDATE branch rather than the per-bill iterator.
+     */
+    public function test_bulk_status_form_path_no_open_bills_delivered_returns_redirect_with_error(): void
+    {
+        $rider = $this->makeRider();
+
+        // Only a terminal (already-delivered) bill — no open bills for this rider.
+        $terminal = $this->makeBill($rider, [
+            'invoice_number'      => 'POS-2026-92901',
+            'invoice_mode'        => 'pra',
+            'pra_status'          => 'submitted',
+            'pra_invoice_number'  => 'PRA-92901',
+            'delivery_status'     => 'delivered',
+            'rider_settlement_id' => null,
+        ]);
+        $before = $this->tx($terminal);
+
+        // Act — plain form-submit (no Accept: application/json header).
+        $response = $this->bulkStatus($rider, 'delivered');
+
+        // Must be a redirect, NOT a JsonResponse, NOT an exception.
+        $this->assertNotInstanceOf(
+            \Illuminate\Http\JsonResponse::class,
+            $response,
+            'form-submit path must return a redirect, not a JsonResponse'
+        );
+        $this->assertInstanceOf(
+            \Illuminate\Http\RedirectResponse::class,
+            $response,
+            'form-submit path must return a RedirectResponse when no open bills'
+        );
+
+        // Session 'error' flash must be set.
+        $errorFlash = $this->flashError($response);
+        $this->assertNotNull($errorFlash, 'error flash must be set when no open bills on form-submit delivered path');
+        $this->assertStringContainsString('No open deliveries', $errorFlash);
+
+        // Terminal bill must be completely untouched.
+        $this->assertSame('delivered', $this->tx($terminal)->delivery_status, 'already-delivered bill must stay delivered');
+        $this->assertFiscalIdentityUnchanged($before, $terminal);
+    }
+
     // ── 9b. bulkStatus form-submit path: delivered stamps delivered_at; riderless untouched ─
 
     /**

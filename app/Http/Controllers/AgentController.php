@@ -837,7 +837,7 @@ class AgentController extends Controller
         if ($job->type === 'bill') {
             $transaction = \App\Models\PosTransaction::withoutGlobalScope('hide_archived')
                 ->where('company_id', $company->id)
-                ->with(['items', 'payments', 'creator', 'terminal'])
+                ->with(['items', 'payments', 'creator', 'terminal', 'rider'])
                 ->find($job->transaction_id);
             if (!$transaction) {
                 return response()->json(['error' => 'Transaction not found'], 404);

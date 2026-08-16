@@ -628,6 +628,9 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/notifications/{id}/dismiss', [PosController::class, 'dismissNotification'])->name('pos.notifications.dismiss');
     Route::post('/notifications/dismiss-all', [PosController::class, 'dismissAllNotifications'])->name('pos.notifications.dismiss-all');
     Route::post('/whats-new/seen', [\App\Http\Controllers\AppUpdateController::class, 'markSeen'])->name('pos.whats-new.seen');
+    // Task 1022: POS survey popup (Caller ID elaan) — admin/manager gated in controller.
+    Route::post('/survey/{id}/respond', [\App\Http\Controllers\PosSurveyController::class, 'respond'])->name('pos.survey.respond');
+    Route::post('/survey/{id}/dismiss', [\App\Http\Controllers\PosSurveyController::class, 'dismiss'])->name('pos.survey.dismiss');
     // Task 767: one-time "KOT centering still ON — verify your printout" banner dismiss (admin/manager only, gated in controller).
     Route::post('/kot-center-notice/dismiss', [PosController::class, 'dismissKotCenterNotice'])->name('pos.kot-center-notice.dismiss');
     // Feature Suggestion box (owner request 20 Jul 2026) — customers submit feature requests.
@@ -1086,6 +1089,12 @@ Route::prefix('admin')->middleware(['admin.auth'])->group(function () {
     Route::get('/feature-suggestions', [\App\Http\Controllers\FeatureSuggestionController::class, 'adminIndex'])->name('admin.feature-suggestions');
     Route::post('/feature-suggestions/{id}/status', [\App\Http\Controllers\FeatureSuggestionController::class, 'setStatus'])->name('admin.feature-suggestions.status');
     Route::delete('/feature-suggestions/{id}/delete', [\App\Http\Controllers\FeatureSuggestionController::class, 'destroy'])->name('admin.feature-suggestions.destroy');
+
+    // POS Surveys (Task 1022 — Caller ID elaan / advice collection)
+    Route::get('/surveys', [\App\Http\Controllers\PosSurveyController::class, 'adminIndex'])->name('admin.surveys');
+    Route::post('/surveys/feature-toggle', [\App\Http\Controllers\PosSurveyController::class, 'toggleFeature'])->name('admin.surveys.feature-toggle');
+    Route::get('/surveys/{id}', [\App\Http\Controllers\PosSurveyController::class, 'adminShow'])->name('admin.surveys.show');
+    Route::post('/surveys/{id}/toggle-close', [\App\Http\Controllers\PosSurveyController::class, 'toggleClose'])->name('admin.surveys.toggle-close');
 
     // Madadgar AI bot — chat logs + settings (owner request 22 Jul 2026)
     Route::get('/madadgar-chats', [\App\Http\Controllers\MadadgarController::class, 'adminChats'])->name('admin.madadgar-chats');

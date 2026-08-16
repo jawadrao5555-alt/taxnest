@@ -4642,4 +4642,14 @@ return [
     'rcpt_preview_title' => 'براہِ راست جھلک',
     'rcpt_preview_sub' => 'نمونہ رسید — تھیم یا چھپائی کے بٹن بدلتے ہی فوراً بدل جاتی ہے۔',
     'rcpt_preview_sample_note' => 'یہ نمونہ ڈیٹا ہے — اصل بل آپ کی اپنی اشیا اور رقم کے ساتھ چھپتا ہے۔',
+
+    // POS survey popup (Task 1022 — Caller ID elaan / advice collection)
+    'survey_badge' => 'آپ کی رائے چاہیے',
+    'survey_banner_label' => 'مشورہ دیں',
+    'survey_answer_btn' => 'جواب بھیجیں',
+    'survey_later_btn' => 'بعد میں',
+    'survey_comment_label' => 'آپ کا مشورہ (اختیاری)',
+    'survey_comment_placeholder' => 'اپنا مشورہ یہاں لکھیں…',
+    'survey_pick_all' => 'ہر سوال کا جواب چنیں',
+    'survey_thanks' => 'شکریہ! آپ کا جواب مل گیا۔',
 ];

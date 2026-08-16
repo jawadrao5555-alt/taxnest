@@ -4643,4 +4643,14 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'rcpt_preview_title' => 'Live Preview',
     'rcpt_preview_sub' => 'Namoona receipt — theme ya print toggle badalte hi foran badal jati hai.',
     'rcpt_preview_sample_note' => 'Yeh namoona data hai — asal bill aap ki apni items aur raqam ke saath chapta hai.',
+
+    // POS survey popup (Task 1022 — Caller ID elaan / advice collection)
+    'survey_badge' => 'Aap ki raye chahiye',
+    'survey_banner_label' => 'Mashwara Dein',
+    'survey_answer_btn' => 'Jawab Bhejein',
+    'survey_later_btn' => 'Baad Mein',
+    'survey_comment_label' => 'Aap ka mashwara (ikhtiyari)',
+    'survey_comment_placeholder' => 'Apna mashwara yahan likhein…',
+    'survey_pick_all' => 'Har sawal ka jawab chunein',
+    'survey_thanks' => 'Shukriya! Aap ka jawab mil gaya.',
 ];

@@ -113,6 +113,31 @@
             }
         }
     } catch (\Throwable $e) { /* keep POS pages alive */ }
+    // Task 1022: POS survey popup + pill (Caller ID elaan / advice collection).
+    // EXACT same gating as What's New above: isPosAdmin, company not pending,
+    // not readonly impersonation, master switch, fail-silent on missing table.
+    $surveyPopup = null; $surveyDismissedSession = false;
+    try {
+        if (($wnAllowed ?? false) && !($wnPending ?? true) && !($wnReadonlyImp ?? true)
+            && \Illuminate\Support\Facades\Schema::hasTable('surveys')
+            && \App\Models\SystemSetting::get('pos_surveys_enabled', '1') === '1') {
+            $svActive = \App\Models\Survey::active()->orderByDesc('created_at')->get();
+            foreach ($svActive as $sv) {
+                // Audience targeting: 'pos_all' or restaurant-mode companies only.
+                if ($sv->audience === 'pos_restaurant' && !($companyLayout->restaurant_mode ?? false)) {
+                    continue;
+                }
+                $svAnswered = \App\Models\SurveyResponse::where('survey_id', $sv->id)
+                    ->where('user_id', $posUserLayout->id)->whereNotNull('answered_at')->exists();
+                if (!$svAnswered) {
+                    $surveyPopup = $sv;
+                    // "Baad mein" hides the popup for this session; pill stays until answered.
+                    $surveyDismissedSession = (bool) session('pos_survey_dismissed_' . $sv->id);
+                    break;
+                }
+            }
+        }
+    } catch (\Throwable $e) { /* keep POS pages alive */ }
     // "New APK available" update banner — ONLY for the Android WebView shell.
     // The shell appends "TaxNestPOSApp/<versionName>" to its user agent; compare
     // that against the latest released APK version (SystemSetting, admin-editable
@@ -586,6 +611,23 @@
                            class="relative p-2 rounded-xl text-white hover:bg-white/10 transition cursor-pointer {{ request()->is('pos/suggestions') ? 'bg-white/15' : '' }}">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
                         </a>
+                        @endif
+
+                        @if($surveyPopup)
+                        {{-- Survey pill (Task 1022) — stays until answered or survey closed; reopens the popup --}}
+                        <button type="button" @click="window.dispatchEvent(new CustomEvent('open-pos-survey'))"
+                                title="{{ __('pos.survey_badge') }}"
+                                class="relative hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold text-white bg-white/15 hover:bg-white/25 transition cursor-pointer">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+                            {{ __('pos.survey_banner_label') }}
+                            <span class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                        </button>
+                        <button type="button" @click="window.dispatchEvent(new CustomEvent('open-pos-survey'))"
+                                title="{{ __('pos.survey_badge') }}"
+                                class="relative sm:hidden p-2 rounded-xl text-white hover:bg-white/10 transition cursor-pointer">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+                            <span class="absolute rounded-full bg-red-500" style="top: 3px; right: 3px; width: 9px; height: 9px;"></span>
+                        </button>
                         @endif
 
                         @if($whatsNewList->isNotEmpty())
@@ -1347,6 +1389,105 @@
             </div>
         </div>
         @endif
+        @endif
+
+        @if($surveyPopup)
+        {{-- Survey popup (Task 1022) — one-time tap-to-answer survey (Caller ID elaan).
+             z-index 125 ON PURPOSE: sits UNDER the What's New popup (z-130) so the
+             elaan is read first; survey appears once What's New is dismissed. --}}
+        @php
+            // UTF-8-safe encode (bad-UTF8 @json incident): fallback [] keeps Alpine alive.
+            $svQuestionsJson = json_encode($surveyPopup->questions, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]';
+        @endphp
+        <div x-data="{ svOpen: {{ $surveyDismissedSession ? 'false' : 'true' }},
+                svQuestions: {{ $svQuestionsJson }},
+                svAnswers: {},
+                svComment: '',
+                svDone: false,
+                svBusy: false,
+                svPick(qk, ok) { this.svAnswers[qk] = ok; },
+                svComplete() { return this.svQuestions.every(q => !!this.svAnswers[q.key]); },
+                svDismiss() {
+                    this.svOpen = false;
+                    fetch('/pos/survey/{{ $surveyPopup->id }}/dismiss', { method: 'POST', keepalive: true, headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' } }).catch(() => {});
+                },
+                async svSubmit() {
+                    if (!this.svComplete() || this.svBusy) return;
+                    this.svBusy = true;
+                    try {
+                        const r = await fetch('/pos/survey/{{ $surveyPopup->id }}/respond', {
+                            method: 'POST',
+                            headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ answers: this.svAnswers, comment: this.svComment })
+                        });
+                        const j = await r.json().catch(() => ({}));
+                        if (r.ok && j.ok) {
+                            this.svDone = true;
+                            setTimeout(() => { this.svOpen = false; }, 1800);
+                        } else { this.svBusy = false; }
+                    } catch (e) { this.svBusy = false; }
+                } }"
+             x-show="svOpen" x-cloak data-pos-survey="{{ $surveyPopup->id }}"
+             @open-pos-survey.window="svOpen = true"
+             class="fixed inset-0 flex items-center justify-center p-4"
+             style="z-index: 125; background: rgba(15, 10, 40, 0.55); backdrop-filter: blur(4px);">
+            <div class="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 scale-90"
+                 x-transition:enter-end="opacity-100 scale-100">
+                <div class="px-6 py-4 text-center" style="background: linear-gradient(135deg, hsl(var(--accent-h), var(--accent-s), 42%), hsl(var(--accent-h), var(--accent-s), 28%));">
+                    <div class="text-3xl mb-1">📞</div>
+                    <p class="text-[11px] font-bold uppercase tracking-wide text-white/80">{{ __('pos.survey_badge') }}</p>
+                    <h2 class="text-lg font-extrabold text-white leading-snug">{{ $surveyPopup->title }}</h2>
+                </div>
+                <div x-show="svDone" x-cloak class="px-6 py-10 text-center">
+                    <div class="text-4xl mb-2">🙏</div>
+                    <p class="text-sm font-bold text-gray-800 dark:text-gray-100">{{ __('pos.survey_thanks') }}</p>
+                </div>
+                <div x-show="!svDone" class="px-6 py-4 overflow-y-auto" style="max-height: 58vh;">
+                    @if($surveyPopup->intro)
+                        <p class="text-[13px] text-gray-600 dark:text-gray-300 mb-4">{{ $surveyPopup->intro }}</p>
+                    @endif
+                    <template x-for="(q, qi) in svQuestions" :key="q.key">
+                        <div class="mb-4">
+                            <p class="text-sm font-bold text-gray-800 dark:text-gray-100 mb-2"><span x-text="(qi + 1) + '. '"></span><span x-text="q.text"></span></p>
+                            <div class="flex flex-wrap gap-2">
+                                <template x-for="opt in q.options" :key="opt.key">
+                                    <button type="button" @click="svPick(q.key, opt.key)"
+                                            class="px-3.5 py-2 rounded-xl text-[13px] font-bold border transition cursor-pointer"
+                                            :class="svAnswers[q.key] === opt.key
+                                                ? 'bg-purple-600 border-purple-600 text-white'
+                                                : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-purple-400'"
+                                            x-text="opt.label"></button>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                    @if($surveyPopup->allow_comment)
+                        <div class="mt-4">
+                            <label class="block text-[12px] font-bold text-gray-600 dark:text-gray-300 mb-1.5">{{ __('pos.survey_comment_label') }}</label>
+                            {{-- anti-autofill guard set (POS convention) --}}
+                            <textarea x-model="svComment" rows="2" maxlength="2000"
+                                      name="survey_mashwara_nofill" autocomplete="off" data-lpignore="true" data-form-type="other" data-1p-ignore
+                                      placeholder="{{ __('pos.survey_comment_placeholder') }}"
+                                      class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white text-sm"></textarea>
+                        </div>
+                    @endif
+                </div>
+                <div x-show="!svDone" class="px-6 pb-5 pt-1 flex items-center gap-2.5">
+                    <button type="button" @click="svSubmit()" :disabled="!svComplete() || svBusy"
+                            :class="svComplete() && !svBusy ? 'bg-purple-600 hover:bg-purple-700 cursor-pointer' : 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed'"
+                            class="flex-1 py-3 rounded-xl text-white font-bold text-sm shadow-sm transition">
+                        {{ __('pos.survey_answer_btn') }}
+                    </button>
+                    <button type="button" @click="svDismiss()"
+                            class="px-4 py-3 rounded-xl text-sm font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition cursor-pointer">
+                        {{ __('pos.survey_later_btn') }}
+                    </button>
+                </div>
+                <p x-show="!svDone && !svComplete()" class="px-6 pb-4 -mt-1 text-center text-[11px] text-gray-400">{{ __('pos.survey_pick_all') }}</p>
+            </div>
+        </div>
         @endif
         <x-pwa-update color="purple" />
         <x-trial-lock-modal />

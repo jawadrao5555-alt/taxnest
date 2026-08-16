@@ -4643,4 +4643,14 @@ Once reported, the bill will be locked — no more edit or delete. Continue?',
     'rcpt_preview_title' => 'Live Preview',
     'rcpt_preview_sub' => 'Sample receipt — flips instantly as you change the theme or the print toggles.',
     'rcpt_preview_sample_note' => 'Sample data shown — real bills print with your actual items and amounts.',
+
+    // POS survey popup (Task 1022 — Caller ID elaan / advice collection)
+    'survey_badge' => 'We need your opinion',
+    'survey_banner_label' => 'Give Feedback',
+    'survey_answer_btn' => 'Send Answers',
+    'survey_later_btn' => 'Later',
+    'survey_comment_label' => 'Your suggestion (optional)',
+    'survey_comment_placeholder' => 'Write your suggestion here…',
+    'survey_pick_all' => 'Please answer every question',
+    'survey_thanks' => 'Thank you! Your answer has been received.',
 ];

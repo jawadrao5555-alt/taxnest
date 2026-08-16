@@ -268,7 +268,7 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                     @forelse($bills as $b)
-                    <tr data-delrow data-search="{{ Str::lower(($b->invoice_number ?: ('#' . $b->id)) . ' ' . ($b->customer_name ?? '') . ' ' . ($b->customer_phone ?? '') . ' ' . ($b->delivery_address ?? '') . ' ' . ($b->rider->name ?? '') . ' ' . ($b->delivery_status ?? '') . ' fbr') }}">
+                    <tr data-delrow data-search="{{ Str::lower(($b->invoice_number ?: ('#' . $b->id)) . ' ' . ($b->customer_name ?? '') . ' ' . ($b->customer_phone ?? '') . ' ' . ($b->delivery_address ?? '') . ' ' . ($b->rider->name ?? '') . ' ' . ($b->delivery_status ?? '') . ' fbr' . ' ' . (!$b->rider_id && !empty($b->delivered_by) && !empty($deliveredByUsers[$b->delivered_by]) ? $deliveredByUsers[$b->delivered_by] : '')) }}">
                         <td class="px-4 py-3">
                             <div class="font-semibold text-gray-900 dark:text-white flex items-center gap-1.5 flex-wrap">
                                 <span>{{ $b->invoice_number ?: ('#' . $b->id) }}</span>

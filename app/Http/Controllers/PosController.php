@@ -3395,25 +3395,26 @@ class PosController extends Controller
             'pra_response_code' => null,
         ]);
 
-        // Agent-mode companies: the Desktop Agent picks it up on its next poll.
-        if ($company->agentHandlesPra()) {
-            return back()->with('success', __('pos.requeue_exempt_success_agent', [
-                'invoice' => $transaction->invoice_number,
-            ]));
-        }
-
-        // Direct-server mode: if reporting is currently OFF, the bill is already
-        // queued (pending) — sendInvoice() would refuse with "PRA reporting is
-        // disabled" and the owner would see an error while the bill has already
-        // moved tabs. Instead, surface an explicit "queued, will submit when you
-        // turn reporting back on" message so the state and the UI agree.
+        // Reporting-OFF check comes first — applies to both agent-mode and
+        // direct-server shops. The bill is already queued (pending); surfacing
+        // "queued, will submit when reporting turns back on" is correct for
+        // both modes and avoids the misleading "agent will pick it up" banner
+        // on an agent shop where reporting is actually disabled.
         if (!$company->praReportingActive()) {
             return back()->with('success', __('pos.requeue_exempt_queued_reporting_off', [
                 'invoice' => $transaction->invoice_number,
             ]));
         }
 
-        // Direct-server mode: attempt an immediate PRA submission.
+        // Agent-mode companies with reporting ON: the Desktop Agent picks it up
+        // on its next poll — do not attempt a direct-server submission here.
+        if ($company->agentHandlesPra()) {
+            return back()->with('success', __('pos.requeue_exempt_success_agent', [
+                'invoice' => $transaction->invoice_number,
+            ]));
+        }
+
+        // Direct-server mode with reporting ON: attempt an immediate PRA submission.
         try {
             $praService = new PraIntegrationService($company);
             $result = $praService->sendInvoice($transaction);

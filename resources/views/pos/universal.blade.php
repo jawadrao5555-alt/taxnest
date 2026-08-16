@@ -4743,6 +4743,10 @@ function restaurantPos() {
                     setTimeout(() => this.loadTableStatus(), 2200);
                     setInterval(() => { if (!document.hidden && !this.showPayModal && !this.boardBusy) this.loadTableStatus(); }, 25000);
                 }
+                // Task 899: poll held-orders every 25 s so a cancel on another tab/terminal
+                // disappears from this session's Held Orders list within one cycle.
+                // Runs independently of the table board so it works on retail POS too.
+                setInterval(() => { if (!document.hidden) this.loadHeldOrders(); }, 25000);
             }
             // 🔄 Auto-Sync — kicks in after 4 sec, then every 30 sec.
             // Live-updates online/offline pill + silently retries pending bills.
@@ -6868,6 +6872,38 @@ function restaurantPos() {
             } catch (e) { console.error('[tables] status load failed', e); }
             this.tablesLoading = false;
         },
+        // Task 899: cross-terminal held-orders sync — refreshes this.heldOrders from
+        // the server so a cancel on Tab/Terminal B disappears from Tab/Terminal A within
+        // one poll cycle (~25 s). Only replaces entries that are NOT currently loaded
+        // into the cart (recalledOrderId) to avoid clobbering an in-progress edit.
+        async loadHeldOrders() {
+            try {
+                const res = await fetch('/pos/restaurant/api/held-orders', { headers: { 'Accept': 'application/json' } });
+                if (!res.ok) return;
+                const fresh = await res.json();
+                if (!Array.isArray(fresh)) return;
+                // Preserve any recalled order that is actively being edited in the cart
+                // so a concurrent server-side update doesn't stomp the cashier's work.
+                const recalled = this.recalledOrderId ? Number(this.recalledOrderId) : null;
+                if (recalled) {
+                    // Keep the local copy of the recalled order; replace everything else.
+                    const localRecalled = this.heldOrders.find(o => Number(o.id) === recalled);
+                    const merged = fresh.filter(o => Number(o.id) !== recalled);
+                    if (localRecalled) merged.push(localRecalled);
+                    this.heldOrders = merged;
+                } else {
+                    this.heldOrders = fresh;
+                }
+                // Clamp the held-orders modal cursor so it never points past the list end.
+                if (this.activeHeldIndex >= this.heldOrders.length) {
+                    this.activeHeldIndex = Math.max(0, this.heldOrders.length - 1);
+                }
+                if (this.heldOrders.length === 0 && this.showHeldOrders) {
+                    this.showHeldOrders = false;
+                    this.activeHeldIndex = 0;
+                }
+            } catch (e) { /* silent — stale list is better than a toast flood */ }
+        },
         async selectTable(table, opts) {
             // Table-se-Bill (Jul 2026) + ZFC (5 Aug 2026): occupied table WITH a
             // waiting waiter order ab bhi WAHI options menu kholta hai jo desktop
@@ -7425,6 +7461,8 @@ function restaurantPos() {
                         this.clearCart();
                     }
                     this.showToast(t ? (window.TXT.order_cancel_t_prefix + t.table_number + window.TXT.table_freed_suffix) : window.TXT.order_cancelled_toast, 'success');
+                    // Task 899: refresh from server so any OTHER open tab also drops this order.
+                    this.loadHeldOrders();
                     // Task 840: whole-order cancel void slip — same path as deleteHeldOrder.
                     if (data.kot_void_queued) {
                         this.showToast(window.TXT.kot_void_sent || 'Void slip sent to kitchen', 'success');
@@ -9729,6 +9767,8 @@ function restaurantPos() {
                     if (this.heldOrders.length === 0) { this.showHeldOrders = false; this.activeHeldIndex = 0; }
                     this.showToast(window.TXT.order_deleted, 'success');
                     if (this.tableBoardEnabled) this.loadTableStatus(); // Table Board: table freed
+                    // Task 899: refresh from server so any OTHER open tab also drops this order.
+                    this.loadHeldOrders();
                     // Task 840: whole-order cancel void slip — kitchen must STOP all
                     // printed dishes. Same iframe/agent path as the per-dish void in holdOrder.
                     if (data.kot_void_queued) {

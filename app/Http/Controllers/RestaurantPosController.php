@@ -1601,6 +1601,64 @@ class RestaurantPosController extends Controller
         return response()->json(['success' => true, 'customer' => $customer]);
     }
 
+    /**
+     * Task 899: live held-orders feed for cross-terminal sync.
+     * Returns the same JSON shape as the baked $heldOrdersJson so the JS
+     * loadHeldOrders() can hot-swap this.heldOrders every 25 s, making a
+     * cancel on Terminal B visible on Terminal A within one poll cycle.
+     */
+    public function listHeldOrders()
+    {
+        $companyId = app('currentCompanyId');
+        $orders = RestaurantOrder::where('company_id', $companyId)
+            ->whereIn('status', ['held', 'preparing', 'ready'])
+            ->with(['table', 'items'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $json = $orders->map(function ($o) {
+            return [
+                'id'              => $o->id,
+                'order_number'    => $o->order_number,
+                'token_no'        => $o->token_no ?? null,
+                'status'          => $o->status,
+                'source'          => $o->source,
+                'order_type'      => $o->order_type,
+                'priority'        => (bool) ($o->priority ?? false),
+                'customer_id'     => $o->customer_id,
+                'customer_name'   => $o->customer_name,
+                'customer_phone'  => $o->customer_phone,
+                'kitchen_notes'   => $o->kitchen_notes,
+                'delivery_address'=> $o->delivery_address ?? null,
+                'discount_type'   => $o->discount_type,
+                'discount_value'  => (float) ($o->discount_value ?? 0),
+                'discount_amount' => (float) ($o->discount_amount ?? 0),
+                'total_amount'    => (float) ($o->total_amount ?? 0),
+                'kot_sent_at'     => $o->kot_sent_at ? $o->kot_sent_at->toJSON() : null,
+                'table'           => $o->table ? [
+                    'id'            => $o->table->id,
+                    'table_number'  => $o->table->table_number,
+                    'occupied_since'=> optional($o->table->occupied_since)->toJSON(),
+                ] : null,
+                'items'           => $o->items->map(fn ($i) => [
+                    'id'                  => $i->id,
+                    'item_id'             => $i->item_id,
+                    'item_type'           => $i->item_type,
+                    'item_name'           => $i->item_name,
+                    'quantity'            => (float) $i->quantity,
+                    'unit_price'          => (float) $i->unit_price,
+                    'subtotal'            => (float) $i->subtotal,
+                    'special_notes'       => $i->special_notes,
+                    'is_tax_exempt'       => (bool) ($i->is_tax_exempt ?? false),
+                    'item_discount_type'  => $i->item_discount_type,
+                    'item_discount_value' => (float) ($i->item_discount_value ?? 0),
+                ])->values(),
+            ];
+        })->values();
+
+        return response()->json($json);
+    }
+
     public function getOrdersByTable($tableId)
     {
         $companyId = app('currentCompanyId');

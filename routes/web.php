@@ -913,6 +913,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
     Route::post('/restaurant/tables/{id}/reserve', [RestaurantTableController::class, 'reserveTable'])->name('pos.restaurant.tables.reserve');
     Route::post('/restaurant/tables/{id}/release', [RestaurantTableController::class, 'releaseTable'])->name('pos.restaurant.tables.release');
     Route::get('/restaurant/api/table-status', [RestaurantTableController::class, 'tableStatus'])->name('pos.restaurant.table-status');
+    // Task 899: cross-terminal held-orders sync feed (polled every 25 s by all open tabs).
+    Route::get('/restaurant/api/held-orders', [RestaurantPosController::class, 'listHeldOrders'])->name('pos.restaurant.api.held-orders');
     Route::get('/restaurant/kds', [RestaurantKdsController::class, 'index'])->name('pos.restaurant.kds');
     Route::post('/restaurant/kds/{id}/status', [RestaurantKdsController::class, 'updateStatus'])->name('pos.restaurant.kds.status');
     Route::post('/restaurant/kds/{id}/kitchen-status', [RestaurantKdsController::class, 'kitchenStatus'])->name('pos.restaurant.kds.kitchen-status');

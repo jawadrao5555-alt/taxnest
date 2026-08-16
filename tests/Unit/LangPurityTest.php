@@ -157,6 +157,42 @@ class LangPurityTest extends TestCase
         $this->assertSame([], $bad, 'en/pos.php is not pure English:' . $msg);
     }
 
+    /**
+     * Scan each pos.php source file for duplicate array keys.
+     * PHP silently uses the last definition — duplicates are invisible bugs.
+     * We parse the raw source instead of require()ing so we catch both definitions.
+     */
+    public function test_no_duplicate_keys_in_any_lang_file(): void
+    {
+        $duplicates = [];
+        foreach (['en', 'ur', 'rur'] as $locale) {
+            $file = __DIR__ . "/../../lang/{$locale}/pos.php";
+            $this->assertFileExists($file, "lang/{$locale}/pos.php missing");
+
+            $src = file_get_contents($file);
+            // Match lines of the form:  'some_key'  =>  (any value)
+            // Handles optional leading spaces and both ' and " quote chars.
+            preg_match_all("/^\s*['\"]([a-zA-Z0-9_]+)['\"]\s*=>/m", $src, $m);
+            $seen  = [];
+            $dupes = [];
+            foreach ($m[1] as $key) {
+                if (isset($seen[$key])) {
+                    $dupes[] = $key;
+                }
+                $seen[$key] = true;
+            }
+            if ($dupes) {
+                $duplicates[$locale] = array_unique($dupes);
+            }
+        }
+
+        $msg = '';
+        foreach ($duplicates as $locale => $keys) {
+            $msg .= "\n  lang/{$locale}/pos.php: " . implode(', ', $keys);
+        }
+        $this->assertSame([], $duplicates, 'Duplicate keys found in lang files:' . $msg);
+    }
+
     public function test_placeholders_preserved_in_both_urdu_files(): void
     {
         $en = $this->basePathSafeLoad('en');

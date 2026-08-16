@@ -371,6 +371,119 @@ class FbrPosReceiptSerialWithFiscalTest extends TestCase
         }
     }
 
+    // ── 3c. CONFIG_ERROR — permanent settings badge, NOT the retry badge ────────
+
+    /**
+     * fbr_status='config_error' means POSID or Token is misconfigured. The
+     * auto-retry loop intentionally skips these bills. The receipt must NOT say
+     * "will retry automatically" — that would mislead the cashier into waiting
+     * for an automatic fix that will never come.
+     *
+     * Invariants locked (both paper widths):
+     *   • .local-badge is ABSENT — not an offline-sync issue.
+     *   • "Will retry automatically" copy is ABSENT — no false promise.
+     *   • The config-error heading (config_error_autoretry_off) IS present.
+     *   • The shop's own POS serial appears so the cashier can identify the bill.
+     *   • No spurious "FBR: <fiscal>" line (there is no fiscal number).
+     */
+    public function test_config_error_bill_shows_settings_badge_not_retry_copy(): void
+    {
+        foreach (self::PAPERS as $paper) {
+            $company = $this->makeCompany($paper);
+            $txn = $this->makeTransaction($company, 'config_error', null);
+
+            $body = $this->renderBody($company, $txn);
+
+            // Must NOT show the offline sync indicator.
+            $this->assertStringNotContainsString(
+                'local-badge',
+                $body,
+                ".local-badge must NOT appear for a config_error bill ({$paper})"
+            );
+
+            // Must NOT promise auto-retry — the auto-retry loop skips config_error.
+            $this->assertStringNotContainsString(
+                __('pos.rcpt_will_retry'),
+                $body,
+                "'Will retry automatically' must NOT appear for config_error — auto-retry is off ({$paper})"
+            );
+
+            // The settings-error heading must appear.
+            $this->assertStringContainsString(
+                __('pos.config_error_autoretry_off'),
+                $body,
+                "settings-error heading must render for config_error bill ({$paper})"
+            );
+
+            // POS serial must be visible.
+            $this->assertStringContainsString(
+                'POS: ' . self::SERIAL,
+                $body,
+                "POS serial appears inside the config_error badge ({$paper})"
+            );
+
+            // No spurious FBR fiscal line.
+            $this->assertStringNotContainsString(
+                'FBR: ',
+                $body,
+                "no FBR fiscal line for a config_error bill ({$paper})"
+            );
+        }
+    }
+
+    // ── 3d. UNKNOWN STATUS — visible warning badge, never "pending / will retry" ──
+
+    /**
+     * If a future fbr_status value (e.g. 'queued', 'cancelled') reaches the
+     * receipt template without a matching explicit branch, the catch-all must
+     * render a clearly abnormal badge. It must NEVER silently present as
+     * "pending / will retry" which would actively mislead the cashier.
+     *
+     * Invariants locked (both paper widths):
+     *   • "Will retry automatically" copy is ABSENT.
+     *   • The FBR-PENDING heading is ABSENT (unknown ≠ pending).
+     *   • The raw status value IS visible so the problem is immediately obvious.
+     *   • .local-badge is ABSENT.
+     */
+    public function test_unknown_fbr_status_shows_visible_warning_not_pending_badge(): void
+    {
+        foreach (self::PAPERS as $paper) {
+            $company = $this->makeCompany($paper);
+            // Use a plausible future status that has no explicit branch.
+            $txn = $this->makeTransaction($company, 'queued', null);
+
+            $body = $this->renderBody($company, $txn);
+
+            // Must NOT silently show the "pending / will retry" copy.
+            $this->assertStringNotContainsString(
+                __('pos.rcpt_will_retry'),
+                $body,
+                "unknown status must NOT show 'will retry' copy ({$paper})"
+            );
+
+            // Must NOT show the standard FBR-PENDING heading — unknown ≠ pending.
+            $this->assertStringNotContainsString(
+                __('pos.rcpt_fbr_pending'),
+                $body,
+                "unknown status must NOT show the FBR-PENDING heading ({$paper})"
+            );
+
+            // Must NOT show the offline indicator.
+            $this->assertStringNotContainsString(
+                'local-badge',
+                $body,
+                ".local-badge must NOT appear for an unknown status ({$paper})"
+            );
+
+            // The raw status value must be visible in the badge.
+            $this->assertStringContainsString(
+                'queued',
+                $body,
+                "raw unknown status value must appear in the warning badge ({$paper})"
+            );
+        }
+    }
+
     // ── 4. LOCAL / PROVISIONAL — unchanged (big serial badge, no FBR line) ──
 
     public function test_local_provisional_bill_keeps_top_badge_serial_only(): void

@@ -408,7 +408,17 @@
     {{-- Owner (6 Aug 2026): QR box saaf — sirf QR + FBR invoice number + Tax Asaan
          verify line. "Integrated/Verified" headings, POS invoice aur POS Reg #
          yahan se hataye (POS Reg # footer mein pehle se maujood hai). --}}
+    {{-- Bottom-badge routing — one explicit branch per known fbr_status value so
+         any future status (e.g. 'queued', 'cancelled') fails loudly instead of
+         silently falling into the wrong badge.
+         Branch map:
+           'submitted' + fbr_invoice_number → fiscalised: QR + FBR number + verify line
+           'offline'                         → created offline: .local-badge + sync note
+           'failed'                          → FBR rejected: dashed retry badge
+           'pending' / (other non-null)      → awaiting submission: dashed retry badge
+           null / 'local' ($fbrRcptTopBadge) → handled in top section; QR-only here --}}
     @if($transaction->fbr_status === 'submitted' && $transaction->fbr_invoice_number)
+    {{-- SUBMITTED: FBR accepted the bill and returned a fiscal invoice number. --}}
     <div class="fbr-badge">
         <div style="margin: 3px 0;">
             <img src="{{ $qrUrl }}" alt="FBR QR Code" style="width:{{ $is58 ? '60px' : '70px' }}; height:{{ $is58 ? '60px' : '70px' }}; margin:0 auto; display:block;">
@@ -420,17 +430,19 @@
         @endif
     </div>
     @elseif($transaction->fbr_status === 'offline')
-    {{-- OFFLINE badge (Task 824): bill was created while internet was unavailable;
-         FBR fiscal number not yet assigned.  Mirrors the PRA .local-badge pattern:
-         heading + sync note + serial.  .local-badge class uses the same dashed
-         border style so cashiers recognise it immediately.  The serial MUST appear
-         inside this block so the printed slip is never number-less. --}}
+    {{-- OFFLINE: bill was created while internet was unavailable; FBR fiscal number
+         not yet assigned.  Mirrors the PRA .local-badge pattern: heading + sync note
+         + serial.  The serial MUST appear inside this block so the slip is never
+         number-less. --}}
     <div class="local-badge">
         {{ __('pos.receipt_offline_invoice') }}<br>
         {{ __('pos.receipt_offline_sync_fbr') }}<br>
         {{ $transaction->invoice_number }}
     </div>
-    @elseif(!$fbrRcptTopBadge)
+    @elseif($transaction->fbr_status === 'failed')
+    {{-- FAILED: FBR rejected the submission (e.g. duplicate, validation error).
+         System will auto-retry; cashier sees the same dashed retry badge as
+         'pending'.  Kept as its own branch so copy/style can diverge later. --}}
     <div class="fbr-badge" style="border-style: dashed;">
         <div class="fbr-title">⏳ {{ __('pos.rcpt_fbr_pending') }}</div>
         <div style="margin: 3px 0;">
@@ -438,6 +450,39 @@
         </div>
         <div>POS: {{ $transaction->invoice_number }}</div>
         <div style="font-size:10px; margin-top:3px;">{{ __('pos.rcpt_will_retry') }}</div>
+    </div>
+    @elseif($transaction->fbr_status === 'config_error')
+    {{-- CONFIG_ERROR: submission failed because POSID or Token is not configured.
+         The auto-retry loop intentionally skips these bills; the admin must fix
+         the settings and trigger a MANUAL retry from the Fail Queue.  Do NOT
+         show "will retry automatically" — that would mislead the cashier. --}}
+    <div class="fbr-badge" style="border-style: dashed;">
+        <div class="fbr-title">⚠ {{ __('pos.config_error_autoretry_off') }}</div>
+        <div style="margin: 3px 0;">
+            <img src="{{ $qrUrl }}" alt="QR Code" style="width:{{ $is58 ? '60px' : '70px' }}; height:{{ $is58 ? '60px' : '70px' }}; margin:0 auto; display:block;">
+        </div>
+        <div>POS: {{ $transaction->invoice_number }}</div>
+        <div style="font-size:10px; margin-top:3px;">{{ __('pos.fq_config_error_body_1') }}</div>
+    </div>
+    @elseif($transaction->fbr_status === 'pending')
+    {{-- PENDING: bill queued for FBR submission; system will retry automatically. --}}
+    <div class="fbr-badge" style="border-style: dashed;">
+        <div class="fbr-title">⏳ {{ __('pos.rcpt_fbr_pending') }}</div>
+        <div style="margin: 3px 0;">
+            <img src="{{ $qrUrl }}" alt="QR Code" style="width:{{ $is58 ? '60px' : '70px' }}; height:{{ $is58 ? '60px' : '70px' }}; margin:0 auto; display:block;">
+        </div>
+        <div>POS: {{ $transaction->invoice_number }}</div>
+        <div style="font-size:10px; margin-top:3px;">{{ __('pos.rcpt_will_retry') }}</div>
+    </div>
+    @elseif(!$fbrRcptTopBadge)
+    {{-- UNKNOWN STATUS: a new fbr_status value reached the receipt without a
+         matching branch above.  Show a clearly abnormal badge so the cashier
+         and developer notice immediately — never silently present this as
+         "pending / will retry" which would be actively misleading. --}}
+    <div class="fbr-badge" style="border-style: dotted; border-color: #c00;">
+        <div class="fbr-title" style="color:#c00;">⚠ FBR STATUS: {{ e($transaction->fbr_status) }}</div>
+        <div>POS: {{ $transaction->invoice_number }}</div>
+        <div style="font-size:10px; margin-top:3px;">Unknown FBR status — contact support.</div>
     </div>
     @else
     {{-- Owner (22 Jul 2026): SALE RECEIPT / PROVISIONAL bills also carry a QR at the

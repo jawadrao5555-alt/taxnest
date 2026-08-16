@@ -629,6 +629,53 @@
         @endif
     </table>
 
+    {{-- Payment breakdown — shown only when ≥2 pos_payments rows exist (split
+         payment). Single-method bills are unchanged. Schema-guarded via
+         relationLoaded. Mirrors receipt_80mm. --}}
+    @php
+        $rcptSplitPayments = [];
+        try {
+            if ($transaction->relationLoaded('payments')) {
+                $rcptRawPay = $transaction->payments ?? collect();
+                if ($rcptRawPay->count() >= 2) {
+                    $rcptCardAliases = ['card', 'debit_card', 'credit_card'];
+                    $rcptPayLabel = function(string $m) use ($rcptCardAliases): string {
+                        if ($m === 'cash')                          return __('pos.receipt_pay_cash');
+                        if (in_array($m, $rcptCardAliases, true))  return __('pos.receipt_pay_card');
+                        return __('pos.receipt_pay_other');
+                    };
+                    $rcptGrouped = [];
+                    foreach ($rcptRawPay as $rp) {
+                        $bkt = $rp->payment_method === 'cash' ? 'cash'
+                            : (in_array($rp->payment_method, $rcptCardAliases, true) ? 'card' : ('other:'.$rp->payment_method));
+                        $rcptGrouped[$bkt] = ($rcptGrouped[$bkt] ?? 0) + (float) $rp->amount;
+                    }
+                    foreach ($rcptGrouped as $bkt => $amt) {
+                        $rm = $bkt === 'cash' ? 'cash'
+                            : (str_starts_with($bkt, 'other:') ? substr($bkt, 6) : 'debit_card');
+                        $rcptSplitPayments[] = ['label' => $rcptPayLabel($rm), 'amount' => $amt];
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            $rcptSplitPayments = [];
+        }
+    @endphp
+    @if(count($rcptSplitPayments) >= 1)
+    <div class="separator"></div>
+    <table class="totals-table" style="margin:2px 0;">
+        <tr>
+            <td class="tot-label" colspan="2" style="font-size:9px; text-transform:uppercase; letter-spacing:0.4px; padding-bottom:1px;">{{ __('pos.payment_breakdown') }}</td>
+        </tr>
+        @foreach($rcptSplitPayments as $sp)
+        <tr>
+            <td class="tot-label">{{ $sp['label'] }}</td>
+            <td class="tot-value">PKR {{ number_format($sp['amount'], 0) }}</td>
+        </tr>
+        @endforeach
+    </table>
+    @endif
+
     {{-- Task 647: exempt-bill clarifier — approved neutral wording, small/plain,
          no box, render-time locale. Mirrors receipt_80mm. --}}
     @if($transaction->isExemptStream())

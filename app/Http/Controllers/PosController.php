@@ -4739,7 +4739,7 @@ class PosController extends Controller
         $companyId = app('currentCompanyId');
         $company = Company::find($companyId);
         $transaction = PosTransaction::where('company_id', $companyId)
-            ->with(['items', 'terminal', 'creator'])
+            ->with(['items', 'payments', 'terminal', 'creator'])
             ->findOrFail($id);
 
         // Billing Scope: stream-locked staff cannot download the other stream's bills.
@@ -4814,7 +4814,7 @@ class PosController extends Controller
         }
 
         $transaction = PosTransaction::where('share_token', $token)
-            ->with(['items', 'terminal', 'creator'])
+            ->with(['items', 'payments', 'terminal', 'creator'])
             ->firstOrFail();
 
         if ($transaction->share_token_created_at && $transaction->share_token_created_at < now()->subDays(30)) {

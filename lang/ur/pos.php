@@ -2317,6 +2317,7 @@ return [
     'payment_complete' => 'پیمنٹ مکمل!',
     'payment_error_prefix' => 'پیمنٹ میں غلطی:',
     'payment_failed' => 'پیمنٹ ناکام',
+    'pay_timeout_retry' => 'سرور کا جواب وقت پر نہیں آیا — دوبارہ ادائیگی دبائیں، بل دو بار نہیں بنے گا۔',
     'payment_label' => 'پیمنٹ',
     'payment_method' => 'پیمنٹ کا طریقہ',
     'payment_method_summary_month' => 'ادائیگی طریقہ خلاصہ (اس ماہ)',

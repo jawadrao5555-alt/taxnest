@@ -4409,6 +4409,15 @@ function restaurantPos() {
         // Waiter name shown in the success popup (empty for non-waiter bills).
         lastWaiterName: '',
         submitting: false,
+        // Task 994: per-sale-attempt idempotency key — minted at the first Pay
+        // press, REUSED on every retry of the SAME sale (rides on both the hold
+        // and pay POSTs), cleared on success / clearCart. The server replays the
+        // original bill for a known uuid instead of creating a duplicate.
+        payAttemptUuid: null,
+        // Same idea for DIRECT held-order pays (held modal / table board): one
+        // uuid per order id — a retry after a lost response replays the original
+        // success (receipt data included) instead of a dead-end "already paid".
+        _payUuidByOrder: {},
         cartAnimating: false,
         stockError: '',
         mobileView: 'menu',
@@ -4908,6 +4917,19 @@ function restaurantPos() {
             try { if (crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
             return 'off-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
         },
+        // Task 994: fetch with a HARD timeout — a hung hold/pay request must
+        // surface an error within seconds, not after the browser's multi-minute
+        // default (owner report 16 Aug 2026: "error aya bohat der baad"). Safe
+        // to abort mid-flight: the pay_uuid/offline_uuid replay guards make the
+        // retry idempotent server-side (no duplicate bill, no duplicate KOT).
+        async fetchWithTimeout(url, opts = {}, ms = 20000) {
+            if (typeof AbortController === 'undefined') return fetch(url, opts);
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => { try { ctrl.abort(); } catch (_) {} }, ms);
+            try { return await fetch(url, { ...opts, signal: ctrl.signal }); }
+            finally { clearTimeout(timer); }
+        },
+        _isTimeoutError(e) { return !!e && (e.name === 'AbortError' || /abort/i.test(String(e.name || ''))); },
         // Queue a bill that could NOT reach the server (no internet). Mirrors the
         // success UX: receipt popup (offline variant) + optional auto-print of a
         // client-rendered interim receipt, cart cleared so billing continues.
@@ -6629,7 +6651,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.kitchenNotes = ''; this.showCartNote = false; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.recalledOrderMeta = null; this.incomingOrderId = null; this.incomingOrderInfo = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.deliveryPrepaid = false; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this.fixCartIndex(); this.clearCartStorage(); },
+        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.payAttemptUuid = null; this.kitchenNotes = ''; this.showCartNote = false; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.recalledOrderMeta = null; this.incomingOrderId = null; this.incomingOrderInfo = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.deliveryPrepaid = false; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm(window.TXT.current_order_has + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast(window.TXT.new_sale_started, 'success');
@@ -8349,6 +8371,10 @@ function restaurantPos() {
                 return await this.processPaymentManual(method, provisional, skipReceipt);
             }
 
+            // Task 994: HARD double-submit guard — while a pay request is in
+            // flight (button spinner showing), Enter / 1 / 2 / a second tap must
+            // be a no-op, not a second request.
+            if (this.submitting) return;
             const now = Date.now();
             // Debounce toast (architect, 26 Jul 2026): one-tap CASH/CARD made this
             // 3s guard easily reachable in fast shops — a SILENT return looked like
@@ -8356,15 +8382,19 @@ function restaurantPos() {
             if (now - this.lastPayTime < 3000) { this.showToast(window.TXT.wait_prev_bill_saved, 'error'); return; }
             this.lastPayTime = now;
             this.submitting = true; this.stockError = '';
+            // Task 994: one idempotency uuid per SALE attempt — reused across
+            // retries of this same cart so the server can dedupe a retry whose
+            // first attempt succeeded but lost the response mid-flight.
+            if (!this.payAttemptUuid) this.payAttemptUuid = this._newOfflineUuid();
             try {
-                const holdRes = await fetch('{{ route("pos.restaurant.orders.hold") }}', {
+                const holdRes = await this.fetchWithTimeout('{{ route("pos.restaurant.orders.hold") }}', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                     // billing_flow — this is the INTERNAL hold-then-pay billing pass-through
                     // (normal final sale on restaurant companies), NOT an explicit Hold/KOT
                     // action. Backend skips the dine_in-only flow gate when this flag is set;
                     // the explicit Hold button / F5 (holdOrder fn above) sends no flag and
                     // stays gated client + server.
-                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount, billing_flow: true, delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || null) : null }),
+                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount, billing_flow: true, pay_uuid: this.payAttemptUuid, delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || null) : null }),
                 });
                 if (!holdRes.ok) {
                     const bodyText = await holdRes.text().catch(() => '');
@@ -8378,23 +8408,46 @@ function restaurantPos() {
                 const holdData = await holdRes.json();
                 if (!holdData.success) { this.showToast(holdData.message || window.TXT.failed_word, 'error'); this.submitting = false; return; }
                 const savedTotal = this.totalAmount;
-                const paid = await this.payHeldOrderDirect(holdData.order.id, method, savedTotal, provisional, null, skipReceipt);
+                // Task 994: REPLAY — the previous attempt's pay already succeeded
+                // server-side (response was lost); the server returned the ORIGINAL
+                // bill instead of re-holding. Jump straight to the pay-success
+                // handling: receipt popup + auto-print chain fire now (they never
+                // fired on the lost attempt), and NO duplicate bill/KOT exists.
+                if (holdData.already_paid) {
+                    this.payAttemptUuid = null;
+                    this.recalledOrderId = null;
+                    this.applyPaySuccess(holdData, holdData.order_id || null, method, savedTotal, this.orderType, skipReceipt, provisional, null);
+                    this.clearCart();
+                    this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
+                    this.showPayModal = false; this.submitting = false; this.saveAsProvisional = false;
+                    return;
+                }
+                const paid = await this.payHeldOrderDirect(holdData.order.id, method, savedTotal, provisional, null, skipReceipt, this.payAttemptUuid);
                 if (!paid) {
                     // Pay failed — KEEP the cart for instant retry and remember the
                     // freshly-created held order so the next Pay REUSES it via
                     // recalled_order_id (hold endpoint cancels+replaces it) instead
                     // of minting a duplicate 'held' row per attempt (Frost & Brew
                     // live issue accumulated 4 orphan held orders this way).
+                    // payAttemptUuid intentionally NOT cleared — the retry must ride
+                    // the same uuid so the server can dedupe a lost-response success.
                     this.recalledOrderId = holdData.order.id;
                     this.submitting = false;
                     return;
                 }
+                this.payAttemptUuid = null; // sale done — next sale mints a fresh key
                 this.clearCart();
                 // Auto-focus phone input → ready for next sale, NO dead focus.
                 this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
             } catch (e) {
                 console.error('[processPayment] FAIL', e);
-                this.showToast(window.TXT.submit_failed_prefix + (e?.message || e?.name || 'unknown') + ' — check console (F12)', 'error');
+                // Task 994: a TIMEOUT gets its own message — cashier must know the
+                // retry is safe (same uuid = server replays, never duplicates).
+                if (this._isTimeoutError(e)) {
+                    this.showToast(window.TXT.pay_timeout_retry, 'error');
+                } else {
+                    this.showToast(window.TXT.submit_failed_prefix + (e?.message || e?.name || 'unknown') + ' — check console (F12)', 'error');
+                }
             }
             this.showPayModal = false; this.submitting = false; this.saveAsProvisional = false;
         },
@@ -8407,6 +8460,8 @@ function restaurantPos() {
         // wantsJson() — same shape used by payHeldOrderDirect for receipt
         // modal rendering.
         async processPaymentManual(method, provisional = false, skipReceipt = false) {
+            // Task 994: hard double-submit guard (mirrors processPayment).
+            if (this.submitting) return;
             const now = Date.now();
             // Same debounce toast as processPayment — one-tap must never look dead.
             if (now - this.lastPayTime < 3000) { this.showToast(window.TXT.wait_prev_bill_saved, 'error'); return; }
@@ -8480,7 +8535,12 @@ function restaurantPos() {
                 }
                 let res;
                 try {
-                    res = await fetch('{{ route("pos.invoice.store") }}', {
+                    // Task 994: hard 20s timeout — a HUNG server (reachable but not
+                    // answering) must not freeze the pay button for minutes. An
+                    // aborted request falls into the same offline-queue path below;
+                    // the payload's offline_uuid dedupes server-side if the hung
+                    // attempt actually succeeded, so no duplicate bill either way.
+                    res = await this.fetchWithTimeout('{{ route("pos.invoice.store") }}', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -8492,9 +8552,9 @@ function restaurantPos() {
                     });
                 } catch (netErr) {
                     // fetch threw = server unreachable (WiFi says "connected" but
-                    // internet is dead). Same offline path — HTTP errors from a
-                    // REACHABLE server never land here.
-                    console.warn('[storeInvoice] network unreachable — queueing offline', netErr);
+                    // internet is dead) OR timed out. Same offline path — HTTP
+                    // errors from a REACHABLE server never land here.
+                    console.warn('[storeInvoice] network unreachable/timeout — queueing offline', netErr);
                     if (!this.offlineAllowed) { // Task 117: plan-gated (cart intact for retry)
                         this.showToast(window.TXT.offline_plan_locked, 'error');
                         this.submitting = false;
@@ -9224,13 +9284,18 @@ function restaurantPos() {
                     // IMMEDIATELY (agent prints them in order anyway) instead of
                     // waiting for the receipt roundtrip before creating the KOT job.
                     if (this.silentBillPrint && this.silentKotPrint) {
-                        // Task 655 review fix: printReceipt() is async now (bounded
-                        // fiscal grace while pra_status='pending') — enqueue order
-                        // must stay RECEIPT-FIRST → KOT-AFTER, so await the receipt
-                        // enqueue before creating the KOT job. Grace is bounded
-                        // (~5s worst case, agent normally submits in 2-5s) so the
-                        // kitchen is never meaningfully delayed.
-                        this.queuePrintTimer(async () => { await this.printReceipt(); fireKot(); }, 150);
+                        // Task 994 (owner voice note 16 Aug 2026 — "KOT der se
+                        // nikli"): the Task 655 receipt-first sequencing made the
+                        // KOT job wait behind praPrintGrace() (up to ~5s fiscal
+                        // wait) PLUS the receipt-enqueue roundtrip — on a slow
+                        // shop link that pushed the kitchen slip a full poll
+                        // cycle later. The KOT needs NO fiscal number, so enqueue
+                        // it IMMEDIATELY, in parallel: fireKot() first (its job
+                        // POST leaves right away), receipt keeps its own bounded
+                        // grace. Different printers make ordering moot; on a
+                        // shared printer the agent still prints jobs in queue
+                        // order. Silent-print stamping/dedupe rules unchanged.
+                        this.queuePrintTimer(async () => { fireKot(); await this.printReceipt(); }, 150);
                         return;
                     }
                     this.queuePrintTimer(() => {
@@ -9815,7 +9880,48 @@ function restaurantPos() {
             } catch (e) { console.error('Delete held order error:', e); this.showToast(window.TXT.error_deleting_order, 'error'); }
         },
 
-        async payHeldOrderDirect(orderId, method, savedTotal, provisional = false, orderTypeOverride = null, skipReceipt = false) {
+        // Task 994: shared pay-success handler — used by payHeldOrderDirect AND
+        // the hold-time `already_paid` replay branch (retry after a lost pay
+        // response). data.order_id (replay responses) overrides orderId so the
+        // print chain KOTs the ORIGINAL order, never a cancelled retry-ghost.
+        applyPaySuccess(data, orderId, method, savedTotal, payOrderType, skipReceipt, provisional, heldOrd) {
+            orderId = (data && data.order_id) || orderId;
+            this.heldOrders = this.heldOrders.filter(o => o.id !== orderId);
+            this.lastInvoiceNumber = data.invoice_number || ''; this.lastTransactionId = data.transaction_id || null;
+            this.lastOrderId = orderId || null;
+            this.lastTotal = Math.round(savedTotal || data.total_amount || 0); this.lastPaymentMethod = method;
+            this.lastPraNumber = data.pra_invoice_number || ''; this.lastPraStatus = data.pra_status || '';
+            this.lastWaiterName = (this.incomingOrderInfo && this.incomingOrderInfo.waiter) ? this.incomingOrderInfo.waiter : ((heldOrd && heldOrd.waiter) ? heldOrd.waiter : '');
+            // Task 921: clear the claimed-waiter state once its order is paid so the NEXT
+            // non-waiter sale does not inherit a stale incomingOrderInfo.waiter.
+            // (payHeldOrderDirect never calls clearCart(), so without this the global
+            //  incomingOrderInfo stays set and bleeds the waiter name into the popup.)
+            if (this.incomingOrderId && this.incomingOrderId === orderId) {
+                this.incomingOrderId = null;
+                this.incomingOrderInfo = null;
+            }
+            this.lastItemsCount = (this.cart || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
+            this.lastSaleAt = Date.now();
+            this.showReceipt = true;
+            this.scheduleReceiptAutoClose();
+            this.startPraPoll(); // Task 655: agent-mode 'pending' → badge + receipt auto-flip
+            this.$nextTick(() => { setTimeout(() => this.triggerConfetti(), 300); });
+            // Print order: INVOICE FIRST → KOT AFTER. Cashier-requested sequence.
+            // Uses postMessage-chained engine — KOT never fires before the receipt
+            // print dialog is dismissed (was a race in the old setTimeout(200/1800) impl
+            // on slow networks where KOT iframe loaded before receipt iframe).
+            // Replay edge (no order_id in the response): KOT from the transaction.
+            this.runAutoPrintChain(orderId, payOrderType, orderId ? null : (data.transaction_id || null), skipReceipt);
+            // Refresh provisional badge count when this save was provisional.
+            if (provisional) { this.loadLocalBills(); }
+            // Refresh failed badge so cashier sees pending/failed state in real time.
+            this.loadFailedBills();
+            this.loadReprintBills(); // Akhri Bills strip stays current
+            if (this.tableBoardEnabled) this.loadTableStatus(); // Table Board: paid table frees up
+            return true;
+        },
+
+        async payHeldOrderDirect(orderId, method, savedTotal, provisional = false, orderTypeOverride = null, skipReceipt = false, payUuid = null) {
             // Order type captured NOW (owner, Jul 2026): held-modal pays read it from
             // the heldOrders entry (removed from the list on success below); billing
             // pass-through orders are never in heldOrders → falls back to the current
@@ -9826,11 +9932,16 @@ function restaurantPos() {
             // wrongly re-trigger the auto-KOT chain.
             const heldOrd = this.heldOrders.find(o => o.id === orderId);
             const payOrderType = orderTypeOverride || (heldOrd && heldOrd.order_type) || this.orderType || null;
+            // Task 994: idempotency key — billing pass-through passes the sale-level
+            // uuid in; DIRECT held-order pays (held modal / table board) mint one
+            // per order id and REUSE it on retry, so a lost-response retry replays
+            // the original bill (with receipt data) instead of dead-ending on 409.
+            const effPayUuid = payUuid || (this._payUuidByOrder[orderId] = this._payUuidByOrder[orderId] || this._newOfflineUuid());
             try {
                 // PROVISIONAL BILL FLOW — when true, RestaurantPosController::payOrder
                 // forces pra_status='local' and skips PRA submission. Bill remains
                 // editable / deletable until promoted via "Submit to PRA — Make Final".
-                const res = await fetch(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method, save_as_provisional: !!provisional, cash_received: (method === 'cash' && parseFloat(this.cashReceived) > 0) ? parseFloat(this.cashReceived) : null, delivery_address: payOrderType === 'delivery' ? (((heldOrd && (heldOrd.delivery_address || '').trim()) || (this.selectedDeliveryAddress || '').trim()) || null) : null }) });
+                const res = await this.fetchWithTimeout(`/pos/restaurant/orders/${orderId}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': '{{ csrf_token() }}' }, body: JSON.stringify({ payment_method: method, save_as_provisional: !!provisional, pay_uuid: effPayUuid, cash_received: (method === 'cash' && parseFloat(this.cashReceived) > 0) ? parseFloat(this.cashReceived) : null, delivery_address: payOrderType === 'delivery' ? (((heldOrd && (heldOrd.delivery_address || '').trim()) || (this.selectedDeliveryAddress || '').trim()) || null) : null }) });
                 if (!res.ok) {
                     const bodyText = await res.text().catch(() => '');
                     console.error('[payOrder] HTTP', res.status, res.statusText, bodyText.slice(0, 500));
@@ -9847,7 +9958,7 @@ function restaurantPos() {
                     // offer a one-click provisional settle instead of a dead-end error.
                     if (res.status === 403 && errData && errData.quota_full && errData.provisional_allowed && !provisional) {
                         if (confirm(window.TXT.quota_provisional_prompt || errData.message)) {
-                            return await this.payHeldOrderDirect(orderId, method, savedTotal, true, orderTypeOverride, skipReceipt);
+                            return await this.payHeldOrderDirect(orderId, method, savedTotal, true, orderTypeOverride, skipReceipt, payUuid);
                         }
                     }
                     this.showToast((errData && errData.message) || ('Payment failed (HTTP ' + res.status + ') — F12 console'), 'error');
@@ -9855,42 +9966,20 @@ function restaurantPos() {
                 }
                 const data = await res.json();
                 if (data.success) {
-                    this.heldOrders = this.heldOrders.filter(o => o.id !== orderId);
-                    this.lastInvoiceNumber = data.invoice_number || ''; this.lastTransactionId = data.transaction_id || null;
-                    this.lastOrderId = orderId || null;
-                    this.lastTotal = Math.round(savedTotal || data.total_amount || 0); this.lastPaymentMethod = method;
-                    this.lastPraNumber = data.pra_invoice_number || ''; this.lastPraStatus = data.pra_status || '';
-                    this.lastWaiterName = (this.incomingOrderInfo && this.incomingOrderInfo.waiter) ? this.incomingOrderInfo.waiter : ((heldOrd && heldOrd.waiter) ? heldOrd.waiter : '');
-                    // Task 921: clear the claimed-waiter state once its order is paid so the NEXT
-                    // non-waiter sale does not inherit a stale incomingOrderInfo.waiter.
-                    // (payHeldOrderDirect never calls clearCart(), so without this the global
-                    //  incomingOrderInfo stays set and bleeds the waiter name into the popup.)
-                    if (this.incomingOrderId && this.incomingOrderId === orderId) {
-                        this.incomingOrderId = null;
-                        this.incomingOrderInfo = null;
-                    }
-                    this.lastItemsCount = (this.cart || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
-                    this.lastSaleAt = Date.now();
-                    this.showReceipt = true;
-                    this.scheduleReceiptAutoClose();
-                    this.startPraPoll(); // Task 655: agent-mode 'pending' → badge + receipt auto-flip
-                    this.$nextTick(() => { setTimeout(() => this.triggerConfetti(), 300); });
-                    // Print order: INVOICE FIRST → KOT AFTER. Cashier-requested sequence.
-                    // Uses postMessage-chained engine — KOT never fires before the receipt
-                    // print dialog is dismissed (was a race in the old setTimeout(200/1800) impl
-                    // on slow networks where KOT iframe loaded before receipt iframe).
-                    this.runAutoPrintChain(orderId, payOrderType, null, skipReceipt);
-                    // Refresh provisional badge count when this save was provisional.
-                    if (provisional) { this.loadLocalBills(); }
-                    // Refresh failed badge so cashier sees pending/failed state in real time.
-                    this.loadFailedBills();
-                    this.loadReprintBills(); // Akhri Bills strip stays current
-                    if (this.tableBoardEnabled) this.loadTableStatus(); // Table Board: paid table frees up
-                    return true;
+                    // Sale done — retire this order's retry key (next pay of any
+                    // other order mints its own). Success body handled centrally.
+                    delete this._payUuidByOrder[orderId];
+                    return this.applyPaySuccess(data, orderId, method, savedTotal, payOrderType, skipReceipt, provisional, heldOrd);
                 } else { if (data.stock_error) { this.stockError = data.message; this.showPayModal = true; } this.showToast(data.message || window.TXT.payment_failed, 'error'); if (res.status === 409 && this.tableBoardEnabled) this.loadTableStatus(); return false; }
             } catch (e) {
                 console.error('[payHeldOrderDirect] FAIL', e);
-                this.showToast(window.TXT.payment_error_prefix + (e?.message || e?.name || 'unknown') + ' — F12 console', 'error');
+                // Task 994: timeout gets its own message — retry is SAFE (same
+                // uuid rides the retry, server replays instead of duplicating).
+                if (this._isTimeoutError(e)) {
+                    this.showToast(window.TXT.pay_timeout_retry, 'error');
+                } else {
+                    this.showToast(window.TXT.payment_error_prefix + (e?.message || e?.name || 'unknown') + ' — F12 console', 'error');
+                }
                 return false;
             }
         },

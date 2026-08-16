@@ -172,7 +172,43 @@ class RestaurantPosController extends Controller
             'order_type' => 'required|in:dine_in,takeaway,delivery',
             'discount_type' => 'nullable|in:percentage,amount',
             'discount_value' => 'nullable|numeric|min:0|max:999999',
+            // Task 994: per-sale-attempt idempotency key (billing pass-through only).
+            'pay_uuid' => 'nullable|string|max:64',
         ]);
+
+        // ── Task 994: RETRY-AFTER-LOST-RESPONSE short-circuit ────────────────
+        // The billing pass-through (hold → pay) rides one pay_uuid across every
+        // retry of the same sale. If a bill with that uuid already exists, the
+        // FIRST attempt's pay succeeded server-side and only the response was
+        // lost — re-holding would mint a duplicate order (KDS ghost + duplicate
+        // KOT risk) and re-paying a duplicate bill. Return the original bill as
+        // `already_paid` instead; the client jumps straight to its pay-success
+        // handling (receipt popup + print chain). withoutGlobalScope: archived
+        // bills still dedupe. Schema guard = deploy-before-migrate window.
+        $holdPayUuid = trim((string) $request->input('pay_uuid', ''));
+        if ($holdPayUuid !== '' && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'offline_uuid')) {
+            $existingTxn = PosTransaction::withoutGlobalScope('hide_archived')
+                ->where('company_id', $companyId)
+                ->where('offline_uuid', $holdPayUuid)
+                ->first();
+            if ($existingTxn) {
+                $originalOrder = RestaurantOrder::where('company_id', $companyId)
+                    ->where('pos_transaction_id', $existingTxn->id)
+                    ->first();
+                Log::info('[HOLD] Replayed by pay_uuid — sale already billed', ['transaction_id' => $existingTxn->id, 'pay_uuid' => $holdPayUuid]);
+                return response()->json([
+                    'success' => true,
+                    'already_paid' => true,
+                    'order_id' => $originalOrder?->id,
+                    'message' => "Payment received. Invoice: {$existingTxn->invoice_number}",
+                    'transaction_id' => $existingTxn->id,
+                    'invoice_number' => $existingTxn->invoice_number,
+                    'total_amount' => (float) $existingTxn->total_amount,
+                    'pra_invoice_number' => $existingTxn->pra_invoice_number,
+                    'pra_status' => $existingTxn->pra_status,
+                ]);
+            }
+        }
 
         // Order-type flow rules (owner, Jul 2026): Hold / Send-to-Kitchen is the Dine-In
         // procedure ONLY on companies where the order-type widget is visible (any of
@@ -962,6 +998,9 @@ class RestaurantPosController extends Controller
                 // live shop (ZFC Pizza Point, 10 Aug 2026). Legacy 'online'/'split'
                 // kept for old tabs still open on the previous build.
                 'payment_method' => 'nullable|string|in:cash,card,debit_card,credit_card,qr_payment,online,split',
+                // Task 994: per-sale-attempt idempotency key (client reuses it on
+                // every retry of the SAME sale) — mirrors storeInvoice's offline_uuid.
+                'pay_uuid' => 'nullable|string|max:64',
             ]);
         } catch (\Illuminate\Validation\ValidationException $ve) {
             Log::warning('[PAY] Validation failed', ['errors' => $ve->errors(), 'input' => $request->all()]);
@@ -972,11 +1011,35 @@ class RestaurantPosController extends Controller
             ], 422);
         }
 
+        // ── Task 994: RETRY-AFTER-LOST-RESPONSE replay guard ─────────────────
+        // Owner report (16 Aug 2026): a slow pay request errored late client-side
+        // but had SUCCEEDED server-side; the retry re-held the cart (the original
+        // order was already 'completed', so recall found nothing) and paid a brand
+        // new order → duplicate bill + duplicate KOT. The client now rides the same
+        // pay_uuid on every retry of one sale attempt; if a bill with that uuid
+        // already exists, return the ORIGINAL success payload instead of paying
+        // again. Checked BEFORE the order lookup/'already paid' guard on purpose:
+        // on a retry the $orderId here may be a freshly-created ghost order — the
+        // replay must win and the ghost gets tidied up (cancelled, table freed).
+        // withoutGlobalScope: an already-archived bill (day-close ran between
+        // attempts) must still dedupe. Schema guard = deploy-before-migrate window.
+        $payUuid = trim((string) $request->input('pay_uuid', ''));
+        $payUuidUsable = $payUuid !== '' && \Illuminate\Support\Facades\Schema::hasColumn('pos_transactions', 'offline_uuid');
+        if ($payUuidUsable && ($replay = $this->replayPayByUuid($companyId, $payUuid, $orderId))) {
+            return $replay;
+        }
+
         $order = RestaurantOrder::where('company_id', $companyId)
             ->with('items')
             ->findOrFail($orderId);
 
         if ($order->status === 'completed') {
+            // Task 994 review fix: a same-order retry can land here when the
+            // first request committed AFTER the early replay lookup above ran —
+            // if OUR uuid produced the bill, replay it instead of a dead 400.
+            if ($payUuidUsable && ($replay = $this->replayPayByUuid($companyId, $payUuid, $orderId))) {
+                return $replay;
+            }
             return response()->json(['success' => false, 'message' => 'Order already paid'], 400);
         }
 
@@ -1115,6 +1178,16 @@ class RestaurantPosController extends Controller
                 ->find($orderId);
             if (!$freshOrder || in_array($freshOrder->status, ['completed', 'cancelled'], true)) {
                 DB::rollBack();
+                // Task 994 review fix: LOCK-AWARE replay re-check. A retry that
+                // arrived while the first (slow) pay of the SAME uuid was mid-txn
+                // waits on the row lock above; by the time it wakes the order is
+                // 'completed'. Without this re-check the retry would 409 — which
+                // is exactly the lost-response window pay_uuid exists to close.
+                // The winner has committed (lock released), so the uuid lookup
+                // now sees its bill and replays the original success payload.
+                if ($payUuidUsable && ($replay = $this->replayPayByUuid($companyId, $payUuid, $orderId))) {
+                    return $replay;
+                }
                 return response()->json([
                     'success' => false,
                     'message' => 'This order was already settled or cancelled on another terminal — refresh the table board.',
@@ -1191,6 +1264,12 @@ class RestaurantPosController extends Controller
             }
             if ($menuRateColumnExists) {
                 $transactionData['tax_menu_rate'] = $menuRate;
+            }
+            // Task 994: stamp the retry-idempotency key on the bill — the replay
+            // guard above (and the UNIQUE(company_id, offline_uuid) index as the
+            // race-window safety net) dedupes any retry of this same sale attempt.
+            if ($payUuidUsable) {
+                $transactionData['offline_uuid'] = $payUuid;
             }
             // Delivery Riders (Jul 2026): snapshot the held order's type + optional
             // rider from the PAY request. Delivery-only; invalid rider ids silently
@@ -1342,6 +1421,24 @@ class RestaurantPosController extends Controller
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();
+            // Task 994 review fix: DUPLICATE-KEY RECOVERY. Two same-uuid pays can
+            // both pass the pre-create checks when they target DIFFERENT order
+            // rows (original + a ghost re-hold — the row lock can't serialize
+            // those). The UNIQUE(company_id, offline_uuid) index makes the loser
+            // throw right here; recover it into the winner's canonical success
+            // payload (tidying the ghost) instead of surfacing a 500.
+            if ($payUuidUsable
+                && $e instanceof \Illuminate\Database\QueryException
+                && str_contains($e->getMessage(), 'offline_uuid')) {
+                try {
+                    if ($replay = $this->replayPayByUuid($companyId, $payUuid, $orderId)) {
+                        Log::info('[PAY] Duplicate pay_uuid insert recovered into replay', ['pay_uuid' => $payUuid, 'order_id' => $orderId]);
+                        return $replay;
+                    }
+                } catch (\Throwable $re) {
+                    Log::warning('[PAY] Duplicate-key replay recovery failed: ' . $re->getMessage());
+                }
+            }
             $errorDetail = $e->getMessage() ?: '(empty message)';
             $errorClass = get_class($e);
             $errorWhere = basename($e->getFile()) . ':' . $e->getLine();
@@ -1361,6 +1458,68 @@ class RestaurantPosController extends Controller
                 'message' => 'Payment failed [' . class_basename($errorClass) . ' @ ' . $errorWhere . ']: ' . $errorDetail,
             ], 500);
         }
+    }
+
+    /**
+     * Task 994: canonical replay response for a pay_uuid that already produced
+     * a bill (retry after a lost/timed-out response). Returns null when no bill
+     * with that uuid exists yet. Called from FOUR spots in payOrder: the early
+     * pre-lookup guard, the pre-txn completed check, the post-lock 409 branch,
+     * and duplicate-key recovery — all must return the SAME payload shape.
+     * withoutGlobalScope: an already-archived bill (day-close ran between
+     * attempts) must still dedupe.
+     */
+    private function replayPayByUuid($companyId, string $payUuid, $retryOrderId = null)
+    {
+        $existingTxn = PosTransaction::withoutGlobalScope('hide_archived')
+            ->where('company_id', $companyId)
+            ->where('offline_uuid', $payUuid)
+            ->first();
+        if (!$existingTxn) {
+            return null;
+        }
+        $originalOrder = RestaurantOrder::where('company_id', $companyId)
+            ->where('pos_transaction_id', $existingTxn->id)
+            ->first();
+        // Ghost tidy (best-effort, never blocks the replay): the retry's re-hold
+        // may have minted a duplicate 'held' order — cancel it and free its table
+        // so it doesn't linger on KDS / the held list / the table board.
+        try {
+            if ($retryOrderId && (int) $retryOrderId !== (int) ($originalOrder->id ?? 0)) {
+                $ghost = RestaurantOrder::where('company_id', $companyId)
+                    ->whereIn('status', ['held', 'preparing', 'ready'])
+                    ->find($retryOrderId);
+                if ($ghost) {
+                    $ghost->update(['status' => 'cancelled']);
+                    if ($ghost->table_id) {
+                        $otherActive = RestaurantOrder::where('company_id', $companyId)
+                            ->where('table_id', $ghost->table_id)
+                            ->where('id', '!=', $ghost->id)
+                            ->whereNotIn('status', ['completed', 'cancelled'])
+                            ->exists();
+                        if (!$otherActive) {
+                            RestaurantTable::where('company_id', $companyId)->where('id', $ghost->table_id)
+                                ->update(['status' => 'available', 'locked_by_user_id' => null, 'locked_at' => null, 'occupied_since' => null]);
+                        }
+                    }
+                    Log::info('[PAY] Replay guard cancelled ghost retry order', ['ghost_order_id' => $ghost->id, 'original_txn_id' => $existingTxn->id]);
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('[PAY] Replay ghost tidy failed: ' . $e->getMessage());
+        }
+        Log::info('[PAY] Replayed by pay_uuid', ['transaction_id' => $existingTxn->id, 'pay_uuid' => $payUuid]);
+        return response()->json([
+            'success' => true,
+            'replayed' => true,
+            'order_id' => $originalOrder?->id,
+            'message' => "Payment received. Invoice: {$existingTxn->invoice_number}",
+            'transaction_id' => $existingTxn->id,
+            'invoice_number' => $existingTxn->invoice_number,
+            'total_amount' => (float) $existingTxn->total_amount,
+            'pra_invoice_number' => $existingTxn->pra_invoice_number,
+            'pra_status' => $existingTxn->pra_status,
+        ]);
     }
 
     private function validateStockForOrder($companyId, $order, $lock = false)

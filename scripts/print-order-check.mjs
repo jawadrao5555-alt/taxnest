@@ -1,11 +1,13 @@
 #!/usr/bin/env node
-// Print-order regression check (Task 655 review): extracts the REAL
-// runAutoPrintChain / printReceipt / praPrintGrace sources from
-// resources/views/pos/universal.blade.php and executes them in a stubbed
+// Print-order regression check (Task 655 review, REVERSED by Task 994):
+// extracts the REAL runAutoPrintChain / printReceipt / praPrintGrace sources
+// from resources/views/pos/universal.blade.php and executes them in a stubbed
 // component to assert that on the PRA silent-bill + silent-KOT fast path the
-// RECEIPT silent job is enqueued BEFORE the KOT job even when the bill starts
-// pra_status='pending' (printReceipt is async and awaits a bounded fiscal
-// grace — a bare `this.printReceipt(); fireKot();` would enqueue KOT first).
+// KOT job is enqueued IMMEDIATELY (it needs no fiscal number) and never waits
+// behind praPrintGrace() — owner voice note 16 Aug 2026: KOT reached the
+// kitchen seconds late because it queued behind the receipt's bounded fiscal
+// grace + enqueue roundtrip. The receipt must STILL be enqueued afterwards
+// (grace respected so it carries the PRA number).
 import { readFileSync } from 'node:fs';
 
 const blade = readFileSync(new URL('../resources/views/pos/universal.blade.php', import.meta.url), 'utf8');
@@ -57,26 +59,30 @@ const comp = Object.assign({
   // the event after a real async delay so a fire-and-forget printReceipt()
   // (promise settling before the enqueue completes) lets KOT jump the queue
   // and the ordering assertion below catches it.
-  trySilentPrint: async (job) => { await sleep(120); events.push(job.type); return { deduped: false }; },
-  printKitchenTicket: (id, cb) => { events.push('kot'); if (cb) cb(); },
-  printTxnKitchenTicket: (id, cb) => { events.push('kot'); if (cb) cb(); },
+  trySilentPrint: async (job) => { await sleep(120); events.push(job.type); times[job.type] = Date.now() - t0; return { deduped: false }; },
+  printKitchenTicket: (id, cb) => { events.push('kot'); times.kot = Date.now() - t0; if (cb) cb(); },
+  printTxnKitchenTicket: (id, cb) => { events.push('kot'); times.kot = Date.now() - t0; if (cb) cb(); },
   _printViaIframe: () => { events.push('iframe'); },
   // status poll stubs: agent "submits" on the first grace probe
   _fetchPraStatus: async () => ({ success: true, pra_status: 'submitted', pra_invoice_number: 'QA' }),
   _applyPraStatus: () => { comp.lastPraStatus = 'submitted'; },
 }, methods);
 
+const t0 = Date.now();
+const times = {};
 comp.runAutoPrintChain(7, 'takeaway');
 // grace waits 1.2s before its first probe — give the chain time to finish.
 await sleep(1800);
 await sleep(50);
 
 if (events.length < 2) fail(`expected receipt + kot enqueues, got: ${JSON.stringify(events)}`);
-if (!(events[0] === 'bill' && events.includes('kot'))) {
-  fail(`silent fast path enqueued out of order (receipt must precede KOT): ${JSON.stringify(events)}`);
-}
-const kotIdx = events.indexOf('kot');
-const billIdx = events.indexOf('bill');
-if (billIdx > kotIdx) fail(`KOT enqueued before receipt: ${JSON.stringify(events)}`);
+if (!events.includes('kot')) fail(`KOT never enqueued: ${JSON.stringify(events)}`);
+if (!events.includes('bill')) fail(`receipt never enqueued: ${JSON.stringify(events)}`);
+// Task 994: KOT must NOT wait behind praPrintGrace (first probe is 1.2s out).
+// A KOT enqueued after ~1s means it queued behind the fiscal grace again.
+if (times.kot > 1000) fail(`KOT delayed behind fiscal grace (${times.kot}ms after chain start): ${JSON.stringify(events)}`);
+// Receipt must still respect grace: bill enqueued AFTER the pending→submitted
+// probe resolved (i.e. after the first 1.2s grace wait), never before.
+if (times.bill < 1000) fail(`receipt skipped fiscal grace (enqueued at ${times.bill}ms while pra_status was pending)`);
 
-console.log(`PRINT-ORDER OK: pending-PRA silent fast path enqueued ${JSON.stringify(events)} — receipt before KOT, grace respected.`);
+console.log(`PRINT-ORDER OK: silent fast path enqueued ${JSON.stringify(events)} — KOT immediate (${times.kot}ms), receipt after grace (${times.bill}ms).`);

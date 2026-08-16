@@ -669,7 +669,11 @@
     </div>
     @endif
     @elseif($transaction->pra_status === 'offline')
-    <div class="local-badge">{{ __('pos.receipt_offline_sync') }}</div>
+    <div class="local-badge">
+        {{ __('pos.receipt_offline_invoice') }}<br>
+        {{ __('pos.receipt_offline_sync_auto') }}<br>
+        {{ $transaction->invoice_number }}
+    </div>
     @else
     @php
         // Reporting-OFF FINALS vs provisionals (client report Jul 2026 — ZFC):

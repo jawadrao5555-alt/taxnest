@@ -365,12 +365,22 @@ class PraReceiptSerialWithFiscalTest extends TestCase
                 ".local-badge block renders for offline bill ({$template})"
             );
 
-            // Shop's own serial must appear somewhere in the body — the receipt
-            // must never be number-less even when the fiscal number is absent.
+            // Shop's own serial must appear INSIDE the .local-badge block —
+            // not just somewhere in the body (e.g. the invoice-numbers box above).
+            // Extract the badge's inner content by finding the block between the
+            // opening div and its closing tag.
+            $badgeStart = strpos($body, 'local-badge');
+            $this->assertNotFalse(
+                $badgeStart,
+                ".local-badge found for serial-in-badge assertion ({$template})"
+            );
+            $badgeOpen  = strpos($body, '>', $badgeStart);
+            $badgeClose = strpos($body, '</div>', $badgeOpen);
+            $badgeContent = substr($body, $badgeOpen + 1, $badgeClose - $badgeOpen - 1);
             $this->assertStringContainsString(
                 self::SERIAL,
-                $body,
-                "serial appears in body for offline bill ({$template})"
+                $badgeContent,
+                "serial appears inside .local-badge for offline bill ({$template})"
             );
 
             // No PRA Fiscal # label row — there is no fiscal number to show.

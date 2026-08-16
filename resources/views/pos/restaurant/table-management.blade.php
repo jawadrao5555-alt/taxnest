@@ -15,6 +15,26 @@
     <div class="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">{{ session('error') }}</div>
     @endif
 
+    {{-- Task 779 — Tables-first flow (video note, 15 Aug 2026): opt-in per-company.
+         ON = dine-in KOT / receipt popup ke baad cashier full-screen Tables page
+         par wapas — chhoti table-picker window auto-open nahi hoti. Default OFF
+         (baqi shops ka flow unchanged). Page itself is feature:tables gated +
+         admin-only (denyCashier), so the toggle is only visible when tables ON. --}}
+    <div class="mb-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 flex items-center justify-between gap-4">
+        <div>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('pos.tables_first_flow_title') }}</h3>
+            <p class="text-xs text-gray-500 mt-0.5">{{ __('pos.tables_first_flow_hint') }}</p>
+        </div>
+        <form method="POST" action="{{ route('pos.restaurant.tables-first-flow') }}">
+            @csrf
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="hidden" name="tables_first_flow" value="0">
+                <input type="checkbox" name="tables_first_flow" value="1" {{ ($company->tables_first_flow ?? false) ? 'checked' : '' }} onchange="this.form.submit()" class="sr-only peer">
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-purple-600"></div>
+            </label>
+        </form>
+    </div>
+
     @forelse($floors as $floor)
     <div class="mb-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div class="px-5 py-4 bg-gray-50 dark:bg-gray-800/80 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">

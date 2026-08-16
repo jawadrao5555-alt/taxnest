@@ -62,7 +62,29 @@ class RestaurantTableController extends Controller
             ->orderBy('sort_order')
             ->get();
 
-        return view('pos.restaurant.table-management', compact('floors'));
+        $company = \App\Models\Company::find($companyId);
+
+        return view('pos.restaurant.table-management', compact('floors', 'company'));
+    }
+
+    /**
+     * Task 779 — Tables-first flow (opt-in, default OFF). ON = after a dine-in
+     * KOT send / after the receipt popup closes, the cashier returns to the
+     * full-screen Tables page instead of the small table-picker popup.
+     * Settings write path → cashier 403 (owner rule). hasColumn guard = prod
+     * self-heal parity (code may land before migrate --force).
+     */
+    public function updateTablesFirstFlow(Request $request)
+    {
+        $this->denyCashier();
+        $companyId = app('currentCompanyId');
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'tables_first_flow')) {
+            \App\Models\Company::where('id', $companyId)
+                ->update(['tables_first_flow' => $request->boolean('tables_first_flow'), 'updated_at' => now()]);
+        }
+
+        return back()->with('success', __('pos.tables_first_flow_saved'));
     }
 
     public function storeFloor(Request $request)

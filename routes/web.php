@@ -860,6 +860,8 @@ Route::middleware(['pos.auth', 'company.approval'])->prefix('pos')->group(functi
         });
         Route::prefix('restaurant')->middleware('feature:tables')->group(function () {
             Route::get('/table-management', [RestaurantTableController::class, 'manage'])->name('pos.restaurant.table-management');
+            // Task 779: Tables-first flow toggle (admin-only — denyCashier in controller).
+            Route::post('/tables-first-flow', [RestaurantTableController::class, 'updateTablesFirstFlow'])->name('pos.restaurant.tables-first-flow');
             Route::post('/floors', [RestaurantTableController::class, 'storeFloor'])->name('pos.restaurant.floors.store');
             Route::put('/floors/{id}', [RestaurantTableController::class, 'updateFloor'])->name('pos.restaurant.floors.update');
             Route::delete('/floors/{id}', [RestaurantTableController::class, 'deleteFloor'])->name('pos.restaurant.floors.delete');

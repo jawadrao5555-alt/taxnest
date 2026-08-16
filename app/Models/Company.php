@@ -87,6 +87,7 @@ class Company extends Model
         'print_on_hold',
         'print_on_pay',
         'dine_in_auto_kot',
+        'tables_first_flow',
         'pos_kot_full_mode',
         'kot_compact',
         'kot_show_customer',
@@ -190,6 +191,7 @@ class Company extends Model
         'use_universal_pos' => 'boolean',
         'auto_print_kot' => 'boolean',
         'dine_in_auto_kot' => 'boolean',
+        'tables_first_flow' => 'boolean',
         'pos_kot_full_mode' => 'boolean',
         'kot_compact' => 'boolean',
         'order_match_style_locked' => 'boolean',
@@ -430,7 +432,10 @@ class Company extends Model
             // Dine-in final auto-print flag is BAKED into the sale screen JS —
             // a toggle must refresh cached sale screens (Pizza Master, 11 Aug 2026).
             'print_on_pay_dinein',
+            // Task 779: Tables-first flow flag is BAKED into the sale screen JS —
+            // a toggle must refresh cached sale screens.
             'auto_print_kot', 'kot_reprint_enabled', 'dine_in_auto_kot',
+            'tables_first_flow',
             'pos_kot_full_mode', 'kot_compact', 'kot_show_customer',
             'kot_show_orderby', 'kot_show_barcode', 'kot_show_footer',
             'kot_align_center', 'kot_left_margin_mm',

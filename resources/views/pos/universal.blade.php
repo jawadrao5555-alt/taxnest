@@ -3465,7 +3465,7 @@ window.addEventListener('popstate', function() {
                 <span class="opacity-75 font-semibold">{{ __('pos.stop_word') }}</span>
             </button>
             {{-- Top-right cross (primary close action) --}}
-            <button @click="showReceipt = false" class="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/80 dark:bg-gray-800/80 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white flex items-center justify-center transition shadow-sm" title="{{ __('pos.ti_close_popup') }}">
+            <button @click="closeReceiptPopup()" class="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/80 dark:bg-gray-800/80 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white flex items-center justify-center transition shadow-sm" title="{{ __('pos.ti_close_popup') }}">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
 
@@ -3578,7 +3578,7 @@ window.addEventListener('popstate', function() {
                         {{ __('pos.new_word') }} <kbd class="text-[8px] bg-green-500/40 px-1 rounded font-mono">↵</kbd>
                     </button>
                     {{-- 4. Close popup (mouse only - Esc no longer bound to keep print dialog Esc clean) --}}
-                    <button @click="showReceipt = false" class="py-3 text-center rounded-xl bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 text-sm font-semibold transition flex items-center justify-center gap-1.5" title="{{ __('pos.ti_close_popup_no_new_sale') }}">
+                    <button @click="closeReceiptPopup()" class="py-3 text-center rounded-xl bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 text-sm font-semibold transition flex items-center justify-center gap-1.5" title="{{ __('pos.ti_close_popup_no_new_sale') }}">
                         {{ __('pos.close') }}
                     </button>
                 </div>
@@ -4112,6 +4112,12 @@ function restaurantPos() {
         showHeldOrders: false,
         // ─── Table Board (Jul 2026): "TABLE" button below cart → board modal ───
         tableBoardEnabled: {{ ($features->tables ?? false) ? 'true' : 'false' }},
+        // Task 779 — TABLES-FIRST FLOW (video note, 15 Aug 2026): opt-in per-company
+        // (Table Setup page). ON = dine-in KOT ke baad + receipt popup band hone par
+        // cashier full-screen Tables page par WAPAS jata hai — chhota table-picker
+        // baar baar auto-open nahi hota. Default OFF = flow bilkul purana.
+        tablesFirstFlow: {{ (($features->tables ?? false) && ($company->tables_first_flow ?? false)) ? 'true' : 'false' }},
+        tablesReturnPending: false, // navigation armed — dobara close clicks no-op
         // Task #643 (owner 13 Aug 2026): baked Order Cancel verdict — hides board
         // "Order Cancel", bell-panel Cancel AND the claimed-cart Cancel when false.
         // Server (deleteOrder) re-enforces the SAME verdict with a 403.
@@ -4322,6 +4328,11 @@ function restaurantPos() {
         // Registry of attached postMessage listeners — lets us remove them on cancel
         // so long cashier sessions (100s of bills) don't leak window-level listeners.
         printMessageHandlers: [],
+        // Task 779: in-flight print WORK counter (silent enqueue fetches + printReceipt's
+        // PRA-grace window) — pendingPrintTimers/printMessageHandlers alone miss these
+        // async gaps. Tables-first navigation waits until ALL three are idle so a
+        // page change can never cut off a print that's still on its way to the queue.
+        printWorkInFlight: 0,
         lastInvoiceNumber: '',
         lastTransactionId: null,
         lastOrderId: null,
@@ -6331,7 +6342,7 @@ function restaurantPos() {
                 // Esc closes the success popup (per cashier feedback — mouse use was needed).
                 // If a browser print dialog is on top, Esc closes that first (native) — second Esc
                 // reaches us and dismisses the popup.
-                if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); this.showReceipt = false; return; }
+                if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); this.closeReceiptPopup(); return; }
                 if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.startNewAfterPayment(); return; }
                 if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.lastIsOffline ? this.printOfflineReceipt() : this.printReceipt(); return; }
                 if ((e.key === 'k' || e.key === 'K') && (this.lastOrderId || this.lastTxnKotId)) { e.preventDefault(); this.lastOrderId ? this.printKitchenTicket() : this.printTxnKitchenTicket(this.lastTxnKotId); return; }
@@ -7716,7 +7727,16 @@ function restaurantPos() {
                     const successMsg = opts.successMessage || data.message;
                     this.showToast(successMsg, 'success'); this.heldOrders.unshift(data.order); this.clearCart();
                     if (wasDineIn && this.tableBoardEnabled) {
-                        this.$nextTick(() => this.openTablePicker());
+                        // Task 779: Tables-first flow ON → chhota picker NAHI, seedha
+                        // full-screen Tables page. $nextTick tak neeche wali KOT-print
+                        // branch chal chuki hoti hai, is liye navigateToTablesWhenIdle
+                        // ka busy-wait chalti KOT print kabhi nahi kaat'ta. Offline par
+                        // purana picker flow (tables page SW-cache mein nahi hoti).
+                        if (this.tablesFirstFlow && navigator.onLine) {
+                            this.$nextTick(() => this.navigateToTablesWhenIdle());
+                        } else {
+                            this.$nextTick(() => this.openTablePicker());
+                        }
                     } else {
                         this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); });
                     }
@@ -8289,9 +8309,60 @@ function restaurantPos() {
         },
 
         startNewAfterPayment() {
+            // Task 779: Tables-first flow ON → "New" bhi bari Tables screen par le jata hai.
+            if (this.returnToTablesAfterReceipt()) return;
             this.showReceipt = false;
             this.clearCart();
             this.$nextTick(() => { this.$refs.customerPhoneInput?.focus(); this.$refs.customerPhoneInput?.select(); });
+        },
+
+        // ── Task 779: TABLES-FIRST FLOW (return to the big Tables screen) ──────
+        // printChainBusy(): TRUE jab tak koi print kaam chal raha hai — queued
+        // chain timers, iframe postMessage handlers, ya async print work (silent
+        // enqueue fetch / printReceipt ki PRA-grace). Navigation kabhi chalti
+        // print nahi kaat'ti; _printViaIframe ka 30s hard ceiling guarantee karta
+        // hai ke intezar kabhi hamesha ke liye nahi atakta.
+        printChainBusy() {
+            return !!((this.pendingPrintTimers && this.pendingPrintTimers.length)
+                || (this.printMessageHandlers && this.printMessageHandlers.length)
+                || this.printWorkInFlight > 0);
+        },
+        // Dine-in Hold/KOT ke baad (receipt popup nahi hota) — prints mukammal
+        // hote hi full-screen Tables page par chalo.
+        navigateToTablesWhenIdle() {
+            if (this.tablesReturnPending) return;
+            this.tablesReturnPending = true;
+            const go = () => { window.location.assign('/pos/restaurant/tables'); };
+            if (!this.printChainBusy()) { go(); return; }
+            const iv = setInterval(() => {
+                if (this.printChainBusy()) return;
+                clearInterval(iv);
+                go();
+            }, 400);
+        },
+        // Receipt-close gateway: TRUE lautaye to caller kuch na kare (hum popup
+        // ko print-chain khatam hone par khud band karke Tables par le jate hain).
+        // Flag OFF / offline (tables page SW-cache mein nahi) = FALSE → purana flow.
+        returnToTablesAfterReceipt() {
+            if (!this.tablesFirstFlow || !this.tableBoardEnabled) return false;
+            if (!navigator.onLine) return false;
+            if (this.tablesReturnPending) return true; // pehle se raste mein
+            this.tablesReturnPending = true;
+            const finish = () => { this.showReceipt = false; window.location.assign('/pos/restaurant/tables'); };
+            if (!this.printChainBusy()) { finish(); return true; }
+            // Prints abhi chal rahi hain → popup khula rehta hai (auto-close ka
+            // wahi "wait" usool) — chain drain hote hi band + navigate.
+            const iv = setInterval(() => {
+                if (this.printChainBusy()) return;
+                clearInterval(iv);
+                finish();
+            }, 400);
+            return true;
+        },
+        // X / Close / Esc — single gateway so tables-first shops return to the board.
+        closeReceiptPopup() {
+            if (this.returnToTablesAfterReceipt()) return;
+            this.showReceipt = false;
         },
 
         // Cancelable timer registry — prevents stray prints firing after the cashier closes
@@ -8342,12 +8413,21 @@ function restaurantPos() {
                 window.removeEventListener('message', messageHandler);
                 this.printMessageHandlers = this.printMessageHandlers.filter(h => h !== messageHandler);
             };
+            let ceilingTimerId = null; // Task 779: 30s hard-fallback timer id (cleared on success)
             const fireOnce = (() => {
                 let invoked = false;
                 return () => {
                     if (invoked) return;
                     invoked = true;
                     removeHandler();
+                    // Task 779: success par 30s ceiling timer bhi saaf karo — warna woh
+                    // pendingPrintTimers mein 30s tak para rehta aur receipt auto-close /
+                    // tables-first navigation bila wajah "print chal rahi hai" samajh kar rukti.
+                    if (ceilingTimerId) {
+                        clearTimeout(ceilingTimerId);
+                        this.pendingPrintTimers = this.pendingPrintTimers.filter(t => t !== ceilingTimerId);
+                        ceilingTimerId = null;
+                    }
                     // FOCUS RECOVERY (customer report Jul 2026 — "direct print shortcut
                     // not working properly"): after the print dialog closes, focus can
                     // stay INSIDE the hidden print iframe. Our shortcuts live on the
@@ -8371,7 +8451,7 @@ function restaurantPos() {
             this.printMessageHandlers.push(messageHandler);
             // Hard ceiling — if iframe never signals (load failure / exotic printer driver),
             // advance the chain after 30s so the cashier isn't stuck.
-            this.queuePrintTimer(fireOnce, 30000);
+            ceilingTimerId = this.queuePrintTimer(fireOnce, 30000);
             const cacheBustedUrl = url
                 + (url.includes('?') ? '&' : '?')
                 + '_t=' + Date.now()
@@ -8408,6 +8488,16 @@ function restaurantPos() {
         },
 
         async trySilentPrint(payload, _retry = true) {
+            // Task 779: enqueue fetch in flight = print WORK busy — tables-first
+            // navigation intezar karti hai (warna fetch page-change par kat jata).
+            this.printWorkInFlight++;
+            try {
+                return await this._trySilentPrintInner(payload, _retry);
+            } finally {
+                this.printWorkInFlight--;
+            }
+        },
+        async _trySilentPrintInner(payload, _retry = true) {
             try {
                 const res = await fetch('/pos/api/print-jobs', {
                     method: 'POST',
@@ -8461,6 +8551,17 @@ function restaurantPos() {
 
         async printReceipt(onAfterPrint) {
             if (!this.lastTransactionId) { if (typeof onAfterPrint === 'function') onAfterPrint(); return; }
+            // Task 779: poore printReceipt ko print-WORK ginti mein rakho — praPrintGrace
+            // ke intezar ke doran na timers hote hain na handlers, aur tables-first
+            // navigation us khali gap mein page badal kar print kaat sakti thi.
+            this.printWorkInFlight++;
+            try {
+                return await this._printReceiptInner(onAfterPrint);
+            } finally {
+                this.printWorkInFlight--;
+            }
+        },
+        async _printReceiptInner(onAfterPrint) {
             // Task 655: agent-mode fiscal grace — bill abhi 'pending' hai to chand
             // seconds ka bounded intezar (submit aa jaye to PEHLI slip par hi PRA
             // fiscal number chapta hai), warna jo bhi haalat hai usi par print.
@@ -9467,6 +9568,9 @@ function restaurantPos() {
                     return;
                 }
                 this.cancelReceiptAutoClose();
+                // Task 779: Tables-first flow ON → auto-close bhi Tables screen par
+                // wapas le jata hai (print chain yahan tak pehle hi drain ho chuki).
+                if (this.returnToTablesAfterReceipt()) return;
                 this.showReceipt = false;
             }, 1000);
         },

@@ -3543,6 +3543,11 @@ window.addEventListener('popstate', function() {
                         <span x-text="lastPaymentMethod"></span>
                     </span>
                 </div>
+                {{-- Waiter name (Task 881): shown only when the settled bill was a waiter order --}}
+                <div x-show="lastWaiterName" x-cloak class="relative flex items-center justify-center gap-1.5 mt-2">
+                    <svg class="w-3.5 h-3.5 text-teal-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                    <span class="text-[11px] font-semibold text-teal-700 dark:text-teal-400" x-text="lastWaiterName"></span>
+                </div>
                 {{-- Sale meta: time + item count (item count auto-hides when unknown) --}}
                 <div class="relative flex items-center justify-center gap-2.5 mt-2 text-[10px] font-semibold text-gray-400 dark:text-gray-500">
                     <span class="inline-flex items-center gap-1" x-show="lastSaleAt">
@@ -4390,6 +4395,8 @@ function restaurantPos() {
         // actual PRA fiscal invoice number once PRA returns it.
         lastPraNumber: '',
         lastPraStatus: '',
+        // Waiter name shown in the success popup (empty for non-waiter bills).
+        lastWaiterName: '',
         submitting: false,
         cartAnimating: false,
         stockError: '',
@@ -4915,6 +4922,7 @@ function restaurantPos() {
             this.lastPaymentMethod = method;
             this.lastPraNumber = '';
             this.lastPraStatus = '';
+            this.lastWaiterName = (this.incomingOrderInfo && this.incomingOrderInfo.waiter) ? this.incomingOrderInfo.waiter : '';
             this.lastItemsCount = (this.cart || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
             this.lastSaleAt = Date.now();
             this.showReceipt = true;
@@ -8459,6 +8467,7 @@ function restaurantPos() {
                 this.lastPaymentMethod = method;
                 this.lastPraNumber = data.pra_invoice_number || '';
                 this.lastPraStatus = data.pra_status || '';
+                this.lastWaiterName = (this.incomingOrderInfo && this.incomingOrderInfo.waiter) ? this.incomingOrderInfo.waiter : '';
                 this.lastItemsCount = (this.cart || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
                 this.lastSaleAt = Date.now();
                 this.showReceipt = true;
@@ -9564,6 +9573,7 @@ function restaurantPos() {
                     this.lastTotal = Math.round(parseFloat(data.total_amount ?? bill.total_amount) || 0);
                     this.lastPaymentMethod = method || bill.payment_method || 'cash';
                     this.lastPraNumber = data.pra_number || '';
+                    this.lastWaiterName = '';
                     // Task 655: 'submitted' (not 'completed') — the popup badge only
                     // understands submitted/pending/offline/failed; 'completed' fell
                     // through to the grey LOCAL BILL label on a real fiscal submit.
@@ -9777,6 +9787,7 @@ function restaurantPos() {
                     this.lastOrderId = orderId || null;
                     this.lastTotal = Math.round(savedTotal || data.total_amount || 0); this.lastPaymentMethod = method;
                     this.lastPraNumber = data.pra_invoice_number || ''; this.lastPraStatus = data.pra_status || '';
+                    this.lastWaiterName = (this.incomingOrderInfo && this.incomingOrderInfo.waiter) ? this.incomingOrderInfo.waiter : '';
                     this.lastItemsCount = (this.cart || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
                     this.lastSaleAt = Date.now();
                     this.showReceipt = true;

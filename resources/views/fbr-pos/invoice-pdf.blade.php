@@ -130,6 +130,23 @@
                  POS Reg # kisi jagah nahi. --}}
         </div>
 
+        {{-- Order type badge (mirrors receipt.blade.php lines 265–281):
+             Dine-In / Take Away / Delivery shown bold + centered so the badge
+             is visible on the printed A4 PDF. Retail bills (no order_type) skip. --}}
+        @php
+            $pdfOrderType = match ($transaction->order_type ?? null) {
+                'dine_in'  => 'DINE-IN',
+                'takeaway' => 'TAKE AWAY',
+                'delivery' => 'DELIVERY',
+                default    => null,
+            };
+        @endphp
+        @if($pdfOrderType)
+        <div style="text-align:center; margin:6px 0 4px;">
+            <span style="display:inline-block; border:2px solid #1e3a5f; padding:3px 16px; font-size:13px; font-weight:bold; letter-spacing:1.5px; color:#1e3a5f;">{{ $pdfOrderType }}</span>
+        </div>
+        @endif
+
         <div class="info-section">
             <div class="info-row">
                 <div class="lbl">{{ __('pos.receipt_date') }}</div>

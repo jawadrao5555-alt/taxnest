@@ -3980,6 +3980,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'vs_last_weekday' => 'Ba-muqabla pichle :weekday',
     'vs_yesterday' => 'ba-muqabla kal',
     'wait_prev_bill_saved' => 'Thora ruk kar dobara dabayen — pichla bill abhi save hua hai',
+    'waiter_order_already_settled' => 'Yeh waiter order kisi aur cashier ne pehle hi settle kar diya hai. Dobara load karein aur koshish karein.',
     'waiter_order_cancel_side' => 'Waiter ka order — cancel sirf waiter/admin side se',
     'incoming_cancel_btn' => 'Order Cancel karo',
     'cancel_incoming_q' => 'Waiter ka order cancel karein ',

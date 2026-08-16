@@ -959,15 +959,25 @@ class RestaurantWaiterController extends Controller
         $order = RestaurantOrder::where('company_id', $companyId)->with('table')->find($orderId);
 
         // Free the table if no other live order still sits on it (P4 pattern).
+        // Task 880: wrapped in try/catch so a non-critical table-status update
+        // never propagates into the parent DB transaction and rolls back the bill.
         if ($order && $order->table_id) {
-            $stillActive = RestaurantOrder::where('company_id', $companyId)
-                ->where('table_id', $order->table_id)
-                ->where('id', '!=', $order->id)
-                ->whereIn('status', ['held', 'preparing', 'ready'])
-                ->exists();
-            if (!$stillActive) {
-                RestaurantTable::where('id', $order->table_id)
-                    ->update(['status' => 'available', 'locked_by_user_id' => null, 'locked_at' => null, 'occupied_since' => null]);
+            try {
+                $stillActive = RestaurantOrder::where('company_id', $companyId)
+                    ->where('table_id', $order->table_id)
+                    ->where('id', '!=', $order->id)
+                    ->whereIn('status', ['held', 'preparing', 'ready'])
+                    ->exists();
+                if (!$stillActive) {
+                    RestaurantTable::where('id', $order->table_id)
+                        ->update(['status' => 'available', 'locked_by_user_id' => null, 'locked_at' => null, 'occupied_since' => null]);
+                }
+            } catch (\Throwable $e) {
+                \Log::warning('settleWaiterOrder: table-free failed (non-fatal)', [
+                    'order_id' => $orderId,
+                    'table_id' => $order->table_id,
+                    'error'    => $e->getMessage(),
+                ]);
             }
         }
 

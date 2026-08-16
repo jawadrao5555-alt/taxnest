@@ -2559,6 +2559,25 @@ class PosController extends Controller
                 'reference_number' => $request->reference_number,
             ]);
 
+            // Task 880: settle the linked waiter order INSIDE the transaction so
+            // pos_transaction_id is written atomically with the bill commit. Receipt
+            // templates query restaurant_orders by pos_transaction_id to show the
+            // waiter name — the link must exist before the auto-print chain fires its
+            // first receipt render. If settle returns false (order already settled
+            // elsewhere / not claimable by this cashier), the entire DB transaction
+            // rolls back: no orphaned bill, no silent missing-waiter-line on the slip.
+            // FINAL bills only — provisionals are editable/deletable and must never
+            // consume the waiter order prematurely (conscious P7 rule).
+            $waiterOrderSettled = false;
+            if (!$saveAsProvisional && $request->filled('incoming_order_id')) {
+                $waiterOrderSettled = RestaurantWaiterController::settleWaiterOrder(
+                    $companyId, (int) $request->input('incoming_order_id'), $transaction, auth('pos')->user()
+                );
+                if (!$waiterOrderSettled) {
+                    throw new \RuntimeException(__('pos.waiter_order_already_settled'));
+                }
+            }
+
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
@@ -2586,28 +2605,6 @@ class PosController extends Controller
             $invoiceNumber,
             auth('pos')->id()
         );
-
-        // Task 646: settle the linked WAITER order server-side, BEFORE this
-        // response — the receipt templates look the waiter up via
-        // restaurant_orders.pos_transaction_id, so the link must exist by the
-        // time the (auto-)print chain renders the first receipt. FINAL bills
-        // only: the client omits incoming_order_id on provisional saves (a
-        // provisional must never consume the waiter order — conscious P7 rule).
-        $waiterOrderSettled = false;
-        if (!$saveAsProvisional && $request->filled('incoming_order_id')) {
-            try {
-                $waiterOrderSettled = RestaurantWaiterController::settleWaiterOrder(
-                    $companyId, (int) $request->input('incoming_order_id'), $transaction, auth('pos')->user()
-                );
-            } catch (\Throwable $e) {
-                // Never fail a stored sale over the settle — the client's
-                // completeIncomingOrder fallback retries it.
-                \Log::warning('Waiter order settle in storeInvoice failed: ' . $e->getMessage(), [
-                    'transaction_id' => $transaction->id,
-                    'incoming_order_id' => $request->input('incoming_order_id'),
-                ]);
-            }
-        }
 
         // F3 Dine-In (Jul 2026): a table reserved from the universal sale screen is
         // auto-freed the moment its bill is stored (final OR provisional). Only

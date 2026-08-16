@@ -3981,6 +3981,7 @@ return [
     'vs_last_weekday' => 'بمقابلہ گزشتہ :weekday',
     'vs_yesterday' => 'بمقابلہ کل',
     'wait_prev_bill_saved' => 'تھوڑا انتظار کریں اور دوبارہ دبائیں — پچھلا بل ابھی سیو ہوا ہے',
+    'waiter_order_already_settled' => 'یہ ویٹر آرڈر کسی دوسرے کیشیئر نے پہلے ہی سیٹل کر دیا ہے۔ براہ کرم دوبارہ لوڈ کر کے کوشش کریں۔',
     'waiter_order_cancel_side' => 'ویٹر آرڈر — صرف ویٹر/ایڈمن سائیڈ سے کینسل کریں',
     'incoming_cancel_btn' => 'آرڈر کینسل کریں',
     'cancel_incoming_q' => 'ویٹر آرڈر کینسل کریں ',

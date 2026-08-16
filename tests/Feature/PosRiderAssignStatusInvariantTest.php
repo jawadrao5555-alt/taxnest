@@ -538,4 +538,86 @@ class PosRiderAssignStatusInvariantTest extends TestCase
         $this->assertSame('delivered', $this->tx($bill)->delivery_status);
         $this->assertFiscalIdentityUnchanged($before, $bill);
     }
+
+    // ── 7. updateStatus JSON path: dispatched/returned rejected on riderless ──
+
+    /**
+     * Task 813: the riderless guard in updateStatus() allows ONLY 'delivered'
+     * (once, from NULL).  POSTing 'dispatched' or 'returned' via the
+     * JSON/sale-screen path must return a JSON error body (success:false or
+     * absent), never a 200 success, and must not mutate any column.
+     *
+     * This test covers delivery_status='dispatched' on a riderless bill.
+     */
+    public function test_update_status_json_path_rejects_dispatched_on_riderless_bill(): void
+    {
+        $bill = $this->makeBill(null, [
+            'invoice_number'     => 'POS-2026-81301',
+            'invoice_mode'       => 'pra',
+            'pra_status'         => 'submitted',
+            'pra_invoice_number' => 'PRA-8131',
+            'order_type'         => 'delivery',
+            'status'             => 'completed',
+            'delivery_status'    => null,
+            'rider_id'           => null,
+            'rider_settlement_id' => null,
+        ]);
+        $before = $this->tx($bill);
+
+        $response = $this->updateStatusJson($bill, 'dispatched');
+
+        // Must be a JsonResponse — not a redirect, not a 500.
+        $this->assertInstanceOf(\Illuminate\Http\JsonResponse::class, $response);
+
+        // success must NOT be true.
+        $body = $response->getData(true);
+        $this->assertFalse(
+            (bool) ($body['success'] ?? false),
+            'dispatched on riderless bill must not return success:true'
+        );
+
+        // Delivery status unchanged (still NULL).
+        $this->assertNull($this->tx($bill)->delivery_status, 'delivery_status must stay NULL after rejected dispatched');
+
+        // Fiscal identity byte-for-byte unchanged.
+        $this->assertFiscalIdentityUnchanged($before, $bill);
+    }
+
+    /**
+     * Task 813: same guard — 'returned' on a riderless bill must also be
+     * rejected via the JSON path with a JSON error body and no DB mutation.
+     */
+    public function test_update_status_json_path_rejects_returned_on_riderless_bill(): void
+    {
+        $bill = $this->makeBill(null, [
+            'invoice_number'     => 'POS-2026-81302',
+            'invoice_mode'       => 'pra',
+            'pra_status'         => 'submitted',
+            'pra_invoice_number' => 'PRA-8132',
+            'order_type'         => 'delivery',
+            'status'             => 'completed',
+            'delivery_status'    => null,
+            'rider_id'           => null,
+            'rider_settlement_id' => null,
+        ]);
+        $before = $this->tx($bill);
+
+        $response = $this->updateStatusJson($bill, 'returned');
+
+        // Must be a JsonResponse — not a redirect, not a 500.
+        $this->assertInstanceOf(\Illuminate\Http\JsonResponse::class, $response);
+
+        // success must NOT be true.
+        $body = $response->getData(true);
+        $this->assertFalse(
+            (bool) ($body['success'] ?? false),
+            'returned on riderless bill must not return success:true'
+        );
+
+        // Delivery status unchanged (still NULL).
+        $this->assertNull($this->tx($bill)->delivery_status, 'delivery_status must stay NULL after rejected returned');
+
+        // Fiscal identity byte-for-byte unchanged.
+        $this->assertFiscalIdentityUnchanged($before, $bill);
+    }
 }

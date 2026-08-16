@@ -4936,7 +4936,16 @@ function restaurantPos() {
         // to abort mid-flight: the pay_uuid/offline_uuid replay guards make the
         // retry idempotent server-side (no duplicate bill, no duplicate KOT).
         async fetchWithTimeout(url, opts = {}, ms = 20000) {
-            if (typeof AbortController === 'undefined') return fetch(url, opts);
+            if (typeof AbortController === 'undefined') {
+                // Older Android WebViews lack AbortController — use Promise.race
+                // so the 20 s hard timeout still fires and _isTimeoutError(e)
+                // recognises it (AbortError name), showing the safe-retry toast
+                // instead of hanging forever or showing a blank error.
+                var _toutP = new Promise(function (_, rej) {
+                    setTimeout(function () { var e = new Error('timeout'); e.name = 'AbortError'; rej(e); }, ms);
+                });
+                return Promise.race([fetch(url, opts), _toutP]);
+            }
             const ctrl = new AbortController();
             const timer = setTimeout(() => { try { ctrl.abort(); } catch (_) {} }, ms);
             try { return await fetch(url, { ...opts, signal: ctrl.signal }); }

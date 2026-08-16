@@ -1,6 +1,7 @@
 <x-pos-layout>
 <div x-data="kdsScreen()" x-init="startPolling(); $nextTick(() => $refs.scanInput && $refs.scanInput.focus())"
      @click.self="$refs.scanInput && $refs.scanInput.focus()"
+     @click.window.once="unlockAudio()"
      class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     {{-- Hidden scanner input: stays focused; barcode scanners auto-type then send Enter --}}
     <input type="text" x-ref="scanInput" x-model="scanBuffer"
@@ -65,7 +66,10 @@
         {{-- Task 883: cancellation alert — shown above tiles when any order has unacknowledged void_items.
              Uses the same acknowledgeVoids() path as the list-view badge so the ack clears on ALL
              KDS screens on the next poll (server sets void_items = NULL). --}}
+        {{-- Task 931: kds-urgent pulsing ring applied whenever the banner is visible;
+             the pulse stops automatically when the cook taps "Got it" (aggregateVoidOrders empties). --}}
         <div x-show="aggregateVoidOrders.length > 0"
+             :class="{ 'kds-urgent': aggregateVoidOrders.length > 0 }"
              class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border-2 border-red-400 dark:border-red-700 rounded-xl">
             <div class="flex items-start justify-between gap-3 flex-wrap">
                 <div class="flex items-start gap-2 min-w-0">
@@ -282,6 +286,9 @@ function kdsScreen() {
         // Task 841: per-device acknowledgement of cancelled-items badges.
         // Map of orderId → JSON-string of void_items last acknowledged by this device.
         acknowledgedVoids: {},
+        // Task 931: single shared AudioContext — created once on first user gesture so
+        // Chrome/Android's autoplay policy doesn't keep it suspended when polling fires.
+        _audioCtx: null,
 
         // Kitchen lifecycle state (never the billing status): new → preparing → ready.
         kstate(order) {
@@ -422,24 +429,60 @@ function kdsScreen() {
             if (v !== null && this.validStations.includes(String(v))) this.stationFilter = String(v);
         },
 
+        // Task 931: unlockAudio() must be called from a real user-gesture handler
+        // (click/tap) so Chrome/Android lifts the autoplay suspension on _audioCtx.
+        // @click.window.once on the container wires this automatically on first touch.
+        unlockAudio() {
+            try {
+                if (!this._audioCtx) {
+                    this._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (this._audioCtx.state === 'suspended') this._audioCtx.resume().catch(() => {});
+            } catch(e) {}
+        },
+
         playUrgentBeep() {
             try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc = ctx.createOscillator(); const gain = ctx.createGain();
-                osc.connect(gain); gain.connect(ctx.destination);
-                osc.frequency.value = 880; osc.type = 'square';
-                gain.gain.value = 0.15;
-                osc.start(); osc.stop(ctx.currentTime + 0.15);
-                setTimeout(() => { const o2 = ctx.createOscillator(); o2.connect(gain); o2.frequency.value = 880; o2.type = 'square'; o2.start(); o2.stop(ctx.currentTime + 0.15); }, 200);
+                // Reuse the shared context unlocked via unlockAudio(); create lazily
+                // if unlockAudio() hasn't run yet (e.g. urgent-timer fires first).
+                if (!this._audioCtx) {
+                    this._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                const ctx = this._audioCtx;
+                const play = () => {
+                    const gain = ctx.createGain();
+                    gain.connect(ctx.destination);
+                    gain.gain.value = 0.15;
+                    const osc = ctx.createOscillator();
+                    osc.connect(gain); osc.frequency.value = 880; osc.type = 'square';
+                    osc.start(); osc.stop(ctx.currentTime + 0.15);
+                    setTimeout(() => {
+                        const o2 = ctx.createOscillator();
+                        o2.connect(gain); o2.frequency.value = 880; o2.type = 'square';
+                        o2.start(); o2.stop(ctx.currentTime + 0.15);
+                    }, 200);
+                };
+                // If still suspended (no gesture yet), resume first then play.
+                if (ctx.state === 'suspended') {
+                    ctx.resume().then(play).catch(() => {});
+                } else {
+                    play();
+                }
             } catch(e) {}
         },
 
         async refreshOrders() {
             try {
+                // Task 931: snapshot void-order ids before the poll so we can detect
+                // new cancellations arriving mid-session and beep once for the cook.
+                const prevVoidIds = new Set(this.aggregateVoidOrders.map(o => o.id));
                 const res = await fetch('{{ route("pos.restaurant.live-orders") }}');
                 if (res.ok) {
                     this.orders = await res.json();
                     this.checkAutoPrint();
+                    // Play the urgent beep if any void order wasn't visible before this poll.
+                    const hasNew = this.aggregateVoidOrders.some(o => !prevVoidIds.has(o.id));
+                    if (hasNew) this.playUrgentBeep();
                 }
             } catch (e) {}
         },

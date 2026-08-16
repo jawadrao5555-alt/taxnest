@@ -994,6 +994,18 @@ function waiterApp() {
         async confirmCancel() {
             if (!this.cancelAsk || this.cancelBusy) return;
             this.cancelBusy = true;
+
+            // Task 925 — Android popup-blocker fix: open a BLANK named window here,
+            // synchronously inside the click/tap handler, while the browser still
+            // recognises this as a direct user gesture. After the async cancel POST
+            // we either navigate the window to the void-slip URL (agent offline path)
+            // or close it immediately (agent handled it, or cancel failed).
+            // window.open() called after an await loses the user-activation context
+            // on Android Chrome, so the popup blocker kills it — hence the pre-open.
+            // If window.open() itself is blocked (returns null), _printVoidViaIframe
+            // falls back to a hidden iframe which still works on desktop Chrome.
+            const voidWin = window.open('', 'waiter-void-print', 'width=380,height=620');
+
             try {
                 const res = await fetch('/pos/waiter/orders/' + this.cancelAsk.id + '/cancel', {
                     method: 'POST',
@@ -1003,16 +1015,23 @@ function waiterApp() {
                 if (res.ok && data.success) {
                     this.showToast(@js(__('pos.order_cancelled_toast')), 'success');
                     // Task 850 — void slip delivery: agent path (queued=true) needs no
-                    // client action. When the agent is offline, fall back to a hidden
-                    // iframe that triggers window.print() via auto_print=1 so the
-                    // kitchen still gets the VOID slip from the browser.
+                    // client action. When the agent is offline, navigate the pre-opened
+                    // window to the void-ticket URL so auto_print=1 triggers
+                    // window.print() in a real window context (works on Android).
                     if (!data.kot_void_queued && data.kot_void_url) {
-                        this._printVoidViaIframe(data.kot_void_url + '&auto_print=1');
+                        this._printVoidViaIframe(data.kot_void_url + '&auto_print=1', voidWin);
+                    } else {
+                        // Agent queued the void — no browser print needed; close the
+                        // pre-opened blank window so nothing lingers on screen.
+                        if (voidWin && !voidWin.closed) voidWin.close();
                     }
                 } else {
+                    // Cancel failed — discard the pre-opened window immediately.
+                    if (voidWin && !voidWin.closed) voidWin.close();
                     this.showToast(data.message || @js(__('pos.cancel_failed')), 'error');
                 }
             } catch (e) {
+                if (voidWin && !voidWin.closed) voidWin.close();
                 this.showToast(@js(__('pos.cancel_failed_conn')), 'error');
             }
             this.cancelBusy = false;
@@ -1282,19 +1301,36 @@ function waiterApp() {
             this._toastTimer = setTimeout(() => { this.toast = ''; }, 3000);
         },
 
-        // Task 850 — void-slip iframe fallback: when the Desktop Agent is offline,
-        // load the void-ticket URL in a hidden iframe so auto_print=1 triggers
-        // window.print() inside it and the kitchen still gets the VOID slip.
-        // Mirrors the cashier sale screen's _printViaIframe pattern (universal.blade.php).
-        _printVoidViaIframe(url) {
-            let frame = document.getElementById('waiter-void-frame');
-            if (!frame) {
-                frame = document.createElement('iframe');
-                frame.id = 'waiter-void-frame';
-                frame.style.cssText = 'position:fixed;width:0;height:0;border:none;left:-9999px;top:-9999px;';
-                document.body.appendChild(frame);
+        // Task 850/925 — void-slip browser-print fallback: when the Desktop Agent is
+        // offline, navigate to the void-ticket URL so auto_print=1 triggers
+        // window.print() and the kitchen gets the VOID slip.
+        //
+        // voidWin — pre-opened blank window from confirmCancel() (opened synchronously
+        //   inside the click handler while user-activation is still live). Navigate it
+        //   to the URL so Android Chrome's popup bridge is already established.
+        //   Falls back to a fresh window.open() if caller could not pre-open (future
+        //   callers), and then to a hidden iframe if even that is blocked.
+        _printVoidViaIframe(url, voidWin) {
+            if (voidWin && !voidWin.closed) {
+                // Use the pre-opened window — already past the popup blocker because
+                // it was opened synchronously in the user-gesture context.
+                voidWin.location.href = url;
+                return;
             }
-            frame.src = url;
+            // No pre-opened window — try a fresh open (works if still in gesture ctx,
+            // or on desktop where popup blocker is off).
+            const popup = window.open(url, 'waiter-void-print', 'width=380,height=620');
+            if (!popup) {
+                // Popup blocked — fall back to hidden iframe (desktop Chrome fallback).
+                let frame = document.getElementById('waiter-void-frame');
+                if (!frame) {
+                    frame = document.createElement('iframe');
+                    frame.id = 'waiter-void-frame';
+                    frame.style.cssText = 'position:fixed;width:0;height:0;border:none;left:-9999px;top:-9999px;';
+                    document.body.appendChild(frame);
+                }
+                frame.src = url;
+            }
         },
     };
 }

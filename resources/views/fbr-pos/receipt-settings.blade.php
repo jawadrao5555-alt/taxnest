@@ -92,6 +92,9 @@
         @php $pconf = $company->printerSettings(); @endphp
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-5">
             <label class="flex items-start gap-3 cursor-pointer p-3 rounded-lg border {{ !empty($pconf['print_confirm_ask']) ? 'border-blue-400 bg-blue-50/40 dark:bg-blue-900/10' : 'border-gray-200 dark:border-gray-700' }} transition">
+                {{-- rp_print_confirm_present = presence marker so a stale/cached POST
+                     can never silently flip this setting OFF (mirrors rp_verify_present). --}}
+                <input type="hidden" name="rp_print_confirm_present" value="1">
                 <input type="checkbox" name="rp_print_confirm" value="1" {{ !empty($pconf['print_confirm_ask']) ? 'checked' : '' }}
                        class="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4">
                 <span class="flex-1 min-w-0">

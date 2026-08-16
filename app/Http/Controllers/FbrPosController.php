@@ -2762,7 +2762,8 @@ class FbrPosController extends Controller
                 'rp_logo_style'   => 'nullable|in:side,center',
                 'rp_receipt_theme' => 'nullable|in:' . implode(',', \App\Support\PosReceiptThemes::keys()),
                 'rp_order_match'  => 'nullable|in:off,token,code',
-                'rp_print_confirm' => 'nullable|in:1',
+                'rp_print_confirm'         => 'nullable|in:1',
+                'rp_print_confirm_present' => 'nullable|in:1',
                 'rp_show_verify_line' => 'nullable|in:1',
                 'rp_verify_present'   => 'nullable|in:1',
             ]);
@@ -2820,9 +2821,14 @@ class FbrPosController extends Controller
             // Task 565: opt-in Yes/No print-confirm dialog — shared flag with PRA
             // POS, stored in pos_printer_settings (normalized-shape rebuild so no
             // other key gets dropped).
-            $pset = $company->printerSettings();
-            $pset['print_confirm_ask'] = $request->has('rp_print_confirm');
-            $company->pos_printer_settings = $pset;
+            // Gated on rp_print_confirm_present (mirrors the rp_verify_present
+            // pattern) so a stale/bare second POST cannot silently flip the
+            // setting OFF when the user has deliberately enabled it.
+            if ($request->has('rp_print_confirm_present')) {
+                $pset = $company->printerSettings();
+                $pset['print_confirm_ask'] = $request->has('rp_print_confirm');
+                $company->pos_printer_settings = $pset;
+            }
 
             $company->save();
 

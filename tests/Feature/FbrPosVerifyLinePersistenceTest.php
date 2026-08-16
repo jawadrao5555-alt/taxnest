@@ -208,6 +208,231 @@ class FbrPosVerifyLinePersistenceTest extends TestCase
             'show_verify_line must default to true when absent from the fbrpos set');
     }
 
+    // ── D. Re-entrant receipt-settings saves must not drop any key ───────────
+
+    /**
+     * Save receipt-settings twice in a row:
+     *   1st POST — rp_verify_present present + show_verify_line=false + bold style set
+     *   2nd POST — rp_verify_present ABSENT (stale/cached form, no verify block)
+     *
+     * After both saves:
+     *   • show_verify_line must still equal the value written in the 1st POST (false)
+     *   • pos_style['bold'] set in the 1st POST must survive the 2nd POST unchanged
+     */
+    public function test_double_save_second_without_verify_present_preserves_show_verify_line_and_pos_style(): void
+    {
+        // 1st POST — sets show_verify_line=false AND bold=true
+        $this->actingAs($this->posAdmin, 'fbrpos')
+            ->post('/fbr-pos/receipt-settings', [
+                'rp_verify_present'  => '1',
+                // rp_show_verify_line absent = false
+                'rp_style_bold'      => '1',
+                'rp_logo_style'      => 'center',
+            ])
+            ->assertRedirect();
+
+        $this->company->refresh();
+        $prefs = $this->company->invoice_display_prefs;
+        $this->assertFalse((bool) ($prefs['fbrpos']['show_verify_line'] ?? true),
+            '1st save: show_verify_line should be false');
+        $this->assertTrue((bool) ($prefs['pos_style']['bold'] ?? false),
+            '1st save: pos_style.bold should be true');
+
+        // 2nd POST — rp_verify_present absent (stale form), no style fields either
+        $this->actingAs($this->posAdmin, 'fbrpos')
+            ->post('/fbr-pos/receipt-settings', [])
+            ->assertRedirect();
+
+        $this->company->refresh();
+        $prefs = $this->company->invoice_display_prefs;
+
+        $this->assertFalse((bool) ($prefs['fbrpos']['show_verify_line'] ?? true),
+            '2nd save: show_verify_line must still be false (2nd POST must not flip it)');
+        $this->assertTrue((bool) ($prefs['pos_style']['bold'] ?? false),
+            '2nd save: pos_style.bold must survive a bare 2nd POST');
+    }
+
+    /**
+     * Mirror: 1st POST sets show_verify_line=true + bold=false;
+     *         2nd POST has rp_verify_present but no rp_show_verify_line (unchecked).
+     *         Then a 3rd POST has neither rp_verify_present NOR any style field.
+     *
+     * After all three saves:
+     *   • show_verify_line = false (set by 2nd POST — marker was present)
+     *   • pos_style['bold'] = false (set by 1st POST, never changed since)
+     */
+    public function test_triple_save_verify_line_and_pos_style_each_only_change_when_their_marker_present(): void
+    {
+        // 1st POST — show_verify_line=true, bold=false (explicit rp_logo_style only)
+        $this->actingAs($this->posAdmin, 'fbrpos')
+            ->post('/fbr-pos/receipt-settings', [
+                'rp_verify_present'   => '1',
+                'rp_show_verify_line' => '1',
+                'rp_logo_style'       => 'center',
+                // no rp_style_bold → bold=false
+            ])
+            ->assertRedirect();
+
+        $this->company->refresh();
+        $prefs = $this->company->invoice_display_prefs;
+        $this->assertTrue((bool) ($prefs['fbrpos']['show_verify_line'] ?? false),
+            '1st save: show_verify_line should be true');
+
+        // 2nd POST — rp_verify_present present, checkbox unchecked (show_verify_line→false)
+        // No style fields → pos_style stays as-is via read-modify-write
+        $this->actingAs($this->posAdmin, 'fbrpos')
+            ->post('/fbr-pos/receipt-settings', [
+                'rp_verify_present' => '1',
+                // rp_show_verify_line absent → false
+            ])
+            ->assertRedirect();
+
+        $this->company->refresh();
+        $prefs = $this->company->invoice_display_prefs;
+        $this->assertFalse((bool) ($prefs['fbrpos']['show_verify_line'] ?? true),
+            '2nd save: show_verify_line should now be false');
+
+        // 3rd POST — completely bare form (no rp_verify_present, no style fields)
+        $this->actingAs($this->posAdmin, 'fbrpos')
+            ->post('/fbr-pos/receipt-settings', [])
+            ->assertRedirect();
+
+        $this->company->refresh();
+        $prefs = $this->company->invoice_display_prefs;
+        $this->assertFalse((bool) ($prefs['fbrpos']['show_verify_line'] ?? true),
+            '3rd save: show_verify_line must still be false (bare POST must not touch it)');
+    }
+
+    /**
+     * pos_style keys not touched on this page (show_logo, pdf_paper, show_menu_qr)
+     * must survive even when a full-featured 1st POST is followed by a bare 2nd POST.
+     *
+     * This guards against a "rebuild-from-scratch" regression where a 2nd save
+     * could blank pos_style keys that were never submitted in the form.
+     */
+    public function test_double_save_preserves_unrelated_pos_style_keys(): void
+    {
+        // Pre-seed keys that the receipt-settings page does not submit
+        $this->company->invoice_display_prefs = [
+            'pos_style' => [
+                'show_logo'    => false,
+                'pdf_paper'    => 'a4',
+                'show_menu_qr' => true,
+                'bold'         => false,
+                'logo'         => 'center',
+            ],
+            'fbrpos' => ['show_verify_line' => true],
+        ];
+        $this->company->save();
+
+        // 1st POST — sets bold + verify_line
+        $this->actingAs($this->posAdmin, 'fbrpos')
+            ->post('/fbr-pos/receipt-settings', [
+                'rp_verify_present'   => '1',
+                'rp_show_verify_line' => '1',
+                'rp_style_bold'       => '1',
+                'rp_logo_style'       => 'side',
+            ])
+            ->assertRedirect();
+
+        $this->company->refresh();
+        $prefs = $this->company->invoice_display_prefs;
+        // Keys written by this page
+        $this->assertTrue((bool) ($prefs['fbrpos']['show_verify_line'] ?? false));
+        $this->assertTrue((bool) ($prefs['pos_style']['bold'] ?? false));
+        $this->assertSame('side', $prefs['pos_style']['logo'] ?? null);
+        // Keys this page never touches — must survive
+        $this->assertFalse((bool) ($prefs['pos_style']['show_logo'] ?? true),
+            '1st save: show_logo (not in form) must be preserved');
+        $this->assertSame('a4', $prefs['pos_style']['pdf_paper'] ?? null,
+            '1st save: pdf_paper (not in form) must be preserved');
+        $this->assertTrue((bool) ($prefs['pos_style']['show_menu_qr'] ?? false),
+            '1st save: show_menu_qr (not in form) must be preserved');
+
+        // 2nd POST — bare form (simulate stale/cached submit)
+        $this->actingAs($this->posAdmin, 'fbrpos')
+            ->post('/fbr-pos/receipt-settings', [])
+            ->assertRedirect();
+
+        $this->company->refresh();
+        $prefs = $this->company->invoice_display_prefs;
+        // All keys must survive the bare 2nd POST
+        $this->assertTrue((bool) ($prefs['fbrpos']['show_verify_line'] ?? false),
+            '2nd save: show_verify_line must survive bare POST');
+        $this->assertTrue((bool) ($prefs['pos_style']['bold'] ?? false),
+            '2nd save: bold must survive bare POST');
+        $this->assertSame('side', $prefs['pos_style']['logo'] ?? null,
+            '2nd save: logo must survive bare POST');
+        $this->assertFalse((bool) ($prefs['pos_style']['show_logo'] ?? true),
+            '2nd save: show_logo must survive bare POST');
+        $this->assertSame('a4', $prefs['pos_style']['pdf_paper'] ?? null,
+            '2nd save: pdf_paper must survive bare POST');
+        $this->assertTrue((bool) ($prefs['pos_style']['show_menu_qr'] ?? false),
+            '2nd save: show_menu_qr must survive bare POST');
+    }
+
+    /**
+     * print_confirm_ask=true set in a 1st POST (with rp_print_confirm_present marker)
+     * must survive a 2nd bare POST that omits rp_print_confirm_present entirely.
+     *
+     * Before the fix, the bare 2nd POST would call has('rp_print_confirm') → false
+     * unconditionally and silently disable the setting the owner deliberately enabled.
+     */
+    public function test_double_save_bare_second_post_does_not_disable_print_confirm_ask(): void
+    {
+        // 1st POST — enable print-confirm dialog
+        $this->actingAs($this->posAdmin, 'fbrpos')
+            ->post('/fbr-pos/receipt-settings', [
+                'rp_print_confirm_present' => '1',
+                'rp_print_confirm'         => '1',
+            ])
+            ->assertRedirect();
+
+        $this->company->refresh();
+        $pset = $this->company->printerSettings();
+        $this->assertTrue((bool) ($pset['print_confirm_ask'] ?? false),
+            '1st save: print_confirm_ask should be true');
+
+        // 2nd POST — bare/stale form (no rp_print_confirm_present, no rp_print_confirm)
+        $this->actingAs($this->posAdmin, 'fbrpos')
+            ->post('/fbr-pos/receipt-settings', [])
+            ->assertRedirect();
+
+        $this->company->refresh();
+        $pset = $this->company->printerSettings();
+        $this->assertTrue((bool) ($pset['print_confirm_ask'] ?? false),
+            '2nd bare POST must not silently disable print_confirm_ask');
+    }
+
+    /**
+     * When rp_print_confirm_present is present but rp_print_confirm is absent
+     * (checkbox unchecked), print_confirm_ask must be written as false — the
+     * marker distinguishes "intentionally unchecked" from "stale form".
+     */
+    public function test_print_confirm_present_without_checkbox_writes_false(): void
+    {
+        // Pre-enable
+        $this->actingAs($this->posAdmin, 'fbrpos')
+            ->post('/fbr-pos/receipt-settings', [
+                'rp_print_confirm_present' => '1',
+                'rp_print_confirm'         => '1',
+            ])
+            ->assertRedirect();
+
+        // Deliberate uncheck — marker present, checkbox absent
+        $this->actingAs($this->posAdmin, 'fbrpos')
+            ->post('/fbr-pos/receipt-settings', [
+                'rp_print_confirm_present' => '1',
+                // rp_print_confirm absent = unchecked
+            ])
+            ->assertRedirect();
+
+        $this->company->refresh();
+        $pset = $this->company->printerSettings();
+        $this->assertFalse((bool) ($pset['print_confirm_ask'] ?? true),
+            'Deliberate uncheck (marker present, checkbox absent) must write false');
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────────
 
     private function seedShop(): array

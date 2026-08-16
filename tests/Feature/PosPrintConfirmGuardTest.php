@@ -269,10 +269,11 @@ class PosPrintConfirmGuardTest extends TestCase
         $resp = $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')
             ->from('/fbr-pos/receipt-settings')
             ->post('/fbr-pos/receipt-settings', [
-                'rp_logo_style' => 'center',
-                'rp_style_bold' => '1',
-                'rp_order_match' => 'off',
-                'rp_print_confirm' => '1',
+                'rp_logo_style'            => 'center',
+                'rp_style_bold'            => '1',
+                'rp_order_match'           => 'off',
+                'rp_print_confirm_present' => '1',
+                'rp_print_confirm'         => '1',
             ]);
         $resp->assertRedirect();
 
@@ -294,7 +295,9 @@ class PosPrintConfirmGuardTest extends TestCase
         $resp = $this->actingAs(User::find($this->fbrAdminId), 'fbrpos')
             ->from('/fbr-pos/receipt-settings')
             ->post('/fbr-pos/receipt-settings', [
-                'rp_logo_style' => 'center',
+                'rp_logo_style'            => 'center',
+                'rp_print_confirm_present' => '1',
+                // rp_print_confirm absent = deliberately unchecked = false
             ]);
         $resp->assertRedirect();
 

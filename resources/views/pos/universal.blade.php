@@ -3804,12 +3804,14 @@ $heldOrdersJson = $heldOrders->map(function ($o) {
         'discount_value' => (float) ($o->discount_value ?? 0),
         'discount_amount' => (float) ($o->discount_amount ?? 0),
         'total_amount' => (float) ($o->total_amount ?? 0),
+        'kot_sent_at' => $o->kot_sent_at ? $o->kot_sent_at->toJSON() : null,
         'table' => $o->table ? [
             'id' => $o->table->id,
             'table_number' => $o->table->table_number,
             'occupied_since' => optional($o->table->occupied_since)->toJSON(),
         ] : null,
         'items' => $o->items->map(fn ($i) => [
+            'id' => $i->id,
             'item_id' => $i->item_id,
             'item_type' => $i->item_type,
             'item_name' => $i->item_name,
@@ -7340,7 +7342,22 @@ function restaurantPos() {
         heldMenuRecall() { const o = this.heldMenu; this.heldMenu = null; if (o) this.recallOrder(o); },
         heldMenuPay()    { const o = this.heldMenu; this.heldMenu = null; if (o) this.payHeldOrder(o.id); },
         heldMenuResend() { const o = this.heldMenu; this.heldMenu = null; if (o) this.resendKitchen(o); },
-        heldMenuDelete() { const o = this.heldMenu; this.heldMenu = null; if (o) this.deleteHeldOrder(o.id); },
+        heldMenuDelete() {
+            const o = this.heldMenu;
+            this.heldMenu = null;
+            if (!o) return;
+            if (o.kot_sent_at) {
+                // KOT kitchen ja chuki hai → bare confirm() ki jagah rich modal —
+                // items + Made/Not-Made checkboxes (buildOrderCancelAsk degrades to
+                // noTicks if heldOrders snapshot has no real item ids, par KOT alert
+                // aur made_item_ids path dono sahi kaam karte hain).
+                this.boardCancelAsk = this.buildOrderCancelAsk(o);
+                this.boardCancelMade = {};
+            } else {
+                // No KOT sent — bare confirm is fine (nothing was cooked yet).
+                this.deleteHeldOrder(o.id);
+            }
+        },
         // Free table: reserved-only → release; any open order (cashier OR waiter,
         // Task #409) → confirm + soft-cancel via the same deleteOrder endpoint.
         async boardFree() {
@@ -7384,6 +7401,10 @@ function restaurantPos() {
                 const data = res.ok ? await res.json().catch(() => null) : null;
                 if (data && data.success) {
                     this.heldOrders = this.heldOrders.filter(o => o.id !== ask.order.id);
+                    // Held-orders list modal cleanup — match deleteHeldOrder() so the
+                    // index doesn't point past the end and the modal auto-closes when empty.
+                    if (this.activeHeldIndex >= this.heldOrders.length) this.activeHeldIndex = Math.max(0, this.heldOrders.length - 1);
+                    if (this.heldOrders.length === 0) { this.showHeldOrders = false; this.activeHeldIndex = 0; }
                     // Waiter order cancelled from the board → drop it from the ghanti
                     // (incoming) list too, warna badge stale reh jata (Task #409).
                     this.incomingOrders = this.incomingOrders.filter(o => o.id !== ask.order.id);

@@ -254,6 +254,28 @@
     </table>
     @endif
 
+    @if(($analytics->is_restaurant ?? false) && $analytics->order_types->isNotEmpty())
+    <div class="section-title">{{ __('pos.dcp_order_type_split') }}</div>
+    <table class="data">
+        <thead>
+            <tr>
+                <th>{{ __('pos.dcp_order_type') }}</th>
+                <th class="c">{{ __('pos.dcp_bills') }}</th>
+                <th class="r">{{ __('pos.dc_th_revenue_pkr') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($analytics->order_types as $type => $ot)
+            <tr>
+                <td>{{ ['dine_in' => __('pos.dc_dine_in'), 'takeaway' => __('pos.dc_takeaway'), 'delivery' => __('pos.dc_delivery'), 'counter' => __('pos.dc_counter')][$type] ?? ucfirst(str_replace('_', ' ', $type)) }}</td>
+                <td class="c">{{ $ot->count }}</td>
+                <td class="r">{{ number_format($ot->revenue, 2) }}</td>
+            </tr>
+            @endforeach
+        </tbody>
+    </table>
+    @endif
+
     @if($analytics->top_customers->isNotEmpty())
     <div class="section-title">{{ __('pos.ra_top_customers') }}</div>
     <table class="data">

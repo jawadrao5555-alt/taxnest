@@ -3474,6 +3474,13 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'tables_first_flow_title' => 'Tables-first flow (bari Tables screen wapas)',
     'tables_first_flow_hint' => 'Dine-in KOT ya bill mukammal hone ke baad cashier full-screen Tables page par wapas jata hai — chhoti table window baar baar nahi khulti.',
     'tables_first_flow_saved' => 'Tables-first flow setting save ho gayi.',
+    // Task 781 — Table click = seedha bill kholo (opt-in) + panel table actions
+    'table_direct_open_title' => 'Table click = seedha bill kholo',
+    'table_direct_open_hint' => 'Masroof table par click karte hi uska order seedha cart mein edit ke liye khul jata hai — beech mein koi popup nahi. Table ke saare actions (Proof Bill, FINAL, KOT dobara, Table Badlein, cancel) payment panel mein milte hain.',
+    'table_direct_open_saved' => 'Table-click seedha kholne ki setting save ho gayi.',
+    'panel_table_actions_title' => 'Table ke actions',
+    'panel_proof_bill' => 'Proof Bill Print',
+    'panel_table_shift' => 'Table Badlein (Shift)',
     'table_status_available' => 'Available',
     'table_status_occupied' => 'Occupied',
     'table_status_reserved' => 'Reserved',

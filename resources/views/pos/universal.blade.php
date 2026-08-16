@@ -1628,6 +1628,33 @@ window.addEventListener('popstate', function() {
                         </button>
                     </template>
                     @endif
+                    {{-- ═══ Task 781: IN-PANEL TABLE ACTIONS ═══ (direct-open shops only)
+                         Jab table ka order cart mein khula ho (recalled ya claimed waiter),
+                         board popup ke saare actions yahin milte hain: Proof Bill, FINAL
+                         (print-choice modal ke saath), KOT Dobara, Aakhri Add-on KOT,
+                         Table Badlein, Order Cancel. Flag OFF = block render hi nahi hota. --}}
+                    @if($features->tables ?? false)
+                    <div x-show="panelTableActionsVisible()" x-cloak class="rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20 p-2 space-y-1.5">
+                        <div class="flex items-center justify-between px-1">
+                            <span class="text-[10px] font-black uppercase tracking-wide text-purple-700 dark:text-purple-300">{{ __('pos.panel_table_actions_title') }}</span>
+                            <span class="text-[10px] font-bold text-gray-500 dark:text-gray-400" x-text="panelTableInfo() ? 'T-' + panelTableInfo().table_number : (panelOrderMeta().order_number || '')"></span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-1.5">
+                            <button @click="panelProofBill()" :disabled="submitting || boardBusy" class="py-2 px-1 rounded-lg text-[11px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 disabled:opacity-40 transition">&#128462; {{ __('pos.panel_proof_bill') }}</button>
+                            <button @click="panelAskFinal()" :disabled="submitting || boardBusy" class="py-2 px-1 rounded-lg text-[11px] font-extrabold text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 transition" x-text="window.TXT.make_final_rs_prefix + Math.round(roundedTotal).toLocaleString()"></button>
+                        </div>
+                        @if(($features->kot ?? false) || ($features->kitchen ?? false))
+                        <div class="grid grid-cols-2 gap-1.5" x-show="panelKotSent()">
+                            <button @click="panelResendKot()" :disabled="submitting || boardBusy" title="{{ __('pos.kot_resend_btn') }}" class="py-1.5 px-1 rounded-lg text-[10px] font-bold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 hover:bg-orange-100 disabled:opacity-40 transition">{{ __('pos.resend_short') }}</button>
+                            <button @click="panelLastKot()" :disabled="submitting || boardBusy" title="{{ __('pos.ti_kot_last_addon') }}" class="py-1.5 px-1 rounded-lg text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 disabled:opacity-40 transition">{{ __('pos.kot_last_addon_short') }}</button>
+                        </div>
+                        @endif
+                        <div class="grid grid-cols-2 gap-1.5">
+                            <button x-show="panelTableInfo()" @click="panelAskShift()" :disabled="submitting || boardBusy" class="py-1.5 px-1 rounded-lg text-[10px] font-bold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 disabled:opacity-40 transition">&#8644; {{ __('pos.panel_table_shift') }}</button>
+                            <button x-show="canOrderCancel" @click="panelCancelAsk()" :disabled="submitting || boardBusy" class="py-1.5 px-1 rounded-lg text-[10px] font-bold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 disabled:opacity-40 transition">{{ __('pos.order_cancel_table_free') }}</button>
+                        </div>
+                    </div>
+                    @endif
                     {{-- ONE-TAP method buttons (owner, 26 Jul 2026): CASH/CARD finalize the
                          bill DIRECTLY with that method — tax rate auto-follows the company's
                          tax module (taxRules/pricing mode), no second 8%/16% choice popup.
@@ -1744,7 +1771,7 @@ window.addEventListener('popstate', function() {
                                 <p x-show="tableFloors.length > 1" class="text-[10px] font-bold text-gray-400 uppercase mt-1.5 px-1" x-text="floor.name"></p>
                                 <div class="grid grid-cols-3 gap-2 mt-1.5">
                                     <template x-for="t in floor.tables" :key="'bt' + t.id">
-                                        <button type="button" @click="tableBoardOpen = false; openBoardMenu(t)" class="rounded-lg border-2 px-2 py-1.5 text-left transition hover:scale-[1.02]" :class="boardTileClass(t)">
+                                        <button type="button" @click="tableBoardOpen = false; boardTileClick(t)" class="rounded-lg border-2 px-2 py-1.5 text-left transition hover:scale-[1.02]" :class="boardTileClass(t)">
                                             <span class="flex items-center justify-between gap-1">
                                                 <span class="text-xs font-black" x-text="'T-' + t.table_number"></span>
                                                 <span class="text-[10px] font-bold whitespace-nowrap" :class="boardTileUrgent(t) ? 'animate-pulse' : ''" x-text="(boardTileUrgent(t) ? '⚠ ' : '') + boardTileTime(t)"></span>
@@ -4118,6 +4145,16 @@ function restaurantPos() {
         // baar baar auto-open nahi hota. Default OFF = flow bilkul purana.
         tablesFirstFlow: {{ (($features->tables ?? false) && ($company->tables_first_flow ?? false)) ? 'true' : 'false' }},
         tablesReturnPending: false, // navigation armed — dobara close clicks no-op
+        // Task 781 — TABLE CLICK DIRECT OPEN (video note, 15 Aug 2026): opt-in
+        // per-company (Table Setup page). ON = occupied table par click karte hi
+        // order SEEDHA cart mein edit mode mein khul jata hai (action popup skip)
+        // aur popup ke saare actions payment panel ke table-actions block mein
+        // milte hain. Default OFF = popup flow bilkul purana.
+        tableClickDirectOpen: {{ (($features->tables ?? false) && ($company->table_click_direct_open ?? false)) ? 'true' : 'false' }},
+        // Task 781: snapshot of the recalled order's meta (kot_sent_at /
+        // order_number) — recallOrder REMOVES the order from heldOrders, so the
+        // in-panel KOT buttons + cancel modal need this to gate/label correctly.
+        recalledOrderMeta: null,
         // Task #643 (owner 13 Aug 2026): baked Order Cancel verdict — hides board
         // "Order Cancel", bell-panel Cancel AND the claimed-cart Cancel when false.
         // Server (deleteOrder) re-enforces the SAME verdict with a 403.
@@ -6546,7 +6583,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.kitchenNotes = ''; this.showCartNote = false; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.incomingOrderId = null; this.incomingOrderInfo = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.deliveryPrepaid = false; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this.fixCartIndex(); this.clearCartStorage(); },
+        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.kitchenNotes = ''; this.showCartNote = false; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.recalledOrderMeta = null; this.incomingOrderId = null; this.incomingOrderInfo = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.deliveryPrepaid = false; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm(window.TXT.current_order_has + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast(window.TXT.new_sale_started, 'success');
@@ -6832,7 +6869,9 @@ function restaurantPos() {
             const inc = this.incomingForTable(table);
             if (inc) {
                 if (table.order) {
-                    if (this.cart.length === 0) { this.showTablePicker = false; this.openBoardMenu(table); return; }
+                    // Task 781: flag ON = popup skip, order seedha edit mode mein
+                    // (waiter orders atomic claim se — directOpenTable handles it).
+                    if (this.cart.length === 0) { this.showTablePicker = false; if (this.tableClickDirectOpen) { await this.directOpenTable(table); } else { this.openBoardMenu(table); } return; }
                     this.showToast(window.TXT.table_t_prefix2 + table.table_number + window.TXT.table_occupied_cart_hint, 'warning'); return;
                 }
                 await this.claimAndLoadIncoming(inc); return;
@@ -6843,7 +6882,8 @@ function restaurantPos() {
                 // par warning (view-only rule — cart kabhi discard na ho). ZFC
                 // (3 Aug 2026): warning ab AGLA QADAM batati hai — sirf "masroof
                 // hai" se cashier samajhta tha ke table kharab/phansa hua hai.
-                if (this.cart.length === 0) { this.showTablePicker = false; this.openBoardMenu(table); return; }
+                // Task 781: flag ON = popup skip, order seedha edit mode mein.
+                if (this.cart.length === 0) { this.showTablePicker = false; if (this.tableClickDirectOpen) { await this.directOpenTable(table); } else { this.openBoardMenu(table); } return; }
                 this.showToast(window.TXT.table_t_prefix2 + table.table_number + window.TXT.table_occupied_cart_hint, 'warning'); return;
             }
             // ZFC (Aug 2026): table ALREADY selected + a DIFFERENT free table +
@@ -7204,6 +7244,11 @@ function restaurantPos() {
         // dine_in never re-triggers the auto-KOT chain from a foreign terminal.
         async boardFinalPay(method) {
             if (this.boardBusy || !this.boardConfirm) return;
+            // Task 781: in-panel FINAL — the order is OPEN IN THE CART (possibly
+            // with unsent edits), so it must settle through processPayment (the
+            // hold-with-recalled_order_id → pay pipeline) instead of paying the
+            // stale server-side order snapshot directly.
+            if (this.boardConfirm.fromPanel) { return this.panelFinalPay(method); }
             const t = this.boardConfirm.table;
             this.boardBusy = true;
             try {
@@ -7341,6 +7386,11 @@ function restaurantPos() {
                         this.clearCart();
                         this.loadIncoming();
                     }
+                    // Task 781: in-panel cancel of the RECALLED order in the cart —
+                    // same reset (table freed server-side; clearCart drops the link).
+                    if (this.recalledOrderId && Number(ask.order.id) === Number(this.recalledOrderId)) {
+                        this.clearCart();
+                    }
                     this.showToast(t ? (window.TXT.order_cancel_t_prefix + t.table_number + window.TXT.table_freed_suffix) : window.TXT.order_cancelled_toast, 'success');
                 } else {
                     this.showToast((data && data.message) || window.TXT.cancel_failed, 'error');
@@ -7359,6 +7409,159 @@ function restaurantPos() {
             if (!t) return;
             this.boardMenuTable = null;
             await this.selectTable(t);
+        },
+
+        // ═══ Task 781 — TABLE CLICK DIRECT OPEN + IN-PANEL TABLE ACTIONS ═══
+        // Opt-in (tableClickDirectOpen). Occupied tile/picker click → the order
+        // loads straight into the cart in edit mode (popup skipped); the popup's
+        // actions live in the payment panel while the order is open. Flag OFF =
+        // every path below is dead code and the popup flow is untouched.
+        // Board tile click dispatcher: occupied + empty cart + flag ON = direct
+        // open; everything else (free/reserved tiles, filled cart, flag OFF)
+        // keeps the existing action-menu popup.
+        boardTileClick(t) {
+            if (this.tableClickDirectOpen && t && t.order && this.cart.length === 0) { this.directOpenTable(t); return; }
+            this.openBoardMenu(t);
+        },
+        // Direct open — same logic as boardViewEdit but without the popup:
+        // waiter orders go through the ATOMIC claim; cashier orders are fetched
+        // fresh WITH items from by-table and recalled into the cart. On failure
+        // the cashier gets a clear toast and the table board stays intact.
+        async directOpenTable(t) {
+            if (!t || !t.order || this.boardBusy) return;
+            this.boardBusy = true;
+            try {
+                if (t.order.source === 'waiter') {
+                    await this.claimAndLoadIncoming({ id: t.order.id });
+                    return;
+                }
+                const res = await fetch('/pos/restaurant/orders/by-table/' + t.id, { headers: { 'Accept': 'application/json' } });
+                const orders = res.ok ? await res.json() : [];
+                const list = Array.isArray(orders) ? orders : [];
+                // Number() dono taraf — live PDO ids ko STRING deta hai.
+                const ord = list.find(o => Number(o.id) === Number(t.order.id)) || list[0];
+                if (!ord) {
+                    this.showToast(window.TXT.order_not_found_refreshing, 'warning');
+                    this.loadTableStatus();
+                    return;
+                }
+                ord.table = ord.table || { id: t.id, table_number: t.table_number, occupied_since: t.occupied_since };
+                this.recallOrder(ord);
+            } catch (e) {
+                this.showToast(window.TXT.order_load_failed_conn, 'error');
+            } finally { this.boardBusy = false; }
+        },
+        // ── In-panel table-actions context ─────────────────────────────────
+        // The block shows only when the flag is ON and a dine-in TABLE order is
+        // open in the cart: recalled cashier order (selectedTable set) or a
+        // claimed waiter order (incomingOrderInfo carries table_id/table).
+        panelTableActionsVisible() {
+            if (!this.tableClickDirectOpen || this.orderType !== 'dine_in' || this.cart.length === 0) return false;
+            if (this.recalledOrderId && this.selectedTable) return true;
+            if (this.incomingOrderId && this.incomingOrderInfo) return true;
+            return false;
+        },
+        panelOrderId() { return this.recalledOrderId || this.incomingOrderId || null; },
+        panelOrderMeta() {
+            if (this.recalledOrderId) return this.recalledOrderMeta || {};
+            return this.incomingOrderInfo || {};
+        },
+        panelTableInfo() {
+            if (this.selectedTable) return this.selectedTable;
+            const info = this.incomingOrderInfo;
+            if (info && info.table_id) return { id: info.table_id, table_number: info.table || '' };
+            return null;
+        },
+        panelKotSent() { return !!(this.panelOrderMeta().kot_sent_at); },
+        // Proof Bill — same silent-first / iframe-fallback chain as the popup;
+        // prints the SERVER-side order state (same semantics as the popup).
+        panelProofBill() {
+            const oid = this.panelOrderId();
+            if (!oid) return;
+            const url = '/pos/restaurant/orders/' + oid + '/proof-bill?auto_print=1';
+            const fallback = () => this._printViaIframe('print-receipt-frame', url, 'width=400,height=700');
+            if (this.silentBillPrint) {
+                this.trySilentPrint({ type: 'proof', restaurant_order_id: oid }).then(ok => {
+                    if (ok) this.showToast(window.TXT.proof_bill_sent_to_printer, 'success'); else fallback();
+                });
+                return;
+            }
+            fallback();
+        },
+        // FINAL — reuses the boardConfirm modal (big amount + CASH/CARD + the
+        // Task 514 print checkbox, initialized from the company default). The
+        // fromPanel flag routes confirm through panelFinalPay (cart-aware).
+        panelAskFinal() {
+            const oid = this.panelOrderId();
+            if (!oid || this.submitting) return;
+            this.boardPrintReceipt = this.billPrintDefault(this.orderType || 'dine_in');
+            const ti = this.panelTableInfo();
+            this.boardConfirm = {
+                fromPanel: true,
+                table: { table_number: (ti && ti.table_number) || '', order: { id: oid, total_amount: this.roundedTotal, order_type: this.orderType || 'dine_in' } },
+            };
+        },
+        // FINAL confirm (CASH/CARD) — the standard processPayment pipeline:
+        // recalled orders re-hold with recalled_order_id (cart edits included),
+        // claimed waiter carts settle via processPaymentManual. payPrintReceipt
+        // carries the checkbox choice into the auto-print chain; Task 779's
+        // tables-first return flow rides the receipt-close exactly as on the
+        // normal CASH/CARD buttons.
+        async panelFinalPay(method) {
+            if (this.submitting) return;
+            this.boardConfirm = null;
+            this.payingHeldOrderId = null;
+            this.saveAsProvisional = false;
+            this.payPrintReceipt = this.boardPrintReceipt;
+            await this.processPayment(method);
+            this.loadTableStatus();
+        },
+        panelResendKot() {
+            const oid = this.panelOrderId();
+            if (oid) this.resendKitchen({ id: oid });
+        },
+        panelLastKot() {
+            const oid = this.panelOrderId();
+            if (oid) this.reprintLastKot({ id: oid });
+        },
+        // Table Shift — same modal + doShiftTable pipeline (empty-target-only,
+        // timer carries, NO KOT reprint); doShiftTable already re-points
+        // selectedTable when the shifted order is the one open in the cart.
+        panelAskShift() {
+            const oid = this.panelOrderId();
+            const ti = this.panelTableInfo();
+            if (!oid || !ti) return;
+            this.boardShift = { table: { id: ti.id, table_number: ti.table_number }, order: { id: oid } };
+            this.loadTableStatus(); // fresh statuses — stale "khali" tile na dikhe
+        },
+        // Order Cancel + free table — same warning modal (items + KOT alert +
+        // Made/Not-Made ticks) and boardCancelConfirm soft-cancel. Claimed
+        // waiter carts keep their existing cartCancelIncoming path.
+        async panelCancelAsk() {
+            if (this.boardBusy) return;
+            if (this.incomingOrderId) { this.cartCancelIncoming(); return; }
+            const oid = this.recalledOrderId;
+            const ti = this.panelTableInfo();
+            if (!oid) return;
+            const meta = this.recalledOrderMeta || {};
+            this.boardCancelAsk = {
+                table: ti ? { table_number: ti.table_number } : null,
+                order: { id: oid, order_number: meta.order_number || null, order_type: 'dine_in', total_amount: this.roundedTotal, kot_sent_at: meta.kot_sent_at || null },
+                items: null,
+            };
+            this.boardCancelMade = {};
+            try {
+                const res = ti ? await fetch('/pos/restaurant/orders/by-table/' + ti.id, { headers: { 'Accept': 'application/json' } }) : null;
+                const list = (res && res.ok) ? await res.json().catch(() => null) : null;
+                const full = Array.isArray(list) ? list.find(o => Number(o.id) === Number(oid)) : null;
+                if (this.boardCancelAsk && this.boardCancelAsk.order && Number(this.boardCancelAsk.order.id) === Number(oid)) {
+                    this.boardCancelAsk.items = (full && Array.isArray(full.items)) ? full.items : [];
+                    if (full) {
+                        this.boardCancelAsk.order.kot_sent_at = full.kot_sent_at || this.boardCancelAsk.order.kot_sent_at;
+                        this.boardCancelAsk.order.total_amount = full.total_amount || this.boardCancelAsk.order.total_amount;
+                    }
+                }
+            } catch (e) { if (this.boardCancelAsk) this.boardCancelAsk.items = []; }
         },
 
         // ── Global mouse-wheel forwarding ──────────────────────────────────────
@@ -9697,6 +9900,10 @@ function restaurantPos() {
                     });
                 }
             }
+            // Task 781: meta snapshot for the in-panel table actions — the order
+            // leaves heldOrders on the next line, so KOT gating + the cancel
+            // modal would otherwise lose kot_sent_at / order_number.
+            this.recalledOrderMeta = { order_number: order.order_number || null, kot_sent_at: order.kot_sent_at || null, source: order.source || null };
             this.heldOrders = this.heldOrders.filter(o => o.id !== order.id); this.showHeldOrders = false; this.showToast(window.TXT.order_recalled_for_editing, 'success');
         },
 

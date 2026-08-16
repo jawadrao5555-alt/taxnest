@@ -87,6 +87,26 @@ class RestaurantTableController extends Controller
         return back()->with('success', __('pos.tables_first_flow_saved'));
     }
 
+    /**
+     * Task 781 — Table click = seedha bill kholo (opt-in, default OFF). ON =
+     * clicking an occupied table loads its order straight into the cart in
+     * edit mode (no action popup); the popup's actions move into the payment
+     * panel. Settings write path → cashier 403 (owner rule). hasColumn guard
+     * = prod self-heal parity (code may land before migrate --force).
+     */
+    public function updateTableClickDirectOpen(Request $request)
+    {
+        $this->denyCashier();
+        $companyId = app('currentCompanyId');
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('companies', 'table_click_direct_open')) {
+            \App\Models\Company::where('id', $companyId)
+                ->update(['table_click_direct_open' => $request->boolean('table_click_direct_open'), 'updated_at' => now()]);
+        }
+
+        return back()->with('success', __('pos.table_direct_open_saved'));
+    }
+
     public function storeFloor(Request $request)
     {
         $this->denyCashier();

@@ -88,6 +88,7 @@ class Company extends Model
         'print_on_pay',
         'dine_in_auto_kot',
         'tables_first_flow',
+        'table_click_direct_open',
         'pos_kot_full_mode',
         'kot_compact',
         'kot_show_customer',
@@ -192,6 +193,7 @@ class Company extends Model
         'auto_print_kot' => 'boolean',
         'dine_in_auto_kot' => 'boolean',
         'tables_first_flow' => 'boolean',
+        'table_click_direct_open' => 'boolean',
         'pos_kot_full_mode' => 'boolean',
         'kot_compact' => 'boolean',
         'order_match_style_locked' => 'boolean',
@@ -434,8 +436,9 @@ class Company extends Model
             'print_on_pay_dinein',
             // Task 779: Tables-first flow flag is BAKED into the sale screen JS —
             // a toggle must refresh cached sale screens.
+            // Task 781: table-click direct-open flag is BAKED the same way.
             'auto_print_kot', 'kot_reprint_enabled', 'dine_in_auto_kot',
-            'tables_first_flow',
+            'tables_first_flow', 'table_click_direct_open',
             'pos_kot_full_mode', 'kot_compact', 'kot_show_customer',
             'kot_show_orderby', 'kot_show_barcode', 'kot_show_footer',
             'kot_align_center', 'kot_left_margin_mm',

@@ -820,6 +820,46 @@ class PosRiderAssignStatusInvariantTest extends TestCase
         $this->assertSame($beforeRider->pra_invoice_number, $updatedRiderBill->pra_invoice_number, 'rider bill fiscal number must be unchanged');
     }
 
+    // ── 11. updateStatus single-bill path: returned stamps returned_at ─────────
+
+    /**
+     * Task 847: updateStatus() single-bill returned path stamps returned_at
+     * when the column exists (Schema::hasColumn guard, same pattern as
+     * delivered_at and the bulk path in Task 839).  Confirms:
+     *   a) delivery_status flips to 'returned'
+     *   b) returned_at is non-null after the call
+     *   c) fiscal identity of the bill is untouched
+     */
+    public function test_update_status_returned_stamps_returned_at(): void
+    {
+        $rider = $this->makeRider();
+
+        $bill = $this->makeBill($rider, [
+            'invoice_number'      => 'POS-2026-84701',
+            'invoice_mode'        => 'pra',
+            'pra_status'          => 'submitted',
+            'pra_invoice_number'  => 'PRA-84701',
+            'delivery_status'     => 'dispatched',
+            'rider_settlement_id' => null,
+        ]);
+
+        $before = $this->tx($bill);
+
+        // Act — single-bill updateStatus via JSON path.
+        $this->updateStatusJson($bill, 'returned');
+
+        $updated = $this->tx($bill);
+
+        // a) delivery_status must flip to 'returned'.
+        $this->assertSame('returned', $updated->delivery_status, 'delivery_status must be returned after updateStatus');
+
+        // b) returned_at must be stamped (non-null).
+        $this->assertNotNull($updated->returned_at, 'returned_at must be stamped on single-bill returned');
+
+        // c) Fiscal identity byte-for-byte unchanged.
+        $this->assertFiscalIdentityUnchanged($before, $bill);
+    }
+
     /**
      * Task 813: same guard — 'returned' on a riderless bill must also be
      * rejected via the JSON path with a JSON error body and no DB mutation.

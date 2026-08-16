@@ -647,6 +647,12 @@ class PosRiderController extends Controller
             && Schema::hasColumn('pos_transactions', 'delivered_at')) {
             $upd['delivered_at'] = now();
         }
+        // Task 847: stamp returned_at when a single bill is marked returned —
+        // mirrors the bulk path (Task 839) so the column is consistent across
+        // all return paths regardless of Schema presence.
+        if ($newStatus === 'returned' && Schema::hasColumn('pos_transactions', 'returned_at')) {
+            $upd['returned_at'] = now();
+        }
         $txn->update($upd);
 
         // Auto full return / credit note (Task 586): the moment a bill is

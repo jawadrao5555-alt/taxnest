@@ -4139,10 +4139,11 @@ function restaurantPos() {
         showHeldOrders: false,
         // ─── Table Board (Jul 2026): "TABLE" button below cart → board modal ───
         tableBoardEnabled: {{ ($features->tables ?? false) ? 'true' : 'false' }},
-        // Task 779 — TABLES-FIRST FLOW (video note, 15 Aug 2026): opt-in per-company
-        // (Table Setup page). ON = dine-in KOT ke baad + receipt popup band hone par
-        // cashier full-screen Tables page par WAPAS jata hai — chhota table-picker
-        // baar baar auto-open nahi hota. Default OFF = flow bilkul purana.
+        // Task 779 — TABLES-FIRST FLOW (video note, 15 Aug 2026): ON = dine-in KOT
+        // ke baad + receipt popup band hone par cashier full-screen Tables page par
+        // WAPAS jata hai — chhota table-picker baar baar auto-open nahi hota.
+        // Default ON (16 Aug 2026: owner ne sab companies ke liye ON kar diya —
+        // migration 2026_08_28_130000; opt-out Table Setup toggle se per-company).
         tablesFirstFlow: {{ (($features->tables ?? false) && ($company->tables_first_flow ?? false)) ? 'true' : 'false' }},
         tablesReturnPending: false, // navigation armed — dobara close clicks no-op
         // Task 781 — TABLE CLICK DIRECT OPEN (video note, 15 Aug 2026): opt-in

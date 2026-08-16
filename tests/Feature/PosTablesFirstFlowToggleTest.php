@@ -15,18 +15,19 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 /**
  * TABLES-FIRST FLOW TOGGLE (Task 779, owner video note 15 Aug 2026).
  *
- * companies.tables_first_flow: default OFF — sale screen behaves exactly as
- * today (small table-picker reopens after dine-in KOT; receipt close stays on
- * the sale screen). A restaurant shop that wants the big Tables board back
- * between orders flips it ON at Table Setup.
+ * companies.tables_first_flow: default ON (owner decision 16 Aug 2026 —
+ * migration 2026_08_28_130000 set MySQL DEFAULT 1 and back-filled all rows).
+ * New signups inherit the column default — no registration path writes an
+ * explicit 0. Restaurant shops that prefer the old small-picker can flip OFF
+ * at Table Setup.
  * Invariants locked here:
- *   1. Default is OFF (new column defaults to 0) — no shop changes behavior
- *      until it opts in.
+ *   1. Default is ON (new column defaults to 1) — all new signups start with
+ *      the big Tables screen flow active.
  *   2. Admin/manager can flip ON and OFF; only the company row changes.
  *   3. Cashier gets 403 and no write (settings POST keeps the cashier guard).
  *   4. Flipping the flag changes posConfigRev — the offline boot fingerprint
- *      must refresh cached sale screens, or a shop that turns the flow ON
- *      keeps the old picker behavior on cashier machines.
+ *      must refresh cached sale screens, or a shop that turns the flow ON/OFF
+ *      keeps the stale behavior on cashier machines.
  *
  * Pattern: sqlite :memory: + minimal Schema::create, controller invoked
  * directly (same as PosCashReceivedToggleTest).
@@ -42,7 +43,7 @@ class PosTablesFirstFlowToggleTest extends TestCase
         Schema::create('companies', function (Blueprint $table) {
             $table->id();
             $table->string('name')->nullable();
-            $table->boolean('tables_first_flow')->default(false);
+            $table->boolean('tables_first_flow')->default(true);
             $table->timestamps();
             $table->softDeletes();
         });
@@ -74,9 +75,12 @@ class PosTablesFirstFlowToggleTest extends TestCase
         return app(RestaurantTableController::class)->updateTablesFirstFlow($request);
     }
 
-    public function test_default_is_off(): void
+    public function test_default_is_on(): void
     {
-        $this->assertSame(0, (int) DB::table('companies')->where('id', 1)->value('tables_first_flow'));
+        // Owner decision 16 Aug 2026: column DEFAULT changed to 1 via
+        // migration 2026_08_28_130000_enable_tables_first_flow_for_all_companies.
+        // New signups inherit this default — no registration path writes 0.
+        $this->assertSame(1, (int) DB::table('companies')->where('id', 1)->value('tables_first_flow'));
     }
 
     public function test_admin_can_flip_on_and_off(): void
@@ -101,14 +105,15 @@ class PosTablesFirstFlowToggleTest extends TestCase
 
     public function test_cashier_gets_403_and_no_write(): void
     {
+        // Default is now 1; attempt to flip it OFF — must be blocked and stay 1.
         $this->makeUser('pos_cashier');
         try {
-            $this->callToggle(true);
+            $this->callToggle(false);
             $this->fail('Expected 403 HttpException for cashier');
         } catch (HttpException $e) {
             $this->assertSame(403, $e->getStatusCode());
         }
-        $this->assertSame(0, (int) DB::table('companies')->where('id', 1)->value('tables_first_flow'));
+        $this->assertSame(1, (int) DB::table('companies')->where('id', 1)->value('tables_first_flow'));
     }
 
     public function test_boot_fingerprint_changes_when_flag_flips(): void

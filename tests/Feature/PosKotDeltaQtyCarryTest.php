@@ -1031,6 +1031,102 @@ class PosKotDeltaQtyCarryTest extends TestCase
         $this->assertStringNotContainsString('background:#000', $html);
     }
 
+    // ── 10. Task 840: WHOLE-ORDER CANCEL void slip ───────────────────────
+
+    /** Helper: cancel a held order via deleteOrder. */
+    private function cancel(int $orderId, array $extra = [])
+    {
+        $request = Request::create("/pos/restaurant/orders/{$orderId}/delete", 'POST', $extra);
+        return app(RestaurantPosController::class)->deleteOrder($request, $orderId);
+    }
+
+    public function test_cancel_after_kot_emits_void_slip_for_all_printed_items(): void
+    {
+        $c = $this->makeCompany();
+        $this->makeCashier($c);
+        $tableId = $this->makeTable($c);
+
+        $res = $this->hold([
+            'items' => [
+                $this->bottle(2),
+                ['item_type' => 'manual', 'item_name' => 'Fries', 'unit_price' => 50, 'quantity' => 1],
+            ],
+            'order_type' => 'dine_in', 'table_id' => $tableId,
+        ]);
+        $orderId = json_decode($res->getContent(), true)['order']['id'];
+        $this->stampPrinted($orderId, 1); // KOT already fired all items
+
+        $del = $this->cancel($orderId);
+        $this->assertSame(200, $del->getStatusCode(), $del->getContent());
+        $data = json_decode($del->getContent(), true);
+
+        $this->assertTrue($data['success'], 'cancel must succeed');
+        $this->assertNotNull($data['kot_void_url'], 'cancelling after KOT must produce a void slip URL');
+        $this->assertFalse($data['kot_void_queued'], 'agent disabled → not queued; client uses iframe fallback');
+
+        $items = $this->decodeVoidUrl($data['kot_void_url']);
+        $this->assertCount(2, $items, 'void slip must list ALL printed items');
+        $names = array_column($items, 'item_name');
+        $this->assertContains('Bottle', $names);
+        $this->assertContains('Fries', $names);
+
+        $bottle = collect($items)->firstWhere('item_name', 'Bottle');
+        $this->assertEquals(2.0, (float) $bottle['qty'], 'void qty must match the printed qty');
+
+        // Order itself must be soft-cancelled.
+        $this->assertSame('cancelled', RestaurantOrder::find($orderId)->status);
+    }
+
+    public function test_cancel_before_kot_emits_no_void_slip(): void
+    {
+        // Fresh hold cancelled before any KOT — nothing printed, nothing to void.
+        $c = $this->makeCompany();
+        $this->makeCashier($c);
+        $tableId = $this->makeTable($c);
+
+        $res = $this->hold(['items' => [$this->bottle(1)], 'order_type' => 'dine_in', 'table_id' => $tableId]);
+        $orderId = json_decode($res->getContent(), true)['order']['id'];
+        // NO stampPrinted — KOT never printed.
+
+        $del = $this->cancel($orderId);
+        $this->assertSame(200, $del->getStatusCode());
+        $data = json_decode($del->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertNull($data['kot_void_url'], 'no KOT fired → no void slip needed');
+        $this->assertFalse($data['kot_void_queued']);
+    }
+
+    public function test_cancel_with_agent_online_queues_kot_void_job(): void
+    {
+        $c = $this->makeCompany();
+        $this->makeCashier($c);
+        $tableId = $this->makeTable($c);
+        DB::table('companies')->where('id', $c->id)->update([
+            'agent_enabled'        => true,
+            'agent_last_seen'      => now(),
+            'pos_printer_settings' => json_encode(['silent_print_enabled' => true, 'kot_printer' => 'Kitchen-1']),
+        ]);
+
+        $res = $this->hold(['items' => [$this->bottle(1)], 'order_type' => 'dine_in', 'table_id' => $tableId]);
+        $orderId = json_decode($res->getContent(), true)['order']['id'];
+        $this->stampPrinted($orderId, 1);
+
+        // Re-fetch company so agent_enabled/pos_printer_settings are loaded fresh.
+        $c->refresh();
+        $del = $this->cancel($orderId);
+        $data = json_decode($del->getContent(), true);
+
+        $this->assertTrue($data['kot_void_queued'], 'agent online + silent print ON → server queues the void job');
+        $job = DB::table('pos_print_jobs')->where('type', 'kot_void')->first();
+        $this->assertNotNull($job, 'kot_void print job must exist');
+        $this->assertSame('Kitchen-1', $job->target_printer);
+        $payload = json_decode($job->render_query, true);
+        $this->assertCount(1, $payload);
+        $this->assertSame('Bottle', $payload[0]['item_name']);
+        $this->assertEquals(1.0, (float) $payload[0]['qty']);
+    }
+
     public function test_pay_with_distinct_lines_keeps_them_separate(): void
     {
         // Genuinely different lines (different notes) must NOT merge on the bill.

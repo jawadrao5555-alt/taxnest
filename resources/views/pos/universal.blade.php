@@ -7392,6 +7392,12 @@ function restaurantPos() {
                         this.clearCart();
                     }
                     this.showToast(t ? (window.TXT.order_cancel_t_prefix + t.table_number + window.TXT.table_freed_suffix) : window.TXT.order_cancelled_toast, 'success');
+                    // Task 840: whole-order cancel void slip — same path as deleteHeldOrder.
+                    if (data.kot_void_queued) {
+                        this.showToast(window.TXT.kot_void_sent || 'Void slip sent to kitchen', 'success');
+                    } else if (data.kot_void_url) {
+                        this._printViaIframe('print-kot-void-frame', data.kot_void_url + '&auto_print=1', 'width=380,height=620');
+                    }
                 } else {
                     this.showToast((data && data.message) || window.TXT.cancel_failed, 'error');
                 }
@@ -9688,6 +9694,13 @@ function restaurantPos() {
                     if (this.heldOrders.length === 0) { this.showHeldOrders = false; this.activeHeldIndex = 0; }
                     this.showToast(window.TXT.order_deleted, 'success');
                     if (this.tableBoardEnabled) this.loadTableStatus(); // Table Board: table freed
+                    // Task 840: whole-order cancel void slip — kitchen must STOP all
+                    // printed dishes. Same iframe/agent path as the per-dish void in holdOrder.
+                    if (data.kot_void_queued) {
+                        this.showToast(window.TXT.kot_void_sent || 'Void slip sent to kitchen', 'success');
+                    } else if (data.kot_void_url) {
+                        this._printViaIframe('print-kot-void-frame', data.kot_void_url + '&auto_print=1', 'width=380,height=620');
+                    }
                 } else { this.showToast(data.message || window.TXT.failed_word, 'error'); }
             } catch (e) { console.error('Delete held order error:', e); this.showToast(window.TXT.error_deleting_order, 'error'); }
         },

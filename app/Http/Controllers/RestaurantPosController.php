@@ -720,6 +720,24 @@ class RestaurantPosController extends Controller
         if ($order->status === 'completed') {
             return response()->json(['success' => false, 'message' => 'Cannot delete a completed order'], 400);
         }
+
+        // Task 840 — WHOLE-ORDER VOID SLIP: collect every printed item BEFORE
+        // the cancel so we can tell the kitchen to stop ALL dishes. Only items
+        // with a kot_printed_at stamp are counted — a fresh hold cancelled
+        // before any KOT got out stays silent (nothing printed = nothing to void).
+        $company = Company::find($companyId);
+        $printedItems = $order->items()->whereNotNull('kot_printed_at')->get();
+        $voidItems = [];
+        foreach ($printedItems as $oi) {
+            $voidItems[] = [
+                'item_type' => $oi->item_type ?? 'product',
+                'item_id'   => $oi->item_id,
+                'item_name' => $oi->item_name ?? '',
+                'notes'     => $oi->special_notes ?? '',
+                'qty'       => (float) $oi->quantity,
+            ];
+        }
+
         DB::beginTransaction();
         try {
             $orderData = ['order_number' => $order->order_number, 'total_amount' => $order->total_amount, 'status' => $order->status];
@@ -765,7 +783,32 @@ class RestaurantPosController extends Controller
             } catch (\Exception $auditEx) {
             }
             DB::commit();
-            return response()->json(['success' => true, 'message' => 'Order deleted']);
+
+            // Task 840 — post-commit void enqueue. Best-effort: a failed enqueue
+            // never affects the cancel itself. Desktop Agent silent path first;
+            // client falls back to the iframe void-ticket route when queued=false.
+            $kotVoidQueued = false;
+            $kotVoidUrl    = null;
+            if (!empty($voidItems) && $company) {
+                try {
+                    $enqVoid = \App\Services\KotPrintService::enqueueVoid($company, $order, $voidItems, Auth::guard('pos')->id());
+                    $kotVoidQueued = (bool) ($enqVoid['printed'] ?? false) && !empty($enqVoid['job_ids'] ?? []);
+                } catch (\Throwable $e) {
+                    Log::warning('deleteOrder void KOT enqueue failed: ' . $e->getMessage(), ['order_id' => $order->id]);
+                }
+                // Iframe fallback URL — same relative-URL convention as holdOrder's
+                // void path (route-absolute-https trap on plain-http dev, see
+                // route-absolute-https-fetch.md in memory).
+                $kotVoidUrl = route('pos.restaurant.void-ticket', $order->id, false)
+                    . '?void_items=' . urlencode(base64_encode(json_encode($voidItems)));
+            }
+
+            return response()->json([
+                'success'          => true,
+                'message'          => 'Order deleted',
+                'kot_void_queued'  => $kotVoidQueued,
+                'kot_void_url'     => $kotVoidUrl,
+            ]);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['success' => false, 'message' => 'Failed to delete order: ' . $e->getMessage()], 500);

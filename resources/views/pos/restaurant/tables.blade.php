@@ -1,21 +1,133 @@
 <x-pos-layout>
 {{-- Task 819 (Aug 2026): Offline banner — tab dikhta hai jab SW cached snapshot
      serve kare (net nahi). Wapas online par auto page-reload ho jata hai. --}}
+{{-- Task 865 (Aug 2026): Snapshot staleness — offline bar mein relative timestamp
+     dikhta hai ("aakhri table status: 12 minute pehle") taake staff ghante purani
+     status par action na le.
+
+     Approach: server-render timestamp PHP se bake hota hai page HTML mein.
+     SW network-first cache karta hai POORI response (HTML + baked timestamp).
+     Jab SW cache serve kare, baked timestamp WOHI waqt hai jab page server se
+     aaya tha — navigator.onLine ki zaroorat nahi (jo sirf NIC check karta hai,
+     server reach nahi). Age label har 30s mein tick karta hai jab offline ho. --}}
+@php $tvSnapshotMs = now()->timestamp * 1000; $tvCompanyId = auth('pos')->user()?->company_id ?? 0; @endphp
 <div id="tn-tables-offline-bar" style="display:none" class="w-full bg-amber-500 text-white text-sm font-semibold text-center py-2 px-4">
-    📡 {{ __('pos.offline_cached_snapshot') }}
+    📡 {{ __('pos.offline_cached_snapshot') }}<span id="tn-tables-snapshot-age" class="font-semibold"></span>
     <span class="font-normal opacity-80 ml-1">{{ __('pos.offline_auto_refresh_hint') }}</span>
 </div>
 <script>
 (function () {
-    var bar = document.getElementById('tn-tables-offline-bar');
+    var bar    = document.getElementById('tn-tables-offline-bar');
+    var ageEl  = document.getElementById('tn-tables-snapshot-age');
+    var locale = '{{ app()->getLocale() }}';
+    // Company-scoped key — isolates shops sharing a browser.
+    var LS_KEY = 'tn_tables_snapshot_at_{{ $tvCompanyId }}';
+
+    // Baked server-render timestamp. SW caches the full HTML including this value.
+    // Online load  → value is current (fresh server response).
+    // Cached load  → value is from when the page was last fetched from the server.
+    // Either way: always persist it — it is the authoritative "snapshot freshness" marker.
+    var renderedAt = {{ $tvSnapshotMs }};
+    try { localStorage.setItem(LS_KEY, renderedAt.toString()); } catch (e) {}
+
+    function fmtAge(ms) {
+        if (isNaN(ms) || ms < 0) ms = 0;
+        var mins = Math.round(ms / 60000);
+        if (mins < 1) {
+            return locale === 'ur' ? 'ابھی ابھی' : (locale === 'rur' ? 'abhi abhi' : 'just now');
+        }
+        if (mins < 60) {
+            if (locale === 'ur') return mins + ' منٹ پہلے';
+            if (locale === 'rur') return mins + ' minute pehle';
+            return mins + (mins === 1 ? ' minute ago' : ' minutes ago');
+        }
+        var h = Math.round(mins / 60);
+        if (h < 24) {
+            if (locale === 'ur') return h + ' گھنٹے پہلے';
+            if (locale === 'rur') return h + ' ghante pehle';
+            return h + (h === 1 ? ' hour ago' : ' hours ago');
+        }
+        var d = Math.round(h / 24);
+        if (locale === 'ur') return d + ' دن پہلے';
+        if (locale === 'rur') return d + ' din pehle';
+        return d + (d === 1 ? ' day ago' : ' days ago');
+    }
+
+    function syncAge() {
+        if (!ageEl) return;
+        try {
+            var ts = parseInt(localStorage.getItem(LS_KEY) || '0', 10);
+            if (ts > 0) {
+                var label = locale === 'ur'  ? ' — آخری ٹیبل اسٹیٹس: '
+                          : locale === 'rur' ? ' — aakhri table status: '
+                          : ' — last table status: ';
+                ageEl.textContent = label + fmtAge(Date.now() - ts);
+            } else {
+                ageEl.textContent = '';
+            }
+        } catch (e) { ageEl.textContent = ''; }
+    }
+
+    // Tick the age label every 30 s while bar is shown so "just now" never freezes.
+    var ageInterval = null;
+    function showBar() {
+        syncAge();
+        if (!ageInterval) ageInterval = setInterval(syncAge, 30000);
+        if (bar) bar.style.display = '';
+    }
+    function hideBar() {
+        if (ageInterval) { clearInterval(ageInterval); ageInterval = null; }
+        if (ageEl) ageEl.textContent = '';
+        if (bar) bar.style.display = 'none';
+    }
+
+    // servedFromCache is set async after reading the SW meta-cache flag.
+    // Handles "server down but navigator.onLine still true" — SW served
+    // TABLES_CACHE but the NIC is connected so 'offline' event never fires.
+    var servedFromCache = false;
+
     function sync() {
-        if (!navigator.onLine) {
-            if (bar) bar.style.display = '';
+        if (!navigator.onLine || servedFromCache) {
+            showBar();
         } else {
-            if (bar) bar.style.display = 'none';
+            hideBar();
         }
     }
-    sync();
+
+    // Two-step serve-mode check — handles "server down, navigator.onLine still true":
+    // Step 1: ask the SW "what is my client ID?" via MessageChannel echo.
+    //         Listener is registered BEFORE the message is sent — no receive race.
+    //         SW just echoes e.source.id (no stored state needed; survives termination).
+    // Step 2: use that clientId to read the per-client flag written durably to the
+    //         'tn-tables-meta' Cache API by the SW before returning the cached response.
+    //         Delete the entry after reading (one-shot, avoids stale reads on reload).
+    // This survives SW termination between navigate and query because the flag lives
+    // in the Cache API, not in-memory. Keyed by clientId — no cross-tab interference.
+    function checkServeMode() {
+        if (!('serviceWorker' in navigator) || !('caches' in window)) return;
+        navigator.serviceWorker.ready.then(function (reg) {
+            if (!reg.active) return;
+            var mc = new MessageChannel();
+            mc.port1.onmessage = function (evt) {
+                if (!evt.data || evt.data.type !== 'TN_TABLES_CLIENT_ID_RESP') return;
+                var clientId = evt.data.clientId;
+                if (!clientId) return;
+                var metaKey = location.origin + '/__tn_tables_meta_' + clientId;
+                caches.open('tn-tables-meta').then(function (metaCache) {
+                    return metaCache.match(metaKey).then(function (r) {
+                        if (!r) return;
+                        metaCache.delete(metaKey); // consume — one-shot
+                        servedFromCache = true;
+                        sync(); // re-evaluate: show bar even though navigator.onLine is true
+                    });
+                }).catch(function () {});
+            };
+            reg.active.postMessage({ type: 'TN_TABLES_QUERY_CLIENT_ID' }, [mc.port2]);
+        }).catch(function () {});
+    }
+
+    sync();           // immediate decision based on navigator.onLine
+    checkServeMode(); // async, client-scoped correction via SW MessageChannel
     window.addEventListener('offline', sync);
     // Back online → reload to get fresh table statuses from server.
     window.addEventListener('online', function () { location.reload(); });

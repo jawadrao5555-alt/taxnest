@@ -17,6 +17,16 @@ const SALE_CACHE = `${CACHE_VERSION}-sale`;
 const TABLES_CACHE = `${CACHE_VERSION}-tables`;
 const OFFLINE_PAGE = '/offline-splash';
 
+// Task 865: durable cache name for per-client Tables serve-mode flags.
+// Fixed (non-versioned) so it survives SW updates and is readable from page JS.
+// Keys: 'cache-serve-{clientId}' — written (awaited) before the cached response
+// is returned, so the flag is guaranteed present when the page reads it.
+// The page gets its own clientId via a lightweight echo postMessage
+// (TN_TABLES_QUERY_CLIENT_ID → e.source.id), then reads + consumes (deletes)
+// the entry directly from the Cache API.
+// Survives SW termination between navigate and page query — no in-memory state.
+const TN_TABLES_META = 'tn-tables-meta';
+
 const STATIC_ASSETS = [
     '/manifest.json',
     '/manifest-pos.json',
@@ -61,7 +71,7 @@ self.addEventListener('fetch', e => {
     // GET or POST) purges all cached authenticated pages so the next user on a shared
     // terminal can never see the previous session's pages, even offline.
     if (url.pathname.includes('/logout')) {
-        e.waitUntil(Promise.all([caches.delete(RUNTIME_CACHE), caches.delete(SALE_CACHE), caches.delete(TABLES_CACHE)]));
+        e.waitUntil(Promise.all([caches.delete(RUNTIME_CACHE), caches.delete(SALE_CACHE), caches.delete(TABLES_CACHE), caches.delete(TN_TABLES_META)]));
         return;
     }
 
@@ -72,7 +82,7 @@ self.addEventListener('fetch', e => {
         // Tables board is cache-first + bakes per-session data — must be purged
         // alongside the sale screen on user-switch so a new login never sees the
         // previous session's table snapshot (cross-user exposure on shared terminals).
-        e.waitUntil(Promise.all([caches.delete(SALE_CACHE), caches.delete(TABLES_CACHE)]));
+        e.waitUntil(Promise.all([caches.delete(SALE_CACHE), caches.delete(TABLES_CACHE), caches.delete(TN_TABLES_META)]));
         return;
     }
 
@@ -111,7 +121,15 @@ self.addEventListener('fetch', e => {
     // flow triggers. Cache is updated on every successful network response so that an
     // offline fallback exists; on fetch failure serve the last snapshot (with the
     // auto-reload banner handled inside tables.blade).
+    //
+    // Task 865: when serving from TABLES_CACHE, write a durable per-client flag to
+    // TN_TABLES_META cache (awaited before returning the response — guaranteed present
+    // when the page reads it). The page gets its own clientId via a lightweight echo
+    // postMessage (TN_TABLES_QUERY_CLIENT_ID → e.source.id), then reads and consumes
+    // the flag directly from the Cache API. Survives SW termination between navigate
+    // and page query; keyed by clientId so concurrent tabs don't interfere.
     if (req.mode === 'navigate' && url.pathname === '/pos/restaurant/tables' && url.search === '') {
+        const resultingClientId = e.resultingClientId;
         e.respondWith((async () => {
             const c = await caches.open(TABLES_CACHE);
             try {
@@ -119,11 +137,32 @@ self.addEventListener('fetch', e => {
                 const ct = res.headers.get('content-type') || '';
                 if (res.ok && !res.redirected && ct.includes('text/html')) {
                     c.put(req, res.clone());
+                    // Fresh network serve: remove any stale cached-serve flag for this client.
+                    if (resultingClientId) {
+                        caches.open(TN_TABLES_META)
+                            .then(mc => mc.delete(self.location.origin + '/__tn_tables_meta_' + resultingClientId))
+                            .catch(() => {});
+                    }
                 }
                 return res;
             } catch (err) {
-                // Offline: serve last-known snapshot; tables.blade auto-reloads on reconnect.
-                return (await c.match(req)) || (await caches.match(OFFLINE_PAGE)) || Response.error();
+                // Offline / server unreachable: serve last-known snapshot.
+                // tables.blade auto-reloads on 'online' event.
+                const cached = await c.match(req);
+                if (cached) {
+                    // AWAITED before `return cached` — flag is durably stored before
+                    // the browser parses the cached HTML and scripts execute.
+                    // Survives SW termination; page reads from Cache API directly.
+                    if (resultingClientId) {
+                        try {
+                            const mc = await caches.open(TN_TABLES_META);
+                            await mc.put(self.location.origin + '/__tn_tables_meta_' + resultingClientId,
+                                new Response('1', { headers: { 'Content-Type': 'text/plain' } }));
+                        } catch (_) {}
+                    }
+                    return cached;
+                }
+                return (await caches.match(OFFLINE_PAGE)) || Response.error();
             }
         })());
         return;
@@ -266,5 +305,15 @@ self.addEventListener('message', e => {
                 if (res.ok && !res.redirected && ct.includes('text/html')) await c.put(url, res.clone());
             } catch (err) { /* best-effort — next online visit still primes via navigate path */ }
         })());
+    }
+    // Task 865: lightweight echo — page asks "what is my client ID?" so it can
+    // look up its own per-client cache-serve flag in TN_TABLES_META without the
+    // SW needing any in-memory state (survives SW termination). The flag itself
+    // is stored durably in the Cache API and consumed (deleted) by the page after
+    // reading. e.source.id equals e.resultingClientId recorded at navigate time.
+    if (e.data && e.data.type === 'TN_TABLES_QUERY_CLIENT_ID') {
+        if (e.ports && e.ports[0]) {
+            e.ports[0].postMessage({ type: 'TN_TABLES_CLIENT_ID_RESP', clientId: e.source && e.source.id });
+        }
     }
 });

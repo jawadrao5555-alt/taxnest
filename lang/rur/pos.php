@@ -2159,7 +2159,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'offline_pending_sync_desc' => 'Yeh invoice offline save hui thi aur connection aane par khud-ba-khud PRA ko sync ho jaye gi.',
     'offline_plan_locked' => 'Internet nahi — offline billing aap ke package mein shamil nahi (Business+). Bill save nahi hoga; internet aane par dobara try karein.',
     'offline_update_online_only' => 'No internet — bill update sirf online ho sakta hai',
-    'offline_cached_snapshot' => 'Offline — aakhri maloom table status dikh raha hai.',
+    'offline_cached_snapshot' => 'Offline',
     'offline_auto_refresh_hint' => 'Net wapas aane par page khud refresh ho jayega.',
     'ok_word' => 'OK',
     'old_bills_settled_today' => 'Aaj settle kiye gaye purane bills:',

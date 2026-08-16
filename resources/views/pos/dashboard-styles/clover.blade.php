@@ -30,8 +30,9 @@
 
             <div class="cl-metric mb-3">
                 <p class="text-[9px] text-emerald-200/60 font-bold uppercase">{{ __("pos.revenue_word") }}</p>
-                <p class="text-2xl font-black text-white mt-1">Rs.{{ number_format($todaySales ?? $todayStats->revenue ?? 0) }}</p>
-                @php $yest=$yesterdaySales??0;$today=$todaySales??$todayStats->revenue??0;$pct=$yest>0?round(($today-$yest)/$yest*100):0; @endphp
+                {{-- Task 988: combined PRA+Local (+exempt) figure — matches the Aaj ka Khaata sum this user sees --}}
+                <p class="text-2xl font-black text-white mt-1">Rs.{{ number_format($todayTotalSale ?? $todaySales ?? $todayStats->revenue ?? 0) }}</p>
+                @php $yest=$yesterdayTotalSale??$yesterdaySales??0;$today=$todayTotalSale??$todaySales??$todayStats->revenue??0;$pct=$yest>0?round(($today-$yest)/$yest*100):0; @endphp
                 <div class="cl-progress mt-2"><div class="cl-progress-fill" style="width: {{ min(100, $yest > 0 ? ($today / $yest * 100) : 50) }}%"></div></div>
                 @if($pct!=0)<p class="text-[9px] mt-1 {{ $pct>=0?'text-emerald-300':'text-red-300' }}">{{ $pct>=0?'↑':'↓' }} {{ abs($pct) }}% {{ __("pos.vs_yesterday") }}</p>@endif
             </div>
@@ -41,9 +42,11 @@
                     <p class="text-[9px] text-emerald-200/60 font-bold">{{ __("pos.orders_caps") }}</p>
                     <p class="text-lg font-black text-white">{{ $todayOrders ?? $todayStats->count ?? 0 }}</p>
                 </div>
+                {{-- Task 988: AVG metric replaced by New Customers (owner voice note, 16 Aug 2026) --}}
                 <div class="cl-metric">
-                    <p class="text-[9px] text-emerald-200/60 font-bold">{{ __("pos.avg_caps") }}</p>
-                    <p class="text-lg font-black text-white">Rs.{{ number_format($todayStats->avg_ticket ?? (($todayOrders ?? 0) > 0 ? ($todaySales ?? 0) / ($todayOrders ?? 1) : 0)) }}</p>
+                    <p class="text-[9px] text-emerald-200/60 font-bold">{{ __("pos.new_customers") }}</p>
+                    <p class="text-lg font-black text-white">{{ number_format($newCustomersToday ?? 0) }}</p>
+                    <p class="text-[9px] text-emerald-200/60">{{ number_format($newCustomersMonth ?? 0) }} {{ __("pos.period_this_month") }}</p>
                 </div>
             </div>
 
@@ -55,7 +58,7 @@
             @else
             <div class="cl-metric mb-4">
                 <p class="text-[9px] text-emerald-200/60 font-bold">{{ __("pos.monthly_caps") }}</p>
-                <p class="text-lg font-black text-white mt-1">Rs.{{ number_format($monthSales ?? $monthStats->revenue ?? 0) }}</p>
+                <p class="text-lg font-black text-white mt-1">Rs.{{ number_format($monthTotalSale ?? $monthSales ?? $monthStats->revenue ?? 0) }}</p>
             </div>
             @endif
 

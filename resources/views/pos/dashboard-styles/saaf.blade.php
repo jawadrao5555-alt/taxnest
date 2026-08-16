@@ -12,8 +12,10 @@
     // Custom Access tick re-opens it — same verdict as nav + route guards.
     $saafCanDayClose = \App\Services\PosAccessService::dayCloseAllowed(auth('pos')->user());
     if (!empty($isRestaurant)) {
-        $saafToday     = (float) ($todaySales ?? 0);
-        $saafYesterday = (float) ($yesterdaySales ?? 0);
+        // Task 988: combined PRA+Local (+exempt) figures — match the Aaj ka
+        // Khaata sum this user sees (fallback = old single-stream sums).
+        $saafToday     = (float) ($todayTotalSale ?? $todaySales ?? 0);
+        $saafYesterday = (float) ($yesterdayTotalSale ?? $yesterdaySales ?? 0);
         $saafBills     = (int) ($completedCount ?? $todayOrders ?? 0);
         $saafProfit    = (float) ($todayProfit ?? 0);
         $saafTopItems  = collect($topProducts ?? [])->take(5)->map(fn ($r) => [
@@ -22,7 +24,7 @@
         ]);
         $saafTopLabel  = __("pos.top_items_7_days");
     } else {
-        $saafToday     = (float) ($todayStats->revenue ?? 0);
+        $saafToday     = (float) ($todayTotalSale ?? $todayStats->revenue ?? 0);
         $saafYesterday = isset($yesterdayRevenue) ? (float) $yesterdayRevenue : null;
         $saafBills     = (int) ($todayStats->count ?? 0);
         $saafProfit    = (float) ($profitStats['profit'] ?? 0);
@@ -32,7 +34,6 @@
         ]);
         $saafTopLabel  = __("pos.todays_top_items");
     }
-    $saafAvg = $saafBills > 0 ? $saafToday / $saafBills : 0;
     $saafDeltaPct = ($saafYesterday !== null && $saafYesterday > 0)
         ? round((($saafToday - $saafYesterday) / $saafYesterday) * 100)
         : null;
@@ -106,15 +107,16 @@
             <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{{ __("pos.sirf_aapko_nazar") }}</p>
         </div>
         @else
+        {{-- Task 988: Average Bill tile replaced by New Customers (owner voice note, 16 Aug 2026) --}}
         <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-4 sm:p-5 hover:border-teal-600 dark:hover:border-teal-500 transition">
             <div class="flex items-center gap-2">
                 <span class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#ccfbf1;">
-                    <svg class="w-4 h-4" style="color:#0A4D5C;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                    <svg class="w-4 h-4" style="color:#0A4D5C;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                 </span>
-                <p class="text-[11px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wide">{{ __("pos.average_bill") }}</p>
+                <p class="text-[11px] text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-wide">{{ __("pos.new_customers") }}</p>
             </div>
-            <p class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mt-2">Rs. {{ number_format(round($saafAvg)) }}</p>
-            <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{{ __("pos.fi_bill_ausat") }}</p>
+            <p class="text-xl sm:text-2xl font-black text-gray-900 dark:text-white mt-2">{{ number_format($newCustomersToday ?? 0) }}</p>
+            <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-1">{{ number_format($newCustomersMonth ?? 0) }} {{ __("pos.period_this_month") }}</p>
         </div>
         @endif
 

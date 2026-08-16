@@ -2504,6 +2504,32 @@ class RestaurantPosController extends Controller
         // builder + partial as PosController::dashboard.
         $todayKhata = \App\Services\PosTodayKhata::build($companyId, $bizDate, $user);
 
+        // Task 988 (owner video, 16 Aug 2026, PIZZA POINT): the Today's Revenue
+        // card must show the TOTAL sale — PRA + Local (+ exempt) combined from
+        // pos_transactions, i.e. the sum of the ledger figures this user can
+        // see (video: card said Rs 80 while the ledger showed Local Rs 410).
+        // Scope-aware — no local-stream leak. Chart / profit / order tiles
+        // keep the RestaurantOrder-based $todaySales.
+        $todayTotalSale = \App\Services\PosTodayKhata::combinedSale($companyId, $user, $bizDate, $bizDate);
+        // Yesterday delta compares like-with-like (combined vs combined).
+        $yesterdayBizDate = \Carbon\Carbon::parse($bizDate, config('app.timezone'))->subDay()->toDateString();
+        $yesterdayTotalSale = \App\Services\PosTodayKhata::combinedSale($companyId, $user, $yesterdayBizDate, $yesterdayBizDate);
+
+        // Task 988: "New Customers" card (replaces Avg. Order — owner voice
+        // note): customers added in the current BUSINESS day (window starts at
+        // $today = bizDate + cutoff) + this calendar month.
+        // hasTable drift guard (PROD schema-drift policy): a schema without
+        // pos_customers must still render the dashboard — counts show 0.
+        $hasCustomersTable = \Schema::hasTable('pos_customers');
+        $newCustomersToday = $hasCustomersTable
+            ? PosCustomer::where('company_id', $companyId)
+                ->where('created_at', '>=', $today)->count()
+            : 0;
+        $newCustomersMonth = $hasCustomersTable
+            ? PosCustomer::where('company_id', $companyId)
+                ->where('created_at', '>=', now()->startOfMonth())->count()
+            : 0;
+
         return view('pos.restaurant.dashboard', compact(
             'company', 'todaySales', 'yesterdaySales', 'todayOrders',
             'heldCount', 'completedCount', 'totalTables', 'occupiedTables',
@@ -2513,7 +2539,8 @@ class RestaurantPosController extends Controller
             'todayCost', 'todayProfit', 'kitchenStats',
             'dashboardStyle', 'isRestaurant', 'isAdmin', 'praStatus', 'isCashier',
             'pendingProvisional', 'openOrdersCount', 'cancelledTodayCount',
-            'counterOrdersCount', 'todayKhata'
+            'counterOrdersCount', 'todayKhata',
+            'todayTotalSale', 'yesterdayTotalSale', 'newCustomersToday', 'newCustomersMonth'
         ));
     }
 

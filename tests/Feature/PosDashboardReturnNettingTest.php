@@ -294,11 +294,135 @@ class PosDashboardReturnNettingTest extends TestCase
         $today = $data['todayStats'];
         $this->assertSame(2, (int) $today->count, 'credit note must not count as a bill');
         $this->assertSame(1441.0, (float) $today->revenue, '1070 + 585 − 214 return');
-        $this->assertSame(720.5, (float) $today->avg_ticket, 'netted revenue / sales-only bills');
 
         $month = $data['monthStats'];
         $this->assertSame(2, (int) $month->count);
         $this->assertSame(1441.0, (float) $month->revenue);
+
+        // Task 988: the revenue cards now read the COMBINED figure — with only
+        // PRA rows seeded it must equal the netted PRA sum, and the netting
+        // convention (signed returns) must hold there too.
+        $this->assertSame(1441.0, (float) $data['todayTotalSale'], 'combined card nets the return');
+        $this->assertSame(1441.0, (float) $data['monthTotalSale']);
+
+        // No pos_customers table in this minimal schema — the hasTable drift
+        // guard must keep the dashboard alive and report zero new customers.
+        $this->assertSame(0, (int) $data['newCustomersToday']);
+        $this->assertSame(0, (int) $data['newCustomersMonth']);
+    }
+
+    // ── 1b. Task 988: combined revenue card (PRA + Local + exempt, scoped) ──
+
+    /** Local + exempt rows on top of the canonical netting day. */
+    private function seedMixedStreams(int $companyId): void
+    {
+        $this->seedNettingDay($companyId);
+
+        // Local provisional sale 410 + local return 60 → local nets to 350.
+        $this->makeTxn($companyId, 'L-0001', [
+            'invoice_mode' => 'local', 'pra_status' => 'local', 'pra_invoice_number' => null,
+            'subtotal' => 410, 'total_amount' => 410,
+        ]);
+        $this->makeTxn($companyId, 'L-0002', [
+            'transaction_type' => 'return',
+            'invoice_mode' => 'local', 'pra_status' => 'local', 'pra_invoice_number' => null,
+            'subtotal' => 60, 'total_amount' => 60,
+        ]);
+        // Fully-exempt bill 25 — belongs to NO stream, visible to every scope.
+        $this->makeTxn($companyId, 'E-0001', [
+            'pra_status' => 'exempt_internal', 'pra_invoice_number' => null,
+            'subtotal' => 25, 'total_amount' => 25, 'exempt_amount' => 25,
+        ]);
+    }
+
+    public function test_combined_card_sums_pra_local_and_exempt_for_both_scope_admin(): void
+    {
+        $companyId = $this->makeCompany();
+        $this->seedMixedStreams($companyId);
+
+        // Through the dashboard (pos_admin, scope both): 1441 PRA + 350 local + 25 exempt.
+        $data = $this->dashboardData($companyId);
+        $this->assertSame(1816.0, (float) $data['todayTotalSale'], 'PRA 1441 + local 350 + exempt 25');
+        $this->assertSame(1816.0, (float) $data['monthTotalSale']);
+
+        // The card must equal the SUM of the ledger buckets the admin sees.
+        $k = $data['todayKhata'];
+        $this->assertSame(
+            (float) $data['todayTotalSale'],
+            (float) $k['pra']['sale'] + (float) $k['local']['sale'] + (float) $k['exempt']['sale'],
+            'revenue card must equal the Aaj ka Khaata sum'
+        );
+    }
+
+    public function test_combined_card_scope_rules_no_local_leak(): void
+    {
+        $companyId = $this->makeCompany();
+        $this->seedMixedStreams($companyId);
+        $biz = \App\Services\PosBusinessDay::current($companyId);
+
+        $mkScoped = function (string $posRole, ?string $scope) use ($companyId) {
+            $id = DB::table('users')->insertGetId([
+                'name' => 'Scoped', 'email' => $posRole . ($scope ?? 'null') . $companyId . '@taxnest.test',
+                'company_id' => $companyId, 'role' => 'user', 'pos_role' => $posRole,
+                'pos_billing_scope' => $scope, 'is_active' => true,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+
+            return User::find($id);
+        };
+
+        // PRA-scoped cashier: PRA 1441 + exempt 25 only — never the local 350.
+        $pra = \App\Services\PosTodayKhata::combinedSale($companyId, $mkScoped('pos_cashier', 'pra'), $biz, $biz);
+        $this->assertSame(1466.0, $pra, 'pra-scoped = PRA + exempt, no local leak');
+
+        // Local-scoped cashier: local 350 + exempt 25 only.
+        $local = \App\Services\PosTodayKhata::combinedSale($companyId, $mkScoped('pos_cashier', 'local'), $biz, $biz);
+        $this->assertSame(375.0, $local, 'local-scoped = local + exempt only');
+
+        // Hidden-local manager (khufia local-check OFF): PRA-only headline.
+        $manager = $mkScoped('pos_manager', 'both');
+        session()->forget('pos_local_check');
+        $this->assertTrue($manager->posHidesLocalStream(), 'manager without local-check hides local');
+        $hidden = \App\Services\PosTodayKhata::combinedSale($companyId, $manager, $biz, $biz);
+        $this->assertSame(1466.0, $hidden, 'hidden-local manager must not see the local 350');
+
+        // Same manager with khufia mode ON sees the full combined figure.
+        session(['pos_local_check' => true]);
+        $revealed = \App\Services\PosTodayKhata::combinedSale($companyId, $manager, $biz, $biz);
+        $this->assertSame(1816.0, $revealed);
+        session()->forget('pos_local_check');
+    }
+
+    public function test_new_customers_card_counts_today_and_month_company_scoped(): void
+    {
+        $companyId = $this->makeCompany();
+        $otherId = $this->makeCompany(['name' => 'Other Co']);
+        $this->seedNettingDay($companyId);
+
+        Schema::create('pos_customers', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('company_id');
+            $table->string('name')->nullable();
+            $table->string('phone')->nullable();
+            $table->timestamps();
+        });
+        DB::table('pos_customers')->insert([
+            // Added today (now is always inside the current business-day window).
+            ['company_id' => $companyId, 'name' => 'Aaj Wala', 'created_at' => now(), 'updated_at' => now()],
+            // Earlier this month but a previous business day.
+            ['company_id' => $companyId, 'name' => 'Mahine Wala', 'created_at' => now()->startOfMonth()->addHours(12), 'updated_at' => now()],
+            // Last month — counts in neither figure.
+            ['company_id' => $companyId, 'name' => 'Purana', 'created_at' => now()->subMonthNoOverflow(), 'updated_at' => now()],
+            // Other company — never counted.
+            ['company_id' => $otherId, 'name' => 'Ghair', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $data = $this->dashboardData($companyId);
+        // On the 1st of a month "earlier this month" collapses into today; both
+        // figures must still obey window ⊆ month and company scoping.
+        $expectedMonth = now()->day === 1 ? 1 : 2;
+        $this->assertSame(1, (int) $data['newCustomersToday']);
+        $this->assertSame($expectedMonth, (int) $data['newCustomersMonth']);
     }
 
     // ── 2. payment breakdown: per-method signed sums ─────────────────────────

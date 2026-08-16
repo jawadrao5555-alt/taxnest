@@ -135,9 +135,10 @@
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 slide-up slide-up-3">
         <div class="stat-card card-reveal bg-gradient-to-br from-emerald-500 to-emerald-700 p-4 shadow-lg shadow-emerald-500/15">
             <div class="relative z-10">
+                {{-- Task 988: combined PRA+Local (+exempt) figure — matches the Aaj ka Khaata sum this user sees --}}
                 <span class="text-[9px] font-bold uppercase tracking-wider text-emerald-100/70">{{ __("pos.todays_revenue") }}</span>
-                <p class="text-xl font-extrabold text-white mt-1">Rs. <span data-count-target="{{ $todaySales ?? $todayStats->revenue ?? 0 }}">{{ number_format($todaySales ?? $todayStats->revenue ?? 0, 0) }}</span></p>
-                <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: {{ min(100, ($monthSales ?? $monthStats->revenue ?? 1) > 0 ? (($todaySales ?? $todayStats->revenue ?? 0) / ($monthSales ?? $monthStats->revenue ?? 1) * 100) : 0) }}%"></div></div>
+                <p class="text-xl font-extrabold text-white mt-1">Rs. <span data-count-target="{{ $todayTotalSale ?? $todaySales ?? $todayStats->revenue ?? 0 }}">{{ number_format($todayTotalSale ?? $todaySales ?? $todayStats->revenue ?? 0, 0) }}</span></p>
+                <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: {{ min(100, ($monthTotalSale ?? $monthSales ?? $monthStats->revenue ?? 1) > 0 ? (($todayTotalSale ?? $todaySales ?? $todayStats->revenue ?? 0) / ($monthTotalSale ?? $monthSales ?? $monthStats->revenue ?? 1) * 100) : 0) }}%"></div></div>
             </div>
         </div>
         <div class="stat-card card-reveal bg-gradient-to-br from-teal-600 to-teal-800 p-4 shadow-lg shadow-teal-600/15">
@@ -149,9 +150,11 @@
         </div>
         <div class="stat-card card-reveal bg-gradient-to-br from-purple-500 to-purple-700 p-4 shadow-lg">
             <div class="relative z-10">
-                <span class="text-[9px] font-bold uppercase tracking-wider text-white/70">{{ __("pos.avg_order") }}</span>
-                <p class="text-xl font-extrabold text-white mt-1">Rs. <span data-count-target="{{ round($todayStats->avg_ticket ?? (($todayOrders ?? 0) > 0 ? ($todaySales ?? 0) / ($todayOrders ?? 1) : 0)) }}">{{ number_format(round($todayStats->avg_ticket ?? (($todayOrders ?? 0) > 0 ? ($todaySales ?? 0) / ($todayOrders ?? 1) : 0))) }}</span></p>
-                <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: 60%"></div></div>
+                {{-- Task 988: Avg. Order card replaced by New Customers (owner voice note, 16 Aug 2026) --}}
+                <span class="text-[9px] font-bold uppercase tracking-wider text-white/70">{{ __("pos.new_customers") }}</span>
+                <p class="text-xl font-extrabold text-white mt-1"><span data-count-target="{{ $newCustomersToday ?? 0 }}">{{ number_format($newCustomersToday ?? 0) }}</span></p>
+                <p class="text-[9px] font-bold text-white/70 mt-1">{{ number_format($newCustomersMonth ?? 0) }} {{ __("pos.period_this_month") }}</p>
+                <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: {{ ($newCustomersMonth ?? 0) > 0 ? min(100, round(($newCustomersToday ?? 0) / max(1, $newCustomersMonth ?? 1) * 100)) : 0 }}%"></div></div>
             </div>
         </div>
         @if($isRestaurant)
@@ -166,7 +169,7 @@
         <div class="stat-card card-reveal bg-gradient-to-br from-amber-500 to-orange-600 p-4 shadow-lg shadow-amber-500/15">
             <div class="relative z-10">
                 <span class="text-[9px] font-bold uppercase tracking-wider text-amber-100/70">{{ __("pos.monthly_word") }}</span>
-                <p class="text-xl font-extrabold text-white mt-1">Rs. <span data-count-target="{{ $monthSales ?? $monthStats->revenue ?? 0 }}">{{ number_format($monthSales ?? $monthStats->revenue ?? 0, 0) }}</span></p>
+                <p class="text-xl font-extrabold text-white mt-1">Rs. <span data-count-target="{{ $monthTotalSale ?? $monthSales ?? $monthStats->revenue ?? 0 }}">{{ number_format($monthTotalSale ?? $monthSales ?? $monthStats->revenue ?? 0, 0) }}</span></p>
                 <div class="progress-bar bg-white/10 mt-2"><div class="progress-fill bg-white/40" style="width: 75%"></div></div>
             </div>
         </div>

@@ -46,9 +46,10 @@
 
     <div class="os-stat-strip os-anim os-d2">
         <div class="os-stat-cell">
+            {{-- Task 988: combined PRA+Local (+exempt) figure — matches the Aaj ka Khaata sum this user sees --}}
             <p class="text-[9px] font-bold text-teal-600 uppercase">{{ __("pos.revenue_word") }}</p>
-            <p class="text-xl font-black text-gray-900 dark:text-white" style="font-variant-numeric:tabular-nums">Rs.{{ number_format($todaySales ?? $todayStats->revenue ?? 0) }}</p>
-            @php $yest=$yesterdaySales??0;$today=$todaySales??$todayStats->revenue??0;$pct=$yest>0?round(($today-$yest)/$yest*100):0; @endphp
+            <p class="text-xl font-black text-gray-900 dark:text-white" style="font-variant-numeric:tabular-nums">Rs.{{ number_format($todayTotalSale ?? $todaySales ?? $todayStats->revenue ?? 0) }}</p>
+            @php $yest=$yesterdayTotalSale??$yesterdaySales??0;$today=$todayTotalSale??$todaySales??$todayStats->revenue??0;$pct=$yest>0?round(($today-$yest)/$yest*100):0; @endphp
             @if($pct!=0)<p class="text-[9px] font-bold mt-0.5 {{ $pct>=0?'text-emerald-600':'text-red-500' }}">{{ $pct>=0?'▲':'▼' }} {{ abs($pct) }}%</p>@endif
         </div>
         <div class="os-stat-cell">
@@ -56,9 +57,11 @@
             <p class="text-xl font-black text-gray-900 dark:text-white">{{ $todayOrders ?? $todayStats->count ?? 0 }}</p>
             <p class="text-[9px] text-gray-400 mt-0.5">{{ $heldCount ?? 0 }} {{ __("pos.held_lc") }}</p>
         </div>
+        {{-- Task 988: Avg. Ticket cell replaced by New Customers (owner voice note, 16 Aug 2026) --}}
         <div class="os-stat-cell">
-            <p class="text-[9px] font-bold text-teal-600 uppercase">{{ __("pos.avg_ticket") }}</p>
-            <p class="text-xl font-black text-gray-900 dark:text-white">Rs.{{ number_format($todayStats->avg_ticket ?? (($todayOrders ?? 0) > 0 ? ($todaySales ?? 0) / ($todayOrders ?? 1) : 0)) }}</p>
+            <p class="text-[9px] font-bold text-teal-600 uppercase">{{ __("pos.new_customers") }}</p>
+            <p class="text-xl font-black text-gray-900 dark:text-white">{{ number_format($newCustomersToday ?? 0) }}</p>
+            <p class="text-[9px] text-gray-400 mt-0.5">{{ number_format($newCustomersMonth ?? 0) }} {{ __("pos.period_this_month") }}</p>
         </div>
         <div class="os-stat-cell">
             @if($isRestaurant)
@@ -67,7 +70,7 @@
             <p class="text-[9px] text-gray-400 mt-0.5">{{ ($totalTables ?? 0) > 0 ? round(($occupiedTables ?? 0) / ($totalTables ?? 1) * 100) : 0 }}% {{ __("pos.full_lc") }}</p>
             @else
             <p class="text-[9px] font-bold text-teal-600 uppercase">{{ __("pos.monthly_word") }}</p>
-            <p class="text-xl font-black text-gray-900 dark:text-white">Rs.{{ number_format($monthSales ?? $monthStats->revenue ?? 0) }}</p>
+            <p class="text-xl font-black text-gray-900 dark:text-white">Rs.{{ number_format($monthTotalSale ?? $monthSales ?? $monthStats->revenue ?? 0) }}</p>
             <p class="text-[9px] text-gray-400 mt-0.5">{{ $monthStats->count ?? 0 }} {{ __("pos.orders_lc") }}</p>
             @endif
         </div>

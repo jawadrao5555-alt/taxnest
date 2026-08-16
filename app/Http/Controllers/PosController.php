@@ -1049,10 +1049,9 @@ class PosController extends Controller
             ->where($excludeLocal)
             ->selectRaw("COALESCE(SUM({$dashSaleRowExpr}),0) as count, COALESCE(SUM(({$dashSignExpr}) * total_amount),0) as revenue")
             ->first();
-        // Avg ticket = netted revenue over sales-only bills (a raw AVG would
-        // count the return row as a bill and average its positive amount in).
-        $todayStats->avg_ticket = ((int) $todayStats->count) > 0
-            ? (float) $todayStats->revenue / (int) $todayStats->count : 0;
+        // (Task 988: the avg_ticket figure is gone — the Avg. Order card was
+        // replaced by New Customers on every dashboard style, and no other
+        // view reads it.)
 
         // Task 109 (ZFC, 2 Aug 2026): Pending Bills — provisional bills of the
         // current BUSINESS day that are still not FINAL. Triple-filter per
@@ -1292,6 +1291,38 @@ class PosController extends Controller
         $todayKhata = \App\Services\PosTodayKhata::build($companyId, $bizToday, $user);
         // ─────────────────────────────────────────────────────────────────────
 
+        // Task 988 (owner video, 16 Aug 2026): the Today's Revenue card shows the
+        // TOTAL sale — PRA + Local (+ exempt) combined, i.e. exactly the sum of
+        // the ledger figures this user is allowed to see — so the owner never
+        // has to add PRA + Local himself. Scope-aware (no local-stream leak:
+        // PRA-scoped / hidden-local users stay PRA-only, local-scoped stay
+        // local-only). The chart / profit / payment tiles keep their existing
+        // single-stream sources ($todayStats et al.).
+        $todayTotalSale = \App\Services\PosTodayKhata::combinedSale($companyId, $user, $bizToday, $bizToday);
+        // Monthly card gets the same combined treatment so the two revenue
+        // cards can never contradict each other.
+        $monthTotalSale = \App\Services\PosTodayKhata::combinedSale($companyId, $user, now()->startOfMonth()->toDateString());
+
+        // Task 988: "New Customers" card (replaces Avg. Order — owner voice note):
+        // customers added in the current BUSINESS day + this calendar month.
+        // pos_customers has no business_date column — window = biz day start
+        // (bizToday @ per-company cutoff) in app TZ.
+        $newCustWindowStart = \Carbon\Carbon::parse(
+            $bizToday . ' ' . \App\Services\PosBusinessDay::cutoffFor($companyId),
+            config('app.timezone')
+        );
+        // hasTable drift guard (PROD schema-drift policy): a schema without
+        // pos_customers must still render the dashboard — counts show 0.
+        $hasCustomersTable = \Schema::hasTable('pos_customers');
+        $newCustomersToday = $hasCustomersTable
+            ? PosCustomer::where('company_id', $companyId)
+                ->where('created_at', '>=', $newCustWindowStart)->count()
+            : 0;
+        $newCustomersMonth = $hasCustomersTable
+            ? PosCustomer::where('company_id', $companyId)
+                ->where('created_at', '>=', now()->startOfMonth())->count()
+            : 0;
+
         $allowedStyles = ['default', 'toast', 'lightspeed', 'clover', 'oscar', 'shopify', 'saaf'];
         $dashboardStyle = in_array($company->pos_dashboard_style, $allowedStyles) ? $company->pos_dashboard_style : 'default';
         $isRestaurant = false;
@@ -1302,12 +1333,10 @@ class PosController extends Controller
         $yesterdayRevenue = null;
         $praSyncedToday = null;
         if ($dashboardStyle === 'saaf') {
-            $yesterdayRevenue = (float) (PosTransaction::where('company_id', $companyId)
-                ->where('status', 'completed')
-                ->where('business_date', \Carbon\Carbon::parse($bizToday)->subDay()->toDateString())
-                ->where($excludeLocal)
-                ->selectRaw("COALESCE(SUM(({$dashSignExpr}) * total_amount),0) as revenue")
-                ->value('revenue') ?? 0);
+            // Task 988: vs-kal delta must compare like-with-like — yesterday's
+            // figure is the same scope-aware COMBINED sale as the today card.
+            $saafYesterdayBiz = \Carbon\Carbon::parse($bizToday)->subDay()->toDateString();
+            $yesterdayRevenue = \App\Services\PosTodayKhata::combinedSale($companyId, $user, $saafYesterdayBiz, $saafYesterdayBiz);
             // Synced-bill count stays SALES-only (a submitted credit note is
             // not a bill; counting it would disagree with the today tile).
             $praSyncedToday = (int) PosTransaction::where('company_id', $companyId)
@@ -1350,7 +1379,8 @@ class PosController extends Controller
             'dashboardStyle', 'isRestaurant', 'isAdmin', 'notifications',
             'profitStats', 'topSold', 'topProfit', 'lowMargin', 'costCoverage',
             'dayOpening', 'todayClosed', 'yesterdayRevenue', 'praSyncedToday',
-            'pendingProvisional', 'unclosedPriorDays', 'canDayClose', 'todayKhata'
+            'pendingProvisional', 'unclosedPriorDays', 'canDayClose', 'todayKhata',
+            'todayTotalSale', 'monthTotalSale', 'newCustomersToday', 'newCustomersMonth'
         ));
     }
 

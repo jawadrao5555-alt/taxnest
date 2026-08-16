@@ -6870,9 +6870,14 @@ function restaurantPos() {
             const inc = this.incomingForTable(table);
             if (inc) {
                 if (table.order) {
-                    // Task 781: flag ON = popup skip, order seedha edit mode mein
-                    // (waiter orders atomic claim se — directOpenTable handles it).
-                    if (this.cart.length === 0) { this.showTablePicker = false; if (this.tableClickDirectOpen) { await this.directOpenTable(table); } else { this.openBoardMenu(table); } return; }
+                    // Task 781: flag ON = popup skip, order seedha edit mode mein.
+                    // Task 867 (Aug 2026): directOpenTable(table) ko BYPASS karo —
+                    // woh table.order.source check karta hai, lekin table-status poll
+                    // stale ho sakta hai (source='pos' show kare jabke waiter order
+                    // bell-panel mein already hai). Hamesha inc (bell-panel ka fresh
+                    // id) se directly claimAndLoadIncoming karo taake source-mismatch
+                    // race mein waiter order silently skip na ho.
+                    if (this.cart.length === 0) { this.showTablePicker = false; if (this.tableClickDirectOpen) { await this.claimAndLoadIncoming(inc); } else { this.openBoardMenu(table); } return; }
                     this.showToast(window.TXT.table_t_prefix2 + table.table_number + window.TXT.table_occupied_cart_hint, 'warning'); return;
                 }
                 await this.claimAndLoadIncoming(inc); return;

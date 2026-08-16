@@ -4743,8 +4743,9 @@ function restaurantPos() {
                     setTimeout(() => this.loadTableStatus(), 2200);
                     setInterval(() => { if (!document.hidden && !this.showPayModal && !this.boardBusy) this.loadTableStatus(); }, 25000);
                 }
-                // Task 899: poll held-orders every 25 s so a cancel on another tab/terminal
-                // disappears from this session's Held Orders list within one cycle.
+                // Task 899 / 935: poll held-orders every 25 s for bidirectional cross-terminal
+                // sync — a cancel on Tab B disappears here within one cycle, and a NEW hold
+                // on Tab B appears here within one cycle (full server list replaces local list).
                 // Runs independently of the table board so it works on retail POS too.
                 setInterval(() => { if (!document.hidden) this.loadHeldOrders(); }, 25000);
             }
@@ -6872,10 +6873,11 @@ function restaurantPos() {
             } catch (e) { console.error('[tables] status load failed', e); }
             this.tablesLoading = false;
         },
-        // Task 899: cross-terminal held-orders sync — refreshes this.heldOrders from
-        // the server so a cancel on Tab/Terminal B disappears from Tab/Terminal A within
-        // one poll cycle (~25 s). Only replaces entries that are NOT currently loaded
-        // into the cart (recalledOrderId) to avoid clobbering an in-progress edit.
+        // Task 899 / 935: cross-terminal held-orders sync — refreshes this.heldOrders from
+        // the server every 25 s. Works BOTH directions: a cancel on Tab B disappears here
+        // within one cycle, AND a new hold on Tab B appears here within one cycle (full
+        // server list replaces local list). Only preserves the local copy of a recalled
+        // order actively being edited (recalledOrderId) to avoid clobbering work.
         async loadHeldOrders() {
             try {
                 const res = await fetch('/pos/restaurant/api/held-orders', { headers: { 'Accept': 'application/json' } });

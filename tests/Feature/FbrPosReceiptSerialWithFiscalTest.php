@@ -258,6 +258,66 @@ class FbrPosReceiptSerialWithFiscalTest extends TestCase
         }
     }
 
+    // ── 3a. FAILED — dashed retry badge, NOT the offline .local-badge ────────
+
+    /**
+     * fbr_status='failed' means FBR rejected the submission (e.g. duplicate
+     * invoice, validation error).  The cashier needs a clear "retry" signal,
+     * NOT the "sync pending" offline indicator that implies the problem will
+     * resolve itself once connectivity returns.
+     *
+     * Invariants locked (both paper widths):
+     *   • .local-badge is ABSENT — the offline sync indicator must NOT fire.
+     *   • The dashed FBR-PENDING / retry badge IS present.
+     *   • The shop's own POS serial appears so the cashier can identify the bill.
+     *   • No spurious "FBR: <fiscal>" line (there is no fiscal number).
+     */
+    public function test_failed_bill_shows_retry_badge_not_local_badge(): void
+    {
+        foreach (self::PAPERS as $paper) {
+            $company = $this->makeCompany($paper);
+            // fbr_status='failed', fbr_invoice_number=null — FBR rejected the bill.
+            $txn = $this->makeTransaction($company, 'failed', null);
+
+            $body = $this->renderBody($company, $txn);
+
+            // Must NOT show the offline sync indicator.
+            $this->assertStringNotContainsString(
+                'local-badge',
+                $body,
+                ".local-badge must NOT appear for a failed FBR submission ({$paper})"
+            );
+
+            // Must show the dashed FBR-PENDING retry badge.
+            $this->assertStringContainsString(
+                __('pos.rcpt_fbr_pending'),
+                $body,
+                "dashed FBR-PENDING retry badge must render for a failed bill ({$paper})"
+            );
+
+            // The retry note must also appear inside that badge.
+            $this->assertStringContainsString(
+                __('pos.rcpt_will_retry'),
+                $body,
+                "retry copy must print on a failed bill ({$paper})"
+            );
+
+            // POS serial must be visible so the cashier can identify the bill.
+            $this->assertStringContainsString(
+                'POS: ' . self::SERIAL,
+                $body,
+                "POS serial appears inside the retry badge ({$paper})"
+            );
+
+            // No spurious FBR fiscal line — there is no fiscal number.
+            $this->assertStringNotContainsString(
+                'FBR: ',
+                $body,
+                "no FBR fiscal line for a failed bill ({$paper})"
+            );
+        }
+    }
+
     // ── 3b. OFFLINE → SUBMITTED (after Desktop Agent sync) ─────────────────
 
     /**

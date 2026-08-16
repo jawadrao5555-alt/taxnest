@@ -89,6 +89,8 @@ class PosHoldOrderIdentityNoteStripTest extends TestCase
             $table->unsignedBigInteger('created_by')->nullable();
             $table->timestamp('kot_sent_at')->nullable();
             $table->unsignedSmallInteger('kot_print_count')->default(0);
+            // Task 1001: hold_uuid idempotency key — must match live schema.
+            $table->string('hold_uuid', 64)->nullable()->unique();
             $table->timestamps();
         });
 

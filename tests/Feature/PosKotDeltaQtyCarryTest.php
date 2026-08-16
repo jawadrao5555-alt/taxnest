@@ -272,6 +272,8 @@ class PosKotDeltaQtyCarryTest extends TestCase
             $table->timestamp('superseded_at')->nullable();
             // Task 841: KDS void-items badge column.
             $table->text('void_items')->nullable();
+            // Task 1001: hold_uuid idempotency key — must match live schema.
+            $table->string('hold_uuid', 64)->nullable()->unique();
             $table->timestamps();
         });
 

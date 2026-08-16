@@ -19,6 +19,8 @@ class RestaurantOrder extends Model
         'superseded_at',
         // Task 841: KDS cancelled-items badge — JSON list of voided dishes.
         'void_items',
+        // Task 1001: per-hold-attempt idempotency key — replay guard for lost responses.
+        'hold_uuid',
     ];
 
     protected $casts = [

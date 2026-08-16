@@ -119,6 +119,8 @@ class PosRecallSupersedeGhostTest extends TestCase
             $table->timestamp('cancelled_at')->nullable();
             $table->unsignedBigInteger('cancelled_by')->nullable();
             $table->timestamp('superseded_at')->nullable();
+            // Task 1001: hold_uuid idempotency key — must match live schema.
+            $table->string('hold_uuid', 64)->nullable()->unique();
             $table->timestamps();
         });
 

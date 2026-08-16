@@ -174,7 +174,35 @@ class RestaurantPosController extends Controller
             'discount_value' => 'nullable|numeric|min:0|max:999999',
             // Task 994: per-sale-attempt idempotency key (billing pass-through only).
             'pay_uuid' => 'nullable|string|max:64',
+            // Task 1001: per-hold-attempt idempotency key (standalone Hold / Send-to-Kitchen).
+            'hold_uuid' => 'nullable|string|max:64',
         ]);
+
+        // ── Task 1001: HOLD-ONLY RETRY-AFTER-LOST-RESPONSE short-circuit ─────
+        // Standalone Hold (F5) and Send-to-Kitchen carry a hold_uuid per attempt.
+        // If a RestaurantOrder already exists with that uuid the first hold
+        // succeeded but the response was lost — return the original order so the
+        // client doesn't create a twin (duplicate KOT + ghost in Held Orders).
+        // Schema guard: deploy-before-migrate window safety.
+        $holdUuid = trim((string) $request->input('hold_uuid', ''));
+        if ($holdUuid !== '' && Schema::hasColumn('restaurant_orders', 'hold_uuid')) {
+            $existingOrder = RestaurantOrder::where('company_id', $companyId)
+                ->where('hold_uuid', $holdUuid)
+                ->whereIn('status', ['held', 'preparing', 'ready'])
+                ->with(['items', 'table'])
+                ->first();
+            if ($existingOrder) {
+                Log::info('[HOLD] Replayed by hold_uuid — order already held', ['order_id' => $existingOrder->id, 'hold_uuid' => $holdUuid]);
+                return response()->json([
+                    'success'           => true,
+                    'message'           => "Order {$existingOrder->order_number} held successfully",
+                    'order'             => $existingOrder,
+                    'kot_delta_queued'  => false,
+                    'kot_void_queued'   => false,
+                    'kot_void_url'      => null,
+                ]);
+            }
+        }
 
         // ── Task 994: RETRY-AFTER-LOST-RESPONSE short-circuit ────────────────
         // The billing pass-through (hold → pay) rides one pay_uuid across every
@@ -497,7 +525,12 @@ class RestaurantPosController extends Controller
                     ? \App\Services\OrderTokenService::nextToken($companyId)
                     : null);
 
-            $order = RestaurantOrder::create([
+            // Task 1001: build the create array conditionally so hold_uuid is
+            // never included when the column doesn't exist yet (deploy-before-
+            // migrate window OR test schemas that don't define the column).
+            // Including the key with null when the column is absent causes a
+            // SQL "unknown column" error — never a silent no-op.
+            $orderCreateData = [
                 'company_id' => $companyId,
                 'order_number' => $orderNumber,
                 'token_no' => $tokenNo,
@@ -532,7 +565,13 @@ class RestaurantPosController extends Controller
                 // Carry kot_print_count forward on re-send so the ticket shows "UPDATED".
                 'kot_sent_at' => now(),
                 'kot_print_count' => $carriedKotCount + 1,
-            ]);
+            ];
+            // Task 1001: add hold_uuid only when the column exists AND the
+            // client sent a uuid. Conditional key = no SQL error on old schemas.
+            if ($holdUuid !== '' && Schema::hasColumn('restaurant_orders', 'hold_uuid')) {
+                $orderCreateData['hold_uuid'] = $holdUuid;
+            }
+            $order = RestaurantOrder::create($orderCreateData);
 
             foreach ($resolvedItems as $item) {
                 // Task 778 QUANTITY-AWARE CARRY: consume this identity's printed
@@ -738,6 +777,34 @@ class RestaurantPosController extends Controller
                 'kot_void_queued' => $kotVoidQueued,
                 'kot_void_url'    => $kotVoidUrl,
             ]);
+        } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+            // Task 1001: DUPLICATE-KEY RACE — two requests carrying the same
+            // hold_uuid both passed the pre-transaction lookup (network retry
+            // while first was in-flight). The first committed; the second hit
+            // the unique index on hold_uuid during create(). Roll back and
+            // return the winner's order as a canonical replay response instead
+            // of a 500 — the client gets the same payload as a pre-lookup hit.
+            DB::rollBack();
+            if ($holdUuid !== '' && Schema::hasColumn('restaurant_orders', 'hold_uuid')) {
+                $winner = RestaurantOrder::where('company_id', $companyId)
+                    ->where('hold_uuid', $holdUuid)
+                    ->whereIn('status', ['held', 'preparing', 'ready'])
+                    ->with(['items', 'table'])
+                    ->first();
+                if ($winner) {
+                    Log::info('[HOLD] Duplicate-key race resolved — returning winner', ['order_id' => $winner->id, 'hold_uuid' => $holdUuid]);
+                    return response()->json([
+                        'success'          => true,
+                        'message'          => "Order {$winner->order_number} held successfully",
+                        'order'            => $winner,
+                        'kot_delta_queued' => false,
+                        'kot_void_queued'  => false,
+                        'kot_void_url'     => null,
+                    ]);
+                }
+            }
+            Log::error('Hold order unique-key collision (no winner found): ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to hold order. Please try again.'], 500);
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Hold order failed: ' . $e->getMessage());

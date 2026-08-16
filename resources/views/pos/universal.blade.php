@@ -4420,6 +4420,13 @@ function restaurantPos() {
         // and pay POSTs), cleared on success / clearCart. The server replays the
         // original bill for a known uuid instead of creating a duplicate.
         payAttemptUuid: null,
+        // Task 1001: per-hold-attempt idempotency key for standalone Hold (F5) /
+        // Send-to-Kitchen. Minted on first press, REUSED on every retry of the
+        // SAME hold attempt (e.g. after a timeout where the server may have
+        // succeeded but the response was lost). Cleared on success / clearCart.
+        // Unlike payAttemptUuid this is NOT shared with the billing pass-through
+        // (which sends pay_uuid instead), so both guards are independent.
+        holdAttemptUuid: null,
         // Same idea for DIRECT held-order pays (held modal / table board): one
         // uuid per order id — a retry after a lost response replays the original
         // success (receipt data included) instead of a dead-end "already paid".
@@ -6657,7 +6664,7 @@ function restaurantPos() {
             });
         },
 
-        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.payAttemptUuid = null; this.kitchenNotes = ''; this.showCartNote = false; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.recalledOrderMeta = null; this.incomingOrderId = null; this.incomingOrderInfo = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.deliveryPrepaid = false; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this.fixCartIndex(); this.clearCartStorage(); },
+        clearCart() { if (this.selectedTable) this.releaseTable(this.selectedTable.id); this.cart = []; this.payAttemptUuid = null; this.holdAttemptUuid = null; this.kitchenNotes = ''; this.showCartNote = false; this.selectedTable = null; this.orderType = 'takeaway'; this.selectedCustomer = null; this.customerStats = null; this.customerPhoneQuery = ''; this.customerPhoneResults = []; this.customerPhoneDropdown = false; this.stockError = ''; this.priorityOrder = false; this.recalledOrderId = null; this.recalledOrderMeta = null; this.incomingOrderId = null; this.incomingOrderInfo = null; this.discountType = 'percentage'; this.discountValue = 0; this.discountAmount = 0; this.showDiscount = false; this.managerOverrideActive = false; this.activeCartIndex = -1; this.cartMode = false; this.flowStep = 'customer'; this.deliveryChargeInput = ''; this.deliveryPrepaid = false; this.customerAddresses = []; this.selectedDeliveryAddress = ''; this.showAddrNew = false; this.newAddrText = ''; this.newAddrLabel = ''; this.fixCartIndex(); this.clearCartStorage(); },
         newSale() {
             if (this.cart.length > 0) { if (!confirm(window.TXT.current_order_has + this.cart.length + ' item(s). Discard and start new sale?')) return; }
             this.clearCart(); this.showToast(window.TXT.new_sale_started, 'success');
@@ -8051,11 +8058,15 @@ function restaurantPos() {
             if (now - this.lastHoldTime < 2000) return null;
             this.lastHoldTime = now;
             this.submitting = true;
+            // Task 1001: mint once per hold attempt, reuse on every retry so a
+            // lost-response retry returns the original order instead of creating
+            // a twin. Cleared to null on success (below) / clearCart().
+            if (!this.holdAttemptUuid) this.holdAttemptUuid = this._newOfflineUuid();
             let result = null;
             try {
                 const res = await fetch('{{ route("pos.restaurant.orders.hold") }}', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount, delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || null) : null }),
+                    body: JSON.stringify({ items: this.cart, order_type: this.orderType, table_id: this.selectedTable?.id || null, customer_id: this.selectedCustomer?.id || null, customer_name: this.selectedCustomer?.name || null, customer_phone: this.selectedCustomer?.phone || null, kitchen_notes: this.kitchenNotes, priority: this.priorityOrder, recalled_order_id: this.recalledOrderId, discount_type: this.discountAmount > 0 ? this.discountType : null, discount_value: this.discountAmount > 0 ? this.discountValue : 0, discount_amount: this.discountAmount, delivery_address: this.orderType === 'delivery' ? ((this.selectedDeliveryAddress || '').trim() || null) : null, hold_uuid: this.holdAttemptUuid }),
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -8067,6 +8078,8 @@ function restaurantPos() {
                     // ko WAPAS tables chart pe le aao — agla order wahin se banta hai.
                     const wasDineIn = this.orderType === 'dine_in';
                     const successMsg = opts.successMessage || data.message;
+                    // Task 1001: hold succeeded — next hold is a fresh attempt.
+                    this.holdAttemptUuid = null;
                     this.showToast(successMsg, 'success'); this.heldOrders.unshift(data.order); this.clearCart();
                     if (wasDineIn && this.tableBoardEnabled) {
                         // Task 779: Tables-first flow ON → chhota picker NAHI, seedha

@@ -652,48 +652,47 @@
         @endif
     </table>
 
-    {{-- Payment breakdown — shown only when ≥2 pos_payments rows exist (split
-         payment). Single-method bills are unchanged. Schema-guarded via
-         relationLoaded. Mirrors receipt_80mm. --}}
+    {{-- Task 816: split-payment breakdown — printed receipt mirrors the public
+         /bill/{token} page (Task 803). Shown ONLY when ≥2 raw pos_payments rows
+         exist (single-method bills unchanged). relationLoaded guard: render
+         paths that don't eager-load 'payments' simply skip the section — prod
+         strict lazy-loading never throws. Mirrors receipt_80mm; keep in sync. --}}
     @php
-        $rcptSplitPayments = [];
+        $rcptPayBreakdown = [];
         try {
-            if ($transaction->relationLoaded('payments')) {
-                $rcptRawPay = $transaction->payments ?? collect();
-                if ($rcptRawPay->count() >= 2) {
-                    $rcptCardAliases = ['card', 'debit_card', 'credit_card'];
-                    $rcptPayLabel = function(string $m) use ($rcptCardAliases): string {
-                        if ($m === 'cash')                          return __('pos.receipt_pay_cash');
-                        if (in_array($m, $rcptCardAliases, true))  return __('pos.receipt_pay_card');
-                        return __('pos.receipt_pay_other');
-                    };
-                    $rcptGrouped = [];
-                    foreach ($rcptRawPay as $rp) {
-                        $bkt = $rp->payment_method === 'cash' ? 'cash'
-                            : (in_array($rp->payment_method, $rcptCardAliases, true) ? 'card' : ('other:'.$rp->payment_method));
-                        $rcptGrouped[$bkt] = ($rcptGrouped[$bkt] ?? 0) + (float) $rp->amount;
-                    }
-                    foreach ($rcptGrouped as $bkt => $amt) {
-                        $rm = $bkt === 'cash' ? 'cash'
-                            : (str_starts_with($bkt, 'other:') ? substr($bkt, 6) : 'debit_card');
-                        $rcptSplitPayments[] = ['label' => $rcptPayLabel($rm), 'amount' => $amt];
-                    }
+            if ($transaction->relationLoaded('payments') && ($transaction->payments ?? collect())->count() >= 2) {
+                // Bucket aliases so the customer sees a friendly label; legacy
+                // 'card' + 'debit_card' + 'credit_card' collapse into one Card row.
+                $rcptPayAliases = ['card', 'debit_card', 'credit_card'];
+                $rcptPayGrouped = [];
+                foreach ($transaction->payments as $rcptPayRow) {
+                    $rcptPayMethod = strtolower((string) $rcptPayRow->payment_method);
+                    $rcptPayBucket = $rcptPayMethod === 'cash' ? 'cash'
+                        : (in_array($rcptPayMethod, $rcptPayAliases, true) ? 'card' : 'other:' . $rcptPayMethod);
+                    $rcptPayGrouped[$rcptPayBucket] = ($rcptPayGrouped[$rcptPayBucket] ?? 0) + (float) $rcptPayRow->amount;
+                }
+                foreach ($rcptPayGrouped as $rcptPayBucket => $rcptPayAmount) {
+                    $rcptPayBreakdown[] = [
+                        'label'  => $rcptPayBucket === 'cash' ? __('pos.receipt_pay_cash')
+                            : ($rcptPayBucket === 'card' ? __('pos.receipt_pay_card') : __('pos.receipt_pay_other')),
+                        'amount' => $rcptPayAmount,
+                    ];
                 }
             }
         } catch (\Throwable $e) {
-            $rcptSplitPayments = [];
+            $rcptPayBreakdown = [];
         }
     @endphp
-    @if(count($rcptSplitPayments) >= 1)
+    @if(count($rcptPayBreakdown) >= 1)
     <div class="separator"></div>
-    <table class="totals-table" style="margin:2px 0;">
+    <table class="totals-table">
         <tr>
-            <td class="tot-label" colspan="2" style="font-size:9px; text-transform:uppercase; letter-spacing:0.4px; padding-bottom:1px;">{{ __('pos.payment_breakdown') }}</td>
+            <td class="tot-label" colspan="2" style="font-weight:bold; text-transform:uppercase;">{{ __('pos.payment_breakdown') }}</td>
         </tr>
-        @foreach($rcptSplitPayments as $sp)
+        @foreach($rcptPayBreakdown as $rcptPayLine)
         <tr>
-            <td class="tot-label">{{ $sp['label'] }}</td>
-            <td class="tot-value">PKR {{ number_format($sp['amount'], 0) }}</td>
+            <td class="tot-label">{{ $rcptPayLine['label'] }}:</td>
+            <td class="tot-value">PKR {{ number_format($rcptPayLine['amount'], 2) }}</td>
         </tr>
         @endforeach
     </table>

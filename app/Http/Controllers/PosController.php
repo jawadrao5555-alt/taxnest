@@ -4724,6 +4724,10 @@ class PosController extends Controller
         $height += ($company && $company->logo_path) ? 70.0 : 0.0; // logo block
         $height += $itemLines * $perLine;                          // item rows
         $height += ($transaction->discount_amount > 0) ? 26.0 : 0.0;
+        // Task 816: split-payment breakdown section (heading + one row per bucket).
+        if ($transaction->relationLoaded('payments') && $transaction->payments->count() >= 2) {
+            $height += 30.0 + ($transaction->payments->count() * 22.0);
+        }
         // Notes wrap to several lines on a narrow thermal roll — scale by length, never assume one line.
         if (!empty($transaction->notes)) {
             $noteCharsPerLine = $printerSize === '58mm' ? 28 : 40;

@@ -661,4 +661,130 @@ class PosLocalBillKotTokenAndQrTest extends TestCase
         $res->assertSee('500');
         $res->assertDontSee(__('pos.payment_breakdown'));
     }
+
+    // ── Split-payment breakdown on printed receipts (Task 816) ────────────
+
+    /**
+     * Build in-memory PosPayment rows and attach them to the transaction the
+     * way every receipt render path does (eager-loaded 'payments' relation).
+     */
+    private function attachPayments(PosTransaction $txn, array $rows): void
+    {
+        $payments = collect();
+        foreach ($rows as $i => $row) {
+            $p = new \App\Models\PosPayment($row);
+            $p->id = $i + 1;
+            $p->transaction_id = $txn->id;
+            $payments->push($p);
+        }
+        $txn->setRelation('payments', $payments);
+    }
+
+    /**
+     * A split-payment bill (cash + card) must print the breakdown section on
+     * BOTH thermal templates: heading, one line per bucket, correct amounts.
+     */
+    public function test_split_payment_receipt_shows_breakdown_on_both_templates(): void
+    {
+        $this->insertTxnRow();
+        $company = $this->makeCompany();
+        $company->invoice_display_prefs = ['pos_style' => ['show_menu_qr' => true, 'bold' => false]];
+
+        QrImage::fake();
+        foreach (self::TEMPLATES as $tpl) {
+            $txn = $this->makeTxn($company, ['total_amount' => 1000]);
+            $this->attachPayments($txn, [
+                ['payment_method' => 'cash',       'amount' => 600],
+                ['payment_method' => 'debit_card', 'amount' => 400],
+            ]);
+            $html = view($tpl, ['transaction' => $txn, 'company' => $company])->render();
+
+            $this->assertStringContainsString(__('pos.payment_breakdown'), $html, $tpl);
+            $this->assertStringContainsString(__('pos.receipt_pay_cash'), $html, $tpl);
+            $this->assertStringContainsString(__('pos.receipt_pay_card'), $html, $tpl);
+            $this->assertStringContainsString('PKR 600.00', $html, $tpl);
+            $this->assertStringContainsString('PKR 400.00', $html, $tpl);
+        }
+    }
+
+    /**
+     * Legacy 'card' + 'debit_card' alias rows collapse into ONE Card line on
+     * the printed receipt (combined amount), but the section still prints
+     * because there were ≥2 raw payment rows — same rule as the public page.
+     */
+    public function test_split_payment_receipt_merges_card_aliases_into_one_line(): void
+    {
+        $this->insertTxnRow();
+        $company = $this->makeCompany();
+        $company->invoice_display_prefs = ['pos_style' => ['show_menu_qr' => true, 'bold' => false]];
+
+        QrImage::fake();
+        foreach (self::TEMPLATES as $tpl) {
+            $txn = $this->makeTxn($company, ['total_amount' => 900, 'payment_method' => 'debit_card']);
+            $this->attachPayments($txn, [
+                ['payment_method' => 'card',       'amount' => 400], // legacy alias
+                ['payment_method' => 'debit_card', 'amount' => 500], // same bucket
+            ]);
+            $html = view($tpl, ['transaction' => $txn, 'company' => $company])->render();
+
+            $this->assertStringContainsString(__('pos.payment_breakdown'), $html, $tpl);
+            // Combined card amount (400 + 500 = 900) on a single Card line.
+            $this->assertStringContainsString('PKR 900.00', $html, $tpl);
+            // Breakdown rows print as "<label>:" — exactly one Card line, no
+            // Cash line. (Bare "Cash"/"Card" words appear legitimately in the
+            // receipt's own Payment info line, so assert the row format.)
+            $this->assertSame(1, substr_count($html, __('pos.receipt_pay_card') . ':'),
+                $tpl . ': card + debit_card aliases must collapse into a single Card row');
+            $this->assertStringNotContainsString(__('pos.receipt_pay_cash') . ':', $html, $tpl);
+        }
+    }
+
+    /**
+     * Single-method bills are UNCHANGED — no breakdown section on either
+     * template when only one pos_payments row exists.
+     */
+    public function test_single_payment_receipt_has_no_breakdown_section(): void
+    {
+        $this->insertTxnRow();
+        $company = $this->makeCompany();
+        $company->invoice_display_prefs = ['pos_style' => ['show_menu_qr' => true, 'bold' => false]];
+
+        QrImage::fake();
+        foreach (self::TEMPLATES as $tpl) {
+            $txn = $this->makeTxn($company, ['total_amount' => 800]);
+            $this->attachPayments($txn, [
+                ['payment_method' => 'cash', 'amount' => 800],
+            ]);
+            $html = view($tpl, ['transaction' => $txn, 'company' => $company])->render();
+
+            $this->assertStringNotContainsString(__('pos.payment_breakdown'), $html, $tpl);
+        }
+    }
+
+    /**
+     * Old bills with no payment rows (or render paths that don't eager-load
+     * 'payments') render exactly as before — no breakdown, no error. makeTxn
+     * seeds an EMPTY loaded relation; also cover the fully-unloaded case.
+     */
+    public function test_receipt_without_payment_rows_renders_without_breakdown(): void
+    {
+        $this->insertTxnRow();
+        $company = $this->makeCompany();
+        $company->invoice_display_prefs = ['pos_style' => ['show_menu_qr' => true, 'bold' => false]];
+
+        QrImage::fake();
+        foreach (self::TEMPLATES as $tpl) {
+            // Empty loaded relation (post-split-feature bill, single legacy write).
+            $txn = $this->makeTxn($company);
+            $html = view($tpl, ['transaction' => $txn, 'company' => $company])->render();
+            $this->assertStringNotContainsString(__('pos.payment_breakdown'), $html, $tpl);
+
+            // Relation NOT loaded at all (render path without eager load):
+            // section silently skipped — must not lazy-load or throw.
+            $txn2 = $this->makeTxn($company);
+            $txn2->unsetRelation('payments');
+            $html2 = view($tpl, ['transaction' => $txn2, 'company' => $company])->render();
+            $this->assertStringNotContainsString(__('pos.payment_breakdown'), $html2, $tpl);
+        }
+    }
 }

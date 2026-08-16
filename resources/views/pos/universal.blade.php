@@ -356,12 +356,12 @@
 .receipt-modal-enter { animation: receiptSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
 .success-icon-animate { animation: successPulse 1.5s ease-out 0.3s; }
 
-/* ============================================================
+/* -----------------------------------------------------------
    Phase 6 — PREMIUM POLISH LAYER (v13)
    Pure additive CSS. No HTML/JS structural changes.
    Design tokens, refined hover states, tighter rhythm,
    better numerics, consistent button feel, calmer chrome.
-   ============================================================ */
+   ----------------------------------------------------------- */
 
 :root {
     --tn-radius:14px;
@@ -9824,6 +9824,14 @@ function restaurantPos() {
                     this.lastTotal = Math.round(savedTotal || data.total_amount || 0); this.lastPaymentMethod = method;
                     this.lastPraNumber = data.pra_invoice_number || ''; this.lastPraStatus = data.pra_status || '';
                     this.lastWaiterName = (this.incomingOrderInfo && this.incomingOrderInfo.waiter) ? this.incomingOrderInfo.waiter : ((heldOrd && heldOrd.waiter) ? heldOrd.waiter : '');
+                    // Task 921: clear the claimed-waiter state once its order is paid so the NEXT
+                    // non-waiter sale does not inherit a stale incomingOrderInfo.waiter.
+                    // (payHeldOrderDirect never calls clearCart(), so without this the global
+                    //  incomingOrderInfo stays set and bleeds the waiter name into the popup.)
+                    if (this.incomingOrderId && this.incomingOrderId === orderId) {
+                        this.incomingOrderId = null;
+                        this.incomingOrderInfo = null;
+                    }
                     this.lastItemsCount = (this.cart || []).reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
                     this.lastSaleAt = Date.now();
                     this.showReceipt = true;

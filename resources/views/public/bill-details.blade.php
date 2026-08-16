@@ -62,6 +62,35 @@
     @endif
     <div class="meta">{{ __('pos.receipt_date') }}: {{ $transaction->created_at->format('d/m/Y h:i A') }}</div>
 
+    {{-- Table name (Task 814): dine-in bills show which table the order was for,
+         matching the printed receipt. Takeaway / delivery / retail: no row.
+         Schema-guarded per PROD drift convention. --}}
+    @php
+        $pageTableLabel = null;
+        if (($transaction->order_type ?? null) === 'dine_in') {
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('restaurant_orders', 'table_id')) {
+                    $pageTableRO = \App\Models\RestaurantOrder::where('company_id', $transaction->company_id)
+                        ->where('pos_transaction_id', $transaction->id)
+                        ->with('table.floor')
+                        ->orderByDesc('id')
+                        ->first();
+                    if ($pageTableRO && $pageTableRO->table) {
+                        $pageTableLabel = 'T-' . $pageTableRO->table->table_number;
+                        if ($pageTableRO->table->floor && $pageTableRO->table->floor->name) {
+                            $pageTableLabel .= ' — ' . $pageTableRO->table->floor->name;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                $pageTableLabel = null;
+            }
+        }
+    @endphp
+    @if($pageTableLabel)
+    <div class="meta" style="font-weight:700; color:#111827;">{{ __('pos.receipt_table') }}: {{ $pageTableLabel }}</div>
+    @endif
+
     <table>
         <tr>
             <th>{{ __('pos.receipt_item') }}</th>

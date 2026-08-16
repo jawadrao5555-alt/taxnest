@@ -91,6 +91,22 @@
     <div class="meta" style="font-weight:700; color:#111827;">{{ __('pos.receipt_table') }}: {{ $pageTableLabel }}</div>
     @endif
 
+    {{-- Order type badge (Task 826): Dine-In / Take Away / Delivery.
+         Mirrors the bold badge on the printed receipt. Retail bills (no order_type) skip. --}}
+    @php
+        $pageOrderType = match ($transaction->order_type ?? null) {
+            'dine_in'  => 'DINE-IN',
+            'takeaway' => 'TAKE AWAY',
+            'delivery' => 'DELIVERY',
+            default    => null,
+        };
+    @endphp
+    @if($pageOrderType)
+    <div style="text-align:center; margin: 6px 0 10px;">
+        <span style="display:inline-block; border:1.5px solid #374151; border-radius:4px; padding:2px 12px; font-size:11px; font-weight:800; letter-spacing:1.2px; color:#111827;">{{ $pageOrderType }}</span>
+    </div>
+    @endif
+
     <table>
         <tr>
             <th>{{ __('pos.receipt_item') }}</th>

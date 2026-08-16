@@ -619,4 +619,90 @@ class PosDeliveriesStreamScopeTest extends TestCase
         $this->assertTrue($invoiceNumbers->contains($localInv), 'admin should see local final');
         $this->assertTrue($invoiceNumbers->contains($praInv),   'admin should see PRA final');
     }
+
+    /**
+     * Task 815 — UNASSIGNED finals (rider_id NULL, Task 513's 7-day branch) ride
+     * the SAME $finalBills query, so the Task 807 stream predicate must hide
+     * cross-stream unassigned delivery bills too. Locked here because no test
+     * covered the unassigned branch × scope combination.
+     */
+    public function test_api_unassigned_final_deliveries_hidden_for_cross_stream_staff(): void
+    {
+        $cid = $this->buildSchema();
+
+        $seedUnassigned = function (array $attrs): void {
+            DB::table('pos_transactions')->insert(array_merge([
+                'company_id'          => $attrs['company_id'],
+                'business_date'       => now()->toDateString(),
+                'status'              => 'completed',
+                'is_archived'         => false,
+                'order_type'          => 'delivery',
+                // Task 513 unassigned shape: no rider, no status, unsettled,
+                // created inside the 7-day window.
+                'rider_id'            => null,
+                'rider_assigned_at'   => null,
+                'delivery_status'     => null,
+                'rider_settlement_id' => null,
+                'payment_method'      => 'cash',
+                'total_amount'        => 300.00,
+                'subtotal'            => 300.00,
+                'created_at'          => now()->subDay(),
+                'updated_at'          => now()->subDay(),
+            ], $attrs));
+        };
+
+        // Unassigned PRA final (full PRA trail).
+        $praInv = 'INV-UNASSIGNED-PRA-T815';
+        $seedUnassigned([
+            'company_id'         => $cid,
+            'invoice_number'     => $praInv,
+            'invoice_mode'       => 'pra',
+            'pra_status'         => 'completed',
+            'pra_invoice_number' => 'PRAU-' . rand(10000, 99999),
+        ]);
+
+        // Unassigned LOCAL-stream final — reporting-OFF shape (invoice_mode='pra',
+        // NULL pra trail), the real-world local final; passes the provisional
+        // whereNot because invoice_mode != 'local'.
+        $localInv = 'INV-UNASSIGNED-LOCAL-T815';
+        $seedUnassigned([
+            'company_id'         => $cid,
+            'invoice_number'     => $localInv,
+            'invoice_mode'       => 'pra',
+            'pra_status'         => null,
+            'pra_invoice_number' => null,
+        ]);
+
+        $localCashier = $this->makeUser($cid, 'pos_cashier', 'local');
+        $praCashier   = $this->makeUser($cid, 'pos_cashier', 'pra');
+        $admin        = $this->makeUser($cid, 'pos_admin');
+
+        // Local-scoped staff: local unassigned visible, PRA unassigned hidden.
+        $res = $this->actingAs($localCashier, 'pos')
+            ->get('/pos/api/provisional-bills')
+            ->assertOk();
+        $invoiceNumbers = collect($res->json('final_deliveries'))->pluck('invoice_number');
+        $this->assertTrue($invoiceNumbers->contains($localInv),
+            'local-scoped staff should see the local unassigned delivery bill in the popup');
+        $this->assertFalse($invoiceNumbers->contains($praInv),
+            'local-scoped staff must NOT see the PRA unassigned delivery bill in the popup');
+
+        // PRA-scoped staff: PRA unassigned visible, local unassigned hidden.
+        $res = $this->actingAs($praCashier, 'pos')
+            ->get('/pos/api/provisional-bills')
+            ->assertOk();
+        $invoiceNumbers = collect($res->json('final_deliveries'))->pluck('invoice_number');
+        $this->assertFalse($invoiceNumbers->contains($localInv),
+            'pra-scoped staff must NOT see the local unassigned delivery bill in the popup');
+        $this->assertTrue($invoiceNumbers->contains($praInv),
+            'pra-scoped staff should see the PRA unassigned delivery bill in the popup');
+
+        // Admin ('both'): both unassigned bills visible — nothing stranded.
+        $res = $this->actingAs($admin, 'pos')
+            ->get('/pos/api/provisional-bills')
+            ->assertOk();
+        $invoiceNumbers = collect($res->json('final_deliveries'))->pluck('invoice_number');
+        $this->assertTrue($invoiceNumbers->contains($localInv), 'admin should see the local unassigned bill');
+        $this->assertTrue($invoiceNumbers->contains($praInv),   'admin should see the PRA unassigned bill');
+    }
 }

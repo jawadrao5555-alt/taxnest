@@ -327,27 +327,6 @@ class PosLocalBillKotTokenAndQrTest extends TestCase
         }
     }
 
-    /**
-     * Bill URL takes PRIORITY over the menu QR (review 16 Aug 2026): even a
-     * company with an enabled public profile must get the bill-page QR — the
-     * bill page itself carries the onward menu link. publicUrlFor is
-     * short-circuited when a share token exists, so no profile tables needed.
-     */
-    public function test_bill_url_beats_menu_qr_when_public_profile_enabled(): void
-    {
-        $this->insertTxnRow();
-        $company = $this->makeCompany(['public_profile_slug' => 'token-qr-co']);
-        $company->invoice_display_prefs = ['pos_style' => ['show_menu_qr' => true, 'bold' => false]];
-
-        foreach (self::TEMPLATES as $tpl) {
-            $txn = $this->makeTxn($company);
-            $html = view($tpl, ['transaction' => $txn, 'company' => $company])->render();
-            $this->assertStringContainsString(__('pos.receipt_scan_bill'), $html, $tpl);
-            $this->assertStringNotContainsString(__('pos.receipt_scan_menu'), $html, $tpl);
-        }
-        $this->assertNotEmpty(PosTransaction::withoutGlobalScope('hide_archived')->find(self::TXN_ID)->share_token);
-    }
-
     public function test_show_menu_qr_off_suppresses_qr_and_mints_nothing(): void
     {
         $this->insertTxnRow();

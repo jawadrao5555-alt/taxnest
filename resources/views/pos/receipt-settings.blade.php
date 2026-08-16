@@ -68,6 +68,11 @@
     <div class="lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start" x-data='rcptThemePicker({!! $rcptThemeCfg !!})'>
     <form method="POST" action="{{ route('pos.receipt-settings') }}" class="space-y-6 lg:col-span-3" id="rcptSettingsForm">
         @csrf
+        {{-- Marker: tells the handler this form was freshly rendered, so it may safely
+             write checkbox-based pos_style keys (show_logo, logo_finals_only,
+             show_menu_qr, pdf_paper). A stale cached form that lacks this marker
+             leaves those keys untouched — mirrors rp_verify_present on the FBR page. --}}
+        <input type="hidden" name="rp_pos_style_present" value="1">
 
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md overflow-hidden">
             {{-- Tab switcher --}}

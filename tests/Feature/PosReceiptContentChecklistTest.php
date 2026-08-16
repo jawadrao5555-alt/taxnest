@@ -393,12 +393,16 @@ class PosReceiptContentChecklistTest extends TestCase
         );
         app()->instance('currentCompanyId', $this->companyId);
 
-        // Only rp_show_menu_qr present — rp_show_logo absent = unchecked
+        // Only rp_show_menu_qr present — rp_show_logo absent = unchecked.
+        // rp_pos_style_present must be present so the handler knows this is a
+        // fresh form submission (not a stale/cached form) and writes the checkbox
+        // keys from the form instead of preserving the stored values.
         $this->post('/pos/receipt-settings', [
-            '_token'          => csrf_token(),
-            'rp_show_menu_qr' => '1',
-            'rp_style_bold'   => '1',
-            'rp_logo_style'   => 'center',
+            '_token'               => csrf_token(),
+            'rp_pos_style_present' => '1',
+            'rp_show_menu_qr'      => '1',
+            'rp_style_bold'        => '1',
+            'rp_logo_style'        => 'center',
         ]);
 
         $prefs = json_decode(
@@ -418,10 +422,11 @@ class PosReceiptContentChecklistTest extends TestCase
         app()->instance('currentCompanyId', $this->companyId);
 
         $this->post('/pos/receipt-settings', [
-            '_token'        => csrf_token(),
-            'rp_show_logo'  => '1',
-            'rp_style_bold' => '1',
-            'rp_logo_style' => 'center',
+            '_token'               => csrf_token(),
+            'rp_pos_style_present' => '1',
+            'rp_show_logo'         => '1',
+            'rp_style_bold'        => '1',
+            'rp_logo_style'        => 'center',
         ]);
 
         $prefs = json_decode(

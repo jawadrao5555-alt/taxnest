@@ -237,13 +237,14 @@ class PosReceiptStyleGuardTest extends TestCase
 
         $resp = $this->actingAs(User::find($this->posAdminId), 'pos')
             ->post('/pos/receipt-settings', [
-                'rp_style_bold' => '1',
-                'rp_logo_style' => 'center',
-                'rp_pdf_paper' => 'thermal',
-                'rp_show_logo' => '1',
-                'rp_logo_finals_only' => '1',
-                'rp_show_menu_qr' => '1',
-                'rp_show_tax' => '1',
+                'rp_pos_style_present' => '1',   // fresh-form marker required for checkbox keys
+                'rp_style_bold'        => '1',
+                'rp_logo_style'        => 'center',
+                'rp_pdf_paper'         => 'thermal',
+                'rp_show_logo'         => '1',
+                'rp_logo_finals_only'  => '1',
+                'rp_show_menu_qr'      => '1',
+                'rp_show_tax'          => '1',
             ]);
         $resp->assertRedirect();
 
@@ -266,9 +267,12 @@ class PosReceiptStyleGuardTest extends TestCase
 
     public function test_pra_receipt_settings_blade_renders_every_style_control(): void
     {
-        // The "absence = deliberate OFF" semantics of the PRA rebuild are only
-        // safe because the form ALWAYS renders every style control.
-        // Task 712: bold/logo are now submitted as a named theme (rp_receipt_theme);
+        // Checkbox-based pos_style keys (show_logo, show_menu_qr, logo_finals_only,
+        // pdf_paper) are only written by the controller when rp_pos_style_present is
+        // in the request — meaning the form was freshly rendered, not stale/cached.
+        // The form MUST always render every style control AND the hidden marker so
+        // that a fresh save can always express the user's current intent.
+        // Task 712: bold/logo are submitted as a named theme (rp_receipt_theme);
         // the legacy rp_style_bold/rp_logo_style fields left the blade but the
         // controller still accepts them (old cached forms). The theme input is
         // rendered by the shared cards partial included inside the form.
@@ -279,8 +283,8 @@ class PosReceiptStyleGuardTest extends TestCase
             $blade,
             'receipt-settings form must include the theme cards partial'
         );
-        foreach (['rp_receipt_theme', 'rp_pdf_paper', 'rp_show_logo',
-                  'rp_logo_finals_only', 'rp_show_menu_qr'] as $field) {
+        foreach (['rp_pos_style_present', 'rp_receipt_theme', 'rp_pdf_paper',
+                  'rp_show_logo', 'rp_logo_finals_only', 'rp_show_menu_qr'] as $field) {
             $this->assertStringContainsString($field, $blade, "receipt-settings form must render {$field}");
         }
     }

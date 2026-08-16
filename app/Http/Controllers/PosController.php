@@ -292,23 +292,44 @@ class PosController extends Controller
                     'logo' => ($curStyle['logo'] ?? 'center') === 'side' ? 'side' : 'center',
                 ];
             }
+            // bold/logo: always read-modify-write via posReceiptStyle() so a bare/stale
+            // POST never silently resets them (e.g. theme-picker not in old cached form).
             $prefs['pos_style'] = [
                 'bold' => $styleBoldLogo['bold'],
                 'logo' => $styleBoldLogo['logo'],
+            ];
+            // Checkbox-based pos_style keys (show_logo, logo_finals_only, show_menu_qr)
+            // and pdf_paper are only written when rp_pos_style_present is in the request,
+            // meaning the form was freshly rendered and the user's intent is known.
+            // A stale/cached form without the marker must never silently reset these to
+            // their unchecked defaults — mirrors the rp_verify_present guard on the FBR page.
+            if ($request->has('rp_pos_style_present')) {
                 // PDF Download Paper (customer video Jul 2026): 'thermal' = exact
                 // roll-width PDF page (default); 'a4' = real A4 page, receipt strip
                 // top-left — fixes right-shifted/clipped prints on office printers.
-                'pdf_paper' => $request->input('rp_pdf_paper') === 'a4' ? 'a4' : 'thermal',
+                $prefs['pos_style']['pdf_paper'] = $request->input('rp_pdf_paper') === 'a4' ? 'a4' : 'thermal';
                 // show_logo (Task #292): master logo toggle. Default ON (checkbox
                 // present = on; absent = off). When off, logo never prints on any receipt.
-                'show_logo' => $request->has('rp_show_logo'),
+                $prefs['pos_style']['show_logo'] = $request->has('rp_show_logo');
                 // Logo on finals only: sub-option under show_logo — when ON, logo prints
                 // only on final/PRA bills; suppressed on local/provisional bills.
-                'logo_finals_only' => $request->has('rp_logo_finals_only'),
+                $prefs['pos_style']['logo_finals_only'] = $request->has('rp_logo_finals_only');
                 // show_menu_qr (Task #292): master QR toggle. When off, neither the
                 // Menu QR nor the invoice JSON fallback QR prints. PRA fiscal QR unaffected.
-                'show_menu_qr' => $request->has('rp_show_menu_qr'),
-            ];
+                $prefs['pos_style']['show_menu_qr'] = $request->has('rp_show_menu_qr');
+            } else {
+                // Stale form — preserve whatever is currently stored.
+                // $curStyle does not carry pdf_paper (posReceiptStyle() omits it) and
+                // $prefs['pos_style'] has already been overwritten with just bold+logo,
+                // so read pdf_paper directly from the company's persisted prefs.
+                $origPrefsStyle = $company->invoice_display_prefs ?? [];
+                $origStyle = is_array($origPrefsStyle['pos_style'] ?? null)
+                    ? $origPrefsStyle['pos_style'] : [];
+                $prefs['pos_style']['pdf_paper']        = $origStyle['pdf_paper']       ?? 'thermal';
+                $prefs['pos_style']['show_logo']        = $curStyle['show_logo']         ?? true;
+                $prefs['pos_style']['logo_finals_only'] = $curStyle['logo_finals_only']  ?? false;
+                $prefs['pos_style']['show_menu_qr']     = $curStyle['show_menu_qr']      ?? true;
+            }
             $companyUpdates = [
                 'invoice_display_prefs' => $prefs,
                 // Owner decision (Jul 2026): tax display toggle lives HERE (receipt

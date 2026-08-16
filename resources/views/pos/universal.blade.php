@@ -6981,6 +6981,19 @@ function restaurantPos() {
             // single-winner invariant barqarar. Agar table-status mein order abhi
             // nahi aya (poll lag) to purana direct-claim path hi chalta hai.
             const inc = this.incomingForTable(table);
+            // Task 1026: cart mein USI table ka recalled/claimed order khula ho
+            // to us table par click = editing RESUME — sirf picker band, koi
+            // warning nahi, dobara claim nahi (order pehle se cart mein hai).
+            // Match order-id se (occupied tile ka table.order YA purple tile ka
+            // inc), aur fallback table-id se (recall ne selectedTable set kiya
+            // hota hai) taa-ke stale table-status poll bhi dead-end na banaye.
+            // Number() dono taraf — live PDO ids ko STRING deta hai.
+            const cartOrderId = this.recalledOrderId || this.incomingOrderId;
+            if (cartOrderId && (
+                (table.order && Number(table.order.id) === Number(cartOrderId)) ||
+                (inc && Number(inc.id) === Number(cartOrderId)) ||
+                (this.selectedTable && Number(this.selectedTable.id) === Number(table.id))
+            )) { this.showTablePicker = false; return; }
             if (inc) {
                 if (table.order) {
                     // Task 867 (Aug 2026): table-status poll stale ho sakta hai — table.order

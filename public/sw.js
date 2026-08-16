@@ -10,8 +10,8 @@ const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 // (per-user data is baked into the HTML — audit rule, July 2026).
 const SALE_CACHE = `${CACHE_VERSION}-sale`;
 // OFFLINE-FIRST TABLES BOARD (Task 819, Aug 2026): dedicated cache for
-// /pos/restaurant/tables — cache-first + background revalidate, same pattern
-// as SALE_CACHE. Tables-first shops navigate here after every KOT/payment;
+// /pos/restaurant/tables — network-first, offline fallback to last snapshot.
+// Tables-first shops navigate here after every KOT/payment;
 // cache lets the board open even with no internet (last-known snapshot).
 // Purged on logout so the next staff member never sees stale table statuses.
 const TABLES_CACHE = `${CACHE_VERSION}-tables`;
@@ -69,7 +69,10 @@ self.addEventListener('fetch', e => {
     // starting a session — drop the cached sale screen, it bakes per-user data
     // (PRA toggle, role gates, discount limit, grid prefs).
     if (req.method === 'POST' && url.pathname.includes('/login')) {
-        e.waitUntil(caches.delete(SALE_CACHE));
+        // Tables board bakes per-session data — must be purged
+        // alongside the sale screen on user-switch so a new login never sees the
+        // previous session's table snapshot (cross-user exposure on shared terminals).
+        e.waitUntil(Promise.all([caches.delete(SALE_CACHE), caches.delete(TABLES_CACHE)]));
         return;
     }
 
@@ -102,27 +105,25 @@ self.addEventListener('fetch', e => {
         return;
     }
 
-    // OFFLINE-FIRST TABLES BOARD (Task 819): exact match on /pos/restaurant/tables
-    // (no query string). Cache-first + background revalidate — identical pattern to
-    // the sale screen above. Page bakes live table statuses; offline shows the last-
-    // known snapshot and auto-reloads when connectivity returns (handled in tables.blade).
+    // TABLES BOARD (Task 819): exact match on /pos/restaurant/tables (no query string).
+    // Network-FIRST: table statuses must always be fresh after every KOT/payment
+    // transition — cache-first would return stale status on the very navigation this
+    // flow triggers. Cache is updated on every successful network response so that an
+    // offline fallback exists; on fetch failure serve the last snapshot (with the
+    // auto-reload banner handled inside tables.blade).
     if (req.mode === 'navigate' && url.pathname === '/pos/restaurant/tables' && url.search === '') {
         e.respondWith((async () => {
             const c = await caches.open(TABLES_CACHE);
-            const cached = await c.match(req);
-            const network = fetch(req).then(res => {
+            try {
+                const res = await fetch(req);
                 const ct = res.headers.get('content-type') || '';
                 if (res.ok && !res.redirected && ct.includes('text/html')) {
                     c.put(req, res.clone());
                 }
                 return res;
-            });
-            if (cached) {
-                network.catch(() => {}); // background revalidate
-                return cached;
-            }
-            try { return await network; } catch (err) {
-                return (await caches.match(OFFLINE_PAGE)) || Response.error();
+            } catch (err) {
+                // Offline: serve last-known snapshot; tables.blade auto-reloads on reconnect.
+                return (await c.match(req)) || (await caches.match(OFFLINE_PAGE)) || Response.error();
             }
         })());
         return;

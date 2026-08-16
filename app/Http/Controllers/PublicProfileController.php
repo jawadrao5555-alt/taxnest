@@ -62,7 +62,7 @@ class PublicProfileController extends Controller
         return url('/menu/' . $company->public_profile_slug);
     }
 
-    // ============================== PUBLIC ==============================
+    // ------------------------------ PUBLIC ------------------------------
 
     public function show(string $slug)
     {
@@ -197,7 +197,7 @@ class PublicProfileController extends Controller
             ->header('X-Robots-Tag', 'noindex');
     }
 
-    // ============================== ADMIN ==============================
+    // ------------------------------ ADMIN ------------------------------
 
     private function adminGate(Request $request): array
     {

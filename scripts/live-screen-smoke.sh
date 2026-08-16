@@ -157,6 +157,7 @@ fi
 say "/pos/invoice/create — print-confirm setting baked into sale screen"
 if fetch "/pos/invoice/create"; then
   require "/pos/invoice/create" "printConfirmAsk state" 'printConfirmAsk'
+  require "/pos/invoice/create" "tablesFirstFlow flag (Task 779)" 'tablesFirstFlow'
 fi
 
 say "/pos/day-close — auto-close toggle + X-Report card (deterministic, Task 731)"

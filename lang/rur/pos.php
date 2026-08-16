@@ -2618,7 +2618,7 @@ Report hone ke baad, bill lock ho jayega — mazeed edit ya delete nahi hoga. Ja
     'print_receipt' => 'Print Receipt',
     'print_receipt_on_pay' => 'Payment par Receipt print karein',
     'print_receipt_on_pay_hint' => 'Payment ke baad customer receipt khud-ba-khud print karein',
-    'print_confirm_ask_hint' => 'ON hone par har bill ke foran baad ek chhota Haan/Nahi box aata hai — seedha print nahi hota. Enter = Haan, Tab se badlein, Esc = Nahi. Sirf payment par bill aur KOT ki auto-print par asar hota hai.',
+    'print_confirm_ask_hint' => 'ON hone par har bill ke foran baad ek chhota Haan/Nahi box aata hai — seedha print nahi hota. Enter = Haan, Tab se badlein, Esc = Nahi. "Nahi" sirf customer bill rokta hai — kitchen ticket (KOT) hamesha ki tarah print hoti hai.',
     'print_confirm_ask_label' => 'Print se pehle poochein (Haan/Nahi)',
     'print_confirm_keys_hint' => 'Enter = Haan · Tab = badlein · Esc = Nahi',
     'print_confirm_no' => 'Nahi',

@@ -4421,6 +4421,9 @@ function restaurantPos() {
         showPrintConfirm: false,
         printConfirmChoice: 'yes',
         printConfirmAction: null,
+        // Task 1025: "No" ka apna pending action — receipt skip par bhi KOT
+        // apne mojooda gates se guzar kar fire ho (No sirf CUSTOMER BILL rokta hai).
+        printConfirmNoAction: null,
         // Receipt popup auto-close (owner, 23 Jul 2026 — re-enabled after being persistent-only):
         // popup closes itself after N seconds (companies.pos_receipt_autoclose_seconds,
         // NULL = 10s default, 0 = never). Hover PAUSES the countdown; any click/keypress
@@ -4448,6 +4451,11 @@ function restaurantPos() {
         // "Payment pehle, KOT baad": promoted delivery bill ki txn-KOT id — receipt
         // popup ka K button/shortcut is se manual reprint kar sakta hai (recovery path).
         lastTxnKotId: null,
+        // Task 1025: PAID bill ki order type ka SNAPSHOT (payment-success par set,
+        // cart/state reset se pehle — kabhi live widget se na parhna). Tables-first
+        // wapsi (returnToTablesAfterReceipt) sirf dine_in snapshot par chalti hai;
+        // takeaway/delivery cashier ko sale screen par hi rakhte hain.
+        lastOrderType: null,
         lastTotal: 0,
         lastPaymentMethod: '',
         // Success-popup extras: item count + sale timestamp + PRA copy state.
@@ -5052,6 +5060,7 @@ function restaurantPos() {
             this.lastInvoiceNumber = 'OFFLINE-' + uuid.slice(0, 8).toUpperCase();
             this.lastTransactionId = null;
             this.lastOrderId = null;
+            this.lastOrderType = this.orderType || null; // Task 1025: snapshot before clearCart
             this.lastTotal = rec.total;
             this.lastPaymentMethod = method;
             this.lastPraNumber = '';
@@ -8713,6 +8722,9 @@ function restaurantPos() {
                 // the receipt popup's KOT button can reprint the full kitchen ticket.
                 this.lastOrderId = this.incomingOrderId || null;
                 this.lastTxnKotId = null; // fresh sale — purani promoted-KOT id clear
+                // Task 1025: paid bill ki order type ka snapshot — clearCart/reset ke
+                // baad tables-first wapsi isi se faisla karti hai (live widget se nahi).
+                this.lastOrderType = this.orderType || null;
                 this.lastTotal = Math.round(savedTotal || data.total_amount || 0);
                 this.lastPaymentMethod = method;
                 this.lastPraNumber = data.pra_invoice_number || '';
@@ -8859,6 +8871,12 @@ function restaurantPos() {
         // mein hai; offline par bhi cached snapshot milta hai.
         returnToTablesAfterReceipt() {
             if (!this.tablesFirstFlow || !this.tableBoardEnabled) return false;
+            // Task 1025 (owner video): Tables par wapsi SIRF dine-in bill ke baad —
+            // takeaway/delivery counter sale ka cashier sale screen par hi rehta
+            // hai (agla order lena hai, Tables board ka kaam nahi). lastOrderType
+            // payment-success par frozen snapshot hai (live widget kabhi nahi).
+            // Dine-in Hold/KOT wali navigateToTablesWhenIdle is gate se AZAAD hai.
+            if (this.lastOrderType !== 'dine_in') return false;
             if (this.tablesReturnPending) return true; // pehle se raste mein
             this.tablesReturnPending = true;
             const finish = () => { this.showReceipt = false; window.location.assign('/pos/restaurant/tables'); };
@@ -9293,21 +9311,30 @@ function restaurantPos() {
         // Yes-action pending rakho. Focus Yes button par setTimeout se jata hai
         // ($nextTick nahi): post-sale code customerPhoneInput ko $nextTick par
         // focus karta hai — dialog ka Yes USKE BAAD jeetna chahiye.
-        openPrintConfirm(onYes) {
+        openPrintConfirm(onYes, onNo = null) {
             this.printConfirmAction = onYes;
+            // Task 1025: optional "No" action — auto-print chain isse KOT-only
+            // re-entry deta hai (No = sirf customer bill skip, KOT phir bhi chale).
+            this.printConfirmNoAction = onNo;
             this.printConfirmChoice = 'yes';
             this.showPrintConfirm = true;
             setTimeout(() => { try { if (this.showPrintConfirm) this.$refs.printConfirmYes?.focus(); } catch (err) {} }, 50);
         },
         // resolvePrintConfirm: Yes → pending action (confirmed auto-print chain /
-        // offline receipt) bilkul mojooda timings ke saath. No → KUCH nahi khulta
-        // (na iframe, na popup, na silent job). Dono surat mein focus sale screen
-        // par wapas — shortcuts zinda rahen (iframe focus-recovery pattern).
+        // offline receipt) bilkul mojooda timings ke saath. No → sirf CUSTOMER
+        // RECEIPT skip: agar caller ne onNo diya hai (auto-print chain deta hai)
+        // to wahi chalta hai — KOT apne mojooda gates se phir bhi nikalti hai
+        // (Task 1025: takeaway/delivery counter sale par kitchen ko ticket chahiye,
+        // khana abhi paka nahi). onNo ke baghair (offline receipt path) No = kuch
+        // nahi khulta. Dono surat mein focus sale screen par wapas — shortcuts
+        // zinda rahen (iframe focus-recovery pattern).
         resolvePrintConfirm(yes) {
             if (!this.showPrintConfirm) return;
             const action = this.printConfirmAction;
+            const noAction = this.printConfirmNoAction;
             this.showPrintConfirm = false;
             this.printConfirmAction = null;
+            this.printConfirmNoAction = null;
             this.$nextTick(() => {
                 try {
                     const ae = document.activeElement;
@@ -9318,10 +9345,17 @@ function restaurantPos() {
             });
             if (yes && typeof action === 'function') {
                 action();
-            } else if (!yes && (this.silentBillPrint || this.silentKotPrint)) {
-                // Silent-print shops expect paper on every sale — record the
-                // deliberate "No" so a "bill never printed" report is diagnosable.
-                this.printBeacon('print-confirm-no', { transaction_id: this.lastTransactionId || '', order_id: this.lastOrderId || '' });
+                return;
+            }
+            if (!yes) {
+                if (this.silentBillPrint || this.silentKotPrint) {
+                    // Silent-print shops expect paper on every sale — record the
+                    // deliberate "No" so a "bill never printed" report is diagnosable.
+                    // (KOT may STILL print via noAction below — the beacon means
+                    // "cashier declined the customer bill", not "nothing printed".)
+                    this.printBeacon('print-confirm-no', { transaction_id: this.lastTransactionId || '', order_id: this.lastOrderId || '' });
+                }
+                if (typeof noAction === 'function') noAction();
             }
         },
         // Task 514: per-bill checkbox ka default — company setting ka mirror
@@ -9379,9 +9413,19 @@ function restaurantPos() {
             // Task 565: opt-in Yes/No confirm — kuch print hone WALA hai aur flag
             // ON hai to pehle poocho (dialog foran, koi delay nahi). Yes = YEHI
             // chain confirmed re-entry se chale — silent-first / iframe fallback /
-            // 150ms-80ms timings sab waisa ka waisa. No = receipt + KOT dono skip.
-            if (this.printConfirmAsk && !askConfirmed) {
-                this.openPrintConfirm(() => this.runAutoPrintChain(orderId, orderType, txnKotId, skipReceiptOverride, true));
+            // 150ms-80ms timings sab waisa ka waisa.
+            // Task 1025 (owner video, live shop): sawaal SIRF customer receipt ka
+            // hai — "No" par KOT apne mojooda gates (auto-KOT ON, not dine-in,
+            // KDS-suppress, order/txn id) se phir bhi fire hoti hai (skip-receipt
+            // re-entry), warna takeaway/delivery par kitchen ko ticket hi nahi
+            // milta tha. Receipt print honi hi nahi (wantsReceipt false — dine-in
+            // suppress / per-bill skip) to poochte bhi nahi: KOT-only chain seedha
+            // chalti hai, callbacks/idle signal kabhi stall nahi hote.
+            if (this.printConfirmAsk && !askConfirmed && wantsReceipt) {
+                this.openPrintConfirm(
+                    () => this.runAutoPrintChain(orderId, orderType, txnKotId, skipReceiptOverride, true),
+                    () => this.runAutoPrintChain(orderId, orderType, txnKotId, true, true),
+                );
                 return;
             }
             // Blind-spot beacon (review catch): KOT will print but NO receipt is
@@ -9820,6 +9864,8 @@ function restaurantPos() {
                     this.lastInvoiceNumber = data.invoice_number || bill.invoice_number || '';
                     this.lastTransactionId = data.id || bill.id;
                     this.lastOrderId = null; // provisional bills have no restaurant order
+                    this.lastOrderType = bill.order_type || null; // Task 1025: promote popup bhi bill ki apni type par
+
                     this.lastTotal = Math.round(parseFloat(data.total_amount ?? bill.total_amount) || 0);
                     this.lastPaymentMethod = method || bill.payment_method || 'cash';
                     this.lastPraNumber = data.pra_number || '';
@@ -10005,6 +10051,9 @@ function restaurantPos() {
             this.heldOrders = this.heldOrders.filter(o => o.id !== orderId);
             this.lastInvoiceNumber = data.invoice_number || ''; this.lastTransactionId = data.transaction_id || null;
             this.lastOrderId = orderId || null;
+            // Task 1025: paid bill ki order type ka snapshot (payOrderType pehle hi
+            // held-order/override se capture ho chuka) — tables-first wapsi ka gate.
+            this.lastOrderType = payOrderType || null;
             this.lastTotal = Math.round(savedTotal || data.total_amount || 0); this.lastPaymentMethod = method;
             this.lastPraNumber = data.pra_invoice_number || ''; this.lastPraStatus = data.pra_status || '';
             this.lastWaiterName = (this.incomingOrderInfo && this.incomingOrderInfo.waiter) ? this.incomingOrderInfo.waiter : ((heldOrd && heldOrd.waiter) ? heldOrd.waiter : '');

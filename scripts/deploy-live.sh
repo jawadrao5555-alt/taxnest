@@ -448,6 +448,10 @@ step "Preflight: silent print-order check (receipt enqueues before KOT, incl. pe
 node scripts/print-order-check.mjs \
   || fail "print-order check FAILED — silent fast path enqueues KOT before the receipt (invoice-first invariant); fix before deploying"
 
+step "Preflight: print-confirm check (\"No\" = receipt-only skip, KOT alive; tables return dine-in-only)"
+node scripts/print-confirm-check.mjs \
+  || fail "print-confirm check FAILED — the Yes/No print dialog or the tables-first return regressed (Task 1025); fix before deploying"
+
 step "Preflight: PWA refresh-button check (slow-install wait, no-update reload+toast, offline, timeout)"
 node scripts/pwa-refresh-check.mjs \
   || fail "pwa-refresh check FAILED — the header update icon click contract regressed (Task 706); fix before deploying"

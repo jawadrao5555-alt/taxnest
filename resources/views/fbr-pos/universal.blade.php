@@ -3199,6 +3199,9 @@ function restaurantPos() {
         showPrintConfirm: false,
         printConfirmChoice: 'yes',
         printConfirmAction: null,
+        // Task 1025 (port): "No" ka apna pending action — receipt skip par bhi
+        // KOT apne mojooda gates se fire ho (No sirf CUSTOMER BILL rokta hai).
+        printConfirmNoAction: null,
         // Task 520 (port of Task 514): Pay modal ka per-bill "Receipt print karein"
         // checkbox — default = billPrintDefault() (auto-print master ka mirror).
         payPrintReceipt: true,
@@ -6262,21 +6265,29 @@ function restaurantPos() {
         // openPrintConfirm: dialog foran (koi artificial delay nahi), Yes-action
         // pending. Focus setTimeout se ($nextTick nahi — post-sale code
         // customerPhoneInput ko $nextTick par focus karta hai, Yes baad mein jeete).
-        openPrintConfirm(onYes) {
+        openPrintConfirm(onYes, onNo = null) {
             this.printConfirmAction = onYes;
+            // Task 1025 (port): optional "No" action — auto-print chain isse
+            // KOT-only re-entry deta hai (No = sirf customer bill skip).
+            this.printConfirmNoAction = onNo;
             this.printConfirmChoice = 'yes';
             this.showPrintConfirm = true;
             setTimeout(() => { try { if (this.showPrintConfirm) this.$refs.printConfirmYes?.focus(); } catch (err) {} }, 50);
         },
         // resolvePrintConfirm: Yes → pending action (confirmed chain / offline
-        // receipt) mojooda timings ke saath. No → KUCH nahi khulta (FBR par
-        // silent branch nahi — iframe/popup hi skip hota hai). Focus wapas sale
-        // screen par taake shortcuts zinda rahen.
+        // receipt) mojooda timings ke saath. No → sirf CUSTOMER RECEIPT skip:
+        // caller ka onNo (auto-print chain deta hai) chalta hai — KOT apne
+        // mojooda gates se phir bhi nikalti hai (Task 1025 port: counter sale
+        // par kitchen ko ticket chahiye). onNo ke baghair (offline receipt path)
+        // No = kuch nahi khulta. Focus wapas sale screen par taake shortcuts
+        // zinda rahen.
         resolvePrintConfirm(yes) {
             if (!this.showPrintConfirm) return;
             const action = this.printConfirmAction;
+            const noAction = this.printConfirmNoAction;
             this.showPrintConfirm = false;
             this.printConfirmAction = null;
+            this.printConfirmNoAction = null;
             this.$nextTick(() => {
                 try {
                     const ae = document.activeElement;
@@ -6285,7 +6296,8 @@ function restaurantPos() {
                     this.$refs.customerPhoneInput?.focus();
                 } catch (err) {}
             });
-            if (yes && typeof action === 'function') action();
+            if (yes && typeof action === 'function') { action(); return; }
+            if (!yes && typeof noAction === 'function') noAction();
         },
         // Task 520 (port of Task 514): per-bill checkbox ka default — FBR POS par
         // auto-print master switch ka mirror (koi dine-in variant nahi).
@@ -6305,9 +6317,16 @@ function restaurantPos() {
             // Task 565: opt-in Yes/No confirm — kuch print hone WALA hai aur flag
             // ON hai to pehle poocho (foran, koi delay nahi). Yes = YEHI chain
             // confirmed re-entry se (FBR par silent branch nahi — Yes seedha
-            // iframe chain, 150ms/80ms timings waisi hi). No = receipt+KOT skip.
-            if (this.printConfirmAsk && !askConfirmed) {
-                this.openPrintConfirm(() => this.runAutoPrintChain(orderId, isFbrHeld, skipReceiptOverride, true));
+            // iframe chain, 150ms/80ms timings waisi hi).
+            // Task 1025 (port): sawaal SIRF customer receipt ka hai — "No" par
+            // KOT apne mojooda gates se phir bhi fire hoti hai (skip-receipt
+            // re-entry). Receipt banti hi nahi (wantsReceipt false) to poochte
+            // bhi nahi — KOT-only chain seedha chalti hai.
+            if (this.printConfirmAsk && !askConfirmed && wantsReceipt) {
+                this.openPrintConfirm(
+                    () => this.runAutoPrintChain(orderId, isFbrHeld, skipReceiptOverride, true),
+                    () => this.runAutoPrintChain(orderId, isFbrHeld, true, true),
+                );
                 return;
             }
             // isFbrHeld distinguishes held-sale KOT (uses /fbr-pos/held/{id}/kitchen-ticket)

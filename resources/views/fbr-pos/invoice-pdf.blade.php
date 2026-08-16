@@ -249,6 +249,56 @@
             <div class="val">PKR {{ number_format($transaction->total_amount, 2) }}</div>
         </div>
 
+        {{-- Task 874: split-payment breakdown — mirrors the PRA thermal receipt
+             (Task 816). FBR POS stores the breakdown as a JSON column
+             (payment_breakdown) cast to array. Shown ONLY when ≥2 distinct rows
+             exist; single-method bills are unchanged.
+             Bucketing: cash → Cash; card / debit_card / credit_card → Card;
+             everything else → Other. --}}
+        @php
+            $fbrPdfPayBreakdown    = [];
+            $fbrPdfRawBreakdown    = is_array($transaction->payment_breakdown ?? null)
+                                        ? $transaction->payment_breakdown : [];
+            $fbrPdfShowBreakdown   = false;
+            try {
+                if (count($fbrPdfRawBreakdown) >= 2) {
+                    // Guard: show whenever ≥2 raw rows exist, even if all aliases
+                    // collapse into one display bucket (e.g. debit_card+credit_card
+                    // → one Card row). Mirrors PRA receipt_80mm / receipt_58mm.
+                    $fbrPdfShowBreakdown = true;
+                    $fbrPdfCardAliases   = ['card', 'debit_card', 'credit_card'];
+                    $fbrPdfGrouped       = [];
+                    foreach ($fbrPdfRawBreakdown as $fbrPdfRow) {
+                        $fbrPdfMethod = strtolower((string) ($fbrPdfRow['method'] ?? ''));
+                        $fbrPdfBucket = $fbrPdfMethod === 'cash' ? 'cash'
+                            : (in_array($fbrPdfMethod, $fbrPdfCardAliases, true) ? 'card' : 'other:' . $fbrPdfMethod);
+                        $fbrPdfGrouped[$fbrPdfBucket] = ($fbrPdfGrouped[$fbrPdfBucket] ?? 0) + (float) ($fbrPdfRow['amount'] ?? 0);
+                    }
+                    foreach ($fbrPdfGrouped as $fbrPdfBucket => $fbrPdfAmount) {
+                        $fbrPdfPayBreakdown[] = [
+                            'label'  => $fbrPdfBucket === 'cash' ? __('pos.receipt_pay_cash')
+                                : ($fbrPdfBucket === 'card' ? __('pos.receipt_pay_card') : __('pos.receipt_pay_other')),
+                            'amount' => $fbrPdfAmount,
+                        ];
+                    }
+                }
+            } catch (\Throwable $e) {
+                $fbrPdfPayBreakdown  = [];
+                $fbrPdfShowBreakdown = false;
+            }
+        @endphp
+        @if($fbrPdfShowBreakdown && count($fbrPdfPayBreakdown) >= 1)
+        <div style="border-top: 1px solid #9ca3af; padding: 6px 0; margin: 6px 0 4px;">
+            <div class="section-label" style="margin-bottom:4px;">{{ __('pos.payment_breakdown') }}</div>
+            @foreach($fbrPdfPayBreakdown as $fbrPdfLine)
+            <div class="total-row">
+                <div class="lbl">{{ $fbrPdfLine['label'] }}:</div>
+                <div class="val">PKR {{ number_format($fbrPdfLine['amount'], 2) }}</div>
+            </div>
+            @endforeach
+        </div>
+        @endif
+
         {{-- Owner (6 Aug 2026): QR box saaf — sirf FBR invoice number + Tax Asaan
              verify line (QR PDF mein pehle se alag block mein hai jahan lagta hai).
              POS invoice / POS Reg # yahan se hataye (Reg # footer mein maujood). --}}
